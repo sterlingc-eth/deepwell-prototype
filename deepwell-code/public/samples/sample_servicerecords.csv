@@ -1,0 +1,11 @@
+Date,Technician,Customer,Equipment Serial,Work Type,Duration (Hours),Cost,Status,Notes
+2024-09-05,Maria Elena Garcia,Johnson Residence,SN-LEN-987654,Quarterly Maintenance,2.0,220.00,Approved,Filter replacement and coil cleaning
+2024-08-28,David Chen,Tech Solutions Inc.,SN-CAR-654321,Emergency Repair,3.5,450.00,Approved,Compressor replacement and system recharge
+2024-08-15,Carlos Rodriguez,Rodriguez Family,SN-RHE-445566,Annual Service,2.5,280.00,Approved,Full inspection and preventive maintenance
+2024-07-20,Maria Elena Garcia,Smith Residence,SN-CAR-654321,Installation,4.0,1200.00,Approved,New system installation and setup
+2024-07-10,David Chen,Martinez LLC,SN-TRN-112233,Repair Call,1.5,185.00,Approved,Thermostat replacement
+2024-06-30,Carlos Rodriguez,Johnson Enterprises,SN-YRK-778899,Maintenance,2.0,210.00,Approved,Seasonal checkup and cleaning
+2024-06-15,Maria Elena Garcia,Garcia Household,SN-LEN-556677,Repair,2.5,295.00,Approved,Capacitor replacement
+2024-06-01,David Chen,Wilson Properties,SN-RHE-998811,Inspection,1.0,125.00,Approved,Pre-lease inspection
+2024-05-20,Carlos Rodriguez,City Services,SN-CAR-334455,Emergency,3.0,425.00,Approved,Emergency refrigerant leak repair
+2024-05-10,Maria Elena Garcia,Miller Manufacturing,SN-TRN-445566,Commercial Service,4.5,680.00,Approved,Large unit quarterly maintenance

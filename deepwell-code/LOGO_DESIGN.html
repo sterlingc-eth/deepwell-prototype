@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepWell Logo</title>
+  <style>
+    body { margin: 0; padding: 40px; background: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 60px; max-width: 1200px; }
+    .item { }
+    .item h3 { color: #999; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 30px 0; font-weight: 500; }
+    svg { display: block; width: 200px; height: 200px; margin-bottom: 20px; }
+    .usage { color: #666; font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    <!-- Mark 1: Refrigerant Coil -->
+    <div class="item">
+      <h3>Refrigerant Coil (Primary)</h3>
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0A5F7F;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0A8FB3;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <!-- Coil loops -->
+        <path d="M 60 80 Q 70 60, 80 80 Q 90 100, 80 120 Q 70 140, 60 120" stroke="url(#grad1)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 100 70 Q 110 50, 120 70 Q 130 90, 120 110 Q 110 130, 100 110" stroke="url(#grad1)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 140 80 Q 150 60, 160 80 Q 170 100, 160 120 Q 150 140, 140 120" stroke="url(#grad1)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="usage"><strong>Usage:</strong> App icon, favicon, primary brand mark. Works at 32px+ scales. Represents cooling/efficiency.</div>
+    </div>
+
+    <!-- Mark 2: Thermometer + Well -->
+    <div class="item">
+      <h3>Thermometer + Well (Compact)</h3>
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="grad2" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#0A5F7F;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#D97706;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <!-- Well (bucket shape) -->
+        <path d="M 70 60 L 65 150 Q 65 160, 75 160 L 125 160 Q 135 160, 135 150 L 130 60 Z" stroke="#0A5F7F" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <line x1="70" y1="60" x2="130" y2="60" stroke="#0A5F7F" stroke-width="3" stroke-linecap="round"/>
+        
+        <!-- Thermometer inside -->
+        <rect x="90" y="75" width="20" height="65" rx="10" fill="url(#grad2)" opacity="0.8"/>
+        <circle cx="100" cy="155" r="8" fill="url(#grad2)"/>
+      </svg>
+      <div class="usage"><strong>Usage:</strong> Logo lockup variant, horizontal layouts. Shows heating + cooling duality.</div>
+    </div>
+
+    <!-- Mark 3: Minimal Wordmark -->
+    <div class="item">
+      <h3>Wordmark (Horizontal)</h3>
+      <svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- Icon -->
+        <circle cx="30" cy="50" r="24" fill="none" stroke="#0A5F7F" stroke-width="2.5"/>
+        <path d="M 20 40 L 30 50 L 40 45" fill="none" stroke="#0A5F7F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        <!-- Text -->
+        <text x="70" y="65" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#1a1a1a" letter-spacing="-1">DeepWell</text>
+      </svg>
+      <div class="usage"><strong>Usage:</strong> Website headers, documentation, business cards.</div>
+    </div>
+
+    <!-- Mark 4: Icon Only (Stacked) -->
+    <div class="item">
+      <h3>Icon Only (Stack Safe)</h3>
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Geometric well shape -->
+        <rect x="55" y="50" width="90" height="100" rx="8" fill="none" stroke="#0A5F7F" stroke-width="4"/>
+        <line x1="55" y1="75" x2="145" y2="75" stroke="#0A5F7F" stroke-width="3"/>
+        <line x1="55" y1="100" x2="145" y2="100" stroke="#0A5F7F" stroke-width="3" opacity="0.6"/>
+        <line x1="55" y1="125" x2="145" y2="125" stroke="#0A5F7F" stroke-width="3" opacity="0.4"/>
+        <!-- Center drop -->
+        <circle cx="100" cy="110" r="6" fill="#D97706"/>
+      </svg>
+      <div class="usage"><strong>Usage:</strong> Favicon (32×32), app icon, small contexts. Geometric, scalable.</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 80px; padding: 40px; background: #222; border-radius: 8px; color: #ccc;">
+    <h2 style="margin-top: 0; color: #fff;">Design Rationale</h2>
+    <ul style="line-height: 1.8; color: #aaa;">
+      <li><strong>Refrigerant Blue (#0A5F7F):</strong> Core HVAC identity—cooling systems, technical precision</li>
+      <li><strong>Heating Amber (#D97706):</strong> Secondary accent for heat/maintenance contexts</li>
+      <li><strong>Geometry:</strong> Coils, wells, and thermometer elements are instantly recognizable to contractors</li>
+      <li><strong>No AI signaling:</strong> Purely functional design—no gradients, no gradients, no decorative flourishes</li>
+      <li><strong>Scalable:</strong> Works from favicon (16px) to billboard (1000px+)</li>
+    </ul>
+  </div>
+</body>
+</html>

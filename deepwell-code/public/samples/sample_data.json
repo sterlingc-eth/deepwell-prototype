@@ -1,0 +1,392 @@
+{
+  "technicians": [
+    {
+      "id": "tech-001",
+      "name": "Maria Elena Garcia",
+      "email": "maria.garcia@hvac.com",
+      "phone": "602-555-0101",
+      "certifications": [
+        "Universal",
+        "EPA 608",
+        "Type II"
+      ],
+      "specialty": "Residential Cooling",
+      "yearsExperience": 12,
+      "customersServed": 156
+    },
+    {
+      "id": "tech-002",
+      "name": "David Chen",
+      "email": "david.chen@hvac.com",
+      "phone": "602-555-0102",
+      "certifications": [
+        "Universal",
+        "Type I"
+      ],
+      "specialty": "Commercial Systems",
+      "yearsExperience": 8,
+      "customersServed": 89
+    },
+    {
+      "id": "tech-003",
+      "name": "Carlos Rodriguez",
+      "email": "carlos.r@hvac.com",
+      "phone": "602-555-0103",
+      "certifications": [
+        "Universal",
+        "EPA 608"
+      ],
+      "specialty": "Heat Pumps",
+      "yearsExperience": 15,
+      "customersServed": 203
+    },
+    {
+      "id": "tech-004",
+      "name": "Jenny Wilson",
+      "email": "jenny.w@hvac.com",
+      "phone": "602-555-0104",
+      "certifications": [
+        "Universal",
+        "Type I",
+        "Type II"
+      ],
+      "specialty": "Ductwork & IAQ",
+      "yearsExperience": 9,
+      "customersServed": 112
+    },
+    {
+      "id": "tech-005",
+      "name": "Miguel Santos",
+      "email": "miguel.s@hvac.com",
+      "phone": "602-555-0105",
+      "certifications": [
+        "Universal",
+        "Type III"
+      ],
+      "specialty": "Industrial Units",
+      "yearsExperience": 11,
+      "customersServed": 87
+    },
+    {
+      "id": "tech-006",
+      "name": "Brian Thompson",
+      "email": "brian.t@hvac.com",
+      "phone": "602-555-0106",
+      "certifications": [
+        "Universal"
+      ],
+      "specialty": "Maintenance & Tune-ups",
+      "yearsExperience": 6,
+      "customersServed": 145
+    },
+    {
+      "id": "tech-007",
+      "name": "Andrea Martinez",
+      "email": "andrea.m@hvac.com",
+      "phone": "602-555-0107",
+      "certifications": [
+        "Universal",
+        "EPA 608",
+        "Type II"
+      ],
+      "specialty": "Commercial Retrofit",
+      "yearsExperience": 10,
+      "customersServed": 78
+    },
+    {
+      "id": "tech-008",
+      "name": "Kevin Patterson",
+      "email": "kevin.p@hvac.com",
+      "phone": "602-555-0108",
+      "certifications": [
+        "Universal",
+        "Type I"
+      ],
+      "specialty": "Furnace Installation",
+      "yearsExperience": 7,
+      "customersServed": 134
+    },
+    {
+      "id": "tech-009",
+      "name": "Rosa Hernandez",
+      "email": "rosa.h@hvac.com",
+      "phone": "602-555-0109",
+      "certifications": [
+        "Universal"
+      ],
+      "specialty": "Residential Service",
+      "yearsExperience": 5,
+      "customersServed": 98
+    },
+    {
+      "id": "tech-010",
+      "name": "Mark Johnson",
+      "email": "mark.j@hvac.com",
+      "phone": "602-555-0110",
+      "certifications": [
+        "Universal",
+        "Type I",
+        "Type II",
+        "Type III"
+      ],
+      "specialty": "Complex Systems",
+      "yearsExperience": 18,
+      "customersServed": 267
+    },
+    {
+      "id": "tech-011",
+      "name": "Lisa Wong",
+      "email": "lisa.w@hvac.com",
+      "phone": "602-555-0111",
+      "certifications": [
+        "Universal",
+        "EPA 608"
+      ],
+      "specialty": "Commercial HVAC",
+      "yearsExperience": 9,
+      "customersServed": 101
+    },
+    {
+      "id": "tech-012",
+      "name": "Josh Kennedy",
+      "email": "josh.k@hvac.com",
+      "phone": "602-555-0112",
+      "certifications": [
+        "Universal"
+      ],
+      "specialty": "Residential Sales",
+      "yearsExperience": 4,
+      "customersServed": 67
+    }
+  ],
+  "equipment": [
+    {
+      "id": "eq-001",
+      "serialNumber": "SN-LEN-987654",
+      "manufacturer": "Lennox",
+      "modelNumber": "XC21-046-230",
+      "equipmentType": "AC",
+      "installDate": "2021-06-15",
+      "warrantyExpiry": "2026-06-15",
+      "lastServiceDate": "2024-08-20"
+    },
+    {
+      "id": "eq-002",
+      "serialNumber": "SN-CAR-654321",
+      "manufacturer": "Carrier",
+      "modelNumber": "ACP-12024-2023",
+      "equipmentType": "Heat Pump",
+      "installDate": "2023-08-22",
+      "warrantyExpiry": "2027-08-22",
+      "lastServiceDate": "2024-09-01"
+    },
+    {
+      "id": "eq-003",
+      "serialNumber": "SN-RHE-445566",
+      "manufacturer": "Rheem",
+      "modelNumber": "RA1448AJ1NA",
+      "equipmentType": "Furnace",
+      "installDate": "2020-03-10",
+      "warrantyExpiry": "2025-03-10",
+      "lastServiceDate": "2024-07-15"
+    },
+    {
+      "id": "eq-004",
+      "serialNumber": "SN-TRN-112233",
+      "manufacturer": "Trane",
+      "modelNumber": "XR15",
+      "equipmentType": "AC",
+      "installDate": "2019-05-20",
+      "warrantyExpiry": "2024-05-20",
+      "lastServiceDate": "2024-08-05"
+    },
+    {
+      "id": "eq-005",
+      "serialNumber": "SN-YRK-778899",
+      "manufacturer": "York",
+      "modelNumber": "YVAA18S",
+      "equipmentType": "Heat Pump",
+      "installDate": "2022-11-08",
+      "warrantyExpiry": "2027-11-08",
+      "lastServiceDate": "2024-06-12"
+    },
+    {
+      "id": "eq-006",
+      "serialNumber": "SN-CAR-334455",
+      "manufacturer": "Carrier",
+      "modelNumber": "25VPA048A00",
+      "equipmentType": "Commercial Unit",
+      "installDate": "2018-02-14",
+      "warrantyExpiry": "2024-02-14",
+      "lastServiceDate": "2024-09-03"
+    },
+    {
+      "id": "eq-007",
+      "serialNumber": "SN-LEN-556677",
+      "manufacturer": "Lennox",
+      "modelNumber": "13HPH",
+      "equipmentType": "Heat Pump",
+      "installDate": "2021-09-30",
+      "warrantyExpiry": "2026-09-30",
+      "lastServiceDate": "2024-08-18"
+    },
+    {
+      "id": "eq-008",
+      "serialNumber": "SN-RHE-998811",
+      "manufacturer": "Rheem",
+      "modelNumber": "RG1024AJMSA",
+      "equipmentType": "Furnace",
+      "installDate": "2019-12-20",
+      "warrantyExpiry": "2024-12-20",
+      "lastServiceDate": "2024-07-22"
+    },
+    {
+      "id": "eq-009",
+      "serialNumber": "SN-TRN-223344",
+      "manufacturer": "Trane",
+      "modelNumber": "XV18",
+      "equipmentType": "AC",
+      "installDate": "2023-01-15",
+      "warrantyExpiry": "2028-01-15",
+      "lastServiceDate": "2024-08-30"
+    },
+    {
+      "id": "eq-010",
+      "serialNumber": "SN-YRK-445566",
+      "manufacturer": "York",
+      "modelNumber": "YHPH18S",
+      "equipmentType": "Heat Pump",
+      "installDate": "2020-07-10",
+      "warrantyExpiry": "2025-07-10",
+      "lastServiceDate": "2024-06-25"
+    }
+  ],
+  "properties": [
+    {
+      "id": "prop-001",
+      "address": "1234 Main Street",
+      "city": "Phoenix",
+      "state": "AZ",
+      "zipCode": "85001",
+      "customerName": "Smith Residence",
+      "propertyType": "residential",
+      "equipmentIds": [
+        "eq-001",
+        "eq-007"
+      ]
+    },
+    {
+      "id": "prop-002",
+      "address": "5678 Oak Avenue",
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zipCode": "85251",
+      "customerName": "Rodriguez Family",
+      "propertyType": "residential",
+      "equipmentIds": [
+        "eq-003"
+      ]
+    },
+    {
+      "id": "prop-003",
+      "address": "9012 Corporate Blvd",
+      "city": "Chandler",
+      "state": "AZ",
+      "zipCode": "85224",
+      "customerName": "Tech Solutions Inc.",
+      "propertyType": "commercial",
+      "equipmentIds": [
+        "eq-002",
+        "eq-006"
+      ]
+    },
+    {
+      "id": "prop-004",
+      "address": "3456 Desert Lane",
+      "city": "Mesa",
+      "state": "AZ",
+      "zipCode": "85201",
+      "customerName": "Martinez LLC",
+      "propertyType": "commercial",
+      "equipmentIds": [
+        "eq-004",
+        "eq-009"
+      ]
+    },
+    {
+      "id": "prop-005",
+      "address": "7890 Mountain View",
+      "city": "Tucson",
+      "state": "AZ",
+      "zipCode": "85701",
+      "customerName": "Johnson Enterprises",
+      "propertyType": "industrial",
+      "equipmentIds": [
+        "eq-005",
+        "eq-010"
+      ]
+    },
+    {
+      "id": "prop-006",
+      "address": "2468 Sunset Drive",
+      "city": "Phoenix",
+      "state": "AZ",
+      "zipCode": "85007",
+      "customerName": "Garcia Household",
+      "propertyType": "residential",
+      "equipmentIds": [
+        "eq-008"
+      ]
+    },
+    {
+      "id": "prop-007",
+      "address": "1357 Commerce Street",
+      "city": "Tempe",
+      "state": "AZ",
+      "zipCode": "85281",
+      "customerName": "City Services",
+      "propertyType": "commercial",
+      "equipmentIds": [
+        "eq-002"
+      ]
+    },
+    {
+      "id": "prop-008",
+      "address": "2468 Park Plaza",
+      "city": "Glendale",
+      "state": "AZ",
+      "zipCode": "85301",
+      "customerName": "Wilson Properties",
+      "propertyType": "residential",
+      "equipmentIds": [
+        "eq-004"
+      ]
+    },
+    {
+      "id": "prop-009",
+      "address": "3691 Industrial Way",
+      "city": "Phoenix",
+      "state": "AZ",
+      "zipCode": "85034",
+      "customerName": "Manufacturing Corp",
+      "propertyType": "industrial",
+      "equipmentIds": [
+        "eq-006"
+      ]
+    },
+    {
+      "id": "prop-010",
+      "address": "5234 Residential Dr",
+      "city": "Chandler",
+      "state": "AZ",
+      "zipCode": "85225",
+      "customerName": "Miller Residence",
+      "propertyType": "residential",
+      "equipmentIds": [
+        "eq-001",
+        "eq-005"
+      ]
+    }
+  ],
+  "generated": "2026-09-10T05:05:50.451942"
+}
