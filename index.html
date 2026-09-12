@@ -327,6 +327,40 @@ section.band + section{border-top:0}
 .close::after{content:"";position:absolute;left:-10vw;bottom:-40vw;width:60vw;height:60vw;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 3vw,rgba(255,255,255,.06) 3vw calc(3vw + 1px));animation:breathe 18s ease-in-out infinite reverse;pointer-events:none}
 .close .wrap{position:relative}
 
+/* ---- live ask: thinking state, records shelf ---- */
+.think{display:flex;flex-direction:column;gap:18px;padding:8px 0}
+.think .rings{width:64px;height:64px;position:relative}
+.think .rings i{position:absolute;inset:0;border:2px solid var(--navy-ink);border-radius:50%;opacity:0;animation:tr 1.8s ease-out infinite}
+.think .rings i:nth-child(2){animation-delay:.6s;border-color:var(--well)}
+.think .rings i:nth-child(3){animation-delay:1.2s}
+@keyframes tr{0%{transform:scale(.15);opacity:.9}100%{transform:scale(1);opacity:0}}
+:root[data-theme="dark"] .think .rings i:nth-child(2){border-color:#9DC4B2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .think .rings i:nth-child(2){border-color:#9DC4B2}}
+.think .steps-t{display:flex;flex-direction:column;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--faint)}
+.think .steps-t span{display:flex;align-items:center;gap:10px;opacity:.35;transition:opacity .3s}
+.think .steps-t span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.think .steps-t span.on{opacity:1;color:var(--text)}
+.think .steps-t span.on::before{background:var(--navy-ink)}
+.think .steps-t span.done{opacity:.7}
+.think .steps-t span.done::before{background:#10B981}
+.answer .w{display:inline-block;opacity:0;animation:wordin .35s ease-out both}
+@keyframes wordin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.shelf{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.rec{border:1px solid var(--line);background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-height:64px;transition:border-color .3s,box-shadow .3s,transform .3s;position:relative}
+.rec .t{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.rec .n{font-size:.8rem;line-height:1.3;color:var(--muted)}
+.rec.lit{border-color:var(--navy-ink);box-shadow:0 0 0 1px var(--navy-ink),0 10px 24px -14px rgba(18,61,107,.6);transform:translateY(-2px)}
+.rec.lit .n{color:var(--text)}
+.rec.lit::after{content:"cited";position:absolute;top:8px;right:10px;font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--navy-ink)}
+.rec.scan{animation:scan .5s ease-out}
+@keyframes scan{0%{border-color:var(--navy-ink)}100%{border-color:var(--line)}}
+.shelf-head{display:flex;justify-content:space-between;align-items:baseline;margin-top:22px;gap:12px;flex-wrap:wrap}
+.shelf-head .eyebrow{margin:0}
+.shelf-head .t{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--faint)}
+.live-dot{display:inline-flex;align-items:center;gap:6px}
+.live-dot::before{content:"";width:7px;height:7px;border-radius:50%;background:#10B981;box-shadow:0 0 0 0 rgba(16,185,129,.5);animation:livepulse 2s infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.reveal-stagger > *{opacity:1!important;transform:none!important}}
 </style>
 </head>
@@ -516,7 +550,7 @@ section.band + section{border-top:0}
     </div>
     <div class="demo-wrap reveal">
     <form class="ask" id="ask" role="search">
-      <input id="ask-input" type="text" autocomplete="off" placeholder="Ask anything — an address, a serial, a name, a question…" aria-label="Ask a question about your records">
+      <input id="ask-input" type="text" autocomplete="off" placeholder="Ask anything — try “who serviced 455 Birch?” or “what’s at 1120 Pine?”" aria-label="Ask a question about your records">
       <button type="submit">Ask</button>
     </form>
     <div class="demo">
@@ -531,6 +565,11 @@ section.band + section{border-top:0}
         <!-- rendered by script -->
       </div>
     </div>
+    <div class="shelf-head">
+      <div class="eyebrow">The records behind this preview</div>
+      <div class="t" id="shelf-status">12 sample documents · cited ones light up</div>
+    </div>
+    <div class="shelf" id="shelf" aria-label="Sample records"></div>
     </div>
   </div>
 </section>
@@ -724,56 +763,116 @@ section.band + section{border-top:0}
   requestAnimationFrame(frame);
 })();
 
-/* ---- demo ---- */
+/* ---- demo: canned answers + live Ask over sample records ---- */
+const RECORDS=[
+ ["R1","Warranty registration","Carrier 59TP6 furnace — 3247 Elm St"],
+ ["R2","Work order","#19-0412 — furnace install, 3247 Elm St"],
+ ["R3","Nameplate photo","Nameplate — 3247 Elm St, Nov 2025"],
+ ["R4","Work order","#25-1187 — no heat, Henderson, 8810 Ridgeview"],
+ ["R5","Work order","#25-1233 — blower cleaning, Henderson"],
+ ["R6","Invoice","Invoice 25-1187 — Henderson"],
+ ["R7","Spreadsheet","Maintenance agreements 2026.xlsx"],
+ ["R8","Warranty registration","Carrier 24ACC6 AC — 1120 Pine Ave"],
+ ["R9","Warranty registration","Carrier 58STA furnace — 455 Birch Ct"],
+ ["R10","Work order","#24-0655 — capacitor, 455 Birch Ct"],
+ ["R11","Startup sheet","Startup — Carrier 59TP6, 3247 Elm St"],
+ ["R12","Permit","Mechanical permit M-2019-1183 — 3247 Elm St"]
+];
 const DEMO=[
  {q:"Is the furnace at 3247 Elm still under warranty?",
   answer:"Yes — parts coverage on the Carrier 59TP6 at 3247 Elm St runs through 14 Mar 2029. Labor coverage ended 14 Mar 2024.",
   fields:[["Equipment","Carrier 59TP6A080V17","",""],["Serial","4N2119-08772","",""],["Installed","14 Mar 2019 · M. Reyes","",""],["Parts warranty","Active · 2y 6m left","ok","Active"],["Labor warranty","Ended Mar 2024","bad","Expired"],["Last service","02 Nov 2025 · igniter","",""]],
-  sources:[["PDF","Warranty registration — Carrier, 03/19/2019","page 1"],["WO","Work order #19-0412, signed J. Alvarez","page 2, serial field"],["IMG","Nameplate photo, 11/02/2025, M. Reyes","truck upload"]]},
+  sources:[["R1","Warranty registration — Carrier, 03/19/2019","page 1"],["R2","Work order #19-0412, signed J. Alvarez","page 2, serial field"],["R3","Nameplate photo, 11/02/2025, M. Reyes","truck upload"]]},
  {q:"What did Marcus do at the Henderson job last fall?",
   answer:"Marcus Reyes made two visits to Henderson (8810 Ridgeview) in fall 2025: a no-heat call on 2 Nov where he replaced the hot-surface igniter, and a follow-up on 19 Nov for a blower wheel cleaning.",
   fields:[["Customer","Henderson, R. & D.","",""],["Address","8810 Ridgeview Dr","",""],["Visit 1","02 Nov 2025 · igniter · $312","",""],["Visit 2","19 Nov 2025 · blower · $189","",""],["Callback?","None within 30 days","ok","Clean"],["Tech","Marcus Reyes · #T-07","",""]],
-  sources:[["WO","Work order #25-1187, 11/02/2025","notes, parts"],["WO","Work order #25-1233, 11/19/2025","notes"],["INV","Invoice 25-1187 · Henderson","line items"]]},
+  sources:[["R4","Work order #25-1187, 11/02/2025","notes, parts"],["R5","Work order #25-1233, 11/19/2025","notes"],["R6","Invoice 25-1187 · Henderson","line items"]]},
  {q:"Serial 4N2119-08772 — what is it and where is it?",
   answer:"That's a Carrier 59TP6 96% gas furnace, 80k BTU, installed 14 Mar 2019 at 3247 Elm St (customer: Okafor). It has been serviced four times; parts coverage is active.",
   fields:[["Model","59TP6A080V17--20","",""],["Location","3247 Elm St · basement","",""],["Customer","Okafor, T.","",""],["Age","7 yrs 6 mo","",""],["Parts warranty","Through Mar 2029","ok","Active"],["Service events","4 (last: Nov 2025)","",""]],
-  sources:[["IMG","Nameplate photo, 03/14/2019","serial read 99%"],["PDF","Startup sheet, Carrier 59TP6","model/BTU"],["WO","4 work orders linked by serial","2019–2025"]]},
+  sources:[["R3","Nameplate photo, 03/14/2019","serial read 99%"],["R11","Startup sheet, Carrier 59TP6","model/BTU"],["R2","Work order #19-0412","install"]]},
  {q:"Which Carrier units we installed expire in the next 90 days?",
-  answer:"Six Carrier units have parts coverage ending before 11 Dec 2026. Two are on active maintenance agreements; four are not — those are the ones worth a call this month.",
-  fields:[["Units expiring","6 of 214 Carrier","warn","90-day window"],["On agreement","2","ok","Covered"],["Not on agreement","4","warn","Call list"],["Earliest","24 Sep 2026 · 1120 Pine","",""],["Est. warranty value","$4,800 in parts","",""],["Export","CSV · dispatch list","",""]],
-  sources:[["PDF","6 warranty registrations, 2016–2017","expiry dates"],["XLS","Maintenance agreements 2026.xlsx","agreement status"],["WO","Install work orders (6)","addresses"]]}
+  answer:"Two Carrier units have parts coverage ending in the next 90 days: the AC at 1120 Pine Ave (24 Sep 2026) and the furnace at 455 Birch Ct (30 Oct 2026). Pine is on a maintenance agreement; Birch is not — that one is worth a call this month.",
+  fields:[["Units expiring","2 of 4 Carrier","warn","90-day window"],["1120 Pine Ave","Expires 24 Sep 2026","warn","12 days"],["455 Birch Ct","Expires 30 Oct 2026","warn","48 days"],["On agreement","Pine only","ok","Covered"],["Call list","Nguyen · 455 Birch","warn","Not covered"],["Export","CSV · dispatch list","",""]],
+  sources:[["R8","Warranty registration — 1120 Pine","expiry dates"],["R9","Warranty registration — 455 Birch","expiry dates"],["R7","Maintenance agreements 2026.xlsx","agreement status"]]}
 ];
 (function(){
   const main=document.getElementById('demo-main');
   const btns=[...document.querySelectorAll('.q')];
-  function render(i){
+  const shelf=document.getElementById('shelf');
+  const status=document.getElementById('shelf-status');
+  const ask=document.getElementById('ask');
+  const input=document.getElementById('ask-input');
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let live=null; // null = unknown, true/false after first probe
+
+  shelf.innerHTML=RECORDS.map(([id,t,n])=>`<div class="rec" data-id="${id}"><span class="t">${t}</span><span class="n">${n}</span></div>`).join('');
+  const recs=[...shelf.children];
+  function light(ids){recs.forEach(r=>r.classList.toggle('lit',ids.includes(r.dataset.id)))}
+  function scanAll(){recs.forEach((r,i)=>{r.classList.remove('scan');setTimeout(()=>r.classList.add('scan'),i*45)})}
+  const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const words=t=>reduce?esc(t):esc(t).split(' ').map((w,i)=>`<span class="w" style="animation-delay:${i*28}ms">${w}</span>`).join(' ');
+
+  function renderAnswer({answer,fields,sources,meta}){
+    main.innerHTML=`
+      <div class="answer-head"><div class="eyebrow">Answer</div><div class="t">${meta}</div></div>
+      <p class="answer">${words(answer)}</p>
+      ${fields.length?`<div class="kv">${fields.map(([k,v,cls,label])=>`<div><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${cls?`<span class="pill ${cls}">${esc(label)}</span>`:''}</div>`).join('')}</div>`:''}
+      ${sources.length?`<div class="sources">${sources.map(([id,n,w])=>`<div class="src"><span class="ic">${esc(id)}</span><span><b>${esc(n)}</b> · ${esc(w)}</span></div>`).join('')}</div>`:''}
+      <div class="demo-note">Example records. Names, addresses and figures are illustrative.</div>`;
+    light(sources.map(s=>s[0]));
+  }
+  function renderCanned(i){
     const d=DEMO[i];
     btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.i===i)));
-    main.innerHTML=`
-      <div class="answer-head"><div class="eyebrow">Answer</div><div class="t">4 sources · 1.4 s</div></div>
-      <p class="answer">${d.answer}</p>
-      <div class="kv">${d.fields.map(([k,v,cls,label])=>`<div><span class="k">${k}</span><span class="v">${v}</span>${cls?`<span class="pill ${cls}">${label}</span>`:''}</div>`).join('')}</div>
-      <div class="sources">${d.sources.map(([t,n,w])=>`<div class="src"><span class="ic">${t}</span><span><b>${n}</b> · ${w}</span></div>`).join('')}</div>
-      <div class="demo-note">Example records. Names, addresses and figures are illustrative.</div>`;
+    renderAnswer({answer:d.answer,fields:d.fields,sources:d.sources,meta:`${d.sources.length} sources · 1.4 s`});
   }
-  btns.forEach(b=>b.addEventListener('click',()=>{render(+b.dataset.i);document.getElementById('ask-input').value=DEMO[+b.dataset.i].q}));
-  const KEYS=[["elm","3247","furnace","warranty","under"],["marcus","henderson","ridgeview","fall","did"],["4n2119","08772","serial","what is it","where"],["carrier","expire","90","next","which"]];
-  function match(q){
-    q=q.toLowerCase();let best=0,bi=-1;
-    KEYS.forEach((ks,i)=>{const n=ks.filter(k=>q.includes(k)).length;if(n>best){best=n;bi=i}});
-    return bi;
-  }
-  document.getElementById('ask').addEventListener('submit',e=>{
-    e.preventDefault();
-    const q=document.getElementById('ask-input').value.trim();if(!q)return;
-    const i=match(q);
-    if(i>=0){render(i);return;}
+  function renderNone(q){
     btns.forEach(b=>b.setAttribute('aria-pressed','false'));
-    main.innerHTML=`<div class="answer-head"><div class="eyebrow">Answer</div><div class="t">0 sources · 0.3 s</div></div>
-      <p class="answer">Nothing in the sample records matches "${q.replace(/</g,'&lt;')}". In your own account this would search every document you've uploaded — try one of the four questions on the left to see how an answer is built.</p>
-      <div class="demo-note">This preview holds a handful of example records. Your account answers from your files.</div>`;
-  });
-  render(0);
+    renderAnswer({answer:`Nothing in the sample records answers "${q}". In your own account this would search every document you've uploaded — try one of the questions on the left, or ask about 3247 Elm, Henderson, 1120 Pine or 455 Birch.`,fields:[],sources:[],meta:'0 sources · 0.3 s'});
+  }
+  function thinking(){
+    btns.forEach(b=>b.setAttribute('aria-pressed','false'));
+    main.innerHTML=`<div class="think">
+      <div class="rings"><i></i><i></i><i></i></div>
+      <div class="steps-t"><span id="st0">Reading 12 records</span><span id="st1">Linking serials, addresses, names</span><span id="st2">Writing the answer with sources</span></div></div>`;
+    scanAll();
+    const st=[0,1,2].map(i=>document.getElementById('st'+i));
+    st[0].classList.add('on');
+    return {t1:setTimeout(()=>{st[0].classList.replace('on','done');st[1].classList.add('on')},700),
+            t2:setTimeout(()=>{st[1].classList.replace('on','done');st[2].classList.add('on')},1500)};
+  }
+  const KEYS=[["elm","3247","furnace","warranty","under"],["marcus","henderson","ridgeview","fall","did"],["4n2119","08772","serial","what is it","where"],["carrier","expire","90","next","which"]];
+  function match(q){q=q.toLowerCase();let best=0,bi=-1;KEYS.forEach((ks,i)=>{const n=ks.filter(k=>q.includes(k)).length;if(n>best){best=n;bi=i}});return bi}
+
+  async function askLive(q){
+    const t0=performance.now();
+    const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    if(!r.ok) throw new Error('bad status');
+    const d=await r.json();
+    const secs=((performance.now()-t0)/1000).toFixed(1);
+    const fields=(d.facts||[]).slice(0,6).map(f=>[f.label,f.value,f.status&&f.status!=='none'?f.status:'',f.statusLabel||'']);
+    const sources=(d.sources||[]).map(s=>[s.id,`${s.type} — ${s.title}`,s.where]);
+    return {answer:d.answer,fields,sources,meta:`${sources.length} source${sources.length===1?'':'s'} · ${secs} s`};
+  }
+
+  async function submit(q){
+    const timers=thinking();
+    let res=null;
+    if(live!==false){
+      try{res=await askLive(q);live=true;status.innerHTML='<span class="live-dot">Live answers over 12 sample documents</span>'}
+      catch(e){live=false}
+    }
+    clearTimeout(timers.t1);clearTimeout(timers.t2);
+    if(!res){ await new Promise(r=>setTimeout(r,900)); const i=match(q); if(i>=0) return renderCanned(i); return renderNone(q); }
+    renderAnswer(res);
+  }
+
+  btns.forEach(b=>b.addEventListener('click',()=>{input.value=DEMO[+b.dataset.i].q;renderCanned(+b.dataset.i)}));
+  ask.addEventListener('submit',e=>{e.preventDefault();const q=input.value.trim();if(q)submit(q)});
+  renderCanned(0);
+  // probe once so the status line is honest
+  fetch('/api/ask',{method:'GET'}).then(r=>{if(r.ok){live=true;status.innerHTML='<span class="live-dot">Live answers over 12 sample documents</span>'}else live=false}).catch(()=>{live=false});
 })();
 
 /* ---- reveal on scroll, nav condense, ripple ---- */
