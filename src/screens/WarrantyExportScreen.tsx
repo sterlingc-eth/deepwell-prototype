@@ -1,354 +1,187 @@
-// @ts-nocheck
-import React, { useRef } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Plus, X } from 'lucide-react';
-import { useAppStore } from '../store/appStore';
-import { EquipmentCard, DataField } from '../components';
-import { equipment } from '../mocks/data';
+import { useRef, useState } from 'react';
+import { ArrowLeft, Download, Plus, X, CheckCircle2, AlertTriangle } from 'lucide-react';
 import html2canvas from 'html2canvas';
-// @ts-ignore
 import { jsPDF } from 'jspdf';
+import { AppShell } from '../components/AppShell';
+import { WarrantyStatusBadge, warrantyStatus } from '../components/WarrantyStatusBadge';
+import { docsLinkedTo, entitiesOfType, useGraph } from '../core/entityGraph';
+import { dateOf, fmtDate, str } from '../core/answer';
+import type { Entity } from '../core/types';
+import { useAppStore } from '../store/appStore';
 
-export const WarrantyExportScreen: React.FC = () => {
+/**
+ * Warranty claim packet. Pulls the selected units from the entity graph
+ * (the same records Ask answers from), checks what a manufacturer will need,
+ * and renders a printable packet that lists the verified documents behind it.
+ */
+export function WarrantyExportScreen() {
+  const graph = useGraph();
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
-  const selectedForExport = useAppStore((s) => s.selectedForExport);
-  const toggleSelectForExport = useAppStore((s) => s.toggleSelectForExport);
-  const clearExportSelection = useAppStore((s) => s.clearExportSelection);
+  const selectedIds = useAppStore((s) => s.selectedForExport);
+  const toggle = useAppStore((s) => s.toggleSelectForExport);
+  const clear = useAppStore((s) => s.clearExportSelection);
+  const askQuestion = useAppStore((s) => s.askQuestion);
   const pdfRef = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [picker, setPicker] = useState('');
 
-  // Use selected equipment or demo data (first equipment unit)
-  const displayForExport = selectedForExport.length > 0 ? selectedForExport : [equipment[0]];
+  const allUnits = entitiesOfType(graph, 'equipment');
+  const units = selectedIds.map((id) => graph.entities[id]).filter((e): e is Entity => !!e && e.type === 'equipment');
+  const property = (e: Entity) => graph.entities[str(e, 'propertyId')];
+  const now = new Date();
 
-  const handleGeneratePDF = async () => {
-    if (!pdfRef.current || displayForExport.length === 0) return;
+  const readiness = units.map((e) => {
+    const info = warrantyStatus(dateOf(e, 'warrantyExpiry'), now);
+    const missing: string[] = [];
+    if (!str(e, 'serial')) missing.push('serial');
+    if (!dateOf(e, 'installDate')) missing.push('install date');
+    if (!str(e, 'installedByName')) missing.push('installer');
+    if (!dateOf(e, 'warrantyExpiry')) missing.push('warranty registration');
+    const verifiedDocs = docsLinkedTo(graph, e.id).filter((d) => d.stage === 'verified');
+    const ready = missing.length === 0 && info.status !== 'expired' && verifiedDocs.length > 0;
+    return { e, info, missing, verifiedDocs, ready };
+  });
+  const allReady = readiness.length > 0 && readiness.every((r) => r.ready);
 
+  const generate = async () => {
+    if (!pdfRef.current || !units.length) return;
+    setBusy(true);
     try {
-      const canvas = await html2canvas(pdfRef.current, {
-        backgroundColor: '#1f2937',
-        scale: 2,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
+      const canvas = await html2canvas(pdfRef.current, { backgroundColor: '#ffffff', scale: 2 });
+      const img = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= 297;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
+      const w = 210;
+      const h = (canvas.height * w) / canvas.width;
+      let left = h;
+      let pos = 0;
+      pdf.addImage(img, 'PNG', 0, pos, w, h);
+      left -= 297;
+      while (left > 0) {
+        pos = left - h;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= 297;
+        pdf.addImage(img, 'PNG', 0, pos, w, h);
+        left -= 297;
       }
-
-      pdf.save('warranty-claim.pdf');
-    } catch (error) {
-      console.error('PDF generation failed:', error);
+      pdf.save(`deepwell-warranty-claim-${now.toISOString().slice(0, 10)}.pdf`);
+    } finally {
+      setBusy(false);
     }
   };
 
-  const allWarrantyStatus = displayForExport.map((eq) => {
-    const now = new Date();
-    const expiry = eq.warrantyExpiry;
-    if (!expiry) return { status: 'none', daysLeft: null };
-    if (now > expiry) return { status: 'expired', daysLeft: null };
-    const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-    return { status: daysLeft < 30 ? 'expiring' : 'active', daysLeft };
-  });
-
-  const readyForClaim = displayForExport.every(
-    (eq) =>
-      eq.serialNumber &&
-      eq.installDate &&
-      eq.installedByTechName &&
-      eq.warrantyExpiry &&
-      new Date() <= eq.warrantyExpiry
-  );
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-accent-900 to-accent-800 dark:from-accent-900 dark:to-accent-800">
-      {/* Header */}
-      <header className="border-b border-accent-700 dark:border-accent-600 bg-accent-900 dark:bg-accent-800/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setCurrentScreen('home')}
-              className="p-2 hover:bg-accent-800 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-primary-400" />
-            </motion.button>
-            <div>
-              <h1 className="text-2xl font-bold text-accent-50">Warranty Export</h1>
-              <p className="text-xs text-accent-400">Prepare insurance claims</p>
+    <AppShell>
+      <div className="space-y-8">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <button type="button" onClick={() => setCurrentScreen('dashboard')} className="dw-btn-tertiary -ml-3 mb-1">
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Dashboard
+            </button>
+            <h1>Warranty claim packet</h1>
+            <p className="text-ink-2 mt-1">Everything a manufacturer asks for, with the documents behind each fact.</p>
+          </div>
+          <button type="button" className="dw-btn-primary" onClick={generate} disabled={!allReady || busy}>
+            <Download className="w-4 h-4" aria-hidden="true" /> {busy ? 'Preparing…' : 'Download PDF'}
+          </button>
+        </header>
+
+        <section aria-labelledby="units-heading" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="units-heading" className="dw-label">Units in this packet · {units.length}</h2>
+            <div className="flex flex-wrap gap-2 items-center">
+              <label htmlFor="unit-picker" className="sr-only">Add a unit</label>
+              <select id="unit-picker" className="dw-input !min-h-[40px] !py-1.5 w-auto" value={picker} onChange={(e) => setPicker(e.target.value)}>
+                <option value="">Add a unit…</option>
+                {allUnits.filter((u) => !selectedIds.includes(u.id)).map((u) => (
+                  <option key={u.id} value={u.id}>{str(u, 'serial')} · {str(u, 'manufacturer')} {str(u, 'model')} · {str(property(u), 'address')}</option>
+                ))}
+              </select>
+              <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" disabled={!picker} onClick={() => { toggle(picker); setPicker(''); }}>
+                <Plus className="w-4 h-4" aria-hidden="true" /> Add
+              </button>
+              {units.length > 0 && <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5" onClick={clear}>Clear</button>}
             </div>
           </div>
-          {displayForExport.length > 0 && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleGeneratePDF}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
-            >
-              <Download className="w-4 h-4" />
-              Download PDF
-            </motion.button>
-          )}
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <>
-          {/* Selected Equipment */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-accent-50">
-                Selected Equipment ({displayForExport.length})
-              </h2>
-              {selectedForExport.length > 0 && (
-                <button
-                  onClick={clearExportSelection}
-                  className="text-xs text-accent-400 hover:text-accent-300 px-3 py-1 rounded hover:bg-accent-800 transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-3 mb-6">
-              {displayForExport.map((eq, index) => (
-                <motion.div
-                  key={eq.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="flex items-start gap-4 bg-accent-800 dark:bg-accent-700 border border-accent-700 dark:border-accent-600 rounded-lg p-4"
-                >
-                  <div className="flex-1">
-                    <div className="font-mono font-bold text-primary-400 mb-1">
-                      {eq.serialNumber}
-                    </div>
-                    <div className="text-sm text-accent-300">
-                      {eq.manufacturer} {eq.modelNumber}
-                    </div>
-                  </div>
-                  {selectedForExport.includes(eq) && (
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => toggleSelectForExport(eq)}
-                      className="p-2 hover:bg-accent-600 rounded transition-colors"
-                    >
-                      <X className="w-4 h-4 text-accent-400" />
-                    </motion.button>
+          {units.length === 0 ? (
+            <p className="dw-card p-6 text-ink-3">No units selected. Add one above, or start from the Dashboard's warranty table.</p>
+          ) : (
+            <ul className="divide-y divide-line border border-line rounded-lg bg-surface">
+              {readiness.map(({ e, missing, verifiedDocs, ready, info }) => (
+                <li key={e.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-data text-ink">{str(e, 'serial')}</span>
+                    <span className="block text-body text-ink-3">{str(e, 'manufacturer')} {str(e, 'equipmentType')} · {str(e, 'model')} · {str(property(e), 'address')}</span>
+                  </span>
+                  <WarrantyStatusBadge warranty={{ warrantyExpiry: dateOf(e, 'warrantyExpiry') }} />
+                  {ready ? (
+                    <span className="dw-pill-ok"><CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Ready · {verifiedDocs.length} verified doc{verifiedDocs.length === 1 ? '' : 's'}</span>
+                  ) : (
+                    <span className="dw-pill-warn"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> {info.status === 'expired' ? 'Warranty expired' : missing.length ? `Missing ${missing.join(', ')}` : 'No verified documents'}</span>
                   )}
-                </motion.div>
+                  <button type="button" onClick={() => toggle(e.id)} aria-label={`Remove ${str(e, 'serial')}`} className="dw-btn-tertiary !min-h-[40px] min-w-touch"><X className="w-4 h-4" aria-hidden="true" /></button>
+                </li>
               ))}
-            </div>
+            </ul>
+          )}
+        </section>
 
-            {/* Warranty Status Check */}
-            <div className="bg-primary-900/30 border border-primary-700 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-primary-300 mb-3">Claim Readiness</h3>
-              <div className="space-y-2 text-sm">
-                {displayForExport.map((eq, idx) => {
-                  const status = allWarrantyStatus[idx];
-                  const isReady =
-                    eq.serialNumber &&
-                    eq.installDate &&
-                    eq.installedByTechName &&
-                    eq.warrantyExpiry &&
-                    new Date() <= eq.warrantyExpiry;
-
+        {units.length > 0 && (
+          <section aria-labelledby="packet-heading" className="space-y-3">
+            <h2 id="packet-heading" className="dw-label">Packet preview</h2>
+            <div className="overflow-x-auto">
+              <div ref={pdfRef} className="bg-white text-stone-950 p-8 rounded-lg shadow-card min-w-[640px]" style={{ colorScheme: 'light' }}>
+                <div className="border-b-2 border-stone-200 pb-4 mb-6 flex items-end justify-between">
+                  <div>
+                    <p className="text-[11px] tracking-[0.2em] uppercase text-stone-500">Warranty claim</p>
+                    <p className="font-display text-[26px] leading-tight mt-1" style={{ color: '#163C2C' }}>DeepWell</p>
+                  </div>
+                  <p className="text-[12px] text-stone-500">Prepared {fmtDate(now)} · {units.length} unit{units.length === 1 ? '' : 's'}</p>
+                </div>
+                {readiness.map(({ e, verifiedDocs }, i) => {
+                  const p = property(e);
                   return (
-                    <div
-                      key={eq.id}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-accent-300">{eq.serialNumber}</span>
-                      <span
-                        className={`text-xs font-mono ${
-                          isReady ? 'text-success' : 'text-warning'
-                        }`}
-                      >
-                        {isReady
-                          ? '✓ Ready for claim'
-                          : status.status === 'expired'
-                            ? '✗ Warranty expired'
-                            : '⚠ Missing data'}
-                      </span>
+                    <div key={e.id} className={i < readiness.length - 1 ? 'mb-8 pb-8 border-b border-stone-200' : ''}>
+                      <h3 className="text-[15px] font-semibold text-stone-900 mb-3">Unit {i + 1} — {str(e, 'manufacturer')} {str(e, 'equipmentType')}</h3>
+                      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px]">
+                        {[
+                          ['Serial number', str(e, 'serial'), true],
+                          ['Model', str(e, 'model'), false],
+                          ['Manufacturer', str(e, 'manufacturer'), false],
+                          ['Type', str(e, 'equipmentType'), false],
+                          ['Installed', fmtDate(dateOf(e, 'installDate')), false],
+                          ['Installed by', str(e, 'installedByName'), false],
+                          ['Warranty expires', fmtDate(dateOf(e, 'warrantyExpiry')) || 'Not on file', false],
+                          ['Service address', p ? `${str(p, 'address')}, ${str(p, 'city')}, ${str(p, 'state')} ${str(p, 'zip')}` : '—', false],
+                          ['Customer', p ? str(p, 'customerName') : '—', false],
+                        ].map(([k, v, mono]) => (
+                          <div key={String(k)}>
+                            <dt className="text-[11px] uppercase tracking-wide text-stone-500">{k}</dt>
+                            <dd className={`${mono ? 'font-mono' : ''} font-medium text-stone-900`}>{v}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <p className="text-[11px] uppercase tracking-wide text-stone-500 mt-4 mb-1">Supporting documents (verified)</p>
+                      <ol className="text-[12px] text-stone-700 list-decimal pl-5 space-y-0.5">
+                        {verifiedDocs.map((d) => (
+                          <li key={d.id}><span className="font-mono">{d.filename}</span> — {graph.schema.documentTypes.find((t) => t.id === d.typeId)?.label ?? 'Document'}{d.verifiedAt ? `, verified ${fmtDate(d.verifiedAt)}` : ''}</li>
+                        ))}
+                        {verifiedDocs.length === 0 && <li>None yet — verify the registration in Intake before submitting.</li>}
+                      </ol>
                     </div>
                   );
                 })}
+                <p className="text-center text-[11px] text-stone-500 pt-6 mt-6 border-t border-stone-200">Every fact above traces to a verified document in DeepWell. Check details against the originals before submitting.</p>
               </div>
             </div>
-          </motion.div>
+          </section>
+        )}
 
-            {/* PDF Preview */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mb-8"
-            >
-              <h2 className="text-lg font-bold text-accent-50 mb-4">Warranty Claim Document</h2>
-
-              {/* PDF Content */}
-              <div
-                ref={pdfRef}
-                className="bg-white text-black p-8 rounded-lg shadow-lg"
-              >
-                {/* Header */}
-                <div className="border-b-2 border-gray-300 pb-4 mb-6">
-                  <h1 className="text-2xl font-bold text-primary-900">WARRANTY CLAIM</h1>
-                  <p className="text-gray-600 text-sm">
-                    Generated by DeepWell • {new Date().toLocaleDateString()}
-                  </p>
-                </div>
-
-                {/* Equipment Details */}
-                {displayForExport.map((eq, index) => (
-                  <div key={eq.id} className="mb-8 pb-8 border-b border-gray-300">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4">
-                      Equipment #{index + 1}
-                    </h2>
-
-                    {/* Grid Layout */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div>
-                        <p className="text-xs font-semibold text-gray-600 mb-1">
-                          SERIAL NUMBER
-                        </p>
-                        <p className="font-mono font-bold text-lg text-primary-900">
-                          {eq.serialNumber}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-600 mb-1">MODEL</p>
-                        <p className="font-bold text-primary-900">{eq.modelNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-600 mb-1">
-                          MANUFACTURER
-                        </p>
-                        <p className="text-gray-900">{eq.manufacturer}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-600 mb-1">TYPE</p>
-                        <p className="text-gray-900">{eq.equipmentType}</p>
-                      </div>
-                    </div>
-
-                    {/* Installation Info */}
-                    <div className="bg-gray-100 p-4 rounded mb-6">
-                      <h3 className="font-semibold text-gray-900 mb-3">Installation Details</h3>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600 text-xs mb-1">Installed Date</p>
-                          <p className="font-semibold text-gray-900">
-                            {eq.installDate.toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600 text-xs mb-1">Installed By</p>
-                          <p className="font-semibold text-gray-900">
-                            {eq.installedByTechName}
-                          </p>
-                        </div>
-                        {eq.epaCertType && (
-                          <div>
-                            <p className="text-gray-600 text-xs mb-1">EPA Certification</p>
-                            <p className="font-semibold text-gray-900">{eq.epaCertType}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Warranty Info */}
-                    {eq.warrantyExpiry && (
-                      <div className="bg-primary-50 border-2 border-primary-200 p-4 rounded">
-                        <h3 className="font-semibold text-primary-900 mb-3">Warranty Coverage</h3>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          {eq.partsExpiryDate && (
-                            <div>
-                              <p className="text-gray-600 text-xs mb-1">Parts</p>
-                              <p className="font-semibold text-primary-900">
-                                {eq.partsExpiryDate.toLocaleDateString()}
-                              </p>
-                            </div>
-                          )}
-                          {eq.laborExpiryDate && (
-                            <div>
-                              <p className="text-gray-600 text-xs mb-1">Labor</p>
-                              <p className="font-semibold text-primary-900">
-                                {eq.laborExpiryDate.toLocaleDateString()}
-                              </p>
-                            </div>
-                          )}
-                          {eq.compressorExpiryDate && (
-                            <div>
-                              <p className="text-gray-600 text-xs mb-1">Compressor</p>
-                              <p className="font-semibold text-primary-900">
-                                {eq.compressorExpiryDate.toLocaleDateString()}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Footer */}
-                <div className="text-center text-xs text-gray-500 pt-4 border-t border-gray-300">
-                  <p>This document was generated by DeepWell Warranty Management System</p>
-                  <p>Please verify all details before submitting to the manufacturer</p>
-                </div>
-              </div>
-            </motion.div>
-
-          {/* Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex gap-4"
-          >
-            <button
-              onClick={() => setCurrentScreen('search')}
-              className="flex-1 px-4 py-3 bg-accent-700 hover:bg-accent-600 text-accent-50 rounded-lg font-medium transition-colors"
-            >
-              Add More Equipment
-            </button>
-            <button
-              onClick={handleGeneratePDF}
-              disabled={!readyForClaim}
-              className={`
-                flex-1 px-4 py-3 rounded-lg font-medium transition-colors
-                flex items-center justify-center gap-2
-                ${
-                  readyForClaim
-                    ? 'bg-primary-600 hover:bg-primary-700 text-white'
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                }
-              `}
-            >
-              <Download className="w-4 h-4" />
-              Download Warranty Claim PDF
-            </button>
-          </motion.div>
-        </>
-      </main>
-    </div>
+        {units[0] && (
+          <button type="button" className="dw-btn-tertiary -ml-3" onClick={() => askQuestion(`Is ${str(units[0], 'serial')} under warranty?`)}>
+            Ask about {str(units[0], 'serial')}
+          </button>
+        )}
+      </div>
+    </AppShell>
   );
-};
+}

@@ -353,6 +353,13 @@ export const equipment: Equipment[] = [
 // PROPERTIES (10 total)
 // ============================================================================
 
+/** Look up a unit by id; throws at module load if the mock is inconsistent. */
+function eq(id: string): Equipment {
+  const found = equipment.find((e) => e.id === id);
+  if (!found) throw new Error(`Mock data: unknown equipment id ${id}`);
+  return found;
+}
+
 export const properties: Property[] = [
   {
     id: 'PROP001',
@@ -362,7 +369,7 @@ export const properties: Property[] = [
     zipCode: '85018',
     customerId: 'cust-001',
     customerName: 'James Mitchell',
-    equipment: [equipment[0], equipment[9]],
+    equipment: [eq('EQ001'), eq('EQ010')],
   },
   {
     id: 'PROP002',
@@ -372,7 +379,7 @@ export const properties: Property[] = [
     zipCode: '85016',
     customerId: 'cust-002',
     customerName: 'Sarah Johnson',
-    equipment: [equipment[1]],
+    equipment: [eq('EQ002')],
   },
   {
     id: 'PROP003',
@@ -382,7 +389,7 @@ export const properties: Property[] = [
     zipCode: '85210',
     customerId: 'cust-003',
     customerName: 'Michael Torres',
-    equipment: [equipment[2], equipment[10]],
+    equipment: [eq('EQ003'), eq('EQ011')],
   },
   {
     id: 'PROP004',
@@ -392,7 +399,7 @@ export const properties: Property[] = [
     zipCode: '85381',
     customerId: 'cust-004',
     customerName: 'David Martinez',
-    equipment: [equipment[3]],
+    equipment: [eq('EQ004')],
   },
   {
     id: 'PROP005',
@@ -402,7 +409,7 @@ export const properties: Property[] = [
     zipCode: '85204',
     customerId: 'cust-002',
     customerName: 'Office Plaza Management',
-    equipment: [equipment[4], equipment[11]],
+    equipment: [eq('EQ005'), eq('EQ012')],
   },
   {
     id: 'PROP006',
@@ -412,7 +419,7 @@ export const properties: Property[] = [
     zipCode: '85301',
     customerId: 'cust-005',
     customerName: 'Jennifer Lee',
-    equipment: [equipment[5]],
+    equipment: [eq('EQ006')],
   },
   {
     id: 'PROP007',
@@ -422,7 +429,7 @@ export const properties: Property[] = [
     zipCode: '85020',
     customerId: 'cust-001',
     customerName: 'Robert Williams',
-    equipment: [equipment[6], equipment[12]],
+    equipment: [eq('EQ007'), eq('EQ013')],
   },
   {
     id: 'PROP008',
@@ -432,7 +439,7 @@ export const properties: Property[] = [
     zipCode: '85224',
     customerId: 'cust-003',
     customerName: 'Amanda Garcia',
-    equipment: [equipment[7]],
+    equipment: [eq('EQ008')],
   },
   {
     id: 'PROP009',
@@ -442,7 +449,7 @@ export const properties: Property[] = [
     zipCode: '85037',
     customerId: 'cust-004',
     customerName: 'Commercial Warehouse Inc',
-    equipment: [equipment[8], equipment[13]],
+    equipment: [eq('EQ009'), eq('EQ014')],
   },
   {
     id: 'PROP010',
@@ -452,7 +459,7 @@ export const properties: Property[] = [
     zipCode: '85251',
     customerId: 'cust-005',
     customerName: 'Christopher Brown',
-    equipment: [equipment[14]],
+    equipment: [eq('EQ015')],
   },
 ];
 

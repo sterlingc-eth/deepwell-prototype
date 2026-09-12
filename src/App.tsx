@@ -1,35 +1,38 @@
-import { AnimatePresence } from 'framer-motion';
+import { lazy, Suspense } from 'react';
 import { useAppStore } from './store/appStore';
-import {
-  HomeScreen,
-  OnSiteSearchScreen,
-  JobDispatchBriefScreen,
-  WarrantyExportScreen,
-  DocumentIngestionScreen,
-  ExtractionReviewScreen,
-  DashboardScreen,
-  TechnicianProfileScreen,
-  EquipmentDetailScreen,
-  WarrantyTrackingScreen,
-} from './screens';
+import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, IntakeScreen, RecordsScreen, ReviewScreen } from './screens';
 import './index.css';
+
+// The claim-packet export pulls in jspdf + html2canvas (~60 KB gzipped); only load it when opened.
+const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen').then((m) => ({ default: m.WarrantyExportScreen })));
 
 function App() {
   const currentScreen = useAppStore((s) => s.currentScreen);
 
-  return (
-    <AnimatePresence mode="wait">
-      {currentScreen === 'home' && <DocumentIngestionScreen key="home" />}
-      {currentScreen === 'dashboard' && <DashboardScreen key="dashboard" />}
-      {currentScreen === 'extraction-review' && <ExtractionReviewScreen key="extraction-review" />}
-      {currentScreen === 'search' && <OnSiteSearchScreen key="search" />}
-      {currentScreen === 'dispatch-brief' && <JobDispatchBriefScreen key="dispatch-brief" />}
-      {currentScreen === 'warranty-export' && <WarrantyExportScreen key="warranty-export" />}
-      {currentScreen === 'technician-profile' && <TechnicianProfileScreen key="technician-profile" />}
-      {currentScreen === 'equipment-detail' && <EquipmentDetailScreen key="equipment-detail" />}
-      {currentScreen === 'warranty-tracking' && <WarrantyTrackingScreen key="warranty-tracking" />}
-    </AnimatePresence>
-  );
+  switch (currentScreen) {
+    case 'ask':
+      return <AskScreen />;
+    case 'entity':
+      return <EntityScreen />;
+    case 'records':
+      return <RecordsScreen />;
+    case 'ingest':
+      return <IntakeScreen />;
+    case 'review':
+      return <ReviewScreen />;
+    case 'dashboard':
+      return <DashboardScreen />;
+    case 'browse':
+      return <BrowseScreen />;
+    case 'warranty-export':
+      return (
+        <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
+          <WarrantyExportScreen />
+        </Suspense>
+      );
+    default:
+      return <AskScreen />;
+  }
 }
 
 export default App;

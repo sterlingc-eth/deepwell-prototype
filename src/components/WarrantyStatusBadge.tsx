@@ -1,69 +1,45 @@
-import React from 'react';
-import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, HelpCircle, XCircle } from 'lucide-react';
 import type { Equipment } from '../types';
 
+export type WarrantyStatus = 'active' | 'expiring' | 'expired' | 'unknown';
+
+export interface WarrantyStatusInfo {
+  status: WarrantyStatus;
+  label: string;
+  daysRemaining: number | null;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Single source of truth for how a warranty date becomes a status. */
+export function warrantyStatus(expiry: Date | null | undefined, now: Date = new Date()): WarrantyStatusInfo {
+  if (!expiry) return { status: 'unknown', label: 'No warranty on file', daysRemaining: null };
+  const days = Math.ceil((expiry.getTime() - now.getTime()) / DAY);
+  if (days < 0) return { status: 'expired', label: `Expired ${Math.abs(days)}d ago`, daysRemaining: days };
+  if (days <= 90) return { status: 'expiring', label: `Expires in ${days}d`, daysRemaining: days };
+  return { status: 'active', label: 'Active', daysRemaining: days };
+}
+
+const PILL: Record<WarrantyStatus, { className: string; Icon: typeof CheckCircle }> = {
+  active: { className: 'dw-pill-ok', Icon: CheckCircle },
+  expiring: { className: 'dw-pill-warn', Icon: AlertCircle },
+  expired: { className: 'dw-pill-bad', Icon: XCircle },
+  unknown: { className: 'dw-pill-muted', Icon: HelpCircle },
+};
+
 interface WarrantyStatusBadgeProps {
-  warranty: Equipment;
+  warranty: Pick<Equipment, 'warrantyExpiry'>;
+  /** Show the text label next to the icon (default true — colour alone is never the signal). */
   showLabel?: boolean;
 }
 
-export const WarrantyStatusBadge: React.FC<WarrantyStatusBadgeProps> = ({
-  warranty,
-  showLabel = false,
-}) => {
-  if (!warranty.warrantyExpiry) {
-    return (
-      <div className="flex items-center gap-2 inline-flex">
-        <div className="w-3 h-3 rounded-full bg-accent-500" />
-        <span className="text-xs text-accent-400">No Warranty Data</span>
-      </div>
-    );
-  }
-
-  const now = new Date();
-  const expiryDate = warranty.warrantyExpiry;
-  const daysUntilExpiry = Math.ceil(
-    (expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
-  );
-
-  let status: 'active' | 'expiring' | 'expired';
-  let bgColor: string;
-  let textColor: string;
-  let icon: React.ReactNode;
-  let label: string;
-
-  if (daysUntilExpiry < 0) {
-    status = 'expired';
-    bgColor = 'bg-red-900/30';
-    textColor = 'text-error';
-    icon = <XCircle className="w-4 h-4" />;
-    label = 'Expired';
-  } else if (daysUntilExpiry < 30) {
-    status = 'expiring';
-    bgColor = 'bg-secondary-900/30';
-    textColor = 'text-secondary-400';
-    icon = <AlertCircle className="w-4 h-4" />;
-    label = `Expiring (${daysUntilExpiry}d)`;
-  } else {
-    status = 'active';
-    bgColor = 'bg-success/10';
-    textColor = 'text-success';
-    icon = <CheckCircle className="w-4 h-4" />;
-    label = 'Active';
-  }
-
+export function WarrantyStatusBadge({ warranty, showLabel = true }: WarrantyStatusBadgeProps) {
+  const info = warrantyStatus(warranty.warrantyExpiry);
+  const { className, Icon } = PILL[info.status];
   return (
-    <div
-      className={`
-        inline-flex items-center gap-2 px-2 py-1 rounded-md
-        ${bgColor} ${textColor}
-        text-xs font-medium
-      `}
-      role="status"
-      aria-label={`Warranty status: ${label}`}
-    >
-      {icon}
-      {showLabel && <span>{label}</span>}
-    </div>
+    <span className={className} role="status" aria-label={`Warranty: ${info.label}`}>
+      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+      {showLabel && <span>{info.label}</span>}
+    </span>
   );
-};
+}

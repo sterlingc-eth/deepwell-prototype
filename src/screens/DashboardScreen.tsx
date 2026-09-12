@@ -1,207 +1,175 @@
-// @ts-nocheck
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Upload, FileText, Zap, TrendingUp, AlertCircle, Clock } from 'lucide-react';
+import { useMemo } from 'react';
+import { ArrowRight, AlertTriangle, FileText, Link2, ShieldCheck } from 'lucide-react';
+import { AppShell } from '../components/AppShell';
+import { WarrantyStatusBadge, warrantyStatus } from '../components/WarrantyStatusBadge';
+import { docCountsByStage, entitiesOfType, openConflicts, unlinkedDocs, useGraph } from '../core/entityGraph';
+import { dateOf, fmtDate, str } from '../core/answer';
+import type { Entity } from '../core/types';
 import { useAppStore } from '../store/appStore';
 
-export const DashboardScreen: React.FC = () => {
+const DAY = 86400000;
+
+/**
+ * The office view. Every row is a question — click it and the Ask screen
+ * answers it with sources. Warranty expiry and at-risk sections read the
+ * entity graph, so they change when review changes the records.
+ */
+export function DashboardScreen() {
+  const graph = useGraph();
+  const askQuestion = useAppStore((s) => s.askQuestion);
+  const openEntity = useAppStore((s) => s.openEntity);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  const toggleSelectForExport = useAppStore((s) => s.toggleSelectForExport);
+  const clearExportSelection = useAppStore((s) => s.clearExportSelection);
 
-  // Mock dashboard data
-  const stats = [
-    { label: 'Documents Ingested', value: '47', change: '+8 this week', icon: FileText, color: 'text-primary-400' },
-    { label: 'Equipment Linked', value: '23', change: '+3 new', icon: Zap, color: 'text-secondary-400' },
-    { label: 'Warranty Alerts', value: '5', change: 'Expiring soon', icon: AlertCircle, color: 'text-warning' },
-    { label: 'Extraction Accuracy', value: '94.2%', change: '+2.1% this month', icon: TrendingUp, color: 'text-success' },
-  ];
+  const now = new Date();
+  const counts = docCountsByStage(graph);
+  const total = Object.values(graph.docs).length;
+  const unlinked = unlinkedDocs(graph).length;
+  const conflicts = openConflicts(graph).length;
 
-  const recentDocuments = [
-    { name: 'IMG_2024_WorkOrder_Johnson.jpg', date: '2 hours ago', equipment: 'SN-LEN-987654', status: 'approved' },
-    { name: 'Warranty_Certificate_Smith.pdf', date: '1 day ago', equipment: 'SN-CAR-654321', status: 'approved' },
-    { name: 'Service_Records_2024.xlsx', date: '3 days ago', equipment: '8 units', status: 'approved' },
-  ];
+  const units = useMemo(() => entitiesOfType(graph, 'equipment'), [graph]);
+  const property = (e: Entity) => graph.entities[str(e, 'propertyId')];
+  const lastVisit = (e: Entity) =>
+    entitiesOfType(graph, 'service')
+      .filter((s) => str(s, 'equipmentId') === e.id)
+      .map((s) => dateOf(s, 'date'))
+      .filter((d): d is Date => !!d)
+      .sort((a, b) => b.getTime() - a.getTime())[0];
 
-  const equipmentAtRisk = [
-    { serial: 'SN-RHE-445566', warranty: 'Expires in 15 days', lastService: '3 months ago', risk: 'high' },
-    { serial: 'SN-YRK-112233', warranty: 'Expires in 45 days', lastService: '6 months ago', risk: 'medium' },
-    { serial: 'SN-TRN-778899', warranty: 'Expires in 30 days', lastService: '2 months ago', risk: 'high' },
-  ];
+  const byExpiry = [...units].sort((a, b) => {
+    const da = dateOf(a, 'warrantyExpiry');
+    const db = dateOf(b, 'warrantyExpiry');
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.getTime() - db.getTime();
+  });
+  const upcoming = byExpiry.filter((e) => {
+    const d = dateOf(e, 'warrantyExpiry');
+    return !!d && d >= now;
+  });
+  const atRisk = units
+    .map((e) => {
+      const info = warrantyStatus(dateOf(e, 'warrantyExpiry'), now);
+      const last = lastVisit(e);
+      const monthsSince = last ? Math.floor((now.getTime() - last.getTime()) / (30 * DAY)) : null;
+      const reasons: string[] = [];
+      if (info.status === 'expiring') reasons.push(info.label);
+      if (info.status === 'unknown') reasons.push('No warranty on file');
+      if (monthsSince === null) reasons.push('Never serviced');
+      else if (monthsSince >= 12) reasons.push(`Last service ${monthsSince} months ago`);
+      if (info.status === 'expired' && monthsSince !== null && monthsSince >= 6) reasons.push('Out of warranty and overdue');
+      return { e, reasons, info, last };
+    })
+    .filter((x) => x.reasons.length > 0)
+    .sort((a, b) => b.reasons.length - a.reasons.length);
+
+  const exportSelected = (ids: string[]) => {
+    clearExportSelection();
+    for (const id of ids) toggleSelectForExport(id);
+    setCurrentScreen('warranty-export');
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-accent-900 to-accent-800">
-      {/* Header */}
-      <header className="border-b border-accent-700 bg-accent-900 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
+    <AppShell>
+      <div className="space-y-10">
+        <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-accent-50">Dashboard</h1>
-            <p className="text-sm text-accent-400 mt-1">Intelligent document layer for HVAC</p>
+            <h1>Dashboard</h1>
+            <p className="text-ink-2 mt-1">Every row is a question. Click one and your records answer it.</p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setCurrentScreen('home')}
-            className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-accent-50 font-medium transition-colors"
-          >
-            Upload Documents
-          </motion.button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="border border-accent-700 rounded-lg bg-accent-900/50 hover:bg-accent-900/70 p-6 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-xs font-semibold text-accent-400 uppercase tracking-wide">
-                      {stat.label}
-                    </p>
-                    <p className="text-3xl font-bold text-accent-50 mt-2">
-                      {stat.value}
-                    </p>
-                  </div>
-                  <Icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-                <p className="text-xs text-accent-500">
-                  {stat.change}
-                </p>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Documents */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="lg:col-span-2 border border-accent-700 rounded-lg bg-accent-900/50 p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-accent-50">Recent Documents</h2>
-              <button
-                onClick={() => setCurrentScreen('home')}
-                className="text-sm text-primary-400 hover:text-primary-300 transition-colors"
-              >
-                View All →
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {recentDocuments.map((doc, index) => (
-                <motion.div
-                  key={doc.name}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 + index * 0.05 }}
-                  className="flex items-center justify-between p-3 bg-accent-800/30 rounded-lg hover:bg-accent-800/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-accent-50 truncate">
-                      {doc.name}
-                    </p>
-                    <p className="text-xs text-accent-500 mt-1">
-                      {doc.equipment} · {doc.date}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-success/20 text-success">
-                      ✓ Approved
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Equipment at Risk */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="border border-accent-700 rounded-lg bg-accent-900/50 p-6"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="w-5 h-5 text-warning" />
-              <h2 className="text-lg font-semibold text-accent-50">At Risk</h2>
-            </div>
-
-            <div className="space-y-3">
-              {equipmentAtRisk.map((eq, index) => (
-                <motion.div
-                  key={eq.serial}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 + index * 0.05 }}
-                  className={`p-3 rounded-lg border ${
-                    eq.risk === 'high'
-                      ? 'border-destructive/50 bg-destructive/10'
-                      : 'border-warning/50 bg-warning/10'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-accent-50">
-                    {eq.serial}
-                  </p>
-                  <p className={`text-xs mt-1 ${
-                    eq.risk === 'high' ? 'text-destructive' : 'text-warning'
-                  }`}>
-                    {eq.warranty}
-                  </p>
-                  <p className="text-xs text-accent-500 mt-1">
-                    {eq.lastService}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          <button
-            onClick={() => setCurrentScreen('home')}
-            className="p-6 border border-accent-700 rounded-lg hover:bg-accent-900/50 transition-colors text-left group"
-          >
-            <Upload className="w-6 h-6 text-primary-400 mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-accent-50">Upload Documents</h3>
-            <p className="text-xs text-accent-500 mt-1">Add new photos or PDFs</p>
+          <button type="button" className="dw-btn-primary" onClick={() => setCurrentScreen('ask')}>
+            Ask a question <ArrowRight className="w-4 h-4" aria-hidden="true" />
           </button>
+        </header>
 
-          <button
-            onClick={() => setCurrentScreen('search')}
-            className="p-6 border border-accent-700 rounded-lg hover:bg-accent-900/50 transition-colors text-left group"
-          >
-            <FileText className="w-6 h-6 text-secondary-400 mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-accent-50">Search Equipment</h3>
-            <p className="text-xs text-accent-500 mt-1">Find by serial or address</p>
-          </button>
+        <section aria-label="Overview" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Documents', value: total, sub: `${counts.verified} verified`, Icon: FileText, onClick: () => setCurrentScreen('records') },
+            { label: 'Units on record', value: units.length, sub: `${upcoming.length} under warranty`, Icon: ShieldCheck, onClick: () => askQuestion('Which units are out of warranty?') },
+            { label: 'Unlinked inbox', value: unlinked, sub: unlinked ? 'Target is zero' : 'Clear', Icon: Link2, onClick: () => setCurrentScreen('review') },
+            { label: 'Conflicts open', value: conflicts, sub: conflicts ? 'Need a decision' : 'Clear', Icon: AlertTriangle, onClick: () => setCurrentScreen('review') },
+          ].map(({ label, value, sub, Icon, onClick }) => (
+            <button key={label} type="button" onClick={onClick} className="dw-card p-4 text-left hover:shadow-lift transition-shadow duration-quick">
+              <div className="flex items-start justify-between">
+                <p className="text-caption text-ink-3">{label}</p>
+                <Icon className="w-4 h-4 text-ink-3" aria-hidden="true" />
+              </div>
+              <p className="font-display text-h1 mt-1">{value}</p>
+              <p className="text-body text-ink-3">{sub}</p>
+            </button>
+          ))}
+        </section>
 
-          <button
-            onClick={() => setCurrentScreen('warranty-tracking')}
-            className="p-6 border border-accent-700 rounded-lg hover:bg-accent-900/50 transition-colors text-left group"
-          >
-            <Clock className="w-6 h-6 text-warning mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-accent-50">Warranty Tracking</h3>
-            <p className="text-xs text-accent-500 mt-1">Monitor all warranties</p>
-          </button>
-        </motion.div>
-      </main>
-    </div>
+        <section aria-labelledby="expiry-heading" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="expiry-heading" className="dw-label">Warranty expiry · next to expire first</h2>
+            <div className="flex gap-2">
+              <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" onClick={() => askQuestion('Which warranties expire in the next 12 months?')}>Ask: next 12 months</button>
+              <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" onClick={() => exportSelected(upcoming.slice(0, 3).map((e) => e.id))}>Prepare claim packet</button>
+            </div>
+          </div>
+          <div className="relative overflow-x-auto border border-line rounded-lg bg-surface">
+            <table className="w-full text-body-lg">
+              <thead className="text-left text-label text-ink-3 uppercase bg-surface-2">
+                <tr>
+                  <th scope="col" className="px-4 py-2 font-medium">Unit</th>
+                  <th scope="col" className="px-4 py-2 font-medium">Location</th>
+                  <th scope="col" className="px-4 py-2 font-medium">Expires</th>
+                  <th scope="col" className="px-4 py-2 font-medium">Status</th>
+                  <th scope="col" className="px-4 py-2"><span className="sr-only">Ask</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {byExpiry.map((e) => {
+                  const p = property(e);
+                  const q = `Is ${str(e, 'serial')} under warranty?`;
+                  return (
+                    <tr key={e.id} className="hover:bg-surface-2 cursor-pointer" onClick={() => askQuestion(q)}>
+                      <td className="px-4 py-3">
+                        <button type="button" onClick={(ev) => { ev.stopPropagation(); openEntity(e.id); }} className="font-mono text-data text-ink underline decoration-line-2 underline-offset-4">{str(e, 'serial')}</button>
+                        <span className="block text-body text-ink-3">{str(e, 'manufacturer')} {str(e, 'equipmentType')} · {str(e, 'model')}</span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-2">{p ? str(p, 'address') : '—'}</td>
+                      <td className="px-4 py-3 text-ink-2">{dateOf(e, 'warrantyExpiry') ? fmtDate(dateOf(e, 'warrantyExpiry')) : '—'}</td>
+                      <td className="px-4 py-3"><WarrantyStatusBadge warranty={{ warrantyExpiry: dateOf(e, 'warrantyExpiry') }} /></td>
+                      <td className="px-4 py-3 text-right"><button type="button" onClick={(ev) => { ev.stopPropagation(); askQuestion(q); }} className="dw-btn-tertiary !min-h-[36px] !py-1" aria-label={q}>Ask <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section aria-labelledby="risk-heading" className="space-y-3">
+          <h2 id="risk-heading" className="dw-label">Equipment at risk · {atRisk.length}</h2>
+          <ul className="grid md:grid-cols-2 gap-3">
+            {atRisk.map(({ e, reasons, last }) => {
+              const p = property(e);
+              const q = p ? `${str(p, 'address')}` : str(e, 'serial');
+              return (
+                <li key={e.id}>
+                  <button type="button" onClick={() => askQuestion(q)} className="w-full text-left dw-card p-4 hover:shadow-lift transition-shadow duration-quick">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-data text-ink">{str(e, 'serial')}</p>
+                        <p className="text-ink">{str(e, 'manufacturer')} {str(e, 'equipmentType')} · {p ? str(p, 'address') : ''}</p>
+                      </div>
+                      <WarrantyStatusBadge warranty={{ warrantyExpiry: dateOf(e, 'warrantyExpiry') }} />
+                    </div>
+                    <ul className="mt-2 flex flex-wrap gap-1.5">
+                      {reasons.map((r) => <li key={r} className="dw-pill-warn">{r}</li>)}
+                    </ul>
+                    <p className="mt-2 text-body text-ink-3">Last service: {last ? fmtDate(last) : 'none on record'} · Ask about this property <ArrowRight className="inline w-3.5 h-3.5" aria-hidden="true" /></p>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
+    </AppShell>
   );
-};
+}
