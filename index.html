@@ -847,7 +847,7 @@ const DEMO=[
 
   async function askLive(q){
     const t0=performance.now();
-    const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    const r=await fetch('/api/demo-ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
     if(!r.ok) throw new Error('bad status');
     const d=await r.json();
     const secs=((performance.now()-t0)/1000).toFixed(1);
@@ -872,7 +872,7 @@ const DEMO=[
   ask.addEventListener('submit',e=>{e.preventDefault();const q=input.value.trim();if(q)submit(q)});
   renderCanned(0);
   // probe once so the status line is honest
-  fetch('/api/ask',{method:'GET'}).then(r=>{if(r.ok){live=true;status.innerHTML='<span class="live-dot">Live answers over 12 sample documents</span>'}else live=false}).catch(()=>{live=false});
+  fetch('/api/demo-ask',{method:'GET'}).then(r=>{if(r.ok){live=true;status.innerHTML='<span class="live-dot">Live answers over 12 sample documents</span>'}else live=false}).catch(()=>{live=false});
 })();
 
 /* ---- reveal on scroll, nav condense, ripple ---- */
