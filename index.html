@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0D2B4D">
 <meta name="description" content="DeepWell turns decades of contracts, invoices, records and field photos into one place your whole team can ask, with every answer tied to its source. Proven first in HVAC.">
 <meta property="og:title" content="DeepWell — Knowledge builds business.">
 <meta property="og:description" content="Every record your company ever made, answerable in seconds.">
@@ -78,9 +79,17 @@ a{color:inherit}
 
 /* nav */
 .nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line)}
+.nav{position:relative}
 .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
-.nav .btn-ghost{margin-left:auto}
-@media (max-width:760px){.nav .btn-ghost{display:none}}
+.nav-actions{display:flex;align-items:center;gap:14px;margin-left:auto}
+.menu-btn{display:none;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--line-strong);background:transparent;color:var(--text);border-radius:4px;cursor:pointer;padding:0}
+@media (max-width:760px){.nav .btn-ghost{display:none}.menu-btn{display:inline-flex}}
+@media (max-width:360px){.nav .wrap{gap:10px}.nav-actions{gap:8px}.btn{padding:10px 14px;font-size:.88rem}.brand .word{font-size:1.2rem}.menu-btn{width:40px;height:40px}}
+.mobile-menu{display:none;flex-direction:column;border-top:1px solid var(--line);background:var(--ground)}
+.mobile-menu.open{display:flex}
+.mobile-menu a{padding:14px clamp(16px,4vw,40px);min-height:48px;display:flex;align-items:center;color:var(--text);text-decoration:none;font-size:1rem;border-bottom:1px solid var(--line)}
+.mobile-menu a:last-child{border-bottom:0}
+.mobile-menu a:hover{background:var(--surface)}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
 .brand .mark{width:34px;height:34px}
 .brand .word{font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
@@ -228,7 +237,9 @@ section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
 
 footer{padding-block:32px;font-size:.84rem;color:var(--faint)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
-footer a{color:var(--muted);text-decoration:none;margin-left:18px}
+footer .wrap > div{min-width:0}
+footer .wrap > div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px}
+footer a{color:var(--muted);text-decoration:none}
 
 
 /* ---- brand bands: navy + green as surfaces ---- */
@@ -243,6 +254,8 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
 .band-navy{background:var(--navy-deep)}
 .band-green{background:var(--well)}
 .nav.band{background:rgba(13,43,77,.88);border-bottom-color:rgba(255,255,255,.12)}
+.nav.band .mobile-menu{background:rgba(13,43,77,.97)}
+.nav.band .menu-btn{border-color:rgba(255,255,255,.4);color:#fff}
 .nav.band .brand .word b{color:#9CC0EC}
 .nav.band .brand .word i{color:#9DC4B2}
 .hero.band{background:radial-gradient(900px 520px at 85% 10%, rgba(22,60,44,.75), transparent 62%), var(--navy-deep)}
@@ -384,8 +397,21 @@ section.band + section{border-top:0}
       <a href="#who">Who it's for</a>
       <a href="#plans">Plans</a>
     </div>
-    <a class="btn btn-ghost" href="/app/">Sign in</a>
-    <a class="btn btn-primary" href="#contact">Get started</a>
+    <div class="nav-actions">
+      <a class="btn btn-ghost" href="/app/">Sign in</a>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <a class="btn btn-primary" href="#contact">Get started</a>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu" hidden>
+    <a href="#problem">The problem</a>
+    <a href="#platform">Platform</a>
+    <a href="#demo">What it feels like</a>
+    <a href="#who">Who it's for</a>
+    <a href="#plans">Plans</a>
+    <a href="/app/">Sign in</a>
   </div>
 </nav>
 
@@ -883,6 +909,17 @@ const DEMO=[
   });
   const nav=document.querySelector('.nav');
   addEventListener('scroll',()=>{nav.classList.toggle('tight',scrollY>40)},{passive:true});
+
+  // mobile menu
+  const menuBtn=document.getElementById('menuBtn');
+  const mobileMenu=document.getElementById('mobileMenu');
+  const closeMenu=()=>{mobileMenu.classList.remove('open');mobileMenu.hidden=true;menuBtn.setAttribute('aria-expanded','false')};
+  const openMenu=()=>{mobileMenu.hidden=false;requestAnimationFrame(()=>mobileMenu.classList.add('open'));menuBtn.setAttribute('aria-expanded','true')};
+  menuBtn.addEventListener('click',()=>{mobileMenu.classList.contains('open')?closeMenu():openMenu()});
+  mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',closeMenu));
+  addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+  addEventListener('resize',()=>{if(innerWidth>760)closeMenu()});
+
   const ask=document.getElementById('ask');
   ask.addEventListener('submit',()=>{ask.classList.remove('drop');void ask.offsetWidth;ask.classList.add('drop')});
   document.querySelectorAll('.q').forEach(b=>b.addEventListener('click',()=>{ask.classList.remove('drop');void ask.offsetWidth;ask.classList.add('drop')}));
