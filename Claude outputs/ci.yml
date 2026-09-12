@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Nightly real-provider eval, 09:00 UTC.
+    - cron: "0 9 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, types, build, mock eval, API tests, browser checks
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: User-facing string lint
+        run: node scripts/string-lint.mjs
+
+      - name: Type check
+        run: npx tsc -b
+
+      - name: Build
+        run: npm run build
+
+      - name: Eval (mock provider, must be 50/50)
+        run: npm run eval
+
+      - name: API tests (guard, retrieval, validator, SSE — no network)
+        run: npm run test:api
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end
+        run: node scripts/e2e.mjs
+
+      - name: Field mode check
+        run: node scripts/field-mode-check.mjs
+
+  eval-claude:
+    name: Eval (real provider)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Skip when no key is configured
+        id: key
+        run: |
+          if [ -z "$CLAUDE_API_KEY" ]; then
+            echo "::notice title=Eval (real provider) skipped::CLAUDE_API_KEY secret is empty; add it to run the 50 questions against the real answer path."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Eval (real provider, must be ≥ 48/50)
+        if: steps.key.outputs.present == 'true'
+        run: npm run eval:claude -- --json eval-claude.json
+
+      - name: Upload results
+        if: always() && steps.key.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-claude
+          path: eval-claude.json
+          if-no-files-found: ignore
