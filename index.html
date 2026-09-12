@@ -1,13 +1,633 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>deepwell-prototype</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="DeepWell turns decades of work orders, warranties, invoices and job-site photos into one place your whole team can ask. Built for HVAC first.">
+<meta property="og:title" content="DeepWell — Knowledge builds business.">
+<meta property="og:description" content="Every record your company ever made, answerable in seconds.">
+<meta property="og:image" content="/deepwell-logo.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>DeepWell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --well:#163C2C;        /* logo green */
+  --navy:#123D6B;        /* wordmark navy */
+  --brass:#B98A4E;       /* single warm accent */
+  --ink:#0B1613;
+  --ground:#EEF2EE;
+  --surface:#FFFFFF;
+  --surface-2:#E2E9E4;
+  --text:#0F1F19;
+  --muted:#4F6259;
+  --faint:#8FA39A;
+  --line:rgba(22,60,44,.18);
+  --line-strong:rgba(22,60,44,.38);
+  --ring:rgba(22,60,44,.55);
+  --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.14), transparent 60%);
+  --shadow:0 20px 50px -30px rgba(11,22,19,.45);
+  --brass-text:#8E6530;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
+    --text:#E6EEE9; --muted:#A9BBB2; --faint:#6E8579;
+    --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
+    --ring:rgba(157,196,178,.55);
+    --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.45), transparent 60%);
+    --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+    --brass-text:#D8AE6E;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
+  --text:#E6EEE9; --muted:#A9BBB2; --faint:#6E8579;
+  --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
+  --ring:rgba(157,196,178,.55);
+  --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.45), transparent 60%);
+  --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+  --brass-text:#D8AE6E;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--ground);color:var(--text);
+  font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;
+}
+.serif{font-family:"Newsreader",Georgia,"Times New Roman",serif}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+h1,h2,h3{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.08;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(2.6rem,6vw,4.6rem)}
+h2{font-size:clamp(1.9rem,3.6vw,2.8rem)}
+h3{font-size:1.35rem;line-height:1.25}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
+.lede{font-size:1.15rem;color:var(--muted);max-width:56ch}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
+.nav .btn-ghost{margin-left:auto}
+@media (max-width:760px){.nav .btn-ghost{display:none}}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .mark{width:34px;height:34px}
+.brand .word{font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
+.brand .word b{color:var(--navy);font-weight:600}
+.brand .word i{font-style:normal;color:var(--well)}
+:root[data-theme="dark"] .brand .word b,:root[data-theme="dark"] .brand .word i{color:var(--text)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brand .word b,:root:not([data-theme="light"]) .brand .word i{color:var(--text)}}
+.navlinks{display:flex;gap:28px;font-size:.92rem;font-weight:500}
+.navlinks a{text-decoration:none;color:var(--muted)}
+.navlinks a:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:4px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid transparent;transition:transform .2s ease,background .2s ease;min-height:44px}
+.btn-primary{background:var(--well);color:#fff}
+.btn-primary:hover{background:var(--navy);transform:translateY(-1px)}
+.btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
+.btn-ghost:hover{background:var(--surface)}
+@media (max-width:760px){.navlinks{display:none}}
+
+/* hero */
+.hero{position:relative;overflow:hidden;background:var(--hero-grad)}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;padding-block:clamp(56px,9vw,120px)}
+.hero-copy{display:flex;flex-direction:column;gap:28px;position:relative;z-index:2}
+.hero h1 em{font-style:italic;font-weight:400;color:var(--navy)}
+:root[data-theme="dark"] .hero h1 em{color:#9DC4B2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .hero h1 em{color:#9DC4B2}}
+.cta-row{display:flex;gap:14px;flex-wrap:wrap}
+.hero-facts{display:flex;gap:32px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line);margin-top:8px}
+.fact{display:flex;flex-direction:column;gap:2px}
+.fact b{font-family:"Newsreader",serif;font-size:1.6rem;font-weight:500;font-variant-numeric:tabular-nums}
+.fact span{font-size:.78rem;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-family:"IBM Plex Mono",monospace}
+.well{position:relative;aspect-ratio:1;max-width:100%;width:100%}
+.well canvas{width:100%;height:100%;display:block}
+@media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.well{max-width:360px;margin:0 auto;order:-1}}
+
+/* sections */
+section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
+.sec-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px;align-items:end;margin-bottom:clamp(36px,5vw,64px)}
+.sec-head .eyebrow{margin-bottom:16px}
+@media (max-width:860px){.sec-head{grid-template-columns:1fr}}
+
+/* problem */
+.ledger{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);background:var(--surface)}
+.ledger > div{padding:28px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.ledger > div:last-child{border-right:0}
+.ledger .where{font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brass-text)}
+.ledger h3{font-size:1.5rem}
+.ledger p{color:var(--muted);font-size:.95rem}
+@media (max-width:860px){.ledger{grid-template-columns:1fr}.ledger > div{border-right:0;border-bottom:1px solid var(--line)}.ledger > div:last-child{border-bottom:0}}
+
+/* process */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
+.step{padding:32px 28px 32px 0;display:flex;flex-direction:column;gap:16px;position:relative}
+.step + .step{padding-left:28px;border-left:1px solid var(--line)}
+.step .num{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--brass-text);letter-spacing:.14em}
+.step .when{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--faint)}
+.step ul{margin:0;padding-left:18px;color:var(--muted);font-size:.95rem;display:flex;flex-direction:column;gap:6px}
+@media (max-width:860px){.steps{grid-template-columns:1fr}.step + .step{padding-left:0;border-left:0;border-top:1px solid var(--line)}}
+
+/* onboard */
+.onboard{margin-top:clamp(36px,5vw,64px);border:1px solid var(--line-strong);background:var(--surface);padding:32px;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:32px;align-items:center;border-left:4px solid var(--brass)}
+.onboard .eyebrow{margin-bottom:10px}
+.onboard p{color:var(--muted)}
+@media (max-width:860px){.onboard{grid-template-columns:1fr}}
+/* verticals */
+.verts{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);background:var(--surface)}
+.vert{padding:24px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px;min-height:150px}
+.vert:last-child{border-right:0}
+.vert .st{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.vert.now .st{color:var(--brass-text)}
+.vert h3{font-size:1.15rem}
+.vert p{font-size:.88rem;color:var(--muted)}
+@media (max-width:860px){.verts{grid-template-columns:1fr 1fr}.vert{border-bottom:1px solid var(--line)}.vert:nth-child(2n){border-right:0}}
+@media (max-width:480px){.verts{grid-template-columns:1fr}.vert{border-right:0}}
+/* plans */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.plan{border:1px solid var(--line);background:var(--surface);padding:28px;display:flex;flex-direction:column;gap:18px}
+.plan.featured{border-color:var(--well);box-shadow:var(--shadow)}
+.plan .tier{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.plan h3{font-size:1.6rem}
+.plan .for{color:var(--muted);font-size:.92rem;min-height:3.2em}
+.plan ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;font-size:.92rem;border-top:1px solid var(--line);padding-top:16px}
+.plan li{display:flex;gap:10px}
+.plan li::before{content:"—";color:var(--brass-text);flex:none}
+.plan .btn{margin-top:auto;justify-content:center}
+@media (max-width:860px){.plans{grid-template-columns:1fr}}
+/* ask box */
+.ask{display:flex;gap:0;border:1px solid var(--line-strong);background:var(--surface);align-items:stretch}
+.ask input{flex:1;min-width:0;border:0;background:transparent;padding:16px 18px;font:inherit;font-size:1.05rem;color:var(--text);outline:none}
+.ask input::placeholder{color:var(--faint)}
+.ask button{all:unset;cursor:pointer;padding:0 22px;background:var(--well);color:#fff;font-weight:600;font-size:.95rem;display:flex;align-items:center;min-height:48px}
+.ask button:hover{background:var(--navy)}
+.ask:focus-within{box-shadow:0 0 0 2px var(--brass)}
+.ask-hint{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--faint);margin-top:10px}
+.demo-wrap{display:flex;flex-direction:column;gap:18px}
+/* demo */
+.demo{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);display:grid;grid-template-columns:300px 1fr;min-height:420px}
+.demo-side{border-right:1px solid var(--line);padding:24px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2)}
+.demo-side .eyebrow{margin-bottom:8px}
+.q{all:unset;cursor:pointer;display:block;padding:12px 14px;border:1px solid transparent;border-radius:3px;font-family:"IBM Plex Mono",monospace;font-size:.86rem;line-height:1.4;color:var(--text)}
+.q:hover{border-color:var(--line-strong)}
+.q[aria-pressed="true"]{background:var(--surface);border-color:var(--line-strong);box-shadow:inset 3px 0 0 var(--brass)}
+.demo-main{padding:28px;display:flex;flex-direction:column;gap:22px}
+.answer-head{display:flex;justify-content:space-between;gap:16px;align-items:baseline;flex-wrap:wrap}
+.answer-head .t{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--faint)}
+.answer{font-family:"Newsreader",serif;font-size:1.45rem;line-height:1.35;max-width:48ch}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;border:1px solid var(--line)}
+.kv > div{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.kv .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-family:"IBM Plex Mono",monospace}
+.kv .v{font-family:"IBM Plex Mono",monospace;font-size:.95rem;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:.78rem;font-weight:600;font-family:"IBM Plex Sans",sans-serif;width:max-content}
+.pill.ok{background:rgba(16,185,129,.15);color:#0E7A57}.pill.warn{background:rgba(245,158,11,.18);color:#8A5A00}.pill.bad{background:rgba(239,68,68,.14);color:#B42323}
+:root[data-theme="dark"] .pill.ok{color:#5FD7A6}:root[data-theme="dark"] .pill.warn{color:#F5C169}:root[data-theme="dark"] .pill.bad{color:#F58C8C}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.ok{color:#5FD7A6}:root:not([data-theme="light"]) .pill.warn{color:#F5C169}:root:not([data-theme="light"]) .pill.bad{color:#F58C8C}}
+.sources{display:flex;flex-direction:column;gap:8px}
+.src{display:flex;gap:12px;align-items:center;font-size:.86rem;color:var(--muted);padding:10px 12px;border:1px dashed var(--line-strong)}
+.src .ic{width:26px;height:26px;border:1px solid var(--line-strong);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:.62rem;color:var(--brass-text);flex:none}
+.src b{color:var(--text);font-weight:500}
+.demo-note{font-size:.8rem;color:var(--faint);font-family:"IBM Plex Mono",monospace}
+@media (max-width:860px){.demo{grid-template-columns:1fr}.demo-side{border-right:0;border-bottom:1px solid var(--line)}}
+
+/* people */
+.people{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.person{padding:28px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.person .role{font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.person blockquote{margin:0;font-family:"Newsreader",serif;font-size:1.3rem;line-height:1.3;font-style:italic}
+.person p{color:var(--muted);font-size:.95rem}
+@media (max-width:860px){.people{grid-template-columns:1fr}}
+
+/* principles */
+.principles{display:grid;grid-template-columns:repeat(2,1fr);gap:40px 56px}
+.principle{display:grid;grid-template-columns:44px 1fr;gap:16px}
+.principle svg{width:44px;height:44px;stroke:var(--well);fill:none;stroke-width:1.5}
+:root[data-theme="dark"] .principle svg{stroke:#9DC4B2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .principle svg{stroke:#9DC4B2}}
+.principle p{color:var(--muted);font-size:.95rem;margin-top:6px}
+@media (max-width:760px){.principles{grid-template-columns:1fr}}
+
+/* closing */
+.close{background:var(--well);color:#fff;border-top:0}
+.close .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:48px;align-items:center}
+.close h2{color:#fff}
+.close p{color:rgba(255,255,255,.78)}
+.close .btn-primary{background:var(--brass);color:#1B1408}
+.close .btn-primary:hover{background:#D8AE6E}
+.close .btn-ghost{border-color:rgba(255,255,255,.4);color:#fff}
+.close .btn-ghost:hover{background:rgba(255,255,255,.08)}
+.logo-card{background:#fff;padding:28px;display:grid;place-items:center}
+.logo-card img{max-width:280px;width:100%;height:auto;display:block}
+@media (max-width:860px){.close .wrap{grid-template-columns:1fr}.logo-card{max-width:340px}}
+
+footer{padding-block:32px;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer a{color:var(--muted);text-decoration:none;margin-left:18px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="DeepWell home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <g fill="none" stroke="var(--well)" stroke-width="4">
+          <circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="10"/>
+        </g>
+      </svg>
+      <span class="word"><b>Deep</b><i>Well</i></span>
+    </a>
+    <div class="navlinks">
+      <a href="#problem">The problem</a>
+      <a href="#platform">Platform</a>
+      <a href="#demo">What it feels like</a>
+      <a href="#who">Who it's for</a>
+      <a href="#plans">Plans</a>
+    </div>
+    <a class="btn btn-ghost" href="/app/">Sign in</a>
+    <a class="btn btn-primary" href="#contact">Get started</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-copy">
+      <div class="eyebrow">The knowledge platform for businesses that run on records</div>
+      <h1>Every record your company ever made, <em>answerable in seconds.</em></h1>
+      <p class="lede">DeepWell turns twenty years of work orders, warranty sheets, invoices and job-site photos into one place your whole team can ask. It's a platform, not a project — and our team sets it up for you, so day one is already useful.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#contact">Get started</a>
+        <a class="btn btn-ghost" href="#demo">See what it feels like</a>
+      </div>
+      <div class="hero-facts" aria-label="Typical results">
+        <div class="fact"><b>&lt; 3 s</b><span>Question to answer</span></div>
+        <div class="fact"><b>&lt; 5 min</b><span>Upload to searchable</span></div>
+        <div class="fact"><b>100%</b><span>Answers cite the source</span></div>
+        <div class="fact"><b>Days</b><span>Signup to go-live</span></div>
+      </div>
+    </div>
+    <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">The problem</div>
+        <h2>The knowledge exists. It's just in the wrong place.</h2>
+      </div>
+      <p class="lede">A mid-sized shop closes 3,000 jobs a year. Each one leaves a trail — but the trail is split across a filing cabinet, a dispatcher's inbox, a shared drive, and a tech's phone. When a customer calls about a compressor installed in 2019, somebody spends forty minutes looking.</p>
+    </div>
+    <div class="ledger">
+      <div>
+        <div class="where">In the office</div>
+        <h3>The filing cabinet</h3>
+        <p>Signed work orders, manufacturer warranty registrations, permit copies. Complete, and unsearchable. The serial number you need is on page two of a carbon copy.</p>
+      </div>
+      <div>
+        <div class="where">In the inbox</div>
+        <h3>The PDF nobody renamed</h3>
+        <p>Distributor invoices, startup sheets, equipment submittals — every one attached to an email titled "Re: Re: Fwd: Tuesday." Findable only by the person who received it.</p>
+      </div>
+      <div>
+        <div class="where">In the truck</div>
+        <h3>The photo on a phone</h3>
+        <p>The clearest record of what was installed is a nameplate photo taken by a tech who has since moved to another company. It was never uploaded anywhere.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="platform">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">The platform</div>
+        <h2>Ingest everything. Link what belongs together. Ask anything.</h2>
+      </div>
+      <p class="lede">DeepWell is one hosted system that does three things to your records, continuously — from the first box of paper to this morning's job sheet. No IT department required; it runs under your company's name and we keep it running.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">INGEST</div>
+        <h3>Everything goes in as-is</h3>
+        <div class="when">Paper · PDF · spreadsheets · photos · email</div>
+        <p>Scan the cabinet, forward the inbox, drop the shared drive, upload from a phone in the field. Handwriting, carbon copies and nameplate photos included. Nothing has to be renamed or filed first.</p>
+        <ul>
+          <li>Drag-and-drop, email intake, and folder sync</li>
+          <li>Reads handwritten and low-quality scans</li>
+          <li>Searchable within minutes of upload</li>
+        </ul>
+      </div>
+      <div class="step">
+        <div class="num">LINK</div>
+        <h3>Facts get connected</h3>
+        <div class="when">Equipment ↔ site ↔ customer ↔ people ↔ money</div>
+        <p>Each document is read for the facts that matter — serials, addresses, dates, names, amounts — and stitched to every other record about the same thing. One serial number pulls up seven years of history from a dozen files.</p>
+        <ul>
+          <li>Every fact traceable to the page it came from</li>
+          <li>Uncertain reads are flagged for a quick human check</li>
+          <li>Your corrections make the system sharper</li>
+        </ul>
+      </div>
+      <div class="step">
+        <div class="num">ASK</div>
+        <h3>Answers, not search results</h3>
+        <div class="when">Desk · phone · truck</div>
+        <p>Type a question the way you'd ask a coworker. Get the answer, the linked records behind it, and the original document one tap away. Dashboards surface what's expiring, what's due, and what's slipping.</p>
+        <ul>
+          <li>Plain-language questions, cited answers</li>
+          <li>Warranty, maintenance and callback dashboards</li>
+          <li>Export to CSV, your dispatch tool, or your accountant</li>
+        </ul>
+      </div>
+    </div>
+    <div class="onboard">
+      <div>
+        <div class="eyebrow">Included with every account</div>
+        <h3>White-glove setup by the DeepWell team</h3>
+      </div>
+      <p>Software that needs six months of "getting the data in" never gets used. So we do it: our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon. You log in to a system that already knows your business.</p>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">What it feels like</div>
+        <h2>Ask the way you'd ask a coworker who never forgets.</h2>
+      </div>
+      <p class="lede">An address, a serial, a customer name, a tech, a date — any of them gets you the whole story, with the original document one click away. Try a few of the questions a dispatcher asks on a normal Tuesday.</p>
+    </div>
+    <div class="demo-wrap">
+    <form class="ask" id="ask" role="search">
+      <input id="ask-input" type="text" autocomplete="off" placeholder="Ask anything — an address, a serial, a name, a question…" aria-label="Ask a question about your records">
+      <button type="submit">Ask</button>
+    </form>
+    <div class="demo">
+      <div class="demo-side">
+        <div class="eyebrow">Or try one of these</div>
+        <button class="q" type="button" id="q0" data-i="0" aria-pressed="true">Is the furnace at 3247 Elm still under warranty?</button>
+        <button class="q" type="button" id="q1" data-i="1">What did Marcus do at the Henderson job last fall?</button>
+        <button class="q" type="button" id="q2" data-i="2">Serial 4N2119-08772 — what is it and where is it?</button>
+        <button class="q" type="button" id="q3" data-i="3">Which Carrier units we installed expire in the next 90 days?</button>
+      </div>
+      <div class="demo-main" id="demo-main" aria-live="polite">
+        <!-- rendered by script -->
+      </div>
+    </div>
+    </div>
+  </div>
+</section>
+
+<section id="who">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Who it's for</div>
+        <h2>One system. Three people who use it differently.</h2>
+      </div>
+      <p class="lede">The same records, seen from the desk, the truck, and the owner's office. Nobody gets a dumbed-down version; everybody gets the view that matches their day.</p>
+    </div>
+    <div class="people">
+      <div class="person">
+        <div class="role">Office manager · dispatch</div>
+        <blockquote>"The customer's on hold. I need the install date and who was out there last."</blockquote>
+        <p>Answer the call without putting it down. Equipment, warranty status and last three visits on one screen, with the signed work order behind it.</p>
+      </div>
+      <div class="person">
+        <div class="role">Field technician · on site</div>
+        <blockquote>"I'm in the attic on my phone. What's this unit's history?"</blockquote>
+        <p>Type the serial off the nameplate — or photograph it — and read the last tech's notes before you touch anything. Big type, high contrast, works in sun.</p>
+      </div>
+      <div class="person">
+        <div class="role">Owner · operations</div>
+        <blockquote>"How much warranty money did we leave on the table last year?"</blockquote>
+        <p>See expiring coverage across every unit you've ever installed, which techs' jobs generate callbacks, and where your maintenance agreements are due.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="industries">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Where it works</div>
+        <h2>Built for HVAC first. Built to go further.</h2>
+      </div>
+      <p class="lede">We started with HVAC because it's the hardest case: decades of paper, equipment that outlives three owners, and warranties worth real money. The same platform fits any business whose knowledge lives in job records.</p>
+    </div>
+    <div class="verts">
+      <div class="vert now"><div class="st">Available now</div><h3>HVAC contractors</h3><p>Equipment, warranties, service history, maintenance agreements.</p></div>
+      <div class="vert"><div class="st">Next</div><h3>Plumbing &amp; electrical</h3><p>Fixtures, panels, permits, inspection records by property.</p></div>
+      <div class="vert"><div class="st">Next</div><h3>Property management</h3><p>Every unit's repairs, vendors, leases and warranties in one history.</p></div>
+      <div class="vert"><div class="st">Roadmap</div><h3>Fleet &amp; equipment rental</h3><p>Asset histories, service intervals, and manufacturer coverage.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="plans">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Plans</div>
+        <h2>Priced by the size of the shop, not the size of the archive.</h2>
+      </div>
+      <p class="lede">Every plan includes hosting, backups, setup by our team, and unlimited questions. Monthly, cancel anytime; a 12-month term earns a discount. Pricing is shared on your first call.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <div class="tier">Starter</div>
+        <h3>One truck to five.</h3>
+        <p class="for">For owner-operators who want the cabinet searchable and warranties tracked.</p>
+        <ul>
+          <li>Up to 5,000 documents</li>
+          <li>Search by address, serial, customer, date</li>
+          <li>Warranty expiry alerts</li>
+          <li>Phone and desk access</li>
+          <li>Email support</li>
+        </ul>
+        <a class="btn btn-ghost" href="#contact">Get started</a>
+      </div>
+      <div class="plan featured">
+        <div class="tier">Team · most shops</div>
+        <h3>Five trucks to fifty.</h3>
+        <p class="for">For shops with a dispatcher, an office, and a backlog of paper worth reading.</p>
+        <ul>
+          <li>Unlimited documents</li>
+          <li>Plain-language questions with cited answers</li>
+          <li>Equipment, warranty and callback dashboards</li>
+          <li>Email intake and folder sync</li>
+          <li>Corrections and review queue</li>
+          <li>One dispatch or accounting integration</li>
+        </ul>
+        <a class="btn btn-primary" href="#contact">Get started</a>
+      </div>
+      <div class="plan">
+        <div class="tier">Enterprise</div>
+        <h3>Multi-branch.</h3>
+        <p class="for">For regional operators and roll-ups consolidating several companies' records.</p>
+        <ul>
+          <li>Everything in Team, across branches</li>
+          <li>Unlimited integrations and API access</li>
+          <li>Audit logs and role-based access</li>
+          <li>Dedicated onboarding lead</li>
+          <li>Priority support and quarterly reviews</li>
+        </ul>
+        <a class="btn btn-ghost" href="#contact">Talk to us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">How we build</div>
+        <h2>Rules we don't bend.</h2>
+      </div>
+      <p class="lede">These are commitments in every DeepWell agreement, not a values page. If a feature can't meet them, it doesn't ship.</p>
+    </div>
+    <div class="principles">
+      <div class="principle">
+        <svg viewBox="0 0 44 44" aria-hidden="true"><rect x="8" y="6" width="28" height="32" rx="2"/><path d="M14 16h16M14 22h16M14 28h9"/></svg>
+        <div><h3>Every answer shows its source.</h3><p>No fact appears without the page it came from. If the system isn't sure, it says so and shows you the document instead of guessing.</p></div>
+      </div>
+      <div class="principle">
+        <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 6l14 6v10c0 8-6 13-14 16C14 35 8 30 8 22V12z"/><path d="M16 22l4 4 8-8"/></svg>
+        <div><h3>Your records stay yours.</h3><p>Data is stored under your company's own account, never pooled with another contractor's, never used to build anything for anyone else. You can take it all with you.</p></div>
+      </div>
+      <div class="principle">
+        <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15"/><path d="M22 12v10l7 4"/></svg>
+        <div><h3>Built for the job, not the demo.</h3><p>Readable in an attic on a cracked phone. Works when the signal drops. Nothing that flashes or slows a tech down. Office gets the full desk view.</p></div>
+      </div>
+      <div class="principle">
+        <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
+        <div><h3>Measured before you rely on it.</h3><p>During setup we score your account against the questions your team actually asks and show you the number. Under 95% on your own set, we keep working before go-live.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="close" id="contact">
+  <div class="wrap">
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div class="eyebrow" style="color:rgba(255,255,255,.7)">Start here</div>
+      <h2>Start with one box of records.</h2>
+      <p class="lede" style="color:rgba(255,255,255,.8)">Send us a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you'll ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="mailto:hello@deepwell.co?subject=Records%20audit">hello@deepwell.co</a>
+        <a class="btn btn-ghost" href="tel:+10000000000">Call the studio</a>
+      </div>
+    </div>
+    <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell — Knowledge builds business." width="900" height="750"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>© 2026 DeepWell · Knowledge builds business.</div>
+    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/app/">Sign in</a></div>
+  </div>
+</footer>
+
+<script>
+/* ---- ambient well rings ---- */
+(function(){
+  const c=document.getElementById('well');if(!c)return;
+  const ctx=c.getContext('2d');
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let w,h,dpr,t0=performance.now();
+  function size(){dpr=Math.min(devicePixelRatio||1,2);const r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+  size();addEventListener('resize',size);
+  function ringColor(){return getComputedStyle(document.documentElement).getPropertyValue('--ring').trim()||'rgba(22,60,44,.5)'}
+  function frame(now){
+    const t=reduce?0:(now-t0)/1000;
+    ctx.clearRect(0,0,w,h);
+    const cx=w/2,cy=h/2,R=Math.min(w,h)/2-6;
+    const N=9,base=ringColor();
+    for(let i=0;i<N;i++){
+      // rings drift outward slowly, like a ripple; opacity fades at the edge
+      const phase=((i/N)+t*0.035)%1;
+      const r=R*(0.08+0.92*phase);
+      const a=Math.sin(phase*Math.PI);
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.lineWidth=2.2;
+      ctx.strokeStyle=base.replace(/[\d.]+\)$/,(0.15+0.85*a)+')');
+      ctx.stroke();
+    }
+    // static center + hairline crosshair
+    ctx.beginPath();ctx.arc(cx,cy,R*0.06,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=base;ctx.stroke();
+    if(!reduce)requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ---- demo ---- */
+const DEMO=[
+ {q:"Is the furnace at 3247 Elm still under warranty?",
+  answer:"Yes — parts coverage on the Carrier 59TP6 at 3247 Elm St runs through 14 Mar 2029. Labor coverage ended 14 Mar 2024.",
+  fields:[["Equipment","Carrier 59TP6A080V17","",""],["Serial","4N2119-08772","",""],["Installed","14 Mar 2019 · M. Reyes","",""],["Parts warranty","Active · 2y 6m left","ok","Active"],["Labor warranty","Ended Mar 2024","bad","Expired"],["Last service","02 Nov 2025 · igniter","",""]],
+  sources:[["PDF","Warranty registration — Carrier, 03/19/2019","page 1"],["WO","Work order #19-0412, signed J. Alvarez","page 2, serial field"],["IMG","Nameplate photo, 11/02/2025, M. Reyes","truck upload"]]},
+ {q:"What did Marcus do at the Henderson job last fall?",
+  answer:"Marcus Reyes made two visits to Henderson (8810 Ridgeview) in fall 2025: a no-heat call on 2 Nov where he replaced the hot-surface igniter, and a follow-up on 19 Nov for a blower wheel cleaning.",
+  fields:[["Customer","Henderson, R. & D.","",""],["Address","8810 Ridgeview Dr","",""],["Visit 1","02 Nov 2025 · igniter · $312","",""],["Visit 2","19 Nov 2025 · blower · $189","",""],["Callback?","None within 30 days","ok","Clean"],["Tech","Marcus Reyes · #T-07","",""]],
+  sources:[["WO","Work order #25-1187, 11/02/2025","notes, parts"],["WO","Work order #25-1233, 11/19/2025","notes"],["INV","Invoice 25-1187 · Henderson","line items"]]},
+ {q:"Serial 4N2119-08772 — what is it and where is it?",
+  answer:"That's a Carrier 59TP6 96% gas furnace, 80k BTU, installed 14 Mar 2019 at 3247 Elm St (customer: Okafor). It has been serviced four times; parts coverage is active.",
+  fields:[["Model","59TP6A080V17--20","",""],["Location","3247 Elm St · basement","",""],["Customer","Okafor, T.","",""],["Age","7 yrs 6 mo","",""],["Parts warranty","Through Mar 2029","ok","Active"],["Service events","4 (last: Nov 2025)","",""]],
+  sources:[["IMG","Nameplate photo, 03/14/2019","serial read 99%"],["PDF","Startup sheet, Carrier 59TP6","model/BTU"],["WO","4 work orders linked by serial","2019–2025"]]},
+ {q:"Which Carrier units we installed expire in the next 90 days?",
+  answer:"Six Carrier units have parts coverage ending before 11 Dec 2026. Two are on active maintenance agreements; four are not — those are the ones worth a call this month.",
+  fields:[["Units expiring","6 of 214 Carrier","warn","90-day window"],["On agreement","2","ok","Covered"],["Not on agreement","4","warn","Call list"],["Earliest","24 Sep 2026 · 1120 Pine","",""],["Est. warranty value","$4,800 in parts","",""],["Export","CSV · dispatch list","",""]],
+  sources:[["PDF","6 warranty registrations, 2016–2017","expiry dates"],["XLS","Maintenance agreements 2026.xlsx","agreement status"],["WO","Install work orders (6)","addresses"]]}
+];
+(function(){
+  const main=document.getElementById('demo-main');
+  const btns=[...document.querySelectorAll('.q')];
+  function render(i){
+    const d=DEMO[i];
+    btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.i===i)));
+    main.innerHTML=`
+      <div class="answer-head"><div class="eyebrow">Answer</div><div class="t">4 sources · 1.4 s</div></div>
+      <p class="answer">${d.answer}</p>
+      <div class="kv">${d.fields.map(([k,v,cls,label])=>`<div><span class="k">${k}</span><span class="v">${v}</span>${cls?`<span class="pill ${cls}">${label}</span>`:''}</div>`).join('')}</div>
+      <div class="sources">${d.sources.map(([t,n,w])=>`<div class="src"><span class="ic">${t}</span><span><b>${n}</b> · ${w}</span></div>`).join('')}</div>
+      <div class="demo-note">Example records. Names, addresses and figures are illustrative.</div>`;
+  }
+  btns.forEach(b=>b.addEventListener('click',()=>{render(+b.dataset.i);document.getElementById('ask-input').value=DEMO[+b.dataset.i].q}));
+  const KEYS=[["elm","3247","furnace","warranty","under"],["marcus","henderson","ridgeview","fall","did"],["4n2119","08772","serial","what is it","where"],["carrier","expire","90","next","which"]];
+  function match(q){
+    q=q.toLowerCase();let best=0,bi=-1;
+    KEYS.forEach((ks,i)=>{const n=ks.filter(k=>q.includes(k)).length;if(n>best){best=n;bi=i}});
+    return bi;
+  }
+  document.getElementById('ask').addEventListener('submit',e=>{
+    e.preventDefault();
+    const q=document.getElementById('ask-input').value.trim();if(!q)return;
+    const i=match(q);
+    if(i>=0){render(i);return;}
+    btns.forEach(b=>b.setAttribute('aria-pressed','false'));
+    main.innerHTML=`<div class="answer-head"><div class="eyebrow">Answer</div><div class="t">0 sources · 0.3 s</div></div>
+      <p class="answer">Nothing in the sample records matches "${q.replace(/</g,'&lt;')}". In your own account this would search every document you've uploaded — try one of the four questions on the left to see how an answer is built.</p>
+      <div class="demo-note">This preview holds a handful of example records. Your account answers from your files.</div>`;
+  });
+  render(0);
+})();
+</script>
+
+</body>
 </html>
