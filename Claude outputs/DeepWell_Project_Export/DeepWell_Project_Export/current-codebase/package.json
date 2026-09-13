@@ -1,0 +1,48 @@
+{
+  "name": "deepwell-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/string-lint.mjs && tsc -b && vite build",
+    "lint": "oxlint",
+    "lint:strings": "node scripts/string-lint.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "eval": "tsx scripts/eval.ts",
+    "test:api": "node --test scripts/test-api.mjs",
+    "eval:claude": "tsx scripts/eval.ts --provider claude --confirm",
+    "eval:ingest": "tsx scripts/eval-ingest.ts",
+    "eval:ingest:claude": "tsx scripts/eval-ingest.ts --provider claude --confirm",
+    "gen:pages": "node scripts/gen-sample-pages.mjs",
+    "e2e": "node scripts/e2e.mjs",
+    "check:field": "node scripts/field-mode-check.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^1.43.0",
+    "pdfjs-dist": "^4.7.76",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "6.26.0",
+    "zustand": "4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "autoprefixer": "^10.4.20",
+    "canvas": "^3.2.3",
+    "oxlint": "^1.79.0",
+    "playwright": "^1.56.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
+}

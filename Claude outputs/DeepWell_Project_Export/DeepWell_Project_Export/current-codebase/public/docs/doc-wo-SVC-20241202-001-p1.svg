@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="816" height="1056" viewBox="0 0 816 1056" role="img" aria-label="WO-20241202-8765-w-thunderbird.pdf page 1">
+<rect width="816" height="1056" fill="#fdfcf9"/>
+<rect x="64" y="64" width="6" height="34" fill="#163c2c"/>
+<text x="82" y="80" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="19" fill="#163c2c" font-weight="600">Desert Air Mechanical</text>
+<text x="82" y="96" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783">2210 W Broadway Rd · Phoenix, AZ 85041 · (602) 555-0188</text>
+<line x1="64" y1="120" x2="752" y2="120" stroke="#c9d0cb" stroke-width="1"/>
+<text x="64" y="158" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="24" fill="#1c211d" font-weight="600" letter-spacing="1">Work Order</text>
+<text x="752" y="158" font-family="IBM Plex Mono, Menlo, monospace" font-size="12" fill="#4a5350" text-anchor="end">No. SVC-20241202-001</text>
+<text x="64" y="194" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783" font-weight="600" letter-spacing="1.2" style="text-transform:uppercase">Customer &amp; visit</text>
+<line x1="64" y1="202" x2="752" y2="202" stroke="#e4e9e5" stroke-width="1"/>
+<text x="64" y="224" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Customer</text>
+<text x="194" y="224" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">David Martinez</text>
+<text x="64" y="250" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Service address</text>
+<text x="194" y="250" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">8765 W Thunderbird Rd, Peoria</text>
+<text x="64" y="282" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Date</text>
+<text x="164" y="282" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">2024-12-02</text>
+<text x="408" y="282" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Technician</text>
+<text x="508" y="282" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">Carlos Rodriguez</text>
+<text x="64" y="320" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783" font-weight="600" letter-spacing="1.2" style="text-transform:uppercase">Equipment</text>
+<line x1="64" y1="328" x2="752" y2="328" stroke="#e4e9e5" stroke-width="1"/>
+<rect x="64" y="346" width="688" height="26" fill="#e4e9e5"/>
+<text x="74" y="363" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#4a5350" font-weight="600">Serial No.</text>
+<text x="418" y="363" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#4a5350" font-weight="600">Model</text>
+<text x="74" y="391" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">SN-TRA-789012</text>
+<text x="418" y="391" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">XR15a</text>
+<rect x="64" y="346" width="688" height="55" fill="none" stroke="#c9d0cb" stroke-width="1"/>
+<line x1="408" y1="346" x2="408" y2="401" stroke="#c9d0cb" stroke-width="1"/>
+<rect x="64" y="421" width="688" height="94.6" fill="none" stroke="#c9d0cb" stroke-width="1" rx="3"/>
+<text x="76" y="435" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783" font-weight="600" letter-spacing="1" style="text-transform:uppercase">Work performed</text>
+<text x="76" y="457.9" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">Blower motor replacement</text>
+<line x1="64" y1="1006" x2="752" y2="1006" stroke="#e4e9e5" stroke-width="1"/>
+<text x="64" y="1020" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10" fill="#7d8783">Desert Air Mechanical · Work order</text>
+<text x="752" y="1020" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10" fill="#7d8783" text-anchor="end">Page 1 of 2</text>
+<line x1="0" y1="762" x2="816" y2="762" stroke="#b9c0bb" stroke-width="0.8" opacity="0.55"/>
+<line x1="38" y1="735" x2="317" y2="735" stroke="#c7cdc8" stroke-width="1.2" opacity="0.5"/>
+</svg>

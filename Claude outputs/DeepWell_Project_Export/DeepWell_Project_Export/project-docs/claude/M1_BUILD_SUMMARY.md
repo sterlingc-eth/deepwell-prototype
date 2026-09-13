@@ -1,0 +1,1 @@
+See project doc `claude/M1_BUILD_SUMMARY.md` — build summary for Milestone 1 (real Ask interface). Content pending re-fetch; placeholder written during export to preserve directory structure. Refer to the Claude Project copy for full content if this file is not replaced before delivery.

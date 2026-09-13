@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="816" height="1056" viewBox="0 0 816 1056" role="img" aria-label="WarrantyReg_Carrier_58MVC_SN-CAR-123456.pdf page 1">
+<rect width="816" height="1056" fill="#fdfcf9"/>
+<rect x="64" y="64" width="6" height="34" fill="#1a4f9c"/>
+<text x="82" y="80" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#1a4f9c" font-weight="600">Carrier</text>
+<text x="82" y="96" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783">Residential &amp; Light Commercial Warranty Services</text>
+<line x1="64" y1="120" x2="752" y2="120" stroke="#c9d0cb" stroke-width="1"/>
+<text x="64" y="158" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="24" fill="#1c211d" font-weight="600" letter-spacing="1">Warranty Registration Certificate</text>
+<text x="752" y="158" font-family="IBM Plex Mono, Menlo, monospace" font-size="12" fill="#4a5350" text-anchor="end">Certificate WR-608503</text>
+<text x="64" y="194" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783" font-weight="600" letter-spacing="1.2" style="text-transform:uppercase">Registered equipment</text>
+<line x1="64" y1="202" x2="752" y2="202" stroke="#e4e9e5" stroke-width="1"/>
+<text x="64" y="224" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Serial No.</text>
+<text x="182" y="224" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">SN-CAR-123456</text>
+<text x="408" y="224" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Model</text>
+<text x="526" y="224" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">58MVC</text>
+<text x="64" y="250" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Manufacturer</text>
+<text x="182" y="250" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">Carrier</text>
+<text x="408" y="250" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Equipment type</text>
+<text x="526" y="250" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">Furnace</text>
+<text x="64" y="282" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Install date</text>
+<text x="182" y="282" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">2020-11-03</text>
+<text x="408" y="282" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Installing tech</text>
+<text x="526" y="282" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">Carlos Rodriguez</text>
+<text x="64" y="320" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10.5" fill="#7d8783" font-weight="600" letter-spacing="1.2" style="text-transform:uppercase">Installation site</text>
+<line x1="64" y1="328" x2="752" y2="328" stroke="#e4e9e5" stroke-width="1"/>
+<text x="64" y="350" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Registered owner</text>
+<text x="204" y="350" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">Robert Williams</text>
+<text x="64" y="376" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#7d8783">Service address</text>
+<text x="204" y="376" font-family="IBM Plex Mono, Menlo, monospace" font-size="13" fill="#1c211d">7890 N 16th St, Phoenix, AZ 85020</text>
+<text x="64" y="408" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#4a5350">See page 2 for coverage terms and the parts warranty end date.</text>
+<line x1="64" y1="1006" x2="752" y2="1006" stroke="#e4e9e5" stroke-width="1"/>
+<text x="64" y="1020" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10" fill="#7d8783">Carrier · Warranty registration · SN-CAR-123456</text>
+<text x="752" y="1020" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10" fill="#7d8783" text-anchor="end">Page 1 of 2</text>
+<line x1="0" y1="162" x2="816" y2="160" stroke="#b9c0bb" stroke-width="0.8" opacity="0.55"/>
+<line x1="302" y1="455" x2="729" y2="455" stroke="#c7cdc8" stroke-width="1.2" opacity="0.5"/>
+</svg>

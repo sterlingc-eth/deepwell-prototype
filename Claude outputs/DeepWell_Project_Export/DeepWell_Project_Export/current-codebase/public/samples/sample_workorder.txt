@@ -1,0 +1,49 @@
+WORK ORDER - Document Ingestion Demo
+
+Document Type: Work Order
+Date: September 5, 2024
+Order ID: WO-2024-09-05-001
+
+CUSTOMER INFORMATION
+Customer Name: Johnson Residence
+Address: 2847 Oak Ridge Drive, Phoenix, Arizona 85028
+Contact: Robert Johnson
+Phone: (602) 555-0147
+
+EQUIPMENT INFORMATION
+Equipment Type: HVAC System
+Manufacturer: Lennox
+Model: XC21-046
+Serial Number: SN-LEN-987654
+Installation Date: March 15, 2020
+
+WORK DESCRIPTION
+Service Type: Quarterly Maintenance & Inspection
+Technician: Maria Elena Garcia
+Date Completed: September 5, 2024
+Work Duration: 2 hours
+
+Services Performed:
+- Filter replacement (MERV 13)
+- Coil cleaning and inspection
+- Thermostat calibration
+- System performance testing
+- Coolant level verification
+
+FINDINGS & NOTES
+System operating at 94.2% efficiency. Minor debris in condenser unit cleaned. All components functioning normally. Customer advised to replace filter every 3 months.
+
+WARRANTY INFORMATION
+Warranty Type: Parts & Labor
+Warranty Expiry: June 15, 2026
+Coverage: Compressor, motor, heat exchanger
+
+COST BREAKDOWN
+Labor: $150.00
+Materials: $45.00
+Service Call: $25.00
+Total: $220.00
+
+Status: APPROVED
+Technician Signature: Maria Elena Garcia
+Supervisor: David Chen

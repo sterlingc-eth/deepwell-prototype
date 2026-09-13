@@ -1,0 +1,1297 @@
+{
+  "generatedAt": "2026-09-12",
+  "documentCount": 27,
+  "documents": [
+    {
+      "documentId": "doc-01-warranty-eq001",
+      "filename": "WarrantyReg_Carrier_25HBC648A003_SN-CAR-234567.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "warranty-registration"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Serial No.",
+          "value": "SN-CAR-234567",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "25HBC648A003",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Manufacturer",
+          "value": "Carrier",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Equipment type",
+          "value": "AC",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Registered owner",
+          "value": "James Mitchell",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "4521 E Camelback Rd, Phoenix, AZ 85018",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Parts coverage ends",
+          "value": "2025-03-15",
+          "valueTypeGuess": "date"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ001"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Clean warranty registration certificate \u2014 Carrier condenser at Camelback Rd (EQ001)."
+    },
+    {
+      "documentId": "doc-02-workorder-eq002-skew",
+      "filename": "WO-20260805-2847n24thst.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Sarah Johnson",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "2847 N 24th St, Phoenix, AZ 85016",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-08-05",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "Maria Santos",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-LEN-456789",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "XC21-100",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Work performed",
+          "value": "Annual furnace tune-up, cleaned burners, checked heat exchanger, replaced filter.",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Total",
+          "value": "$245",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ002"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Work order, skewed/noisy scan \u2014 Lennox furnace tune-up at N 24th St (EQ002)."
+    },
+    {
+      "documentId": "doc-03-invoice-eq003-fax",
+      "filename": "invoice_fax_0417.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "invoice"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Michael Torres",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "1523 S Alma School Rd, Mesa, AZ 85210",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Invoice date",
+          "value": "2026-07-22",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Total due",
+          "value": "$410",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ003"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Invoice, low-res faxed copy \u2014 Carrier AC repair at Alma School Rd (EQ003)."
+    },
+    {
+      "documentId": "doc-04-nameplate-eq004-glare",
+      "filename": "IMG_5502.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "nameplate-photo"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Model No.",
+          "value": "XR15a",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-TRA-789012",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Mfr.",
+          "value": "Trane",
+          "valueTypeGuess": "text"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ004"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Phone photo of a Trane nameplate with perspective skew and glare (EQ004)."
+    },
+    {
+      "documentId": "doc-05-startup-eq005",
+      "filename": "StartupSheet_Rheem_RAHL-036JAZ.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "startup-sheet"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Serial No.",
+          "value": "SN-RHE-012345",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "RAHL-036JAZ",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Startup date",
+          "value": "2026-08-14",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Performed by",
+          "value": "Maria Santos",
+          "valueTypeGuess": "name"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ005"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Equipment startup/commissioning sheet \u2014 Rheem heat pump at Broadway Rd (EQ005)."
+    },
+    {
+      "documentId": "doc-06-workorder-eq006-handwritten",
+      "filename": "IMG_5518_workorder.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Jennifer Lee",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "5600 W Camelback Rd, Glendale, AZ 85301",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-09-02",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "David Chen",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-LEN-345678",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "XC25",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Work performed",
+          "value": "Replaced dual run capacitor, cleared drain line, checked refrigerant charge - ok.",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Total",
+          "value": "$195",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ006"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Handwritten-style work order photo \u2014 Lennox AC capacitor swap at Camelback Rd Glendale (EQ006)."
+    },
+    {
+      "documentId": "doc-07-warranty-eq007-2page",
+      "filename": "WarrantyReg_Carrier_58MVC_SN-CAR-123456.pdf",
+      "fileType": "pdf",
+      "pages": 2,
+      "expectedAspects": [
+        "warranty-registration"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Serial No.",
+          "value": "SN-CAR-123456",
+          "valueTypeGuess": "serial",
+          "page": 1
+        },
+        {
+          "label": "Model",
+          "value": "58MVC",
+          "valueTypeGuess": "text",
+          "page": 1
+        },
+        {
+          "label": "Manufacturer",
+          "value": "Carrier",
+          "valueTypeGuess": "text",
+          "page": 1
+        },
+        {
+          "label": "Registered owner",
+          "value": "Robert Williams",
+          "valueTypeGuess": "name",
+          "page": 1
+        },
+        {
+          "label": "Service address",
+          "value": "7890 N 16th St, Phoenix, AZ 85020",
+          "valueTypeGuess": "address",
+          "page": 1
+        },
+        {
+          "label": "Parts coverage ends",
+          "value": "2025-11-03",
+          "valueTypeGuess": "date",
+          "page": 2
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ007"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Two-page warranty registration certificate \u2014 Carrier furnace at N 16th St (EQ007); coverage terms on page 2."
+    },
+    {
+      "documentId": "doc-08-service-records-eq008",
+      "filename": "ServiceRecords_PriceRd_export.csv",
+      "fileType": "spreadsheet",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Serial No.",
+          "value": "SN-TRA-234567",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "XV18",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Date",
+          "value": "2025-04-11",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Date",
+          "value": "2025-09-02",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Date",
+          "value": "2026-06-19",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Total",
+          "value": "$385",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ008"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "CSV export of three service visits for a Trane AC at Price Rd, Chandler (EQ008) \u2014 a real spreadsheet upload, not an image."
+    },
+    {
+      "documentId": "doc-09-nameplate-eq009-clean",
+      "filename": "IMG_5531.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "nameplate-photo"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Model No.",
+          "value": "RA1505AJ",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-RHE-456789",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Mfr.",
+          "value": "Rheem",
+          "valueTypeGuess": "text"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ009"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Clean, legible nameplate photo \u2014 Rheem furnace at Van Buren St (EQ009)."
+    },
+    {
+      "documentId": "doc-10-workorder-eq010",
+      "filename": "WO-20260828-4521ecamelback.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "James Mitchell",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "4521 E Camelback Rd, Phoenix, AZ 85018",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-08-28",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "Carlos Rodriguez",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-LEN-567890",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "XP15",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Total",
+          "value": "$150",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ010"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Work order \u2014 Lennox AC seasonal checkup, second unit at the Camelback Rd property (EQ010)."
+    },
+    {
+      "documentId": "doc-11-nameplate-eq014",
+      "filename": "IMG_5546.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "nameplate-photo"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Model No.",
+          "value": "ML",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-LEN-678901",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Mfr.",
+          "value": "Lennox",
+          "valueTypeGuess": "text"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ014"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Nameplate photo \u2014 Lennox furnace at Van Buren St, second unit (EQ014)."
+    },
+    {
+      "documentId": "doc-12-workorder-eq015",
+      "filename": "IMG_5559_workorder.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Karen Nguyen",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "6543 E Indian School Rd, Scottsdale, AZ 85251",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-09-05",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "David Chen",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-CAR-789012",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "25HNH648A003",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Total",
+          "value": "$275",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ015"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Work order photo \u2014 Carrier AC no-cool call at Indian School Rd, Scottsdale (EQ015)."
+    },
+    {
+      "documentId": "doc-13-warranty-eq013-conflict-a",
+      "filename": "WarrantyReg_Rheem_RHEEM-2000_SN-RHE-678901.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "warranty-registration"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Serial No.",
+          "value": "SN-RHE-678901",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Model",
+          "value": "RHEEM-2000",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Manufacturer",
+          "value": "Rheem",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Registered owner",
+          "value": "Robert Williams",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "7890 N 16th St, Phoenix, AZ 85020",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Parts coverage ends",
+          "value": "2027-10-30",
+          "valueTypeGuess": "date"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ013"
+      },
+      "dedupe": null,
+      "conflict": {
+        "withDocumentId": "doc-14-nameplate-eq013-conflict-a",
+        "entityId": "EQ013",
+        "field": "serial",
+        "thisValue": "SN-RHE-678901",
+        "otherValue": "SN-RHE-678981"
+      },
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "CONFLICT A (serial), side 1: warranty registration for Rheem heat pump at N 16th St (EQ013) \u2014 correct serial."
+    },
+    {
+      "documentId": "doc-14-nameplate-eq013-conflict-a",
+      "filename": "IMG_5567.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "nameplate-photo"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Model No.",
+          "value": "RHEEM-2000",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-RHE-678981",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Mfr.",
+          "value": "Rheem",
+          "valueTypeGuess": "text"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ013"
+      },
+      "dedupe": null,
+      "conflict": {
+        "withDocumentId": "doc-13-warranty-eq013-conflict-a",
+        "entityId": "EQ013",
+        "field": "serial",
+        "thisValue": "SN-RHE-678981",
+        "otherValue": "SN-RHE-678901"
+      },
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "CONFLICT A (serial), side 2: nameplate photo of the same heat pump (EQ013) \u2014 glare-misread serial, last two digits transposed."
+    },
+    {
+      "documentId": "doc-15-workorder-conflict-b",
+      "filename": "WO-20260830-5600wcamelback.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Jennifer Lee",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "5600 W Camelback Rd, Glendale, AZ 85301",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-08-30",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "David Chen",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-LEN-345678",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Total",
+          "value": "$540",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ006"
+      },
+      "dedupe": null,
+      "conflict": {
+        "withDocumentId": "doc-16-invoice-conflict-b",
+        "entityId": "doc-15/16 service visit (2026-08-30, EQ006)",
+        "field": "cost",
+        "thisValue": "$540",
+        "otherValue": "$585"
+      },
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "CONFLICT B (total), side 1: work order for a Lennox AC compressor repair at Camelback Rd, Glendale (EQ006) \u2014 total $540."
+    },
+    {
+      "documentId": "doc-16-invoice-conflict-b",
+      "filename": "invoice_scan_5600wcamelback.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "invoice"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Jennifer Lee",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "5600 W Camelback Rd, Glendale, AZ 85301",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Invoice date",
+          "value": "2026-08-30",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Total due",
+          "value": "$585",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ006"
+      },
+      "dedupe": null,
+      "conflict": {
+        "withDocumentId": "doc-15-workorder-conflict-b",
+        "entityId": "doc-15/16 service visit (2026-08-30, EQ006)",
+        "field": "cost",
+        "thisValue": "$585",
+        "otherValue": "$540"
+      },
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "CONFLICT B (total), side 2: invoice for the same visit \u2014 total $585 (parts markup added after the work order was written)."
+    },
+    {
+      "documentId": "doc-17-workorder-eq004-original",
+      "filename": "WO-20260714-8765wthunderbird.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "David Martinez",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "8765 W Thunderbird Rd, Peoria, AZ 85381",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-07-14",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "Carlos Rodriguez",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-TRA-789012",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Total",
+          "value": "$210",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ004"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Work order \u2014 Trane AC blower motor capacitor at Thunderbird Rd (EQ004). First upload."
+    },
+    {
+      "documentId": "doc-18-workorder-eq004-duplicate",
+      "filename": "WO-20260714-8765wthunderbird (1).pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "work-order"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "David Martinez",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "8765 W Thunderbird Rd, Peoria, AZ 85381",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Date",
+          "value": "2026-07-14",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Technician",
+          "value": "Carlos Rodriguez",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-TRA-789012",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Total",
+          "value": "$210",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ004"
+      },
+      "dedupe": {
+        "relation": "exact-duplicate",
+        "of": "doc-17-workorder-eq004-original"
+      },
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Byte-identical re-upload of doc-17 (same file, saved twice from the truck) \u2014 must dedupe exactly, no second processing."
+    },
+    {
+      "documentId": "doc-19-invoice-eq009-original",
+      "filename": "Invoice_VanBurenSt_INV330175.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "invoice"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Commercial Warehouse Inc",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "9012 W Van Buren St, Phoenix, AZ 85037",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Invoice date",
+          "value": "2026-06-02",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Total due",
+          "value": "$298",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ009"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "Invoice PDF for a Rheem furnace repair at Van Buren St (EQ009), emailed to the office."
+    },
+    {
+      "documentId": "doc-20-invoice-eq009-photo-of-pdf",
+      "filename": "IMG_5580_invoice_photo.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [
+        "invoice"
+      ],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Commercial Warehouse Inc",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "9012 W Van Buren St, Phoenix, AZ 85037",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Invoice date",
+          "value": "2026-06-02",
+          "valueTypeGuess": "date"
+        },
+        {
+          "label": "Total due",
+          "value": "$298",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ009"
+      },
+      "dedupe": {
+        "relation": "possible-duplicate",
+        "of": "doc-19-invoice-eq009-original"
+      },
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [],
+      "description": "The same invoice (doc-19), later photographed off a printed copy on the truck dash \u2014 same field values, different bytes and framing: a near-duplicate, not an exact one."
+    },
+    {
+      "documentId": "doc-21-blank-page",
+      "filename": "IMG_5591.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [],
+      "expectedLink": null,
+      "dedupe": null,
+      "conflict": null,
+      "special": "blank-page",
+      "expectedOutcome": "No segments or facets; stage should not advance past received/classified; must not crash the pipeline.",
+      "novelFacets": [],
+      "description": "A blank page \u2014 accidental photo of a blank sheet, no content of any kind."
+    },
+    {
+      "documentId": "doc-22-password-protected",
+      "filename": "FinancingAgreement_locked.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [],
+      "expectedLink": null,
+      "dedupe": null,
+      "conflict": null,
+      "special": "password-protected",
+      "expectedOutcome": "Page render/read must fail gracefully with a specific \"password protected\" gap issue on the document \u2014 no facets extracted, no crash, no silent skip.",
+      "novelFacets": [],
+      "description": "A real password-protected PDF (RC4-encrypted) \u2014 a financing agreement the customer locked before emailing. Must fail gracefully, not crash the pipeline."
+    },
+    {
+      "documentId": "doc-23-no-key-fields",
+      "filename": "IMG_5602_flyer.jpg",
+      "fileType": "image",
+      "pages": 1,
+      "expectedAspects": [],
+      "isNovelSchemaDocument": false,
+      "expectedFields": [],
+      "expectedLink": null,
+      "dedupe": null,
+      "conflict": null,
+      "special": "no-key-fields",
+      "expectedOutcome": "Segments/facets may include marketing copy text but no identifier/date/money/serial-typed facets; document should park with a \"no key fields found\" reason, not be forced into a type.",
+      "novelFacets": [],
+      "description": "A \"thank you\" flyer photographed by mistake along with a batch of job photos \u2014 text present, but no identifiers, dates, amounts, or names to extract."
+    },
+    {
+      "documentId": "doc-24-novel-rebate-form",
+      "filename": "SRP_CoolCash_RebateApplication.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "rebate-form"
+      ],
+      "isNovelSchemaDocument": true,
+      "expectedFields": [
+        {
+          "label": "Applicant Name",
+          "value": "James Mitchell",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service Address",
+          "value": "4521 E Camelback Rd, Phoenix, AZ 85018",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Model No.",
+          "value": "25HBC648A003",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-CAR-234567",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Installation Date",
+          "value": "2020-03-15",
+          "valueTypeGuess": "date"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ001"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [
+        {
+          "label": "Utility Account Number",
+          "value": "SRP-88213045",
+          "valueTypeGuess": "identifier"
+        },
+        {
+          "label": "Rebate Program",
+          "value": "SRP Cool Cash \u2014 High-Efficiency AC",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "SEER Rating",
+          "value": "16.5",
+          "valueTypeGuess": "number"
+        },
+        {
+          "label": "Rebate Amount Requested",
+          "value": "$400",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "description": "NOVEL SCHEMA 1/4: utility energy-rebate application for the new Carrier AC at Camelback Rd (EQ001) \u2014 fields (Rebate Program, SEER Rating, Utility Account Number, Rebate Amount Requested) do not exist in the tier-0 registry."
+    },
+    {
+      "documentId": "doc-25-novel-permit-checklist",
+      "filename": "Permit_Inspection_Checklist_2026-1187.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "permit"
+      ],
+      "isNovelSchemaDocument": true,
+      "expectedFields": [
+        {
+          "label": "Permit No.",
+          "value": "MES-2026-1187",
+          "valueTypeGuess": "identifier"
+        },
+        {
+          "label": "Address",
+          "value": "1523 S Alma School Rd, Mesa, AZ 85210",
+          "valueTypeGuess": "address"
+        },
+        {
+          "label": "Inspection Date",
+          "value": "2026-08-27",
+          "valueTypeGuess": "date"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "property",
+        "entityId": "PROP003"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [
+        {
+          "label": "Inspector Name",
+          "value": "Ray Delgado",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Inspector Badge No.",
+          "value": "MSA-4471",
+          "valueTypeGuess": "identifier"
+        },
+        {
+          "label": "Inspection Result",
+          "value": "Approved with corrections",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Re-inspection Fee",
+          "value": "$75",
+          "valueTypeGuess": "money"
+        }
+      ],
+      "description": "NOVEL SCHEMA 2/4: mechanical permit inspection checklist for the Alma School Rd job (EQ003/PROP003) \u2014 classifies as the existing tier-0 \"permit\" document type (this really is a permit inspection form), but its fields (Inspector Name, Inspector Badge No., Inspection Result, Re-inspection Fee) are not registered on that type \u2014 a mapping/proposal gap, not a classification gap."
+    },
+    {
+      "documentId": "doc-26-novel-recall-notice",
+      "filename": "Lennox_Recall_Notice_LX-2026-0091.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "recall-notice"
+      ],
+      "isNovelSchemaDocument": true,
+      "expectedFields": [
+        {
+          "label": "Affected Model",
+          "value": "XC21-100",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Serial No.",
+          "value": "SN-LEN-456789",
+          "valueTypeGuess": "serial"
+        },
+        {
+          "label": "Service address",
+          "value": "2847 N 24th St, Phoenix, AZ 85016",
+          "valueTypeGuess": "address"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "equipment",
+        "entityId": "EQ002"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [
+        {
+          "label": "Recall Number",
+          "value": "LX-2026-0091",
+          "valueTypeGuess": "identifier"
+        },
+        {
+          "label": "Affected Serial Range",
+          "value": "SN-LEN-450000 through SN-LEN-460000",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Safety Hazard Description",
+          "value": "A wiring defect in the induced draft motor can overheat and pose a fire hazard under continuous high-demand operation.",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Remedy Offered",
+          "value": "Free in-home inspection and replacement of the induced draft motor wiring harness by an authorized Lennox dealer.",
+          "valueTypeGuess": "text"
+        }
+      ],
+      "description": "NOVEL SCHEMA 3/4: manufacturer recall notice for a range of Lennox furnaces including the unit at N 24th St (EQ002) \u2014 fields (Recall Number, Affected Serial Range, Safety Hazard Description, Remedy Offered) do not exist in the tier-0 registry."
+    },
+    {
+      "documentId": "doc-27-novel-financing-agreement",
+      "filename": "EquipmentFinancing_OfficePlaza.pdf",
+      "fileType": "pdf",
+      "pages": 1,
+      "expectedAspects": [
+        "financing-agreement"
+      ],
+      "isNovelSchemaDocument": true,
+      "expectedFields": [
+        {
+          "label": "Customer",
+          "value": "Office Plaza Management",
+          "valueTypeGuess": "name"
+        },
+        {
+          "label": "Service address",
+          "value": "3210 E Broadway Rd, Mesa, AZ 85204",
+          "valueTypeGuess": "address"
+        }
+      ],
+      "expectedLink": {
+        "entityType": "property",
+        "entityId": "PROP005"
+      },
+      "dedupe": null,
+      "conflict": null,
+      "special": null,
+      "expectedOutcome": null,
+      "novelFacets": [
+        {
+          "label": "Lender Name",
+          "value": "Comfort Capital Finance",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Loan Amount",
+          "value": "$9,800",
+          "valueTypeGuess": "money"
+        },
+        {
+          "label": "APR",
+          "value": "7.9%",
+          "valueTypeGuess": "text"
+        },
+        {
+          "label": "Monthly Payment",
+          "value": "$215",
+          "valueTypeGuess": "money"
+        },
+        {
+          "label": "Financing Term (months)",
+          "value": "48",
+          "valueTypeGuess": "number"
+        }
+      ],
+      "description": "NOVEL SCHEMA 4/4: equipment financing agreement for a new commercial unit at Broadway Rd, Mesa (PROP005, a provisional property \u2014 no existing equipment entity for the financed unit) \u2014 fields (Loan Amount, APR, Monthly Payment, Financing Term, Lender Name) do not exist in the tier-0 registry."
+    }
+  ]
+}

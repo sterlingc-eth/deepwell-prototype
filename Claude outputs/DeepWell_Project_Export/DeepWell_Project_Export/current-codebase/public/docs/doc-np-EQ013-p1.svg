@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="816" height="1056" viewBox="0 0 816 1056" role="img" aria-label="IMG_4419_nameplate.jpg page 1">
+<rect x="0" y="0" width="816" height="1056" fill="#23272a"/>
+<rect x="60" y="120" width="696" height="816" fill="#2e3336"/>
+<circle cx="92" cy="150" r="6" fill="#1a1d1f"/><circle cx="92" cy="150" r="3.5" fill="#4a5054"/>
+<circle cx="724" cy="150" r="6" fill="#1a1d1f"/><circle cx="724" cy="150" r="3.5" fill="#4a5054"/>
+<circle cx="92" cy="906" r="6" fill="#1a1d1f"/><circle cx="92" cy="906" r="3.5" fill="#4a5054"/>
+<circle cx="724" cy="906" r="6" fill="#1a1d1f"/><circle cx="724" cy="906" r="3.5" fill="#4a5054"/>
+<rect x="112" y="306" width="600" height="430" fill="#000" rx="14" opacity="0.4"/>
+<rect x="108" y="300" width="600" height="430" fill="#383d41" stroke="#5d646a" stroke-width="2" rx="14"/>
+<rect x="122" y="314" width="572" height="402" fill="none" stroke="#5d646a" stroke-width="1" rx="8" opacity="0.6"/>
+<text x="144" y="362" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="30" fill="#e8e9e6" font-weight="700" letter-spacing="6">RHEEM</text>
+<text x="144" y="388" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="11" fill="#aeb4b8" letter-spacing="2">OUTDOOR UNIT · RATING PLATE</text>
+<line x1="144" y1="404" x2="672" y2="404" stroke="#5d646a" stroke-width="1"/>
+<text x="144" y="456" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="12" fill="#aeb4b8" letter-spacing="1.5">MODEL NO.</text>
+<text x="308" y="456" font-family="IBM Plex Mono, Menlo, monospace" font-size="22" fill="#e8e9e6" font-weight="600" letter-spacing="2">RHEEM-2000H</text>
+<text x="144" y="510" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="12" fill="#aeb4b8" letter-spacing="1.5">SERIAL NO.</text>
+<text x="308" y="510" font-family="IBM Plex Mono, Menlo, monospace" font-size="22" fill="#e8e9e6" font-weight="600" letter-spacing="2">SN-RHE-678901</text>
+<line x1="144" y1="590" x2="672" y2="590" stroke="#5d646a" stroke-width="1"/>
+<text x="144" y="626" font-family="IBM Plex Mono, Menlo, monospace" font-size="11" fill="#c5cacd" letter-spacing="1">VOLTS 208/230</text>
+<text x="344" y="626" font-family="IBM Plex Mono, Menlo, monospace" font-size="11" fill="#c5cacd" letter-spacing="1">PH 1</text>
+<text x="544" y="626" font-family="IBM Plex Mono, Menlo, monospace" font-size="11" fill="#c5cacd" letter-spacing="1">HZ 60</text>
+<text x="144" y="656" font-family="IBM Plex Mono, Menlo, monospace" font-size="11" fill="#c5cacd" letter-spacing="1">REFRIG. R-410A</text>
+<text x="344" y="656" font-family="IBM Plex Mono, Menlo, monospace" font-size="11" fill="#c5cacd" letter-spacing="1">MCA 28.4 A</text>
+<text x="544" y="656" font-family="IBM Plex Mono, Menlo, monospace" font-size="11" fill="#c5cacd" letter-spacing="1">MAX FUSE 45 A</text>
+<text x="144" y="700" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" font-size="10" fill="#8d9498" letter-spacing="2">MADE IN USA · LISTED</text>
+</svg>

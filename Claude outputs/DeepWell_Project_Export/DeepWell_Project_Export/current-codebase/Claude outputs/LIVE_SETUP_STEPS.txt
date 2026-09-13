@@ -1,0 +1,96 @@
+═══════════════════════════════════════════════════════════════════════════════
+  DEEPWELL LIVE DEPLOYMENT WITH LOGIN - 4 STEPS
+═══════════════════════════════════════════════════════════════════════════════
+
+STATUS: Frontend at deepwell-prototype.vercel.app
+        API handlers ready in /api/records.ts
+        Clerk configured (just needs frontend wiring)
+        Neon database ready (just needs schema)
+
+═══════════════════════════════════════════════════════════════════════════════
+  STEP 1: CREATE DATABASE SCHEMA (One-time, 2 minutes)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Go to: https://console.neon.tech (your Neon project)
+2. Click "SQL Editor" on the left
+3. Paste the entire content of init-schema.sql
+4. Click "Execute"
+5. Wait for success message
+
+This creates:
+  ✓ All 10 tables (documents, facets, extractions, entities, etc.)
+  ✓ Row-Level Security policies (tenant isolation)
+  ✓ Indexes for performance
+  ✓ Default tenant
+
+═══════════════════════════════════════════════════════════════════════════════
+  STEP 2: UPDATE ENVIRONMENT VARIABLES (2 minutes)
+═══════════════════════════════════════════════════════════════════════════════
+
+In your local deepwell-prototype folder, edit .env.local:
+
+CHANGE THIS LINE:
+  CLERK_PUBLISHABLE_KEY=pk_test_...
+
+TO THIS (add VITE_ prefix):
+  VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+
+Keep everything else the same.
+
+═══════════════════════════════════════════════════════════════════════════════
+  STEP 3: UPDATE FRONTEND CODE (Copy 3 files)
+═══════════════════════════════════════════════════════════════════════════════
+
+Copy these files to your local repo:
+
+  1. Replace src/App.tsx with the new App.tsx
+  2. Replace src/main.tsx with the new main.tsx
+  3. Create new file src/screens/LoginScreen.tsx (copy LoginScreen.tsx)
+
+Then install Clerk package:
+  npm install @clerk/clerk-react
+
+═══════════════════════════════════════════════════════════════════════════════
+  STEP 4: PUSH TO GITHUB → VERCEL AUTO-DEPLOYS (3 minutes)
+═══════════════════════════════════════════════════════════════════════════════
+
+From your command line in deepwell-prototype folder:
+
+  git add .
+  git commit -m "Add Clerk authentication and database schema"
+  git push
+
+Vercel will automatically:
+  ✓ Detect the push
+  ✓ Install @clerk/clerk-react
+  ✓ Build the app
+  ✓ Deploy to deepwell-prototype.vercel.app
+
+Wait 2-3 minutes, then refresh https://deepwell-prototype.vercel.app
+
+═══════════════════════════════════════════════════════════════════════════════
+  WHAT YOU'LL SEE
+═══════════════════════════════════════════════════════════════════════════════
+
+✓ Login page with Clerk sign-in form
+✓ Sign up with email or Google
+✓ After login → Ask screen appears
+✓ All data syncs to Neon database
+✓ RLS ensures tenant isolation
+
+═══════════════════════════════════════════════════════════════════════════════
+  IF SOMETHING BREAKS
+═══════════════════════════════════════════════════════════════════════════════
+
+Issue: "VITE_CLERK_PUBLISHABLE_KEY is undefined"
+Fix: Make sure you added VITE_ prefix in .env.local
+
+Issue: Vercel deploy fails with "@clerk/clerk-react not found"
+Fix: Run "npm install @clerk/clerk-react" before pushing
+
+Issue: Database error when trying to create documents
+Fix: Run the init-schema.sql in Neon SQL Editor (Step 1)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+THAT'S IT! You'll have a fully live, authenticated DeepWell app at your Vercel URL.

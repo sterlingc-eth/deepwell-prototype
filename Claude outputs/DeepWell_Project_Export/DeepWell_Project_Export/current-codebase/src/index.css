@@ -1,0 +1,237 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------ */
+/* Semantic tokens                                                     */
+/* Light = office. `.dark` = field mode: high contrast, larger type.   */
+/* ------------------------------------------------------------------ */
+@layer base {
+  :root {
+    --dw-bg: #f6f8f6;          /* stone-50 */
+    --dw-surface: #ffffff;
+    --dw-surface-2: #ecf0ed;   /* stone-100 */
+    --dw-ink: #0d110e;         /* stone-950 */
+    --dw-ink-2: #3c463f;       /* stone-700 */
+    --dw-ink-3: #6e7c72;       /* stone-500 */
+    --dw-line: #dce3de;        /* stone-200 */
+    --dw-line-2: #c2ccc5;      /* stone-300 */
+    --dw-accent: #b98a4e;      /* brass-500 */
+    --dw-accent-ink: #7a572c;  /* brass-700 — brass on light needs the darker step for text */
+    --dw-focus: #123d6b;       /* navy-600 */
+    color-scheme: light;
+  }
+
+  .dark {
+    --dw-bg: #05100b;          /* forest-950 */
+    --dw-surface: #0a1b14;     /* forest-900 */
+    --dw-surface-2: #10291f;   /* forest-800 */
+    --dw-ink: #f6f8f6;
+    --dw-ink-2: #dce3de;
+    --dw-ink-3: #b3cdbb;
+    --dw-line: #245239;        /* forest-600 */
+    --dw-line-2: #3a6b4d;
+    --dw-accent: #d9b57a;      /* brass-300 — lifted for contrast on dark */
+    --dw-accent-ink: #e8d1a8;
+    --dw-focus: #d9b57a;
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans text-body-lg;
+    margin: 0;
+  }
+
+  /* Field mode: everything one step larger, min 18px body */
+  .dark body {
+    @apply text-body-xl;
+  }
+
+  h1, h2, h3 {
+    @apply font-display font-medium text-ink;
+    letter-spacing: -0.005em;
+  }
+  h1 { @apply text-h1; }
+  h2 { @apply text-h2; }
+  h3 { @apply text-h3; }
+  h4 { @apply font-sans font-semibold text-h4 text-ink; }
+
+  code, kbd, samp, .font-data {
+    @apply font-mono text-data;
+  }
+
+  /* Focus: visible everywhere, never removed. */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 2px solid var(--dw-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: #d8e6dc;
+    color: #0d110e;
+  }
+  .dark ::selection {
+    background: #3a6b4d;
+    color: #f6f8f6;
+  }
+
+  /* Reduced motion: respect it globally. Framer Motion also checks this. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--dw-line-2);
+    border-radius: 8px;
+    border: 2px solid var(--dw-bg);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Component primitives — small, reused everywhere                     */
+/* ------------------------------------------------------------------ */
+@layer components {
+  .dw-card {
+    @apply bg-surface border border-line rounded-lg shadow-card;
+  }
+
+  .dw-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md font-medium
+           transition-colors duration-quick select-none
+           disabled:cursor-not-allowed disabled:opacity-50;
+    min-height: 44px;
+    padding: 10px 18px;
+  }
+  .dark .dw-btn { min-height: 48px; padding: 12px 20px; }
+
+  .dw-btn-primary {
+    @apply dw-btn bg-forest-700 text-stone-0 hover:bg-forest-800 active:bg-forest-900;
+  }
+  .dark .dw-btn-primary {
+    @apply bg-brass-300 text-forest-950 hover:bg-brass-200 active:bg-brass-400;
+  }
+  .dw-btn-secondary {
+    @apply dw-btn bg-surface text-ink border border-line-2 hover:bg-surface-2;
+  }
+  .dw-btn-tertiary {
+    @apply dw-btn bg-transparent text-forest-700 hover:bg-forest-50;
+    padding: 8px 12px;
+    min-height: 40px;
+  }
+  .dark .dw-btn-tertiary {
+    @apply text-brass-300 hover:bg-forest-800;
+  }
+
+  .dw-input {
+    @apply w-full bg-surface text-ink border border-line-2 rounded-md
+           placeholder:text-ink-3 transition-colors duration-quick
+           focus:border-focus;
+    padding: 12px 16px;
+    min-height: 48px;
+  }
+
+  .dw-label {
+    @apply text-label font-medium text-ink-3 uppercase;
+  }
+
+  .dark .dw-label { font-size: 16px; line-height: 24px; }
+
+  .dw-pill {
+    @apply inline-flex items-center gap-1.5 rounded-sm font-medium text-label;
+    padding: 4px 8px;
+  }
+  /* Field mode: pills are read at arm's length in sun — 16px, taller, roomier */
+  .dark .dw-pill, .dark .dw-pill-ok, .dark .dw-pill-warn, .dark .dw-pill-bad, .dark .dw-pill-info, .dark .dw-pill-muted {
+    font-size: 16px;
+    line-height: 24px;
+    padding: 8px 12px;
+    min-height: 44px;
+  }
+  .dw-pill-ok   { @apply dw-pill bg-ok-bg text-ok-ink; }
+  .dw-pill-warn { @apply dw-pill bg-warn-bg text-warn-ink; }
+  .dw-pill-bad  { @apply dw-pill bg-bad-bg text-bad-ink; }
+  .dw-pill-info { @apply dw-pill bg-info-bg text-info-ink; }
+  .dw-pill-muted{ @apply dw-pill bg-surface-2 text-ink-2; }
+
+  /* Field mode pills keep text legible on dark surfaces */
+  .dark .dw-pill-ok   { background: #16432a; color: #b9e6c9; }
+  .dark .dw-pill-warn { background: #4d3300; color: #ffd98a; }
+  .dark .dw-pill-bad  { background: #5a1a13; color: #ffc1b8; }
+  .dark .dw-pill-info { background: #0e3057; color: #c3d8ef; }
+
+  .dw-kbd {
+    @apply font-mono text-caption text-ink-3 border border-line rounded-sm px-1.5 py-0.5;
+  }
+  .dark .dw-kbd { font-size: 16px; line-height: 24px; }
+
+  .dw-skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100]
+           focus:bg-surface focus:text-ink focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lift;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Field mode type + targets (FLD-01..03, A11Y-04)                     */
+/* One rule set, not per-element tuning: in `.dark` every small size    */
+/* class scales up (nothing below 16px, body 18px, headings 24px) and   */
+/* every control is at least 48×48. `html.dark .x` (0,2,1) beats both   */
+/* plain utilities and Tailwind's own `.dark .dark\:x` variants.        */
+/* Deliberately outside @layer: Tailwind would tree-shake layered rules  */
+/* whose class names never appear in the source.                        */
+/* ------------------------------------------------------------------ */
+@media all {
+  html.dark .text-caption, html.dark .dark\:text-caption,
+  html.dark .text-label,   html.dark .dark\:text-label,
+  html.dark .text-data,    html.dark .dark\:text-data {
+    font-size: 16px;
+    line-height: 24px;
+  }
+  html.dark .text-body,    html.dark .dark\:text-body,
+  html.dark .text-body-lg, html.dark .dark\:text-body-lg {
+    font-size: 18px;
+    line-height: 28px;
+  }
+  html.dark .text-h4, html.dark .text-h3, html.dark h3, html.dark h4 {
+    font-size: 24px;
+    line-height: 32px;
+  }
+  html.dark code, html.dark kbd, html.dark samp, html.dark .font-data {
+    font-size: 16px;
+    line-height: 24px;
+  }
+  @media (min-width: 640px) {
+    html.dark .sm\:text-body-lg { font-size: 18px; line-height: 28px; }
+    html.dark .sm\:text-body-xl { font-size: 18px; line-height: 28px; }
+  }
+
+  /* Every control is a gloved-thumb target. Checkboxes/radios keep their
+     intrinsic box; the wrapping label carries the 48px target. */
+  html.dark button,
+  html.dark [role="button"],
+  html.dark select,
+  html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+    min-height: 48px;
+  }
+  html.dark button, html.dark [role="button"] {
+    min-width: 48px;
+  }
+  html.dark input[type="checkbox"], html.dark input[type="radio"] {
+    width: 24px;
+    height: 24px;
+  }
+}
