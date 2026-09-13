@@ -1,0 +1,24 @@
+M2 delivery — two manual steps on your machine (everything else was written automatically):
+
+1. Replace .env.local.example
+   The remote tool won't write this filename directly (same restriction hit in M1).
+   Rename the attached "env.local.example.txt" to ".env.local.example" and drop it into
+   C:\Users\chapman\Desktop\GitHub\deepwell-app\, overwriting the existing one.
+   It now documents two new variables: INGEST_ENABLED=false (default off, same pattern as ASK_ENABLED)
+   and INGEST_DAILY_PAGES=300.
+
+   Also add these two lines to your real .env.local (not the example file) so ingestion works locally:
+     INGEST_ENABLED=true
+     INGEST_DAILY_PAGES=300
+
+2. Delete two dead files
+   api/extract.js and api/search.js were leftover from before the M0/M1 rebuild and are not called
+   anywhere live (confirmed by a repo-wide grep). They were removed from this session's copy but the
+   remote tool can only write/overwrite files, not delete them — please delete these two yourself:
+     C:\Users\chapman\Desktop\GitHub\deepwell-app\api\extract.js
+     C:\Users\chapman\Desktop\GitHub\deepwell-app\api\search.js
+
+After both steps, run in the deepwell-app folder:
+  npm install        (picks up pdfjs-dist, canvas, playwright/jsPDF added this milestone)
+  npm run build       should pass clean
+  npm run test:api && npm run test:ingest-api   should be 23/23 and 15/15
