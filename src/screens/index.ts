@@ -5,3 +5,4 @@ export { IntakeScreen } from './IntakeScreen';
 export { ReviewScreen } from './ReviewScreen';
 export { DashboardScreen } from './DashboardScreen';
 export { BrowseScreen } from './BrowseScreen';
+export { LoginScreen } from './LoginScreen';

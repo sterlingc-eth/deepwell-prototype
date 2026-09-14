@@ -1,23 +1,25 @@
 import { lazy, Suspense } from 'react';
-import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useAppStore } from './store/appStore';
-import { usePostgresSync } from './hooks/usePostgresSync';
-import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, IntakeScreen, RecordsScreen, ReviewScreen } from './screens';
-import { LoginScreen } from './screens/LoginScreen';
+import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, IntakeScreen, LoginScreen, RecordsScreen, ReviewScreen } from './screens';
 import './index.css';
 
 // The claim-packet export pulls in jspdf + html2canvas (~60 KB gzipped); only load it when opened.
 const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen').then((m) => ({ default: m.WarrantyExportScreen })));
 
-function AppContent() {
+function App() {
+  const { isSignedIn, isLoaded } = useAuth();
   const currentScreen = useAppStore((s) => s.currentScreen);
-  const { userId, orgId } = useAuth();
 
-  // Use orgId as tenantId (Clerk organizations = tenants)
-  const tenantId = orgId || userId || 'tenant-default';
+  // Show loading screen while authentication is loading
+  if (!isLoaded) {
+    return <div className="min-h-screen bg-bg" aria-busy="true" />;
+  }
 
-  // Enable Postgres sync on app load with real tenantId
-  usePostgresSync(tenantId);
+  // Show login screen if not authenticated
+  if (!isSignedIn) {
+    return <LoginScreen />;
+  }
 
   switch (currentScreen) {
     case 'ask':
@@ -43,19 +45,6 @@ function AppContent() {
     default:
       return <AskScreen />;
   }
-}
-
-function App() {
-  return (
-    <>
-      <SignedOut>
-        <LoginScreen />
-      </SignedOut>
-      <SignedIn>
-        <AppContent />
-      </SignedIn>
-    </>
-  );
 }
 
 export default App;
