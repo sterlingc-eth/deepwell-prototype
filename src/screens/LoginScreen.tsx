@@ -1,4 +1,5 @@
 import { SignIn } from '@clerk/clerk-react';
+import { ArrowLeft } from 'lucide-react';
 import { Wordmark } from '../components/Wordmark';
 
 /** The plate behind the lockup; the sign-in card matches it. */
@@ -35,6 +36,14 @@ export function LoginScreen() {
           }}
         />
       </div>
+
+      <a
+        href="/"
+        className="dw-rise dw-rise-late inline-flex items-center gap-2 min-h-touch px-3 rounded-md text-forest-100 hover:text-stone-0 hover:bg-white/10 transition-colors duration-quick focus-visible:outline-brass-300"
+      >
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+        <span className="text-body">Back to the DeepWell website</span>
+      </a>
     </div>
   );
 }
