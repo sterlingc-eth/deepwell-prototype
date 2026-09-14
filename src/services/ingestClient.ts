@@ -11,8 +11,8 @@
  *   1. hash the bytes in the browser (so the server can dedupe without ever
  *      receiving a duplicate)
  *   2. POST /api/upload-url -> a document row + a short-lived presigned PUT
- *   3. PUT the bytes straight to object storage, then POST /api/extract, which
- *      reads the file back out and writes its page text into Postgres
+ *   3. PUT the bytes straight to object storage, then POST /api/read-document,
+ *      which reads the file back out and writes its page text into Postgres
  *
  * The bytes never pass through a serverless function: a 30 MB scanned PDF
  * would exceed the request body limit, and paying compute to relay uploads
@@ -106,7 +106,7 @@ export async function ingestFile(
     }
 
     report('reading');
-    const { pages } = await postJson<{ pages: number }>('/api/extract', { documentId });
+    const { pages } = await postJson<{ pages: number }>('/api/read-document', { documentId });
 
     report('done');
     return { filename: file.name, documentId, pages };
