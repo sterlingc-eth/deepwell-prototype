@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "noEmit": true, "strict": true, "module": "nodenext", "moduleResolution": "nodenext",
+    "target": "es2022", "allowJs": true, "checkJs": false, "skipLibCheck": true,
+    "esModuleInterop": true
+  },
+  "include": ["api/**/*.ts"]
+}

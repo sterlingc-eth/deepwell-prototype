@@ -6,9 +6,18 @@ import { docCountsByStage, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
+import { ingestFiles, type IngestProgress } from '../services/ingestClient';
 
 const SOURCE_LABEL: Record<IntakeSource, string> = { cabinet: 'Filing cabinet', email: 'Email', drive: 'Shared drive', truck: 'Truck' };
 const CURRENT_USER = 'You';
+
+const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
+  hashing: 'Checking…',
+  uploading: 'Uploading…',
+  reading: 'Reading…',
+  done: 'Read',
+  error: 'Failed',
+};
 
 const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -68,9 +77,33 @@ export function IntakeScreen() {
   };
 
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Upload progress, keyed by filename. Local to this screen on purpose: it is
+  // about the transfer, not about the document, and it should disappear when
+  // you navigate away.
+  const [uploads, setUploads] = useState<Record<string, IngestProgress>>({});
+  const uploading = Object.values(uploads).some((u) => u.status !== 'done' && u.status !== 'error');
+
+  /** Sample files have no bytes behind them — they seed the graph only. */
   const addFiles = (files: { filename: string }[]) => {
     if (!selected) return;
     receiveDocs(selected.id, files.map((f) => ({ filename: f.filename, fileType: fileTypeOf(f.filename) })));
+  };
+
+  /**
+   * Real files: show them in the batch immediately so the screen responds, then
+   * upload and read them in the background. The previous version kept `f.name`
+   * and dropped the File itself, so nothing could ever be re-read or cited.
+   */
+  const uploadFiles = async (files: File[]) => {
+    if (!selected || !files.length) return;
+    addFiles(files.map((f) => ({ filename: f.name })));
+    setUploads((prev) => {
+      const next = { ...prev };
+      for (const f of files) next[f.name] = { filename: f.name, status: 'hashing' };
+      return next;
+    });
+    await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })));
   };
   const processReceived = () => {
     if (!selected) return;
@@ -204,10 +237,10 @@ export function IntakeScreen() {
                       multiple
                       className="sr-only"
                       aria-label="Add files to batch"
-                      onChange={(e) => { const fs = Array.from(e.target.files ?? []).map((f) => ({ filename: f.name })); if (fs.length) addFiles(fs); e.target.value = ''; }}
+                      onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ''; void uploadFiles(fs); }}
                     />
-                    <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => fileInput.current?.click()}>
-                      <Upload className="w-4 h-4" aria-hidden="true" /> Add files
+                    <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" disabled={uploading} onClick={() => fileInput.current?.click()}>
+                      <Upload className="w-4 h-4" aria-hidden="true" /> {uploading ? 'Working…' : 'Add files'}
                     </button>
                     <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => addFiles(SAMPLE_UPLOADS.map((filename) => ({ filename })))}>
                       Add sample files
@@ -219,6 +252,20 @@ export function IntakeScreen() {
                     )}
                   </div>
                 </div>
+                {Object.values(uploads).length > 0 && (
+                  <ul className="border border-line rounded-lg bg-surface divide-y divide-line text-sm" aria-live="polite">
+                    {Object.values(uploads).map((u) => (
+                      <li key={u.filename} className="flex items-center justify-between gap-3 px-4 py-2">
+                        <span className="truncate min-w-0">{u.filename}</span>
+                        {u.status === 'error' ? (
+                          <span className="dw-pill-warn shrink-0"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />{u.error}</span>
+                        ) : (
+                          <span className="shrink-0 text-ink-2">{UPLOAD_LABEL[u.status]}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <ul className="divide-y divide-line border border-line rounded-lg bg-surface">
                   {batchDocs(selected)
                     .sort((a, b) => PIPELINE_STAGES.indexOf(a.stage) - PIPELINE_STAGES.indexOf(b.stage))

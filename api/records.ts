@@ -1,33 +1,29 @@
 /**
- * Vercel API Handler - Postgres RecordsStore wrapper
- * Deploy as /api/records.ts (or split into separate files per resource)
+ * POST /api/records — the app's single data endpoint.
+ *
+ * Two things this file must never get wrong:
+ *
+ * 1. The store is imported from ./_lib/. Vercel bundles each function from its
+ *    own directory, so the previous `../src/services/postgresRecordsStore`
+ *    import was never shipped and every request died with ERR_MODULE_NOT_FOUND
+ *    before a line of handler code ran.
+ *
+ * 2. The tenant comes from the verified Clerk token and nothing else. Every
+ *    spelling of a caller-supplied tenant is stripped from the payload below,
+ *    and the real one is stamped on after. Stripping only `tenantId` was not
+ *    enough — the inserts read `tenant_id` (snake_case), so a caller could POST
+ *    { action: 'createDocument', tenant_id: '<victim uuid>', ... }.
  */
 
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth, denyAuth } from './_lib/auth.js';
-import { PostgresRecordsStore } from '../src/services/postgresRecordsStore';
+import { withTenant } from './_lib/recordsStore.js';
 
-// Initialize connection pool (reuse across invocations)
-let store: PostgresRecordsStore | null = null;
+export const config = {
+  api: { bodyParser: { sizeLimit: '1mb' } },
+};
 
-async function getStore(): Promise<PostgresRecordsStore> {
-  if (!store) {
-    const connString = process.env.NEON_CONNECTION_STRING;
-    if (!connString) throw new Error('NEON_CONNECTION_STRING not set');
-    store = new PostgresRecordsStore(connString);
-  }
-  return store;
-}
-
-interface ApiRequest extends VercelRequest {
-  body: {
-    action: string;
-    tenantId?: string;
-    [key: string]: any;
-  };
-}
-
-export default async (req: ApiRequest, res: VercelResponse) => {
+export default async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -39,150 +35,81 @@ export default async (req: ApiRequest, res: VercelResponse) => {
     return denyAuth(res, err);
   }
 
+  const { action, ...rest } = (req.body ?? {}) as Record<string, any>;
+  if (!action) {
+    return res.status(400).json({ error: 'action required' });
+  }
+
+  // Deliberately `any`: this is a generic dispatcher over ~24 differently
+  // shaped payloads. Narrowing would mean a discriminated union per action,
+  // which is not worth it while the shapes are still moving.
+  const payload: any = { ...rest };
+  for (const k of ['tenantId', 'tenant_id', 'tenantID', 'TenantId', 'user_id', 'userId']) {
+    delete payload[k];
+  }
+  payload.clerk_user_id = auth.userId;
+
   try {
-    // The tenant comes from the verified token and NOTHING else.
-    //
-    // Stripping only `tenantId` was not enough: the store's insert methods read
-    // `doc.tenant_id` (snake_case), so a caller could POST
-    //   { action: 'createDocument', tenant_id: '<victim uuid>', ... }
-    // and write into another tenant's data. Every spelling is removed here, and
-    // the authenticated tenant is then stamped on explicitly.
-    const { action, ...rest } = req.body ?? {};
-    // Deliberately `any`: the store methods take concrete Document/Facet/etc
-    // types and this is a generic action dispatcher. Narrowing here would mean
-    // a discriminated union over every action, which is not worth it yet.
-    const payload: any = { ...rest };
-    for (const k of ['tenantId', 'tenant_id', 'tenantID', 'TenantId', 'user_id', 'userId']) {
-      delete payload[k];
-    }
-    payload.tenant_id = auth.tenantId;
-    payload.user_id = auth.userId;
+    const result = await withTenant(
+      { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+      async (db) => {
+        switch (action) {
+          // ---- documents ----
+          case 'createDocument': return { id: (await db.createDocument(payload))?.id };
+          case 'getDocument': return await db.getDocument(payload.id);
+          case 'listDocuments': return await db.listDocuments(payload.filters);
+          case 'updateDocument':
+            await db.updateDocument(payload.id, payload.updates); return { success: true };
 
-    if (!action) {
-      return res.status(400).json({ error: 'action required' });
-    }
+          // ---- facets ----
+          case 'createFacet': return { id: (await db.createFacet(payload))?.id };
+          case 'getFacet': return await db.getFacet(payload.id);
+          case 'listFacetsByDocument': return await db.listFacetsByDocument(payload.documentId);
+          case 'updateFacet':
+            await db.updateFacet(payload.id, payload.updates); return { success: true };
 
-    const db = await getStore();
+          // ---- extractions ----
+          case 'createExtraction': return { id: (await db.createExtraction(payload))?.id };
+          case 'getExtraction': return await db.getExtraction(payload.id);
+          case 'listExtractionsByDocument': return await db.listExtractionsByDocument(payload.documentId);
+          case 'listExtractionsByEntity': return await db.listExtractionsByEntity(payload.entityId);
+          case 'updateExtraction':
+            await db.updateExtraction(payload.id, payload.updates); return { success: true };
 
-    // Always set the RLS context. Never conditionally — a warm invocation would
-    // otherwise inherit whatever tenant the previous request set.
-    await db.connect(auth.tenantId);
+          // ---- entities ----
+          case 'createEntity': return { id: (await db.createEntity(payload))?.id };
+          case 'getEntity': return await db.getEntity(payload.id);
+          case 'listEntities': return await db.listEntities(payload.type);
+          case 'updateEntity':
+            await db.updateEntity(payload.id, payload.updates); return { success: true };
 
-    // Document operations
-    if (action === 'createDocument') {
-      const id = await db.createDocument(payload);
-      return res.json({ id });
-    }
-    if (action === 'getDocument') {
-      const doc = await db.getDocument(payload.id);
-      return res.json(doc);
-    }
-    if (action === 'listDocuments') {
-      const docs = await db.listDocuments(payload.filters);
-      return res.json(docs);
-    }
-    if (action === 'updateDocument') {
-      await db.updateDocument(payload.id, payload.updates);
-      return res.json({ success: true });
-    }
+          // ---- proposals ----
+          case 'createProposal': return { id: (await db.createProposal(payload))?.id };
+          case 'getProposal': return await db.getProposal(payload.id);
+          case 'listProposals': return await db.listProposals(payload.status);
+          case 'updateProposal':
+            await db.updateProposal(payload.id, payload.updates); return { success: true };
 
-    // Facet operations
-    if (action === 'createFacet') {
-      const id = await db.createFacet(payload);
-      return res.json({ id });
-    }
-    if (action === 'getFacet') {
-      const facet = await db.getFacet(payload.id);
-      return res.json(facet);
-    }
-    if (action === 'listFacetsByDocument') {
-      const facets = await db.listFacetsByDocument(payload.documentId);
-      return res.json(facets);
-    }
-    if (action === 'updateFacet') {
-      await db.updateFacet(payload.id, payload.updates);
-      return res.json({ success: true });
-    }
+          // ---- audit ----
+          case 'logAction':
+            await db.logAction(payload); return { success: true };
+          case 'getAuditLog': return await db.getAuditLog(payload.filters);
 
-    // Extraction operations
-    if (action === 'createExtraction') {
-      const id = await db.createExtraction(payload);
-      return res.json({ id });
-    }
-    if (action === 'getExtraction') {
-      const extraction = await db.getExtraction(payload.id);
-      return res.json(extraction);
-    }
-    if (action === 'listExtractionsByDocument') {
-      const extractions = await db.listExtractionsByDocument(payload.documentId);
-      return res.json(extractions);
-    }
-    if (action === 'listExtractionsByEntity') {
-      const extractions = await db.listExtractionsByEntity(payload.entityId);
-      return res.json(extractions);
-    }
-    if (action === 'updateExtraction') {
-      await db.updateExtraction(payload.id, payload.updates);
-      return res.json({ success: true });
-    }
+          // ---- schema version ----
+          case 'getSchemaVersion': return { version: await db.getSchemaVersion() };
+          case 'incrementSchemaVersion':
+            return { version: await db.incrementSchemaVersion(payload.description, payload.changeKind) };
 
-    // Entity operations
-    if (action === 'createEntity') {
-      const id = await db.createEntity(payload);
-      return res.json({ id });
-    }
-    if (action === 'getEntity') {
-      const entity = await db.getEntity(payload.id);
-      return res.json(entity);
-    }
-    if (action === 'listEntities') {
-      const entities = await db.listEntities(payload.type);
-      return res.json(entities);
-    }
-    if (action === 'updateEntity') {
-      await db.updateEntity(payload.id, payload.updates);
-      return res.json({ success: true });
-    }
+          default:
+            return { __unknownAction: true };
+        }
+      }
+    );
 
-    // Proposal operations
-    if (action === 'createProposal') {
-      const id = await db.createProposal(payload);
-      return res.json({ id });
+    if (result && (result as any).__unknownAction) {
+      return res.status(400).json({ error: `Unknown action: ${action}` });
     }
-    if (action === 'getProposal') {
-      const proposal = await db.getProposal(payload.id);
-      return res.json(proposal);
-    }
-    if (action === 'listProposals') {
-      const proposals = await db.listProposals(payload.status);
-      return res.json(proposals);
-    }
-    if (action === 'updateProposal') {
-      await db.updateProposal(payload.id, payload.updates);
-      return res.json({ success: true });
-    }
-
-    // Audit operations
-    if (action === 'logAction') {
-      await db.logAction(payload);
-      return res.json({ success: true });
-    }
-    if (action === 'getAuditLog') {
-      const logs = await db.getAuditLog(payload.filters);
-      return res.json(logs);
-    }
-
-    // Schema version operations
-    if (action === 'getSchemaVersion') {
-      const version = await db.getSchemaVersion();
-      return res.json({ version });
-    }
-    if (action === 'incrementSchemaVersion') {
-      const version = await db.incrementSchemaVersion(payload.description, payload.changeKind);
-      return res.json({ version });
-    }
-
-    return res.status(400).json({ error: `Unknown action: ${action}` });
+    return res.json(result ?? null);
   } catch (err) {
     // Log the detail, return none of it — raw messages leak schema and
     // connection internals to anonymous callers.

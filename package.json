@@ -9,7 +9,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "eval": "tsx scripts/eval.ts"
+    "eval": "tsx scripts/eval.ts",
+    "verify:sigv4": "node scripts/verify-sigv4.mjs",
+    "verify:retrieval": "node scripts/verify-retrieval.mjs",
+    "typecheck:api": "tsc -p tsconfig.api-check.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
