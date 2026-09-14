@@ -23,8 +23,19 @@ dist-ssr
 *.sln
 *.sw?
 
-# Secrets
+# Secrets — broad on purpose. The narrow ".env*" patterns below used to miss
+# files like "env.example" and "env-local-updated", which is how real Neon,
+# Cloudflare R2 and Clerk credentials ended up committed to a public repo.
 .env
 .env.local
 .env.*.local
+.env*
+**/env.*
+**/env-local*
+*.pem
+*.key
 .vercel
+
+# Local exports / scratch — a full second copy of the codebase lived here
+Claude outputs/
+*.zip

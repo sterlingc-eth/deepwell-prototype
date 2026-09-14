@@ -29,14 +29,14 @@ npm install pg
 Make sure your `.env.local` has the Neon connection string:
 
 ```
-NEON_CONNECTION_STRING=postgresql://neondb_owner:npg_51lRW5rTQqIIap-rapid-rice-axqd45ey-pooler.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_CONNECTION_STRING=postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require
 ```
 
 ### 3. Run the migration
 
 ```bash
 # From deepwell root
-NEON_CONNECTION_STRING=$(grep NEON_CONNECTION_STRING .env.local | cut -d= -f2) \
+NEON_CONNECTION_STRING=postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require
 SCHEMA_FILE=./M3-config/01-create-schema.sql \
 node run-migration-v2.js
 ```
@@ -44,7 +44,7 @@ node run-migration-v2.js
 Or on Windows (PowerShell):
 
 ```powershell
-$env:NEON_CONNECTION_STRING = (Get-Content .env.local | Select-String "NEON_CONNECTION_STRING" | ForEach-Object { $_ -replace ".*=", "" })
+$env:NEON_CONNECTION_STRING = postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require
 $env:SCHEMA_FILE = ".\M3-config\01-create-schema.sql"
 node run-migration-v2.js
 ```
