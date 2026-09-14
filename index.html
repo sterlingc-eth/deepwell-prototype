@@ -403,6 +403,327 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
   </div>
 </section>
 
+<style>
+/* ==================================================================== */
+/*  How it works — "the well in section"                                */
+/*  A vertical cutaway: a record drops down the shaft, forks into two    */
+/*  chambers of visibly different shape (a stack of pages vs a table of  */
+/*  rows), and a brass thread ties the row to the page it points at.     */
+/*  Inline SVG + CSS keyframes only. Everything namespaced dwflow-.      */
+/* ==================================================================== */
+
+.dwflow-grid{
+  display:grid;
+  grid-template-columns:minmax(0,430px) minmax(0,1fr);
+  gap:clamp(28px,4vw,56px);
+  align-items:start;
+}
+.dwflow-stage{min-width:0;max-width:430px;width:100%;margin-inline:auto}
+.dwflow-svg{display:block;width:100%;height:auto}
+
+/* screen-reader-only summary of the flow */
+.dwflow-sr{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
+}
+
+/* the three beats, as real HTML text beside the diagram */
+.dwflow-beats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;min-width:0}
+.dwflow-beats li{
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 18px;
+  padding-block:22px;border-top:1px solid var(--line);
+}
+.dwflow-beats li:first-child{border-top:0;padding-top:0}
+.dwflow-beats .dwflow-n{
+  grid-row:1 / span 2;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:.78rem;letter-spacing:.14em;color:var(--brass);padding-top:.35em;
+}
+.dwflow-beats h3{font-size:1.25rem}
+.dwflow-beats p{color:var(--muted);font-size:.95rem;margin-top:6px}
+.dwflow-beats code{
+  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:.86em;color:var(--text);
+  border-bottom:1px solid var(--line-strong);white-space:nowrap;
+}
+.dwflow-beats .dwflow-key{color:var(--brass);border-bottom-color:var(--brass)}
+
+.dwflow-thesis{
+  margin-top:clamp(32px,4vw,52px);padding:24px 28px;
+  border:1px solid var(--line-strong);border-left:4px solid var(--brass);
+  background:var(--surface);
+  font-family:"Newsreader",Georgia,serif;font-size:clamp(1.15rem,2.1vw,1.5rem);
+  line-height:1.35;color:var(--text);max-width:70ch;
+}
+.dwflow-thesis b{font-weight:500;color:var(--brass)}
+
+@media (max-width:880px){
+  .dwflow-grid{grid-template-columns:1fr;gap:36px}
+  .dwflow-beats li{padding-block:18px}
+}
+
+/* ---------- SVG type ---------- */
+.dwflow-svg text{fill:var(--text)}
+.dwflow-mono,.dwflow-k,.dwflow-v,.dwflow-sub,.dwflow-cap,.dwflow-beat,.dwflow-key-t,.dwflow-path-t{
+  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+.dwflow-name{font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-weight:600;font-size:19px}
+.dwflow-sub{font-size:10.5px;fill:var(--muted)}
+.dwflow-k{font-size:10.5px;fill:var(--faint)}
+.dwflow-v{font-size:10.5px;fill:var(--text)}
+.dwflow-cap{font-size:10px;fill:var(--faint)}
+.dwflow-mono{font-size:10.5px;fill:var(--text)}
+.dwflow-beat{font-size:11.5px;fill:var(--brass);letter-spacing:.14em}
+.dwflow-key-t{font-size:10px;fill:var(--brass);letter-spacing:.04em}
+.dwflow-path-t{font-size:9px;fill:var(--text);letter-spacing:.01em}
+.dwflow-ask{font-family:"Newsreader",Georgia,serif;font-style:italic;font-size:15px;fill:var(--text)}
+.dwflow-ans{font-family:"Newsreader",Georgia,serif;font-size:16px;fill:var(--text)}
+.dwflow-brass{fill:var(--brass)}
+
+/* ---------- SVG structure ---------- */
+.dwflow-panel{fill:var(--surface);fill-opacity:.6;stroke:var(--line-strong);stroke-width:1}
+.dwflow-hair{stroke:var(--line);stroke-width:1;fill:none}
+.dwflow-rule{stroke:var(--line-strong);stroke-width:1;fill:none}
+.dwflow-page{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
+.dwflow-page-top{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.4}
+.dwflow-ink{fill:var(--faint);fill-opacity:.5}
+.dwflow-wire{fill:none;stroke:var(--line-strong);stroke-width:1.1}
+.dwflow-band{fill:var(--brass);fill-opacity:.1;stroke:var(--brass);stroke-opacity:.55;stroke-width:1}
+.dwflow-tick{fill:var(--brass)}
+.dwflow-chip{fill:none;stroke:var(--brass);stroke-opacity:.5;stroke-width:1;stroke-dasharray:4 3}
+
+/* the pointer: always drawn, so the relationship reads even when still */
+.dwflow-ptr{fill:none;stroke:var(--brass);stroke-opacity:.6;stroke-width:1.4}
+.dwflow-node{fill:var(--brass)}
+
+/* travelling signals */
+.dwflow-sig{fill:none;stroke:var(--brass);stroke-width:2.2;stroke-linecap:round;
+  stroke-dasharray:11 100;stroke-dashoffset:11;
+  animation-duration:18s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+.dwflow-sig-a{animation-name:dwflow-run-split}
+.dwflow-sig-b{animation-name:dwflow-run-split}
+.dwflow-sig-p1{animation-name:dwflow-run-ptr1}
+.dwflow-sig-q{animation-name:dwflow-run-query}
+.dwflow-sig-p2{animation-name:dwflow-run-ptr2}
+.dwflow-sig-r{animation-name:dwflow-run-back}
+
+/* focus swells — a soft brass outline that walks the story */
+.dwflow-glow{fill:none;stroke:var(--brass);stroke-width:1.6;opacity:0;
+  animation-duration:18s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+.dwflow-g-doc{animation-name:dwflow-lit-doc}
+.dwflow-g-vault{animation-name:dwflow-lit-store}
+.dwflow-g-index{animation-name:dwflow-lit-store}
+.dwflow-g-key{animation-name:dwflow-lit-key}
+.dwflow-g-ask{animation-name:dwflow-lit-ask}
+.dwflow-g-page{animation-name:dwflow-lit-page}
+.dwflow-g-src{animation-name:dwflow-lit-src}
+
+@keyframes dwflow-run-split{ 0%,13%{stroke-dashoffset:11} 34%,100%{stroke-dashoffset:-100} }
+@keyframes dwflow-run-ptr1{  0%,46%{stroke-dashoffset:11} 57%,100%{stroke-dashoffset:-100} }
+@keyframes dwflow-run-query{ 0%,67%{stroke-dashoffset:11} 78%,100%{stroke-dashoffset:-100} }
+@keyframes dwflow-run-ptr2{  0%,79%{stroke-dashoffset:11} 86%,100%{stroke-dashoffset:-100} }
+@keyframes dwflow-run-back{  0%,87%{stroke-dashoffset:11} 97%,100%{stroke-dashoffset:-100} }
+
+@keyframes dwflow-lit-doc{   0%{opacity:0} 5%,13%{opacity:.85} 20%,100%{opacity:0} }
+@keyframes dwflow-lit-store{ 0%,30%{opacity:0} 36%,45%{opacity:.8} 52%,100%{opacity:0} }
+@keyframes dwflow-lit-key{   0%,43%{opacity:0} 48%,58%{opacity:.9} 64%,77%{opacity:0} 82%,88%{opacity:.9} 94%,100%{opacity:0} }
+@keyframes dwflow-lit-ask{   0%,61%{opacity:0} 66%,74%{opacity:.85} 80%,100%{opacity:0} }
+@keyframes dwflow-lit-page{  0%,82%{opacity:0} 87%,92%{opacity:.85} 97%,100%{opacity:0} }
+@keyframes dwflow-lit-src{   0%{opacity:.85} 5%,93%{opacity:0} 97%,100%{opacity:.85} }
+
+/* ---------- reduced motion: a complete, still diagram ---------- */
+@media (prefers-reduced-motion: reduce){
+  .dwflow-sig{
+    animation:none!important;
+    stroke-dasharray:none!important;stroke-dashoffset:0!important;
+    stroke-width:1.4;stroke-opacity:.7;
+  }
+  .dwflow-glow{animation:none!important;opacity:.5;stroke-width:1.2}
+  .dwflow-ptr{stroke-opacity:.85}
+}
+</style>
+
+<section id="how-it-works">
+  <div class="wrap">
+
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">How it works</div>
+        <h2>Every record goes two places at once.</h2>
+      </div>
+      <p class="lede">One upload, two destinations. The record keeps the address of the page, so an answer can show you the original instead of asking you to trust it.</p>
+    </div>
+
+    <div class="dwflow-grid">
+
+      <div class="dwflow-stage">
+        <p class="dwflow-sr">Diagram of the DeepWell data flow. A document is uploaded. The page itself is written to the vault under a key scoped to the account, while the facts about it are written to the index as a single record that holds the key. Later, a question queries the index, the matching record’s key is followed to the vault, and the original page is returned with the answer as the cited source.</p>
+
+        <svg class="dwflow-svg" viewBox="0 0 430 800" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+
+          <!-- ============ BEAT 1 — a record arrives at the surface ============ -->
+          <text class="dwflow-beat" x="20" y="26">1 · A RECORD ARRIVES</text>
+
+          <rect class="dwflow-panel" x="138" y="44" width="156" height="50" rx="3"/>
+          <g>
+            <rect class="dwflow-page" x="150" y="56" width="20" height="26" rx="1.5"/>
+            <rect class="dwflow-ink" x="154" y="61" width="12" height="1.6"/>
+            <rect class="dwflow-ink" x="154" y="66" width="12" height="1.6"/>
+            <rect class="dwflow-ink" x="154" y="71" width="8"  height="1.6"/>
+          </g>
+          <text class="dwflow-mono" x="181" y="68">invoice_4471.pdf</text>
+          <text class="dwflow-cap"  x="181" y="82">184.2 KB · PDF</text>
+          <rect class="dwflow-glow dwflow-g-doc" x="138" y="44" width="156" height="50" rx="3"/>
+
+          <!-- the mouth of the well, seen from above -->
+          <g class="dwflow-hair">
+            <ellipse cx="216" cy="112" rx="96" ry="11"/>
+            <ellipse cx="216" cy="112" rx="70" ry="8"/>
+            <ellipse cx="216" cy="112" rx="46" ry="5.5"/>
+            <ellipse cx="216" cy="112" rx="24" ry="3"/>
+          </g>
+
+          <!-- ============ BEAT 2 — it splits ============ -->
+          <text class="dwflow-beat" x="20" y="152">2 · IT SPLITS</text>
+
+          <path class="dwflow-wire" d="M216 118 C216 172 113 176 113 248"/>
+          <path class="dwflow-wire" d="M216 118 C216 172 317 176 317 248"/>
+          <path class="dwflow-sig dwflow-sig-a" pathLength="100" d="M216 118 C216 172 113 176 113 248"/>
+          <path class="dwflow-sig dwflow-sig-b" pathLength="100" d="M216 118 C216 172 317 176 317 248"/>
+
+          <text class="dwflow-mono" x="86"  y="200" text-anchor="middle">bytes</text>
+          <text class="dwflow-cap"  x="86"  y="215" text-anchor="middle">the page itself</text>
+          <text class="dwflow-mono" x="346" y="200" text-anchor="middle">facts</text>
+          <text class="dwflow-cap"  x="346" y="215" text-anchor="middle">what it says</text>
+
+          <!-- ============ TWO CHAMBERS ============ -->
+
+          <!-- LEFT — the vault, drawn as a stack of pages -->
+          <rect class="dwflow-panel" x="20" y="250" width="186" height="310" rx="3"/>
+          <text class="dwflow-name" x="32" y="280">The vault</text>
+          <text class="dwflow-sub"  x="32" y="296">object storage</text>
+          <text class="dwflow-key-t" x="32" y="318">acme-hvac/2026/</text>
+          <text class="dwflow-key-t" x="32" y="331">invoice_4471.pdf</text>
+
+          <g>
+            <rect class="dwflow-page" x="58" y="370" width="92" height="130" rx="2"/>
+            <rect class="dwflow-page" x="64" y="364" width="92" height="130" rx="2"/>
+            <rect class="dwflow-page" x="70" y="358" width="92" height="130" rx="2"/>
+            <rect class="dwflow-page-top" x="76" y="352" width="92" height="130" rx="2"/>
+            <g class="dwflow-ink">
+              <rect x="86" y="368" width="60" height="2"/>
+              <rect x="86" y="378" width="72" height="2"/>
+              <rect x="86" y="388" width="72" height="2"/>
+              <rect x="86" y="398" width="44" height="2"/>
+              <rect x="86" y="416" width="72" height="2"/>
+              <rect x="86" y="426" width="52" height="2"/>
+              <rect x="86" y="444" width="36" height="2"/>
+            </g>
+            <rect class="dwflow-glow dwflow-g-page" x="76" y="352" width="92" height="130" rx="2"/>
+          </g>
+          <text class="dwflow-cap" x="32" y="524">the bytes, unchanged</text>
+          <rect class="dwflow-glow dwflow-g-vault" x="20" y="250" width="186" height="310" rx="3"/>
+
+          <!-- RIGHT — the index, drawn as a table of rows -->
+          <rect class="dwflow-panel" x="224" y="250" width="186" height="310" rx="3"/>
+          <text class="dwflow-name" x="236" y="280">The index</text>
+          <text class="dwflow-sub"  x="236" y="296">one record</text>
+
+          <path class="dwflow-rule" d="M236 310 H398"/>
+          <g class="dwflow-hair">
+            <path d="M236 340 H398"/><path d="M236 364 H398"/>
+            <path d="M236 388 H398"/><path d="M236 412 H398"/>
+          </g>
+          <text class="dwflow-k" x="236" y="332">filename</text>
+          <text class="dwflow-v" x="398" y="332" text-anchor="end">invoice_4471.pdf</text>
+          <text class="dwflow-k" x="236" y="356">size</text>
+          <text class="dwflow-v" x="398" y="356" text-anchor="end">184.2 KB</text>
+          <text class="dwflow-k" x="236" y="380">sha256</text>
+          <text class="dwflow-v" x="398" y="380" text-anchor="end">9f4c…a71b</text>
+          <text class="dwflow-k" x="236" y="404">account</text>
+          <text class="dwflow-v" x="398" y="404" text-anchor="end">acme-hvac</text>
+          <text class="dwflow-k" x="236" y="428">uploaded_at</text>
+          <text class="dwflow-v" x="398" y="428" text-anchor="end">2026-03-14</text>
+
+          <!-- the pointer column -->
+          <rect class="dwflow-band" x="230" y="438" width="176" height="44" rx="2"/>
+          <rect class="dwflow-tick" x="230" y="438" width="2.5" height="44"/>
+          <text class="dwflow-key-t"  x="240" y="456">storage_key</text>
+          <text class="dwflow-path-t" x="240" y="472">acme-hvac/2026/invoice_4471.pdf</text>
+          <rect class="dwflow-glow dwflow-g-key" x="230" y="438" width="176" height="44" rx="2"/>
+
+          <text class="dwflow-cap" x="236" y="524">the facts, plus an address</text>
+          <rect class="dwflow-glow dwflow-g-index" x="224" y="250" width="186" height="310" rx="3"/>
+
+          <!-- ============ THE POINTER — row → object ============ -->
+          <path class="dwflow-ptr" d="M232 460 C212 460 200 404 182 403"/>
+          <path class="dwflow-sig dwflow-sig-p1" pathLength="100" d="M232 460 C212 460 200 404 182 403"/>
+          <path class="dwflow-sig dwflow-sig-p2" pathLength="100" d="M232 460 C212 460 200 404 182 403"/>
+          <circle class="dwflow-node" cx="232" cy="460" r="3"/>
+          <polygon class="dwflow-node" points="170,403 182,398 182,408"/>
+
+          <!-- ============ BEAT 3 — later, someone asks ============ -->
+          <text class="dwflow-beat" x="22" y="592">3 · LATER, SOMEONE ASKS</text>
+          <text class="dwflow-cap"  x="404" y="592" text-anchor="end">the query</text>
+
+          <rect class="dwflow-panel" x="20" y="608" width="390" height="46" rx="3"/>
+          <text class="dwflow-ask" x="36" y="637">“What did we pay Carrier in March?”</text>
+          <rect class="dwflow-glow dwflow-g-ask" x="20" y="608" width="390" height="46" rx="3"/>
+
+          <!-- query rail: up the outer casing into the index -->
+          <path class="dwflow-wire" d="M410 631 C422 631 422 606 422 566 L422 352 C422 326 416 316 404 314"/>
+          <path class="dwflow-sig dwflow-sig-q" pathLength="100"
+                d="M410 631 C422 631 422 606 422 566 L422 352 C422 326 416 316 404 314"/>
+          <polygon class="dwflow-node" points="396,314 408,309 408,319"/>
+
+          <!-- return rail: back out of the vault, down to the cited source -->
+          <path class="dwflow-wire" d="M50 562 C22 568 10 582 10 606 L10 690 C10 726 12 750 22 757"/>
+          <path class="dwflow-sig dwflow-sig-r" pathLength="100"
+                d="M50 562 C22 568 10 582 10 606 L10 690 C10 726 12 750 22 757"/>
+          <text class="dwflow-cap" x="404" y="690" text-anchor="end">the original page comes back</text>
+
+          <!-- ============ THE ANSWER ============ -->
+          <text class="dwflow-ans" x="26" y="700">Paid Carrier $14,206 in March.</text>
+          <rect class="dwflow-chip" x="24" y="740" width="252" height="34" rx="3"/>
+          <g>
+            <rect class="dwflow-page" x="36" y="748" width="16" height="18" rx="1"/>
+            <rect class="dwflow-ink" x="39" y="752" width="10" height="1.4"/>
+            <rect class="dwflow-ink" x="39" y="756" width="10" height="1.4"/>
+            <rect class="dwflow-ink" x="39" y="760" width="6"  height="1.4"/>
+          </g>
+          <text class="dwflow-mono" x="62"  y="763">invoice_4471.pdf</text>
+          <text class="dwflow-cap"  x="172" y="763">· page 1</text>
+          <text class="dwflow-cap"  x="288" y="763">cited source</text>
+          <rect class="dwflow-glow dwflow-g-src" x="24" y="740" width="252" height="34" rx="3"/>
+
+        </svg>
+      </div>
+
+      <ol class="dwflow-beats">
+        <li>
+          <span class="dwflow-n">01</span>
+          <h3>A record arrives</h3>
+          <p>Somebody drops in a file — from a scanner, an inbox, a phone in the field. Nothing is renamed or filed first.</p>
+        </li>
+        <li>
+          <span class="dwflow-n">02</span>
+          <h3>It goes two places at once</h3>
+          <p>The page itself is stored under a key scoped to your account. What it <i>says</i> is recorded separately, alongside that key.</p>
+        </li>
+        <li>
+          <span class="dwflow-n">03</span>
+          <h3>Later, someone asks</h3>
+          <p>The question is answered from the record, and the key leads back to the original page — attached to the answer as its source.</p>
+        </li>
+      </ol>
+
+    </div>
+
+    <p class="dwflow-thesis">One side holds the <b>pointer</b>. The other holds the <b>thing it points at</b>. That is why an answer can put the real page in front of you.</p>
+
+  </div>
+</section>
+
+
 <section id="demo">
   <div class="wrap">
     <div class="sec-head">
