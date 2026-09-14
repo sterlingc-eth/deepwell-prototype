@@ -10,6 +10,13 @@
  */
 import { verifyToken } from "@clerk/backend";
 
+/** Origins whose tokens this API will accept. */
+const AUTHORIZED_PARTIES = [
+  "https://deepwellinc.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:4173",
+];
+
 export class AuthError extends Error {
   constructor(message, status = 401) {
     super(message);
@@ -36,7 +43,12 @@ export async function requireAuth(req) {
 
   let claims;
   try {
-    claims = await verifyToken(token, { secretKey });
+    claims = await verifyToken(token, {
+      secretKey,
+      // Without this, ANY token minted by this Clerk instance is accepted —
+      // including one issued to a different frontend or a JWT template.
+      authorizedParties: AUTHORIZED_PARTIES,
+    });
   } catch (err) {
     console.error("Token verification failed:", err?.message);
     throw new AuthError("Session is invalid or has expired");

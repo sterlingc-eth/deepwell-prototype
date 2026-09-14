@@ -121,6 +121,6 @@ Be smart about natural language - "warranty expiring this year" should find anyt
       },
     });
   } catch (error) {
-    return handleError(res, error);
+    return handleError(res, error, req);
   }
 }

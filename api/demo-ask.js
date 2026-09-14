@@ -25,7 +25,6 @@ export function getRecords() {
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
-  if (req.method === "GET") return res.status(200).json({ records: getRecords() });
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   let auth;
@@ -112,6 +111,6 @@ Rules:
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(out);
   } catch (err) {
-    return handleError(res, err);
+    return handleError(res, err, req);
   }
 }

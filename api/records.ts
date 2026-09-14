@@ -41,11 +41,20 @@ export default async (req: ApiRequest, res: VercelResponse) => {
   }
 
   try {
-    // tenantId comes from the verified token only. Anything the caller put in
-    // the body is discarded — otherwise any caller could name any tenant and
-    // read that tenant's documents.
-    const { action, tenantId: _ignored, ...payload } = req.body;
-    void _ignored;
+    // The tenant comes from the verified token and NOTHING else.
+    //
+    // Stripping only `tenantId` was not enough: the store's insert methods read
+    // `doc.tenant_id` (snake_case), so a caller could POST
+    //   { action: 'createDocument', tenant_id: '<victim uuid>', ... }
+    // and write into another tenant's data. Every spelling is removed here, and
+    // the authenticated tenant is then stamped on explicitly.
+    const { action, ...rest } = req.body ?? {};
+    const payload: Record<string, unknown> = { ...rest };
+    for (const k of ['tenantId', 'tenant_id', 'tenantID', 'TenantId', 'user_id', 'userId']) {
+      delete payload[k];
+    }
+    payload.tenant_id = auth.tenantId;
+    payload.user_id = auth.userId;
 
     if (!action) {
       return res.status(400).json({ error: 'action required' });

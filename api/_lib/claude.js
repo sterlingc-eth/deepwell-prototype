@@ -68,28 +68,25 @@ export function handleCors(res, req) {
   return res;
 }
 
-export function handleError(res, error) {
+export function handleError(res, error, req) {
+  // Log the detail; return none of it. `error.message` here can carry the
+  // Anthropic SDK's internals, our own config hints, or a stack fragment —
+  // all of it useful to an attacker and useless to a user.
   console.error("API Error:", error);
 
   const msg = (error && error.message) || "";
   const status = error && error.status;
 
   if (status === 401 || msg.includes("401") || msg.includes("authentication") || msg.includes("API key") || msg.includes("CLAUDE_API_KEY")) {
-    return handleCors(res).status(401).json({
-      error: "Authentication failed",
-      details: msg || "Check your CLAUDE_API_KEY in .env.local",
-    });
+    return handleCors(res, req).status(401).json({ error: "Authentication failed" });
   }
 
   if (status === 429 || msg.includes("429")) {
-    return handleCors(res).status(429).json({
+    return handleCors(res, req).status(429).json({
       error: "Rate limited",
       details: "Too many requests. Please try again in a moment.",
     });
   }
 
-  return handleCors(res).status(500).json({
-    error: "Processing failed",
-    details: msg || "Unknown error",
-  });
+  return handleCors(res, req).status(500).json({ error: "Processing failed" });
 }

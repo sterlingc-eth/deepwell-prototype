@@ -15,6 +15,13 @@ import { requireAuth, denyAuth } from "./_lib/auth.js";
  * This is the seam the prototype's mock answerService swaps out for; set
  * VITE_ANSWER_PROVIDER=claude in the frontend to use it.
  */
+// Vercel's default body limit is 4.5MB; that is far too much to forward into a
+// model prompt. Cap the request and the payload we actually use.
+export const config = { api: { bodyParser: { sizeLimit: '512kb' } } };
+
+const MAX_QUESTION = 2000;
+const MAX_RECORDS = 400;
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -32,6 +39,12 @@ export default async function handler(req, res) {
     const { question, records, includeUnverified = false, today } = req.body ?? {};
     if (!question || !Array.isArray(records)) {
       return res.status(400).json({ error: "Missing question or records" });
+    }
+    if (typeof question !== "string" || question.length > MAX_QUESTION) {
+      return res.status(400).json({ error: "Question is too long" });
+    }
+    if (records.length > MAX_RECORDS) {
+      return res.status(400).json({ error: "Too many records in one request" });
     }
 
     const allowedDocs = new Set();
@@ -127,6 +140,6 @@ Rules:
       },
     });
   } catch (error) {
-    return handleError(res, error);
+    return handleError(res, error, req);
   }
 }

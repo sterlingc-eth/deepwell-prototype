@@ -165,6 +165,6 @@ export default async function handler(req, res) {
       },
     });
   } catch (error) {
-    return handleError(res, error);
+    return handleError(res, error, req);
   }
 }
