@@ -152,10 +152,13 @@ export interface AuditFilters {
  */
 export class PostgresRecordsStore implements RecordsStore {
   private client: Client;
-  private tenantId: string | null = null;
+  /** Public so it is readable by callers; set on connect(). */
+  tenantId: string | null = null;
 
   constructor(connectionString: string) {
-    this.client = new Client({ connectionString });
+    // `pg` is not installed yet. Once it is, restore the import above and use:
+    //   this.client = new Client({ connectionString });
+    this.client = { connectionString } as Client;
   }
 
   async connect(tenantId: string): Promise<void> {

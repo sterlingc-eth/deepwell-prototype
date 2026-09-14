@@ -53,10 +53,11 @@ export function usePostgresSync(tenantId: string) {
 
           // Simple upsert: update if exists, create if new
           const validStages = ['received', 'read', 'mapped', 'linked', 'verified'];
+          // Map the in-memory graph doc onto the Postgres row shape.
+          // `preview` has no column in `documents`, so it is not synced.
           await recordsStore.updateDocument(doc.id, {
             ...(validStages.includes(doc.stage) && { stage: doc.stage as any }),
-            typeId: doc.typeId,
-            preview: doc.preview,
+            document_type: doc.typeId ?? undefined,
           }).catch(async () => {
             // If update fails, it's probably a new doc, so create it
             await recordsStore.createDocument(doc as any);
