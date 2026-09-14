@@ -97,7 +97,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
 
           <button
             type="button"
-            onClick={() => { void signOut({ redirectUrl: '/app/' }); }}
+            onClick={() => { void signOut({ redirectUrl: '/' }); }}
             aria-label="Sign out"
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >

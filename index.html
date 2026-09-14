@@ -121,6 +121,28 @@ a{color:inherit}
 .well canvas{width:100%;height:100%;display:block}
 @media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.well{max-width:360px;margin:0 auto;order:-1}}
 
+/* ------------------------------------------------------------------ */
+/* Ambient background. Two very soft lights drifting on long cycles, so */
+/* the page feels alive when scrolled without competing with the copy.  */
+/* ------------------------------------------------------------------ */
+.ambient{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.ambient span{position:absolute;top:-30vmax;left:-20vmax;width:90vmax;height:90vmax;border-radius:50%;
+  background:radial-gradient(circle,rgba(18,61,107,.62),transparent 62%);
+  animation:dw-drift-a 34s ease-in-out infinite alternate}
+.ambient span+span{top:auto;bottom:-40vmax;left:auto;right:-25vmax;
+  background:radial-gradient(circle,rgba(58,107,77,.52),transparent 62%);
+  animation:dw-drift-b 46s ease-in-out infinite alternate}
+@keyframes dw-drift-a{
+  from{transform:translate3d(0,0,0) scale(1)}
+  to{transform:translate3d(26vmax,18vmax,0) scale(1.35)}
+}
+@keyframes dw-drift-b{
+  from{transform:translate3d(0,0,0) scale(1.1)}
+  to{transform:translate3d(-22vmax,-16vmax,0) scale(1)}
+}
+@media (prefers-reduced-motion: reduce){.ambient span{animation:none}}
+header,section,footer{position:relative;z-index:1}
+
 /* sections */
 section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
 .sec-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px;align-items:end;margin-bottom:clamp(36px,5vw,64px)}
@@ -233,8 +255,9 @@ section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
 .close .btn-primary:hover{background:#D8AE6E}
 .close .btn-ghost{border-color:rgba(255,255,255,.4);color:#fff}
 .close .btn-ghost:hover{background:rgba(255,255,255,.08)}
-.logo-card{background:#fff;padding:28px;display:grid;place-items:center}
-.logo-card img{max-width:280px;width:100%;height:auto;display:block}
+.logo-card{background:#F4F7F4;padding:28px;display:grid;place-items:center}
+/* The artwork ships on a white ground; multiply drops it into the cream. */
+.logo-card img{max-width:280px;width:100%;height:auto;display:block;mix-blend-mode:multiply}
 @media (max-width:860px){.close .wrap{grid-template-columns:1fr}.logo-card{max-width:340px}}
 
 footer{padding-block:32px;font-size:.84rem;color:var(--faint)}
@@ -246,6 +269,8 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
 </head>
 <body>
 
+
+<div class="ambient" aria-hidden="true"><span></span><span></span></div>
 
 <nav class="nav" aria-label="Primary">
   <div class="wrap">
