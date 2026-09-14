@@ -4,7 +4,8 @@
  * Handles: documents, facets, extractions, entities, proposals, audit logs
  */
 
-import { Client, PoolClient } from 'pg';
+type Client = any; // Stub for pg.Client - install 'pg' when ready
+// import { Client } from 'pg';
 
 export interface RecordsStore {
   // Connection management

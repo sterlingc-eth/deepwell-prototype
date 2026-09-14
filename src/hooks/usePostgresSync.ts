@@ -6,7 +6,6 @@
 import { useEffect } from 'react';
 import { recordsStore } from '../services/recordsStoreClient';
 import { useGraph } from '../core/entityGraph';
-import type { Doc, Entity } from '../core/types';
 
 export function usePostgresSync(tenantId: string) {
   const graphState = useGraph();
@@ -53,8 +52,9 @@ export function usePostgresSync(tenantId: string) {
           if (!doc) continue;
 
           // Simple upsert: update if exists, create if new
+          const validStages = ['received', 'read', 'mapped', 'linked', 'verified'];
           await recordsStore.updateDocument(doc.id, {
-            stage: doc.stage,
+            ...(validStages.includes(doc.stage) && { stage: doc.stage as any }),
             typeId: doc.typeId,
             preview: doc.preview,
           }).catch(async () => {
@@ -78,9 +78,7 @@ export function usePostgresSync(tenantId: string) {
           const entity = graphState.entities[entityId];
           if (!entity) continue;
 
-          await recordsStore.updateEntity(entity.id, {
-            fields: entity.fields,
-          }).catch(async () => {
+          await recordsStore.updateEntity(entity.id, entity as any).catch(async () => {
             // If update fails, try creating
             await recordsStore.createEntity(entity as any);
           });
