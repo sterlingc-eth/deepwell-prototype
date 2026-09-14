@@ -45,7 +45,7 @@
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --wordmark-deep:#0764B8;   /* logo navy: same hue + saturation, value raised to clear 3:1 on the dark ground */
+  --wordmark-deep:#04315A;   /* true logo navy (used on the light header) */
   --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
   --text:#E6EEE9; --muted:#A9BBB2; --faint:#6E8579;
   --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
@@ -93,6 +93,14 @@ a{color:inherit}
 .btn-primary:hover{background:var(--navy);transform:translateY(-1px)}
 .btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
 .btn-ghost:hover{background:var(--surface)}
+/* The header runs on a light plate so the wordmark can use the real logo
+   colours: navy #04315A and forest #163C2C. Both are unreadable on the dark
+   ground (1.4:1 and 1.2:1), so the surface changes rather than the brand. */
+.nav{--ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;
+     --line:rgba(22,60,44,.18);--line-strong:rgba(22,60,44,.38);--wordmark-deep:#04315A;
+     --well:#0D3827;   /* true logo green, sampled from the artwork */
+     color:var(--text);background:#F4F7F4;border-bottom:1px solid var(--line)}
+:root[data-theme="dark"] .nav .brand .word i{color:var(--well)}
 .navcta{display:flex;align-items:center;gap:12px}
 @media (max-width:760px){.navlinks{display:none}}
 @media (max-width:520px){.navcta .btn-primary{display:none}}

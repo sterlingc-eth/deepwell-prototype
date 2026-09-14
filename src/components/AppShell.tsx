@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { MessageSquareText, Database, Inbox, LayoutDashboard, List, Sun, Moon, LogOut, Globe } from 'lucide-react';
 import { useClerk } from '@clerk/clerk-react';
+import { Wordmark } from './Wordmark';
 import { useAppStore, type Screen } from '../store/appStore';
 
 interface NavItem {
@@ -43,13 +44,10 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           <button
             type="button"
             onClick={() => setCurrentScreen('ask')}
-            className="flex items-center gap-2.5 min-h-touch rounded-md px-1 -ml-1 focus-visible:outline-brass-300"
+            className="flex items-center min-h-touch rounded-md -ml-1 focus-visible:outline-brass-300"
             aria-label="DeepWell home"
           >
-            <span aria-hidden="true" className="w-7 h-7 rounded-full border-[3px] border-brass-400 grid place-items-center">
-              <span className="w-2.5 h-2.5 rounded-full bg-brass-400" />
-            </span>
-            <span className="hidden xs:inline sm:inline font-display font-semibold text-[22px] leading-none tracking-tight">DeepWell</span>
+            <Wordmark />
           </button>
 
           <nav aria-label="Primary" className="ml-auto flex items-center gap-0.5 sm:gap-1">
@@ -99,7 +97,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
 
           <button
             type="button"
-            onClick={() => { void signOut(); }}
+            onClick={() => { void signOut({ redirectUrl: '/app/' }); }}
             aria-label="Sign out"
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
