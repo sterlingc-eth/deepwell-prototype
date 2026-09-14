@@ -1,15 +1,25 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { requireAuth, denyAuth } from "./_lib/auth.js";
 
 export default async function handler(req, res) {
   // CORS handling
   if (req.method === "OPTIONS") {
-    return handleCors(res);
+    return handleCors(res, req).status(204).end();
   }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  let auth;
+  try {
+    auth = await requireAuth(req);
+  } catch (err) {
+    return denyAuth(res, err);
+  }
+  void auth;
+
 
   try {
     const { query, equipment } = req.body;
@@ -102,7 +112,7 @@ Be smart about natural language - "warranty expiring this year" should find anyt
       equipment.some((e) => e.id === match.equipmentId)
     );
 
-    return handleCors(res).status(200).json({
+    return handleCors(res, req).status(200).json({
       success: true,
       data: {
         query,

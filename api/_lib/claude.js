@@ -49,10 +49,22 @@ export function getApiKey() {
   return key;
 }
 
-export function handleCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+const ALLOWED_ORIGINS = [
+  "https://deepwellinc.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:4173",
+];
+
+export function handleCors(res, req) {
+  // An allowlist, not "*". With credentials in play, "*" would let any site on
+  // the internet call these endpoints from a signed-in user's browser.
+  const origin = req?.headers?.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   return res;
 }
 

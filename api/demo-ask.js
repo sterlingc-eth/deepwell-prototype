@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { requireAuth, denyAuth } from "./_lib/auth.js";
 
 // Sample records behind the public "Ask" demo on the marketing site.
 // These are illustrative and mirror the DEMO array in index.html.
@@ -23,9 +24,18 @@ export function getRecords() {
 }
 
 export default async function handler(req, res) {
-  if (req.method === "OPTIONS") return handleCors(res).status(204).end();
+  if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method === "GET") return res.status(200).json({ records: getRecords() });
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  let auth;
+  try {
+    auth = await requireAuth(req);
+  } catch (err) {
+    return denyAuth(res, err);
+  }
+  void auth;
+
 
   try {
     const question = String(req.body?.question || "").trim().slice(0, 300);

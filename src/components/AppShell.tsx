@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { MessageSquareText, Database, Inbox, LayoutDashboard, List, Sun, Moon, LogOut, Globe } from 'lucide-react';
+import type { ComponentType, ReactNode } from 'react';
+import { Database, Inbox, LayoutDashboard, List, Sun, Moon, LogOut, Globe } from 'lucide-react';
+import { AskMark } from './AskMark';
 import { useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
 import { useAppStore, type Screen } from '../store/appStore';
@@ -7,13 +8,13 @@ import { useAppStore, type Screen } from '../store/appStore';
 interface NavItem {
   screen: Screen;
   label: string;
-  icon: typeof MessageSquareText;
+  icon: ComponentType<{ className?: string; active?: boolean }>;
   /** Screens that should light up this nav item */
   matches: Screen[];
 }
 
 const NAV: NavItem[] = [
-  { screen: 'ask', label: 'Ask', icon: MessageSquareText, matches: ['ask', 'entity'] },
+  { screen: 'ask', label: 'Ask', icon: AskMark, matches: ['ask', 'entity'] },
   { screen: 'records', label: 'Records', icon: Database, matches: ['records'] },
   { screen: 'ingest', label: 'Intake', icon: Inbox, matches: ['ingest', 'review'] },
   { screen: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, matches: ['dashboard', 'warranty-export'] },
@@ -66,7 +67,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
                       : 'text-forest-100 hover:text-stone-0 hover:bg-forest-800',
                   ].join(' ')}
                 >
-                  <Icon className="w-[18px] h-[18px]" aria-hidden="true" />
+                  <Icon className="w-[18px] h-[18px]" active={active} />
                   <span className="hidden sm:inline">{label}</span>
                   <span className="sr-only sm:hidden">{label}</span>
                 </button>
@@ -97,7 +98,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
 
           <button
             type="button"
-            onClick={() => { void signOut({ redirectUrl: '/' }); }}
+            onClick={() => { void signOut({ redirectUrl: '/app/' }); }}
             aria-label="Sign out"
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >

@@ -4,6 +4,8 @@
  */
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
+// @ts-expect-error - plain JS helper, api/ is not part of the tsc project
+import { requireAuth, denyAuth } from './_lib/auth.js';
 import { PostgresRecordsStore } from '../src/services/postgresRecordsStore';
 
 // Initialize connection pool (reuse across invocations)
@@ -31,8 +33,19 @@ export default async (req: ApiRequest, res: VercelResponse) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  let auth;
   try {
-    const { action, tenantId, ...payload } = req.body;
+    auth = await requireAuth(req);
+  } catch (err) {
+    return denyAuth(res, err);
+  }
+
+  try {
+    // tenantId comes from the verified token only. Anything the caller put in
+    // the body is discarded — otherwise any caller could name any tenant and
+    // read that tenant's documents.
+    const { action, tenantId: _ignored, ...payload } = req.body;
+    void _ignored;
 
     if (!action) {
       return res.status(400).json({ error: 'action required' });
@@ -40,10 +53,9 @@ export default async (req: ApiRequest, res: VercelResponse) => {
 
     const db = await getStore();
 
-    // All operations require tenantId for RLS
-    if (tenantId) {
-      await db.connect(tenantId);
-    }
+    // Always set the RLS context. Never conditionally — a warm invocation would
+    // otherwise inherit whatever tenant the previous request set.
+    await db.connect(auth.tenantId);
 
     // Document operations
     if (action === 'createDocument') {
@@ -161,9 +173,9 @@ export default async (req: ApiRequest, res: VercelResponse) => {
 
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (err) {
+    // Log the detail, return none of it — raw messages leak schema and
+    // connection internals to anonymous callers.
     console.error('API error:', err);
-    return res.status(500).json({
-      error: err instanceof Error ? err.message : 'Internal server error',
-    });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };

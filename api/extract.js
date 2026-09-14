@@ -1,15 +1,25 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { requireAuth, denyAuth } from "./_lib/auth.js";
 
 export default async function handler(req, res) {
   // CORS handling
   if (req.method === "OPTIONS") {
-    return handleCors(res);
+    return handleCors(res, req).status(204).end();
   }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  let auth;
+  try {
+    auth = await requireAuth(req);
+  } catch (err) {
+    return denyAuth(res, err);
+  }
+  void auth;
+
 
   try {
     const { imageData, documentType } = req.body;
@@ -147,7 +157,7 @@ export default async function handler(req, res) {
     const uncertainCount = (extracted.uncertainFields || []).length;
     const confidence = Math.max(0, 1 - uncertainCount * 0.15); // Each uncertain field = -15% confidence
 
-    return handleCors(res).status(200).json({
+    return handleCors(res, req).status(200).json({
       success: true,
       data: {
         ...extracted,

@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { setAuthTokenProvider } from './services/authToken';
 import { useAppStore } from './store/appStore';
 import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, IntakeScreen, LoginScreen, RecordsScreen, ReviewScreen } from './screens';
 import './index.css';
@@ -8,7 +9,13 @@ import './index.css';
 const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen').then((m) => ({ default: m.WarrantyExportScreen })));
 
 function App() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+
+  // Hand Clerk's token getter to the service layer so api/ calls are authenticated.
+  useEffect(() => {
+    setAuthTokenProvider(() => getToken());
+    return () => setAuthTokenProvider(null);
+  }, [getToken]);
   const currentScreen = useAppStore((s) => s.currentScreen);
 
   // Show loading screen while authentication is loading

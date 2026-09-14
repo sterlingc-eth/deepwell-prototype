@@ -15,10 +15,14 @@ import type {
   AuditFilters,
 } from '../services/postgresRecordsStore';
 
+import { authHeader } from './authToken';
+
 const API_URL = '/api/records';
 
 export class RecordsStoreClient implements RecordsStore {
-  private tenantId: string = '';
+  /** Kept for the RecordsStore interface; the server derives the real tenant
+   *  from the verified token, so this is no longer sent with requests. */
+  tenantId: string = '';
   private headers = { 'Content-Type': 'application/json' };
 
   async connect(tenantId: string): Promise<void> {
@@ -32,17 +36,24 @@ export class RecordsStoreClient implements RecordsStore {
   private async call(action: string, payload: any = {}) {
     const response = await fetch(API_URL, {
       method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({
-        action,
-        tenantId: this.tenantId,
-        ...payload,
-      }),
+      // The server derives the tenant from the verified token; sending one from
+      // here would be ignored, so we no longer send it.
+      headers: { ...this.headers, ...(await authHeader()) },
+      body: JSON.stringify({ action, ...payload }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `API error: ${response.statusText}`);
+      // A 500 from Vercel is an HTML error page, so .json() would throw a
+      // SyntaxError and hide the real status. Read as text and try to parse.
+      const raw = await response.text().catch(() => '');
+      let message = `API error ${response.status}: ${response.statusText}`;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.error) message = parsed.error;
+      } catch {
+        /* not JSON — keep the status-based message */
+      }
+      throw new Error(message);
     }
 
     return response.json();

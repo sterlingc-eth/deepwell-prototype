@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { requireAuth, denyAuth } from "./_lib/auth.js";
 
 /**
  * POST /api/ask
@@ -15,8 +16,17 @@ import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
  * VITE_ANSWER_PROVIDER=claude in the frontend to use it.
  */
 export default async function handler(req, res) {
-  if (req.method === "OPTIONS") return handleCors(res).status(204).end();
+  if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  let auth;
+  try {
+    auth = await requireAuth(req);
+  } catch (err) {
+    return denyAuth(res, err);
+  }
+  void auth;
+
 
   try {
     const { question, records, includeUnverified = false, today } = req.body ?? {};
@@ -101,7 +111,7 @@ Rules:
       .map((f) => ({ ...f, sources: (f.sources ?? []).filter((s) => allowedDocs.has(s.documentId)) }))
       .filter((f) => f.sources.length > 0);
 
-    return handleCors(res).status(200).json({
+    return handleCors(res, req).status(200).json({
       success: true,
       data: {
         kind: facts.length ? "answer" : "no-answer",

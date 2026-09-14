@@ -1,4 +1,5 @@
 import type { Answer, AnswerProvider, Fact, SourceRef } from '../core/types';
+import { authHeader } from './authToken';
 import { isAnswerable, type GraphSnapshot } from '../core/entityGraph';
 import { fmtValue } from '../core/answer';
 
@@ -18,7 +19,7 @@ export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '
       const records = exportRecords(g, inc);
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ question, records, includeUnverified: inc, today: (opts?.now ?? new Date()).toISOString().slice(0, 10) }),
       });
       if (!res.ok) {
