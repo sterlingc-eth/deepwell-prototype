@@ -146,6 +146,25 @@ a{color:inherit}
 @media (prefers-reduced-motion: reduce){.ambient span{animation:none}}
 header,section,footer{position:relative;z-index:1}
 
+/* ---------------------------------------------------------------- */
+/* Founders. Avatars are placeholders — to use a real photo, replace */
+/* the .founder-ph div with:                                         */
+/*   <img class="founder-img" src="/sterling.jpg" alt="Sterling …">  */
+/* and drop the file into public/ .                                  */
+/* ---------------------------------------------------------------- */
+.founders{display:grid;grid-template-columns:repeat(2,1fr);gap:28px}
+.founder{display:flex;gap:22px;align-items:flex-start;padding:28px;border:1px solid var(--line);background:var(--surface)}
+.founder-ph,.founder-img{width:96px;height:96px;flex:0 0 96px;border-radius:50%}
+.founder-ph{display:grid;place-items:center;border:2px solid var(--line-strong);background:var(--surface-2);position:relative}
+.founder-ph span{font-family:"Newsreader",serif;font-size:1.6rem;font-weight:500;color:var(--faint)}
+.founder-ph::after{content:"";position:absolute;inset:10px;border-radius:50%;border:1px solid var(--line)}
+.founder-img{object-fit:cover;border:2px solid var(--line-strong)}
+.founder h3{font-family:"Newsreader",serif;font-size:1.3rem;font-weight:500;margin:0 0 2px}
+.founder .role{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-text);margin-bottom:12px}
+.founder p{margin:0;color:var(--muted);font-size:.95rem}
+@media (max-width:860px){.founders{grid-template-columns:1fr}}
+@media (max-width:420px){.founder{flex-direction:column;gap:16px}}
+
 /* sections */
 section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
 .sec-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px;align-items:end;margin-bottom:clamp(36px,5vw,64px)}
@@ -875,6 +894,39 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
       <div class="principle">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
         <div><h3>Measured before you rely on it.</h3><p>During setup we score your account against the questions your team actually asks and show you the number. Under 95% on your own set, we keep working before go-live.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="team">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Who you're working with</div>
+        <h2>A small team, on the phone with you.</h2>
+      </div>
+      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
+    </div>
+
+    <div class="founders">
+      <!-- PLACEHOLDER COPY — replace the text below before launch. -->
+      <div class="founder">
+        <div class="founder-ph" aria-hidden="true"><span>S</span></div>
+        <div>
+          <h3>Sterling Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Placeholder bio. Fifteen years in IT infrastructure — systems integration, networks, and the unglamorous work of making records in one system reachable from another. Built DeepWell after watching the same filing problem repeat at every company he worked in.</p>
+        </div>
+      </div>
+
+      <div class="founder">
+        <div class="founder-ph" aria-hidden="true"><span>H</span></div>
+        <div>
+          <h3>Hilton</h3>
+          <div class="role">Co-founder</div>
+          <p>Placeholder bio. Add a couple of sentences here — what he did before DeepWell, what he owns day to day, and one thing that makes him the person you'd want answering the phone at 7am.</p>
+        </div>
       </div>
     </div>
   </div>
