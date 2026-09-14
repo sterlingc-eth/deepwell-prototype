@@ -4,7 +4,6 @@
  */
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-// @ts-expect-error - plain JS helper, api/ is not part of the tsc project
 import { requireAuth, denyAuth } from './_lib/auth.js';
 import { PostgresRecordsStore } from '../src/services/postgresRecordsStore';
 
@@ -49,7 +48,10 @@ export default async (req: ApiRequest, res: VercelResponse) => {
     // and write into another tenant's data. Every spelling is removed here, and
     // the authenticated tenant is then stamped on explicitly.
     const { action, ...rest } = req.body ?? {};
-    const payload: Record<string, unknown> = { ...rest };
+    // Deliberately `any`: the store methods take concrete Document/Facet/etc
+    // types and this is a generic action dispatcher. Narrowing here would mean
+    // a discriminated union over every action, which is not worth it yet.
+    const payload: any = { ...rest };
     for (const k of ['tenantId', 'tenant_id', 'tenantID', 'TenantId', 'user_id', 'userId']) {
       delete payload[k];
     }
