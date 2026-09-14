@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { MessageSquareText, Database, Inbox, LayoutDashboard, List, Sun, Moon } from 'lucide-react';
+import { MessageSquareText, Database, Inbox, LayoutDashboard, List, Sun, Moon, LogOut, Globe } from 'lucide-react';
+import { useClerk } from '@clerk/clerk-react';
 import { useAppStore, type Screen } from '../store/appStore';
 
 interface NavItem {
@@ -29,6 +30,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const fieldMode = useAppStore((s) => s.fieldMode);
   const setFieldMode = useAppStore((s) => s.setFieldMode);
+  const { signOut } = useClerk();
 
   return (
     <div className="min-h-screen flex flex-col bg-bg text-ink">
@@ -74,6 +76,15 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             })}
           </nav>
 
+          <a
+            href="/"
+            aria-label="Back to the DeepWell website"
+            className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
+          >
+            <Globe className="w-5 h-5" aria-hidden="true" />
+            <span className="hidden md:inline text-body">Website</span>
+          </a>
+
           <button
             type="button"
             role="switch"
@@ -84,6 +95,16 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           >
             {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
             <span className="hidden md:inline text-body">{fieldMode ? 'Field' : 'Office'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { void signOut(); }}
+            aria-label="Sign out"
+            className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
+          >
+            <LogOut className="w-5 h-5" aria-hidden="true" />
+            <span className="hidden md:inline text-body">Sign out</span>
           </button>
         </div>
       </header>

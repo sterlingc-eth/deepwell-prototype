@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +8,7 @@
 <meta property="og:description" content="Every record your company ever made, answerable in seconds.">
 <meta property="og:image" content="deepwell-logo.jpg">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0B1613">
 <title>DeepWell</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -29,6 +30,7 @@
   --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.14), transparent 60%);
   --shadow:0 20px 50px -30px rgba(11,22,19,.45);
   --brass-text:#8E6530;
+  --wordmark-deep:#04315A;   /* true logo navy */
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -42,6 +44,8 @@
   }
 }
 :root[data-theme="dark"]{
+  color-scheme:dark;
+  --wordmark-deep:#0764B8;   /* logo navy: same hue + saturation, value raised to clear 3:1 on the dark ground */
   --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
   --text:#E6EEE9; --muted:#A9BBB2; --faint:#6E8579;
   --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
@@ -77,10 +81,10 @@ a{color:inherit}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
 .brand .mark{width:34px;height:34px}
 .brand .word{font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
-.brand .word b{color:var(--navy);font-weight:600}
+.brand .word b{color:var(--wordmark-deep);font-weight:600}
 .brand .word i{font-style:normal;color:var(--well)}
-:root[data-theme="dark"] .brand .word b,:root[data-theme="dark"] .brand .word i{color:var(--text)}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brand .word b,:root:not([data-theme="light"]) .brand .word i{color:var(--text)}}
+:root[data-theme="dark"] .brand .word i{color:var(--text)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brand .word i{color:var(--text)}}
 .navlinks{display:flex;gap:28px;font-size:.92rem;font-weight:500}
 .navlinks a{text-decoration:none;color:var(--muted)}
 .navlinks a:hover{color:var(--text)}
