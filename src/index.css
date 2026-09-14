@@ -174,3 +174,35 @@
            focus:bg-surface focus:text-ink focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lift;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Brand motion. Everything here is decorative and is switched off     */
+/* entirely for visitors who ask for reduced motion.                   */
+/* ------------------------------------------------------------------ */
+@keyframes dw-ripple {
+  0%, 100% { opacity: 0.3; }
+  45%      { opacity: 1; }
+}
+
+@keyframes dw-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.dw-ring {
+  animation: dw-ripple 3.6s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+.dw-rise {
+  animation: dw-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dw-rise-late {
+  animation-delay: 0.14s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw-ring { animation: none; opacity: 1; }
+  .dw-rise { animation: none; opacity: 1; transform: none; }
+}

@@ -3,27 +3,49 @@
  * every screen. Colours are sampled from the logo artwork: navy #04315A and
  * forest #0D3827. Neither is legible on the dark surfaces this sits on, so the
  * lockup carries its own light plate rather than recolouring the brand.
+ *
+ * The mark is the same concentric-ring geometry as the marketing header, so
+ * the two lockups stay identical.
  */
-const NAVY = 'text-[#04315A]';
 const FOREST = '#0D3827';
+const RINGS = [46, 37, 28, 19, 10];
 
 interface WordmarkProps {
   /** 'lg' for the sign-in screen, 'sm' for the app header. */
   size?: 'sm' | 'lg';
+  /** Ripple the rings outward. Used on the sign-in screen. */
+  animated?: boolean;
 }
 
-export function Wordmark({ size = 'sm' }: WordmarkProps) {
+export function Wordmark({ size = 'sm', animated = false }: WordmarkProps) {
   const lg = size === 'lg';
   return (
-    <span className={`inline-flex items-center rounded-md bg-stone-50 ${lg ? 'gap-3 px-4 py-2.5' : 'gap-2.5 px-2.5 py-1'}`}>
-      <span
+    <span
+      className={`inline-flex items-center rounded-md bg-stone-50 ${lg ? 'gap-3.5 px-5 py-3' : 'gap-2.5 px-2.5 py-1'}`}
+    >
+      <svg
+        viewBox="0 0 100 100"
         aria-hidden="true"
-        className={`rounded-full grid place-items-center border-[3px] border-[#0D3827] ${lg ? 'w-9 h-9' : 'w-7 h-7'}`}
+        className={lg ? 'w-11 h-11 shrink-0' : 'w-7 h-7 shrink-0'}
       >
-        <span className={`rounded-full ${lg ? 'w-3 h-3' : 'w-2.5 h-2.5'}`} style={{ background: FOREST }} />
-      </span>
-      <span className={`font-display font-semibold leading-none tracking-tight ${lg ? 'text-[30px]' : 'text-[22px]'}`}>
-        <span className={NAVY}>Deep</span><span className="text-[#0D3827]">Well</span>
+        <g fill="none" stroke={FOREST} strokeWidth={5}>
+          {RINGS.map((r, i) => (
+            <circle
+              key={r}
+              cx="50"
+              cy="50"
+              r={r}
+              className={animated ? 'dw-ring' : undefined}
+              style={animated ? { animationDelay: `${i * 260}ms` } : undefined}
+            />
+          ))}
+        </g>
+        <circle cx="50" cy="50" r="4" fill={FOREST} />
+      </svg>
+      <span
+        className={`font-display font-semibold leading-none tracking-tight ${lg ? 'text-[34px]' : 'text-[22px]'}`}
+      >
+        <span className="text-[#04315A]">Deep</span><span className="text-[#0D3827]">Well</span>
       </span>
     </span>
   );
