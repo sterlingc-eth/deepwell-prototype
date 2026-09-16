@@ -17,17 +17,29 @@
  * The bytes never pass through a serverless function: a 30 MB scanned PDF
  * would exceed the request body limit, and paying compute to relay uploads
  * makes them slower and more expensive for no benefit.
+ *
+ * Step 3 has two shapes now. When the server has a queue configured it answers
+ * 202 and does the reading out of band, so the browser stops holding a request
+ * open for the length of a transcription and starts polling instead. When it
+ * does not, it answers 200 with the page count exactly as before. The client
+ * handles both because which one happens is a deployment detail, and a UI that
+ * only worked against one of them would break the moment the other was
+ * configured.
  */
 
 import { authHeader } from './authToken';
 
-export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'done' | 'error';
+export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'done' | 'error';
 
 export interface IngestResult {
   filename: string;
   documentId?: string;
   pages?: number;
+  fields?: number;
   duplicate?: boolean;
+  queued?: boolean;
+  /** The server chained field extraction behind the read; wait for that too. */
+  awaitingExtraction?: boolean;
   error?: string;
 }
 
@@ -35,6 +47,16 @@ export interface IngestProgress {
   filename: string;
   status: IngestStatus;
   error?: string;
+}
+
+interface DocumentStatusRow {
+  id: string;
+  original_filename: string;
+  stage: string;
+  page_count: number | null;
+  extracted_at: string | null;
+  extract_error: string | null;
+  field_count: string | number | null;
 }
 
 async function sha256Hex(file: File): Promise<string> {
@@ -106,10 +128,23 @@ export async function ingestFile(
     }
 
     report('reading');
-    const { pages } = await postJson<{ pages: number }>('/api/read-document', { documentId });
+    const read = await postJson<{ pages?: number; queued?: boolean; extract?: boolean }>(
+      '/api/read-document',
+      { documentId }
+    );
+
+    if (read.queued) {
+      report('queued');
+      return {
+        filename: file.name,
+        documentId,
+        queued: true,
+        awaitingExtraction: read.extract !== false,
+      };
+    }
 
     report('done');
-    return { filename: file.name, documentId, pages };
+    return { filename: file.name, documentId, pages: read.pages };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     report('error', error);
@@ -117,10 +152,101 @@ export async function ingestFile(
   }
 }
 
+/** One poll of the server's view of a set of documents. */
+export async function fetchDocumentStatus(documentIds: string[]): Promise<DocumentStatusRow[]> {
+  if (!documentIds.length) return [];
+  const { documents } = await postJson<{ documents: DocumentStatusRow[] }>(
+    '/api/document-status',
+    { documentIds }
+  );
+  return documents;
+}
+
+const POLL_INTERVAL_MS = 2500;
+const POLL_TIMEOUT_MS = 15 * 60 * 1000;
+
+/** Pipeline stages in order. Anything at or past 'mapped' has had fields extracted. */
+const STAGES = ['received', 'read', 'mapped', 'linked', 'verified'];
+
+/**
+ * Has this document reached the end of the work that was queued for it?
+ *
+ * `extracted_at` alone is not the finish line when extraction was chained
+ * behind the read: the read step sets it, so a poll landing between the two
+ * steps would call the document done and report zero fields on a document whose
+ * extraction had not started. When extraction is coming, wait for the stage to
+ * advance to 'mapped' instead.
+ */
+function isFinished(row: DocumentStatusRow, result: IngestResult): boolean {
+  if (!row.extracted_at) return false;
+  if (!result.awaitingExtraction) return true;
+  return STAGES.indexOf(row.stage) >= STAGES.indexOf('mapped');
+}
+
+/**
+ * Wait for queued documents to finish reading.
+ *
+ * Finished means `extracted_at` is set or `extract_error` is — the document is
+ * done either way, and a failed one must not hold the batch open. Polling stops
+ * at fifteen minutes so a run that never lands cannot pin a tab open forever;
+ * the documents keep processing server-side regardless, which is the whole
+ * reason the work was moved off the request in the first place.
+ */
+export async function waitForIngest(
+  results: IngestResult[],
+  onProgress?: (p: IngestProgress) => void
+): Promise<IngestResult[]> {
+  const pending = new Map(
+    results.filter((r) => r.queued && r.documentId).map((r) => [r.documentId as string, r])
+  );
+  if (!pending.size) return results;
+
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+
+  while (pending.size && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+    let rows: DocumentStatusRow[];
+    try {
+      rows = await fetchDocumentStatus([...pending.keys()]);
+    } catch {
+      continue; // a dropped poll is not a failed ingest; try again
+    }
+
+    for (const row of rows) {
+      const result = pending.get(row.id);
+      if (!result) continue;
+      if (row.extract_error) {
+        result.error = row.extract_error;
+        result.queued = false;
+        pending.delete(row.id);
+        onProgress?.({ filename: result.filename, status: 'error', error: row.extract_error });
+      } else if (isFinished(row, result)) {
+        result.pages = row.page_count ?? undefined;
+        result.fields = Number(row.field_count ?? 0);
+        result.queued = false;
+        pending.delete(row.id);
+        onProgress?.({ filename: result.filename, status: 'done' });
+      }
+    }
+  }
+
+  for (const result of pending.values()) {
+    result.error = 'Still processing — check the records list in a few minutes.';
+    onProgress?.({ filename: result.filename, status: 'error', error: result.error });
+  }
+
+  return results;
+}
+
 /**
  * Ingest a batch. Bounded concurrency on purpose: extraction is the slow,
  * expensive step, and firing forty of them at once would hit rate limits and
  * make every single file slower than doing a few at a time.
+ *
+ * When the server queues, the uploads still go up a few at a time — that limit
+ * is about the browser's own bandwidth — but the reading is no longer serialised
+ * behind them, so `waitForIngest` is what the caller waits on.
  */
 export async function ingestFiles(
   files: File[],
@@ -131,7 +257,7 @@ export async function ingestFiles(
   let next = 0;
 
   const worker = async () => {
-    while (true) {
+    for (;;) {
       const i = next++;
       const file = files[i];
       if (!file) return;
@@ -140,5 +266,5 @@ export async function ingestFiles(
   };
 
   await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
-  return results;
+  return waitForIngest(results, onProgress);
 }

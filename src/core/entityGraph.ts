@@ -48,6 +48,18 @@ interface GraphActions {
   createBatch: (input: { name: string; source: IntakeSource; from: Date; to: Date; by: string }) => string;
   /** Intake: add received documents to a batch (mock upload). */
   receiveDocs: (batchId: string, files: { filename: string; fileType: Doc['fileType'] }[]) => DocumentId[];
+  /**
+   * Intake: fold a real ingest result onto the client-side placeholder
+   * `receiveDocs` created for it, swapping the invented id for the server's
+   * real `documentId` and applying whatever the ingest pipeline learned
+   * (pages read, pipeline stage, a preview reflecting an error). If the real
+   * id already names a document already in the graph (e.g. a duplicate
+   * re-upload the server matched to an existing row, possibly one this
+   * session already loaded from Postgres), that existing record is kept as
+   * the richer copy and the placeholder is simply dropped rather than
+   * clobbered onto it.
+   */
+  reconcileIntakeDoc: (tempId: DocumentId, updates: { id?: DocumentId } & Partial<Pick<Doc, 'pages' | 'stage' | 'preview'>>) => void;
 }
 
 export type GraphStore = GraphSnapshot & GraphActions;
@@ -218,6 +230,43 @@ export const useGraph = create<GraphStore>((set) => ({
     }));
     return id;
   },
+
+  reconcileIntakeDoc: (tempId, updates) =>
+    set((s) => {
+      const doc = s.docs[tempId];
+      if (!doc) return s;
+      const newId = updates.id ?? tempId;
+      const batch = s.batches[doc.batchId];
+
+      if (newId !== tempId && s.docs[newId]) {
+        // The server's real id already names a document in the graph (a
+        // duplicate upload, most likely). Keep that copy — it may already
+        // carry real pipeline state from Postgres — and just drop the
+        // placeholder instead of overwriting it with thinner local data.
+        const docs = { ...s.docs };
+        delete docs[tempId];
+        const batches = batch
+          ? { ...s.batches, [doc.batchId]: { ...batch, documentIds: batch.documentIds.filter((id) => id !== tempId) } }
+          : s.batches;
+        return { docs, batches };
+      }
+
+      const merged: Doc = {
+        ...doc,
+        ...(updates.pages !== undefined ? { pages: updates.pages } : {}),
+        ...(updates.stage !== undefined ? { stage: updates.stage } : {}),
+        ...(updates.preview !== undefined ? { preview: updates.preview } : {}),
+        id: newId,
+      };
+      const docs = { ...s.docs };
+      delete docs[tempId];
+      docs[newId] = merged;
+      const batches =
+        newId !== tempId && batch
+          ? { ...s.batches, [doc.batchId]: { ...batch, documentIds: batch.documentIds.map((id) => (id === tempId ? newId : id)) } }
+          : s.batches;
+      return { docs, batches };
+    }),
 
   receiveDocs: (batchId, files) => {
     const ids: DocumentId[] = [];

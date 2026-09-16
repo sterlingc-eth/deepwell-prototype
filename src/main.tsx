@@ -5,7 +5,19 @@ import './index.css'
 import App from './App.tsx'
 import { bootstrapHvac } from './domains/hvac'
 
-bootstrapHvac()
+// Demo fixture is opt-in, not the default: a signed-in user with real
+// Postgres data must never see it mixed with theirs. `usePostgresSync` (see
+// App.tsx) is the default data path and replaces whatever is in the store,
+// including this fixture, the moment it loads — so when demo mode is off,
+// skipping the bootstrap entirely (rather than calling it and letting sync
+// overwrite it) just avoids a pointless flash of fixture data on first paint.
+// Compared with plain string 'true', never a boolean: import.meta.env.* is
+// inlined as a string literal at build time, and a missing var is `undefined`
+// here, not `false` — no throw, so a build with no env file simply stays out
+// of demo mode instead of taking the app down.
+if (import.meta.env.VITE_DEMO_MODE === 'true') {
+  bootstrapHvac()
+}
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 

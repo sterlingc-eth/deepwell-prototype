@@ -2,34 +2,53 @@ import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
-import { ANSWER_TOOL, buildPrompt, shapeAnswer } from "./_lib/answer.js";
+import { ANSWER_TOOL, buildPrompt, buildAllowed, shapeAnswer } from "./_lib/answer.js";
 
 /**
  * POST /api/ask
- * body: { question, includeUnverified?, today?, records? }
+ * body: { question, today? }
  *
- * Retrieval happens HERE, on the server, against the tenant's own rows.
+ * Retrieval happens HERE, on the server, against the tenant's own rows:
+ * full-text and identifier search over document_pages, plus any
+ * already-extracted fields that mention the same identifiers. Only the
+ * passages and extractions retrieval actually returns go into the prompt,
+ * and shapeAnswer() then drops any fact whose citation doesn't match one of
+ * those exact rows (document AND page, or document AND field — see
+ * _lib/answer.js). Cost doesn't scale with corpus size, and the model is
+ * handed real pages rather than a summary of them, so a fact it cites is a
+ * fact on a page.
  *
- * It used to happen in the browser: the client exported every answerable field
- * it held and posted the whole corpus with each question. That capped the
- * product at a few hundred entities (a 512 KB body), cost a full-corpus prompt
- * per question, and meant the answer could only be as good as whatever the
- * browser happened to have in memory.
+ * THE TRUST BUG THIS REPLACES: this endpoint used to accept a client-
+ * supplied `records` array and answer from it whenever server retrieval came
+ * back empty. That fallback is gone, on purpose, not just moved.
  *
- * Now the question selects its own evidence — full-text and identifier search
- * over document_pages, plus any already-extracted fields that mention the same
- * identifiers — and only those passages go into the prompt. Cost stops scaling
- * with corpus size, and the model is handed the pages rather than a summary of
- * them, so a fact it cites is a fact on a page.
+ * The reason isn't request size or latency — it's that the browser has no
+ * way to send anything BUT its local entity graph, and today that graph is
+ * always `src/domains/hvac/seed.ts`: a hardcoded demo fixture, bootstrapped
+ * unconditionally on every page load (see src/main.tsx). There is currently
+ * no code path that puts a real customer's own data into that graph. So "no
+ * server passages, fall back to client records" meant, in practice: a real
+ * customer with zero or partially-ingested documents gets a confident,
+ * fully-cited answer built entirely out of demo equipment, demo warranties
+ * and demo work orders. `shapeAnswer` could not catch this, because the
+ * cited "document" genuinely was in the set the fallback handed it — the
+ * whole set was just never the customer's.
  *
- * `records` is still accepted: when the tenant has no ingested pages yet (a
- * fresh account, or the demo data), the old client-supplied path is used so the
- * app keeps answering instead of going silent.
+ * The product's one promise is "every fact comes from your own documents."
+ * An honest "nothing in your records answers that yet" keeps that promise;
+ * a fabricated-but-cited answer breaks it, and breaks it worse the more
+ * confident it sounds. So when retrieval finds nothing, we say so and stop.
+ * We do not reach for a second "evidence" source that was never the
+ * customer's to begin with — and there is no server-side flag or client
+ * field left that could quietly turn it back on. If a real client-side
+ * ingestion path is built later, it should hand the SERVER the raw material
+ * to retrieve from, so it goes through this same tenant-scoped, retrieval-
+ * gated path, not hand the model a pre-packaged, unverifiable "here are the
+ * facts" payload directly.
  */
 export const config = { api: { bodyParser: { sizeLimit: "512kb" } } };
 
 const MAX_QUESTION = 2000;
-const MAX_RECORDS = 400;
 const MAX_PASSAGES = 12;
 const MAX_EXCERPT = 1200;
 
@@ -45,15 +64,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { question, records, includeUnverified = false, today } = req.body ?? {};
+    const { question, today } = req.body ?? {};
     if (typeof question !== "string" || !question.trim()) {
       return res.status(400).json({ error: "Missing question" });
     }
     if (question.length > MAX_QUESTION) {
       return res.status(400).json({ error: "Question is too long" });
-    }
-    if (records != null && (!Array.isArray(records) || records.length > MAX_RECORDS)) {
-      return res.status(400).json({ error: "Too many records in one request" });
     }
 
     // ---- 1. retrieve -------------------------------------------------------
@@ -70,36 +86,45 @@ export default async function handler(req, res) {
       passages = found.passages;
       extractions = found.extractions;
     } catch (err) {
-      // A retrieval failure must not take the endpoint down; fall through to
-      // the client-supplied records so the app still answers.
-      console.error("Retrieval failed, falling back to client records:", err?.message);
+      // A retrieval failure must not take the endpoint down. It also must
+      // NOT be papered over with a second, untrustworthy evidence source —
+      // see the file header. Log it and fall through to the same honest
+      // no-answer that "nothing matched" gets: a customer can't act any
+      // differently on the difference between "we found nothing" and "we
+      // couldn't check", and guessing is worse than either.
+      console.error("Retrieval failed:", err?.message);
     }
 
-    const usingPassages = passages.length > 0;
-    if (!usingPassages && !Array.isArray(records)) {
+    if (passages.length === 0 && extractions.length === 0) {
       return handleCors(res, req).status(200).json({
         success: true,
         data: {
           kind: "no-answer",
-          text: "Nothing in your records answers that.",
+          text: "Nothing in your records answers that yet. Your documents may still be processing.",
           facts: [], sources: [], confidence: 0,
           verifiedCount: 0, unverifiedCount: 0, closest: [],
         },
       });
     }
 
-    // Only documents the retrieval step actually returned may be cited.
-    const allowedDocs = new Set();
-    if (usingPassages) {
-      for (const p of passages) allowedDocs.add(p.document_id);
-      for (const x of extractions) allowedDocs.add(x.document_id);
-    } else {
-      for (const r of records) {
-        for (const f of Object.values(r.fields ?? {})) {
-          for (const s of f.sources ?? []) allowedDocs.add(s.documentId);
-        }
-      }
-    }
+    const mappedPassages = passages.map((p) => ({
+      documentId: p.document_id,
+      filename: p.original_filename,
+      documentType: p.document_type,
+      page: p.page_no,
+      excerpt: String(p.excerpt ?? "").slice(0, MAX_EXCERPT),
+    }));
+    const mappedExtractions = extractions.map((x) => ({
+      documentId: x.document_id,
+      filename: x.original_filename,
+      field: x.field_key,
+      value: x.value,
+      entityType: x.entity_type,
+    }));
+
+    // What a citation is allowed to point at: exactly the documents (and,
+    // per document, the pages/fields) retrieval returned above.
+    const allowed = buildAllowed({ passages: mappedPassages, extractions: mappedExtractions });
 
     // ---- 2. ask ------------------------------------------------------------
     const client = new Anthropic({ apiKey: getApiKey() });
@@ -114,34 +139,21 @@ export default async function handler(req, res) {
           content: buildPrompt({
             question,
             today: today ?? new Date().toISOString().slice(0, 10),
-            includeUnverified,
-            passages: usingPassages
-              ? passages.map((p) => ({
-                  documentId: p.document_id,
-                  filename: p.original_filename,
-                  documentType: p.document_type,
-                  page: p.page_no,
-                  excerpt: String(p.excerpt ?? "").slice(0, MAX_EXCERPT),
-                }))
-              : null,
-            extractions: usingPassages
-              ? extractions.map((x) => ({
-                  documentId: x.document_id,
-                  filename: x.original_filename,
-                  field: x.field_key,
-                  value: x.value,
-                  entityType: x.entity_type,
-                }))
-              : null,
-            records: usingPassages ? null : records,
+            passages: mappedPassages,
+            extractions: mappedExtractions,
           }),
         },
       ],
     });
 
-    // ---- 3. enforce sourcing ----------------------------------------------
+    // ---- 3. enforce sourcing ------------------------------------------------
+    // allowComputed defaults to false here: nothing on this endpoint's
+    // evidence path is a computed value (extraction never does arithmetic —
+    // see warrantyRules.js), so a model claiming basis "computed" is
+    // overruled back to "printed" and held to the ordinary page/field check
+    // rather than getting a free pass around it.
     const toolUse = response.content.find((b) => b.type === "tool_use");
-    const data = shapeAnswer(toolUse?.input, allowedDocs);
+    const data = shapeAnswer(toolUse?.input, allowed);
 
     return handleCors(res, req).status(200).json({ success: true, data });
   } catch (error) {

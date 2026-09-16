@@ -6,7 +6,7 @@ import { docCountsByStage, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
-import { ingestFiles, type IngestProgress } from '../services/ingestClient';
+import { ingestFiles, type IngestProgress, type IngestResult } from '../services/ingestClient';
 
 const SOURCE_LABEL: Record<IntakeSource, string> = { cabinet: 'Filing cabinet', email: 'Email', drive: 'Shared drive', truck: 'Truck' };
 const CURRENT_USER = 'You';
@@ -15,11 +15,51 @@ const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
   hashing: 'Checking…',
   uploading: 'Uploading…',
   reading: 'Reading…',
+  queued: 'Queued…',
   done: 'Read',
   error: 'Failed',
 };
 
 const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+/**
+ * Postgres pipeline stage a finished `IngestResult` implies, positionally
+ * mapped onto the core five-stage pipeline the same way `usePostgresSync.ts`
+ * maps existing documents loaded from Postgres (STAGE_MAP there) — 'mapped'
+ * (fields extracted, even zero of them) -> 'extracted', 'read' (text pulled,
+ * not yet mapped) -> 'classified'. `ingestFiles` never returns enough to
+ * place a document at 'linked' or 'verified' — those only happen once a
+ * person reviews it.
+ */
+function stageFromIngestResult(result: IngestResult): PipelineStage {
+  if (result.fields !== undefined) return 'extracted';
+  if (result.pages !== undefined) return 'classified';
+  return 'received';
+}
+
+/**
+ * Folds one real `ingestFiles` result onto the client-side placeholder
+ * `receiveDocs` created for it. Before this, the placeholder's invented id
+ * and "Received. Not yet classified." preview were the last anyone ever saw
+ * of an uploaded file — `ingestFiles`' real `documentId`, page count and
+ * pipeline progress were fetched and then thrown away.
+ */
+function patchFromIngestResult(result: IngestResult): { id?: string } & Partial<Pick<Doc, 'pages' | 'stage' | 'preview'>> {
+  if (result.error) {
+    // Stays at 'received' — it never got further than that — with the real
+    // failure reason visible instead of the generic placeholder text.
+    return { preview: `${result.filename}\n\n${result.error}` };
+  }
+  if (!result.documentId) return {};
+  if (result.duplicate) {
+    // The server matched this upload to a document it already has by
+    // content hash. Point the placeholder at that real id; `reconcileIntakeDoc`
+    // itself is what actually favors the existing record if one is already
+    // loaded in the graph rather than overwriting it with this thinner one.
+    return { id: result.documentId, preview: `${result.filename}\n\nAlready on file (matched by content).` };
+  }
+  return { id: result.documentId, pages: result.pages ?? 0, stage: stageFromIngestResult(result) };
+}
 
 function issueSummary(doc: Doc): string | null {
   const i = doc.issues[0];
@@ -42,6 +82,7 @@ export function IntakeScreen() {
   const createBatch = useGraph((s) => s.createBatch);
   const receiveDocs = useGraph((s) => s.receiveDocs);
   const classifyDoc = useGraph((s) => s.classifyDoc);
+  const reconcileIntakeDoc = useGraph((s) => s.reconcileIntakeDoc);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
 
@@ -97,13 +138,19 @@ export function IntakeScreen() {
    */
   const uploadFiles = async (files: File[]) => {
     if (!selected || !files.length) return;
-    addFiles(files.map((f) => ({ filename: f.name })));
+    // Captured directly from receiveDocs (not via addFiles) because the ids
+    // it returns are what ties each real ingest result back to its placeholder.
+    const tempIds = receiveDocs(selected.id, files.map((f) => ({ filename: f.name, fileType: fileTypeOf(f.name) })));
     setUploads((prev) => {
       const next = { ...prev };
       for (const f of files) next[f.name] = { filename: f.name, status: 'hashing' };
       return next;
     });
-    await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })));
+    const results = await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })));
+    results.forEach((result, i) => {
+      const tempId = tempIds[i];
+      if (tempId) reconcileIntakeDoc(tempId, patchFromIngestResult(result));
+    });
   };
   const processReceived = () => {
     if (!selected) return;

@@ -177,6 +177,16 @@ export interface Fact {
   status?: FactStatus;
   /** Link target — the entity this fact belongs to */
   entityId?: EntityId;
+  /**
+   * 'printed' (default): the value is written on a cited page, or was
+   * already extracted from one. 'computed': the value was derived by
+   * arithmetic on other evidence (e.g. an install date plus a warranty
+   * term, the same distinction `warrantyRules.js` stores as
+   * `expiresBasis`) and no page says it directly — the UI must render this
+   * differently (no "as stated in document X" framing) so a calculated date
+   * is never shown as though a document printed it.
+   */
+  basis?: 'printed' | 'computed';
   /** Every fact carries at least one source. */
   sources: SourceRef[];
 }
