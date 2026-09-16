@@ -1,6 +1,6 @@
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { handleCors, handleError } from "./_lib/claude.js";
-import { ingestDocument, recordIngestFailure } from "./_lib/readDocument.js";
+import { ingestDocument, recordIngestFailure, isTransientError } from "./_lib/readDocument.js";
 import { isQueueEnabled, enqueueDocument } from "./_lib/queue.js";
 
 /**
@@ -91,12 +91,33 @@ export default async function handler(req, res) {
     const result = await ingestDocument(ctx, documentId, { userId: auth.userId });
     return handleCors(res, req).status(200).json({ ...result, queued: false });
   } catch (error) {
+    // Recording a failure is a one-way door on this path: the browser polls
+    // document-status and treats any extract_error as terminal, so a document
+    // stamped here is a document the technician is told to give up on. That is
+    // the right answer for a file we genuinely cannot read, and the wrong one
+    // for a rate limit that clears in four seconds — which is the single most
+    // likely thing to happen when someone drops a folder of 200 files on a
+    // deployment running ingestion inline. Transient failures are reported as
+    // retryable and left OFF the document.
+    const transient = isTransientError(error);
+
     if (error?.name === "IngestError") {
       // markExtracted already ran for the unsupported-type case; for the rest,
       // record the reason so the document does not sit at 'received' silently.
-      if (error.status !== 415) await recordIngestFailure(ctx, documentId, error);
+      if (error.status !== 415 && !transient) await recordIngestFailure(ctx, documentId, error);
       return handleCors(res, req).status(error.status ?? 400).json({ error: error.message });
     }
+
+    if (transient) {
+      console.error("Transient ingest failure, not recorded:", error?.message);
+      const out = handleCors(res, req);
+      out.setHeader("Retry-After", "10");
+      return out.status(503).json({
+        error: "Busy right now — this document has not been read yet. Try again in a moment.",
+        retryable: true,
+      });
+    }
+
     await recordIngestFailure(ctx, documentId, error);
     return handleError(res, error, req);
   }

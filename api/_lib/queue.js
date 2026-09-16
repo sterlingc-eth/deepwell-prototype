@@ -36,9 +36,19 @@ export const EVENTS = {
   read: "deepwell/document.read",
 };
 
-/** True when the app is configured to queue rather than run ingestion inline. */
+/**
+ * True when the app is configured to queue rather than run ingestion inline.
+ *
+ * BOTH keys, not just the event key. Sending an event needs only
+ * INNGEST_EVENT_KEY, so with that set alone every enqueue succeeded and
+ * /api/read-document answered 202 queued — but the callback into /api/inngest
+ * is verified against INNGEST_SIGNING_KEY and fails closed without it, so the
+ * work never ran. Every document said "queued" forever, and nothing anywhere
+ * recorded an error. Requiring both means a half-configured queue falls back to
+ * the inline path, which is slower but actually finishes.
+ */
 export function isQueueEnabled() {
-  return Boolean(process.env.INNGEST_EVENT_KEY);
+  return Boolean(process.env.INNGEST_EVENT_KEY) && Boolean(process.env.INNGEST_SIGNING_KEY);
 }
 
 /* --------------------------------------------------------------- lazy load */

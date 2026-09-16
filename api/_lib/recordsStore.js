@@ -63,6 +63,34 @@ export const FIELD_EXTRACT_SEGMENT = 'field-extract';
  * decision can be unit tested without a database — see
  * scripts/verify-customer-link.mjs. Neither function touches `db`.
  */
+/**
+ * Serial values that identify nothing. Deliberately a small exact list rather
+ * than a clever pattern: a real serial can look like almost anything, so
+ * anything heuristic here risks discarding a genuine one. Compared after
+ * lowercasing and collapsing every non-alphanumeric run to a single space.
+ */
+const PLACEHOLDER_SERIALS = new Set([
+  'n a', 'na', 'none', 'no serial', 'no serial number', 'unknown', 'unk',
+  'tbd', 'pending', 'illegible', 'unreadable', 'missing', 'not legible',
+  'not readable', 'not available', 'nil', 'null', 'test', 'sample',
+  'see photo', 'see above', 'see attached',
+]);
+
+export function isPlaceholderSerial(raw) {
+  const s = String(raw ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) return true;
+  if (PLACEHOLDER_SERIALS.has(s)) return true;
+  // A single repeated character once separators are gone ("-----", "0000",
+  // "XXXX") is a filler mark on a form, not an identifier.
+  const bare = s.replace(/ /g, '');
+  if (/^(.)\1*$/.test(bare)) return true;
+  return false;
+}
+
 export function normalizeMatchText(raw) {
   const s = String(raw ?? '').trim().replace(/\s+/g, ' ');
   return /[A-Za-z0-9]/.test(s) ? s : '';
@@ -576,6 +604,12 @@ function makeStore(db, tenantId) {
     findOrCreateEquipment: async (facts) => {
       const serial = String(facts?.serial_number ?? '').trim();
       if (!serial) return null;
+      // A placeholder is not an identity. "N/A" on an illegible nameplate is a
+      // technician saying "I could not read this", and matching on it merges
+      // every unreadable plate in the account into one entity — a Carrier
+      // furnace and a Trane condenser at different addresses becoming a single
+      // unit carrying one of their warranties. Treated the same as no serial.
+      if (isPlaceholderSerial(serial)) return null;
 
       const incoming = {};
       // `warranty_expires` is deliberately NOT copied here. The warranty lives
@@ -605,7 +639,7 @@ function makeStore(db, tenantId) {
            VALUES ($1,'equipment',$2,NOW(),NOW()) RETURNING id`,
           [tenantId, incoming]
         );
-        return { id: created.id, created: true };
+        return { id: created.id, created: true, data: incoming };
       }
 
       const data = { ...(existing.data ?? {}) };
@@ -619,7 +653,10 @@ function makeStore(db, tenantId) {
           [existing.id, data]
         );
       }
-      return { id: existing.id, created: false };
+      // `data` goes back to the caller so warranty derivation can see what the
+      // entity already knows. Without it, a service ticket that names no
+      // manufacturer derives an EMPTY warranty and overwrites a correct one.
+      return { id: existing.id, created: false, data };
     },
 
     // ---- customers ----------------------------------------------------

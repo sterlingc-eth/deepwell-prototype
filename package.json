@@ -18,7 +18,8 @@
     "verify:warranty": "node scripts/verify-warranty.mjs",
     "verify:answer": "node scripts/verify-answer.mjs",
     "verify:customer": "node scripts/verify-customer-link.mjs",
-    "verify:all": "npm run verify:extract && npm run verify:warranty && npm run verify:answer && npm run verify:customer"
+    "verify:all": "npm run verify:extract && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:hardening",
+    "verify:hardening": "node scripts/verify-hardening.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",

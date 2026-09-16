@@ -23,6 +23,14 @@ export const config = { api: { bodyParser: { sizeLimit: "16kb" } } };
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
+// What the reader will actually accept for a PDF or a photo. Checked HERE, not
+// only at read time: the old arrangement presigned anything up to 100 MB, the
+// browser uploaded all of it over whatever connection a technician has in a
+// crawlspace, and read-document then refused it with a 413. The bytes were
+// already spent. A file too big to read should be refused before it moves.
+const MAX_MODEL_BYTES = 24 * 1024 * 1024;
+const MODEL_READ_TYPES = /^(application\/pdf|image\/(jpeg|png|gif|webp))$/;
+
 /**
  * Thrown when presign() can't produce an upload URL (R2 env vars unset, e.g.
  * every Preview/Development deploy today). Kept distinct from other errors so
@@ -62,6 +70,18 @@ export default async function handler(req, res) {
     }
     if (sizeBytes != null && sizeBytes > MAX_BYTES) {
       return res.status(413).json({ error: "File is larger than 100 MB" });
+    }
+    if (
+      sizeBytes != null &&
+      sizeBytes > MAX_MODEL_BYTES &&
+      typeof contentType === "string" &&
+      MODEL_READ_TYPES.test(contentType)
+    ) {
+      return res.status(413).json({
+        error:
+          "PDFs and photos have to be under 24 MB to be read. Split this into " +
+          "smaller files, or scan at a lower resolution, and upload again.",
+      });
     }
 
     const result = await withTenant(

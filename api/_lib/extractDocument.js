@@ -59,14 +59,33 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // earlier run rather than leaving them there to look current.
   const facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
 
-  // Derived WITHOUT a clock on purpose: only the stable parts — the
-  // registration deadline, the term, the expiry, and whether that expiry was
-  // printed or calculated — get stored. Day counts are computed when the list
-  // is read, because "19 days left" is true for exactly one day.
-  const warranty = deriveWarranty(facts);
+  let warranty = null;
 
   const written = await withTenant(ctx, async (db) => {
     const entity = await db.findOrCreateEquipment(facts);
+
+    // Derived from the ENTITY's accumulated facts, not this document's alone.
+    //
+    // A unit's manufacturer and install date are stated once, on the install
+    // invoice. Every later document about that same serial — a service ticket,
+    // a filter change, a callback — says neither. Deriving from `facts` by
+    // itself therefore produced an empty warranty for those documents, and
+    // setEquipmentWarranty's jsonb merge replaces the whole `warranty` key, so
+    // the second document silently erased the correct deadline computed from
+    // the first. The unit then vanished from the expiring-warranty list with
+    // nothing recorded as wrong, and which answer you got depended on which
+    // document happened to be extracted last.
+    //
+    // The entity's own values win over this document's: the entity merge is
+    // fill-only, so what is on the row is the first — and by convention the
+    // most authoritative — reading of that field.
+    const known = { ...facts, ...(entity?.data ?? {}) };
+
+    // Still derived WITHOUT a clock: only the stable parts — the registration
+    // deadline, the term, the expiry, and whether that expiry was printed or
+    // calculated — get stored. Day counts are computed when the list is read,
+    // because "19 days left" is true for exactly one day.
+    warranty = deriveWarranty(known);
     if (entity?.id) await db.setEquipmentWarranty(entity.id, warranty);
 
     // Customer resolution never blocks equipment/warranty writes above: a
@@ -83,6 +102,16 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     const counts = await db.replaceDocumentFields(documentId, fields, {
       entityId: entity?.id ?? null,
     });
+
+    // Record what this document turned out to be. Nothing wrote document_type
+    // before, so it was null on every row forever — and the review screen gates
+    // its whole extracted-fields section on that column being set, which meant a
+    // document that HAD been fully extracted rendered as a blank slate and a
+    // technician was invited to key it all in again.
+    const resolvedType = documentType || doc.document_type || inferDocumentType(facts);
+    if (resolvedType && resolvedType !== doc.document_type) {
+      await db.updateDocument(documentId, { document_type: resolvedType });
+    }
     await db.logAction({
       action: "document.fields_extracted",
       resource_type: "document",
@@ -107,11 +136,17 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         customer_linked: linked > 0,
       },
     });
-    return { counts, entityId: entity?.id ?? null, customerId: customer?.id ?? null };
+    return {
+      counts,
+      documentType: resolvedType ?? null,
+      entityId: entity?.id ?? null,
+      customerId: customer?.id ?? null,
+    };
   });
 
   return {
     documentId,
+    documentType: written.documentType,
     entityId: written.entityId,
     customerId: written.customerId,
     fields,
@@ -122,4 +157,19 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     pagesTotal: pages.length,
     warranty,
   };
+}
+
+/**
+ * What kind of document this is, from the fields that came out of it. Only ever
+ * a fallback: an explicit documentType from the caller, or one already on the
+ * row, wins. The point is that the column stops being null, not that the label
+ * is subtle — a human reclassifies it in review.
+ */
+function inferDocumentType(facts) {
+  if (facts.warranty_registered_date || facts.warranty_expires || facts.warranty_term) return "warranty";
+  if (facts.invoice_number || facts.cost) return "invoice";
+  if (facts.service_date || facts.technician || facts.work_performed) return "service_ticket";
+  if (facts.installation_date) return "install_record";
+  if (facts.serial_number || facts.model) return "equipment_record";
+  return "document";
 }

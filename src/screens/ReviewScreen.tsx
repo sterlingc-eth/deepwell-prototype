@@ -11,6 +11,15 @@ import { useAppStore } from '../store/appStore';
 
 const CURRENT_USER = 'You';
 
+// Everything this screen does — correcting a field, classifying, linking,
+// approving, resolving a conflict, merging a duplicate — writes to the
+// in-memory graph and nothing else. usePostgresSync loads from Postgres; there
+// is no write-back path, and there never has been. Silently losing a
+// technician's corrections on refresh is the kind of thing that destroys trust
+// in a tool permanently, so while the write path does not exist, the screen
+// says so out loud rather than letting the stage pill imply it saved.
+const REVIEW_IS_LOCAL_ONLY = import.meta.env.VITE_DEMO_MODE !== 'true';
+
 type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'all';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'attention', label: 'Needs a person' },
@@ -89,6 +98,20 @@ export function ReviewScreen() {
             <p className="text-ink-2 mt-1">What the pipeline can't decide on its own. Zero is the target.</p>
           </div>
         </header>
+
+        {REVIEW_IS_LOCAL_ONLY && (
+          <div
+            role="status"
+            className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 flex items-start gap-2"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warn-ink dark:text-brass-200" aria-hidden="true" />
+            <p className="text-body text-warn-ink dark:text-brass-200">
+              <span className="font-medium">Changes here aren't saved yet.</span>{' '}
+              Corrections, links and approvals on this screen stay in this browser tab and are lost on refresh.
+              Saving review decisions back to your account is still being built.
+            </p>
+          </div>
+        )}
 
         <div role="tablist" aria-label="Queue filters" className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (

@@ -44,8 +44,18 @@ export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '
         body: JSON.stringify({ question, today: (opts?.now ?? new Date()).toISOString().slice(0, 10) }),
       });
       if (!res.ok) {
-        const detail = await res.text().catch(() => '');
-        throw new Error(`Answer service ${res.status}: ${detail || res.statusText}`);
+        // A 500 from Vercel is an HTML page, not JSON. Reading it as text and
+        // showing it raw put a literal <!DOCTYPE html> in front of the user on
+        // the Ask screen. Same guard the ingest and records clients already use.
+        const raw = await res.text().catch(() => '');
+        let message = `${res.status} ${res.statusText}`;
+        try {
+          const parsed = JSON.parse(raw) as { error?: string };
+          if (parsed?.error) message = parsed.error;
+        } catch {
+          /* not JSON — keep the status line rather than dumping the page */
+        }
+        throw new Error(message);
       }
       const body = (await res.json()) as { success: boolean; data?: Partial<Answer>; error?: string };
       if (!body.success || !body.data) throw new Error(body.error ?? 'Answer service returned no data');
