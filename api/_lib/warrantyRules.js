@@ -375,6 +375,23 @@ export function normalizeBrand(raw) {
 }
 
 /** True only for a real calendar date in YYYY-MM-DD. Shape alone is not enough. */
+/**
+ * A real calendar date AND a plausible one.
+ *
+ * isValidYmd alone accepts '0100-01-01' and '9999-12-31', because they are
+ * genuine dates. Both warranty routes accept a caller-supplied `today` and
+ * their own comments say a malformed value must fail loudly rather than
+ * silently produce nonsense urgency — but the guard only checked the calendar,
+ * so `today: "1000-01-01"` came back as "Register with Goodman within 374131
+ * day(s)". Bounded only where a CLOCK value is expected; an installation_date
+ * from 1994 is legitimate and is not checked against this.
+ */
+export function isPlausibleToday(s) {
+  if (!isValidYmd(s)) return false;
+  const year = Number(String(s).slice(0, 4));
+  return year >= 2000 && year <= 2100;
+}
+
 export function isValidYmd(s) {
   return parseYmd(s) !== null;
 }

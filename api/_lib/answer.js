@@ -202,7 +202,13 @@ export function shapeAnswer(raw, allowed, { allowComputed = false } = {}) {
     text: facts.length ? rawText : rawText || "Nothing in your records answers that.",
     facts,
     sources: facts.flatMap((f) => f.sources),
-    confidence: facts.length ? (Number.isFinite(input.confidence) ? input.confidence : 0.8) : 0,
+    // Clamped, because ANSWER_TOOL declares confidence as a bare number with no
+    // minimum or maximum — a model returning 5 passes schema validation, and
+    // the client's `?? 0.8` fallback does not catch an out-of-range number
+    // either. The type says 0–1; this makes that true.
+    confidence: facts.length
+      ? Math.max(0, Math.min(1, Number.isFinite(input.confidence) ? input.confidence : 0.8))
+      : 0,
     entityId: typeof input.entityId === "string" ? input.entityId : undefined,
     interpretation: typeof input.interpretation === "string" ? input.interpretation : undefined,
     verifiedCount: new Set(facts.flatMap((f) => f.sources.map((s) => s.documentId))).size,

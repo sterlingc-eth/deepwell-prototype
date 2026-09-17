@@ -93,8 +93,16 @@ export const __internals = { uriEncode, sha256Hex, hmac };
 /** Fetch an object's bytes. Used by extraction, which runs server-side. */
 export async function getObject(key) {
   const url = presign('GET', key, 120);
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`R2 GET ${key} failed: ${r.status}`);
+  // A hang here burns the whole function budget and is then hard-killed by the
+  // platform, which means no catch block runs and the document is left looking
+  // like it is still processing. A timeout turns that into a normal error.
+  const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+  if (!r.ok) {
+    // Cancel rather than abandon: an unconsumed body holds its connection open
+    // until garbage collection.
+    await r.body?.cancel().catch(() => {});
+    throw new Error(`R2 GET ${key} failed: ${r.status}`);
+  }
   return Buffer.from(await r.arrayBuffer());
 }
 

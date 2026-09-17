@@ -1,101 +1,72 @@
-# M3 Postgres Migration - Local Setup
+# DeepWell database migrations
 
-The schema migration needs to run from your local machine where network connectivity to Neon is available.
+The migrations run from a machine that can reach Neon. `run-migration-v2.js`
+applies exactly **one** file per invocation, so the order below is the order you
+type — nothing enforces it for you.
 
-## Files you need
+## Run order
 
-1. **01-create-schema.sql** - The Postgres schema file (all tables and RLS policies)
-2. **run-migration-v2.js** - The migration runner script
-3. This setup guide
+Filename order is the run order. This matters more than it looks:
+
+| # | File | What it does |
+|---|---|---|
+| 1 | `01-create-schema.sql` | Tables, indexes, RLS policies |
+| 2 | `01b-app-role.sql` | Creates `deepwell_rls`, the role the app connects as |
+| 3 | `02-tenancy-fix.sql` | FORCE RLS, `resolve_tenant()`, the old `deepwell_app` role |
+| 4 | `03-retrieval.sql` | Full-text search, trigram indexes, grants |
+| 5 | `04-cleanup.sql` | Drops `deepwell_app` and `deepwell_probe` |
+| 6 | `05-customer-link.sql` | `entities.customer_id` plus its guard trigger |
+| 7 | `06-warranty-indexes.sql` | Partial expression indexes for the warranty queries |
+
+`01b` is numbered the way it is deliberately. It has to exist before `04` drops
+the older role, or there is a window where the application has no working
+database role at all.
+
+Every file is safe to run twice.
+
+## On an existing database
+
+`01` through `05` have already been applied to production. Outstanding:
+
+- **`06-warranty-indexes.sql`** — not yet run. Adds the indexes behind the
+  warranty-attention query. Run it off-hours; it takes a brief lock on
+  `entities`.
+- **`01b-app-role.sql`** — production already *has* `deepwell_rls`, so this is a
+  no-op there. It exists so the set can rebuild the database from nothing.
+  Before trusting it for that, compare it against the live role:
+
+  ```sql
+  SELECT rolname, rolsuper, rolbypassrls, rolcanlogin, rolconnlimit
+    FROM pg_roles WHERE rolname = 'deepwell_rls';
+  ```
+
+  `rolbypassrls` must be **false**. If it is true, every tenant-isolation
+  guarantee in the application is decoration — a role with BYPASSRLS reads every
+  tenant's rows regardless of any policy.
 
 ## Prerequisites
 
-1. Node.js 18+ installed on your machine
-2. `.env.local` file in your deepwell root with `NEON_CONNECTION_STRING`
-3. The `pg` npm package
+- Node 18+
+- `npm install pg`
+- `NEON_CONNECTION_STRING` in `.env.local` at the project root
 
-## Steps
-
-### 1. Install dependencies
-
-From your deepwell root:
+## Running one file
 
 ```bash
-npm install pg
+NEON_CONNECTION_STRING='postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require' \
+SCHEMA_FILE=./M3-config/06-warranty-indexes.sql \
+node M3-config/run-migration-v2.js
 ```
 
-### 2. Set up environment
+Repeat with each file in the table order.
 
-Make sure your `.env.local` has the Neon connection string:
+## Roles
 
-```
-NEON_CONNECTION_STRING=postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require
-```
+| Role | Status |
+|---|---|
+| `deepwell_rls` | The one the application uses. `NOBYPASSRLS`, no DDL rights. |
+| `deepwell_app` | Superseded. Dropped by `04`. |
+| `deepwell_probe` | Superseded. Dropped by `04`. |
 
-### 3. Run the migration
-
-```bash
-# From deepwell root
-NEON_CONNECTION_STRING=postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require
-SCHEMA_FILE=./M3-config/01-create-schema.sql \
-node run-migration-v2.js
-```
-
-Or on Windows (PowerShell):
-
-```powershell
-$env:NEON_CONNECTION_STRING = postgresql://USER:PASSWORD@HOST.neon.tech/neondb?sslmode=require
-$env:SCHEMA_FILE = ".\M3-config\01-create-schema.sql"
-node run-migration-v2.js
-```
-
-## Expected output
-
-```
-Connecting to Neon...
-✓ Connected
-
-Running schema migration...
-✓ Schema created
-
-Verifying tables...
-✓ Created 10 tables:
-  ├─ audit_log
-  ├─ document_pages
-  ├─ documents
-  ├─ entities
-  ├─ extractions
-  ├─ facets
-  ├─ proposals
-  ├─ schema_versions
-  ├─ tenants
-  ├─ users
-
-Verifying Row-Level Security...
-✓ RLS enabled on 9/10 tables
-
-✅ Migration complete. Postgres schema is ready for M3.
-```
-
-## Troubleshooting
-
-**Connection timeout:**
-- Check your internet connection
-- Verify Neon is online (log in to Neon console)
-- Check if your ISP/network blocks port 5432
-
-**Authentication error:**
-- Verify the connection string in `.env.local` is correct
-- Check if credentials were copied exactly (no extra spaces)
-
-**Table creation fails:**
-- Make sure you have admin access to the Neon database
-- Check if the database already has existing tables (migration tries to create)
-
-## Next steps after migration
-
-Once migration completes successfully:
-1. Verify all 10 tables exist in your Neon console
-2. We'll build the Postgres `RecordsStore` implementation to replace IndexedDB
-3. Test the 8-step pipeline against Postgres
-
+Dropping a role via SQL fails on Neon with "permission denied to drop objects".
+Use the **Roles** page in the Neon console instead.

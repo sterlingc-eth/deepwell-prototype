@@ -1,7 +1,7 @@
 import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
-import { describeWarranty, isValidYmd } from "./_lib/warrantyRules.js";
+import { describeWarranty, isPlausibleToday } from "./_lib/warrantyRules.js";
 
 /**
  * POST /api/customer-equipment
@@ -57,8 +57,8 @@ export default async function handler(req, res) {
   // overridable for previews and deterministic tests, but it goes into date
   // arithmetic below, so a malformed value must fail loudly rather than
   // silently produce nonsense urgency.
-  if (body.today != null && !isValidYmd(body.today)) {
-    return res.status(400).json({ error: "today must be a valid YYYY-MM-DD date" });
+  if (body.today != null && !isPlausibleToday(body.today)) {
+    return res.status(400).json({ error: "today must be a real YYYY-MM-DD date between 2000 and 2100" });
   }
   const today = body.today ?? new Date().toISOString().slice(0, 10);
   const expiringWithin = clampDays(body.expiringWithinDays, 180, 3650);

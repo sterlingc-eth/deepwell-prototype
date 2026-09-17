@@ -1,7 +1,7 @@
 import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
-import { describeWarranty, addDays, ruleCoverage, isValidYmd } from "./_lib/warrantyRules.js";
+import { describeWarranty, addDays, ruleCoverage, isPlausibleToday } from "./_lib/warrantyRules.js";
 
 /**
  * POST /api/warranty-attention
@@ -57,8 +57,8 @@ export default async function handler(req, res) {
   // Validated as a real calendar date, not just the right shape: "2024-13-40"
   // matches /\d{4}-\d{2}-\d{2}/ but every downstream date function rejects it,
   // which would turn a typo into a silently empty list instead of an error.
-  if (body.today != null && !isValidYmd(body.today)) {
-    return res.status(400).json({ error: "today must be a valid YYYY-MM-DD date" });
+  if (body.today != null && !isPlausibleToday(body.today)) {
+    return res.status(400).json({ error: "today must be a real YYYY-MM-DD date between 2000 and 2100" });
   }
   const today = body.today ?? new Date().toISOString().slice(0, 10);
 

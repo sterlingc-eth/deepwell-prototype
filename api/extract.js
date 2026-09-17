@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extractFields.js";
 import { extractDocumentFields, EXTRACT_MODEL } from "./_lib/extractDocument.js";
@@ -110,7 +110,7 @@ async function extractFromImage(req, res, { imageData, mediaType, documentType }
     return res.status(415).json({ error: message });
   }
 
-  const client = new Anthropic({ apiKey: getApiKey() });
+  const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
   const response = await client.messages.create({
     model: EXTRACT_MODEL,
     max_tokens: 2000,

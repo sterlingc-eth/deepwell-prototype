@@ -31,6 +31,16 @@ const MAX_BYTES = 100 * 1024 * 1024;
 const MAX_MODEL_BYTES = 24 * 1024 * 1024;
 const MODEL_READ_TYPES = /^(application\/pdf|image\/(jpeg|png|gif|webp))$/;
 
+// Plain text skips the model entirely — chunkText splits it into 6000-character
+// pages and upsertPages writes them in ONE multi-row INSERT at five bind
+// parameters per page. Postgres caps a query at 65535 bind parameters, which is
+// about 13,100 pages, which is about 79 MB of text. Under the blanket 100 MB
+// ceiling, so an 80 MB CSV uploaded completely and then died on an opaque
+// driver-protocol error that meant nothing to anyone reading it. 20 MB leaves
+// roughly a fifth of that budget used.
+const MAX_TEXT_BYTES = 20 * 1024 * 1024;
+const TEXT_UPLOAD_TYPES = /^(text\/|application\/(json|csv|xml))/;
+
 /**
  * Thrown when presign() can't produce an upload URL (R2 env vars unset, e.g.
  * every Preview/Development deploy today). Kept distinct from other errors so
@@ -70,6 +80,18 @@ export default async function handler(req, res) {
     }
     if (sizeBytes != null && sizeBytes > MAX_BYTES) {
       return res.status(413).json({ error: "File is larger than 100 MB" });
+    }
+    if (
+      sizeBytes != null &&
+      sizeBytes > MAX_TEXT_BYTES &&
+      typeof contentType === "string" &&
+      TEXT_UPLOAD_TYPES.test(contentType)
+    ) {
+      return res.status(413).json({
+        error:
+          "Text and spreadsheet files have to be under 20 MB. Split this into " +
+          "smaller files and upload them separately.",
+      });
     }
     if (
       sizeBytes != null &&

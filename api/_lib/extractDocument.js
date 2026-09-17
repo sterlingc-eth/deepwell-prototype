@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { withTenant } from "./recordsStore.js";
-import { getApiKey } from "./claude.js";
+import { getApiKey, MODEL_TIMEOUT_MS } from "./claude.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages } from "./extractFields.js";
 import { IngestError } from "./readDocument.js";
 import { deriveWarranty } from "./warrantyRules.js";
@@ -39,7 +39,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   }
 
   const { pages: selected, truncated } = selectPages(pages);
-  const client = new Anthropic({ apiKey: getApiKey() });
+  const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
   const response = await client.messages.create({
     model: EXTRACT_MODEL,
     max_tokens: 4000,
@@ -112,6 +112,14 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     if (resolvedType && resolvedType !== doc.document_type) {
       await db.updateDocument(documentId, { document_type: resolvedType });
     }
+
+    // This extraction succeeded, so any error left over from a previous attempt
+    // is now a lie. Nothing cleared it before: extract_error was set by a failed
+    // extraction but only ever cleared by a successful READ, so a document that
+    // failed once and then extracted perfectly on retry stayed marked failed
+    // forever — and the browser treats extract_error as terminal, so the user
+    // was told to give up on a row that held all of its data.
+    await db.clearExtractError(documentId);
     await db.logAction({
       action: "document.fields_extracted",
       resource_type: "document",

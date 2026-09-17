@@ -174,11 +174,17 @@ const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
 
 // Above this, a number is not a plausible cost or hour count for one HVAC
 // document — it is a hallucination or a transcription error — AND it is also
-// exactly the region where Number.prototype.toFixed starts returning
+// well under the region where Number.prototype.toFixed starts returning
 // exponential notation (>= 1e21) instead of a decimal string, which would
-// otherwise get written to a money/number column as literal text like
-// "1e+26". One guard removes both problems: stay well under either boundary.
-const MAX_MAGNITUDE = 1e15;
+// otherwise get written to a money/number column as literal text like "1e+26".
+// One guard removes both problems.
+//
+// Was 1e15, which was only ever the toFixed margin wearing the word
+// "plausible": it let a garbled extraction store a cost of $999,999,999,999,999
+// as a legitimate fact. 1e8 is $100,000,000 — orders of magnitude above any
+// real line on any real HVAC document, and orders of magnitude below where the
+// formatting problem starts.
+const MAX_MAGNITUDE = 1e8;
 
 /** Strip $ and trailing noise from a number. Returns a string or null. */
 export function normalizeNumber(raw, { money }) {

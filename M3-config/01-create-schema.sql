@@ -157,38 +157,52 @@ ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (tenant isolation)
+-- Every policy below is dropped first because Postgres has no
+-- CREATE POLICY IF NOT EXISTS. Without these guards this file could only ever
+-- be run once: a second run failed on the first policy and left everything
+-- after it unapplied. 02, 03 and 05 all guard theirs; this file did not, which
+-- made the very first migration the only non-idempotent one in the set.
+DROP POLICY IF EXISTS tenants_isolate_documents ON documents;
 CREATE POLICY tenants_isolate_documents ON documents
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_document_pages ON document_pages;
 CREATE POLICY tenants_isolate_document_pages ON document_pages
   USING (document_id IN (SELECT id FROM documents WHERE tenant_id = (current_setting('app.tenant_id'))::uuid))
   WITH CHECK (document_id IN (SELECT id FROM documents WHERE tenant_id = (current_setting('app.tenant_id'))::uuid));
 
+DROP POLICY IF EXISTS tenants_isolate_facets ON facets;
 CREATE POLICY tenants_isolate_facets ON facets
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_proposals ON proposals;
 CREATE POLICY tenants_isolate_proposals ON proposals
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_schema_versions ON schema_versions;
 CREATE POLICY tenants_isolate_schema_versions ON schema_versions
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_extractions ON extractions;
 CREATE POLICY tenants_isolate_extractions ON extractions
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_entities ON entities;
 CREATE POLICY tenants_isolate_entities ON entities
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_audit_log ON audit_log;
 CREATE POLICY tenants_isolate_audit_log ON audit_log
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);
 
+DROP POLICY IF EXISTS tenants_isolate_users ON users;
 CREATE POLICY tenants_isolate_users ON users
   USING (tenant_id = (current_setting('app.tenant_id'))::uuid)
   WITH CHECK (tenant_id = (current_setting('app.tenant_id'))::uuid);

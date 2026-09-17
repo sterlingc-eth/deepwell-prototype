@@ -69,8 +69,14 @@ check('never emits exponential notation',
   !/e/i.test(normalizeNumber('999999999999999999999999999', { money: true }) ?? ''));
 eq('large-but-plausible cost still accepted', normalizeNumber('482000.50', { money: true }), '482000.50');
 eq('negative absurd magnitude rejected', normalizeNumber('-100000000000000000000', { money: true }), null);
-eq('magnitude boundary itself rejected (1e15)', normalizeNumber(String(1e15), { money: true }), null);
-eq('just under the boundary accepted', normalizeNumber(String(1e15 - 1), { money: true }), '999999999999999.00');
+eq('magnitude boundary itself rejected (1e8)', normalizeNumber(String(1e8), { money: true }), null);
+eq('just under the boundary accepted', normalizeNumber(String(1e8 - 1), { money: true }), '99999999.00');
+// The ceiling used to be 1e15, which was the toFixed-safety margin wearing the
+// word "plausible": a garbled extraction could store a cost of nearly one
+// quadrillion dollars as a legitimate fact. These two bracket the real bound.
+eq('a quadrillion-dollar cost is not a cost', normalizeNumber('999999999999999', { money: true }), null);
+eq('a large commercial job is still a cost', normalizeNumber('87450.00', { money: true }), '87450.00');
+eq('a big rooftop unit replacement is still a cost', normalizeNumber('$1,250,000.00', { money: true }), '1250000.00');
 eq('negative zero normalizes cleanly', normalizeNumber('-0', { money: true }), '0.00');
 
 // Adversarial: a value with a toString() must not be coerced into a number —

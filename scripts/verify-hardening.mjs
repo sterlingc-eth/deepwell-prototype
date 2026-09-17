@@ -11,10 +11,13 @@
  *
  *   node scripts/verify-hardening.mjs
  */
-import { isPlaceholderSerial } from '../api/_lib/recordsStore.js';
+import { isPlaceholderSerial, normalizeMatchText, DOCUMENT_UPDATE_COLUMNS } from '../api/_lib/recordsStore.js';
 import { isTransientError } from '../api/_lib/readDocument.js';
-import { deriveWarranty } from '../api/_lib/warrantyRules.js';
+import { deriveWarranty, isPlausibleToday, isValidYmd } from '../api/_lib/warrantyRules.js';
 import { isQueueEnabled } from '../api/_lib/queue.js';
+import { normalizeNumber } from '../api/_lib/extractFields.js';
+import { buildAllowed, shapeAnswer } from '../api/_lib/answer.js';
+import { getApiKey } from '../api/_lib/claude.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -152,6 +155,173 @@ check('empty event key -> queue off', isQueueEnabled() === false);
 setKeys('ev', '');
 check('empty signing key -> queue off', isQueueEnabled() === false);
 setKeys(saved[0], saved[1]);
+
+/* =================================================================== */
+/* Round two — 16 September deep audit                                  */
+/* =================================================================== */
+
+/* ------------------------- non-Latin names are names */
+//
+// The bug: normalizeMatchText tested /[A-Za-z0-9]/ — ASCII only. A customer
+// named Иванов, 王芳, محمد or Παπαδόπουλος normalized to the empty string, and
+// findOrCreateCustomer reads an empty string as "this document names nobody",
+// exactly as it reads "---". Those customers silently never got a record and
+// their equipment was never linked to them. It failed quietly, every time, for
+// an ordinary category of real customer.
+
+for (const [label, name] of [
+  ['Cyrillic', 'Иванов'], ['CJK', '王芳'], ['Arabic', 'محمد'],
+  ['Hangul', '김철수'], ['Greek', 'Παπαδόπουλος'], ['Hebrew', 'כהן'],
+  ['Devanagari', 'शर्मा'], ['Thai', 'สมชาย'], ['accented Latin', 'José Núñez'],
+  ['mixed script', 'Ivan Иванов'],
+]) {
+  eq(`${label} name kept`, normalizeMatchText(name), name);
+}
+
+// The boundary the original test was protecting must still hold: a value with
+// no letters and no digits is not a name.
+for (const [label, junk] of [
+  ['punctuation only', '---'], ['em dash only', '—'], ['dots only', '...'],
+  ['whitespace only', '   '], ['empty', ''], ['null', null], ['undefined', undefined],
+  ['symbols only', '#$%&'],
+]) {
+  eq(`${label} still rejected`, normalizeMatchText(junk), '');
+}
+
+/* ------------------------- a clock value must be plausible, not merely real */
+//
+// The bug: both warranty routes accept a caller-supplied `today` and validated
+// it with isValidYmd, which accepts any real calendar date. Their own comments
+// said a malformed value must fail loudly rather than produce nonsense urgency
+// — but today='1000-01-01' came back as "Register with Goodman within 374131
+// day(s)", which is precisely the nonsense the comment promised to prevent.
+
+check('a normal date is plausible', isPlausibleToday('2026-09-16'));
+check('the lower bound is plausible', isPlausibleToday('2000-01-01'));
+check('the upper bound is plausible', isPlausibleToday('2100-12-31'));
+check('year 1000 is not a clock value', !isPlausibleToday('1000-01-01'));
+check('year 0100 is not a clock value', !isPlausibleToday('0100-01-01'));
+check('year 9999 is not a clock value', !isPlausibleToday('9999-12-31'));
+check('year 1999 is out of range', !isPlausibleToday('1999-12-31'));
+check('year 2101 is out of range', !isPlausibleToday('2101-01-01'));
+check('a fake calendar date is still rejected', !isPlausibleToday('2026-02-30'));
+check('a malformed string is still rejected', !isPlausibleToday('2026-13-40'));
+check('not-a-date is rejected', !isPlausibleToday('yesterday'));
+check('null is rejected', !isPlausibleToday(null));
+
+// An installation date from decades ago is legitimate and must NOT be bounded
+// by this — the guard is only for values standing in for "now".
+check('a 1994 install date is still a valid date', isValidYmd('1994-06-01'));
+
+/* ------------------------- a cost is not a quadrillion dollars */
+//
+// The bug: MAX_MAGNITUDE was 1e15, commented as a plausibility guard but
+// actually just the margin before toFixed switches to exponential notation. A
+// garbled extraction could store $999,999,999,999,999 as a legitimate cost.
+
+eq('a quadrillion-dollar cost is rejected', normalizeNumber('999999999999999', { money: true }), null);
+eq('the boundary itself is rejected', normalizeNumber(String(1e8), { money: true }), null);
+eq('a million-dollar commercial job is accepted', normalizeNumber('$1,250,000.00', { money: true }), '1250000.00');
+eq('an ordinary service call is accepted', normalizeNumber('$487.50', { money: true }), '487.50');
+eq('labor hours are accepted', normalizeNumber('3.5', {}), '3.5');
+check('nothing is ever emitted in exponential notation',
+  !/e/i.test(normalizeNumber('99999999999999999999999', { money: true }) ?? ''));
+
+/* ------------------------- confidence is a probability */
+//
+// The bug: ANSWER_TOOL declares confidence as a bare number with no minimum or
+// maximum, so a model returning 5 passed schema validation, and the client's
+// `?? 0.8` fallback does not catch an out-of-range number either. The type says
+// 0-1; now that is true.
+
+{
+  const allowed = buildAllowed({
+    passages: [{ documentId: 'doc1', page: 1, filename: 'invoice.pdf', excerpt: 'Carrier 59TP6 serial 4N2119' }],
+    extractions: [{ documentId: 'doc1', field: 'serial_number', value: '4N2119', filename: 'invoice.pdf' }],
+  });
+  const shape = (confidence) => shapeAnswer({
+    text: 'The serial is 4N2119.',
+    confidence,
+    facts: [{
+      label: 'Serial',
+      value: '4N2119',
+      sources: [{ documentId: 'doc1', location: { page: 1 } }],
+    }],
+  }, allowed);
+
+  // Guard the fixture itself: if this stops being a grounded answer the
+  // clamp checks below would pass for the wrong reason.
+  check('the confidence fixture produces a grounded answer', shape(0.5)?.kind === 'answer');
+
+  check('confidence above 1 is clamped', (shape(5)?.confidence ?? 99) <= 1);
+  check('confidence below 0 is clamped', (shape(-3)?.confidence ?? -99) >= 0);
+  check('a normal confidence survives unchanged', shape(0.62)?.confidence === 0.62);
+  check('a missing confidence gets the default', shape(undefined)?.confidence === 0.8);
+  check('NaN confidence gets the default', shape(NaN)?.confidence === 0.8);
+  check('Infinity is clamped into range', (shape(Infinity)?.confidence ?? 99) <= 1);
+}
+
+/* ------------------------- a placeholder check must not blow the stack */
+//
+// /^(.)\1*$/ is a backtracking regex that overflows on a multi-megabyte string
+// of one repeated character. Unreachable through the pipeline today because
+// normalizeFields caps values at 500 characters, but the function is exported
+// and a bulk-import path would not go through that cap.
+
+check('a 5MB repeated string does not throw', (() => {
+  try { isPlaceholderSerial('1'.repeat(5_000_000)); return true; } catch { return false; }
+})());
+check('a 20MB repeated string does not throw', (() => {
+  try { isPlaceholderSerial('x'.repeat(20_000_000)); return true; } catch { return false; }
+})());
+check('the length guard does not break normal serials', !isPlaceholderSerial('4N2119-08772'));
+check('short filler is still caught after the guard', isPlaceholderSerial('0000'));
+
+/* ------------------------- the state machine stays server-owned */
+//
+// The bug: api/records.ts passes payload.updates straight to updateDocument,
+// whose allowlist covers column NAMES but never values. With `stage` on that
+// list an authenticated caller could roll their own document backwards from
+// 'mapped' to 'received', defeating the forward-only progression every other
+// write path enforces. `storage_key` was worse: the row is tenant-scoped but
+// the KEY is not validated against the tenant prefix, so pointing your own
+// document at another tenant's key and calling read-document would transcribe
+// their file into your account.
+
+check('stage is not client-writable', !DOCUMENT_UPDATE_COLUMNS.includes('stage'));
+check('storage_key is not client-writable', !DOCUMENT_UPDATE_COLUMNS.includes('storage_key'));
+check('document_type is still writable', DOCUMENT_UPDATE_COLUMNS.includes('document_type'));
+check('page_count is still writable', DOCUMENT_UPDATE_COLUMNS.includes('page_count'));
+
+/* ------------------------- a config error is not an auth error */
+//
+// The bug: getApiKey threw a message naming the env var, and handleError's
+// substring match turned it into 401 "Authentication failed" — telling a
+// technician their session had expired when the truth was that nobody had set a
+// server variable. They would sign out and back in forever and it would never
+// help. On the ingestion path that same message was also written onto the
+// document row, leaking the variable name into stored data.
+
+{
+  const saved = [process.env.CLAUDE_API_KEY, process.env.ANTHROPIC_API_KEY];
+  delete process.env.CLAUDE_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  let thrown = null;
+  try { getApiKey(); } catch (e) { thrown = e; }
+  check('a missing key throws', thrown !== null);
+  check('it is a ConfigError, not a generic Error', thrown?.name === 'ConfigError');
+  check('the message does not name the env var',
+    !/CLAUDE_API_KEY|ANTHROPIC_API_KEY/.test(thrown?.message ?? ''),
+    `message was: ${thrown?.message}`);
+  check('the message does not leak the key format',
+    !/sk-ant/.test(thrown?.message ?? ''));
+  check('the message tells the user it is a server problem',
+    /server|administrator|configured/i.test(thrown?.message ?? ''));
+  check('the real diagnostic is preserved for the log',
+    /CLAUDE_API_KEY/.test(String(thrown?.cause ?? '')));
+  if (saved[0] != null) process.env.CLAUDE_API_KEY = saved[0];
+  if (saved[1] != null) process.env.ANTHROPIC_API_KEY = saved[1];
+}
 
 /* ------------------------------------------------------------------ done */
 

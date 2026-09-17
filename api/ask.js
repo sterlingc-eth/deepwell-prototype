@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
 import { ANSWER_TOOL, buildPrompt, buildAllowed, shapeAnswer } from "./_lib/answer.js";
@@ -46,7 +46,11 @@ import { ANSWER_TOOL, buildPrompt, buildAllowed, shapeAnswer } from "./_lib/answ
  * gated path, not hand the model a pre-packaged, unverifiable "here are the
  * facts" payload directly.
  */
-export const config = { api: { bodyParser: { sizeLimit: "512kb" } } };
+// maxDuration is explicit rather than inherited. A route without it runs on
+// the platform's bare default, which is SHORTER than 60s — so the model call
+// below could be hard-killed before its own timeout ever fired, and a hard kill
+// runs no catch block and tells the user nothing.
+export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration: 60 };
 
 const MAX_QUESTION = 2000;
 const MAX_PASSAGES = 12;
@@ -127,7 +131,7 @@ export default async function handler(req, res) {
     const allowed = buildAllowed({ passages: mappedPassages, extractions: mappedExtractions });
 
     // ---- 2. ask ------------------------------------------------------------
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
     const response = await client.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 1500,

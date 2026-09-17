@@ -83,6 +83,13 @@ export function isPlaceholderSerial(raw) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!s) return true;
+  // The repeated-character test below is a backtracking regex: it overflows the
+  // stack somewhere past a couple of million characters. normalizeFields caps
+  // values at 500 chars today so nothing can reach that, but this function is
+  // exported and a future bulk-import path would not go through that cap.
+  // Returning false (not a placeholder) is the safe direction — a wrongly
+  // rejected serial loses a unit's whole history.
+  if (s.length > 200) return false;
   if (PLACEHOLDER_SERIALS.has(s)) return true;
   // A single repeated character once separators are gone ("-----", "0000",
   // "XXXX") is a filler mark on a form, not an identifier.
@@ -91,9 +98,27 @@ export function isPlaceholderSerial(raw) {
   return false;
 }
 
+/**
+ * The only columns a generic update may touch on `documents`.
+ *
+ * Exported so a test can assert what is NOT here — `stage` and `storage_key`
+ * are absent on purpose and their absence is a security boundary. The reasoning
+ * is at the updateDocument call site.
+ */
+export const DOCUMENT_UPDATE_COLUMNS = Object.freeze([
+  'document_type', 'processed_at', 'file_size_bytes', 'content_type', 'page_count',
+]);
+
 export function normalizeMatchText(raw) {
   const s = String(raw ?? '').trim().replace(/\s+/g, ' ');
-  return /[A-Za-z0-9]/.test(s) ? s : '';
+  // Unicode letters and numbers, not ASCII. The old test was /[A-Za-z0-9]/,
+  // which meant a customer named Иванов, 王芳, محمد or Παπαδόπουλος normalized
+  // to the empty string — and findOrCreateCustomer reads an empty string as
+  // "this document names nobody", exactly as it reads "---" or "   ". So those
+  // customers silently never got a record and their equipment was never linked
+  // to them. Not an edge case: an ordinary customer list in most American
+  // cities contains names this rejected, and it failed quietly every time.
+  return /[\p{L}\p{N}]/u.test(s) ? s : '';
 }
 
 /**
@@ -220,7 +245,48 @@ function makeStore(db, tenantId) {
       }
       return many(`SELECT * FROM documents WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 500`, vals);
     },
-    updateDocument: updater('documents', ['stage', 'document_type', 'processed_at', 'file_size_bytes', 'storage_key', 'content_type', 'page_count']),
+    // `stage` and `storage_key` are DELIBERATELY NOT in this list, and that is
+    // a security boundary rather than tidiness.
+    //
+    // api/records.ts hands `payload.updates` straight to this function, and
+    // updater() allowlists column NAMES but never values. With `stage` here, an
+    // authenticated caller could roll their own document backwards from
+    // 'mapped' to 'received' — defeating the forward-only progression that
+    // markExtracted and replaceDocumentFields carefully enforce everywhere else.
+    //
+    // `storage_key` was worse. This row is tenant-scoped, so a caller can only
+    // update their OWN document — but the key it points at is not validated
+    // against the tenant prefix anywhere, and getObject takes a bare key. Set
+    // your own document's storage_key to another tenant's key, call
+    // /api/read-document, and the pipeline fetches their bytes and transcribes
+    // them into your account. A narrow primitive (it needs a known key) but a
+    // real cross-tenant read, riding a column nobody meant to expose.
+    //
+    // Nothing legitimate loses anything: the only server-side caller of this
+    // function writes document_type, and no client screen calls it at all.
+    // Both columns are still written by the code that owns them —
+    // markExtracted for stage, createDocument for storage_key.
+    updateDocument: updater('documents', DOCUMENT_UPDATE_COLUMNS),
+
+    /**
+     * Clear a stale extraction error after a successful extraction.
+     *
+     * Deliberately its own function rather than a column added to the allowlist
+     * above — see the note there. The asymmetry it fixes: extract_error is SET
+     * by a failed extraction but was only ever CLEARED by a successful READ. So
+     * a document that failed extraction once and then extracted fine on retry
+     * kept its error forever, and the browser treats any extract_error as
+     * terminal. The user was told a document had failed while looking at a row
+     * that held all of its data.
+     */
+    clearExtractError: async (documentId) => {
+      const r = await db.query(
+        `UPDATE documents SET extract_error = NULL
+          WHERE id = $1 AND ${TENANT} AND extract_error IS NOT NULL`,
+        [documentId]
+      );
+      return r.rowCount;
+    },
 
     // ---- facets ----
     createFacet: (f) => one(

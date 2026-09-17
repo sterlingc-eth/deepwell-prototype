@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { handleCors, handleError, getApiKey } from "./_lib/claude.js";
+import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
+
+// Explicit, for the reason spelled out in ask.js: a route with no maxDuration
+// gets the platform's bare default, and a model call that outlives it is hard-
+// killed with no catch and no message. A body limit belongs here too — every
+// other route in this codebase declares one, and these two were the exceptions.
+export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration: 60 };
 
 // Sample records behind the public "Ask" demo on the marketing site.
 // These are illustrative and mirror the DEMO array in index.html.
@@ -40,7 +46,7 @@ export default async function handler(req, res) {
     const question = String(req.body?.question || "").trim().slice(0, 300);
     if (!question) return res.status(400).json({ error: "Missing question" });
 
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
     const today = "2026-09-12";
     const corpus = RECORDS.map((r) => `[${r.id}] ${r.type} — ${r.title}\n${r.text}`).join("\n\n");
 
