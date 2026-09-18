@@ -20,6 +20,37 @@ import type {
   SourceRef,
 } from './types';
 import { PIPELINE_STAGES } from './types';
+import { reviewClient } from '../services/reviewClient';
+
+/**
+ * Demo mode keeps the whole graph in memory on purpose (its own fixture data
+ * has no server-side rows to persist to). Everywhere else, the six review
+ * actions below are optimistic writes to a real account: the local store
+ * updates immediately, same as before, and — for the four actions that have
+ * a real server-side counterpart — a request goes out behind it. A failed
+ * request rolls the local change back and records why in `lastError`, so the
+ * screen never shows a correction as saved when it was not.
+ *
+ * `resolveConflict` and `mergeDuplicate` are deliberately NOT wired to a
+ * server call. Both operate on data nothing server-side produces yet:
+ * `conflicts` is seeded as `[]` by every real sync (usePostgresSync's `seed`
+ * call always passes an empty conflicts array — conflict detection across
+ * documents is not implemented server-side), and the 'duplicate' issue is
+ * only ever raised by receiveDocs' filename check against the in-memory demo
+ * fixture, never by anything usePostgresSync produces (`toDoc` always sets
+ * `issues: []`). Wiring either to `reviewClient` today would be dead code:
+ * neither one's precondition can occur outside demo mode. The moment either
+ * form of detection ships server-side, it needs a reviewStore counterpart
+ * the way `linkDoc` has one, and this comment is the reminder to add it.
+ */
+// Optional chaining on purpose: this module is imported by the pure-function
+// test runner (tsx), where import.meta.env does not exist. Vite inlines it in
+// the real build, so the app sees a plain string either way.
+const DEMO_MODE = import.meta.env?.VITE_DEMO_MODE === 'true';
+
+function describeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 export interface GraphSnapshot {
   schema: DomainSchema;
@@ -27,17 +58,22 @@ export interface GraphSnapshot {
   docs: Record<DocumentId, Doc>;
   batches: Record<string, Batch>;
   conflicts: Record<string, Conflict>;
+  /** Message from the last review action that failed to persist server-side,
+   *  or null. Cleared on the next successful action and by clearLastError. */
+  lastError: string | null;
 }
 
 interface GraphActions {
   seed: (schema: DomainSchema, entities: Entity[], docs: Doc[], batches: Batch[], conflicts: Conflict[]) => void;
+  /** Dismiss the banner shown for `lastError`. */
+  clearLastError: () => void;
 
   /** Review: correct an extracted value (or add a missing one). If the doc is linked/verified the entity field updates too. */
   correctField: (docId: DocumentId, fieldName: string, value: string, by: string, target?: FieldTarget) => void;
   /** Review: classify a received doc. */
   classifyDoc: (docId: DocumentId, typeId: string) => void;
   /** Review: attach a doc to an entity (clears the unlinked issue). */
-  linkDoc: (docId: DocumentId, entityId: EntityId) => void;
+  linkDoc: (docId: DocumentId, entityId: EntityId, by: string) => void;
   /** Review: approve — advance as far as the doc's issues allow. */
   approveDoc: (docId: DocumentId, by: string) => void;
   /** Review: pick the winning value for a conflict. */
@@ -131,12 +167,13 @@ function applyDocToEntities(state: GraphSnapshot, doc: Doc): Record<EntityId, En
 let idCounter = 1;
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
-export const useGraph = create<GraphStore>((set) => ({
+export const useGraph = create<GraphStore>((set, get) => ({
   schema: { id: 'none', label: '', entityTypes: [], documentTypes: [], fallbackDocumentType: 'other' },
   entities: {},
   docs: {},
   batches: {},
   conflicts: {},
+  lastError: null,
 
   seed: (schema, entities, docs, batches, conflicts) =>
     set({
@@ -147,7 +184,13 @@ export const useGraph = create<GraphStore>((set) => ({
       conflicts: Object.fromEntries(conflicts.map((c) => [c.id, c])),
     }),
 
-  correctField: (docId, fieldName, value, by, target) =>
+  clearLastError: () => set({ lastError: null }),
+
+  correctField: (docId, fieldName, value, by, target) => {
+    const before = get().docs[docId];
+    if (!before) return;
+    const beforeEntities = get().entities;
+
     set((s) => {
       const doc = s.docs[docId];
       if (!doc) return s;
@@ -156,41 +199,89 @@ export const useGraph = create<GraphStore>((set) => ({
         ? doc.extracted.map((f) => (f.name === fieldName ? { ...f, correctedValue: value, correctedBy: by, correctedAt: new Date(), ...(target ? { target } : {}) } : f))
         : [...doc.extracted, { name: fieldName, value, confidence: 1, location: { page: 1, field: fieldName }, correctedValue: value, correctedBy: by, correctedAt: new Date(), ...(target ? { target } : {}) }];
       const preview = exists ? doc.preview : `${doc.preview}\n${fieldName}: ${value}`;
-      const next = recomputeIssues({ ...doc, extracted, preview }, s.schema);
+      let next = recomputeIssues({ ...doc, extracted, preview }, s.schema);
+      // Mirrors reviewStore.js's nextStageAfterCorrection: a verified document
+      // whose facts just changed is not verified against those facts anymore.
+      if (next.stage === 'verified') {
+        next = { ...next, stage: 'linked', verifiedBy: undefined, verifiedAt: undefined };
+      }
       const docs = { ...s.docs, [docId]: next };
-      return { docs, entities: applyDocToEntities({ ...s, docs }, next) };
-    }),
+      return { docs, entities: applyDocToEntities({ ...s, docs }, next), lastError: null };
+    });
 
-  classifyDoc: (docId, typeId) =>
+    if (!DEMO_MODE) {
+      void reviewClient.correctField(docId, fieldName, value, by).catch((err) => {
+        set((s) => ({ docs: { ...s.docs, [docId]: before }, entities: beforeEntities, lastError: describeError(err) }));
+      });
+    }
+  },
+
+  classifyDoc: (docId, typeId) => {
+    const before = get().docs[docId];
+    if (!before) return;
+
     set((s) => {
       const doc = s.docs[docId];
       if (!doc) return s;
       const next = recomputeIssues({ ...doc, typeId, stage: 'classified' }, s.schema);
-      return { docs: { ...s.docs, [docId]: next } };
-    }),
+      return { docs: { ...s.docs, [docId]: next }, lastError: null };
+    });
 
-  linkDoc: (docId, entityId) =>
+    if (!DEMO_MODE) {
+      void reviewClient.classifyDocument(docId, typeId).catch((err) => {
+        set((s) => ({ docs: { ...s.docs, [docId]: before }, lastError: describeError(err) }));
+      });
+    }
+  },
+
+  linkDoc: (docId, entityId, by) => {
+    const before = get().docs[docId];
+    if (!before) return;
+
     set((s) => {
       const doc = s.docs[docId];
       if (!doc) return s;
       const linkedEntityIds = Array.from(new Set([...doc.linkedEntityIds, entityId]));
       const next = recomputeIssues({ ...doc, linkedEntityIds, linkConfidence: 1 }, s.schema);
-      return { docs: { ...s.docs, [docId]: next } };
-    }),
+      return { docs: { ...s.docs, [docId]: next }, lastError: null };
+    });
 
-  approveDoc: (docId, by) =>
+    if (!DEMO_MODE) {
+      void reviewClient.linkDocument(docId, entityId, by).catch((err) => {
+        set((s) => ({ docs: { ...s.docs, [docId]: before }, lastError: describeError(err) }));
+      });
+    }
+  },
+
+  approveDoc: (docId, by) => {
+    const before = get().docs[docId];
+    if (!before) return;
+    const beforeEntities = get().entities;
+    const target = maxStageFor(before, get().schema);
+
     set((s) => {
       const doc = s.docs[docId];
       if (!doc) return s;
-      const target = maxStageFor(doc, s.schema);
       const next: Doc = { ...doc, stage: target };
       if (target === 'verified') {
         next.verifiedBy = by;
         next.verifiedAt = new Date();
       }
       const docs = { ...s.docs, [docId]: next };
-      return { docs, entities: applyDocToEntities({ ...s, docs }, next) };
-    }),
+      return { docs, entities: applyDocToEntities({ ...s, docs }, next), lastError: null };
+    });
+
+    // Only 'verified' has a server-side counterpart: the Postgres pipeline's
+    // own stages (received/read/mapped/linked/verified) already reflect
+    // classification and linking the moment classifyDoc/linkDoc persist them
+    // above; an intermediate core stage like 'classified' or 'extracted' is
+    // client-side bookkeeping with no column of its own to write.
+    if (!DEMO_MODE && target === 'verified') {
+      void reviewClient.verifyDocument(docId, by).catch((err) => {
+        set((s) => ({ docs: { ...s.docs, [docId]: before }, entities: beforeEntities, lastError: describeError(err) }));
+      });
+    }
+  },
 
   resolveConflict: (conflictId, value, by) =>
     set((s) => {

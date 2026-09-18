@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, Camera, Clock, Loader2, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { AnswerCard } from '../components/AnswerCard';
@@ -6,16 +6,17 @@ import { DocumentPreview } from '../components/DocumentPreview';
 import { SerialCapture } from '../components/SerialCapture';
 import type { Answer, SourceRef } from '../core/types';
 import { useGraph } from '../core/entityGraph';
+import { buildSuggestions } from '../core/suggestions';
 import { ask } from '../services/answerService';
 import { useAppStore } from '../store/appStore';
 
-const SUGGESTED = [
+// Shown only when the account has nothing ingested yet, so there is nothing
+// real to suggest. Clearly labelled "e.g." — never presented as though they
+// are this tenant's own records — and paired with one action: go add some.
+const EXAMPLE_QUESTIONS = [
   'Is the furnace at 2847 N 24th St still under warranty?',
-  'What did Carlos do at 4521 E Camelback in 2025?',
-  'SN-RHE-012345',
+  'What serial number is on that outdoor unit?',
   'Which warranties expire in the next 12 months?',
-  'When were we last at 4321 S Price Rd?',
-  'How much did the compressor replacement at Alma School cost?',
 ];
 
 export function AskScreen() {
@@ -27,8 +28,11 @@ export function AskScreen() {
   const setIncludeUnverified = useAppStore((s) => s.setIncludeUnverified);
   const openEntity = useAppStore((s) => s.openEntity);
   const fieldMode = useAppStore((s) => s.fieldMode);
+  const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   // Re-run the current question whenever the graph changes (a review correction changes the answer)
   const graphVersion = useGraph((s) => s.docs);
+  const entities = useGraph((s) => s.entities);
+  const suggestions = useMemo(() => buildSuggestions(Object.values(entities)), [entities]);
 
   const [input, setInput] = useState('');
   const [asked, setAsked] = useState<string | null>(null);
@@ -165,17 +169,37 @@ export function AskScreen() {
         {!asked && (
           <section aria-labelledby="suggested-heading" className="space-y-3">
             <h2 id="suggested-heading" className="dw-label">
-              Try asking
+              {suggestions.length > 0 ? 'Try asking' : 'For example'}
             </h2>
-            <ul className="flex flex-wrap gap-2">
-              {SUGGESTED.map((q) => (
-                <li key={q}>
-                  <button type="button" onClick={() => void submit(q)} className="dw-btn-secondary !min-h-[44px] !py-2 text-left font-normal">
-                    {q}
+            {suggestions.length > 0 ? (
+              <ul className="flex flex-wrap gap-2">
+                {suggestions.map((q) => (
+                  <li key={q}>
+                    <button type="button" onClick={() => void submit(q)} className="dw-btn-secondary !min-h-[44px] !py-2 text-left font-normal">
+                      {q}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <>
+                <ul className="flex flex-wrap gap-2">
+                  {EXAMPLE_QUESTIONS.map((q) => (
+                    <li key={q}>
+                      <span className="dw-btn-secondary !min-h-[44px] !py-2 text-left font-normal opacity-70 cursor-default select-none">
+                        e.g. {q}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-ink-3">
+                  Nothing ingested yet — add a document and ask about it.{' '}
+                  <button type="button" onClick={() => setCurrentScreen('ingest')} className="dw-btn-primary !min-h-[36px] !py-1 ml-1 align-middle">
+                    Go to Intake <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
-                </li>
-              ))}
-            </ul>
+                </p>
+              </>
+            )}
           </section>
         )}
 

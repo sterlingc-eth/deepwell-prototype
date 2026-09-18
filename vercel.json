@@ -5,7 +5,43 @@
   "installCommand": "npm install",
   "env": {},
   "rewrites": [
-    { "source": "/app", "destination": "/app/index.html" },
-    { "source": "/app/(.*)", "destination": "/app/index.html" }
+    {
+      "source": "/app",
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/api/v1/:resource",
+      "destination": "/api/v1?resource=:resource"
+    },
+    {
+      "source": "/api/keys",
+      "destination": "/api/account?action=keys"
+    },
+    {
+      "source": "/api/tenant-export",
+      "destination": "/api/account?action=export"
+    },
+    {
+      "source": "/api/tenant-delete",
+      "destination": "/api/account?action=delete"
+    },
+    {
+      "source": "/api/cron-sweep",
+      "destination": "/api/account?action=sweep"
+    },
+    {
+      "source": "/api/merge-tenant",
+      "destination": "/api/account?action=merge"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/account?action=sweep",
+      "schedule": "17 9 * * *"
+    }
   ]
 }

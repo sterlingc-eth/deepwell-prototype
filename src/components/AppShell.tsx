@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import { Database, Inbox, LayoutDashboard, List, Sun, Moon, LogOut, Globe } from 'lucide-react';
 import { AskMark } from './AskMark';
-import { useClerk } from '@clerk/clerk-react';
+import { OrganizationSwitcher, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
 import { useAppStore, type Screen } from '../store/appStore';
 
@@ -95,6 +95,24 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
             <span className="hidden md:inline text-body">{fieldMode ? 'Field' : 'Office'}</span>
           </button>
+
+          {/* A tech who works two shops switches their active org here — the
+              app re-derives its tenant from Clerk's orgId the moment this
+              changes (src/App.tsx, usePostgresSync's tenantKey), same as
+              signing into a different account would. hidePersonal: DeepWell
+              has no "personal" tenant concept in the UI — a user with no
+              shop sees OnboardingScreen instead of ever reaching this menu. */}
+          <OrganizationSwitcher
+            hidePersonal
+            afterSelectOrganizationUrl="/app/"
+            appearance={{
+              elements: {
+                organizationSwitcherTrigger: 'text-forest-100 hover:text-stone-0 rounded-md px-2 min-h-touch focus-visible:outline-brass-300',
+                organizationPreviewMainIdentifier: 'text-forest-100',
+                organizationSwitcherTriggerIcon: 'text-forest-100',
+              },
+            }}
+          />
 
           <button
             type="button"

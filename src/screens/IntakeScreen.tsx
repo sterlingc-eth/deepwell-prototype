@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Plus, Upload, AlertTriangle, ChevronRight } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
@@ -6,7 +6,7 @@ import { docCountsByStage, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
-import { ingestFiles, type IngestProgress, type IngestResult } from '../services/ingestClient';
+import { ingestFiles, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
 
 const SOURCE_LABEL: Record<IntakeSource, string> = { cabinet: 'Filing cabinet', email: 'Email', drive: 'Shared drive', truck: 'Truck' };
 const CURRENT_USER = 'You';
@@ -18,6 +18,7 @@ const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
   uploading: 'Uploading…',
   reading: 'Reading…',
   queued: 'Queued…',
+  pending: STILL_PROCESSING_MESSAGE,
   done: 'Read',
   error: 'Failed',
 };
@@ -125,7 +126,17 @@ export function IntakeScreen() {
   // about the transfer, not about the document, and it should disappear when
   // you navigate away.
   const [uploads, setUploads] = useState<Record<string, IngestProgress>>({});
-  const uploading = Object.values(uploads).some((u) => u.status !== 'done' && u.status !== 'error');
+  const uploading = Object.values(uploads).some((u) => u.status !== 'done' && u.status !== 'error' && u.status !== 'pending');
+
+  // Cancels any in-flight upload or status poll the moment this screen is
+  // left, instead of an abandoned 15-minute poll loop running against a
+  // component nobody can see anymore.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    return () => controller.abort();
+  }, []);
 
   /** Sample files have no bytes behind them — they seed the graph only. */
   const addFiles = (files: { filename: string }[]) => {
@@ -172,7 +183,7 @@ export function IntakeScreen() {
       for (const f of files) next[f.name] = { filename: f.name, status: 'hashing' };
       return next;
     });
-    const results = await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })));
+    const results = await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })), 3, abortRef.current?.signal);
     results.forEach((result, i) => {
       const tempId = tempIds[i];
       if (tempId) reconcileIntakeDoc(tempId, patchFromIngestResult(result));
@@ -346,6 +357,10 @@ export function IntakeScreen() {
                         <span className="truncate min-w-0">{u.filename}</span>
                         {u.status === 'error' ? (
                           <span className="dw-pill-warn shrink-0"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />{u.error}</span>
+                        ) : u.status === 'pending' ? (
+                          // Not a failure — extraction is still running server-side past the
+                          // 15-minute poll window. Neutral pill, not the warn pill errors get.
+                          <span className="dw-pill-muted shrink-0">{UPLOAD_LABEL.pending}</span>
                         ) : (
                           <span className="shrink-0 text-ink-2">{UPLOAD_LABEL[u.status]}</span>
                         )}

@@ -11,14 +11,14 @@ import { useAppStore } from '../store/appStore';
 
 const CURRENT_USER = 'You';
 
-// Everything this screen does — correcting a field, classifying, linking,
-// approving, resolving a conflict, merging a duplicate — writes to the
-// in-memory graph and nothing else. usePostgresSync loads from Postgres; there
-// is no write-back path, and there never has been. Silently losing a
-// technician's corrections on refresh is the kind of thing that destroys trust
-// in a tool permanently, so while the write path does not exist, the screen
-// says so out loud rather than letting the stage pill imply it saved.
-const REVIEW_IS_LOCAL_ONLY = import.meta.env.VITE_DEMO_MODE !== 'true';
+// Correcting a field, classifying, linking and approving now persist for a
+// real account (see src/core/entityGraph.ts, api/review.js) — the only mode
+// that stays purely in-memory is the demo fixture, which has no server-side
+// rows to write to in the first place. `lastError` (set by entityGraph.ts
+// when one of those requests fails and the optimistic change is rolled back)
+// is what tells a real account its change did NOT save; there is no more
+// blanket "nothing here is saved" banner because that stopped being true.
+const REVIEW_IS_DEMO_ONLY = import.meta.env.VITE_DEMO_MODE === 'true';
 
 type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'all';
 const FILTERS: { id: Filter; label: string }[] = [
@@ -60,7 +60,8 @@ function entityLabel(e: Entity): string {
  */
 export function ReviewScreen() {
   const graph = useGraph();
-  const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate } = useGraph();
+  const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate, clearLastError } = useGraph();
+  const lastError = useGraph((s) => s.lastError);
   const selectedDocumentId = useAppStore((s) => s.selectedDocumentId);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
@@ -99,17 +100,33 @@ export function ReviewScreen() {
           </div>
         </header>
 
-        {REVIEW_IS_LOCAL_ONLY && (
+        {REVIEW_IS_DEMO_ONLY && (
           <div
             role="status"
+            className="rounded-lg border border-line bg-surface-2 p-3 flex items-start gap-2"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
+            <p className="text-body text-ink-2">
+              <span className="font-medium">Demo data.</span>{' '}
+              Corrections, links and approvals here stay in this browser tab and are lost on refresh — this is
+              sample data with nothing behind it to save to.
+            </p>
+          </div>
+        )}
+
+        {lastError && (
+          <div
+            role="alert"
             className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 flex items-start gap-2"
           >
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warn-ink dark:text-brass-200" aria-hidden="true" />
-            <p className="text-body text-warn-ink dark:text-brass-200">
-              <span className="font-medium">Changes here aren't saved yet.</span>{' '}
-              Corrections, links and approvals on this screen stay in this browser tab and are lost on refresh.
-              Saving review decisions back to your account is still being built.
+            <p className="text-body text-warn-ink dark:text-brass-200 flex-1">
+              <span className="font-medium">That change didn't save.</span> {lastError} The screen has been rolled
+              back to what your account actually has on file.
             </p>
+            <button type="button" onClick={clearLastError} className="dw-btn-tertiary !min-h-[32px] !py-1 !px-2 shrink-0">
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -161,7 +178,7 @@ export function ReviewScreen() {
               onPreview={() => setPreview({ documentId: doc.id, location: { page: 1 } })}
               onCorrect={(name, value) => correctField(doc.id, name, value, CURRENT_USER, targetFor(doc, name, graph))}
               onClassify={(typeId) => classifyDoc(doc.id, typeId)}
-              onLink={(entityId) => linkDoc(doc.id, entityId)}
+              onLink={(entityId) => linkDoc(doc.id, entityId, CURRENT_USER)}
               onApprove={() => approveDoc(doc.id, CURRENT_USER)}
               onResolve={(conflictId, value) => resolveConflict(conflictId, value, CURRENT_USER)}
               onMerge={() => mergeDuplicate(doc.id)}
@@ -352,7 +369,11 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       {!duplicate && (
         <footer className="p-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-body text-ink-3">
-            {canAdvance ? `Approving moves this document to ${STAGE_LABEL[next]}.` : doc.stage === 'verified' ? 'Verified. Counts toward accuracy and answers.' : 'Resolve the items above to advance.'}
+            {canAdvance
+              ? `Approving moves this document to ${STAGE_LABEL[next]}.`
+              : doc.stage === 'verified'
+                ? `Verified${doc.verifiedBy ? ` by ${doc.verifiedBy}` : ''}${doc.verifiedAt ? ` on ${doc.verifiedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}. Counts toward accuracy and answers.`
+                : 'Resolve the items above to advance.'}
           </p>
           <div className="flex gap-2">
             {doc.linkedEntityIds[0] && (

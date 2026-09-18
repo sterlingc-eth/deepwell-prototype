@@ -29,7 +29,7 @@
 
 import { authHeader } from './authToken';
 
-export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'done' | 'error';
+export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'pending' | 'done' | 'error';
 
 export interface IngestResult {
   filename: string;
@@ -66,33 +66,53 @@ async function sha256Hex(file: File): Promise<string> {
     .join('');
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+/** Plain-language fallback when the server gave no usable error message. Never a raw HTTP status line — nobody dropping off paperwork knows what a 502 means. */
+export const NETWORK_ERROR_MESSAGE = "Couldn't reach DeepWell — check your connection and try again.";
+
+/**
+ * Turns a failed response's raw body into copy a contractor can act on: the
+ * server's own message when it sent one as JSON, otherwise plain language.
+ * Pure (just a string in, a string out) so it is unit-tested without a
+ * network call — see scripts/verify-ui.ts.
+ */
+export function describeFetchFailure(rawBody: string): string {
+  try {
+    const parsed = JSON.parse(rawBody);
+    if (parsed && typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error;
+  } catch {
+    /* not JSON — a 500 from Vercel is an HTML page */
+  }
+  return NETWORK_ERROR_MESSAGE;
+}
+
+async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
-    // A 500 from Vercel is an HTML page, so .json() would throw a SyntaxError
-    // and hide the real status. Read as text and try to parse.
     const raw = await res.text().catch(() => '');
-    let message = `${res.status} ${res.statusText}`;
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed?.error) message = parsed.error;
-    } catch {
-      /* not JSON — keep the status */
-    }
-    throw new Error(message);
+    throw new Error(describeFetchFailure(raw));
   }
   return res.json() as Promise<T>;
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
 /** Ingest one file. Resolves with a result rather than throwing, so one bad
- *  file in a batch of forty does not abandon the other thirty-nine. */
+ *  file in a batch of forty does not abandon the other thirty-nine.
+ *
+ *  `signal` cancels the in-flight request(s) — the caller aborting on
+ *  unmount stops promptly instead of the upload or poll continuing to run
+ *  (and to call onProgress) against a screen nobody is looking at. */
 export async function ingestFile(
   file: File,
-  onProgress?: (p: IngestProgress) => void
+  onProgress?: (p: IngestProgress) => void,
+  signal?: AbortSignal
 ): Promise<IngestResult> {
   const report = (status: IngestStatus, error?: string) =>
     onProgress?.({ filename: file.name, status, error });
@@ -111,7 +131,7 @@ export async function ingestFile(
       sha256,
       contentType: file.type || undefined,
       sizeBytes: file.size,
-    });
+    }, signal);
 
     if (alreadyUploaded) {
       report('done');
@@ -123,14 +143,16 @@ export async function ingestFile(
         method: 'PUT',
         body: file,
         headers: file.type ? { 'Content-Type': file.type } : undefined,
+        signal,
       });
-      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+      if (!put.ok) throw new Error('Upload failed — check your connection and try again.');
     }
 
     report('reading');
     const read = await postJson<{ pages?: number; queued?: boolean; extract?: boolean }>(
       '/api/read-document',
-      { documentId }
+      { documentId },
+      signal
     );
 
     if (read.queued) {
@@ -146,6 +168,11 @@ export async function ingestFile(
     report('done');
     return { filename: file.name, documentId, pages: read.pages };
   } catch (err) {
+    if (isAbortError(err)) {
+      // Deliberately cancelled (screen unmounted) — not a failure, and
+      // nobody is watching this progress anymore, so stay quiet.
+      return { filename: file.name, error: 'Cancelled' };
+    }
     const error = err instanceof Error ? err.message : String(err);
     report('error', error);
     return { filename: file.name, error };
@@ -153,17 +180,29 @@ export async function ingestFile(
 }
 
 /** One poll of the server's view of a set of documents. */
-export async function fetchDocumentStatus(documentIds: string[]): Promise<DocumentStatusRow[]> {
+export async function fetchDocumentStatus(documentIds: string[], signal?: AbortSignal): Promise<DocumentStatusRow[]> {
   if (!documentIds.length) return [];
   const { documents } = await postJson<{ documents: DocumentStatusRow[] }>(
     '/api/document-status',
-    { documentIds }
+    { documentIds },
+    signal
   );
   return documents;
 }
 
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
+
+/** Resolves after `ms`, or as soon as `signal` aborts — whichever is first. Never rejects: an abort just ends the wait early so the caller's own loop-top check can exit promptly. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(t);
+      resolve();
+    }, { once: true });
+  });
+}
 
 /** Pipeline stages in order. Anything at or past 'mapped' has had fields extracted. */
 const STAGES = ['received', 'read', 'mapped', 'linked', 'verified'];
@@ -183,6 +222,9 @@ function isFinished(row: DocumentStatusRow, result: IngestResult): boolean {
   return STAGES.indexOf(row.stage) >= STAGES.indexOf('mapped');
 }
 
+/** Shown for documents still processing when the poll gives up — a status, not a failure. Rendered in a neutral pill, never the warn pill an actual error gets. */
+export const STILL_PROCESSING_MESSAGE = 'Still processing — check Records in a few minutes';
+
 /**
  * Wait for queued documents to finish reading.
  *
@@ -190,11 +232,18 @@ function isFinished(row: DocumentStatusRow, result: IngestResult): boolean {
  * done either way, and a failed one must not hold the batch open. Polling stops
  * at fifteen minutes so a run that never lands cannot pin a tab open forever;
  * the documents keep processing server-side regardless, which is the whole
- * reason the work was moved off the request in the first place.
+ * reason the work was moved off the request in the first place. A timeout is
+ * not a failure — the extraction is still happening — so it reports status
+ * 'pending', not 'error', and never sets `result.error`.
+ *
+ * `signal` lets the caller stop polling immediately (e.g. IntakeScreen
+ * unmounting) rather than waiting out the full interval or the whole
+ * fifteen minutes.
  */
 export async function waitForIngest(
   results: IngestResult[],
-  onProgress?: (p: IngestProgress) => void
+  onProgress?: (p: IngestProgress) => void,
+  signal?: AbortSignal
 ): Promise<IngestResult[]> {
   const pending = new Map(
     results.filter((r) => r.queued && r.documentId).map((r) => [r.documentId as string, r])
@@ -204,13 +253,15 @@ export async function waitForIngest(
   const deadline = Date.now() + POLL_TIMEOUT_MS;
 
   while (pending.size && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    if (signal?.aborted) break;
+    await sleep(POLL_INTERVAL_MS, signal);
+    if (signal?.aborted) break;
 
     let rows: DocumentStatusRow[];
     try {
-      rows = await fetchDocumentStatus([...pending.keys()]);
+      rows = await fetchDocumentStatus([...pending.keys()], signal);
     } catch {
-      continue; // a dropped poll is not a failed ingest; try again
+      continue; // a dropped poll is not a failed ingest; try again (or exit above, if that was an abort)
     }
 
     for (const row of rows) {
@@ -231,9 +282,11 @@ export async function waitForIngest(
     }
   }
 
-  for (const result of pending.values()) {
-    result.error = 'Still processing — check the records list in a few minutes.';
-    onProgress?.({ filename: result.filename, status: 'error', error: result.error });
+  if (!signal?.aborted) {
+    for (const result of pending.values()) {
+      result.queued = false;
+      onProgress?.({ filename: result.filename, status: 'pending' });
+    }
   }
 
   return results;
@@ -251,20 +304,23 @@ export async function waitForIngest(
 export async function ingestFiles(
   files: File[],
   onProgress?: (p: IngestProgress) => void,
-  concurrency = 3
+  concurrency = 3,
+  signal?: AbortSignal
 ): Promise<IngestResult[]> {
   const results: IngestResult[] = new Array(files.length);
   let next = 0;
 
   const worker = async () => {
     for (;;) {
+      if (signal?.aborted) return;
       const i = next++;
       const file = files[i];
       if (!file) return;
-      results[i] = await ingestFile(file, onProgress);
+      results[i] = await ingestFile(file, onProgress, signal);
     }
   };
 
   await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
-  return waitForIngest(results, onProgress);
+  if (signal?.aborted) return results.filter(Boolean);
+  return waitForIngest(results, onProgress, signal);
 }

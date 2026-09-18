@@ -1,0 +1,148 @@
+/**
+ * Deep links: `?entity=<id>`, `?doc=<id>`, `?screen=<id>` in the URL.
+ *
+ * Before this, the whole app's navigation state was one zustand string
+ * (`currentScreen`) plus a couple of selected-id fields — nothing in the
+ * URL, so no link, bookmark, or "send this customer to a coworker" ever
+ * worked. This hook is the one-shot consumer of those query params on load;
+ * `deepLinkFor` is the producer other screens use to build a link to copy.
+ */
+import { useEffect, useRef } from 'react';
+import { useAppStore, type Screen } from '../store/appStore';
+import { useGraph } from '../core/entityGraph';
+
+const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'warranty-export'];
+
+function isScreen(value: string): value is Screen {
+  return (SCREENS as readonly string[]).includes(value);
+}
+
+export interface DeepLinkParams {
+  entityId?: string;
+  docId?: string;
+  screen?: Screen;
+}
+
+/**
+ * Reads `entity` / `doc` / `screen` out of a `location.search` string. Pure —
+ * takes the string, not `window`, so it is directly unit-testable.
+ */
+export function parseDeepLink(search: string): DeepLinkParams {
+  const params = new URLSearchParams(search);
+  const out: DeepLinkParams = {};
+  const entity = params.get('entity');
+  if (entity) out.entityId = entity;
+  const doc = params.get('doc');
+  if (doc) out.docId = doc;
+  const screen = params.get('screen');
+  if (screen && isScreen(screen)) out.screen = screen;
+  return out;
+}
+
+/**
+ * An absolute, shareable URL for one entity, document, or bare screen.
+ * Unlike the hook, this has no side effects and does not wait on the graph —
+ * any screen can call it straight away to offer "Copy link".
+ */
+export function deepLinkFor(params: DeepLinkParams): string {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  if (params.entityId) url.searchParams.set('entity', params.entityId);
+  if (params.docId) url.searchParams.set('doc', params.docId);
+  if (params.screen) url.searchParams.set('screen', params.screen);
+  return url.toString();
+}
+
+function cleanUrl(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('entity');
+  url.searchParams.delete('doc');
+  url.searchParams.delete('screen');
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+/** How long to wait for the entity graph to load before giving up on a link. */
+const RETRY_BUDGET_MS = 8000;
+
+/**
+ * Consumes a deep link on mount, then scrubs it from the URL so it can never
+ * re-fire on a later render or linger in a copied/bookmarked URL.
+ *
+ * The graph loads asynchronously (`usePostgresSync` fetches Postgres after
+ * sign-in), so a link opened cold can arrive before the entity/document it
+ * names exists in the store yet. Rather than failing outright, this
+ * subscribes to graph updates and re-checks each time something loads, for
+ * up to RETRY_BUDGET_MS — long enough for a normal sync, short enough that a
+ * stale or wrong id doesn't hold the tab open indefinitely.
+ *
+ * Call this once, high in the tree (App.tsx), after sync is wired up — not
+ * from individual screens.
+ */
+export function useDeepLink(): void {
+  const openEntity = useAppStore((s) => s.openEntity);
+  const openDocument = useAppStore((s) => s.openDocument);
+  const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  const handledRef = useRef(false);
+
+  useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
+    const params = parseDeepLink(window.location.search);
+    if (!params.entityId && !params.docId && !params.screen) return;
+
+    // A bare ?screen= needs nothing from the graph — apply it immediately.
+    if (!params.entityId && !params.docId) {
+      if (params.screen) setCurrentScreen(params.screen);
+      cleanUrl();
+      return;
+    }
+
+    let settled = false;
+
+    const tryApply = (): boolean => {
+      const graph = useGraph.getState();
+      if (params.entityId && graph.entities[params.entityId]) {
+        openEntity(params.entityId);
+        return true;
+      }
+      if (params.docId && graph.docs[params.docId]) {
+        openDocument(params.docId);
+        setCurrentScreen(params.screen ?? 'review');
+        return true;
+      }
+      return false;
+    };
+
+    if (tryApply()) {
+      cleanUrl();
+      return;
+    }
+
+    const unsubscribe = useGraph.subscribe(() => {
+      if (settled) return;
+      if (tryApply()) {
+        settled = true;
+        unsubscribe();
+        cleanUrl();
+      }
+    });
+
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      // The link never resolved (bad id, or a tenant with nothing loaded) —
+      // still clean the URL so it doesn't keep retrying on every remount.
+      cleanUrl();
+    }, RETRY_BUDGET_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+    // Runs once, at mount, by design — see handledRef above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}

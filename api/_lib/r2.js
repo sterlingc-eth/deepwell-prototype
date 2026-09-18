@@ -112,6 +112,30 @@ export async function getObject(key) {
 }
 
 /**
+ * Delete an object. Used by tenant-delete.js, AFTER the Postgres transaction
+ * that removed the rows pointing at it has already committed — see the call
+ * site for why that order matters.
+ *
+ * `presign()` already signs whatever method it's given (the canonical
+ * request below is built from the `method` argument, not hardcoded to GET/PUT
+ * anywhere in it), so this needed no change to the signer itself — only a
+ * caller that asks for DELETE instead of GET.
+ *
+ * Treats 404 as success: the object is already gone, which is exactly the
+ * end state a delete is trying to reach, and R2 returning 404 on a second
+ * delete attempt (a retried sweep, an already-cleaned-up object) must not be
+ * reported as a failure.
+ */
+export async function deleteObject(key) {
+  const url = presign('DELETE', key, 60);
+  const r = await fetch(url, { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
+  await r.body?.cancel().catch(() => {});
+  if (!r.ok && r.status !== 404) {
+    throw new Error(`R2 DELETE ${key} failed: ${r.status}`);
+  }
+}
+
+/**
  * Object keys are tenant-prefixed. This is defence in depth, not the isolation
  * boundary — Postgres RLS is that — but it means a key leaked from one tenant
  * cannot be guessed into another, and it makes per-tenant lifecycle rules and

@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { captureException } from "./telemetry.js";
 
 // --- Load .env.local manually (no dotenv dependency needed) ---
 // vercel dev does not reliably inject .env.local into serverless functions,
@@ -139,11 +140,17 @@ export function handleCors(res, req) {
   return res;
 }
 
-export function handleError(res, error, req) {
+export function handleError(res, error, req, extra = {}) {
   // Log the detail; return none of it. `error.message` here can carry the
   // Anthropic SDK's internals, our own config hints, or a stack fragment —
   // all of it useful to an attacker and useless to a user.
   console.error("API Error:", error);
+
+  // Fire-and-forget: telemetry must never delay or fail the response it is
+  // reporting on. `extra` lets a caller that already has it (ask.js,
+  // read-document.js) pass tenantId through; callers that don't just get
+  // route-level visibility, which is still strictly more than nothing.
+  captureException(error, { route: req?.url, ...extra }).catch(() => {});
 
   const msg = (error && error.message) || "";
   const status = error && error.status;

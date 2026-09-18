@@ -266,6 +266,16 @@ function makeStore(db, tenantId) {
     // function writes document_type, and no client screen calls it at all.
     // Both columns are still written by the code that owns them —
     // markExtracted for stage, createDocument for storage_key.
+    /**
+     * Raw, tenant-scoped query. The transaction already has app.tenant_id set,
+     * so RLS applies to every statement run through here exactly as it does
+     * to the curated helpers. Exists so members.js, reviewStore.js and
+     * opsStore.js can stop carrying private pools that re-implement the
+     * SET LOCAL dance — three copies of a tenancy mechanism is three places
+     * for it to drift.
+     */
+    raw: (sql, params) => db.query(sql, params),
+
     updateDocument: updater('documents', DOCUMENT_UPDATE_COLUMNS),
 
     /**
@@ -743,7 +753,7 @@ function makeStore(db, tenantId) {
       for (const k of ['serial_number', 'model', 'manufacturer', 'equipment_type',
                        'tonnage', 'refrigerant', 'service_address', 'customer_name',
                        'installation_date', 'warranty_registered_date',
-                       'warranty_expires', 'warranty_term']) {
+                       'warranty_expires', 'warranty_term', 'installed_by']) {
         const v = String(facts?.[k] ?? '').trim();
         if (v) incoming[k] = v;
       }

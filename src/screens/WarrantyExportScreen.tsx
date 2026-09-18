@@ -32,14 +32,20 @@ export function WarrantyExportScreen() {
 
   const readiness = units.map((e) => {
     const info = warrantyStatus(dateOf(e, 'warrantyExpiry'), now);
+    // The installer's name is worth flagging but not worth blocking on: a
+    // packet a manufacturer can act on today, missing one line, beats no
+    // packet at all while the pipeline (or a human) fills that in later.
+    // Everything else here still gates the packet — a claim without a serial,
+    // an install date, a registered warranty, or a verified document behind
+    // it isn't one a manufacturer can act on at all.
     const missing: string[] = [];
     if (!str(e, 'serial')) missing.push('serial');
     if (!dateOf(e, 'installDate')) missing.push('install date');
-    if (!str(e, 'installedByName')) missing.push('installer');
     if (!dateOf(e, 'warrantyExpiry')) missing.push('warranty registration');
+    const missingInstaller = !str(e, 'installedByName');
     const verifiedDocs = docsLinkedTo(graph, e.id).filter((d) => d.stage === 'verified');
     const ready = missing.length === 0 && info.status !== 'expired' && verifiedDocs.length > 0;
-    return { e, info, missing, verifiedDocs, ready };
+    return { e, info, missing, missingInstaller, verifiedDocs, ready };
   });
   const allReady = readiness.length > 0 && readiness.every((r) => r.ready);
 
@@ -106,7 +112,7 @@ export function WarrantyExportScreen() {
             <p className="dw-card p-6 text-ink-3">No units selected. Add one above, or start from the Dashboard's warranty table.</p>
           ) : (
             <ul className="divide-y divide-line border border-line rounded-lg bg-surface">
-              {readiness.map(({ e, missing, verifiedDocs, ready, info }) => (
+              {readiness.map(({ e, missing, missingInstaller, verifiedDocs, ready, info }) => (
                 <li key={e.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1">
                     <span className="block font-mono text-data text-ink">{str(e, 'serial')}</span>
@@ -117,6 +123,10 @@ export function WarrantyExportScreen() {
                     <span className="dw-pill-ok"><CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Ready · {verifiedDocs.length} verified doc{verifiedDocs.length === 1 ? '' : 's'}</span>
                   ) : (
                     <span className="dw-pill-warn"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> {info.status === 'expired' ? 'Warranty expired' : missing.length ? `Missing ${missing.join(', ')}` : 'No verified documents'}</span>
+                  )}
+                  {/* Not a blocker — see the comment on `readiness` above. */}
+                  {missingInstaller && (
+                    <span className="dw-pill-warn"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Installer not on file</span>
                   )}
                   <button type="button" onClick={() => toggle(e.id)} aria-label={`Remove ${str(e, 'serial')}`} className="dw-btn-tertiary !min-h-[40px] min-w-touch"><X className="w-4 h-4" aria-hidden="true" /></button>
                 </li>
@@ -149,7 +159,7 @@ export function WarrantyExportScreen() {
                           ['Manufacturer', str(e, 'manufacturer'), false],
                           ['Type', str(e, 'equipmentType'), false],
                           ['Installed', fmtDate(dateOf(e, 'installDate')), false],
-                          ['Installed by', str(e, 'installedByName'), false],
+                          ['Installed by', str(e, 'installedByName') || 'Not on file', false],
                           ['Warranty expires', fmtDate(dateOf(e, 'warrantyExpiry')) || 'Not on file', false],
                           ['Service address', p ? `${str(p, 'address')}, ${str(p, 'city')}, ${str(p, 'state')} ${str(p, 'zip')}` : '—', false],
                           ['Customer', p ? str(p, 'customerName') : '—', false],

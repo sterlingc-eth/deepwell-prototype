@@ -59,10 +59,26 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // earlier run rather than leaving them there to look current.
   const facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
 
+  // Which technician installed a unit is exactly the kind of fact
+  // findOrCreateEquipment's fill-once merge exists for (the first install
+  // document to state it wins; a later service ticket cannot overwrite it) —
+  // it is simply missing from that function's own field list today. See
+  // HANDOFF.md for the one-line addition recordsStore.js still needs
+  // ('installed_by' alongside 'serial_number', 'model', etc.); until that
+  // lands, findOrCreateEquipment silently drops this key from `incoming` the
+  // same way it already drops any key not on its list, so passing it early
+  // is inert rather than wrong, and starts working the moment that list grows.
+  const candidateType = documentType || doc.document_type || inferDocumentType(facts);
+  const isInstallShaped = candidateType === 'install_record'
+    || (candidateType === 'invoice' && !!facts.installation_date);
+  const equipmentFacts = isInstallShaped && facts.technician
+    ? { ...facts, installed_by: facts.technician }
+    : facts;
+
   let warranty = null;
 
   const written = await withTenant(ctx, async (db) => {
-    const entity = await db.findOrCreateEquipment(facts);
+    const entity = await db.findOrCreateEquipment(equipmentFacts);
 
     // Derived from the ENTITY's accumulated facts, not this document's alone.
     //
@@ -108,7 +124,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // its whole extracted-fields section on that column being set, which meant a
     // document that HAD been fully extracted rendered as a blank slate and a
     // technician was invited to key it all in again.
-    const resolvedType = documentType || doc.document_type || inferDocumentType(facts);
+    // Same value computed above for equipmentFacts — recomputing it here (an
+    // identical, deterministic expression) would just be two names for one
+    // thing.
+    const resolvedType = candidateType;
     if (resolvedType && resolvedType !== doc.document_type) {
       await db.updateDocument(documentId, { document_type: resolvedType });
     }

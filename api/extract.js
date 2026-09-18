@@ -1,9 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
-import { requireAuth, denyAuth } from "./_lib/auth.js";
+import { denyAuth } from "./_lib/auth.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extractFields.js";
 import { extractDocumentFields, EXTRACT_MODEL } from "./_lib/extractDocument.js";
 import { sniffMagicBytes } from "./_lib/readDocument.js";
+import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
+import { limit } from "./_lib/rateLimit.js";
+import { recordModelCall } from "./_lib/usage.js";
 
 /**
  * POST /api/extract
@@ -38,16 +41,19 @@ export default async function handler(req, res) {
 
   let auth;
   try {
-    auth = await requireAuth(req);
+    auth = await requireAuthOrKey(req);
+    assertScope(auth, "ingest");
   } catch (err) {
     return denyAuth(res, err);
   }
+
+  if (!(await limit(req, res, auth, "ingest"))) return; // 429 already written
 
   const { documentId, imageData, mediaType, documentType } = req.body ?? {};
 
   try {
     if (!documentId && imageData) {
-      return await extractFromImage(req, res, { imageData, mediaType, documentType });
+      return await extractFromImage(req, res, { auth, imageData, mediaType, documentType });
     }
     if (typeof documentId !== "string" || !documentId) {
       return res.status(400).json({ error: "documentId is required" });
@@ -76,7 +82,7 @@ export default async function handler(req, res) {
  * the serial read back. There is no document behind it, so nothing is stored —
  * the caller gets the fields and decides what to do with them.
  */
-async function extractFromImage(req, res, { imageData, mediaType, documentType }) {
+async function extractFromImage(req, res, { auth, imageData, mediaType, documentType }) {
   if (typeof imageData !== "string" || !imageData) {
     return res.status(400).json({ error: "imageData must be a base64 string" });
   }
@@ -132,6 +138,11 @@ async function extractFromImage(req, res, { imageData, mediaType, documentType }
       },
     ],
   });
+
+  await recordModelCall(
+    { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+    { inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }
+  );
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   const { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: 1 });

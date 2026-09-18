@@ -7,6 +7,8 @@ import { dateOf, fmtDate, fmtMoney, normalize, numOf, str } from '../core/answer
 import type { Entity } from '../core/types';
 import { useAppStore } from '../store/appStore';
 
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
 type Kind = 'all' | 'property' | 'equipment' | 'service' | 'technician';
 const KINDS: { id: Kind; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -43,10 +45,22 @@ export function BrowseScreen() {
     return () => window.clearTimeout(t);
   }, [query]);
 
+  // A kind that can never have data for a real tenant yet (the server has no
+  // writer for property/customer/technician/service entities today — see
+  // usePostgresSync.ts) shouldn't render as a selectable, permanently-empty
+  // category. Demo mode is exempt: its fixture populates all of them.
+  const visibleKinds = useMemo(
+    () => KINDS.filter((k) => k.id === 'all' || DEMO_MODE || entitiesOfType(graph, k.id).length > 0),
+    [graph],
+  );
+  useEffect(() => {
+    if (kind !== 'all' && !visibleKinds.some((k) => k.id === kind)) setKind('all');
+  }, [visibleKinds, kind]);
+
   const results = useMemo(() => {
     const q = normalize(debounced);
     const tokens = q.split(' ').filter(Boolean);
-    const kinds: Kind[] = kind === 'all' ? ['property', 'equipment', 'service', 'technician'] : [kind];
+    const kinds: Kind[] = kind === 'all' ? (visibleKinds.filter((k) => k.id !== 'all').map((k) => k.id)) : [kind];
     const out: { e: Entity; score: number }[] = [];
     for (const k of kinds) {
       for (const e of entitiesOfType(graph, k)) {
@@ -56,7 +70,7 @@ export function BrowseScreen() {
       }
     }
     return out.sort((a, b) => b.score - a.score).slice(0, 60);
-  }, [debounced, kind, graph]);
+  }, [debounced, kind, graph, visibleKinds]);
 
   const row = (e: Entity) => {
     const p = graph.entities[str(e, 'propertyId')];
@@ -94,7 +108,7 @@ export function BrowseScreen() {
         </div>
 
         <div role="tablist" aria-label="Record type" className="flex flex-wrap gap-1.5">
-          {KINDS.map((k) => (
+          {visibleKinds.map((k) => (
             <button key={k.id} role="tab" aria-selected={kind === k.id} onClick={() => setKind(k.id)} className={['dw-btn !min-h-[40px] !py-1.5 !px-3', kind === k.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}>
               {k.label}
             </button>

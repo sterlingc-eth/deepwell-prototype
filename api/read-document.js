@@ -1,7 +1,9 @@
-import { requireAuth, denyAuth } from "./_lib/auth.js";
+import { denyAuth } from "./_lib/auth.js";
 import { handleCors, handleError } from "./_lib/claude.js";
 import { ingestDocument, recordIngestFailure, isTransientError } from "./_lib/readDocument.js";
 import { isQueueEnabled, enqueueDocument } from "./_lib/queue.js";
+import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
+import { limit } from "./_lib/rateLimit.js";
 
 /**
  * POST /api/read-document
@@ -50,10 +52,13 @@ export default async function handler(req, res) {
 
   let auth;
   try {
-    auth = await requireAuth(req);
+    auth = await requireAuthOrKey(req);
+    assertScope(auth, "ingest");
   } catch (err) {
     return denyAuth(res, err);
   }
+
+  if (!(await limit(req, res, auth, "ingest"))) return; // 429 already written
 
   const { documentId, sync = false, extract = true } = req.body ?? {};
   if (typeof documentId !== "string" || !documentId) {
@@ -119,6 +124,6 @@ export default async function handler(req, res) {
     }
 
     await recordIngestFailure(ctx, documentId, error);
-    return handleError(res, error, req);
+    return handleError(res, error, req, { tenantId: auth.tenantId, documentId });
   }
 }

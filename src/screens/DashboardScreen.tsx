@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
-import { ArrowRight, AlertTriangle, FileText, Link2, ShieldCheck } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowRight, AlertTriangle, Check, Copy, FileText, Link2, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { WarrantyStatusBadge, warrantyStatus } from '../components/WarrantyStatusBadge';
 import { docCountsByStage, entitiesOfType, openConflicts, unlinkedDocs, useGraph } from '../core/entityGraph';
 import { dateOf, fmtDate, str } from '../core/answer';
 import type { Entity } from '../core/types';
+import { deepLinkFor } from '../hooks/useDeepLink';
 import { useAppStore } from '../store/appStore';
 
 const DAY = 86400000;
@@ -29,6 +30,13 @@ export function DashboardScreen() {
   const conflicts = openConflicts(graph).length;
 
   const units = useMemo(() => entitiesOfType(graph, 'equipment'), [graph]);
+  // The real (non-demo) ingestion pipeline has no writer for `service` entities
+  // yet (see usePostgresSync.ts) — every real tenant has zero of them. Saying
+  // "none on record" per unit in that world is a lie by omission: it reads as
+  // "we checked and this unit has no history" when the truth is "we don't
+  // track visits at all yet". Gate on whether the graph has ANY service
+  // entities so demo mode (which does) keeps its honest per-unit wording.
+  const hasServiceRecords = entitiesOfType(graph, 'service').length > 0;
   const property = (e: Entity) => graph.entities[str(e, 'propertyId')];
   const lastVisit = (e: Entity) =>
     entitiesOfType(graph, 'service')
@@ -36,6 +44,19 @@ export function DashboardScreen() {
       .map((s) => dateOf(s, 'date'))
       .filter((d): d is Date => !!d)
       .sort((a, b) => b.getTime() - a.getTime())[0];
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyLink = (entityId: string) => {
+    void navigator.clipboard
+      .writeText(deepLinkFor({ entityId }))
+      .then(() => {
+        setCopiedId(entityId);
+        window.setTimeout(() => setCopiedId((id) => (id === entityId ? null : id)), 1500);
+      })
+      .catch(() => {
+        /* clipboard unavailable (permissions, insecure context) — nothing to fall back to here */
+      });
+  };
 
   const byExpiry = [...units].sort((a, b) => {
     const da = dateOf(a, 'warrantyExpiry');
@@ -57,8 +78,13 @@ export function DashboardScreen() {
       const reasons: string[] = [];
       if (info.status === 'expiring') reasons.push(info.label);
       if (info.status === 'unknown') reasons.push('No warranty on file');
-      if (monthsSince === null) reasons.push('Never serviced');
-      else if (monthsSince >= 12) reasons.push(`Last service ${monthsSince} months ago`);
+      // Same honesty gate as the "Last service" line below: "Never serviced"
+      // is a claim about this unit's history, which nothing backs when the
+      // system tracks no service visits at all.
+      if (hasServiceRecords) {
+        if (monthsSince === null) reasons.push('Never serviced');
+        else if (monthsSince >= 12) reasons.push(`Last service ${monthsSince} months ago`);
+      }
       if (info.status === 'expired' && monthsSince !== null && monthsSince >= 6) reasons.push('Out of warranty and overdue');
       return { e, reasons, info, last };
     })
@@ -134,7 +160,15 @@ export function DashboardScreen() {
                       <td className="px-4 py-3 text-ink-2">{p ? str(p, 'address') : '—'}</td>
                       <td className="px-4 py-3 text-ink-2">{dateOf(e, 'warrantyExpiry') ? fmtDate(dateOf(e, 'warrantyExpiry')) : '—'}</td>
                       <td className="px-4 py-3"><WarrantyStatusBadge warranty={{ warrantyExpiry: dateOf(e, 'warrantyExpiry') }} /></td>
-                      <td className="px-4 py-3 text-right"><button type="button" onClick={(ev) => { ev.stopPropagation(); askQuestion(q); }} className="dw-btn-tertiary !min-h-[36px] !py-1" aria-label={q}>Ask <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></button></td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex gap-1.5">
+                          <button type="button" onClick={(ev) => { ev.stopPropagation(); copyLink(e.id); }} className="dw-btn-tertiary !min-h-[36px] !py-1" aria-label={`Copy link to ${str(e, 'serial')}`}>
+                            {copiedId === e.id ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+                            {copiedId === e.id ? 'Copied' : 'Copy link'}
+                          </button>
+                          <button type="button" onClick={(ev) => { ev.stopPropagation(); askQuestion(q); }} className="dw-btn-tertiary !min-h-[36px] !py-1" aria-label={q}>Ask <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -150,9 +184,17 @@ export function DashboardScreen() {
               const p = property(e);
               const q = p ? `${str(p, 'address')}` : str(e, 'serial');
               return (
-                <li key={e.id}>
+                <li key={e.id} className="relative">
+                  <button
+                    type="button"
+                    onClick={(ev) => { ev.stopPropagation(); copyLink(e.id); }}
+                    aria-label={`Copy link to ${str(e, 'serial')}`}
+                    className="absolute top-3 right-3 z-10 dw-btn-tertiary !min-h-[32px] !py-1 !px-2 bg-surface"
+                  >
+                    {copiedId === e.id ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+                  </button>
                   <button type="button" onClick={() => askQuestion(q)} className="w-full text-left dw-card p-4 hover:shadow-lift transition-shadow duration-quick">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-3 pr-8">
                       <div className="min-w-0">
                         <p className="font-mono text-data text-ink">{str(e, 'serial')}</p>
                         <p className="text-ink">{str(e, 'manufacturer')} {str(e, 'equipmentType')} · {p ? str(p, 'address') : ''}</p>
@@ -162,7 +204,9 @@ export function DashboardScreen() {
                     <ul className="mt-2 flex flex-wrap gap-1.5">
                       {reasons.map((r) => <li key={r} className="dw-pill-warn">{r}</li>)}
                     </ul>
-                    <p className="mt-2 text-body text-ink-3">Last service: {last ? fmtDate(last) : 'none on record'} · Ask about this property <ArrowRight className="inline w-3.5 h-3.5" aria-hidden="true" /></p>
+                    <p className="mt-2 text-body text-ink-3">
+                      {hasServiceRecords ? `Last service: ${last ? fmtDate(last) : 'none on record'}` : 'Service visits: not tracked yet'} · Ask about this property <ArrowRight className="inline w-3.5 h-3.5" aria-hidden="true" />
+                    </p>
                   </button>
                 </li>
               );

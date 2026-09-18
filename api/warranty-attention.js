@@ -1,7 +1,9 @@
 import { handleCors, handleError } from "./_lib/claude.js";
-import { requireAuth, denyAuth } from "./_lib/auth.js";
+import { denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
 import { describeWarranty, addDays, ruleCoverage, isPlausibleToday } from "./_lib/warrantyRules.js";
+import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
+import { limit } from "./_lib/rateLimit.js";
 
 /**
  * POST /api/warranty-attention
@@ -29,6 +31,12 @@ import { describeWarranty, addDays, ruleCoverage, isPlausibleToday } from "./_li
  * someone has actually read produce deadlines, so a tenant running mostly
  * Carrier equipment will see a short list. That should be visible as a gap in
  * our rules table rather than looking like there is nothing to do.
+ *
+ * Accepts either a Clerk session or an API key with the 'read' scope, and is
+ * rate-limited on the 'read' bucket (./_lib/apiKeyAuth.js, ./_lib/rateLimit.js).
+ *
+ * `getWarrantyAttention` is exported so api/v1-warranty.js (the public GET
+ * surface) can reuse this exact logic.
  */
 export const config = { api: { bodyParser: { sizeLimit: "8kb" } } };
 
@@ -37,7 +45,96 @@ const clampDays = (v, fallback, max) => {
   return Number.isFinite(n) && n >= 0 ? Math.min(Math.trunc(n), max) : fallback;
 };
 
+export class WarrantyAttentionError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.name = "WarrantyAttentionError";
+    this.status = status;
+  }
+}
 
+/**
+ * @param {{tenantId: string, orgId: string|null}} auth
+ * @param {{today?: unknown, registerWithinDays?: unknown, registerLookbackDays?: unknown, expiringWithinDays?: unknown}} params
+ * @throws {WarrantyAttentionError}
+ */
+export async function getWarrantyAttention(auth, params) {
+  // `today` is overridable so the list can be previewed at a future date and so
+  // tests are deterministic. It must still be a real ISO date — it goes into a
+  // SQL comparison. Validated as a real calendar date, not just the right
+  // shape: "2024-13-40" matches /\d{4}-\d{2}-\d{2}/ but every downstream date
+  // function rejects it, which would turn a typo into a silently empty list
+  // instead of an error.
+  if (params.today != null && !isPlausibleToday(params.today)) {
+    throw new WarrantyAttentionError("today must be a real YYYY-MM-DD date between 2000 and 2100");
+  }
+  const today = params.today ?? new Date().toISOString().slice(0, 10);
+
+  const registerWithin = clampDays(params.registerWithinDays, 30, 365);
+  const registerLookback = clampDays(params.registerLookbackDays, 60, 3650);
+  const expiringWithin = clampDays(params.expiringWithinDays, 180, 3650);
+
+  const rows = await withTenant(
+    { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+    (db) =>
+      db.listWarrantyAttention({
+        registerFrom: addDays(today, -registerLookback),
+        registerTo: addDays(today, registerWithin),
+        // Expiries already past are handled by the registration branch or are
+        // simply history; this list is about what can still be acted on.
+        expiringFrom: today,
+        expiringTo: addDays(today, expiringWithin),
+      })
+  );
+
+  const items = rows
+    .map((r) => {
+      const stable = r.warranty ?? {};
+      const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin });
+      return {
+        entityId: r.id,
+        serialNumber: r.serial_number,
+        model: r.model,
+        manufacturer: r.manufacturer,
+        serviceAddress: r.service_address,
+        customerName: r.customer_name,
+        installDate: stable.installDate ?? null,
+        registrationDeadline: stable.registrationDeadline ?? null,
+        registrationOnFile: stable.registrationOnFile ?? null,
+        expires: stable.expires ?? null,
+        // The UI must never show a calculated date as though a document said
+        // it. This field is what that distinction hangs on.
+        expiresBasis: stable.expiresBasis ?? null,
+        termYears: stable.termYears ?? null,
+        ...now,
+      };
+    })
+    // A row whose dates no longer imply anything actionable is dropped rather
+    // than shown with an empty reason.
+    .filter((i) => i.action);
+
+  const order = { register_urgent: 0, register_soon: 1, register_missed: 2, expiring: 3, expired: 4 };
+  items.sort((a, b) => (order[a.urgency] ?? 9) - (order[b.urgency] ?? 9));
+
+  const counts = items.reduce((acc, i) => {
+    acc[i.urgency] = (acc[i.urgency] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const cov = ruleCoverage();
+
+  return {
+    today,
+    items,
+    counts,
+    total: items.length,
+    coverage: {
+      verifiedBrands: cov.verified.map((v) => v.label),
+      unverifiedBrands: cov.unverified.map((v) => v.label),
+      note: "Only manufacturers whose published warranty terms have been verified produce deadlines.",
+    },
+  };
+}
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
@@ -45,89 +142,21 @@ export default async function handler(req, res) {
 
   let auth;
   try {
-    auth = await requireAuth(req);
+    auth = await requireAuthOrKey(req);
+    assertScope(auth, "read");
   } catch (err) {
     return denyAuth(res, err);
   }
 
-  const body = req.body ?? {};
-  // `today` is overridable so the list can be previewed at a future date and so
-  // tests are deterministic. It must still be a real ISO date — it goes into a
-  // SQL comparison.
-  // Validated as a real calendar date, not just the right shape: "2024-13-40"
-  // matches /\d{4}-\d{2}-\d{2}/ but every downstream date function rejects it,
-  // which would turn a typo into a silently empty list instead of an error.
-  if (body.today != null && !isPlausibleToday(body.today)) {
-    return res.status(400).json({ error: "today must be a real YYYY-MM-DD date between 2000 and 2100" });
-  }
-  const today = body.today ?? new Date().toISOString().slice(0, 10);
-
-  const registerWithin = clampDays(body.registerWithinDays, 30, 365);
-  const registerLookback = clampDays(body.registerLookbackDays, 60, 3650);
-  const expiringWithin = clampDays(body.expiringWithinDays, 180, 3650);
+  if (!(await limit(req, res, auth, "read"))) return; // 429 already written
 
   try {
-    const rows = await withTenant(
-      { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-      (db) =>
-        db.listWarrantyAttention({
-          registerFrom: addDays(today, -registerLookback),
-          registerTo: addDays(today, registerWithin),
-          // Expiries already past are handled by the registration branch or are
-          // simply history; this list is about what can still be acted on.
-          expiringFrom: today,
-          expiringTo: addDays(today, expiringWithin),
-        })
-    );
-
-    const items = rows
-      .map((r) => {
-        const stable = r.warranty ?? {};
-        const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin });
-        return {
-          entityId: r.id,
-          serialNumber: r.serial_number,
-          model: r.model,
-          manufacturer: r.manufacturer,
-          serviceAddress: r.service_address,
-          customerName: r.customer_name,
-          installDate: stable.installDate ?? null,
-          registrationDeadline: stable.registrationDeadline ?? null,
-          registrationOnFile: stable.registrationOnFile ?? null,
-          expires: stable.expires ?? null,
-          // The UI must never show a calculated date as though a document said
-          // it. This field is what that distinction hangs on.
-          expiresBasis: stable.expiresBasis ?? null,
-          termYears: stable.termYears ?? null,
-          ...now,
-        };
-      })
-      // A row whose dates no longer imply anything actionable is dropped rather
-      // than shown with an empty reason.
-      .filter((i) => i.action);
-
-    const order = { register_urgent: 0, register_soon: 1, register_missed: 2, expiring: 3, expired: 4 };
-    items.sort((a, b) => (order[a.urgency] ?? 9) - (order[b.urgency] ?? 9));
-
-    const counts = items.reduce((acc, i) => {
-      acc[i.urgency] = (acc[i.urgency] ?? 0) + 1;
-      return acc;
-    }, {});
-
-    const cov = ruleCoverage();
-
-    return handleCors(res, req).status(200).json({
-      today,
-      items,
-      counts,
-      total: items.length,
-      coverage: {
-        verifiedBrands: cov.verified.map((v) => v.label),
-        unverifiedBrands: cov.unverified.map((v) => v.label),
-        note: "Only manufacturers whose published warranty terms have been verified produce deadlines.",
-      },
-    });
+    const result = await getWarrantyAttention(auth, req.body ?? {});
+    return handleCors(res, req).status(200).json(result);
   } catch (error) {
+    if (error?.name === "WarrantyAttentionError") {
+      return handleCors(res, req).status(error.status).json({ error: error.message });
+    }
     return handleError(res, error, req);
   }
 }

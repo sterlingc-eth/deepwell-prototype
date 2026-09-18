@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { recordsStore } from '../services/recordsStoreClient';
+import { reviewClient, type DocumentLink, type Correction } from '../services/reviewClient';
 import { useGraph } from '../core/entityGraph';
 import { hvacSchema } from '../domains/hvac';
 import type { Batch, Doc, Entity, FieldValue, FileType, PipelineStage } from '../core/types';
@@ -52,6 +53,9 @@ interface DocumentRow {
   content_type?: string | null;
   page_count?: number | null;
   extract_error?: string | null;
+  /** Written by api/_lib/reviewStore.js's verifyDocument (M3-config/08-review.sql). */
+  verified_by?: string | null;
+  verified_at?: unknown;
 }
 
 /**
@@ -115,8 +119,21 @@ interface ExtractionRow {
  * record, and the warranty packet stayed disabled forever. A contractor
  * uploaded a document, it processed perfectly, and the app showed them an
  * empty record.
+ *
+ * Two more bulk fetches (also one round trip for the whole sync, same reason)
+ * feed in here now that review actions persist (api/review.js):
+ *   `links`       — document_entity_links rows a human created with Review's
+ *                   "Link" control, unioned with the extraction-derived
+ *                   entity ids above (a document can be linked to more than
+ *                   the entity its own fields target — a service ticket
+ *                   naming a unit is also about the customer at that address).
+ *   `corrections` — extractions.corrected_value/by/at for this document's
+ *                   fields. Applied OVER the original `value`, same rule
+ *                   entityGraph.ts's `correctField` already used locally
+ *                   (`f.correctedValue ?? f.value` everywhere a fact is
+ *                   read) — the corrected reading is what review answers with.
  */
-function toDoc(row: DocumentRow, extractions: ExtractionRow[]): Doc {
+function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLink[], corrections: Correction[]): Doc {
   const stage = STAGE_MAP[row.stage] ?? 'received';
   const receivedAt = toDateOrNull(row.created_at) ?? new Date();
   const preview = row.extract_error
@@ -124,6 +141,10 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[]): Doc {
     : row.page_count
       ? `${row.original_filename}\n\n${row.page_count} page(s) read.`
       : `${row.original_filename}\n\nReceived.`;
+
+  const correctionByField = new Map(corrections.map((c) => [c.field_key, c]));
+  const linkedFromLinks = links.map((l) => l.entity_id);
+  const linkedFromExtractions = extractions.map((x) => x.entity_id).filter((id): id is string => !!id);
 
   return {
     id: row.id,
@@ -140,6 +161,7 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[]): Doc {
     stage,
     extracted: extractions.map((x) => {
       const field = EQUIPMENT_FIELD_MAP[x.field_key];
+      const correction = correctionByField.get(x.field_key);
       return {
         name: x.field_key,
         value: x.value ?? '',
@@ -148,11 +170,20 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[]): Doc {
         // join away. An uncited fact is honest; an invented page is not.
         location: {},
         target: x.entity_id && field ? { entityId: x.entity_id, field } : undefined,
+        ...(correction
+          ? {
+              correctedValue: correction.corrected_value,
+              correctedBy: correction.corrected_by ?? undefined,
+              correctedAt: toDateOrNull(correction.corrected_at) ?? undefined,
+            }
+          : {}),
       };
     }),
-    linkedEntityIds: [...new Set(extractions.map((x) => x.entity_id).filter((id): id is string => !!id))],
-    linkConfidence: extractions.some((x) => x.entity_id) ? 1 : 0,
+    linkedEntityIds: [...new Set([...linkedFromExtractions, ...linkedFromLinks])],
+    linkConfidence: linkedFromExtractions.length > 0 || linkedFromLinks.length > 0 ? 1 : 0,
     issues: [],
+    verifiedBy: row.verified_by ?? undefined,
+    verifiedAt: toDateOrNull(row.verified_at) ?? undefined,
     preview,
   };
 }
@@ -169,6 +200,11 @@ const EQUIPMENT_FIELD_MAP: Record<string, string> = {
   service_address: 'address',
   customer_name: 'customerName',
   warranty_expires: 'warrantyExpiry',
+  // Written by api/_lib/extractDocument.js for install-shaped documents that
+  // name a technician (facts.technician) — see its module comment for the
+  // one-line addition to findOrCreateEquipment's own field list this still
+  // needs (HANDOFF.md) before a real installed_by value ever reaches here.
+  installed_by: 'installedByName',
 };
 
 /**
@@ -266,12 +302,14 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
         ]);
         if (cancelled || requestId.current !== id) return;
 
-        // One more round trip for every document's fields — not one per
-        // document. Failure here degrades to the old behaviour (documents
-        // without fields) rather than failing the whole sync.
+        // Three more round trips for every document's fields, links and
+        // corrections — not one per document each. Failure in any one of
+        // them degrades to the old behaviour (documents missing that one
+        // enhancement) rather than failing the whole sync.
+        const documentIds = docRows.map((r) => r.id);
         const byDoc = new Map<string, ExtractionRow[]>();
         try {
-          const rows = (await recordsStore.listExtractionsByDocuments(docRows.map((r) => r.id))) as unknown as ExtractionRow[];
+          const rows = (await recordsStore.listExtractionsByDocuments(documentIds)) as unknown as ExtractionRow[];
           for (const x of rows) {
             const list = byDoc.get(x.document_id);
             if (list) list.push(x);
@@ -280,9 +318,36 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
         } catch {
           /* fields are an enhancement to the sync, not a precondition of it */
         }
+
+        const linksByDoc = new Map<string, DocumentLink[]>();
+        try {
+          const { links } = await reviewClient.listLinks(documentIds);
+          for (const l of links) {
+            const list = linksByDoc.get(l.document_id);
+            if (list) list.push(l);
+            else linksByDoc.set(l.document_id, [l]);
+          }
+        } catch {
+          /* manual links are an enhancement to the sync, not a precondition of it */
+        }
+
+        const correctionsByDoc = new Map<string, Correction[]>();
+        try {
+          const { corrections } = await reviewClient.listCorrections(documentIds);
+          for (const c of corrections) {
+            const list = correctionsByDoc.get(c.document_id);
+            if (list) list.push(c);
+            else correctionsByDoc.set(c.document_id, [c]);
+          }
+        } catch {
+          /* corrections are an enhancement to the sync, not a precondition of it */
+        }
+
         if (cancelled || requestId.current !== id) return;
 
-        const docs = docRows.map((r) => toDoc(r, byDoc.get(r.id) ?? []));
+        const docs = docRows.map((r) =>
+          toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [])
+        );
         const entities = entityRows.map(toEntity);
         seed(hvacSchema, entities, docs, buildBatches(docs), []);
 

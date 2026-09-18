@@ -1,8 +1,28 @@
+import crypto from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
-import { requireAuth, denyAuth } from "./_lib/auth.js";
+import { denyAuth } from "./_lib/auth.js";
+import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
+import { limit } from "./_lib/rateLimit.js";
 import { withTenant } from "./_lib/recordsStore.js";
 import { ANSWER_TOOL, buildPrompt, buildAllowed, shapeAnswer } from "./_lib/answer.js";
+
+/**
+ * SHA-256 of a question, never the question itself. Pure and exported so it
+ * can be unit tested without a database — see scripts/verify-ops.mjs.
+ *
+ * WHY THE QUESTION TEXT IS NEVER LOGGED: a dispatcher's question routinely
+ * contains a customer's name, address, or unit serial ("what's the warranty
+ * on the Andersons' furnace at 12 Elm St") typed straight into a free-text
+ * box. audit_log exists to answer "who saw this customer's document" — it is
+ * not a place to accumulate a second, unprotected copy of customer PII next
+ * to the answer. The hash still lets the same question asked twice be
+ * recognized as the same question (e.g. for rate limiting or repeat-question
+ * metrics) without ever storing what was actually typed.
+ */
+export function hashQuestion(question) {
+  return crypto.createHash("sha256").update(String(question)).digest("hex");
+}
 
 /**
  * POST /api/ask
@@ -62,10 +82,15 @@ export default async function handler(req, res) {
 
   let auth;
   try {
-    auth = await requireAuth(req);
+    auth = await requireAuthOrKey(req);
+    assertScope(auth, "ask");
   } catch (err) {
     return denyAuth(res, err);
   }
+
+  // The single most rate-limit-relevant route in the codebase: every call is
+  // a model call. 429 is already written when this returns false.
+  if (!(await limit(req, res, auth, "ask"))) return;
 
   try {
     const { question, today } = req.body ?? {};
@@ -159,8 +184,40 @@ export default async function handler(req, res) {
     const toolUse = response.content.find((b) => b.type === "tool_use");
     const data = shapeAnswer(toolUse?.input, allowed);
 
+    // ---- 4. audit -----------------------------------------------------------
+    // "Who saw this customer's document" has to be answerable, and until now
+    // nothing wrote a row here at all: a question could cite any document in
+    // the tenant's corpus and audit_log would never know it happened. One row
+    // per question, scoped to the tenant by the same withTenant() used for
+    // retrieval above. The question text itself is NEVER stored — see
+    // hashQuestion's doc comment — only its hash, which documents were cited,
+    // and how many passages were considered.
+    //
+    // Best-effort and non-fatal: a customer who asked a question and got a
+    // correct, sourced answer must not see a 500 because the audit write
+    // failed after the fact.
+    try {
+      const citedDocumentIds = [...new Set((data.sources ?? []).map((s) => s.documentId))];
+      await withTenant(
+        { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+        (db) =>
+          db.logAction({
+            action: "document.queried",
+            resource_type: "question",
+            clerk_user_id: auth.userId,
+            changes: {
+              question_hash: hashQuestion(question),
+              documents: citedDocumentIds,
+              passages: passages.length,
+            },
+          })
+      );
+    } catch (err) {
+      console.error("Failed to write document.queried audit row:", err?.message);
+    }
+
     return handleCors(res, req).status(200).json({ success: true, data });
   } catch (error) {
-    return handleError(res, error, req);
+    return handleError(res, error, req, { tenantId: auth.tenantId });
   }
 }
