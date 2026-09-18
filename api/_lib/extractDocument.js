@@ -120,6 +120,11 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // forever — and the browser treats extract_error as terminal, so the user
     // was told to give up on a row that held all of its data.
     await db.clearExtractError(documentId);
+
+    // The pipeline just attached this document to an entity. Say so in the
+    // stage, so the client's "is this document linked" question has an honest
+    // answer without a human having to click anything.
+    if (entity?.id) await db.markLinked(documentId);
     await db.logAction({
       action: "document.fields_extracted",
       resource_type: "document",

@@ -11,6 +11,8 @@ import { ingestFiles, type IngestProgress, type IngestResult } from '../services
 const SOURCE_LABEL: Record<IntakeSource, string> = { cabinet: 'Filing cabinet', email: 'Email', drive: 'Shared drive', truck: 'Truck' };
 const CURRENT_USER = 'You';
 
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
 const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
   hashing: 'Checking…',
   uploading: 'Uploading…',
@@ -136,11 +138,35 @@ export function IntakeScreen() {
    * upload and read them in the background. The previous version kept `f.name`
    * and dropped the File itself, so nothing could ever be re-read or cited.
    */
+  /**
+   * The batch a drop belongs to, creating one if the user hasn't made any.
+   *
+   * The batch form used to be a gate: name, source, and a date range before a
+   * single byte could move. None of it is even sent to the server — batch
+   * metadata lives only in this browser tab — so it was pure friction in front
+   * of the one action this screen exists for. Now it is inferred, and anyone
+   * who wants to name and organise their drops still can.
+   */
+  const ensureBatch = (): string => {
+    if (selected) return selected.id;
+    const today = new Date();
+    const id = createBatch({
+      name: `Uploaded ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      source: 'cabinet',
+      from: today,
+      to: today,
+      by: CURRENT_USER,
+    });
+    setSelectedBatchId(id);
+    return id;
+  };
+
   const uploadFiles = async (files: File[]) => {
-    if (!selected || !files.length) return;
+    if (!files.length) return;
+    const batchId = ensureBatch();
     // Captured directly from receiveDocs (not via addFiles) because the ids
     // it returns are what ties each real ingest result back to its placeholder.
-    const tempIds = receiveDocs(selected.id, files.map((f) => ({ filename: f.name, fileType: fileTypeOf(f.name) })));
+    const tempIds = receiveDocs(batchId, files.map((f) => ({ filename: f.name, fileType: fileTypeOf(f.name) })));
     setUploads((prev) => {
       const next = { ...prev };
       for (const f of files) next[f.name] = { filename: f.name, status: 'hashing' };
@@ -176,8 +202,15 @@ export function IntakeScreen() {
             <button type="button" className="dw-btn-secondary" onClick={() => setCurrentScreen('review')}>
               Review queue
             </button>
-            <button type="button" className="dw-btn-primary" onClick={() => { setShowNew(true); window.setTimeout(() => nameRef.current?.focus(), 0); }}>
+            <button type="button" className="dw-btn-secondary" onClick={() => { setShowNew(true); window.setTimeout(() => nameRef.current?.focus(), 0); }}>
               <Plus className="w-4 h-4" aria-hidden="true" /> New batch
+            </button>
+            {/* Adding files is the primary action and must not be gated behind
+                naming a batch first. Somebody with a stack of paperwork and a
+                phone about to ring should be able to drop it and walk away;
+                a batch gets created around the drop if there isn't one. */}
+            <button type="button" className="dw-btn-primary" disabled={uploading} onClick={() => fileInput.current?.click()}>
+              <Upload className="w-4 h-4" aria-hidden="true" /> {uploading ? 'Working…' : 'Add files'}
             </button>
           </div>
         </header>
@@ -289,9 +322,16 @@ export function IntakeScreen() {
                     <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" disabled={uploading} onClick={() => fileInput.current?.click()}>
                       <Upload className="w-4 h-4" aria-hidden="true" /> {uploading ? 'Working…' : 'Add files'}
                     </button>
-                    <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => addFiles(SAMPLE_UPLOADS.map((filename) => ({ filename })))}>
-                      Add sample files
-                    </button>
+                    {DEMO_MODE && (
+                      // Demo only. These filenames have no bytes behind them —
+                      // they seed the local graph so a walkthrough has something
+                      // to show. In a real account they are indistinguishable
+                      // from documents the contractor actually uploaded, which
+                      // is a good way to lose someone's trust permanently.
+                      <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => addFiles(SAMPLE_UPLOADS.map((filename) => ({ filename })))}>
+                        Add sample files
+                      </button>
+                    )}
                     {batchDocs(selected).some((d) => d.stage === 'received' && !d.issues.length) && (
                       <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" onClick={processReceived}>
                         Classify received

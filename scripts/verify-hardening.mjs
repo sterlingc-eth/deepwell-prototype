@@ -12,10 +12,11 @@
  *   node scripts/verify-hardening.mjs
  */
 import { isPlaceholderSerial, normalizeMatchText, DOCUMENT_UPDATE_COLUMNS } from '../api/_lib/recordsStore.js';
-import { isTransientError } from '../api/_lib/readDocument.js';
+import { isTransientError, decodeText } from '../api/_lib/readDocument.js';
+import { objectKey } from '../api/_lib/r2.js';
 import { deriveWarranty, isPlausibleToday, isValidYmd } from '../api/_lib/warrantyRules.js';
 import { isQueueEnabled } from '../api/_lib/queue.js';
-import { normalizeNumber } from '../api/_lib/extractFields.js';
+import { normalizeNumber, normalizeFields, isFutureDate } from '../api/_lib/extractFields.js';
 import { buildAllowed, shapeAnswer } from '../api/_lib/answer.js';
 import { getApiKey } from '../api/_lib/claude.js';
 
@@ -321,6 +322,83 @@ check('page_count is still writable', DOCUMENT_UPDATE_COLUMNS.includes('page_cou
     /CLAUDE_API_KEY/.test(String(thrown?.cause ?? '')));
   if (saved[0] != null) process.env.CLAUDE_API_KEY = saved[0];
   if (saved[1] != null) process.env.ANTHROPIC_API_KEY = saved[1];
+}
+
+/* =================================================================== */
+/* Round three — 17 September launch-readiness sweep                    */
+/* =================================================================== */
+
+/* ------------------------- a text file is not always UTF-8 */
+//
+// The bug: the text branch called bytes.toString("utf8") unconditionally. A
+// UTF-16 file — which is what Windows Notepad and some Excel exports mean by
+// their default text encoding — came back as replacement characters wherever a
+// non-ASCII character had been. Nothing errored, page_count was right, and
+// extraction then wrote a mangled customer name into the exact field
+// findOrCreateCustomer matches on.
+
+{
+  const sample = 'Outdoor temp 98\u00B0F, tech: Jos\u00E9 N\u00FA\u00F1ez - serial 4N2119-08772';
+  const toBE = (b) => {
+    const o = Buffer.from(b);
+    for (let i = 0; i + 1 < o.length; i += 2) { const x = o[i]; o[i] = o[i + 1]; o[i + 1] = x; }
+    return o;
+  };
+  eq('utf8 decodes', decodeText(Buffer.from(sample, 'utf8')), sample);
+  eq('utf8 with BOM decodes',
+    decodeText(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(sample, 'utf8')])), sample);
+  eq('utf16le with BOM decodes',
+    decodeText(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(sample, 'utf16le')])), sample);
+  eq('utf16le without BOM decodes', decodeText(Buffer.from(sample, 'utf16le')), sample);
+  eq('utf16be with BOM decodes',
+    decodeText(Buffer.concat([Buffer.from([0xfe, 0xff]), toBE(Buffer.from(sample, 'utf16le'))])), sample);
+  check('an empty buffer does not throw', decodeText(Buffer.alloc(0)) === '');
+  // Plain ASCII must not be mistaken for UTF-16 by the heuristic.
+  eq('plain ASCII is left alone', decodeText(Buffer.from('serial 4N2119-08772', 'utf8')), 'serial 4N2119-08772');
+}
+
+/* ------------------------- the same bytes always get the same storage key */
+//
+// The bug: objectKey folded the FILENAME into the R2 key. The same invoice
+// arriving as "PO_4471.pdf" and again as "PO_4471 (1).pdf" hit the sha256
+// unique constraint, took the ON CONFLICT path, and had storage_key updated to
+// a new key that no bytes were ever written to — because the upload was
+// recognized as a duplicate. The row then pointed at nothing, and nobody found
+// out until something re-read it months later.
+
+{
+  const t = 'tenant-1';
+  const h = 'a'.repeat(64);
+  eq('a rename does not change the key', objectKey(t, h, 'PO_4471 (1).pdf'), objectKey(t, h, 'PO_4471.pdf'));
+  eq('a wildly different name does not change the key', objectKey(t, h, 'scan001.PDF'), objectKey(t, h, 'PO_4471.pdf'));
+  check('different content gets a different key', objectKey(t, 'b'.repeat(64), 'x.pdf') !== objectKey(t, h, 'x.pdf'));
+  check('different tenants get different keys', objectKey('tenant-2', h, 'x.pdf') !== objectKey(t, h, 'x.pdf'));
+  check('the key is still tenant-prefixed', objectKey(t, h, 'x.pdf').startsWith(`${t}/`));
+}
+
+/* ------------------------- a record of the past cannot be dated in the future */
+//
+// The bug: normalizeFields checked that a date was a real calendar date, and
+// every year from 1900 to 2200 is real. A document asserting an installation
+// date in 2030 produced a complete, internally consistent, entirely fictional
+// warranty — deadline, term and expiry all computed correctly from a date that
+// had not happened.
+
+{
+  const today = '2026-09-17';
+  const run = (key, value) => normalizeFields([{ key, value, confidence: 0.9 }], { pageCount: 1, today });
+
+  check('a future install date is dropped', run('installation_date', '2030-01-01').fields.length === 0);
+  check('a future registration date is dropped', run('warranty_registered_date', '2030-01-20').fields.length === 0);
+  check('a future service date is dropped', run('service_date', '2029-05-05').fields.length === 0);
+  check('a past install date is kept', run('installation_date', '2019-03-04').fields.length === 1);
+  check('today is kept', run('installation_date', today).fields.length === 1);
+  // A warranty EXPIRES in the future by definition — it must not be caught.
+  check('a future expiry date is kept', run('warranty_expires', '2035-01-01').fields.length === 1);
+  // A small grace window absorbs clock skew and date lines.
+  check('tomorrow is within the grace window', !isFutureDate('2026-09-18', today));
+  check('a week out is not', isFutureDate('2026-09-24', today));
+  check('a garbage today does not crash the guard', isFutureDate('2026-09-18', null) === false);
 }
 
 /* ------------------------------------------------------------------ done */

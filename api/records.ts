@@ -72,6 +72,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
           case 'createExtraction': return { id: (await db.createExtraction(payload))?.id };
           case 'getExtraction': return await db.getExtraction(payload.id);
           case 'listExtractionsByDocument': return await db.listExtractionsByDocument(payload.documentId);
+          case 'listExtractionsByDocuments': return await db.listExtractionsByDocuments(payload.documentIds);
           case 'listExtractionsByEntity': return await db.listExtractionsByEntity(payload.entityId);
           case 'updateExtraction':
             await db.updateExtraction(payload.id, payload.updates); return { success: true };

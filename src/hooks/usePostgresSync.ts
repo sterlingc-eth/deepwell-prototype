@@ -93,21 +93,30 @@ function fileTypeOf(row: DocumentRow): FileType {
   return 'text';
 }
 
+/** One `extractions` row as the bulk action returns it. */
+interface ExtractionRow {
+  id: string;
+  document_id: string;
+  entity_id: string | null;
+  field_key: string;
+  value: string | null;
+  confidence: number | null;
+}
+
 /**
  * Maps one Postgres document row onto the shape `useGraph` expects.
  *
- * Deliberately left empty for now: `extracted` (per-field extractions) and
- * `linkedEntityIds` (which entity this document is about). Both live in the
- * `extractions` table, keyed by document, not on the document row itself —
- * loading them would mean a second query per document (or a join the
- * `listDocuments` action does not do), and at "500 documents at once" that is
- * 500 extra round trips for a hook whose job today is making real documents
- * show up at all. A document synced this way is honestly a step behind a
- * freshly-reviewed one: it will show its real filename, type and pipeline
- * stage, but not yet its extracted fields or which entity it is linked to.
- * Left for a follow-up once there is a bulk `listExtractionsByDocuments`.
+ * `extracted` and `linkedEntityIds` come from the `extractions` table, fetched
+ * for every synced document in ONE bulk call (`listExtractionsByDocuments`).
+ * They used to be hardcoded empty because fetching them was 500 round trips —
+ * and that shortcut cascaded through the whole app: `sourcesFor()` found no
+ * sources so EntityScreen rendered no facts, `docsLinkedTo()` found no links
+ * so it said "no documents are linked" about the document that created the
+ * record, and the warranty packet stayed disabled forever. A contractor
+ * uploaded a document, it processed perfectly, and the app showed them an
+ * empty record.
  */
-function toDoc(row: DocumentRow): Doc {
+function toDoc(row: DocumentRow, extractions: ExtractionRow[]): Doc {
   const stage = STAGE_MAP[row.stage] ?? 'received';
   const receivedAt = toDateOrNull(row.created_at) ?? new Date();
   const preview = row.extract_error
@@ -129,9 +138,20 @@ function toDoc(row: DocumentRow): Doc {
     receivedAt,
     typeId: row.document_type ?? null,
     stage,
-    extracted: [],
-    linkedEntityIds: [],
-    linkConfidence: 0,
+    extracted: extractions.map((x) => {
+      const field = EQUIPMENT_FIELD_MAP[x.field_key];
+      return {
+        name: x.field_key,
+        value: x.value ?? '',
+        confidence: x.confidence ?? 0,
+        // `extractions` carries no page number — that lives on `facets`, one
+        // join away. An uncited fact is honest; an invented page is not.
+        location: {},
+        target: x.entity_id && field ? { entityId: x.entity_id, field } : undefined,
+      };
+    }),
+    linkedEntityIds: [...new Set(extractions.map((x) => x.entity_id).filter((id): id is string => !!id))],
+    linkConfidence: extractions.some((x) => x.entity_id) ? 1 : 0,
     issues: [],
     preview,
   };
@@ -144,6 +164,11 @@ const EQUIPMENT_FIELD_MAP: Record<string, string> = {
   manufacturer: 'manufacturer',
   equipment_type: 'equipmentType',
   installation_date: 'installDate',
+  tonnage: 'tonnage',
+  refrigerant: 'refrigerant',
+  service_address: 'address',
+  customer_name: 'customerName',
+  warranty_expires: 'warrantyExpiry',
 };
 
 /**
@@ -241,7 +266,23 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
         ]);
         if (cancelled || requestId.current !== id) return;
 
-        const docs = docRows.map(toDoc);
+        // One more round trip for every document's fields — not one per
+        // document. Failure here degrades to the old behaviour (documents
+        // without fields) rather than failing the whole sync.
+        const byDoc = new Map<string, ExtractionRow[]>();
+        try {
+          const rows = (await recordsStore.listExtractionsByDocuments(docRows.map((r) => r.id))) as unknown as ExtractionRow[];
+          for (const x of rows) {
+            const list = byDoc.get(x.document_id);
+            if (list) list.push(x);
+            else byDoc.set(x.document_id, [x]);
+          }
+        } catch {
+          /* fields are an enhancement to the sync, not a precondition of it */
+        }
+        if (cancelled || requestId.current !== id) return;
+
+        const docs = docRows.map((r) => toDoc(r, byDoc.get(r.id) ?? []));
         const entities = entityRows.map(toEntity);
         seed(hvacSchema, entities, docs, buildBatches(docs), []);
 

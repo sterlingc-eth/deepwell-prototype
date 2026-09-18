@@ -279,6 +279,26 @@ function makeStore(db, tenantId) {
      * terminal. The user was told a document had failed while looking at a row
      * that held all of its data.
      */
+    /**
+     * mapped -> linked, forward-only, and only when there is something to link.
+     *
+     * Extraction already creates or matches the equipment entity and writes
+     * entity_id onto every extraction row. That IS what "linked" means; the
+     * stage just never said so, because nothing ever advanced past 'mapped'.
+     * Same forward-only idiom as replaceDocumentFields' advance(): a stage is
+     * never moved backwards from here, whatever the caller thinks.
+     */
+    markLinked: async (documentId) => {
+      const r = await db.query(
+        `UPDATE documents SET stage = 'linked'
+          WHERE id = $1 AND ${TENANT} AND stage = 'mapped'
+            AND EXISTS (SELECT 1 FROM extractions x
+                         WHERE x.document_id = documents.id AND x.entity_id IS NOT NULL)`,
+        [documentId]
+      );
+      return r.rowCount;
+    },
+
     clearExtractError: async (documentId) => {
       const r = await db.query(
         `UPDATE documents SET extract_error = NULL
@@ -314,6 +334,30 @@ function makeStore(db, tenantId) {
       many(`SELECT * FROM extractions WHERE document_id = $1 AND ${TENANT} ORDER BY id`, [documentId]),
     listExtractionsByEntity: (entityId) =>
       many(`SELECT * FROM extractions WHERE entity_id = $1 AND ${TENANT} ORDER BY id`, [entityId]),
+
+    /**
+     * Every extraction for many documents in ONE query.
+     *
+     * The sync hook loads up to 500 documents at once. Fetching each one's
+     * fields separately was 500 round trips, so the hook never fetched them at
+     * all — it hardcoded `extracted: []` and `linkedEntityIds: []` on every
+     * synced document. That single shortcut is why a record built from a
+     * document you just uploaded showed no facts and said "no documents are
+     * linked" about the document that created it. One query, capped so a
+     * document dense with repeatable fields cannot blow up the response.
+     */
+    listExtractionsByDocuments: (documentIds) => {
+      const ids = [...new Set((documentIds ?? []).filter((x) => typeof x === 'string'))].slice(0, 500);
+      if (!ids.length) return Promise.resolve([]);
+      return many(
+        `SELECT id, document_id, entity_id, field_key, value, confidence
+           FROM extractions
+          WHERE document_id = ANY($1::uuid[]) AND ${TENANT}
+          ORDER BY document_id, id
+          LIMIT 8000`,
+        [ids]
+      );
+    },
     updateExtraction: updater('extractions', ['value', 'confidence', 'entity_id']),
 
     // ---- entities ----
@@ -684,9 +728,22 @@ function makeStore(db, tenantId) {
       // second flat copy meant a fill-once field (never updated) sitting beside
       // a field rewritten on every extraction — two answers to the same
       // question on one row, guaranteed to disagree eventually.
+      // The warranty-bearing fields are in this list ON PURPOSE. They were not,
+      // and that was the hole: only these identity fields get the fill-once
+      // protection below, so warranty_registered_date and friends flowed freely
+      // from EVERY document that mentioned this serial straight into
+      // deriveWarranty, and setEquipmentWarranty replaces the whole warranty
+      // object. Any later document asserting a registration date — a forwarded
+      // PDF, a customer's own paperwork, anything that reaches OCR — could
+      // silently grant a unit a 10-year registered term it never earned, or
+      // close a window that was still open. Fill-once means the first document
+      // to state a warranty fact establishes it, and a later one cannot quietly
+      // overwrite it; a correction is a human decision, not a side effect of
+      // scanning the mail.
       for (const k of ['serial_number', 'model', 'manufacturer', 'equipment_type',
                        'tonnage', 'refrigerant', 'service_address', 'customer_name',
-                       'installation_date']) {
+                       'installation_date', 'warranty_registered_date',
+                       'warranty_expires', 'warranty_term']) {
         const v = String(facts?.[k] ?? '').trim();
         if (v) incoming[k] = v;
       }

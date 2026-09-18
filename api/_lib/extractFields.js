@@ -125,6 +125,32 @@ const MONTHS = {
  * bare YYYY-MM-DD as UTC midnight, which prints as the previous day anywhere
  * west of Greenwich — including Mesa, where this is being built.
  */
+/**
+ * Some fields record something that ALREADY HAPPENED. A unit cannot have been
+ * installed next year, and a warranty cannot have been registered in 2030.
+ *
+ * Nothing checked this: normalizeDate validates that a date is a real calendar
+ * date, and every year from 1900 to 2200 is real. So a document asserting
+ * "installation_date: 2030-01-01" for a brand with verified rules produced a
+ * complete, internally consistent, entirely fictional warranty — a registration
+ * deadline, a term, an expiry, all computed correctly from a date that had not
+ * happened. Wrong in the most convincing possible way.
+ *
+ * A generous grace window, because a clock can be wrong and a document can be
+ * dated the day after it was scanned somewhere across a date line.
+ */
+const BACKWARD_LOOKING_FIELDS = new Set([
+  'installation_date', 'warranty_registered_date', 'service_date',
+]);
+const FUTURE_GRACE_DAYS = 2;
+
+export function isFutureDate(ymd, today = new Date().toISOString().slice(0, 10)) {
+  if (typeof ymd !== 'string' || typeof today !== 'string') return false;
+  const limit = new Date(`${today}T00:00:00Z`);
+  limit.setUTCDate(limit.getUTCDate() + FUTURE_GRACE_DAYS);
+  return ymd > limit.toISOString().slice(0, 10);
+}
+
 export function normalizeDate(raw) {
   const s = String(raw ?? '').trim();
   if (!s) return null;
@@ -225,7 +251,7 @@ const MAX_VALUE_CHARS = 500;
  * warranty_expires of "sometime next spring" in the database is worse than no
  * warranty_expires, because the entity screen would render it as a fact.
  */
-export function normalizeFields(rawFields, { pageCount } = {}) {
+export function normalizeFields(rawFields, { pageCount, today } = {}) {
   const kept = [];
   const dropped = [];
 
@@ -250,6 +276,13 @@ export function normalizeFields(rawFields, { pageCount } = {}) {
     if (spec.kind === 'date') {
       const d = normalizeDate(value);
       if (!d) { dropped.push({ key, reason: `unparseable date "${value}"` }); continue; }
+      // A record of something that already happened cannot be dated in the
+      // future. Dropped rather than clamped: we do not know what the real date
+      // was, and a guess here becomes a warranty deadline downstream.
+      if (BACKWARD_LOOKING_FIELDS.has(key) && isFutureDate(d, today)) {
+        dropped.push({ key, reason: `date is in the future ("${d}")` });
+        continue;
+      }
       value = d;
     } else if (spec.kind === 'money' || spec.kind === 'number') {
       const n = normalizeNumber(value, { money: spec.kind === 'money' });

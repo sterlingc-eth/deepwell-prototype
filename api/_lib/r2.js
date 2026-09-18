@@ -96,7 +96,12 @@ export async function getObject(key) {
   // A hang here burns the whole function budget and is then hard-killed by the
   // platform, which means no catch block runs and the document is left looking
   // like it is still processing. A timeout turns that into a normal error.
-  const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+  // 10 seconds, not 20: this runs BEFORE the model call in the same request, and
+  // the two together have to fit inside the 60-second platform ceiling with room
+  // to spare. See the note on MODEL_TIMEOUT_MS in claude.js. Fetching bytes we
+  // already own from object storage should take a second, not ten — if it is
+  // slow enough to hit this, the request was not going to finish anyway.
+  const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!r.ok) {
     // Cancel rather than abandon: an unconsumed body holds its connection open
     // until garbage collection.
@@ -113,6 +118,22 @@ export async function getObject(key) {
  * cost attribution possible later.
  */
 export function objectKey(tenantId, sha256, filename) {
-  const safe = String(filename).replace(/[^A-Za-z0-9._-]/g, '_').slice(-80);
-  return `${tenantId}/${sha256.slice(0, 2)}/${sha256}-${safe}`;
+  // The FILENAME IS NOT IN THE KEY, deliberately, and this is a correctness
+  // matter rather than tidiness.
+  //
+  // Documents are deduplicated on (tenant_id, sha256_hash). The same invoice
+  // arriving twice under two names — "PO_4471.pdf" and "PO_4471 (1).pdf", which
+  // is exactly what happens when a PO comes by email and again in a folder —
+  // hits that unique constraint and takes the ON CONFLICT path, which updates
+  // storage_key to the newly computed one. With the filename folded in, that
+  // new key was DIFFERENT, and because the upload was recognized as a duplicate
+  // no bytes were ever written to it. The row then pointed at an object that
+  // does not exist, and nothing noticed until something re-read the document
+  // months later and got a 404 recorded as a permanent failure.
+  //
+  // Keyed by content hash alone, the same bytes always resolve to the same key,
+  // so a rename cannot orphan a document. The original filename is still kept —
+  // on the documents row, where it belongs.
+  void filename;
+  return `${tenantId}/${sha256.slice(0, 2)}/${sha256}`;
 }

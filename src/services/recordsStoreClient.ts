@@ -109,6 +109,11 @@ export class RecordsStoreClient implements RecordsStore {
     return this.call('listExtractionsByDocument', { documentId });
   }
 
+  /** All extractions for many documents in one round trip. See usePostgresSync. */
+  async listExtractionsByDocuments(documentIds: string[]): Promise<Extraction[]> {
+    return this.call('listExtractionsByDocuments', { documentIds });
+  }
+
   async listExtractionsByEntity(entityId: string): Promise<Extraction[]> {
     return this.call('listExtractionsByEntity', { entityId });
   }

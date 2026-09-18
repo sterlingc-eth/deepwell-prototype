@@ -10,6 +10,8 @@ import { EVAL_NOW, EVAL_QUESTIONS } from '../eval/questions';
 import { answerSync } from '../services/answerService.mock';
 import { useAppStore } from '../store/appStore';
 
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
 /**
  * Record health, always visible: documents by stage, batches in progress,
  * what still needs a person, per-property completeness, and the live
@@ -91,7 +93,15 @@ export function RecordsScreen() {
             <Stat label="Unlinked inbox" value={unlinked} sub={unlinked ? 'Target is zero' : 'Clear'} tone={unlinked ? 'warn' : 'ok'} onClick={() => setCurrentScreen('review')} />
             <Stat label="Required-field gaps" value={gaps} sub={gaps ? 'Blocked at Classified' : 'Clear'} tone={gaps ? 'warn' : 'ok'} onClick={() => setCurrentScreen('review')} />
             <Stat label="Conflicts open" value={conflicts} sub={conflicts ? 'Need a decision' : 'Clear'} tone={conflicts ? 'warn' : 'ok'} onClick={() => setCurrentScreen('review')} />
-            <Stat label="Answer accuracy" value={`${accuracy}%`} sub={`${evalScore.pass}/${evalScore.total} on the evaluation set`} tone={accuracy >= 95 ? 'ok' : 'warn'} />
+            {/* Demo only. EVAL_QUESTIONS are written against the fixture
+                graph's entity ids, so against a real account every one of them
+                fails and this renders a red "0%" labelled "Answer accuracy" —
+                a contractor reading that concludes the product does not work,
+                and they are reading a number that has nothing to do with their
+                data. */}
+            {DEMO_MODE && (
+              <Stat label="Answer accuracy" value={`${accuracy}%`} sub={`${evalScore.pass}/${evalScore.total} on the evaluation set`} tone={accuracy >= 95 ? 'ok' : 'warn'} />
+            )}
           </div>
           {dups > 0 && (
             <p className="flex items-center gap-2 text-body text-ink-2"><Copy className="w-4 h-4" aria-hidden="true" /> {dups} duplicate{dups === 1 ? '' : 's'} detected and held out of every count. <button type="button" className="underline underline-offset-4" onClick={() => setCurrentScreen('review')}>Merge</button></p>

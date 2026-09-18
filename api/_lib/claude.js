@@ -78,6 +78,15 @@ export function getApiKey() {
  * Every Anthropic call in this codebase carries an explicit timeout, and the
  * number is chosen against the PLATFORM ceiling, not the SDK's.
  *
+ * THE NUMBERS HAVE TO SUM. Ingestion fetches bytes from R2 and THEN calls the
+ * model, sequentially, inside one 60-second request. The first version of this
+ * set them independently — 20s for R2 and 45s for the model — which adds to 65
+ * seconds. Each one was individually under the ceiling and together they were
+ * over it, so the slowest documents were still hard-killed by the platform with
+ * no catch block, which is the exact failure both timeouts were added to
+ * prevent. 10 + 35 leaves 15 seconds of headroom for everything else in the
+ * request.
+ *
  * The SDK defaults to roughly ten minutes. Vercel kills the function at 60
  * seconds (less, on routes that do not set maxDuration). So the SDK's timeout
  * could never fire first: a hung API call was always a hard kill, which means
@@ -89,7 +98,7 @@ export function getApiKey() {
  * isTransientError already classifies AbortError as transient, so it is
  * reported as retryable rather than stamped on the document as permanent.
  */
-export const MODEL_TIMEOUT_MS = 45_000;
+export const MODEL_TIMEOUT_MS = 35_000;
 
 /**
  * Every client also sets `maxRetries: 0`, and that is not optional — without it
