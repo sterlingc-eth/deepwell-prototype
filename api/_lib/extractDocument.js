@@ -1,7 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { withTenant, linkDocumentToCustomer } from "./recordsStore.js";
+import { withTenant, linkDocumentToCustomer, linkDocumentToEntity } from "./recordsStore.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
-import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages } from "./extractFields.js";
+import {
+  EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages,
+  groupFieldsByUnit, collapseDuplicateValues,
+} from "./extractFields.js";
 import { IngestError, isValidDocumentId } from "./readDocument.js";
 import { assertModelBudget } from "./rateLimit.js";
 import { deriveWarranty } from "./warrantyRules.js";
@@ -202,35 +205,84 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const equipmentFacts = isInstallShaped && facts.technician
     ? { ...facts, installed_by: facts.technician }
     : facts;
+  // Same technician-attribution overlay, applied per unit for a multi-unit
+  // document — a startup sheet's "installed_by" applies to every unit it
+  // installed, not only the one whose facts happen to include a serial first.
+  const withInstalledBy = (unitFacts) =>
+    isInstallShaped && facts.technician ? { ...unitFacts, installed_by: facts.technician } : unitFacts;
+
+  // Multi-unit documents (2026-09-19 live finding): a maintenance agreement
+  // or install invoice can cover more than one physical unit, each with its
+  // own serial/model/install date under a shared customer_name/service_address/
+  // warranty_term. groupFieldsByUnit() (extractFields.js) has already sorted
+  // that out from unit_index tags the model attached, if any.
+  //
+  // Gated on >=2 DISTINCT serial numbers, not merely units.length > 1: a
+  // model that tags unit_index on some fields but only ever names one real
+  // serial is not a multi-unit document, and treating it as one would create
+  // a second, serial-less equipment entity findOrCreateEquipment would
+  // immediately reject anyway (it returns null with no serial) — this check
+  // just skips the pointless extra work and log noise for that case.
+  const { units } = groupFieldsByUnit(fields);
+  const distinctSerials = new Set(
+    fields
+      .filter((f) => f.field_key === 'serial_number' && f.value)
+      .map((f) => f.value.trim().toLowerCase())
+  );
+  const isMultiUnit = distinctSerials.size >= 2 && units.length >= 2;
 
   let warranty = null;
 
   const written = await withTenant(ctx, async (db) => {
-    const entity = await db.findOrCreateEquipment(equipmentFacts);
+    // `entity`/`warranty` end up holding the FIRST unit's — extractions.entity_id
+    // stays single-valued for backward compatibility with everything that
+    // reads "the" entity off a document. Every unit still gets its own
+    // findOrCreateEquipment (so none of the fill-once merge or the B2
+    // advisory-lock race protection is skipped) and its own derived
+    // warranty; units after the first get an additional document_entity_links
+    // row below instead of the primary entity_id.
+    let entity;
+    const unitResults = [];
+    if (isMultiUnit) {
+      for (const unit of units) {
+        const unitEquipmentFacts = withInstalledBy(unit.facts);
+        const unitEntity = await db.findOrCreateEquipment(unitEquipmentFacts);
+        // Same fill-only-merge-then-derive as the single-unit path below,
+        // just scoped to this unit's own facts + its own entity row.
+        const unitKnown = { ...unit.facts, ...(unitEntity?.data ?? {}) };
+        const unitWarranty = deriveWarranty(unitKnown);
+        if (unitEntity?.id) await db.setEquipmentWarranty(unitEntity.id, unitWarranty);
+        unitResults.push({ index: unit.index, entity: unitEntity, warranty: unitWarranty });
+      }
+      entity = unitResults[0]?.entity ?? null;
+      warranty = unitResults[0]?.warranty ?? null;
+    } else {
+      entity = await db.findOrCreateEquipment(equipmentFacts);
 
-    // Derived from the ENTITY's accumulated facts, not this document's alone.
-    //
-    // A unit's manufacturer and install date are stated once, on the install
-    // invoice. Every later document about that same serial — a service ticket,
-    // a filter change, a callback — says neither. Deriving from `facts` by
-    // itself therefore produced an empty warranty for those documents, and
-    // setEquipmentWarranty's jsonb merge replaces the whole `warranty` key, so
-    // the second document silently erased the correct deadline computed from
-    // the first. The unit then vanished from the expiring-warranty list with
-    // nothing recorded as wrong, and which answer you got depended on which
-    // document happened to be extracted last.
-    //
-    // The entity's own values win over this document's: the entity merge is
-    // fill-only, so what is on the row is the first — and by convention the
-    // most authoritative — reading of that field.
-    const known = { ...facts, ...(entity?.data ?? {}) };
+      // Derived from the ENTITY's accumulated facts, not this document's alone.
+      //
+      // A unit's manufacturer and install date are stated once, on the install
+      // invoice. Every later document about that same serial — a service ticket,
+      // a filter change, a callback — says neither. Deriving from `facts` by
+      // itself therefore produced an empty warranty for those documents, and
+      // setEquipmentWarranty's jsonb merge replaces the whole `warranty` key, so
+      // the second document silently erased the correct deadline computed from
+      // the first. The unit then vanished from the expiring-warranty list with
+      // nothing recorded as wrong, and which answer you got depended on which
+      // document happened to be extracted last.
+      //
+      // The entity's own values win over this document's: the entity merge is
+      // fill-only, so what is on the row is the first — and by convention the
+      // most authoritative — reading of that field.
+      const known = { ...facts, ...(entity?.data ?? {}) };
 
-    // Still derived WITHOUT a clock: only the stable parts — the registration
-    // deadline, the term, the expiry, and whether that expiry was printed or
-    // calculated — get stored. Day counts are computed when the list is read,
-    // because "19 days left" is true for exactly one day.
-    warranty = deriveWarranty(known);
-    if (entity?.id) await db.setEquipmentWarranty(entity.id, warranty);
+      // Still derived WITHOUT a clock: only the stable parts — the registration
+      // deadline, the term, the expiry, and whether that expiry was printed or
+      // calculated — get stored. Day counts are computed when the list is read,
+      // because "19 days left" is true for exactly one day.
+      warranty = deriveWarranty(known);
+      if (entity?.id) await db.setEquipmentWarranty(entity.id, warranty);
+    }
 
     // Customer resolution runs regardless of whether an equipment entity was
     // found: a document with no serial (a dispatch note, a proposal, a
@@ -244,7 +296,15 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       ? await db.setEquipmentCustomer(entity.id, customer.id)
       : 0;
 
-    const counts = await db.replaceDocumentFields(documentId, fields, {
+    // Two units sharing an identical printed value (the same model number on
+    // RTU-1 and RTU-2, most often) is a real, legitimate case that
+    // groupFieldsByUnit() above needs to see as two rows — but
+    // replaceDocumentFields throws on an exact (field_key, value) duplicate,
+    // since its write CTE joins each new extraction back to its facet on
+    // that pair. Collapsed only for this write; `fields` itself (returned to
+    // the caller, and what groupFieldsByUnit already read) keeps every row.
+    const fieldsForWrite = collapseDuplicateValues(fields);
+    const counts = await db.replaceDocumentFields(documentId, fieldsForWrite, {
       entityId: entity?.id ?? null,
     });
 
@@ -275,6 +335,18 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     let documentCustomerLinked = false;
     if (entity?.id) {
       await db.markLinked(documentId);
+      // Units after the first don't get extractions.entity_id (that stays
+      // single-valued, see the multi-unit comment above) but the document
+      // still covers their equipment, so each gets its own
+      // document_entity_links row — otherwise RTU-2's own entity screen
+      // would never show this document at all.
+      if (isMultiUnit) {
+        for (const ur of unitResults.slice(1)) {
+          if (ur.entity?.id) {
+            await linkDocumentToEntity(db, { documentId, entityId: ur.entity.id, confidence: 0.6 });
+          }
+        }
+      }
     } else if (customer?.id) {
       const customerFields = fields.filter((f) => f.field_key === 'customer_name' || f.field_key === 'service_address');
       const customerConfidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
@@ -308,6 +380,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         entity_created: entity?.created ?? false,
         warranty_basis: warranty.expiresBasis,
         registration_deadline: warranty.registrationDeadline,
+        unit_count: isMultiUnit ? unitResults.length : 1,
+        additional_entity_ids: isMultiUnit
+          ? unitResults.slice(1).map((u) => u.entity?.id).filter(Boolean)
+          : [],
         customer_id: customer?.id ?? null,
         customer_created: customer?.created ?? false,
         // False when the equipment was already linked to a DIFFERENT customer

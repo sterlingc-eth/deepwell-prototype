@@ -1,0 +1,12 @@
+{
+  "name": "DeepWell Technology",
+  "short_name": "DeepWell",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ],
+  "theme_color": "#0B1613",
+  "background_color": "#0B1613",
+  "display": "standalone",
+  "start_url": "/"
+}

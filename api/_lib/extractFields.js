@@ -42,7 +42,8 @@ export const FIELD_SPECS = [
   { key: 'customer_name',    kind: 'text', desc: 'Customer or account name.' },
   { key: 'installation_date', kind: 'date', desc: 'Date the equipment was installed.' },
   { key: 'warranty_expires', kind: 'date', desc: 'Date the warranty expires.' },
-  { key: 'warranty_term',    kind: 'text', desc: 'Warranty length as printed, e.g. "10 year parts limited".' },
+  { key: 'warranty_term',    kind: 'text', desc: 'The MANUFACTURER warranty length for the equipment itself, as printed, e.g. "10 year parts limited". NOT the service contract period — see agreement_term.' },
+  { key: 'agreement_term',   kind: 'text', desc: 'The service/maintenance AGREEMENT period between the customer and the HVAC company, e.g. "01/01/2025 - 12/31/2025". This is a contract duration, never the manufacturer equipment warranty — see warranty_term.' },
   { key: 'warranty_registered_date', kind: 'date', desc: 'Date the warranty was registered with the manufacturer.' },
   { key: 'service_date',     kind: 'date', desc: 'Date service was performed (service reports and invoices).' },
   { key: 'service_type',     kind: 'text', desc: 'Preventive Maintenance, Repair, Emergency, Installation, Inspection, Startup.' },
@@ -62,6 +63,23 @@ export const FIELD_KEYS = FIELD_SPECS.map((s) => s.key);
 
 /** Keys where several distinct values on one document are all correct. */
 const REPEATABLE = new Set(FIELD_SPECS.filter((s) => s.repeatable).map((s) => s.key));
+
+/**
+ * Keys that describe ONE piece of equipment, not the document as a whole.
+ * On a multi-unit document (a maintenance agreement covering an RTU and a
+ * condenser, say) these are grouped per `unit_index`; everything else
+ * (customer_name, service_address, warranty_term, agreement_term, cost, ...)
+ * is shared across every unit the document mentions. See groupFieldsByUnit().
+ */
+const UNIT_SCOPED_FIELDS = new Set([
+  'equipment_id', 'serial_number', 'model', 'manufacturer',
+  'equipment_type', 'tonnage', 'refrigerant', 'installation_date',
+]);
+
+/** Hard cap on how many distinct units one document's extraction can fan out
+ * into — a garbled unit_index (or a model hallucinating dozens of them)
+ * must not create dozens of equipment entities from one document. */
+export const MAX_UNITS_PER_DOCUMENT = 25;
 
 export const EXTRACT_TOOL = {
   name: 'extract_fields',
@@ -84,10 +102,11 @@ export const EXTRACT_TOOL = {
           type: 'object',
           properties: {
             key: { type: 'string', enum: FIELD_KEYS, description: 'Which canonical field this value is.' },
-            value: { type: 'string', description: 'The value. Dates as YYYY-MM-DD. Money and hours as bare numbers with no symbols or commas. Everything else exactly as printed.' },
+            value: { type: 'string', description: 'The value. Dates as YYYY-MM-DD, or YYYY-MM if only the month and year are printed. Money and hours as bare numbers with no symbols or commas. Everything else exactly as printed.' },
             page_no: { type: 'number', description: 'The page number, from the [page N] marker above the text this came from.' },
             verbatim: { type: 'string', description: 'The short phrase on the page this was read from, copied exactly. Used to show the user where the value came from.' },
             confidence: { type: 'number', description: '0 to 1. Below 0.6 means the text was ambiguous, abbreviated, or partly illegible.' },
+            unit_index: { type: 'number', description: 'Only for documents covering MULTIPLE pieces of equipment: which unit (1, 2, 3, ...) this field belongs to, so per-unit fields (serial_number, model, equipment_type, tonnage, installation_date) can be grouped correctly. Leave out for single-unit documents and for facts that apply to the whole document (customer_name, service_address, warranty_term, agreement_term, ...).' },
           },
           required: ['key', 'value', 'page_no', 'confidence'],
         },
@@ -125,6 +144,8 @@ Rules:
 - If the document does not state a field, leave it out. An omitted field is correct; a guessed one is a defect.
 - Do not calculate. If the warranty term is "10 year" and the install date is 2024-03-04 but no expiry is printed, return warranty_term and installation_date and NOT warranty_expires.
 - If a field appears more than once with conflicting values, return each occurrence with its own page_no and let confidence reflect the conflict.
+- If only the month and year are printed for a date (e.g. "installed 06/2021" with no day), return it as YYYY-MM. Do not guess a day.
+- If this document covers more than one piece of equipment, tag equipment_id, serial_number, model, manufacturer, equipment_type, tonnage, refrigerant and installation_date with unit_index (1, 2, 3, ...) so each unit's facts stay together. Fields that apply to the whole document (customer_name, service_address, warranty_term, agreement_term, cost, ...) do not need unit_index.
 - document_type must be exactly one id from the list above. If none clearly fits, use "other".
 - document_type_confidence: 0 to 1, your confidence in that classification alone (independent of field confidences).`;
 }
@@ -198,7 +219,30 @@ export function normalizeDate(raw) {
     return mo ? ymd(+m[3], mo, +m[1]) : null;
   }
 
+  // Month-precision only: no day was ever printed ("installed 06/2021"). Real
+  // HVAC paperwork does this constantly for install dates on multi-year-old
+  // equipment. Returning null here (as this used to) throws the whole fact
+  // away — an install month is the one thing warrantyRules can still compute
+  // an alert tier from, so it is kept as YYYY-MM rather than discarded or
+  // guessed into a fake day.
+  m = s.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (m) return ym(+m[1], +m[2]);
+
+  m = s.match(/^(\d{1,2})[-/](\d{4})$/);
+  if (m) return ym(+m[2], +m[1]);
+
+  m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{4})$/);
+  if (m) {
+    const mo = MONTHS[m[1].slice(0, 3).toLowerCase()];
+    return mo ? ym(+m[2], mo) : null;
+  }
+
   return null;
+}
+
+function ym(y, mo) {
+  if (!(y >= 1900 && y <= 2200) || !(mo >= 1 && mo <= 12)) return null;
+  return `${y}-${String(mo).padStart(2, '0')}`;
 }
 
 function ymd(y, mo, d) {
@@ -322,12 +366,21 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
     // value, drop the citation — better an uncited fact than a false one.
     if (pageNo != null && pageCount && pageNo > pageCount) pageNo = null;
 
+    // Only meaningful for UNIT_SCOPED_FIELDS (see dedupe()); carried through
+    // for every field regardless, since it's harmless where it isn't used
+    // (replaceDocumentFields ignores unrecognized properties on a field row).
+    let unitIndex = Number(f?.unit_index);
+    unitIndex = Number.isInteger(unitIndex) && unitIndex >= 1 && unitIndex <= MAX_UNITS_PER_DOCUMENT
+      ? unitIndex
+      : null;
+
     kept.push({
       field_key: key,
       value,
       confidence,
       page_no: pageNo,
       verbatim: stripControlChars(String(f?.verbatim ?? '')).trim().slice(0, MAX_VALUE_CHARS) || null,
+      unit_index: unitIndex,
     });
   }
 
@@ -340,6 +393,14 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
  * Non-repeatable keys keep the highest-confidence reading; ties go to the
  * earlier page, because on HVAC paperwork the plate data is printed before the
  * summary that restates it, and the plate is the one that is right.
+ *
+ * UNIT_SCOPED_FIELDS are the second exception: a document naming two units
+ * (unit_index 1 and 2) legitimately has two "best" serial_number readings,
+ * one per unit — collapsing them to one globally is exactly the bug that
+ * threw away every RTU but the first on a multi-unit maintenance agreement.
+ * These still dedupe, just per (field_key, unit_index) instead of per
+ * field_key alone; a field with no unit_index still collapses globally,
+ * which is the entire single-unit-document case.
  */
 function dedupe(fields) {
   const best = new Map();
@@ -353,16 +414,85 @@ function dedupe(fields) {
       out.push(f);
       continue;
     }
-    const prev = best.get(f.field_key);
-    if (!prev) { best.set(f.field_key, f); continue; }
+    const groupKey = UNIT_SCOPED_FIELDS.has(f.field_key) && f.unit_index != null
+      ? `${f.field_key}::unit${f.unit_index}`
+      : f.field_key;
+    const prev = best.get(groupKey);
+    if (!prev) { best.set(groupKey, f); continue; }
     const better =
       f.confidence > prev.confidence ||
       (f.confidence === prev.confidence && (f.page_no ?? 1e9) < (prev.page_no ?? 1e9));
-    if (better) best.set(f.field_key, f);
+    if (better) best.set(groupKey, f);
   }
 
   for (const f of best.values()) if (!REPEATABLE.has(f.field_key)) out.push(f);
   return out.sort((a, b) => FIELD_KEYS.indexOf(a.field_key) - FIELD_KEYS.indexOf(b.field_key));
+}
+
+/**
+ * Group normalized fields (the array normalizeFields() returns) into
+ * per-unit buckets for extractDocument.js's multi-unit handling.
+ *
+ * Pure, no I/O. Returns `{ shared, units }`:
+ *   - `shared`: {field_key: value} for every field that applies to the whole
+ *     document (customer_name, service_address, warranty_term,
+ *     agreement_term, cost, ... — anything not in UNIT_SCOPED_FIELDS, plus
+ *     any UNIT_SCOPED field the model didn't tag with a unit_index).
+ *   - `units`: [{index, facts}], sorted by index, each `facts` a
+ *     {field_key: value} map merging `shared` with that unit's own
+ *     UNIT_SCOPED values — ready to pass straight into findOrCreateEquipment.
+ *
+ * A document with no unit_index anywhere (the ordinary case — nearly every
+ * document) degrades to exactly one synthetic unit at index 1 carrying every
+ * fact, which is byte-for-byte what extractDocument.js already did before
+ * multi-unit support existed. Capped at MAX_UNITS_PER_DOCUMENT.
+ */
+export function groupFieldsByUnit(fields) {
+  const shared = {};
+  const perUnit = new Map();
+
+  for (const f of Array.isArray(fields) ? fields : []) {
+    if (UNIT_SCOPED_FIELDS.has(f.field_key) && f.unit_index != null) {
+      if (!perUnit.has(f.unit_index)) perUnit.set(f.unit_index, {});
+      perUnit.get(f.unit_index)[f.field_key] = f.value;
+    } else {
+      shared[f.field_key] = f.value;
+    }
+  }
+
+  const units = perUnit.size === 0
+    ? [{ index: 1, facts: { ...shared } }]
+    : [...perUnit.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .slice(0, MAX_UNITS_PER_DOCUMENT)
+        .map(([index, facts]) => ({ index, facts: { ...shared, ...facts } }));
+
+  return { shared, units };
+}
+
+/**
+ * Collapse exact (field_key, value) duplicates immediately before
+ * db.replaceDocumentFields — which throws on them, since its CTE joins each
+ * new extraction back to its facet on that exact pair, and a duplicate would
+ * make the join fan out silently.
+ *
+ * A multi-unit document can legitimately produce this: RTU-1 and RTU-2 on
+ * the same rooftop are often the identical model number. groupFieldsByUnit()
+ * above needs both rows kept (they belong to different units); the database
+ * write does not care which unit a `model` fact came from, only that it does
+ * not try to insert the same fact twice. Keeps the first (highest-confidence,
+ * per dedupe()'s own ordering) occurrence.
+ */
+export function collapseDuplicateValues(fields) {
+  const seen = new Set();
+  const out = [];
+  for (const f of fields ?? []) {
+    const pair = `${f.field_key}\u0000${f.value}`;
+    if (seen.has(pair)) continue;
+    seen.add(pair);
+    out.push(f);
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------ page budgeting */

@@ -181,6 +181,23 @@ eq('bad date', daysBetween('nope', '2024-03-04'), null);
   eq('alertTier: expired, not unknown', alertTier(w, '2026-09-19'), 'expired');
 }
 {
+  // The actual live bug, end to end: before this fix, extraction produced
+  // NEITHER installation_date NOR warranty_expires for this document (both
+  // were silently dropped/never grouped), so deriveWarranty never even ran
+  // with useful facts and the Trane showed "No warranty on file". This test
+  // uses ONLY what extraction should now hand deriveWarranty for the primary
+  // unit — manufacturer + installation_date, exactly as printed on the PDF
+  // ("installed 06/2021"), no printed expiry, unregistered — and confirms
+  // the brand-rule computation ALONE (Trane's 5-year unregistered floor,
+  // 2021-06 + 5y = 2026-06, before today 2026-09-19) lands on EXPIRED.
+  const w = deriveWarranty({ manufacturer: 'Trane', installation_date: '06/2021' }, '2026-09-19');
+  eq('computed (not printed) expiry from month-precision install date', w.expires, '2026-06-01');
+  eq('basis is computed, since nothing was printed', w.expiresBasis, 'computed');
+  eq('unregistered floor term applied (5 years)', w.termYears, 5);
+  eq('alertTier: expired, matching the PDF\'s own printed "expires 06/2026"',
+    alertTier(w, '2026-09-19'), 'expired');
+}
+{
   // Same facts, but registered within the window, so describeWarranty's
   // action sentence isn't preempted by a registration-window message — this
   // is where "expired" and the precision caveat actually show up in the text.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="DeepWell turns decades of work orders, warranties, invoices and job-site photos into one place your whole team can ask. Built for HVAC first.">
+<meta name="description" content="AI answers from your HVAC records — work orders, warranties and photos, searchable in seconds.">
 <meta property="og:title" content="DeepWell Technology — Knowledge builds business.">
 <meta property="og:description" content="One question answered right. One $300 callback prevented. Your records, answerable in seconds.">
 <meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
@@ -13,10 +13,17 @@
 <meta property="og:url" content="https://deepwelltechnology.com/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="DeepWell Technology — AI answers from your HVAC records">
+<meta name="twitter:description" content="AI answers from your HVAC records — work orders, warranties and photos, searchable in seconds.">
+<meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
+<link rel="canonical" href="https://deepwelltechnology.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0B1613">
-<title>DeepWell Technology</title>
+<title>DeepWell Technology — AI answers from your HVAC records</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root{
@@ -29,7 +36,7 @@
   --surface-2:#E2E9E4;
   --text:#0F1F19;
   --muted:#4F6259;
-  --faint:#8FA39A;
+  --faint:#576A62;
   --line:rgba(22,60,44,.18);
   --line-strong:rgba(22,60,44,.38);
   --ring:rgba(22,60,44,.55);
@@ -41,7 +48,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
-    --text:#E6EEE9; --muted:#A9BBB2; --faint:#6E8579;
+    --text:#E6EEE9; --muted:#A9BBB2; --faint:#7B9286;
     --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
     --ring:rgba(157,196,178,.55);
     --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.45), transparent 60%);
@@ -53,7 +60,7 @@
   color-scheme:dark;
   --wordmark-deep:#04315A;   /* true logo navy (used on the light header) */
   --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
-  --text:#E6EEE9; --muted:#A9BBB2; --faint:#6E8579;
+  --text:#E6EEE9; --muted:#A9BBB2; --faint:#7B9286;
   --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
   --ring:rgba(157,196,178,.55);
   --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.45), transparent 60%);
@@ -103,7 +110,7 @@ a{color:inherit}
 /* The header runs on a light plate so the wordmark can use the real logo
    colours: navy #04315A and forest #163C2C. Both are unreadable on the dark
    ground (1.4:1 and 1.2:1), so the surface changes rather than the brand. */
-.nav{--ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;
+.nav{--ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;--faint:#576A62;
      --line:rgba(22,60,44,.18);--line-strong:rgba(22,60,44,.38);--wordmark-deep:#04315A;
      --well:#0D3827;   /* true logo green, sampled from the artwork */
      color:var(--text);background:#F4F7F4;border-bottom:1px solid var(--line)}
@@ -799,7 +806,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
     </div>
     <div class="demo-wrap">
     <form class="ask" id="ask" role="search">
-      <input id="ask-input" type="text" autocomplete="off" placeholder="Ask anything — an address, a serial, a name, a question…" aria-label="Ask a question about your records">
+      <input id="ask-input" type="text" autocomplete="off" required placeholder="Ask anything — an address, a serial, a name, a question…" aria-label="Ask a question about your records">
       <button type="submit">Ask</button>
     </form>
     <div class="demo">
@@ -871,7 +878,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Onboarding</span><b>Self-serve</b></li>
         </ul>
         <p class="math">One prevented callback covers 3–6 months.</p>
-        <a class="btn btn-ghost" href="/app/">Get started</a>
+        <a class="btn btn-ghost" href="#contact">Get started</a>
       </div>
       <div class="plan featured">
         <div class="tier">Shop · most popular</div>
@@ -888,7 +895,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Onboarding</span><b>Guided</b></li>
         </ul>
         <p class="math">Three techs preventing one callback a month each: $3,600–7,200 saved. You pay $199.</p>
-        <a class="btn btn-primary" href="/app/">Get started</a>
+        <a class="btn btn-primary" href="#contact">Get started</a>
       </div>
       <div class="plan">
         <div class="tier">Crew</div>
@@ -905,7 +912,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Support</span><b>Phone + email</b></li>
         </ul>
         <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
-        <a class="btn btn-ghost" href="/app/">Get started</a>
+        <a class="btn btn-ghost" href="#contact">Get started</a>
       </div>
       <div class="plan">
         <div class="tier">Fleet</div>
@@ -978,14 +985,14 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
         <a class="btn btn-ghost" href="tel:+10000000000">Call the studio</a>
       </div>
     </div>
-    <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge builds business." width="900" height="750"></div>
+    <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge builds business." width="900" height="750" loading="lazy" decoding="async"></div>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
     <div>© 2026 DeepWell Technology · Knowledge builds business.</div>
-    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a></div>
+    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
   </div>
 </footer>
 
@@ -1073,6 +1080,8 @@ const DEMO=[
   render(0);
 })();
 </script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
 
 </body>
 </html>

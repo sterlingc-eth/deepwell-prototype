@@ -237,6 +237,28 @@ export async function linkDocumentToCustomer(db, { documentId, entityId = null, 
   return true;
 }
 
+/**
+ * Link a document to an ADDITIONAL entity beyond its primary one.
+ *
+ * Multi-unit support (2026-09-19): a maintenance agreement covering two
+ * rooftop units gets ONE primary entity_id on its `extractions` rows (the
+ * first unit, for backward compatibility with everything that still reads
+ * a document's "the" entity) but must show up against BOTH units' entity
+ * screens. This is that second, third, ... link. No stage transition here —
+ * markLinked (already called for the primary unit inside the same
+ * transaction) owns 'mapped' -> 'linked'; this only adds the join row.
+ */
+export async function linkDocumentToEntity(db, { documentId, entityId, confidence = 0.6 } = {}) {
+  if (!documentId || !entityId) return false;
+  const r = await db.raw(
+    `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
+     VALUES ($1,$2,$3,$4,'ai',NOW())
+     ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
+    [db.tenantId, documentId, entityId, confidence]
+  );
+  return r.rowCount > 0;
+}
+
 /** Words too common to identify a page on their own; skipped by the plain-text fallback in searchPassages. */
 const STOPWORDS = new Set(['what','when','where','which','whose','does','did','the','this','that','these','those','with','from','have','has','had','was','were','will','still','under','about','there','their','them','they','into','onto','over','last','next','much','many','more','most','some','any','how','why','who','and','for','are','not','but','can','could','should','would','been','being','than','then','also','just','ever','every','each','tell','show','find','give','need','want','know','like','make','made','get','got','all','one','two','our','your','you','we','us','it','its','is','an','on','at','to','of','in','by','or','if','so','do','a','i','me','my','be','as','up','no','yes','year','years','month','months','week','weeks','day','days','ago','summer','winter','spring','fall','back','call','called','called','unit','units','system','job','work']);
 

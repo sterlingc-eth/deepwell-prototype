@@ -20,6 +20,10 @@ import {
   buildExtractPrompt,
   EXTRACT_TOOL,
   FIELD_KEYS,
+  FIELD_SPECS,
+  groupFieldsByUnit,
+  collapseDuplicateValues,
+  MAX_UNITS_PER_DOCUMENT,
 } from '../api/_lib/extractFields.js';
 import {
   sniff,
@@ -55,6 +59,18 @@ eq('empty rejected', normalizeDate(''), null);
 // The reason this is not `new Date(s)`: a bare ISO date parses as UTC midnight,
 // which in Mesa prints as the day before.
 eq('no timezone slippage', normalizeDate('2024-01-01'), '2024-01-01');
+
+// Live finding (2026-09-19, Plaza Dental maintenance agreement): "installed
+// 06/2021" has no day printed anywhere on the document. This used to return
+// null and throw the whole install date away, which is why deriveWarranty
+// never saw an installation_date and the Trane showed "No warranty on file"
+// instead of expired.
+eq('bare YYYY-MM kept at month precision', normalizeDate('2021-06'), '2021-06');
+eq('MM/YYYY kept at month precision', normalizeDate('06/2021'), '2021-06');
+eq('written month + year kept at month precision', normalizeDate('June 2021'), '2021-06');
+eq('abbreviated month + year kept at month precision', normalizeDate('Jun 2021'), '2021-06');
+eq('month-only, month 13 still rejected', normalizeDate('2021-13'), null);
+eq('month-only, single-digit month padded', normalizeDate('2021-6'), '2021-06');
 
 /* --------------------------------------------------------------- numbers */
 
@@ -173,6 +189,51 @@ eq('array input rejected', normalizeNumber(['4280'], { money: true }), null);
   eq('tie breaks to earlier page', fields[0].value, 'EARLY');
 }
 
+{
+  // Trane/Plaza Dental fixture: installation_date printed only as "06/2021".
+  // Must survive normalizeFields at month precision, not be dropped.
+  const { fields, dropped } = normalizeFields(
+    [{ key: 'installation_date', value: '06/2021', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1 }
+  );
+  eq('month-precision installation_date kept', fields[0]?.value, '2021-06');
+  eq('nothing dropped for a month-precision date', dropped.length, 0);
+}
+
+{
+  // agreement_term (the service contract period) is now a distinct field
+  // from warranty_term (the manufacturer warranty) — both must round-trip.
+  const { fields } = normalizeFields(
+    [
+      { key: 'agreement_term', value: '01/01/2025 - 12/31/2025', page_no: 1, confidence: 0.9 },
+      { key: 'warranty_term', value: '10 year parts limited', page_no: 1, confidence: 0.9 },
+    ],
+    { pageCount: 1 }
+  );
+  const by = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
+  eq('agreement_term kept', by.agreement_term, '01/01/2025 - 12/31/2025');
+  eq('warranty_term kept independently', by.warranty_term, '10 year parts limited');
+}
+
+{
+  // unit_index survives normalization (within 1..MAX_UNITS_PER_DOCUMENT) and
+  // is dropped (nulled) outside that range rather than trusted blindly.
+  const { fields } = normalizeFields(
+    [
+      { key: 'serial_number', value: 'RTU-1-SN', page_no: 1, confidence: 0.9, unit_index: 1 },
+      { key: 'serial_number', value: 'RTU-2-SN', page_no: 1, confidence: 0.9, unit_index: 2 },
+      { key: 'model', value: 'JUNK', page_no: 1, confidence: 0.5, unit_index: 999 },
+    ],
+    { pageCount: 1 }
+  );
+  const serials = fields.filter((f) => f.field_key === 'serial_number');
+  eq('both units\' serials survive dedupe', serials.map((f) => f.value).sort(), ['RTU-1-SN', 'RTU-2-SN']);
+  eq('unit 1 tagged correctly', serials.find((f) => f.value === 'RTU-1-SN')?.unit_index, 1);
+  eq('unit 2 tagged correctly', serials.find((f) => f.value === 'RTU-2-SN')?.unit_index, 2);
+  const junkModel = fields.find((f) => f.field_key === 'model');
+  eq('out-of-range unit_index is nulled, not trusted', junkModel?.unit_index, null);
+}
+
 eq('garbage input yields nothing', normalizeFields(null, { pageCount: 1 }).fields, []);
 eq('non-array input yields nothing', normalizeFields('nope', { pageCount: 1 }).fields, []);
 
@@ -261,7 +322,64 @@ eq('null input is safe', selectPages(null, 100).pages, []);
   const required = EXTRACT_TOOL.input_schema.properties.fields.items.required;
   check('page_no is required of the model', required.includes('page_no'));
   check('no duplicate field keys', new Set(FIELD_KEYS).size === FIELD_KEYS.length);
+  check('tool schema accepts unit_index per field',
+    'unit_index' in EXTRACT_TOOL.input_schema.properties.fields.items.properties);
+  check('unit_index is optional, not required (single-unit documents omit it)',
+    !required.includes('unit_index'));
+  check('agreement_term is a distinct field from warranty_term',
+    FIELD_KEYS.includes('agreement_term') && FIELD_KEYS.includes('warranty_term'));
+  const agreementSpec = FIELD_SPECS.find((s) => s.key === 'agreement_term');
+  const warrantySpec = FIELD_SPECS.find((s) => s.key === 'warranty_term');
+  check('agreement_term description distinguishes it from warranty_term',
+    /warranty_term/i.test(agreementSpec?.desc ?? ''));
+  check('warranty_term description distinguishes it from agreement_term',
+    /agreement_term/i.test(warrantySpec?.desc ?? ''));
 }
+
+/* ------------------------------------------------------------- multi-unit */
+
+{
+  const prompt = buildExtractPrompt([{ page_no: 1, text: 'hello' }], 'maintenance-agreement');
+  check('prompt instructs month-only dates as YYYY-MM', /YYYY-MM\b/.test(prompt));
+  check('prompt instructs tagging unit_index for multi-unit documents', /unit_index/.test(prompt));
+}
+
+{
+  // Ordinary single-unit document: no field carries unit_index anywhere.
+  // Must degrade to exactly one synthetic unit carrying every fact — the
+  // pre-multi-unit behavior, unchanged.
+  const { fields } = normalizeFields(
+    [
+      { key: 'serial_number', value: 'CG-4021-A', page_no: 1, confidence: 0.9 },
+      { key: 'customer_name', value: 'Plaza Dental', page_no: 1, confidence: 0.9 },
+    ],
+    { pageCount: 1 }
+  );
+  const { units } = groupFieldsByUnit(fields);
+  eq('single-unit document yields exactly one unit', units.length, 1);
+  eq('that unit is index 1', units[0].index, 1);
+  eq('it carries every fact', units[0].facts.serial_number, 'CG-4021-A');
+  eq('shared facts included too', units[0].facts.customer_name, 'Plaza Dental');
+}
+
+{
+  const fields = [
+    { field_key: 'serial_number', value: 'DUP', unit_index: 1 },
+    { field_key: 'model', value: 'SAME-MODEL', unit_index: 1 },
+    { field_key: 'serial_number', value: 'DUP', unit_index: 2 },
+    { field_key: 'model', value: 'SAME-MODEL', unit_index: 2 },
+    { field_key: 'customer_name', value: 'Plaza Dental' },
+  ];
+  const collapsed = collapseDuplicateValues(fields);
+  eq('exact (field_key, value) duplicates collapsed for the write path',
+    collapsed.length, 3);
+  check('one of each duplicate pair survives',
+    collapsed.some((f) => f.field_key === 'serial_number' && f.value === 'DUP')
+    && collapsed.some((f) => f.field_key === 'model' && f.value === 'SAME-MODEL')
+    && collapsed.some((f) => f.field_key === 'customer_name'));
+}
+
+eq('MAX_UNITS_PER_DOCUMENT is a sane finite cap', MAX_UNITS_PER_DOCUMENT, 25);
 
 /* ----------------------------------------------------- document_type parsing */
 
