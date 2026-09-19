@@ -80,6 +80,7 @@ export async function getWarrantyAttention(auth, params) {
   // the two or a tenant asking for the default 180-day list would silently
   // never see its own expiring-365 or upsell-eligible rows.
   const ALERT_TIER_HORIZON_DAYS = 365;
+  const EXPIRED_LOOKBACK_DAYS = 730;
   const fetchExpiringWithin = Math.max(expiringWithin, ALERT_TIER_HORIZON_DAYS);
 
   const rows = await withTenant(
@@ -88,9 +89,10 @@ export async function getWarrantyAttention(auth, params) {
       db.listWarrantyAttention({
         registerFrom: addDays(today, -registerLookback),
         registerTo: addDays(today, registerWithin),
-        // Expiries already past are handled by the registration branch or are
-        // simply history; this list is about what can still be acted on.
-        expiringFrom: today,
+        // Include units that expired within the last two years: an expired
+        // warranty is the strongest extended-warranty / service-agreement
+        // upsell signal there is, and the 'expired' alert tier needs them.
+        expiringFrom: addDays(today, -EXPIRED_LOOKBACK_DAYS),
         expiringTo: addDays(today, fetchExpiringWithin),
       })
   );
