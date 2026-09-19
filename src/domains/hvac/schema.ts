@@ -1,4 +1,7 @@
 import type { DomainSchema } from '../../core/types';
+import { DOCUMENT_TYPES, REQUIRED_FIELDS } from './documentTypes';
+
+export { FIELD_LABELS, fieldLabel, requirementLabel } from './documentTypes';
 
 /**
  * HVAC adapter — the first vertical.
@@ -79,20 +82,26 @@ export const hvacSchema: DomainSchema = {
       ],
     },
   ],
-  documentTypes: [
-    { id: 'work-order', label: 'Work order', requiredFields: ['Service address', 'Date', 'Technician'] },
-    { id: 'invoice', label: 'Invoice', requiredFields: ['Service address', 'Date', 'Total'] },
-    { id: 'warranty-registration', label: 'Warranty registration', requiredFields: ['Serial No.', 'Model', 'Warranty expires'] },
-    { id: 'startup-sheet', label: 'Startup sheet', requiredFields: ['Serial No.', 'Date', 'Technician'] },
-    { id: 'permit', label: 'Permit', requiredFields: ['Service address', 'Permit No.'] },
-    { id: 'nameplate-photo', label: 'Nameplate photo', requiredFields: ['Serial No.', 'Model'] },
-    { id: 'maintenance-agreement', label: 'Maintenance agreement', requiredFields: ['Service address', 'Customer', 'Term'] },
-    { id: 'other', label: 'Other', requiredFields: [] },
-  ],
+  // The 15 canonical ids/labels (handoffs/TEAM_BRIEF_2026-09-19.md), each
+  // paired with its required extraction field_keys (REQUIRED_FIELDS entries
+  // may contain `a|b` alternatives — see core/entityGraph.ts).
+  documentTypes: DOCUMENT_TYPES.map((t) => ({
+    id: t.id,
+    label: t.label,
+    requiredFields: REQUIRED_FIELDS[t.id] ?? [],
+  })),
 };
 
-/** Field names as printed on documents → entity field keys. Used by the seed and by the review screen. */
+/**
+ * Maps both the old demo display labels ("Serial No.") and the real
+ * extraction field_keys ("serial_number") to entity field keys. Real synced
+ * documents' `doc.extracted[].name` is always a field_key (see
+ * usePostgresSync.ts's toDoc); the HVAC demo fixture (seed.ts) and manual
+ * gap-filling in ReviewScreen used the old display-label strings, kept here
+ * so neither breaks.
+ */
 export const HVAC_FIELD_ALIASES: Record<string, string> = {
+  // Legacy display labels (demo fixture only)
   'Serial No.': 'serial',
   Model: 'model',
   Manufacturer: 'manufacturer',
@@ -105,4 +114,18 @@ export const HVAC_FIELD_ALIASES: Record<string, string> = {
   Total: 'cost',
   Notes: 'notes',
   Customer: 'customerName',
+  // Canonical extraction field_keys (real pipeline + required-field gaps)
+  serial_number: 'serial',
+  model: 'model',
+  manufacturer: 'manufacturer',
+  installation_date: 'installDate',
+  warranty_expires: 'warrantyExpiry',
+  warranty_term: 'warrantyExpiry',
+  service_address: 'address',
+  service_date: 'date',
+  technician: 'technicianName',
+  work_performed: 'workPerformed',
+  cost: 'cost',
+  notes: 'notes',
+  customer_name: 'customerName',
 };

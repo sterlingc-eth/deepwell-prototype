@@ -102,6 +102,18 @@ export interface ExtractedField {
   correctedAt?: Date;
 }
 
+/** Required-field completeness for one document, as api/_lib/documentTypes.js's
+ *  completenessFor computes it (mirrored in src/domains/hvac/documentTypes.ts).
+ *  `required`/`missing` entries may be `a|b` alternatives. */
+export interface DocCompleteness {
+  type: string;
+  required: string[];
+  present: string[];
+  missing: string[];
+  minConfidence: number;
+  complete: boolean;
+}
+
 export type DocumentIssue =
   | { kind: 'missing-field'; field: string }
   | { kind: 'unlinked'; bestGuess?: EntityId; confidence: number }
@@ -124,8 +136,12 @@ export interface Doc {
   /** 0–1 confidence of the strongest link */
   linkConfidence: number;
   issues: DocumentIssue[];
+  /** Display name of a human verifier, or the literal 'ai' for an automated
+   *  AI verification (see the AI VERIFICATION CONTRACT in the team brief). */
   verifiedBy?: string;
   verifiedAt?: Date;
+  /** Server-computed required-field completeness, when known. */
+  completeness?: DocCompleteness;
   /** Short plain-text rendering used by the document preview */
   preview: string;
 }

@@ -15,6 +15,7 @@ import {
 } from "./_lib/answer.js";
 import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 import { recordModelCall } from "./_lib/usage.js";
+import { documentTypeLabel } from "./_lib/documentTypes.js";
 
 /**
  * SHA-256 of a question, never the question itself. Pure and exported so it
@@ -86,6 +87,179 @@ const MAX_PASSAGES = 12;
 const MAX_EXCERPT = 1200;
 export const ASK_MODEL = "claude-sonnet-4-5";
 
+/**
+ * ---------------------------------------------------------------------------
+ * Meta-question pre-router: "how many documents are in the system", "list
+ * all customers" — inventory questions with a single, deterministic SQL
+ * answer. No model call, no retrieval, no cost, and no chance of the
+ * grounding bug above (there is nothing for a model to hallucinate).
+ *
+ * Classification is exact-match on a normalized question, on purpose: a
+ * flexible regex here ("how many X do we have") would also swallow
+ * per-entity questions like "how many documents does Plaza Dental have" or
+ * "how many tons is the Goodman" — those must keep going through retrieval
+ * (buildAllowed/searchPassages), which already answers them correctly.
+ * classifyMetaQuestion is exported so scripts/verify-retrieval.mjs can check
+ * both the positive phrasings and those negatives without a database.
+ */
+function normalizeQuestion(q) {
+  return String(q ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/[?!.]+$/, "");
+}
+
+const COUNT_QUESTIONS = {
+  "how many documents are in the system": "documents",
+  "how many documents do we have": "documents",
+  "how many documents are there": "documents",
+  "how many docs do we have": "documents",
+  "how many customers do we have": "customers",
+  "how many customers are there": "customers",
+  "how many clients do we have": "customers",
+  "how many units do we have": "equipment",
+  "how many pieces of equipment do we have": "equipment",
+  "how many equipment records are there": "equipment",
+  "how many invoices do we have": "invoices",
+  "how many invoices are there": "invoices",
+  "how many warranties do we have": "warranties",
+  "how many warranty registrations are there": "warranties",
+  "how many documents are verified": "verified",
+  "how many are verified": "verified",
+  "how many documents are unverified": "unverified",
+  "how many are unverified": "unverified",
+  "how many are still unverified": "unverified",
+};
+
+const LIST_DOCUMENTS = new Set([
+  "list all documents", "list documents", "show all documents",
+  "show me all documents", "what documents do we have", "what documents exist",
+]);
+const LIST_UNVERIFIED = new Set([
+  "which documents are unverified", "list unverified documents",
+  "show unverified documents", "what documents are unverified", "what needs review",
+]);
+const LIST_CUSTOMERS = new Set([
+  "list all customers", "list customers", "show all customers", "who are our customers",
+]);
+const LIST_TYPES = new Set([
+  "what document types do we have", "what types of documents do we have",
+  "list document types", "what document types exist",
+]);
+
+export function classifyMetaQuestion(question) {
+  const q = normalizeQuestion(question);
+  if (!q) return null;
+  if (COUNT_QUESTIONS[q]) return { kind: "count", target: COUNT_QUESTIONS[q] };
+  if (LIST_DOCUMENTS.has(q)) return { kind: "list", target: "documents" };
+  if (LIST_UNVERIFIED.has(q)) return { kind: "list", target: "unverified-documents" };
+  if (LIST_CUSTOMERS.has(q)) return { kind: "list", target: "customers" };
+  if (LIST_TYPES.has(q)) return { kind: "list", target: "document-types" };
+  // Imperative: the Ask box can't do these — point at where in the app can.
+  if (/^(please\s+)?(delete|remove)\b/.test(q)) return { kind: "imperative", action: "delete" };
+  if (/^(please\s+)?upload\b/.test(q)) return { kind: "imperative", action: "upload" };
+  return null;
+}
+
+const META_LIST_LIMIT = 50;
+// Belt-and-braces alongside RLS, same predicate recordsStore.js's private
+// TENANT constant uses — see withTenant() there. This route only reaches the
+// database via db.raw(), the tenant-scoped escape hatch recordsStore.js
+// already exposes for exactly this (see its own doc comment).
+const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+
+const COUNT_LABEL = {
+  documents: "documents",
+  customers: "customers",
+  equipment: "pieces of equipment",
+  invoices: "invoices",
+  warranties: "warranty registrations",
+  verified: "verified documents",
+  unverified: "unverified documents",
+};
+
+async function countFor(db, target) {
+  const table = target === "customers" || target === "equipment" ? "entities" : "documents";
+  const where = {
+    documents: TENANT_SQL,
+    customers: `entity_type = 'customer' AND ${TENANT_SQL}`,
+    equipment: `entity_type = 'equipment' AND ${TENANT_SQL}`,
+    invoices: `document_type = 'invoice' AND ${TENANT_SQL}`,
+    // 'warranty' is the pre-migration legacy id (see handoffs/TEAM_BRIEF); a
+    // never-reprocessed row can still carry it.
+    warranties: `document_type IN ('warranty-registration','warranty') AND ${TENANT_SQL}`,
+    verified: `stage = 'verified' AND ${TENANT_SQL}`,
+    unverified: `stage <> 'verified' AND ${TENANT_SQL}`,
+  }[target];
+  const { rows } = await db.raw(`SELECT COUNT(*)::int AS n FROM ${table} WHERE ${where}`, []);
+  return rows[0].n;
+}
+
+async function listDocuments(db, unverifiedOnly) {
+  const filter = unverifiedOnly ? `stage <> 'verified' AND ${TENANT_SQL}` : TENANT_SQL;
+  const total = (await db.raw(`SELECT COUNT(*)::int AS n FROM documents WHERE ${filter}`, [])).rows[0].n;
+  const { rows } = await db.raw(
+    `SELECT id FROM documents WHERE ${filter} ORDER BY created_at DESC LIMIT $1`,
+    [META_LIST_LIMIT]
+  );
+  const sources = rows.map((r) => ({ documentId: r.id, location: {} }));
+  const noun = unverifiedOnly ? "unverified document" : "document";
+  const text = total > sources.length
+    ? `${total} ${noun}s — showing the first ${sources.length}.`
+    : `${total} ${noun}${total === 1 ? "" : "s"}.`;
+  return { kind: "answer", text, facts: [], sources, confidence: 1, verifiedCount: sources.length, unverifiedCount: 0, closest: [] };
+}
+
+async function listCustomers(db) {
+  const total = (await db.raw(
+    `SELECT COUNT(*)::int AS n FROM entities WHERE entity_type = 'customer' AND ${TENANT_SQL}`, []
+  )).rows[0].n;
+  const { rows } = await db.raw(
+    `SELECT data->>'customer_name' AS name, data->>'service_address' AS address
+       FROM entities WHERE entity_type = 'customer' AND ${TENANT_SQL}
+      ORDER BY updated_at DESC LIMIT $1`,
+    [META_LIST_LIMIT]
+  );
+  const facts = rows.map((r) => ({ label: r.name || "Unnamed customer", value: r.address || "—", sources: [] }));
+  const text = total > facts.length
+    ? `${total} customers — showing the first ${facts.length}.`
+    : `${total} customer${total === 1 ? "" : "s"}.`;
+  return { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] };
+}
+
+async function listDocumentTypes(db) {
+  const { rows } = await db.raw(
+    `SELECT document_type, COUNT(*)::int AS n FROM documents WHERE ${TENANT_SQL}
+      GROUP BY document_type ORDER BY n DESC`,
+    []
+  );
+  const facts = rows.map((r) => ({ label: documentTypeLabel(r.document_type), value: String(r.n), sources: [] }));
+  const text = facts.length ? `${facts.length} document type${facts.length === 1 ? "" : "s"} in use.` : "No documents yet.";
+  return { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] };
+}
+
+const IMPERATIVE_TEXT = {
+  delete: "To delete a document: go to Browse → Documents, select it, then choose Delete selected.",
+  upload: "To upload a document: go to Intake and drop your files there.",
+};
+
+async function runMetaQuestion(db, meta) {
+  if (meta.kind === "imperative") {
+    return { kind: "no-answer", text: IMPERATIVE_TEXT[meta.action], facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+  }
+  if (meta.kind === "count") {
+    const n = await countFor(db, meta.target);
+    const label = COUNT_LABEL[meta.target];
+    return {
+      kind: "answer",
+      text: `You have ${n} ${label}.`,
+      facts: [{ label: label[0].toUpperCase() + label.slice(1), value: String(n), sources: [] }],
+      sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
+    };
+  }
+  if (meta.target === "unverified-documents") return listDocuments(db, true);
+  if (meta.target === "documents") return listDocuments(db, false);
+  if (meta.target === "customers") return listCustomers(db);
+  return listDocumentTypes(db);
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -109,6 +283,39 @@ export default async function handler(req, res) {
     }
     if (question.length > MAX_QUESTION) {
       return res.status(400).json({ error: "Question is too long" });
+    }
+
+    // ---- 0. meta-question pre-router (no model, no retrieval) --------------
+    const meta = classifyMetaQuestion(question);
+    if (meta) {
+      try {
+        const data = await withTenant(
+          { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+          (db) => runMetaQuestion(db, meta)
+        );
+        try {
+          await withTenant(
+            { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+            (db) => db.logAction({
+              action: "document.queried",
+              resource_type: "question",
+              clerk_user_id: auth.userId,
+              changes: {
+                question_hash: hashQuestion(question),
+                documents: [...new Set(data.sources.map((s) => s.documentId))],
+                passages: 0,
+              },
+            })
+          );
+        } catch (err) {
+          console.error("Failed to write document.queried audit row (meta):", err?.message);
+        }
+        return handleCors(res, req).status(200).json({ success: true, data });
+      } catch (err) {
+        // A broken meta-query must not 500 a cheap question — fall through to
+        // the normal retrieval+model path rather than failing the request.
+        console.error("Meta-question router failed, falling through:", err?.message);
+      }
     }
 
     // ---- 1. retrieve -------------------------------------------------------
@@ -200,6 +407,11 @@ export default async function handler(req, res) {
     const response = await withBackoff(() => client.messages.create({
       model: ASK_MODEL,
       max_tokens: 1500,
+      // Deterministic on purpose: identical question, identical retrieved
+      // evidence -> identical answer. The 2026-09-19 walkthrough saw the
+      // SAME question return different dollar figures on two runs; that
+      // can't happen at temperature 0.
+      temperature: 0,
       system: [withCache({ type: "text", text: SYSTEM_PROMPT }, ASK_MODEL)],
       tools: [withCache(ANSWER_TOOL, ASK_MODEL)],
       tool_choice: { type: "tool", name: "answer" },
@@ -258,7 +470,14 @@ export default async function handler(req, res) {
     // overruled back to "printed" and held to the ordinary page/field check
     // rather than getting a free pass around it.
     const toolUse = response.content.find((b) => b.type === "tool_use");
-    const data = shapeAnswer(toolUse?.input, allowed);
+    // candidates: what retrieval actually returned, for shapeAnswer to build
+    // `closest` from IF everything gets downgraded to no-answer — see the
+    // Bug 1 fix in answer.js's shapeAnswer doc comment.
+    const candidates = [
+      ...mappedPassages.map((p) => ({ documentId: p.documentId })),
+      ...mappedExtractions.map((x) => ({ documentId: x.documentId })),
+    ];
+    const data = shapeAnswer(toolUse?.input, allowed, { candidates });
 
     // ---- 4. audit -----------------------------------------------------------
     // "Who saw this customer's document" has to be answerable, and until now

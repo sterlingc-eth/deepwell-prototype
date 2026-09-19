@@ -6,6 +6,11 @@
  *   This turns that text into `extractions` rows — what the paper MEANS, keyed
  *   by a canonical field name the rest of the product can look up by.
  *
+ * Also returns a document_type classification (see documentTypes.js) — the
+ * model is shown the canonical type list right in this same cacheable prompt
+ * and asked to pick one, since it has already read the page text needed to
+ * tell a work order from an invoice.
+ *
  * Provenance is the whole point, so the write is two rows deep, exactly as the
  * schema was designed for:
  *
@@ -22,6 +27,7 @@
  * the default and Sonnet is a one-variable change (EXTRACT_MODEL) if an eval
  * ever shows Haiku dropping fields.
  */
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_DEFINITIONS } from './documentTypes.js';
 
 /** The canonical vocabulary. `field_key` in `extractions` is always one of these. */
 export const FIELD_SPECS = [
@@ -48,6 +54,7 @@ export const FIELD_SPECS = [
   { key: 'invoice_number',   kind: 'text', desc: 'Invoice, ticket, or work-order number.' },
   { key: 'status',           kind: 'text', desc: 'Completed, Pending, In Progress.' },
   { key: 'notes',            kind: 'text', desc: 'A short observation the technician recorded that does not fit another field.' },
+  { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.' },
 ];
 
 const SPEC_BY_KEY = new Map(FIELD_SPECS.map((s) => [s.key, s]));
@@ -64,6 +71,12 @@ export const EXTRACT_TOOL = {
   input_schema: {
     type: 'object',
     properties: {
+      document_type: {
+        type: 'string',
+        enum: DOCUMENT_TYPES.map((t) => t.id),
+        description: 'Which one canonical type this document is. See DOCUMENT TYPE below.',
+      },
+      document_type_confidence: { type: 'number', description: '0 to 1 confidence in document_type.' },
       fields: {
         type: 'array',
         description: 'One entry per value found. Omit fields the document does not state.',
@@ -85,11 +98,12 @@ export const EXTRACT_TOOL = {
         description: 'Field keys the document seems to mention but that you could not read confidently.',
       },
     },
-    required: ['fields'],
+    required: ['document_type', 'fields'],
   },
 };
 
 const FIELD_GUIDE = FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}`).join('\n');
+const DOCUMENT_TYPE_GUIDE = DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYPE_DEFINITIONS[t.id] ?? ''}`).join('\n');
 
 export function buildExtractPrompt(pages, documentType) {
   const body = pages.map((p) => `[page ${p.page_no}]\n${p.text}`).join('\n\n');
@@ -102,12 +116,17 @@ Read the pages and return every field the text actually states, using the extrac
 FIELDS:
 ${FIELD_GUIDE}
 
+DOCUMENT TYPE — pick exactly the one id that best fits this document:
+${DOCUMENT_TYPE_GUIDE}
+
 Rules:
 - Copy serial numbers, model numbers, part numbers and dollar amounts character for character. They are what this document will be searched by.
 - page_no must be the page the value appears on, taken from the [page N] marker above it.
 - If the document does not state a field, leave it out. An omitted field is correct; a guessed one is a defect.
 - Do not calculate. If the warranty term is "10 year" and the install date is 2024-03-04 but no expiry is printed, return warranty_term and installation_date and NOT warranty_expires.
-- If a field appears more than once with conflicting values, return each occurrence with its own page_no and let confidence reflect the conflict.`;
+- If a field appears more than once with conflicting values, return each occurrence with its own page_no and let confidence reflect the conflict.
+- document_type must be exactly one id from the list above. If none clearly fits, use "other".
+- document_type_confidence: 0 to 1, your confidence in that classification alone (independent of field confidences).`;
 }
 
 /* ---------------------------------------------------------------- normalize */

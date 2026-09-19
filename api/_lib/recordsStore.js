@@ -334,6 +334,30 @@ function makeStore(db, tenantId) {
       return r.rowCount;
     },
 
+    /**
+     * ('read'|'mapped'|'linked') -> 'verified', set by the AI itself once
+     * documentTypes.js's completenessFor says every required field is in and
+     * confident. Same forward-only idiom as markLinked: guarded in SQL, never
+     * trusts the caller's idea of the current stage, and re-checks the entity
+     * link itself rather than trusting a pre-check done in JS. A document
+     * already 'verified' (by a human or a previous AI pass) is left alone —
+     * this never re-stamps verified_at or flips verified_by back to 'ai'.
+     */
+    verifyByAi: async (documentId) => {
+      const r = await db.query(
+        `UPDATE documents SET stage = 'verified', verified_by = 'ai', verified_at = NOW()
+          WHERE id = $1 AND ${TENANT} AND stage IN ('read','mapped','linked')
+            AND (
+                  EXISTS (SELECT 1 FROM extractions x
+                           WHERE x.document_id = documents.id AND x.entity_id IS NOT NULL)
+               OR EXISTS (SELECT 1 FROM document_entity_links l
+                           WHERE l.document_id = documents.id)
+            )`,
+        [documentId]
+      );
+      return r.rowCount;
+    },
+
     clearExtractError: async (documentId) => {
       const r = await db.query(
         `UPDATE documents SET extract_error = NULL
@@ -385,7 +409,7 @@ function makeStore(db, tenantId) {
       const ids = [...new Set((documentIds ?? []).filter((x) => typeof x === 'string'))].slice(0, 500);
       if (!ids.length) return Promise.resolve([]);
       return many(
-        `SELECT id, document_id, entity_id, field_key, value, confidence
+        `SELECT id, document_id, entity_id, field_key, value, confidence, corrected_value
            FROM extractions
           WHERE document_id = ANY($1::uuid[]) AND ${TENANT}
           ORDER BY document_id, id
@@ -632,6 +656,8 @@ function makeStore(db, tenantId) {
       `SELECT d.id,
               d.original_filename,
               d.stage,
+              d.document_type,
+              d.verified_by,
               d.page_count,
               d.extracted_at,
               d.extract_error,

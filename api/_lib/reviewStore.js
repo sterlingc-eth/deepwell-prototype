@@ -71,8 +71,22 @@
  *                       id (an audit_log row, a browser tab with it cached)
  *                       must keep resolving to something, and merged_into is
  *                       how a reader discovers where it went.
+ *   aiVerifyDocument — recomputes completeness from stored extractions and
+ *                       promotes to verified_by='ai' with no re-extraction;
+ *                       see documentTypes.js and recordsStore.js's verifyByAi.
+ *   reclassifyDocuments — batch, model-free document_type cleanup for rows
+ *                       whose type is null or a legacy id; never touches an
+ *                       already-canonical value.
  */
-import { getPool } from './recordsStore.js';
+import { getPool, withTenant as withRecordsTenant } from './recordsStore.js';
+import {
+  normalizeDocumentType,
+  inferDocumentType,
+  completenessFor,
+  toCompletenessFields,
+  isLegacyOrUnknownType,
+  AI_VERIFY_MIN_CONFIDENCE,
+} from './documentTypes.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -473,6 +487,92 @@ export async function listLinks(ctx, { documentIds }) {
       [ids]
     )).rows;
     return { links: rows };
+  });
+}
+
+/**
+ * Recompute completeness from stored extractions and promote to AI-verified
+ * if it now clears the bar — no re-extraction, no model call. Lets a document
+ * extracted before this build (or corrected since) get promoted without
+ * going back through /api/extract. Uses recordsStore.js's curated store
+ * (getDocument/listExtractionsByDocument/verifyByAi) rather than this file's
+ * own raw-client withTenant — nothing here is a bespoke transition.
+ */
+export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
+  assertUuid('documentId', documentId);
+
+  return withRecordsTenant(ctx, async (db) => {
+    const doc = await db.getDocument(documentId);
+    if (!doc) throw new ReviewError('Document not found', 404);
+
+    const rows = await db.listExtractionsByDocument(documentId); // SELECT * includes corrected_value
+    const type = normalizeDocumentType(doc.document_type);
+    const completeness = completenessFor(type, toCompletenessFields(rows));
+
+    let verified = false;
+    if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
+      verified = (await db.verifyByAi(documentId)) > 0;
+    }
+
+    if (verified) {
+      await db.logAction({
+        clerk_user_id: actorClerkId,
+        action: 'review.ai_verified',
+        resource_type: 'document',
+        resource_id: documentId,
+        changes: { completeness },
+      });
+    }
+
+    const document = verified ? await db.getDocument(documentId) : doc;
+    return { document, completeness, verified };
+  });
+}
+
+/**
+ * Batch, no-model reclassification. Only touches documents whose
+ * document_type is null or a legacy/free-text value — a document already
+ * carrying a canonical id was decided by a human or a previous AI pass, and
+ * this must not silently relabel it. Capped at 100 ids per call; this loops
+ * per document (not the batched "one query" shape document-status.js uses)
+ * because it is an explicit, occasional maintenance action, not something
+ * polled.
+ */
+export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkId) {
+  const ids = [...new Set((documentIds ?? []).filter(isUuid))].slice(0, 100);
+  if (!ids.length) return { changes: [] };
+
+  return withRecordsTenant(ctx, async (db) => {
+    const changes = [];
+    for (const id of ids) {
+      const doc = await db.getDocument(id);
+      if (!doc) continue;
+      if (doc.document_type && !isLegacyOrUnknownType(doc.document_type)) continue;
+
+      const rows = await db.listExtractionsByDocument(id);
+      const facts = Object.fromEntries(
+        toCompletenessFields(rows).map((f) => [f.field_key, f.value])
+      );
+      const resolved = doc.document_type
+        ? normalizeDocumentType(doc.document_type, facts)
+        : inferDocumentType(facts, doc.original_filename);
+
+      if (resolved !== doc.document_type) {
+        await db.updateDocument(id, { document_type: resolved });
+        changes.push({ documentId: id, from: doc.document_type, to: resolved });
+      }
+    }
+
+    if (changes.length) {
+      await db.logAction({
+        clerk_user_id: actorClerkId,
+        action: 'review.reclassified',
+        resource_type: 'document',
+        changes: { count: changes.length, changes },
+      });
+    }
+
+    return { changes };
   });
 }
 

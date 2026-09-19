@@ -74,9 +74,15 @@ function normalizeAnswer(a: Partial<Answer>, g: GraphSnapshot): Answer {
   );
   const sources = facts.flatMap((f) => f.sources);
   const docIds = new Set(sources.map((s) => s.documentId));
+  // Belt-and-braces alongside shapeAnswer's own fix (api/_lib/answer.js): once
+  // facts.length is 0 nothing here was actually grounded, so `a.text` — the
+  // model's free prose, never citation-checked — must not reach the screen
+  // even if a future server regression forwards it. This is exactly the
+  // 2026-09-19 bug (a confident narrative with `sources: []`), guarded here
+  // too so the client alone still fails safe.
   const out: Answer = {
     kind: facts.length ? 'answer' : 'no-answer',
-    text: a.text ?? 'Nothing in your records answers that.',
+    text: facts.length ? (a.text ?? '') : 'Nothing in your records answers that.',
     facts,
     sources,
     confidence: a.confidence ?? (facts.length ? 0.8 : 0),

@@ -14,8 +14,11 @@ import {
   deriveWarranty,
   describeWarranty,
   daysBetween,
+  addDays,
   ruleCoverage,
   isValidYmd,
+  alertTier,
+  upsell,
 } from '../api/_lib/warrantyRules.js';
 
 let failures = 0;
@@ -503,9 +506,134 @@ check('empty rejected', !isValidYmd(''));
   eq(
     'conditional-term brands are listed by name, not silently lumped into "verified"',
     conditionalBrands,
-    ['bryant', 'carrier', 'daikin', 'payne', 'rheem', 'ruud']
+    ['bryant', 'carrier', 'daikin', 'mitsubishi', 'payne', 'rheem', 'ruud']
   );
   console.log(`      (${c.verifiedCount} of ${c.totalCount} brands verified, ${c.conditional.length} of those condition-gated)`);
+}
+
+/* ------------------------------------------------------ new verified brands */
+
+eq('Heil normalizes', normalizeBrand('Heil'), 'heil');
+eq('Tempstar normalizes', normalizeBrand('Tempstar'), 'tempstar');
+eq('Comfortmaker normalizes', normalizeBrand('Comfortmaker'), 'comfortmaker');
+eq('KeepRite normalizes', normalizeBrand('KeepRite'), 'keeprite');
+eq('Arcoaire normalizes', normalizeBrand('Arcoaire'), 'arcoaire');
+eq('Day & Night alias resolves (ampersand cleaned to space)', normalizeBrand('Day & Night'), 'day and night');
+eq('Armstrong Air normalizes', normalizeBrand('Armstrong'), 'armstrong');
+eq('AirEase normalizes', normalizeBrand('AirEase'), 'airease');
+eq('Ducane normalizes', normalizeBrand('Ducane'), 'ducane');
+eq('Napoleon normalizes', normalizeBrand('Napoleon'), 'napoleon');
+eq('Mitsubishi Electric alias still resolves', normalizeBrand('Mitsubishi Electric'), 'mitsubishi');
+
+{
+  // Heil/Tempstar: 90-day window, same shape as Carrier's floor, but a plain
+  // (unconditional) 10-year registered term — no election gate.
+  for (const brand of ['Heil', 'Tempstar', 'Comfortmaker', 'Day and Night', 'KeepRite', 'Arcoaire']) {
+    const w = deriveWarranty(
+      { manufacturer: brand, installation_date: '2024-03-04', warranty_registered_date: '2024-03-10' },
+      '2026-09-16'
+    );
+    eq(`${brand}: unconditional 10-year registered term`, w.termYears, 10);
+    check(`${brand}: not flagged conditional`, w.termConditional === false);
+  }
+}
+
+{
+  // Armstrong/AirEase/Ducane: 60-day window like Lennox, plain 5/10.
+  for (const brand of ['Armstrong', 'AirEase', 'Ducane', 'Napoleon']) {
+    const w = deriveWarranty({ manufacturer: brand, installation_date: '2026-08-06' }, '2026-09-16');
+    eq(`${brand}: 60-day window`, w.registrationDeadline, '2026-10-05');
+    eq(`${brand}: 5-year unregistered floor`, w.termYears, 5);
+  }
+}
+
+{
+  // Mitsubishi: 90-day window, floor 5, registered term gated on owner-
+  // occupied (contractor tier not modeled, so the ceiling here is 10, not 12).
+  const base = { manufacturer: 'Mitsubishi', installation_date: '2024-03-04', warranty_registered_date: '2024-03-10' };
+  const unknown = deriveWarranty(base, '2026-09-16');
+  eq('Mitsubishi: occupancy unknown, floor used', unknown.termYears, 5);
+  check('Mitsubishi: note explains the owner-occupied gate', unknown.notes.some((n) => /owner-occupied/.test(n)));
+
+  const occupied = deriveWarranty({ ...base, owner_occupied: true }, '2026-09-16');
+  eq('Mitsubishi: owner-occupied earns the modeled 10-year ceiling', occupied.termYears, 10);
+}
+
+{
+  // York/Coleman/Luxaire, Fujitsu, Bosch, Maytag, Nordyne remain unmodeled —
+  // each for a different, documented reason (see warrantyRules.js comments).
+  for (const brand of ['York', 'Coleman', 'Luxaire', 'Fujitsu', 'Bosch', 'Maytag', 'Nordyne']) {
+    const w = deriveWarranty({ manufacturer: brand, installation_date: '2026-08-06' }, '2026-09-16');
+    check(`${brand}: still unverified, computes nothing`, w.brandVerified === false && w.expires === null);
+  }
+}
+
+/* --------------------------------------------------------------- alertTier */
+
+{
+  const stableExpired = { expires: '2026-01-01', registrationOnFile: '2020-01-01', registrationDeadline: null };
+  eq('alertTier: expired', alertTier(stableExpired, '2026-09-16'), 'expired');
+
+  const mk = (daysOut) => ({ expires: addDays('2026-09-16', daysOut), registrationOnFile: '2020-01-01', registrationDeadline: null });
+  eq('alertTier: 0 days out is expiring-30 (boundary)', alertTier(mk(0), '2026-09-16'), 'expiring-30');
+  eq('alertTier: 30 days out is expiring-30 (boundary)', alertTier(mk(30), '2026-09-16'), 'expiring-30');
+  eq('alertTier: 31 days out is expiring-90', alertTier(mk(31), '2026-09-16'), 'expiring-90');
+  eq('alertTier: 90 days out is expiring-90 (boundary)', alertTier(mk(90), '2026-09-16'), 'expiring-90');
+  eq('alertTier: 91 days out is expiring-365', alertTier(mk(91), '2026-09-16'), 'expiring-365');
+  eq('alertTier: 365 days out is expiring-365 (boundary)', alertTier(mk(365), '2026-09-16'), 'expiring-365');
+  eq('alertTier: 366 days out is ok', alertTier(mk(366), '2026-09-16'), 'ok');
+
+  const stableNoData = { expires: null, registrationOnFile: null, registrationDeadline: null };
+  eq('alertTier: no dates at all is unknown', alertTier(stableNoData, '2026-09-16'), 'unknown');
+  eq('alertTier: no today is unknown', alertTier(mk(10), null), 'unknown');
+  eq('alertTier: implausible today is unknown', alertTier(mk(10), '1000-01-01'), 'unknown');
+
+  // Registration window closing takes priority over a far-off computed expiry
+  // (the floor term's expiry can be years away while the deadline to earn the
+  // long term is imminent).
+  const stableRegClosing = {
+    expires: '2031-08-06', // 5-year floor, still years off
+    registrationOnFile: null,
+    registrationDeadline: addDays('2026-09-16', 10),
+  };
+  eq('alertTier: registration closing beats a distant expiry', alertTier(stableRegClosing, '2026-09-16'), 'unregistered-window-closing');
+
+  // ...but only while the deadline hasn't actually passed yet.
+  const stableRegPast = { ...stableRegClosing, registrationDeadline: addDays('2026-09-16', -1) };
+  check('alertTier: a deadline already missed is not "closing"', alertTier(stableRegPast, '2026-09-16') !== 'unregistered-window-closing');
+
+  // Already registered: the deadline is moot even if it's within 30 days.
+  const stableRegistered = { ...stableRegClosing, registrationOnFile: '2024-03-05' };
+  check('alertTier: on-file registration ignores the deadline', alertTier(stableRegistered, '2026-09-16') !== 'unregistered-window-closing');
+}
+
+/* ------------------------------------------------------------------ upsell */
+
+{
+  const w = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2010-01-01', warranty_registered_date: '2010-01-05' }, '2026-09-16');
+  const u = upsell(w, '2026-09-16');
+  check('upsell: expired verified-brand unit is eligible', u.eligible === true);
+  check('upsell: reason names expiry', /expired/i.test(u.reason));
+  check('upsell: reason also names the parts-only gap', /parts only/i.test(u.reason));
+}
+{
+  // Well within warranty (5+ years left) but still a verified brand: eligible
+  // on the standing parts-only labor-gap reason alone.
+  const w = deriveWarranty({ manufacturer: 'Trane', installation_date: '2026-06-01', warranty_registered_date: '2026-06-05' }, '2026-09-16');
+  const u = upsell(w, '2026-09-16');
+  check('upsell: far from expiry but verified brand is still eligible (parts-only gap)', u.eligible === true);
+  check('upsell: reason does not falsely claim expiry proximity', !/expires within/i.test(u.reason));
+}
+{
+  // Unverified brand, no printed expiry at all: no evidence, not eligible.
+  const w = deriveWarranty({ manufacturer: 'Frobozz Cooling', installation_date: '2026-06-01' }, '2026-09-16');
+  const u = upsell(w, '2026-09-16');
+  check('upsell: no evidence means not eligible', u.eligible === false);
+}
+{
+  const w = deriveWarranty({ manufacturer: 'Rheem', installation_date: '2020-01-01', warranty_expires: '2027-01-01' }, '2026-09-16');
+  const u = upsell(w, '2026-09-16');
+  check('upsell: printed expiry within a year is eligible even for a conditional brand', u.eligible === true);
 }
 
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nAll warranty checks passed.');

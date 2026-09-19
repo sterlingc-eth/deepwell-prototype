@@ -69,6 +69,21 @@ export interface Correction {
   corrected_at: string | null;
 }
 
+export interface ReviewCompleteness {
+  type: string;
+  required: string[];
+  present: string[];
+  missing: string[];
+  minConfidence: number;
+  complete: boolean;
+}
+
+export interface ReclassifyChange {
+  documentId: string;
+  from: string | null;
+  to: string;
+}
+
 export interface ReviewEntity {
   id: string;
   entity_type: string;
@@ -149,5 +164,21 @@ export const reviewClient = {
   listCorrections(documentIds: string[]) {
     if (!documentIds.length) return Promise.resolve<{ corrections: Correction[] }>({ corrections: [] });
     return postJson<{ corrections: Correction[] }>({ action: 'listCorrections', documentIds });
+  },
+
+  /** AI VERIFICATION CONTRACT: recomputes completeness from stored
+   *  extractions and promotes to verified (verified_by 'ai') if complete and
+   *  confident enough. No-op (verified:false) otherwise — never an error. */
+  aiVerify(documentId: string) {
+    return postJson<{ document: ReviewDocument; completeness: ReviewCompleteness; verified: boolean }>({
+      action: 'aiVerify',
+      documentId,
+    });
+  },
+
+  /** Batch, no-model reclassification of legacy/unknown document_type values (≤100 ids). */
+  reclassify(documentIds: string[]) {
+    if (!documentIds.length) return Promise.resolve<{ changes: ReclassifyChange[] }>({ changes: [] });
+    return postJson<{ changes: ReclassifyChange[] }>({ action: 'reclassify', documentIds });
   },
 };

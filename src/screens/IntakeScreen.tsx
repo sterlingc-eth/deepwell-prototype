@@ -165,6 +165,10 @@ export function IntakeScreen() {
   // you navigate away.
   const [uploads, setUploads] = useState<Record<string, IngestProgress>>({});
   const uploading = Object.values(uploads).some((u) => u.status !== 'done' && u.status !== 'error' && u.status !== 'pending');
+  // filename -> live document id, so the uploads list can show the doc's
+  // real, changing pipeline stage (Extracting/Linked/AI verified) instead of
+  // freezing on "Read" the moment the upload+read step itself finishes.
+  const [uploadDocIds, setUploadDocIds] = useState<Record<string, string>>({});
 
   // Cancels any in-flight upload or status poll the moment this screen is
   // left, instead of an abandoned 15-minute poll loop running against a
@@ -212,6 +216,13 @@ export function IntakeScreen() {
 
   const uploadFiles = async (files: File[]) => {
     if (!files.length) return;
+    // A .zip on this "Add files" zone is a bulk export, not one document —
+    // route it through the same importer the bulk drop zone uses instead of
+    // uploading the archive itself as a single opaque file.
+    if (files.some(isZipFile)) {
+      await handleBulkFiles(files);
+      return;
+    }
     const batchId = ensureBatch();
     // Captured directly from receiveDocs (not via addFiles) because the ids
     // it returns are what ties each real ingest result back to its placeholder.
@@ -221,10 +232,21 @@ export function IntakeScreen() {
       for (const f of files) next[f.name] = { filename: f.name, status: 'hashing' };
       return next;
     });
+    setUploadDocIds((prev) => {
+      const next = { ...prev };
+      files.forEach((f, i) => {
+        const id = tempIds[i];
+        if (id) next[f.name] = id;
+      });
+      return next;
+    });
     const results = await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })), 3, abortRef.current?.signal);
     results.forEach((result, i) => {
       const tempId = tempIds[i];
-      if (tempId) reconcileIntakeDoc(tempId, patchFromIngestResult(result));
+      if (tempId) {
+        reconcileIntakeDoc(tempId, patchFromIngestResult(result));
+        setUploadDocIds((prev) => ({ ...prev, [result.filename]: result.documentId ?? tempId }));
+      }
     });
   };
   // ---- Bulk import: a dropped .zip export or a large multi-file selection ----
@@ -595,20 +617,29 @@ export function IntakeScreen() {
                 </div>
                 {Object.values(uploads).length > 0 && (
                   <ul className="border border-line rounded-lg bg-surface divide-y divide-line text-sm" aria-live="polite">
-                    {Object.values(uploads).map((u) => (
-                      <li key={u.filename} className="flex items-center justify-between gap-3 px-4 py-2">
-                        <span className="truncate min-w-0">{u.filename}</span>
-                        {u.status === 'error' ? (
-                          <span className="dw-pill-warn shrink-0"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />{u.error}</span>
-                        ) : u.status === 'pending' ? (
-                          // Not a failure — extraction is still running server-side past the
-                          // 15-minute poll window. Neutral pill, not the warn pill errors get.
-                          <span className="dw-pill-muted shrink-0">{UPLOAD_LABEL.pending}</span>
-                        ) : (
-                          <span className="shrink-0 text-ink-2">{UPLOAD_LABEL[u.status]}</span>
-                        )}
-                      </li>
-                    ))}
+                    {Object.values(uploads).map((u) => {
+                      // Once the read step itself is done, the row switches to the
+                      // document's own live stage pill — Extracting/Linked/AI
+                      // verified as review and sync move it along — so it never
+                      // looks frozen on a generic "Read" forever.
+                      const liveDoc = uploadDocIds[u.filename] ? graph.docs[uploadDocIds[u.filename] as string] : undefined;
+                      return (
+                        <li key={u.filename} className="flex items-center justify-between gap-3 px-4 py-2">
+                          <span className="truncate min-w-0">{u.filename}</span>
+                          {u.status === 'error' ? (
+                            <span className="dw-pill-warn shrink-0"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />{u.error}</span>
+                          ) : u.status === 'pending' ? (
+                            // Not a failure — extraction is still running server-side past the
+                            // 15-minute poll window. Neutral pill, not the warn pill errors get.
+                            <span className="dw-pill-muted shrink-0">{UPLOAD_LABEL.pending}</span>
+                          ) : (u.status === 'done' || u.status === 'queued') && liveDoc ? (
+                            <span className="shrink-0"><StagePill stage={liveDoc.stage} ai={liveDoc.verifiedBy === 'ai'} compact /></span>
+                          ) : (
+                            <span className="shrink-0 text-ink-2">{UPLOAD_LABEL[u.status]}</span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
                 <ul className="divide-y divide-line border border-line rounded-lg bg-surface">

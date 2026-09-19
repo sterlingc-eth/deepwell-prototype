@@ -6,6 +6,13 @@ import { IngestError } from "./readDocument.js";
 import { deriveWarranty } from "./warrantyRules.js";
 import { withCache, modelCallLogLine } from "./promptCache.js";
 import { recordModelCall } from "./usage.js";
+import {
+  normalizeDocumentType,
+  resolveDocumentType,
+  isLegacyOrUnknownType,
+  completenessFor,
+  AI_VERIFY_MIN_CONFIDENCE,
+} from "./documentTypes.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -142,9 +149,20 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // lands, findOrCreateEquipment silently drops this key from `incoming` the
   // same way it already drops any key not on its list, so passing it early
   // is inert rather than wrong, and starts working the moment that list grows.
-  const candidateType = documentType || doc.document_type || inferDocumentType(facts);
-  const isInstallShaped = candidateType === 'install_record'
-    || (candidateType === 'invoice' && !!facts.installation_date);
+  const classification = documentType
+    ? { documentType: normalizeDocumentType(documentType, facts), confidence: 1, source: 'explicit' }
+    : resolveDocumentType(toolUse?.input, facts, doc.original_filename);
+
+  // A human (via review.classifyDocument) or an earlier pass already decided
+  // this document's type; a routine re-extraction must not quietly relabel
+  // it. An explicit `documentType` argument is the one thing allowed to
+  // override that decision.
+  const existingIsDecided = classification.source !== 'explicit'
+    && doc.document_type && !isLegacyOrUnknownType(doc.document_type);
+  const resolvedType = existingIsDecided ? doc.document_type : classification.documentType;
+
+  const isInstallShaped = resolvedType === 'startup-sheet'
+    || (resolvedType === 'invoice' && !!facts.installation_date);
   const equipmentFacts = isInstallShaped && facts.technician
     ? { ...facts, installed_by: facts.technician }
     : facts;
@@ -198,10 +216,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // its whole extracted-fields section on that column being set, which meant a
     // document that HAD been fully extracted rendered as a blank slate and a
     // technician was invited to key it all in again.
-    // Same value computed above for equipmentFacts — recomputing it here (an
-    // identical, deterministic expression) would just be two names for one
-    // thing.
-    const resolvedType = candidateType;
+    // resolvedType is computed above, before the transaction, from the same
+    // classification/override precedence equipmentFacts already used.
     if (resolvedType && resolvedType !== doc.document_type) {
       await db.updateDocument(documentId, { document_type: resolvedType });
     }
@@ -218,6 +234,17 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // stage, so the client's "is this document linked" question has an honest
     // answer without a human having to click anything.
     if (entity?.id) await db.markLinked(documentId);
+
+    // AI self-verification: every required field for this type is present at
+    // AI_VERIFY_MIN_CONFIDENCE or better, and the document is actually linked
+    // to a record. verifyByAi (recordsStore.js) re-checks the link itself in
+    // SQL, forward-only — this is a cheap pre-check, not the source of truth.
+    const completeness = completenessFor(resolvedType, fields);
+    let aiVerified = false;
+    if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
+      aiVerified = (await db.verifyByAi(documentId)) > 0;
+    }
+
     await db.logAction({
       action: "document.fields_extracted",
       resource_type: "document",
@@ -240,6 +267,11 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         // no customer to link — the two are distinguishable via customer_id
         // above being non-null with customer_linked false.
         customer_linked: linked > 0,
+        document_type: resolvedType,
+        document_type_confidence: classification.confidence,
+        document_type_source: classification.source,
+        completeness_missing: completeness.missing,
+        ai_verified: aiVerified,
       },
     });
     return {
@@ -247,6 +279,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       documentType: resolvedType ?? null,
       entityId: entity?.id ?? null,
       customerId: customer?.id ?? null,
+      completeness,
+      aiVerified,
     };
   });
 
@@ -255,6 +289,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     documentType: written.documentType,
     entityId: written.entityId,
     customerId: written.customerId,
+    completeness: written.completeness,
+    aiVerified: written.aiVerified,
     fields,
     dropped,
     truncated,
@@ -263,19 +299,4 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     pagesTotal: pages.length,
     warranty,
   };
-}
-
-/**
- * What kind of document this is, from the fields that came out of it. Only ever
- * a fallback: an explicit documentType from the caller, or one already on the
- * row, wins. The point is that the column stops being null, not that the label
- * is subtle — a human reclassifies it in review.
- */
-function inferDocumentType(facts) {
-  if (facts.warranty_registered_date || facts.warranty_expires || facts.warranty_term) return "warranty";
-  if (facts.invoice_number || facts.cost) return "invoice";
-  if (facts.service_date || facts.technician || facts.work_performed) return "service_ticket";
-  if (facts.installation_date) return "install_record";
-  if (facts.serial_number || facts.model) return "equipment_record";
-  return "document";
 }

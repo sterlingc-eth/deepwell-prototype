@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Copy, GitMerge, Link2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Copy, GitMerge, Link2, Sparkles } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { STAGE_LABEL } from '../components/StagePill';
 import { docCountsByStage, docsLinkedTo, duplicateDocs, entitiesOfType, gapDocs, openConflicts, unlinkedDocs, useGraph } from '../core/entityGraph';
@@ -22,6 +22,8 @@ export function RecordsScreen() {
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const openEntity = useAppStore((s) => s.openEntity);
   const askQuestion = useAppStore((s) => s.askQuestion);
+  const reclassifyDocs = useGraph((s) => s.reclassifyDocs);
+  const aiVerifyDoc = useGraph((s) => s.aiVerifyDoc);
 
   const counts = docCountsByStage(graph);
   const total = Object.values(graph.docs).length;
@@ -29,6 +31,35 @@ export function RecordsScreen() {
   const gaps = gapDocs(graph).length;
   const conflicts = openConflicts(graph).length;
   const dups = duplicateDocs(graph).length;
+  const aiVerified = Object.values(graph.docs).filter((d) => d.verifiedBy === 'ai').length;
+
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+
+  // "Reclassify & verify all": a no-model cleanup pass over every synced
+  // document (reviewStore.js's reclassifyDocuments only touches legacy/null
+  // types, so re-running this is always safe), then an AI-verify attempt on
+  // whatever still isn't verified. Sequential on purpose — this is an
+  // occasional maintenance action, not something to hammer the API with.
+  const runReclassifyAndVerifyAll = async () => {
+    setBulkRunning(true);
+    setBulkProgress('Reclassifying…');
+    const ids = Object.keys(useGraph.getState().docs);
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      await reclassifyDocs(batch);
+      setBulkProgress(`Reclassifying… ${Math.min(i + batch.length, ids.length)}/${ids.length}`);
+    }
+    const toVerify = Object.values(useGraph.getState().docs).filter((d) => d.stage !== 'verified');
+    let verified = 0;
+    for (const doc of toVerify) {
+      const ok = await aiVerifyDoc(doc.id);
+      if (ok) verified += 1;
+      setBulkProgress(`Verifying with AI… ${toVerify.indexOf(doc) + 1}/${toVerify.length}`);
+    }
+    setBulkProgress(`Done — reclassified ${ids.length} document${ids.length === 1 ? '' : 's'}, AI-verified ${verified} of ${toVerify.length} candidate${toVerify.length === 1 ? '' : 's'}.`);
+    setBulkRunning(false);
+  };
   const batches = Object.values(graph.batches);
   const inProgress = batches.filter((b) => b.documentIds.some((id) => graph.docs[id]?.stage !== 'verified'));
 
@@ -90,6 +121,7 @@ export function RecordsScreen() {
           <h2 id="health-heading" className="dw-label">Health</h2>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <Stat label="Documents" value={total} sub={`${counts.verified} verified · ${Math.round((counts.verified / Math.max(total, 1)) * 100)}%`} />
+            <Stat label="AI verified" value={aiVerified} sub={counts.verified ? `${Math.round((aiVerified / counts.verified) * 100)}% of verified` : 'None yet'} tone={aiVerified ? 'ok' : 'default'} onClick={() => setCurrentScreen('review')} />
             <Stat label="Unlinked inbox" value={unlinked} sub={unlinked ? 'Target is zero' : 'Clear'} tone={unlinked ? 'warn' : 'ok'} onClick={() => setCurrentScreen('review')} />
             <Stat label="Required-field gaps" value={gaps} sub={gaps ? 'Blocked at Classified' : 'Clear'} tone={gaps ? 'warn' : 'ok'} onClick={() => setCurrentScreen('review')} />
             <Stat label="Conflicts open" value={conflicts} sub={conflicts ? 'Need a decision' : 'Clear'} tone={conflicts ? 'warn' : 'ok'} onClick={() => setCurrentScreen('review')} />
@@ -200,10 +232,16 @@ export function RecordsScreen() {
           </div>
         </section>
 
-        <section className="flex flex-wrap gap-2">
+        <section className="flex flex-wrap items-center gap-2">
           <button type="button" className="dw-btn-secondary" onClick={() => setCurrentScreen('review')}><Link2 className="w-4 h-4" aria-hidden="true" /> Empty the unlinked inbox</button>
           <button type="button" className="dw-btn-secondary" onClick={() => setCurrentScreen('review')}><GitMerge className="w-4 h-4" aria-hidden="true" /> Resolve conflicts</button>
           <button type="button" className="dw-btn-secondary" onClick={() => setCurrentScreen('ingest')}>Open intake</button>
+          {!DEMO_MODE && total > 0 && (
+            <button type="button" className="dw-btn-secondary" disabled={bulkRunning} onClick={() => void runReclassifyAndVerifyAll()}>
+              <Sparkles className="w-4 h-4" aria-hidden="true" /> {bulkRunning ? 'Working…' : 'Reclassify & verify all'}
+            </button>
+          )}
+          {bulkProgress && <span className="text-caption text-ink-3">{bulkProgress}</span>}
         </section>
       </div>
     </AppShell>

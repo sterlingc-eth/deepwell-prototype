@@ -23,6 +23,7 @@
  */
 import { requireAuth, denyAuth } from './_lib/auth.js';
 import * as reviewStore from './_lib/reviewStore.js';
+import { deleteDocuments } from './_lib/routes/document-delete.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
@@ -38,6 +39,9 @@ const ACTIONS = new Set([
   'mergeEntities',
   'listLinks',
   'listCorrections',
+  'deleteDocuments',
+  'aiVerify',
+  'reclassify',
 ]);
 
 export default async (req, res) => {
@@ -95,6 +99,15 @@ export default async (req, res) => {
         break;
       case 'listCorrections':
         result = await reviewStore.listCorrections(ctx, payload);
+        break;
+      case 'deleteDocuments':
+        result = await deleteDocuments(ctx, payload, auth);
+        break;
+      case 'aiVerify':
+        result = await reviewStore.aiVerifyDocument(ctx, payload, auth.userId);
+        break;
+      case 'reclassify':
+        result = await reviewStore.reclassifyDocuments(ctx, payload, auth.userId);
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

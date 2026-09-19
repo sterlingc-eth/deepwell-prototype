@@ -283,16 +283,158 @@ export const BRAND_RULES = {
     ],
   },
 
+  // ---- ICP (Carrier-family) brands: one shared certificate shape (90-day
+  // window, 5-year unregistered floor, 10-year registered, no election gate
+  // unlike Carrier's own line). Heil and Tempstar were read directly; the
+  // remaining ICP siblings publish the same certificate structure but were
+  // not fetched individually this session — see docs/HVAC_WARRANTY_RESEARCH.md.
+  heil: {
+    label: 'Heil',
+    rule: { registrationWindowDays: 90, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'high',
+    verified: '2026-09-19',
+    source: 'https://www.heil-hvac.com/en/us/product-registration-warranty',
+  },
+  tempstar: {
+    label: 'Tempstar',
+    rule: { registrationWindowDays: 90, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'high',
+    verified: '2026-09-19',
+    source: 'https://www.tempstar.com/en/us/product-registration-warranty',
+  },
+  comfortmaker: {
+    label: 'Comfortmaker',
+    rule: { registrationWindowDays: 90, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'medium',
+    verified: '2026-09-19',
+    source: 'https://www.comfortmaker.com/en/us/product-registration-warranty',
+    caveats: ["Not independently fetched this session; ICP siblings (Heil, Tempstar) confirm the same certificate structure."],
+  },
+  'day and night': {
+    label: 'Day & Night',
+    rule: { registrationWindowDays: 90, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'medium',
+    verified: '2026-09-19',
+    source: 'https://www.dayandnight.com/en/us/product-registration-warranty',
+    aliases: ['day night'],
+    caveats: ["Not independently fetched this session; ICP siblings (Heil, Tempstar) confirm the same certificate structure."],
+  },
+  keeprite: {
+    label: 'KeepRite',
+    rule: { registrationWindowDays: 90, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'medium',
+    verified: '2026-09-19',
+    source: 'https://www.keeprite.com/en/us/product-registration-warranty',
+    caveats: ["Not independently fetched this session; ICP siblings (Heil, Tempstar) confirm the same certificate structure."],
+  },
+  arcoaire: {
+    label: 'Arcoaire',
+    rule: { registrationWindowDays: 90, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'medium',
+    verified: '2026-09-19',
+    source: 'https://www.arcoaire.com/en/us/product-registration-warranty',
+    caveats: ["Not independently fetched this session; ICP siblings (Heil, Tempstar) confirm the same certificate structure."],
+  },
+
+  // ---- Lennox-family "Allied Air" badge line: same 60/5/10 shape as Lennox
+  // Merit/Elite, verified on each sibling's own page (Armstrong, AirEase) or
+  // corroborated by them (Ducane's own page states the 60-day window and
+  // 5-year floor but not the registered figure explicitly).
+  armstrong: {
+    label: 'Armstrong Air',
+    rule: { registrationWindowDays: 60, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'high',
+    verified: '2026-09-19',
+    source: 'https://www.armstrongair.com/buyers-guide/warranty/',
+    aliases: ['armstrong air'],
+    caveats: ['Heat exchanger warranty (20yr unregistered / lifetime registered) is not modeled — only the parts term.'],
+  },
+  airease: {
+    label: 'AirEase',
+    rule: { registrationWindowDays: 60, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'high',
+    verified: '2026-09-19',
+    source: 'https://www.airease.com/planning/warranty/',
+    caveats: ['Heat exchanger warranty (20yr unregistered / lifetime registered) is not modeled — only the parts term.'],
+  },
+  ducane: {
+    label: 'Ducane',
+    rule: { registrationWindowDays: 60, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'medium',
+    verified: '2026-09-19',
+    source: 'https://www.ducanehvac.com/owner-support/warranty-registration/',
+    caveats: [
+      "Ducane's own page states the 60-day window and 5-year unregistered floor but not the registered figure; " +
+        '10 years is corroborated from sibling Allied Air brands (Armstrong Air, AirEase), not an exact quote from Ducane itself.',
+    ],
+  },
+
+  // ---- Napoleon: cheap, low-volume residential brand. Clean 60/5/10 shape,
+  // its own page, no family caveats.
+  napoleon: {
+    label: 'Napoleon',
+    rule: { registrationWindowDays: 60, unregisteredPartsYears: 5, registeredPartsYears: 10 },
+    confidence: 'high',
+    verified: '2026-09-19',
+    source: 'https://napoleonproducts.com/downloads/hvac/warranty/NAP%20MFG%20Warranty_AC_SEER_13_14_16_EN.pdf',
+  },
+
+  // ---- Mitsubishi Electric Trane HVAC US (METUS): 90-day window, 5-year
+  // unregistered floor (7-year compressor, not modeled — this schema tracks
+  // one parts term only). The registered ceiling depends on TWO facts we
+  // don't collect (owner-occupied, AND Diamond/Ductless-Pro contractor tier
+  // for the top 12-year figure) — modeled the same conservative way as
+  // Daikin's single-fact gate, with the contractor-tier distinction disclosed
+  // rather than guessed.
+  mitsubishi: {
+    label: 'Mitsubishi Electric',
+    rule: {
+      registrationWindowDays: 90,
+      unregisteredPartsYears: 5,
+      registeredPartsYears: null,
+      conditionalRegisteredTerms: [
+        {
+          years: 10,
+          factKey: 'owner_occupied',
+          factValue: true,
+          description:
+            'the home is owner-occupied (a Diamond Contractor/Ductless Pro install may reach 12 years — that ' +
+            'contractor-tier fact is not modeled; confirm separately)',
+        },
+      ],
+    },
+    confidence: 'medium',
+    verified: '2026-09-19',
+    source: 'https://www.acdirect.com/media/specs/Mitsubishi/mitsubishi-r454b-warranty.pdf',
+    aliases: ['mitsubishi electric'],
+    caveats: ['Source is a dealer-hosted copy of the manufacturer certificate, not fetched directly from mitsubishicomfort.com.'],
+  },
+
   // ---- recognised, NOT yet verified. These deliberately compute nothing. ----
+  // york/coleman/luxaire: as of 2026-09-19, york.com's warranty pages 302
+  // redirect to a Bosch parent landing page (york.bosch-hcgroup.com) with no
+  // terms reachable — same brand family, same gap.
   york: { label: 'York', rule: null },
   coleman: { label: 'Coleman', rule: null },
   luxaire: { label: 'Luxaire', rule: null },
-  mitsubishi: { label: 'Mitsubishi Electric', rule: null, aliases: ['mitsubishi electric'] },
+  // fujitsu: fujitsugeneral.com's own AIRSTAGE warranty PDF states the terms
+  // (5yr/7yr unregistered parts/compressor; 10yr registered; 12yr via Elite
+  // contractor) but never states a registration DEADLINE in days — the one
+  // number this schema needs to compute anything. See research doc.
   fujitsu: { label: 'Fujitsu', rule: null },
+  // bosch: bosch-homecomfort.com states registration does NOT change parts
+  // coverage (flat per its own FAQ) — this schema's registration-window shape
+  // doesn't fit a brand where registering changes nothing about the parts
+  // term. Modeling it would either invent a deadline that doesn't matter or
+  // produce a "register to secure X years instead of X" message, which is
+  // wrong. Left unmodeled rather than forced into the wrong shape.
   bosch: { label: 'Bosch', rule: null },
-  heil: { label: 'Heil', rule: null },
-  tempstar: { label: 'Tempstar', rule: null },
+  // maytag: registered figure is stated (12yr, Nordyne/Nortek "M1200"/"M120"
+  // lines) but the unregistered floor — the number this schema needs as its
+  // guaranteed minimum — is not stated anywhere found.
   maytag: { label: 'Maytag', rule: null },
+  // nordyne: umbrella/OEM name, not itself a product line with a published
+  // consumer warranty page.
   nordyne: { label: 'Nordyne', rule: null },
 };
 
@@ -697,6 +839,75 @@ export function describeWarranty(stable, today, { expiringWithinDays = 365 } = {
   }
 
   return out;
+}
+
+/* ------------------------------------------------------------------ alerts */
+
+/**
+ * Bucket a stored derivation into one alert tier for the reminder/alerts UI.
+ *
+ * Pure: no clock read except `today`. Priority order matters — a registration
+ * deadline closing in the next 30 days is the most operationally urgent case
+ * (missing it silently costs years of coverage) and is reported even if the
+ * unregistered-floor expiry it would otherwise bucket into is further out.
+ *
+ * @param {ReturnType<typeof deriveWarranty>} stable
+ * @param {string|null} today YYYY-MM-DD
+ * @returns {'expired'|'expiring-30'|'expiring-90'|'expiring-365'|'unregistered-window-closing'|'ok'|'unknown'}
+ */
+export function alertTier(stable, today) {
+  if (!today || !isPlausibleToday(today)) return 'unknown';
+
+  if (!stable?.registrationOnFile && stable?.registrationDeadline) {
+    const daysToRegister = daysBetween(today, stable.registrationDeadline);
+    if (daysToRegister !== null && daysToRegister >= 0 && daysToRegister <= 30) {
+      return 'unregistered-window-closing';
+    }
+  }
+
+  const daysToExpiry = stable?.expires ? daysBetween(today, stable.expires) : null;
+  if (daysToExpiry === null) return 'unknown';
+  if (daysToExpiry < 0) return 'expired';
+  if (daysToExpiry <= 30) return 'expiring-30';
+  if (daysToExpiry <= 90) return 'expiring-90';
+  if (daysToExpiry <= 365) return 'expiring-365';
+  return 'ok';
+}
+
+/**
+ * Whether this unit is worth an extended-warranty / maintenance-agreement
+ * pitch, and why. Conservative: eligibility always names the fact that earned
+ * it, never a guess. Three independent reasons can apply (a unit can be both
+ * expired AND parts-only) — all that apply are listed.
+ *
+ *   1. Expired parts warranty.
+ *   2. Expiring within 365 days (the window is still open — sell now).
+ *   3. A verified brand rule, which in this file always means parts-only
+ *      coverage (no labor term is ever modeled here) — a standing labor/
+ *      maintenance-agreement gap regardless of how close to expiry.
+ *
+ * @param {ReturnType<typeof deriveWarranty>} stable
+ * @param {string|null} today
+ * @returns {{eligible: boolean, reason: string}}
+ */
+export function upsell(stable, today) {
+  const reasons = [];
+  const tier = alertTier(stable, today);
+
+  if (tier === 'expired') {
+    reasons.push('Parts warranty has expired — pitch an extended warranty or maintenance agreement.');
+  } else if (tier === 'expiring-30' || tier === 'expiring-90' || tier === 'expiring-365') {
+    reasons.push('Parts warranty expires within the next year — the extended-warranty window is still open.');
+  }
+
+  if (stable?.brand && BRAND_RULES[stable.brand]?.rule) {
+    reasons.push(
+      `${stable.brandLabel ?? 'The manufacturer'}'s warranty covers parts only — no labor term is modeled, ` +
+      'so a maintenance agreement fills a real gap regardless of expiry.'
+    );
+  }
+
+  return { eligible: reasons.length > 0, reason: reasons.join(' ') || 'No upsell signal on file.' };
 }
 
 /**

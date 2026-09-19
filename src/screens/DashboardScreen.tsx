@@ -1,14 +1,84 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, AlertTriangle, Check, Copy, FileText, Link2, ShieldCheck } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, AlertTriangle, Check, ClipboardList, Copy, FileText, Link2, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { WarrantyStatusBadge, warrantyStatus } from '../components/WarrantyStatusBadge';
+import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
 import { docCountsByStage, entitiesOfType, openConflicts, unlinkedDocs, useGraph } from '../core/entityGraph';
 import { dateOf, fmtDate, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { deepLinkFor } from '../hooks/useDeepLink';
 import { useAppStore } from '../store/appStore';
+import { authHeader } from '../services/authToken';
 
 const DAY = 86400000;
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
+/** One row of POST /api/warranty-attention's `items` — see
+ *  api/warranty-attention.js and api/_lib/warrantyRules.js (`alertTier`,
+ *  `upsell`). Kept local: this is the only screen that reads this endpoint. */
+interface AttentionItem {
+  entityId: string;
+  serialNumber: string | null;
+  model: string | null;
+  manufacturer: string | null;
+  serviceAddress: string | null;
+  customerName: string | null;
+  expires: string | null;
+  registrationDeadline: string | null;
+  tier: AlertTier;
+  daysLeft: number | null;
+  upsell: { eligible: boolean; reason: string };
+}
+interface AttentionResponse {
+  today: string;
+  items: AttentionItem[];
+  summary: {
+    expired: number;
+    expiring30: number;
+    expiring90: number;
+    expiring365: number;
+    registrationClosing: number;
+    upsellEligible: number;
+  };
+}
+
+/** Alert cards shown on the dashboard, in priority order. `upsell` is not a
+ *  tier — it's `item.upsell.eligible` across every item, so a unit can show
+ *  up here and in another card too. */
+type AlertCardKey = 'expired' | 'expiring-30' | 'expiring-90' | 'unregistered-window-closing' | 'upsell';
+const ALERT_CARDS: { key: AlertCardKey; title: string }[] = [
+  { key: 'expired', title: 'Expired' },
+  { key: 'expiring-30', title: 'Expiring in 30 days' },
+  { key: 'expiring-90', title: 'Expiring in 90 days' },
+  { key: 'unregistered-window-closing', title: 'Registration closing' },
+  { key: 'upsell', title: 'Upsell candidates' },
+];
+
+function itemsForCard(items: AttentionItem[], key: AlertCardKey): AttentionItem[] {
+  return key === 'upsell' ? items.filter((i) => i.upsell.eligible) : items.filter((i) => i.tier === key);
+}
+
+/** Plain-text extended-warranty / maintenance-agreement pitch. Template only —
+ *  no model call, per the brief. Copied to the clipboard for the rep to paste. */
+function outreachDraft(item: AttentionItem): string {
+  const name = item.customerName || 'there';
+  const unit = [item.manufacturer, item.model].filter(Boolean).join(' ') || 'HVAC unit';
+  const where = item.serviceAddress ? ` at ${item.serviceAddress}` : '';
+  const status =
+    item.tier === 'expired'
+      ? `is no longer covered by ${item.manufacturer ?? 'the manufacturer'}'s parts warranty${item.expires ? ` (expired ${item.expires})` : ''}`
+      : item.tier === 'unregistered-window-closing'
+        ? `still needs to be registered with ${item.manufacturer ?? 'the manufacturer'} — the window to lock in the full parts term closes ${item.registrationDeadline ?? 'soon'}`
+        : item.expires
+          ? `is nearing the end of its ${item.manufacturer ?? 'manufacturer'} parts warranty (expires ${item.expires})`
+          : `may not be fully covered for labor even while parts are still under warranty`;
+  return (
+    `Hi ${name},\n\n` +
+    `Our records show your ${unit}${where} ${status}.\n\n` +
+    `We offer an extended warranty / maintenance agreement that covers parts and labor beyond the manufacturer's ` +
+    `terms, so a future repair doesn't come as a surprise bill. Want me to send over the options?\n\n` +
+    `Thanks`
+  );
+}
 
 /**
  * The office view. Every row is a question — click it and the Ask screen
@@ -45,7 +115,47 @@ export function DashboardScreen() {
       .filter((d): d is Date => !!d)
       .sort((a, b) => b.getTime() - a.getTime())[0];
 
+  // Alerts: from POST /api/warranty-attention, not the client-side entity
+  // graph — registration deadlines and upsell reasons need the server's
+  // brand-rule derivation (warrantyRules.js), which the graph doesn't carry.
+  // Skipped in demo mode, which has no backend to call.
+  const [attention, setAttention] = useState<AttentionResponse | null>(null);
+  const [openCard, setOpenCard] = useState<AlertCardKey | null>(null);
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/warranty-attention', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as AttentionResponse;
+        if (!cancelled) setAttention(data);
+      } catch {
+        /* Alerts are a bonus on this screen, not load-bearing — fail quiet. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [draftedId, setDraftedId] = useState<string | null>(null);
+  const draftOutreach = (item: AttentionItem) => {
+    void navigator.clipboard
+      .writeText(outreachDraft(item))
+      .then(() => {
+        setDraftedId(item.entityId);
+        window.setTimeout(() => setDraftedId((id) => (id === item.entityId ? null : id)), 1500);
+      })
+      .catch(() => {
+        /* clipboard unavailable — nothing to fall back to here */
+      });
+  };
   const copyLink = (entityId: string) => {
     void navigator.clipboard
       .writeText(deepLinkFor({ entityId }))
@@ -109,6 +219,77 @@ export function DashboardScreen() {
             Ask a question <ArrowRight className="w-4 h-4" aria-hidden="true" />
           </button>
         </header>
+
+        {attention && attention.items.length > 0 && (
+          <section aria-labelledby="alerts-heading" className="space-y-3">
+            <h2 id="alerts-heading" className="dw-label">Alerts</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {ALERT_CARDS.map(({ key, title }) => {
+                const count = itemsForCard(attention.items, key).length;
+                const isOpen = openCard === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setOpenCard((k) => (k === key ? null : key))}
+                    className={`dw-card p-4 text-left hover:shadow-lift transition-shadow duration-quick ${isOpen ? 'ring-2 ring-accent' : ''}`}
+                    aria-expanded={isOpen}
+                  >
+                    <div className="flex items-start justify-between">
+                      <p className="text-caption text-ink-3">{title}</p>
+                      <ClipboardList className="w-4 h-4 text-ink-3" aria-hidden="true" />
+                    </div>
+                    <p className="font-display text-h1 mt-1">{count}</p>
+                  </button>
+                );
+              })}
+            </div>
+            {openCard && (
+              <ul className="space-y-2">
+                {itemsForCard(attention.items, openCard).map((item) => (
+                  <li key={item.entityId} className="dw-card p-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-data text-ink">{item.serialNumber ?? '—'}</p>
+                      <p className="text-ink">
+                        {[item.manufacturer, item.model].filter(Boolean).join(' ') || 'Unknown unit'}
+                        {item.customerName ? ` · ${item.customerName}` : ''}
+                        {item.serviceAddress ? ` · ${item.serviceAddress}` : ''}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <WarrantyStatusBadge warranty={{ warrantyExpiry: null }} tier={item.tier} />
+                        <span className="text-body text-ink-3">
+                          {item.tier === 'unregistered-window-closing'
+                            ? item.registrationDeadline
+                              ? `Register by ${item.registrationDeadline}`
+                              : 'Registration due soon'
+                            : item.expires
+                              ? `Expires ${item.expires}`
+                              : 'No expiry on file'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => askQuestion(item.serialNumber ? `Is ${item.serialNumber} under warranty?` : 'Which units are out of warranty?')}
+                        className="dw-btn-tertiary !min-h-[36px] !py-1"
+                      >
+                        Ask about this unit
+                      </button>
+                      <button type="button" onClick={() => draftOutreach(item)} className="dw-btn-secondary !min-h-[36px] !py-1">
+                        {draftedId === item.entityId ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : null}
+                        {draftedId === item.entityId ? 'Copied' : 'Draft outreach'}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+                {itemsForCard(attention.items, openCard).length === 0 && (
+                  <li className="text-body text-ink-3">Nothing in this bucket right now.</li>
+                )}
+              </ul>
+            )}
+          </section>
+        )}
 
         <section aria-label="Overview" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[

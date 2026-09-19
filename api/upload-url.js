@@ -32,6 +32,14 @@ import { limit } from "./_lib/rateLimit.js";
  * exactly rather than re-implementing document creation and presigning a
  * second time.
  *
+ * OPEN ORIGINAL (agent-docs-access, handoffs/TEAM_BRIEF_2026-09-19.md): body
+ * may instead be { mode: 'get', documentId } -> { url, contentType, filename,
+ * expiresIn }, a presigned R2 GET (15 min) for that document's own bytes,
+ * tenant-scoped through the same withTenant() as every other lookup here.
+ * Shares this route's existing auth/rate-limit gate rather than adding a new
+ * one (see the handler) — reading a document you can already presign an
+ * upload for is not a wider capability grant.
+ *
  * BATCH MODE (bulk import): body may instead be { files: [{filename, sha256,
  * contentType?, sizeBytes?}, ...] }, up to MAX_BATCH_FILES entries, and the
  * response is { results: [...] } with one entry per input file IN THE SAME
@@ -264,6 +272,53 @@ export async function createUploadUrls(auth, files) {
   );
 }
 
+/** Thrown for a bad `mode: 'get'` request. `.status` is the HTTP status to report. */
+export class DocumentGetError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.name = "DocumentGetError";
+    this.status = status;
+  }
+}
+
+/**
+ * OPEN ORIGINAL: presign a short-lived GET for a document's own stored
+ * bytes, tenant-scoped via withTenant() exactly like every curated
+ * recordsStore.js lookup. `response-content-disposition` is passed through
+ * to presign()'s extraQuery so the browser renders a PDF/image inline
+ * instead of prompting a download; R2's presigned-GET support for that
+ * override query param comes free from being S3-API-compatible.
+ *
+ * @param {{tenantId: string, orgId: string|null}} auth
+ * @param {unknown} documentId
+ * @throws {DocumentGetError} bad/missing id, or no such document in this tenant
+ * @throws {StorageUnavailableError} when R2 is not configured
+ */
+export async function getOriginalUrl(auth, documentId) {
+  if (typeof documentId !== "string" || !documentId.trim()) {
+    throw new DocumentGetError("documentId is required");
+  }
+  return withTenant(
+    { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+    async (db) => {
+      const doc = await db.getDocument(documentId);
+      if (!doc || !doc.storage_key) {
+        throw new DocumentGetError("Document not found", 404);
+      }
+      const filename = doc.original_filename || "document";
+      let url;
+      try {
+        url = presign("GET", doc.storage_key, 900, {
+          "response-content-disposition": `inline; filename="${filename.replace(/"/g, "")}"`,
+        });
+      } catch (err) {
+        throw new StorageUnavailableError(err);
+      }
+      return { url, contentType: doc.content_type ?? null, filename, expiresIn: 900 };
+    }
+  );
+}
+
 /** Shared by this route and v1-ingest.js: map createUploadUrl()'s thrown errors to an HTTP response. */
 export function respondUploadError(res, req, error) {
   if (error?.name === "UploadValidationError") {
@@ -298,6 +353,12 @@ export default async function handler(req, res) {
   if (!(await limit(req, res, auth, "ingest", undefined, batchCost))) return; // 429 already written
 
   try {
+    // OPEN ORIGINAL: { mode: 'get', documentId } -> presigned GET. Checked
+    // first and does not touch the PUT/batch paths below at all.
+    if (req.body && req.body.mode === "get") {
+      const result = await getOriginalUrl(auth, req.body.documentId);
+      return handleCors(res, req).status(200).json(result);
+    }
     // Batch shape: { files: [...] } -> { results: [...] }. One request, one
     // rate-limit charge and one usage_counters increment cover the whole
     // batch today — see the daily-cap note in HANDOFF-C.md for the tradeoff.
@@ -308,6 +369,9 @@ export default async function handler(req, res) {
     const result = await createUploadUrl(auth, req.body);
     return handleCors(res, req).status(200).json(result);
   } catch (error) {
+    if (error?.name === "DocumentGetError") {
+      return handleCors(res, req).status(error.status).json({ error: error.message });
+    }
     return respondUploadError(res, req, error);
   }
 }

@@ -20,7 +20,7 @@ import type {
   SourceRef,
 } from './types';
 import { PIPELINE_STAGES } from './types';
-import { reviewClient } from '../services/reviewClient';
+import { reviewClient, type ReviewCompleteness } from '../services/reviewClient';
 
 /**
  * Demo mode keeps the whole graph in memory on purpose (its own fixture data
@@ -80,6 +80,14 @@ interface GraphActions {
   resolveConflict: (conflictId: string, value: string, by: string) => void;
   /** Review: merge a duplicate into its original (drops the copy). */
   mergeDuplicate: (docId: DocumentId) => void;
+  /** Review: AI VERIFICATION CONTRACT — ask the server to verify this doc if
+   *  it's complete and confident enough. Resolves false (no throw) when it
+   *  isn't; a real transport failure sets `lastError` same as the others. */
+  aiVerifyDoc: (docId: DocumentId) => Promise<boolean>;
+  /** Review: batch, no-model reclassification of legacy/unknown types. Resolves the number actually changed. */
+  reclassifyDocs: (docIds: DocumentId[]) => Promise<number>;
+  /** Review: drop a document locally after its server-side delete succeeded. */
+  removeDoc: (docId: DocumentId) => void;
   /** Intake: create a batch. */
   createBatch: (input: { name: string; source: IntakeSource; from: Date; to: Date; by: string }) => string;
   /** Intake: add received documents to a batch (mock upload). */
@@ -102,6 +110,14 @@ export type GraphStore = GraphSnapshot & GraphActions;
 
 const stageIndex = (s: PipelineStage) => PIPELINE_STAGES.indexOf(s);
 
+/** A requirement may be `a|b` — either extracted field key satisfies it. */
+export function splitAlternatives(requirement: string): string[] {
+  return requirement.split('|');
+}
+export function isRequirementMet(present: Set<string>, requirement: string): boolean {
+  return splitAlternatives(requirement).some((k) => present.has(k));
+}
+
 export function isAnswerable(doc: Doc, includeUnverified: boolean): boolean {
   if (doc.issues.some((i) => i.kind === 'duplicate')) return false;
   return includeUnverified ? stageIndex(doc.stage) >= stageIndex('linked') : doc.stage === 'verified';
@@ -113,18 +129,31 @@ export function maxStageFor(doc: Doc, schema: DomainSchema): PipelineStage {
   if (!doc.typeId) return 'received';
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
-  const missing = (type?.requiredFields ?? []).filter((r) => !present.has(r));
+  const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r));
   if (missing.length) return 'classified';
   if (doc.linkedEntityIds.length === 0) return 'extracted';
   if (doc.issues.some((i) => i.kind === 'conflict')) return 'linked';
   return 'verified';
 }
 
-function recomputeIssues(doc: Doc, schema: DomainSchema): Doc {
+/**
+ * Recomputes `issues` from the document's own extracted fields and links.
+ * Required-field gaps are always freshly derived (never trusted from a stale
+ * `issues` array); an 'unlinked' issue is synthesized for a classified but
+ * unattached document when nothing already flagged it — real synced
+ * documents (usePostgresSync.ts) never carry one on arrival, and this is
+ * what makes Records' health tiles and Review's "Unlinked inbox"/"Needs a
+ * person" filters honest for them, not just for the demo fixture (whose own
+ * `unlinked` issues, seeded with a bestGuess, are preserved as-is).
+ */
+export function recomputeIssues(doc: Doc, schema: DomainSchema): Doc {
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
-  const kept = doc.issues.filter((i) => i.kind !== 'missing-field' && !(i.kind === 'unlinked' && doc.linkedEntityIds.length > 0));
-  const missing = (type?.requiredFields ?? []).filter((r) => !present.has(r)).map((f) => ({ kind: 'missing-field' as const, field: f }));
+  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && !(i.kind === 'unlinked' && doc.linkedEntityIds.length > 0));
+  const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r)).map((f) => ({ kind: 'missing-field' as const, field: f }));
+  if (doc.typeId && doc.linkedEntityIds.length === 0 && !kept.some((i) => i.kind === 'unlinked')) {
+    kept = [...kept, { kind: 'unlinked' as const, confidence: 0 }];
+  }
   return { ...doc, issues: [...missing, ...kept] };
 }
 
@@ -302,6 +331,57 @@ export const useGraph = create<GraphStore>((set, get) => ({
     }),
 
   mergeDuplicate: (docId) =>
+    set((s) => {
+      const doc = s.docs[docId];
+      if (!doc) return s;
+      const docs = { ...s.docs };
+      delete docs[docId];
+      const batch = s.batches[doc.batchId];
+      const batches = batch
+        ? { ...s.batches, [doc.batchId]: { ...batch, documentIds: batch.documentIds.filter((id) => id !== docId) } }
+        : s.batches;
+      return { docs, batches };
+    }),
+
+  aiVerifyDoc: async (docId) => {
+    if (DEMO_MODE) return false;
+    try {
+      const { verified, completeness } = await reviewClient.aiVerify(docId);
+      set((s) => {
+        const doc = s.docs[docId];
+        if (!doc) return s;
+        const next: Doc = verified
+          ? { ...doc, stage: 'verified', verifiedBy: 'ai', verifiedAt: new Date(), completeness: completeness as ReviewCompleteness }
+          : { ...doc, completeness: completeness as ReviewCompleteness };
+        return { docs: { ...s.docs, [docId]: next }, lastError: null };
+      });
+      return verified;
+    } catch (err) {
+      set({ lastError: describeError(err) });
+      return false;
+    }
+  },
+
+  reclassifyDocs: async (docIds) => {
+    if (DEMO_MODE || !docIds.length) return 0;
+    try {
+      const { changes } = await reviewClient.reclassify(docIds);
+      set((s) => {
+        const docs = { ...s.docs };
+        for (const c of changes) {
+          const doc = docs[c.documentId];
+          if (doc) docs[c.documentId] = recomputeIssues({ ...doc, typeId: c.to }, s.schema);
+        }
+        return { docs, lastError: null };
+      });
+      return changes.length;
+    } catch (err) {
+      set({ lastError: describeError(err) });
+      return 0;
+    }
+  },
+
+  removeDoc: (docId) =>
     set((s) => {
       const doc = s.docs[docId];
       if (!doc) return s;

@@ -16,8 +16,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { recordsStore } from '../services/recordsStoreClient';
 import { reviewClient, type DocumentLink, type Correction } from '../services/reviewClient';
-import { useGraph } from '../core/entityGraph';
+import { maxStageFor, recomputeIssues, useGraph } from '../core/entityGraph';
 import { hvacSchema } from '../domains/hvac';
+import { normalizeDocumentType } from '../domains/hvac/documentTypes';
 import type { Batch, Doc, Entity, FieldValue, FileType, PipelineStage } from '../core/types';
 import type { Entity as ApiEntity } from '../services/postgresRecordsStore';
 
@@ -57,25 +58,6 @@ interface DocumentRow {
   verified_by?: string | null;
   verified_at?: unknown;
 }
-
-/**
- * Postgres pipeline stages, in the order the browser polls for
- * (`src/services/ingestClient.ts`'s STAGES), lined up against the core
- * pipeline's own five stages (`PIPELINE_STAGES` in core/types.ts). Both are
- * five-stage, received-to-verified pipelines that only ever move forward;
- * this is a positional mapping between them, not a semantic one — Postgres's
- * 'read' (text pulled out, fields not yet mapped) is not the same idea as
- * the core's 'classified' (a document type assigned, fields not yet
- * extracted), but it sits in the same slot, and nothing downstream treats
- * 'classified' as meaning more than "one step past received".
- */
-const STAGE_MAP: Record<DocumentRow['stage'], PipelineStage> = {
-  received: 'received',
-  read: 'classified',
-  mapped: 'extracted',
-  linked: 'linked',
-  verified: 'verified',
-};
 
 /** Parses whatever JSON actually sent back (a string, or nothing) into a Date. */
 function toDateOrNull(value: unknown): Date | null {
@@ -133,8 +115,24 @@ interface ExtractionRow {
  *                   (`f.correctedValue ?? f.value` everywhere a fact is
  *                   read) — the corrected reading is what review answers with.
  */
+/**
+ * The real stage to show, given what Postgres has and what the graph derives.
+ * `STAGE_MAP` alone used to be the whole answer, which is exactly the "read"
+ * vs "classified" mismatch the brief calls out: a document at backend
+ * 'read'/'mapped' with its type set and every required field present is, by
+ * the core pipeline's own rules, already 'extracted' (or 'linked', if it has
+ * links) — not merely "one step past received". 'verified' is never
+ * upgraded to here; it only ever comes from the backend actually verifying
+ * (human or `verified_by: 'ai'`), never inferred client-side.
+ */
+function deriveStage(row: DocumentRow, doc: Doc): PipelineStage {
+  if (row.stage === 'verified') return 'verified';
+  if (row.stage === 'received') return 'received';
+  const ceiling = maxStageFor(doc, hvacSchema);
+  return ceiling === 'verified' ? 'linked' : ceiling;
+}
+
 function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLink[], corrections: Correction[]): Doc {
-  const stage = STAGE_MAP[row.stage] ?? 'received';
   const receivedAt = toDateOrNull(row.created_at) ?? new Date();
   const preview = row.extract_error
     ? `${row.original_filename}\n\nExtraction failed: ${row.extract_error}`
@@ -146,7 +144,16 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
   const linkedFromLinks = links.map((l) => l.entity_id);
   const linkedFromExtractions = extractions.map((x) => x.entity_id).filter((id): id is string => !!id);
 
-  return {
+  // Postgres's `documents.document_type` column is written raw — legacy ids
+  // (warranty/service_ticket/install_record/...) and free text included; only
+  // /api/document-status.js normalizes it server-side, and this sync uses
+  // /api/records.js's listDocuments, which does not. Normalizing here is what
+  // makes typeId always one of the 15 canonical ids (never null/"Unclassified"
+  // for a document that has been extracted — legacy/unknown falls to 'other').
+  const facts = Object.fromEntries(extractions.filter((x) => x.value != null && x.value !== '').map((x) => [x.field_key, x.value]));
+  const typeId = normalizeDocumentType(row.document_type, facts);
+
+  const doc: Doc = {
     id: row.id,
     filename: row.original_filename,
     fileType: fileTypeOf(row),
@@ -157,8 +164,8 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
     // as "already digital" and is the least misleading of the four options.
     source: 'drive',
     receivedAt,
-    typeId: row.document_type ?? null,
-    stage,
+    typeId,
+    stage: 'received', // placeholder — deriveStage below sets the real one
     extracted: extractions.map((x) => {
       const field = EQUIPMENT_FIELD_MAP[x.field_key];
       const correction = correctionByField.get(x.field_key);
@@ -186,6 +193,15 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
     verifiedAt: toDateOrNull(row.verified_at) ?? undefined,
     preview,
   };
+
+  // recomputeIssues fills `issues` (missing-field gaps, an unlinked flag) so
+  // Records' health tiles and Review's filters are true for a synced
+  // document, not just for one built up locally through classifyDoc/linkDoc.
+  // deriveStage then reads those same issues/links to place the document at
+  // its real reachable stage instead of trusting the backend's raw stage
+  // column at face value (see deriveStage's own comment above).
+  const withIssues = recomputeIssues(doc, hvacSchema);
+  return { ...withIssues, stage: deriveStage(row, withIssues) };
 }
 
 /** entities.data keys the real extraction pipeline writes for 'equipment' (api/_lib/extractDocument.js, findOrCreateEquipment) → the hvac schema's field keys. */

@@ -20,7 +20,9 @@
  *
  *   node scripts/verify-answer.mjs
  */
-import { shapeAnswer, buildAllowed, buildPrompt, ANSWER_TOOL } from '../api/_lib/answer.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { shapeAnswer, buildAllowed, buildPrompt, ANSWER_TOOL, NO_ANSWER_TEXT } from '../api/_lib/answer.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -241,6 +243,91 @@ for (const [name, raw] of Object.entries({
     { allowComputed: true }
   );
   eq('computed basis still requires a retrieved document', out.facts, []);
+}
+
+/* ------------------------------------------- 2026-09-19 grounding downgrade */
+// "Show me everything we have on Plaza Dental": model wrote a confident,
+// detailed narrative with dollar figures into `text` while every fact it
+// tried to cite failed sourceIsGrounded() (unretrieved doc/page). Production
+// shipped that narrative anyway with sources: []. text must now be forced to
+// the fixed, honest string whenever facts.length is 0 — the model's own
+// words are never citation-checked, so they can never be trusted on their own.
+
+{
+  const hallucinated = 'Plaza Dental has a 10-year warranty expiring 2031-04-02 and paid $8,450 for the install.';
+  const out = shapeAnswer(
+    {
+      text: hallucinated,
+      facts: [fact({ sources: [{ documentId: 'doc-NEVER-RETRIEVED', location: { page: 1 } }] })],
+      confidence: 0.95,
+    },
+    ALLOWED
+  );
+  eq('ungrounded facts still yield no-answer', out.kind, 'no-answer');
+  eq('a confident hallucinated narrative is never surfaced as text', out.text, NO_ANSWER_TEXT);
+  check('hallucinated dollar figure does not leak into text', !out.text.includes('$8,450'));
+}
+
+{
+  // Same shape, but the model wrote NOTHING in text (empty string) — must
+  // still get the fixed fallback, not an empty answer card.
+  const out = shapeAnswer(
+    { text: '', facts: [fact({ sources: [] })], confidence: 0.9 },
+    ALLOWED
+  );
+  eq('empty model text on no-answer still gets the fixed fallback', out.text, NO_ANSWER_TEXT);
+}
+
+{
+  // A genuinely grounded answer keeps the model's own text untouched.
+  const out = shapeAnswer({ text: 'Expires 2034-03-10.', facts: [fact()], confidence: 0.9 }, ALLOWED);
+  eq('a grounded answer keeps the model\'s text', out.text, 'Expires 2034-03-10.');
+}
+
+/* -------------------------------------------------- closest (no-answer aid) */
+// When every fact is dropped, `closest` should surface what retrieval DID
+// find (never what the model said), deduplicated, so "Closest documents"
+// is never permanently empty just because the model failed to cite properly.
+
+{
+  const candidates = [
+    { documentId: 'doc-real-1', filename: 'invoice.pdf' },
+    { documentId: 'doc-real-2', filename: 'nameplate.jpg' },
+    { documentId: 'doc-real-1', filename: 'invoice.pdf' }, // duplicate
+  ];
+  const out = shapeAnswer(
+    { text: 'x', facts: [fact({ sources: [{ documentId: 'doc-NEVER-RETRIEVED', location: {} }] })], confidence: 0.9 },
+    ALLOWED,
+    { candidates }
+  );
+  eq('closest is deduplicated by documentId', out.closest.map((c) => c.documentId), ['doc-real-1', 'doc-real-2']);
+}
+
+{
+  // A real answer (facts survive) must never carry a "closest" list too.
+  const out = shapeAnswer(
+    { text: 'Expires 2034-03-10.', facts: [fact()], confidence: 0.9 },
+    ALLOWED,
+    { candidates: [{ documentId: 'doc-real-1' }] }
+  );
+  eq('closest is empty on a real answer', out.closest, []);
+}
+
+{
+  // No candidates supplied at all — must not throw, closest stays empty.
+  const out = shapeAnswer({ text: 'x', facts: [], confidence: 0 }, ALLOWED);
+  eq('closest defaults to empty with no candidates option', out.closest, []);
+}
+
+/* --------------------------------------------------- deterministic settings */
+// The same walkthrough saw the SAME question return different dollar figures
+// on two runs — non-determinism in the model call itself. api/ask.js must
+// pin temperature to 0. Static source check (no network, no DB): this is the
+// one thing a pure shapeAnswer() test cannot see, since temperature is a
+// call-site option, not something that flows through shapeAnswer's inputs.
+{
+  const askSrc = readFileSync(fileURLToPath(new URL('../api/ask.js', import.meta.url)), 'utf8');
+  check('api/ask.js pins temperature to 0 for the model call', /temperature:\s*0\b/.test(askSrc));
 }
 
 /* -------------------------------------------------------------- buildAllowed */

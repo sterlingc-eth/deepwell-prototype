@@ -41,7 +41,7 @@ export function AskScreen() {
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [capture, setCapture] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const requestId = useRef(0);
 
   const submit = useCallback(
@@ -50,7 +50,11 @@ export function AskScreen() {
       if (!q) return;
       const id = ++requestId.current;
       setAsked(q);
-      setInput(q);
+      // Cleared, not repopulated: the asked question stays visible above the
+      // answer (AnswerCard's "Asked: ..." line) — repeating it back in the
+      // box too just meant every answer had to be manually cleared before
+      // asking the next thing.
+      setInput('');
       setLoading(true);
       setError(null);
       if (opts.record !== false) pushRecentQuestion(q);
@@ -84,6 +88,15 @@ export function AskScreen() {
     if (!pendingQuestion) inputRef.current?.focus();
   }, [pendingQuestion]);
 
+  // Auto-grow the textarea for a multi-line (Shift+Enter) question, capped by
+  // the max-h-48/overflow-y-auto on the element itself.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     void submit(input);
@@ -110,14 +123,18 @@ export function AskScreen() {
             Ask anything
           </label>
           <div className="relative">
-            <input
+            <textarea
               ref={inputRef}
               id="ask-input"
-              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  // Enter asks; Shift+Enter inserts a newline (the browser's
+                  // default textarea behavior, left alone below).
+                  e.preventDefault();
+                  void submit(input);
+                } else if (e.key === 'Escape') {
                   e.preventDefault();
                   if (input) clear();
                 }
@@ -125,8 +142,9 @@ export function AskScreen() {
               placeholder="Ask anything — an address, a serial, a name, a question…"
               autoComplete="off"
               spellCheck={false}
+              rows={1}
               enterKeyHint="search"
-              className="dw-input pr-[7.5rem] text-body-lg dark:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4"
+              className="dw-input pr-[7.5rem] text-body-lg dark:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4 resize-none overflow-y-auto max-h-48"
               style={{ minHeight: fieldMode ? 60 : 56 }}
             />
             <div className="absolute inset-y-0 right-1.5 flex items-center gap-1">

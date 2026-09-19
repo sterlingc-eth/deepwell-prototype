@@ -1,6 +1,7 @@
 import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuth, denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
+import { normalizeDocumentType, completenessFor, toCompletenessFields } from "./_lib/documentTypes.js";
 
 /**
  * POST /api/document-status
@@ -45,7 +46,23 @@ export default async function handler(req, res) {
   try {
     const documents = await withTenant(
       { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-      (db) => db.getIngestStatus(ids)
+      async (db) => {
+        const rows = await db.getIngestStatus(ids);
+        // One extra query for the whole batch, not one per document — same
+        // shape as recordsStore.js's listExtractionsByDocuments, for the same
+        // reason (this is polled repeatedly while ingestion runs).
+        const extractions = await db.listExtractionsByDocuments(rows.map((d) => d.id));
+        const byDoc = new Map();
+        for (const e of extractions) {
+          if (!byDoc.has(e.document_id)) byDoc.set(e.document_id, []);
+          byDoc.get(e.document_id).push(e);
+        }
+        return rows.map((d) => {
+          const type = normalizeDocumentType(d.document_type);
+          const completeness = completenessFor(type, toCompletenessFields(byDoc.get(d.id) ?? []));
+          return { ...d, document_type: type, completeness };
+        });
+      }
     );
     return handleCors(res, req).status(200).json({ documents });
   } catch (error) {

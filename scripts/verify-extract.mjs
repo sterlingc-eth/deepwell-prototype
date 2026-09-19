@@ -17,10 +17,12 @@ import {
   normalizeFields,
   selectPages,
   stripControlChars,
+  buildExtractPrompt,
   EXTRACT_TOOL,
   FIELD_KEYS,
 } from '../api/_lib/extractFields.js';
 import { sniff, sniffMagicBytes, chunkText } from '../api/_lib/readDocument.js';
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_IDS, resolveDocumentType } from '../api/_lib/documentTypes.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -252,6 +254,35 @@ eq('null input is safe', selectPages(null, 100).pages, []);
   const required = EXTRACT_TOOL.input_schema.properties.fields.items.required;
   check('page_no is required of the model', required.includes('page_no'));
   check('no duplicate field keys', new Set(FIELD_KEYS).size === FIELD_KEYS.length);
+}
+
+/* ----------------------------------------------------- document_type parsing */
+
+{
+  const typeEnum = EXTRACT_TOOL.input_schema.properties.document_type.enum;
+  eq('document_type enum matches the canonical list', typeEnum, DOCUMENT_TYPES.map((t) => t.id));
+  check('document_type is required of the model', EXTRACT_TOOL.input_schema.required.includes('document_type'));
+  check('permit_number is now an extractable field (needed for the permit type)', FIELD_KEYS.includes('permit_number'));
+}
+
+{
+  const prompt = buildExtractPrompt([{ page_no: 1, text: 'hello' }], 'invoice');
+  check('prompt lists every canonical type id', DOCUMENT_TYPES.every((t) => prompt.includes(t.id)));
+  check('prompt tells the model to pick exactly one', /exactly the one id/i.test(prompt));
+}
+
+{
+  // Robust parsing: a valid model answer is trusted; junk falls back to the
+  // deterministic heuristic. See verify-doctypes.mjs for the heuristic's own
+  // coverage — this just confirms extractDocument.js's entry point wires up.
+  const good = resolveDocumentType({ document_type: 'work-order', document_type_confidence: 0.8 }, { service_date: '2024-01-01', technician: 'Bob' }, 'x.pdf');
+  eq('valid tool output is used as-is', good.documentType, 'work-order');
+
+  const junk = resolveDocumentType({ document_type: 'not-a-type', document_type_confidence: 'NaN' }, { cost: '5' }, 'x.pdf');
+  check('junk tool output falls back to a canonical id, never null', DOCUMENT_TYPE_IDS.has(junk.documentType));
+
+  const missing = resolveDocumentType(null, {}, 'x.pdf');
+  eq('missing tool_use input falls back to "other" via the heuristic', missing.documentType, 'other');
 }
 
 /* --------------------------------------------------------- media-type sniffing */

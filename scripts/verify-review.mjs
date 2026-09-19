@@ -17,6 +17,8 @@ import {
   canVerify,
   nextStageAfterCorrection,
   ReviewError,
+  aiVerifyDocument,
+  reclassifyDocuments,
 } from '../api/_lib/reviewStore.js';
 
 let failures = 0;
@@ -102,6 +104,25 @@ eq('correcting a read document leaves it read', nextStageAfterCorrection('read')
 eq('correcting a received document leaves it received', nextStageAfterCorrection('received'), 'received');
 // Idempotent: applying it twice must not fall through to 'received' or anywhere else.
 eq('applying the rule twice from verified settles at linked, not further', nextStageAfterCorrection(nextStageAfterCorrection('verified')), 'linked');
+
+/* --------------------------------------------------- new review.js actions */
+// No database here — this just pins the module's public shape and its
+// no-DB-call fast paths, so a signature change or a broken import surfaces
+// without needing Postgres. Full behavior is covered by documentTypes.js's
+// own tests (verify-doctypes.mjs) plus manual/staging verification against
+// Neon, per the team brief's "no DDL, no live DB in verify scripts" rule.
+check('aiVerifyDocument is exported as a function', typeof aiVerifyDocument === 'function');
+check('reclassifyDocuments is exported as a function', typeof reclassifyDocuments === 'function');
+
+{
+  // Empty/no-id input must short-circuit before ever touching the database.
+  const result = await reclassifyDocuments({ tenantKey: 'unused' }, { documentIds: [] });
+  eq('reclassifyDocuments no-ops on an empty id list without a db call', result, { changes: [] });
+}
+{
+  const result = await reclassifyDocuments({ tenantKey: 'unused' }, {});
+  eq('reclassifyDocuments no-ops with no documentIds at all', result, { changes: [] });
+}
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -1,0 +1,233 @@
+/**
+ * Unit checks for the canonical document-type/classification/completeness
+ * layer. No database, no network, no model.
+ *
+ *   node scripts/verify-doctypes.mjs
+ */
+import {
+  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_IDS,
+  REQUIRED_FIELDS,
+  FIELD_LABELS,
+  AI_VERIFY_MIN_CONFIDENCE,
+  normalizeDocumentType,
+  isLegacyOrUnknownType,
+  inferDocumentType,
+  resolveDocumentType,
+  completenessFor,
+  toCompletenessFields,
+} from '../api/_lib/documentTypes.js';
+
+let failures = 0;
+const check = (name, ok, detail = '') => {
+  if (!ok) failures++;
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `\n      ${detail}`}`);
+};
+const eq = (name, got, want) =>
+  check(name, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+
+/* --------------------------------------------------------- canonical list */
+
+eq('every REQUIRED_FIELDS type is a canonical id', Object.keys(REQUIRED_FIELDS).every((k) => DOCUMENT_TYPE_IDS.has(k)), true);
+eq('every canonical id has a REQUIRED_FIELDS entry', DOCUMENT_TYPES.every((t) => t.id in REQUIRED_FIELDS), true);
+check('AI_VERIFY_MIN_CONFIDENCE is 0.85', AI_VERIFY_MIN_CONFIDENCE === 0.85);
+
+/* ------------------------------------------------------ normalizeDocumentType */
+
+eq('canonical id passes through', normalizeDocumentType('invoice'), 'invoice');
+eq('legacy warranty maps to warranty-registration', normalizeDocumentType('warranty'), 'warranty-registration');
+eq('legacy service_ticket maps to service-ticket', normalizeDocumentType('service_ticket'), 'service-ticket');
+eq('legacy equipment_record maps to equipment-record', normalizeDocumentType('equipment_record'), 'equipment-record');
+eq('legacy document maps to other', normalizeDocumentType('document'), 'other');
+eq('install_record with cost maps to invoice', normalizeDocumentType('install_record', { cost: '100.00' }), 'invoice');
+eq('install_record with invoice_number maps to invoice', normalizeDocumentType('install_record', { invoice_number: 'INV-1' }), 'invoice');
+eq('install_record with neither maps to startup-sheet', normalizeDocumentType('install_record', {}), 'startup-sheet');
+eq('install_record with no facts arg maps to startup-sheet', normalizeDocumentType('install_record'), 'startup-sheet');
+eq('free text with spaces normalizes', normalizeDocumentType('Work Order'), 'work-order');
+eq('unknown free text falls back to other', normalizeDocumentType('some random label'), 'other');
+eq('null falls back to other', normalizeDocumentType(null), 'other');
+eq('undefined falls back to other', normalizeDocumentType(undefined), 'other');
+eq('empty string falls back to other', normalizeDocumentType(''), 'other');
+check('normalizeDocumentType never returns something outside the canonical set',
+  DOCUMENT_TYPES.concat([{ id: 'warranty' }, { id: 'garbage' }, { id: null }])
+    .every((t) => DOCUMENT_TYPE_IDS.has(normalizeDocumentType(t.id))));
+
+/* ------------------------------------------------------ isLegacyOrUnknownType */
+
+eq('null is legacy/unknown', isLegacyOrUnknownType(null), true);
+eq('empty string is legacy/unknown', isLegacyOrUnknownType(''), true);
+eq('legacy warranty is legacy/unknown', isLegacyOrUnknownType('warranty'), true);
+eq('free text is legacy/unknown', isLegacyOrUnknownType('whatever'), true);
+eq('canonical invoice is NOT legacy/unknown', isLegacyOrUnknownType('invoice'), false);
+eq('canonical other is NOT legacy/unknown', isLegacyOrUnknownType('other'), false);
+
+/* -------------------------------------------------------------- inferDocumentType */
+
+eq('warranty registration date infers warranty-registration', inferDocumentType({ warranty_registered_date: '2024-01-01' }), 'warranty-registration');
+eq('permit_number infers permit', inferDocumentType({ permit_number: 'P-1' }), 'permit');
+eq('term + customer + address + no serial infers maintenance-agreement',
+  inferDocumentType({ warranty_term: '10 year', customer_name: 'Jane', service_address: '1 Main St' }), 'maintenance-agreement');
+eq('term + serial infers warranty-registration (not an agreement)',
+  inferDocumentType({ warranty_term: '10 year', serial_number: 'ABC123' }), 'warranty-registration');
+eq('cost infers invoice', inferDocumentType({ cost: '100.00' }), 'invoice');
+eq('work_performed infers service-ticket', inferDocumentType({ work_performed: 'replaced capacitor' }), 'service-ticket');
+eq('service_date + technician infers work-order', inferDocumentType({ service_date: '2024-01-01', technician: 'Bob' }), 'work-order');
+eq('installation_date alone infers startup-sheet', inferDocumentType({ installation_date: '2024-01-01' }), 'startup-sheet');
+eq('service_date alone infers inspection-report', inferDocumentType({ service_date: '2024-01-01' }), 'inspection-report');
+eq('serial + photo filename infers nameplate-photo', inferDocumentType({ serial_number: 'ABC' }, 'IMG_001.jpg'), 'nameplate-photo');
+eq('serial + non-photo filename infers equipment-record', inferDocumentType({ serial_number: 'ABC' }, 'scan.pdf'), 'equipment-record');
+eq('customer_name alone infers correspondence', inferDocumentType({ customer_name: 'Jane' }), 'correspondence');
+eq('nothing at all infers other', inferDocumentType({}), 'other');
+eq('undefined facts is safe and infers other', inferDocumentType(undefined), 'other');
+check('inferDocumentType always returns a canonical id', DOCUMENT_TYPE_IDS.has(inferDocumentType({})));
+
+/* ------------------------------------------------------------ resolveDocumentType */
+
+{
+  const r = resolveDocumentType({ document_type: 'invoice', document_type_confidence: 0.9 }, { cost: '10' }, 'x.pdf');
+  eq('model classification used when valid', r.documentType, 'invoice');
+  eq('model confidence carried through', r.confidence, 0.9);
+  eq('source is model', r.source, 'model');
+}
+{
+  const r = resolveDocumentType({ document_type: 'not-a-real-type' }, { cost: '10' }, 'x.pdf');
+  eq('invalid model type falls back to heuristic', r.documentType, 'invoice');
+  eq('fallback source is heuristic', r.source, 'heuristic');
+}
+{
+  const r = resolveDocumentType({}, { work_performed: 'flushed line' }, 'x.pdf');
+  eq('missing model type falls back to heuristic', r.documentType, 'service-ticket');
+}
+{
+  const r = resolveDocumentType({ document_type_confidence: 1.5 }, {}, 'x.pdf');
+  eq('out-of-range confidence never used verbatim (heuristic path has its own default)', r.confidence, 0.5);
+}
+
+/* -------------------------------------------------------------- completenessFor */
+
+{
+  const c = completenessFor('invoice', [
+    { field_key: 'service_address', value: '123 Main St', confidence: 0.95 },
+    { field_key: 'cost', value: '100.00', confidence: 0.9 },
+  ]);
+  eq('invoice complete with both required fields', c.complete, true);
+  eq('invoice minConfidence is the lower of the two', c.minConfidence, 0.9);
+  eq('invoice required list', c.required, ['service_address', 'cost']);
+  eq('invoice present list', c.present.sort(), ['cost', 'service_address']);
+  eq('invoice missing list is empty', c.missing, []);
+}
+
+{
+  const c = completenessFor('invoice', [{ field_key: 'service_address', value: '123 Main St', confidence: 0.95 }]);
+  eq('invoice missing cost is incomplete', c.complete, false);
+  eq('invoice reports cost missing', c.missing, ['cost']);
+}
+
+{
+  // Alternatives: warranty_expires|warranty_term — either satisfies.
+  const withExpires = completenessFor('warranty-registration', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.9 },
+    { field_key: 'model', value: 'M1', confidence: 0.9 },
+    { field_key: 'warranty_expires', value: '2030-01-01', confidence: 0.8 },
+  ]);
+  eq('warranty-registration complete via warranty_expires alone', withExpires.complete, true);
+  check('present names the field that actually satisfied it', withExpires.present.includes('warranty_expires'));
+
+  const withTerm = completenessFor('warranty-registration', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.9 },
+    { field_key: 'model', value: 'M1', confidence: 0.9 },
+    { field_key: 'warranty_term', value: '10 year', confidence: 0.8 },
+  ]);
+  eq('warranty-registration complete via warranty_term alone', withTerm.complete, true);
+
+  const withNeither = completenessFor('warranty-registration', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.9 },
+    { field_key: 'model', value: 'M1', confidence: 0.9 },
+  ]);
+  eq('warranty-registration incomplete with neither alternative', withNeither.complete, false);
+  eq('missing reports the whole alternative group', withNeither.missing, ['warranty_expires|warranty_term']);
+}
+
+{
+  // Blank / whitespace-only values do not count as present.
+  const c = completenessFor('correspondence', [{ field_key: 'customer_name', value: '   ', confidence: 0.9 }]);
+  eq('whitespace-only value does not satisfy a requirement', c.complete, false);
+}
+
+{
+  // Highest-confidence duplicate wins when a field_key appears twice.
+  const c = completenessFor('correspondence', [
+    { field_key: 'customer_name', value: 'Jane', confidence: 0.4 },
+    { field_key: 'customer_name', value: 'Jane', confidence: 0.95 },
+  ]);
+  eq('duplicate field_key uses the higher confidence', c.minConfidence, 0.95);
+}
+
+{
+  const c = completenessFor('other', []);
+  eq('other has no required fields', c.required, []);
+  eq('other is always complete', c.complete, true);
+  eq('other has minConfidence 1 (nothing to be unsure about)', c.minConfidence, 1);
+}
+
+{
+  // A legacy/raw type id is normalized before its requirements are looked up.
+  const c = completenessFor('warranty', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.9 },
+    { field_key: 'model', value: 'M1', confidence: 0.9 },
+    { field_key: 'warranty_term', value: '10 year', confidence: 0.9 },
+  ]);
+  eq('legacy type id resolved before checking requirements', c.type, 'warranty-registration');
+  eq('legacy-typed document can still be complete', c.complete, true);
+}
+
+eq('malformed fields array is safe', completenessFor('invoice', null).required, ['service_address', 'cost']);
+eq('non-array fields is safe', completenessFor('invoice', 'nope').complete, false);
+
+/* -------------------------------------------------------- AI-verify threshold */
+
+{
+  const c = completenessFor('startup-sheet', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.9 },
+    { field_key: 'service_date', value: '2024-01-01', confidence: 0.86 },
+  ]);
+  check('complete + minConfidence above threshold clears AI verification',
+    c.complete && c.minConfidence >= AI_VERIFY_MIN_CONFIDENCE);
+}
+{
+  const c = completenessFor('startup-sheet', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.9 },
+    { field_key: 'service_date', value: '2024-01-01', confidence: 0.7 },
+  ]);
+  check('complete but under threshold does NOT clear AI verification',
+    c.complete && !(c.minConfidence >= AI_VERIFY_MIN_CONFIDENCE));
+}
+{
+  const c = completenessFor('startup-sheet', [{ field_key: 'serial_number', value: 'SN1', confidence: 0.99 }]);
+  check('incomplete never clears AI verification regardless of confidence',
+    !c.complete);
+}
+
+/* ------------------------------------------------------------ toCompletenessFields */
+
+{
+  const rows = [
+    { field_key: 'cost', value: '50.00', confidence: 0.4, corrected_value: '75.00' },
+    { field_key: 'service_address', value: '123 Main St', confidence: 0.9, corrected_value: null },
+  ];
+  const fields = toCompletenessFields(rows);
+  const byKey = Object.fromEntries(fields.map((f) => [f.field_key, f]));
+  eq('a human correction wins over the original value', byKey.cost.value, '75.00');
+  eq('a corrected field is treated as fully confident', byKey.cost.confidence, 1);
+  eq('an uncorrected field keeps its own confidence', byKey.service_address.confidence, 0.9);
+}
+eq('toCompletenessFields is safe on null', toCompletenessFields(null), []);
+eq('toCompletenessFields is safe on undefined', toCompletenessFields(undefined), []);
+
+/* -------------------------------------------------------------- FIELD_LABELS */
+
+check('FIELD_LABELS covers every field_key used in REQUIRED_FIELDS',
+  Object.values(REQUIRED_FIELDS).flat().every((req) => req.split('|').every((k) => k in FIELD_LABELS)));
+
+console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
+process.exit(failures === 0 ? 0 : 1);

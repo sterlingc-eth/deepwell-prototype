@@ -255,7 +255,17 @@ function sourceIsGrounded(s, allowed, isComputed) {
  *                held to the normal page/field check rather than exempted
  *                from it.
  */
-export function shapeAnswer(raw, allowed, { allowComputed = false } = {}) {
+/** Forced when nothing survived citation-checking. Never the model's own words
+ *  — see the "text is not citation-checked" note below for why. */
+export const NO_ANSWER_TEXT = "Nothing in your records answers that.";
+
+/**
+ * @param opts.candidates  What retrieval returned (mapped passages/extractions,
+ *                see api/ask.js), used ONLY to build `closest` when every fact
+ *                gets dropped — never to source a fact. Each needs a
+ *                `documentId`; deduplicated and capped.
+ */
+export function shapeAnswer(raw, allowed, { allowComputed = false, candidates = [] } = {}) {
   const safeAllowed = allowed ?? buildAllowed();
   const input = raw && typeof raw === "object" ? raw : {};
 
@@ -272,9 +282,33 @@ export function shapeAnswer(raw, allowed, { allowComputed = false } = {}) {
 
   const rawText = typeof input.text === "string" ? input.text : "";
 
+  // THE 2026-09-19 BUG: `text` is free prose the model writes, and unlike
+  // `facts`/`sources` above it was never citation-checked — a model can lose
+  // every fact to sourceIsGrounded() above (nothing it cited maps to real
+  // retrieval) and still have written a confident, detailed narrative into
+  // `text` itself ("Show me everything on Plaza Dental" came back with a full
+  // narrative and dollar figures while facts/sources were empty). Once
+  // facts.length is 0 there is nothing left in this answer that was actually
+  // grounded, so the model's own words must never reach the user — only this
+  // fixed, honest string does, regardless of what `rawText` says.
+  const text = facts.length ? rawText : NO_ANSWER_TEXT;
+
+  // Downgraded to no-answer: tell the user what retrieval DID find instead of
+  // leaving "closest documents" permanently empty. Built only from what
+  // retrieval actually returned (`candidates`), never from the model.
+  const closest = facts.length
+    ? []
+    : [...new Map(
+        (candidates ?? [])
+          .filter((c) => c && typeof c.documentId === "string")
+          .map((c) => [c.documentId, c])
+      ).values()]
+        .slice(0, 8)
+        .map((c) => ({ documentId: c.documentId, location: {} }));
+
   return {
     kind: facts.length ? "answer" : "no-answer",
-    text: facts.length ? rawText : rawText || "Nothing in your records answers that.",
+    text,
     facts,
     sources: facts.flatMap((f) => f.sources),
     // Clamped, because ANSWER_TOOL declares confidence as a bare number with no
@@ -288,6 +322,6 @@ export function shapeAnswer(raw, allowed, { allowComputed = false } = {}) {
     interpretation: typeof input.interpretation === "string" ? input.interpretation : undefined,
     verifiedCount: new Set(facts.flatMap((f) => f.sources.map((s) => s.documentId))).size,
     unverifiedCount: 0,
-    closest: [],
+    closest,
   };
 }

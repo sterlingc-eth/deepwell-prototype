@@ -1,7 +1,7 @@
 import { handleCors, handleError } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
-import { describeWarranty, addDays, ruleCoverage, isPlausibleToday } from "./_lib/warrantyRules.js";
+import { describeWarranty, addDays, ruleCoverage, isPlausibleToday, alertTier, upsell, daysBetween } from "./_lib/warrantyRules.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit } from "./_lib/rateLimit.js";
 
@@ -74,6 +74,14 @@ export async function getWarrantyAttention(auth, params) {
   const registerLookback = clampDays(params.registerLookbackDays, 60, 3650);
   const expiringWithin = clampDays(params.expiringWithinDays, 180, 3650);
 
+  // The fixed alert tiers (30/90/365 days) are a separate, wider lens than
+  // the caller's own `expiringWithin` horizon (used by the legacy
+  // action/urgency fields below) — the SQL fetch has to cover the wider of
+  // the two or a tenant asking for the default 180-day list would silently
+  // never see its own expiring-365 or upsell-eligible rows.
+  const ALERT_TIER_HORIZON_DAYS = 365;
+  const fetchExpiringWithin = Math.max(expiringWithin, ALERT_TIER_HORIZON_DAYS);
+
   const rows = await withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
     (db) =>
@@ -83,7 +91,7 @@ export async function getWarrantyAttention(auth, params) {
         // Expiries already past are handled by the registration branch or are
         // simply history; this list is about what can still be acted on.
         expiringFrom: today,
-        expiringTo: addDays(today, expiringWithin),
+        expiringTo: addDays(today, fetchExpiringWithin),
       })
   );
 
@@ -91,6 +99,11 @@ export async function getWarrantyAttention(auth, params) {
     .map((r) => {
       const stable = r.warranty ?? {};
       const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin });
+      const tier = alertTier(stable, today);
+      const daysLeft =
+        tier === 'unregistered-window-closing'
+          ? daysBetween(today, stable.registrationDeadline)
+          : now.daysToExpiry;
       return {
         entityId: r.id,
         serialNumber: r.serial_number,
@@ -107,11 +120,15 @@ export async function getWarrantyAttention(auth, params) {
         expiresBasis: stable.expiresBasis ?? null,
         termYears: stable.termYears ?? null,
         ...now,
+        tier,
+        daysLeft,
+        upsell: upsell(stable, today),
       };
     })
-    // A row whose dates no longer imply anything actionable is dropped rather
-    // than shown with an empty reason.
-    .filter((i) => i.action);
+    // A row is kept if the legacy urgency logic names an action OR it lands
+    // in one of the new fixed alert tiers (the two horizons can disagree —
+    // see ALERT_TIER_HORIZON_DAYS above).
+    .filter((i) => i.action || (i.tier !== 'ok' && i.tier !== 'unknown'));
 
   const order = { register_urgent: 0, register_soon: 1, register_missed: 2, expiring: 3, expired: 4 };
   items.sort((a, b) => (order[a.urgency] ?? 9) - (order[b.urgency] ?? 9));
@@ -121,12 +138,22 @@ export async function getWarrantyAttention(auth, params) {
     return acc;
   }, {});
 
+  const summary = {
+    expired: items.filter((i) => i.tier === 'expired').length,
+    expiring30: items.filter((i) => i.tier === 'expiring-30').length,
+    expiring90: items.filter((i) => i.tier === 'expiring-90').length,
+    expiring365: items.filter((i) => i.tier === 'expiring-365').length,
+    registrationClosing: items.filter((i) => i.tier === 'unregistered-window-closing').length,
+    upsellEligible: items.filter((i) => i.upsell.eligible).length,
+  };
+
   const cov = ruleCoverage();
 
   return {
     today,
     items,
     counts,
+    summary,
     total: items.length,
     coverage: {
       verifiedBrands: cov.verified.map((v) => v.label),

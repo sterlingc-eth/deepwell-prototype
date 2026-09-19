@@ -1,10 +1,17 @@
-import { useEffect, useRef } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, AlertTriangle, Download, Loader2 } from 'lucide-react';
 import type { SourceLocation } from '../core/types';
 import { useGraph } from '../core/entityGraph';
 import { useAppStore } from '../store/appStore';
 import { StagePill } from './StagePill';
 import { locationLabel } from './SourceList';
+import { getOriginalUrl, type OriginalUrl } from '../services/documentClient';
+import { requirementLabel } from '../domains/hvac/schema';
+
+// Server document ids are Postgres uuids; local ids minted before a sync
+// completes look like "doc-<base36>-<base36>" (entityGraph.ts's newId). Only
+// a real, synced id can be presigned — see the OPEN ORIGINAL contract.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface DocumentPreviewProps {
   documentId: string;
@@ -25,6 +32,40 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
   const openDocument = useAppStore((s) => s.openDocument);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+
+  const [original, setOriginal] = useState<OriginalUrl | null>(null);
+  const [textBody, setTextBody] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOriginal(null);
+    setTextBody(null);
+    setLoadState('idle');
+    setLoadError(null);
+    if (!UUID_RE.test(documentId)) return; // not synced yet — nothing to fetch
+    let cancelled = false;
+    setLoadState('loading');
+    getOriginalUrl(documentId)
+      .then(async (result) => {
+        if (cancelled) return;
+        setOriginal(result);
+        if (result.contentType === 'text/plain') {
+          const r = await fetch(result.url);
+          if (cancelled) return;
+          setTextBody(await r.text());
+        }
+        setLoadState('ready');
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(err instanceof Error ? err.message : 'Could not load the original file.');
+        setLoadState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
 
   useEffect(() => {
     restoreRef.current = document.activeElement as HTMLElement | null;
@@ -83,13 +124,51 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
               {doc.issues.map((i, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-body text-warn-ink dark:text-brass-200">
                   <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  {i.kind === 'missing-field' && <span>Missing required field: {i.field}</span>}
+                  {i.kind === 'missing-field' && <span>Missing required field: {requirementLabel(i.field)}</span>}
                   {i.kind === 'unlinked' && <span>Not linked to any record{i.bestGuess ? ` (best guess ${Math.round(i.confidence * 100)}%)` : ''}</span>}
                   {i.kind === 'conflict' && <span>Disagrees with another document — needs a decision</span>}
                   {i.kind === 'duplicate' && <span>Duplicate of a document already in the system</span>}
                 </li>
               ))}
             </ul>
+          )}
+
+          {UUID_RE.test(documentId) && (
+            <div className="rounded-lg border border-line overflow-hidden">
+              {loadState === 'loading' && (
+                <div className="flex items-center gap-2 p-4 text-body text-ink-3">
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading original file…
+                </div>
+              )}
+              {loadState === 'error' && (
+                <p className="p-4 text-body text-warn-ink dark:text-brass-200">{loadError}</p>
+              )}
+              {loadState === 'ready' && original && (() => {
+                const ct = original.contentType ?? '';
+                if (ct === 'application/pdf') {
+                  return <iframe src={original.url} title={original.filename} className="w-full min-h-[70vh] block" />;
+                }
+                if (ct.startsWith('image/')) {
+                  return <img src={original.url} alt={original.filename} className="w-full h-auto block" />;
+                }
+                if (ct === 'text/plain') {
+                  return (
+                    <pre className="p-4 font-mono text-data sm:text-[14px] sm:leading-6 whitespace-pre-wrap max-h-[70vh] overflow-y-auto">
+                      {textBody ?? ''}
+                    </pre>
+                  );
+                }
+                return (
+                  <a
+                    href={original.url}
+                    download={original.filename}
+                    className="dw-btn-secondary m-4 inline-flex"
+                  >
+                    <Download className="w-4 h-4" aria-hidden="true" /> Download {original.filename}
+                  </a>
+                );
+              })()}
+            </div>
           )}
 
           <div className="rounded-lg border border-line bg-bg p-4 font-mono text-data sm:text-[14px] sm:leading-6 whitespace-pre-wrap">

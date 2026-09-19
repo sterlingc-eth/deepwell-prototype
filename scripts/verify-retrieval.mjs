@@ -8,19 +8,82 @@
  * Usage:  NEON_CONNECTION_STRING=postgres://... node scripts/verify-retrieval.mjs
  * Point it at a scratch database — it writes rows.
  */
-import { withTenant } from '../api/_lib/recordsStore.js';
 import { buildPrompt } from '../api/_lib/answer.js';
-
-if (!process.env.NEON_CONNECTION_STRING) {
-  console.error('Set NEON_CONNECTION_STRING to a scratch database first.');
-  process.exit(2);
-}
+import { classifyMetaQuestion } from '../api/ask.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
   if (!ok) failures++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `\n      ${detail}`}`);
 };
+
+/**
+ * Meta-question pre-router (api/ask.js classifyMetaQuestion): pure, no DB, so
+ * it runs unconditionally — unlike the retrieval checks below, which need a
+ * real Postgres. Covers item 2 of handoffs/TEAM_BRIEF_2026-09-19.md: inventory
+ * counts/lists must be classified WITHOUT a model call, and a per-entity
+ * question ("...for Plaza Dental", "how many tons is the Goodman") must never
+ * be caught here — that one already works via retrieval and has to keep going
+ * through it.
+ */
+const POSITIVE_META = [
+  ['how many documents are in the system', 'count'], // the literal bug-report phrasing
+  ['How many documents are in the system?', 'count'],
+  ['how many documents do we have', 'count'],
+  ['how many docs do we have', 'count'],
+  ['how many customers do we have', 'count'],
+  ['how many clients do we have', 'count'],
+  ['how many units do we have', 'count'],
+  ['how many pieces of equipment do we have', 'count'],
+  ['how many invoices do we have', 'count'],
+  ['how many warranties do we have', 'count'],
+  ['how many are verified', 'count'],
+  ['how many documents are unverified', 'count'],
+  ['how many are still unverified', 'count'],
+  ['list all documents', 'list'],
+  ['show all documents', 'list'],
+  ['what documents do we have', 'list'],
+  ['which documents are unverified', 'list'],
+  ['list all customers', 'list'],
+  ['who are our customers', 'list'],
+  ['what document types do we have', 'list'],
+  ['delete this document', 'imperative'],
+  ['please remove the old invoice', 'imperative'],
+  ['upload the new warranty card', 'imperative'],
+];
+for (const [q, kind] of POSITIVE_META) {
+  const got = classifyMetaQuestion(q);
+  check(`meta-router classifies: "${q}"`, !!got && got.kind === kind, `got ${JSON.stringify(got)}`);
+}
+check(`meta-router: ${POSITIVE_META.length} phrasings covered (>= 15 required)`, POSITIVE_META.length >= 15);
+
+// Negatives: per-entity questions (already answered correctly by retrieval)
+// and any question a generic "how many X" regex would have wrongly swallowed.
+const NEGATIVE_META = [
+  'how many tons is the Goodman',
+  'how many years is the warranty',
+  'what documents do we have for Plaza Dental',
+  'how many documents does Plaza Dental have',
+  'what is the warranty on unit 3',
+  'when does the warranty expire',
+  "what's the customer's address",
+  'how many BTUs is this unit',
+  'show me everything we have on Plaza Dental',
+];
+for (const q of NEGATIVE_META) {
+  const got = classifyMetaQuestion(q);
+  check(`meta-router does NOT route: "${q}"`, got === null, `got ${JSON.stringify(got)}`);
+}
+
+if (!process.env.NEON_CONNECTION_STRING) {
+  console.log('\nNEON_CONNECTION_STRING not set — skipping DB-backed retrieval checks (meta-router checks above still ran).');
+  console.log(failures ? `\n${failures} FAILURE(S)` : '\nAll retrieval checks passed.');
+  process.exit(failures ? 1 : 0);
+}
+
+// DB-backed checks below need a live tenant store; imported lazily so the
+// pure classifier checks above never require NEON_CONNECTION_STRING.
+const { withTenant } = await import('../api/_lib/recordsStore.js');
 
 const stamp = Date.now();
 const A = { tenantKey: `org_verify_a_${stamp}`, tenantName: 'Verify Acme' };

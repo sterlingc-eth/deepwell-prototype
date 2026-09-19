@@ -9,7 +9,15 @@ import { buildSuggestions } from '../src/core/suggestions';
 import { parseDeepLink } from '../src/hooks/useDeepLink';
 import { describeFetchFailure, NETWORK_ERROR_MESSAGE } from '../src/services/ingestClient';
 import { truncateForDisplay, summarizeProgress, type BulkFileState } from '../src/services/bulkImport';
-import type { Entity } from '../src/core/types';
+import { maxStageFor, recomputeIssues } from '../src/core/entityGraph';
+import { hvacSchema } from '../src/domains/hvac/schema';
+import * as hvacDocTypes from '../src/domains/hvac/documentTypes';
+import type { Doc, Entity } from '../src/core/types';
+// The real source of truth (handoffs/TEAM_BRIEF_2026-09-19.md) — agent-backend
+// owns this file. src/domains/hvac/documentTypes.ts is a hand-mirrored copy
+// (src/ cannot import api/, different tsconfig root); this import exists only
+// to assert the two never drift apart silently.
+import * as backendDocTypes from '../api/_lib/documentTypes.js';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = ''): void => {
@@ -136,6 +144,129 @@ const eq = (name: string, got: unknown, want: unknown): void =>
     pending: 1, // uploading
   });
   eq('summarizeProgress on an empty run', summarizeProgress([]), { total: 0, uploaded: 0, queued: 0, skipped: 0, failed: 0, pending: 0 });
+}
+
+/* ------------------------------------------------- documentTypes parity */
+//
+// src/domains/hvac/documentTypes.ts is a hand-mirrored copy of the real
+// source of truth, api/_lib/documentTypes.js (agent-backend's file — src/
+// cannot import api/, different tsconfig root/build). This is the check the
+// team brief asks for: import the JS module directly (tsx runs plain .js
+// fine) and assert the two agree, so an edit to one that isn't mirrored to
+// the other fails CI instead of silently reintroducing "Unclassified".
+{
+  eq('DOCUMENT_TYPES ids match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.id), backendDocTypes.DOCUMENT_TYPES.map((t: { id: string }) => t.id));
+  eq('DOCUMENT_TYPES labels match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.label), backendDocTypes.DOCUMENT_TYPES.map((t: { label: string }) => t.label));
+  eq('there are exactly the 15 canonical types the brief lists', hvacDocTypes.DOCUMENT_TYPES.length, 15);
+  eq('REQUIRED_FIELDS matches the backend exactly, including a|b alternatives', hvacDocTypes.REQUIRED_FIELDS, backendDocTypes.REQUIRED_FIELDS);
+  eq('FIELD_LABELS matches the backend exactly', hvacDocTypes.FIELD_LABELS, backendDocTypes.FIELD_LABELS);
+  eq('AI_VERIFY_MIN_CONFIDENCE matches the backend', hvacDocTypes.AI_VERIFY_MIN_CONFIDENCE, backendDocTypes.AI_VERIFY_MIN_CONFIDENCE);
+
+  const cases: [string, Record<string, unknown>?][] = [
+    ['warranty', undefined],
+    ['service_ticket', undefined],
+    ['install_record', { cost: '100' }],
+    ['install_record', {}],
+    ['equipment_record', undefined],
+    ['document', undefined],
+    ['unclassified', undefined],
+    ['', undefined],
+    ['work-order', undefined],
+    ['Not A Real Type', undefined],
+  ];
+  for (const [raw, facts] of cases) {
+    eq(
+      `normalizeDocumentType(${JSON.stringify(raw)}) matches the backend`,
+      hvacDocTypes.normalizeDocumentType(raw, facts),
+      backendDocTypes.normalizeDocumentType(raw, facts),
+    );
+  }
+}
+
+/* --------------------------------------- maxStageFor / recomputeIssues */
+//
+// Required fields can be `a|b` alternatives (CANONICAL REQUIRED FIELDS in the
+// team brief) — either extracted field key must satisfy the requirement, and
+// this is the one thing entityGraph.ts's stage math has to get right or every
+// document sits "Blocked at Classified" despite having what it needs.
+{
+  const baseDoc = (overrides: Partial<Doc> = {}): Doc => ({
+    id: 'doc-1',
+    filename: 'test.pdf',
+    fileType: 'pdf',
+    pages: 1,
+    batchId: 'b1',
+    source: 'drive',
+    receivedAt: new Date('2026-01-01'),
+    typeId: null,
+    stage: 'received',
+    extracted: [],
+    linkedEntityIds: [],
+    linkConfidence: 0,
+    issues: [],
+    preview: '',
+    ...overrides,
+  });
+  const field = (name: string, value = 'x', confidence = 0.95) => ({ name, value, confidence, location: {} });
+
+  // warranty-registration requires serial_number, model, warranty_expires|warranty_term
+  const onlyTerm = baseDoc({
+    typeId: 'warranty-registration',
+    extracted: [field('serial_number'), field('model'), field('warranty_term')],
+    linkedEntityIds: ['prop-1'],
+  });
+  eq('maxStageFor: warranty_term alone satisfies warranty_expires|warranty_term', maxStageFor(onlyTerm, hvacSchema), 'verified');
+
+  const neitherAlt = baseDoc({
+    typeId: 'warranty-registration',
+    extracted: [field('serial_number'), field('model')],
+    linkedEntityIds: ['prop-1'],
+  });
+  eq('maxStageFor: neither alternative present stays Blocked at Classified', maxStageFor(neitherAlt, hvacSchema), 'classified');
+
+  const expiresAlt = baseDoc({
+    typeId: 'warranty-registration',
+    extracted: [field('serial_number'), field('model'), field('warranty_expires')],
+  });
+  eq('maxStageFor: the other alternative (warranty_expires) also satisfies it', maxStageFor(expiresAlt, hvacSchema), 'extracted');
+
+  // A correction with an empty value does not count as satisfying a requirement
+  const blankCorrection = baseDoc({
+    typeId: 'startup-sheet', // requires serial_number, service_date
+    extracted: [{ ...field('serial_number'), correctedValue: '  ' }, field('service_date')],
+  });
+  eq('maxStageFor: a blank correction does not satisfy a requirement', maxStageFor(blankCorrection, hvacSchema), 'classified');
+
+  // recomputeIssues: a synced document (no issues yet) with a real gap gets a
+  // missing-field issue naming the still-unsatisfied requirement, and an
+  // unlinked issue since nothing has linked it — exactly what Records' health
+  // tiles and Review's filters read.
+  const synced = baseDoc({
+    typeId: 'warranty-registration',
+    extracted: [field('serial_number'), field('model')],
+    issues: [],
+  });
+  const recomputed = recomputeIssues(synced, hvacSchema);
+  check('recomputeIssues: flags the unsatisfied a|b requirement as missing', recomputed.issues.some((i) => i.kind === 'missing-field' && i.field === 'warranty_expires|warranty_term'), JSON.stringify(recomputed.issues));
+  check('recomputeIssues: flags an unattached classified document as unlinked', recomputed.issues.some((i) => i.kind === 'unlinked'), JSON.stringify(recomputed.issues));
+
+  const linkedComplete = baseDoc({
+    typeId: 'warranty-registration',
+    extracted: [field('serial_number'), field('model'), field('warranty_expires')],
+    linkedEntityIds: ['prop-1'],
+    issues: [],
+  });
+  eq('recomputeIssues: nothing to flag once complete and linked', recomputeIssues(linkedComplete, hvacSchema).issues, []);
+
+  // A demo-seeded bestGuess unlinked issue is preserved, not replaced by a bare one
+  const seeded = baseDoc({
+    typeId: 'work-order',
+    extracted: [field('service_address'), field('service_date'), field('technician')],
+    issues: [{ kind: 'unlinked', bestGuess: 'prop-9', confidence: 0.6 }],
+  });
+  const seededRecomputed = recomputeIssues(seeded, hvacSchema);
+  eq('recomputeIssues: preserves a seeded unlinked issue instead of duplicating it', seededRecomputed.issues.length, 1);
+  check('recomputeIssues: the preserved issue keeps its bestGuess', seededRecomputed.issues[0]?.kind === 'unlinked' && seededRecomputed.issues[0].bestGuess === 'prop-9');
 }
 
 /* ------------------------------------------------------------------ done */

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, AlertTriangle, Link2, GitMerge, Copy, ArrowLeft } from 'lucide-react';
+import { Check, AlertTriangle, Link2, GitMerge, Copy, ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
-import { entitiesOfType, maxStageFor, useGraph } from '../core/entityGraph';
+import { entitiesOfType, isRequirementMet, maxStageFor, useGraph } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
+import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
 import { str } from '../core/answer';
 import { useAppStore } from '../store/appStore';
+import { deleteDocuments } from '../services/documentClient';
 
 const CURRENT_USER = 'You';
 
@@ -60,7 +62,7 @@ function entityLabel(e: Entity): string {
  */
 export function ReviewScreen() {
   const graph = useGraph();
-  const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate, clearLastError } = useGraph();
+  const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate, clearLastError, aiVerifyDoc, removeDoc } = useGraph();
   const lastError = useGraph((s) => s.lastError);
   const selectedDocumentId = useAppStore((s) => s.selectedDocumentId);
   const openDocument = useAppStore((s) => s.openDocument);
@@ -183,6 +185,11 @@ export function ReviewScreen() {
               onResolve={(conflictId, value) => resolveConflict(conflictId, value, CURRENT_USER)}
               onMerge={() => mergeDuplicate(doc.id)}
               onAsk={(q) => askQuestion(q)}
+              onAiVerify={() => aiVerifyDoc(doc.id)}
+              onDelete={async () => {
+                await deleteDocuments([doc.id]);
+                removeDoc(doc.id);
+              }}
             />
           ) : (
             <div className="dw-card p-8 text-ink-3">Select a document.</div>
@@ -205,19 +212,49 @@ interface DocPanelProps {
   onResolve: (conflictId: string, value: string) => void;
   onMerge: () => void;
   onAsk: (q: string) => void;
+  onAiVerify: () => Promise<boolean>;
+  onDelete: () => Promise<void>;
 }
 
-function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, onApprove, onResolve, onMerge, onAsk }: DocPanelProps) {
+function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, onApprove, onResolve, onMerge, onAsk, onAiVerify, onDelete }: DocPanelProps) {
   const graph = useGraph();
   const type = graph.schema.documentTypes.find((t) => t.id === doc.typeId);
-  const present = new Set(doc.extracted.map((f) => f.name));
-  const missing = (type?.requiredFields ?? []).filter((r) => !present.has(r) || !(doc.extracted.find((f) => f.name === r)?.correctedValue ?? doc.extracted.find((f) => f.name === r)?.value ?? '').trim());
+  const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
+  // Required fields may be `a|b` alternatives (either satisfies) — see the
+  // team brief's CANONICAL REQUIRED FIELDS and core/entityGraph.ts.
+  const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r));
   const unlinked = doc.issues.find((i) => i.kind === 'unlinked');
   const duplicate = doc.issues.find((i) => i.kind === 'duplicate');
   const next = maxStageFor(doc, graph.schema);
   const canAdvance = next !== doc.stage && !duplicate;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [linkChoice, setLinkChoice] = useState<string>(unlinked?.kind === 'unlinked' && unlinked.bestGuess ? unlinked.bestGuess : '');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+
+  const runAiVerify = async () => {
+    setAiBusy(true);
+    setAiMsg(null);
+    const verified = await onAiVerify();
+    setAiBusy(false);
+    setAiMsg(verified ? 'Verified by AI.' : 'Not confident enough yet — this still needs a person.');
+  };
+
+  const runDelete = async () => {
+    setDeleting(true);
+    setDeleteErr(null);
+    try {
+      await onDelete();
+      // On success the doc disappears from the graph and the queue selects
+      // the next document — this panel unmounts, so no further state to set.
+    } catch (err) {
+      setDeleting(false);
+      setDeleteErr(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const linkOptions = useMemo(() => {
     const groups: { label: string; items: Entity[] }[] = [
@@ -228,11 +265,12 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
     return groups;
   }, [graph]);
 
-  const commit = (name: string) => {
-    const v = (drafts[name] ?? '').trim();
+  /** `requirement` may be `a|b` — a manually filled gap is written to the first alternative. */
+  const commit = (requirement: string) => {
+    const v = (drafts[requirement] ?? '').trim();
     if (!v) return;
-    onCorrect(name, v);
-    setDrafts((d) => ({ ...d, [name]: '' }));
+    onCorrect(requirement.split('|')[0] ?? requirement, v);
+    setDrafts((d) => ({ ...d, [requirement]: '' }));
   };
 
   const linkedLabels = doc.linkedEntityIds.map((id) => graph.entities[id]).filter((e): e is Entity => !!e);
@@ -241,7 +279,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
     <div className="dw-card divide-y divide-line min-w-0">
       <header className="p-5 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <StagePill stage={doc.stage} />
+          <StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} />
           <span className="text-ink-3">→ can reach</span>
           <StagePill stage={next} />
         </div>
@@ -249,9 +287,36 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
         <p className="text-body text-ink-3">
           {graph.batches[doc.batchId]?.name} · received {doc.receivedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </p>
-        <div className="flex flex-wrap gap-2 pt-1">
+        {doc.verifiedBy === 'ai' && (
+          <div className="rounded-lg border border-ok/40 bg-ok-bg dark:bg-forest-800 p-3 flex items-start gap-2">
+            <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-ok-ink dark:text-ok-bg" aria-hidden="true" />
+            <p className="text-body text-ok-ink dark:text-ok-bg">
+              <span className="font-medium">AI verified{doc.completeness ? ` · ${Math.round(doc.completeness.minConfidence * 100)}% confidence` : ''}.</span>{' '}
+              Looks wrong? Correct a field below — that clears the AI verification and puts this back in review.
+            </p>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={onPreview}>Open original</button>
+          {doc.stage !== 'verified' && !duplicate && (
+            <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => void runAiVerify()} disabled={aiBusy}>
+              <Sparkles className="w-4 h-4" aria-hidden="true" /> {aiBusy ? 'Checking…' : 'Verify with AI'}
+            </button>
+          )}
+          {confirmingDelete ? (
+            <span className="flex items-center gap-2">
+              <span className="text-body text-ink-2">Delete this document? This can't be undone.</span>
+              <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => setConfirmingDelete(false)} disabled={deleting}>Cancel</button>
+              <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5 !bg-bad hover:!bg-bad" onClick={() => void runDelete()} disabled={deleting}>{deleting ? 'Deleting…' : 'Confirm delete'}</button>
+            </span>
+          ) : (
+            <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5 text-bad-ink" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete document
+            </button>
+          )}
         </div>
+        {aiMsg && <p className="text-caption text-ink-3">{aiMsg}</p>}
+        {deleteErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">Delete didn't go through: {deleteErr}</p>}
       </header>
 
       {/* Duplicate */}
@@ -274,7 +339,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               </button>
             ))}
           </div>
-          {type && type.requiredFields.length > 0 && <p className="text-caption text-ink-3">Requires: {type.requiredFields.join(', ')}</p>}
+          {type && type.requiredFields.length > 0 && <p className="text-caption text-ink-3">Requires: {type.requiredFields.map(requirementLabel).join(', ')}</p>}
         </section>
       )}
 
@@ -285,13 +350,16 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           {missing.length > 0 && (
             <div className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 space-y-3">
               <p className="flex items-center gap-2 text-warn-ink dark:text-brass-200 font-medium"><AlertTriangle className="w-4 h-4" aria-hidden="true" /> Blocked at Classified — required fields missing</p>
-              {missing.map((name) => (
-                <div key={name} className="flex gap-2">
-                  <label className="sr-only" htmlFor={`gap-${name}`}>{name}</label>
-                  <input id={`gap-${name}`} className="dw-input !min-h-[44px]" placeholder={name} value={drafts[name] ?? ''} onChange={(e) => setDrafts((d) => ({ ...d, [name]: e.target.value }))} onKeyDown={(e) => e.key === 'Enter' && commit(name)} />
-                  <button type="button" className="dw-btn-primary !min-h-[44px]" onClick={() => commit(name)} disabled={!(drafts[name] ?? '').trim()}>Add</button>
-                </div>
-              ))}
+              {missing.map((requirement) => {
+                const label = requirementLabel(requirement);
+                return (
+                  <div key={requirement} className="flex gap-2">
+                    <label className="sr-only" htmlFor={`gap-${requirement}`}>{label}</label>
+                    <input id={`gap-${requirement}`} className="dw-input !min-h-[44px]" placeholder={label} value={drafts[requirement] ?? ''} onChange={(e) => setDrafts((d) => ({ ...d, [requirement]: e.target.value }))} onKeyDown={(e) => e.key === 'Enter' && commit(requirement)} />
+                    <button type="button" className="dw-btn-primary !min-h-[44px]" onClick={() => commit(requirement)} disabled={!(drafts[requirement] ?? '').trim()}>Add</button>
+                  </div>
+                );
+              })}
             </div>
           )}
           <ul className="divide-y divide-line border border-line rounded-lg">
@@ -301,7 +369,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               return (
                 <li key={f.name} className="px-3 py-2.5 grid sm:grid-cols-[minmax(120px,30%)_1fr] gap-x-4 gap-y-1 items-center">
                   <div>
-                    <p className="text-body text-ink-3">{f.name}</p>
+                    <p className="text-body text-ink-3">{fieldLabel(f.name)}</p>
                     <p className={`text-caption ${low ? 'text-warn-ink dark:text-brass-200' : 'text-ink-3'}`}>{Math.round(f.confidence * 100)}% confidence{f.correctedBy ? ` · corrected by ${f.correctedBy}` : ''}</p>
                   </div>
                   <div className="flex gap-2">
@@ -368,13 +436,25 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       {/* Approve */}
       {!duplicate && (
         <footer className="p-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-body text-ink-3">
-            {canAdvance
-              ? `Approving moves this document to ${STAGE_LABEL[next]}.`
-              : doc.stage === 'verified'
-                ? `Verified${doc.verifiedBy ? ` by ${doc.verifiedBy}` : ''}${doc.verifiedAt ? ` on ${doc.verifiedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}. Counts toward accuracy and answers.`
-                : 'Resolve the items above to advance.'}
-          </p>
+          <div className="text-body text-ink-3">
+            <p>
+              {canAdvance
+                ? `Approving moves this document to ${STAGE_LABEL[next]}.`
+                : doc.stage === 'verified'
+                  ? `${doc.verifiedBy === 'ai' ? 'AI verified' : `Verified${doc.verifiedBy ? ` by ${doc.verifiedBy}` : ''}`}${doc.verifiedAt ? ` on ${doc.verifiedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}. Counts toward accuracy and answers.`
+                  : 'Resolve the items above to advance.'}
+            </p>
+            {!canAdvance && doc.stage !== 'verified' && (
+              <p className="text-caption text-ink-3 mt-0.5">
+                Blocked: {[
+                  !type ? 'choose a document type' : null,
+                  missing.length ? `missing ${missing.map(requirementLabel).join(', ')}` : null,
+                  type && missing.length === 0 && doc.linkedEntityIds.length === 0 ? 'not linked to a record' : null,
+                  conflicts.length ? 'a value is disputed' : null,
+                ].filter(Boolean).join('; ') || 'not yet ready to advance'}.
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             {doc.linkedEntityIds[0] && (
               <button type="button" className="dw-btn-tertiary" onClick={() => { const e = graph.entities[doc.linkedEntityIds[0] ?? '']; if (e) onAsk(e.type === 'property' ? str(e, 'address') : e.type === 'equipment' ? str(e, 'serial') : str(e, 'name')); }}>
