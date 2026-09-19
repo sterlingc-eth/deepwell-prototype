@@ -27,7 +27,7 @@
  * configured.
  */
 
-import { authHeader } from './authToken';
+import { authHeader } from './authToken.ts';
 
 export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'pending' | 'done' | 'error';
 
@@ -59,7 +59,7 @@ interface DocumentStatusRow {
   field_count: string | number | null;
 }
 
-async function sha256Hex(file: File): Promise<string> {
+export async function sha256Hex(file: File): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -85,7 +85,27 @@ export function describeFetchFailure(rawBody: string): string {
   return NETWORK_ERROR_MESSAGE;
 }
 
-async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+/**
+ * Thrown by `postJson` on a non-2xx response. `.message` is the same plain-
+ * language text `ingestFile`'s catch has always reported (via
+ * `describeFetchFailure`); `.status` and `.body` are the raw HTTP status and
+ * parsed JSON body, which single-file ingest never needed but bulk import
+ * does — to tell a 429 (retry it) from a 413 (don't), and a per-minute 429
+ * from the daily-cap 429 the server flags with `body.scope === 'per-day'`
+ * (see api/_lib/rateLimit.js). Exported so bulkImport.ts can inspect it.
+ */
+export class IngestHttpError extends Error {
+  status: number;
+  body: unknown;
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = 'IngestHttpError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+export async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
@@ -94,13 +114,67 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Pr
   });
   if (!res.ok) {
     const raw = await res.text().catch(() => '');
-    throw new Error(describeFetchFailure(raw));
+    let parsedBody: unknown = null;
+    try {
+      parsedBody = raw ? JSON.parse(raw) : null;
+    } catch {
+      /* not JSON — a 500 from Vercel is an HTML page */
+    }
+    throw new IngestHttpError(describeFetchFailure(raw), res.status, parsedBody);
   }
   return res.json() as Promise<T>;
 }
 
-function isAbortError(err: unknown): boolean {
+export function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError';
+}
+
+/** One entry of a batch presign request/response — see api/upload-url.js's BATCH MODE. */
+export interface PresignRequestItem {
+  filename: string;
+  sha256: string;
+  contentType?: string;
+  sizeBytes?: number;
+}
+export interface PresignResultItem {
+  filename?: string;
+  documentId?: string;
+  storageKey?: string;
+  alreadyUploaded?: boolean;
+  uploadUrl?: string | null;
+  error?: string;
+  status?: number;
+}
+
+/** Presign one file. Thin wrapper so single-file and bulk-fallback paths share it. */
+export async function requestUploadUrl(body: PresignRequestItem, signal?: AbortSignal): Promise<PresignResultItem> {
+  return postJson<PresignResultItem>('/api/upload-url', body, signal);
+}
+
+/** Presign up to 50 files in one request — the batch path bulk import uses. */
+export async function requestUploadUrlsBatch(files: PresignRequestItem[], signal?: AbortSignal): Promise<PresignResultItem[]> {
+  const { results } = await postJson<{ results: PresignResultItem[] }>('/api/upload-url', { files }, signal);
+  return results;
+}
+
+/** PUT a file's bytes straight to the presigned R2 URL. Never goes through a serverless function. */
+export async function putFile(uploadUrl: string, file: File | Blob, signal?: AbortSignal): Promise<void> {
+  const contentType = file instanceof File ? file.type : undefined;
+  const put = await fetch(uploadUrl, {
+    method: 'PUT',
+    body: file,
+    headers: contentType ? { 'Content-Type': contentType } : undefined,
+    signal,
+  });
+  if (!put.ok) throw new Error('Upload failed — check your connection and try again.');
+}
+
+/** Kick off (or, when the queue is off, complete) the read step for an already-uploaded document. */
+export async function readDocument(
+  documentId: string,
+  signal?: AbortSignal
+): Promise<{ pages?: number; queued?: boolean; extract?: boolean }> {
+  return postJson('/api/read-document', { documentId }, signal);
 }
 
 /** Ingest one file. Resolves with a result rather than throwing, so one bad
@@ -122,16 +196,10 @@ export async function ingestFile(
     const sha256 = await sha256Hex(file);
 
     report('uploading');
-    const { documentId, uploadUrl, alreadyUploaded } = await postJson<{
-      documentId: string;
-      uploadUrl: string | null;
-      alreadyUploaded: boolean;
-    }>('/api/upload-url', {
-      filename: file.name,
-      sha256,
-      contentType: file.type || undefined,
-      sizeBytes: file.size,
-    }, signal);
+    const { documentId, uploadUrl, alreadyUploaded } = await requestUploadUrl(
+      { filename: file.name, sha256, contentType: file.type || undefined, sizeBytes: file.size },
+      signal
+    );
 
     if (alreadyUploaded) {
       report('done');
@@ -139,21 +207,11 @@ export async function ingestFile(
     }
 
     if (uploadUrl) {
-      const put = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: file.type ? { 'Content-Type': file.type } : undefined,
-        signal,
-      });
-      if (!put.ok) throw new Error('Upload failed — check your connection and try again.');
+      await putFile(uploadUrl, file, signal);
     }
 
     report('reading');
-    const read = await postJson<{ pages?: number; queued?: boolean; extract?: boolean }>(
-      '/api/read-document',
-      { documentId },
-      signal
-    );
+    const read = await readDocument(documentId as string, signal);
 
     if (read.queued) {
       report('queued');

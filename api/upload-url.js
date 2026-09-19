@@ -31,10 +31,27 @@ import { limit } from "./_lib/rateLimit.js";
  * api/v1-ingest.js (the public partner/integration surface) can reuse it
  * exactly rather than re-implementing document creation and presigning a
  * second time.
+ *
+ * BATCH MODE (bulk import): body may instead be { files: [{filename, sha256,
+ * contentType?, sizeBytes?}, ...] }, up to MAX_BATCH_FILES entries, and the
+ * response is { results: [...] } with one entry per input file IN THE SAME
+ * ORDER (callers may zip by index; filenames are not assumed unique). This
+ * exists because a bulk import of thousands of files at one presign-per-HTTP-
+ * request would be thousands of round trips before a single byte moves — one
+ * batch call of 50 cuts that 50x. Each file is validated exactly as the
+ * single-file path validates it; a bad file in the batch becomes a per-item
+ * `error`/`status`, not a failed whole request, so 49 good files are not
+ * held hostage by 1 bad one. All files in one batch call share a single
+ * database transaction (one connection checkout, not fifty) — the one
+ * exception is R2 being unconfigured (StorageUnavailableError), which is
+ * environment-wide and is surfaced as a per-item error too rather than an
+ * uncaught 503, so a batch never rolls back documents that already
+ * committed fine earlier in the same request.
  */
-export const config = { api: { bodyParser: { sizeLimit: "16kb" } } };
+export const config = { api: { bodyParser: { sizeLimit: "64kb" } } };
 
 const MAX_BYTES = 100 * 1024 * 1024;
+const MAX_BATCH_FILES = 50;
 
 // What the reader will actually accept for a PDF or a photo. Checked HERE, not
 // only at read time: the old arrangement presigned anything up to 100 MB, the
@@ -79,16 +96,14 @@ export class UploadValidationError extends Error {
 }
 
 /**
- * The core of /api/upload-url, minus HTTP concerns: validate the body, create
- * (or find) the document row, and presign an upload URL for it.
+ * Validate one file's presign request body. Pure (throws or returns a clean
+ * shape) so both the single-file and batch paths run the exact same checks.
  *
- * @param {{tenantId: string, orgId: string|null, userId: string}} auth  whatever requireAuthOrKey() returned
  * @param {{filename: unknown, sha256: unknown, contentType?: unknown, sizeBytes?: unknown}} body
- * @returns {Promise<{documentId: string, storageKey: string, alreadyUploaded: boolean, uploadUrl: string|null}>}
- * @throws {UploadValidationError} on a bad body (caller maps `.status` to the HTTP response)
- * @throws {StorageUnavailableError} when R2 is not configured
+ * @returns {{filename: string, sha256: string, contentType: string|null, sizeBytes: number|null}}
+ * @throws {UploadValidationError}
  */
-export async function createUploadUrl(auth, body) {
+function validateUploadBody(body) {
   const { filename, sha256, contentType, sizeBytes } = body ?? {};
   if (typeof filename !== "string" || !filename.trim()) {
     throw new UploadValidationError("filename is required");
@@ -126,49 +141,125 @@ export async function createUploadUrl(auth, body) {
       413
     );
   }
+  return { filename, sha256, contentType: contentType ?? null, sizeBytes: sizeBytes ?? null };
+}
+
+/**
+ * Create (or find) the document row and presign an upload URL for it, given
+ * an already-open tenant `db` handle. Shared by the single-file and batch
+ * paths so a batch runs every file through one transaction instead of one
+ * per file.
+ *
+ * @param {ReturnType<typeof withTenant> extends Promise<infer T> ? T : never} db
+ * @param {{filename: string, sha256: string, contentType: string|null, sizeBytes: number|null}} validated
+ * @param {{userId: string, viaKey?: boolean}} auth
+ * @throws {StorageUnavailableError} when R2 is not configured
+ */
+async function createUploadUrlTx(db, validated, auth) {
+  const { filename, sha256, contentType, sizeBytes } = validated;
+  const key = objectKey(db.tenantId, sha256, filename);
+  const doc = await db.createDocument({
+    original_filename: filename,
+    sha256_hash: sha256,
+    file_size_bytes: sizeBytes,
+    content_type: contentType,
+    storage_key: key,
+  });
+  // Was this row already here (same tenant, same bytes)? If the document
+  // already has pages, the client can skip the upload entirely.
+  const pages = await db.listPages(doc.id);
+  const alreadyUploaded = pages.length > 0;
+
+  // presign() must run BEFORE this transaction commits, not after. It used
+  // to be called outside withTenant, once the documents row above was
+  // already committed — so a misconfigured R2 (presign() throws when
+  // R2_ACCOUNT_ID etc. are unset, true for every Preview/Development
+  // deploy today) left behind a permanent orphan row: stage='received',
+  // no error recorded, indistinguishable from an upload in progress,
+  // never cleaned up. Calling it here means a throw happens inside the
+  // transaction, so withTenant's catch/ROLLBACK undoes the createDocument
+  // insert along with it — no row, no orphan.
+  let uploadUrl = null;
+  if (!alreadyUploaded) {
+    try {
+      uploadUrl = presign("PUT", key, 900);
+    } catch (err) {
+      throw new StorageUnavailableError(err);
+    }
+  }
+
+  await db.logAction({
+    action: "document.upload_requested",
+    resource_type: "document",
+    resource_id: doc.id,
+    clerk_user_id: auth.userId,
+    changes: { filename, sizeBytes, viaKey: !!auth.viaKey },
+  });
+  return { documentId: doc.id, storageKey: key, alreadyUploaded, uploadUrl };
+}
+
+/**
+ * The core of /api/upload-url, minus HTTP concerns: validate the body, create
+ * (or find) the document row, and presign an upload URL for it.
+ *
+ * @param {{tenantId: string, orgId: string|null, userId: string}} auth  whatever requireAuthOrKey() returned
+ * @param {{filename: unknown, sha256: unknown, contentType?: unknown, sizeBytes?: unknown}} body
+ * @returns {Promise<{documentId: string, storageKey: string, alreadyUploaded: boolean, uploadUrl: string|null}>}
+ * @throws {UploadValidationError} on a bad body (caller maps `.status` to the HTTP response)
+ * @throws {StorageUnavailableError} when R2 is not configured
+ */
+export async function createUploadUrl(auth, body) {
+  const validated = validateUploadBody(body);
+  return withTenant(
+    { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+    (db) => createUploadUrlTx(db, validated, auth)
+  );
+}
+
+/**
+ * Batch form: presign up to MAX_BATCH_FILES files in one request/transaction.
+ * See the BATCH MODE note above the exports for the response shape and why
+ * a bad file becomes a per-item error instead of failing the whole call.
+ *
+ * @param {{tenantId: string, orgId: string|null, userId: string}} auth
+ * @param {unknown} files  expected to be an array of single-file bodies
+ * @returns {Promise<Array<{filename?: string, documentId?: string, storageKey?: string, alreadyUploaded?: boolean, uploadUrl?: string|null, error?: string, status?: number}>>}
+ * @throws {UploadValidationError} only for a malformed batch itself (not an array, empty, or too long)
+ */
+export async function createUploadUrls(auth, files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new UploadValidationError("files must be a non-empty array");
+  }
+  if (files.length > MAX_BATCH_FILES) {
+    throw new UploadValidationError(`A batch is limited to ${MAX_BATCH_FILES} files`, 413);
+  }
 
   return withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
     async (db) => {
-      const key = objectKey(db.tenantId, sha256, filename);
-      const doc = await db.createDocument({
-        original_filename: filename,
-        sha256_hash: sha256,
-        file_size_bytes: sizeBytes ?? null,
-        content_type: contentType ?? null,
-        storage_key: key,
-      });
-      // Was this row already here (same tenant, same bytes)? If the document
-      // already has pages, the client can skip the upload entirely.
-      const pages = await db.listPages(doc.id);
-      const alreadyUploaded = pages.length > 0;
-
-      // presign() must run BEFORE this transaction commits, not after. It used
-      // to be called outside withTenant, once the documents row above was
-      // already committed — so a misconfigured R2 (presign() throws when
-      // R2_ACCOUNT_ID etc. are unset, true for every Preview/Development
-      // deploy today) left behind a permanent orphan row: stage='received',
-      // no error recorded, indistinguishable from an upload in progress,
-      // never cleaned up. Calling it here means a throw happens inside the
-      // transaction, so withTenant's catch/ROLLBACK undoes the createDocument
-      // insert along with it — no row, no orphan.
-      let uploadUrl = null;
-      if (!alreadyUploaded) {
+      const results = [];
+      for (const raw of files) {
+        const filename = typeof raw?.filename === "string" ? raw.filename : undefined;
         try {
-          uploadUrl = presign("PUT", key, 900);
+          const validated = validateUploadBody(raw);
+          const single = await createUploadUrlTx(db, validated, auth);
+          results.push({ filename: validated.filename, ...single });
         } catch (err) {
-          throw new StorageUnavailableError(err);
+          // A bad or too-large file, or R2 being unconfigured, is this file's
+          // problem alone — record it and keep going, so one item never sinks
+          // the other 49 sharing this transaction. Anything else (a genuine
+          // bug) is left to propagate and abort the whole batch, same as any
+          // other unexpected error in this codebase.
+          if (err?.name === "UploadValidationError") {
+            results.push({ filename, error: err.message, status: err.status });
+          } else if (err?.name === "StorageUnavailableError") {
+            results.push({ filename, error: "File storage is not configured for this environment.", status: 503 });
+          } else {
+            throw err;
+          }
         }
       }
-
-      await db.logAction({
-        action: "document.upload_requested",
-        resource_type: "document",
-        resource_id: doc.id,
-        clerk_user_id: auth.userId,
-        changes: { filename, sizeBytes: sizeBytes ?? null, viaKey: !!auth.viaKey },
-      });
-      return { documentId: doc.id, storageKey: key, alreadyUploaded, uploadUrl };
+      return results;
     }
   );
 }
@@ -202,9 +293,18 @@ export default async function handler(req, res) {
     return denyAuth(res, err);
   }
 
-  if (!(await limit(req, res, auth, "ingest"))) return; // 429 already written
+  // A 50-file batch presign is 50 units of ingest, not one request.
+  const batchCost = Array.isArray(req.body?.files) ? Math.max(1, req.body.files.length) : 1;
+  if (!(await limit(req, res, auth, "ingest", undefined, batchCost))) return; // 429 already written
 
   try {
+    // Batch shape: { files: [...] } -> { results: [...] }. One request, one
+    // rate-limit charge and one usage_counters increment cover the whole
+    // batch today — see the daily-cap note in HANDOFF-C.md for the tradeoff.
+    if (req.body && Array.isArray(req.body.files)) {
+      const results = await createUploadUrls(auth, req.body.files);
+      return handleCors(res, req).status(200).json({ results });
+    }
     const result = await createUploadUrl(auth, req.body);
     return handleCors(res, req).status(200).json(result);
   } catch (error) {

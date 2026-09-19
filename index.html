@@ -70,7 +70,7 @@ body{
 .serif{font-family:"Newsreader",Georgia,"Times New Roman",serif}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
 h1,h2,h3{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.08;margin:0;text-wrap:balance;letter-spacing:-.01em}
-h1{font-size:clamp(2.6rem,6vw,4.6rem)}
+h1{font-size:clamp(2.2rem,4.6vw,3.6rem)}
 h2{font-size:clamp(1.9rem,3.6vw,2.8rem)}
 h3{font-size:1.35rem;line-height:1.25}
 p{margin:0}
@@ -114,17 +114,17 @@ a{color:inherit}
 
 /* hero */
 .hero{position:relative;overflow:hidden;background:var(--hero-grad)}
-.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;padding-block:clamp(48px,7vw,88px)}
-.hero-copy{display:flex;flex-direction:column;gap:28px;position:relative;z-index:2}
+.hero .wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:40px;align-items:center;padding-block:clamp(36px,5vw,56px)}
+.hero-copy{display:flex;flex-direction:column;gap:20px;position:relative;z-index:2}
 .hero h1 em{font-style:italic;font-weight:400;color:var(--navy)}
 :root[data-theme="dark"] .hero h1 em{color:#9DC4B2}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .hero h1 em{color:#9DC4B2}}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
-.hero-facts{display:flex;gap:32px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line);margin-top:8px}
+.hero-facts{display:flex;gap:28px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--line);margin-top:4px}
 .fact{display:flex;flex-direction:column;gap:2px}
-.fact b{font-family:"Newsreader",serif;font-size:1.6rem;font-weight:500;font-variant-numeric:tabular-nums}
+.fact b{font-family:"Newsreader",serif;font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
 .fact span{font-size:.78rem;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-family:"IBM Plex Mono",monospace}
-.well{position:relative;aspect-ratio:1;max-width:100%;width:100%}
+.well{position:relative;aspect-ratio:1;max-width:380px;width:100%;margin-left:auto}
 .well canvas{width:100%;height:100%;display:block}
 @media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.well{max-width:360px;margin:0 auto;order:-1}}
 
@@ -334,7 +334,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
     <div class="hero-copy">
       <div class="eyebrow">Records that answer back — for HVAC shops</div>
       <h1>One question answered right. <em>One $300 callback prevented.</em></h1>
-      <p class="lede">DeepWell finds the answer in your own work orders, warranty sheets, invoices and nameplate photos — so your techs stop calling the office and the office stops digging through the cabinet. Our team sets it up for you; day one is already useful.</p>
+      <p class="lede">DeepWell finds the answer in your own work orders, warranty sheets, invoices and nameplate photos — so your techs stop calling the office. We set it up for you; day one is already useful.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#plans">See pricing</a>
         <a class="btn btn-ghost" href="#demo">See what it feels like</a>
@@ -343,7 +343,6 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
         <div class="fact"><b>&lt; 3 s</b><span>Question to answer</span></div>
         <div class="fact"><b>&lt; 5 min</b><span>Upload to searchable</span></div>
         <div class="fact"><b>100%</b><span>Answers cite the source</span></div>
-        <div class="fact"><b>Days</b><span>Signup to go-live</span></div>
       </div>
     </div>
     <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>

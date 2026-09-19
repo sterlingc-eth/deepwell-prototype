@@ -18,29 +18,34 @@
     "verify:warranty": "node scripts/verify-warranty.mjs",
     "verify:answer": "node scripts/verify-answer.mjs",
     "verify:customer": "node scripts/verify-customer-link.mjs",
-    "verify:all": "npm run verify:extract && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:hardening && npm run verify:auth && npm run verify:review && npm run verify:ops && npm run verify:apikeys && npm run verify:ui",
+    "verify:all": "npm run verify:extract && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:hardening && npm run verify:auth && npm run verify:review && npm run verify:ops && npm run verify:apikeys && npm run verify:transcribe && npm run verify:caching && npm run verify:bulk && npm run verify:scale && npm run verify:ui",
     "verify:hardening": "node scripts/verify-hardening.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:review": "node scripts/verify-review.mjs",
     "verify:ops": "node scripts/verify-ops.mjs",
     "verify:apikeys": "node scripts/verify-apikeys.mjs",
-    "verify:ui": "tsx scripts/verify-ui.ts"
+    "verify:ui": "tsx scripts/verify-ui.ts",
+    "verify:transcribe": "node scripts/verify-transcribe.mjs",
+    "verify:caching": "node scripts/verify-caching.mjs",
+    "verify:bulk": "node scripts/verify-bulk.mjs",
+    "verify:scale": "node scripts/verify-scale.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
     "@clerk/backend": "^3.17.2",
     "@clerk/clerk-react": "^5.3.2",
+    "@sentry/node": "^8.45.0",
     "@types/pg": "^8.23.1",
     "html2canvas": "^1.4.1",
     "inngest": "^4.20.0",
     "jspdf": "^4.2.1",
+    "jszip": "^3.10.2",
     "lucide-react": "^1.43.0",
     "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "6.26.0",
-    "zustand": "4.5.5",
-    "@sentry/node": "^8.45.0"
+    "zustand": "4.5.5"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

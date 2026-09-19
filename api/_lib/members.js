@@ -8,41 +8,20 @@
  * DEVIATION FROM THE ORIGINAL PLAN, FLAGGED HERE ON PURPOSE:
  * The natural way to write this would be `withTenant(ctx, (store) => ...)`
  * from ../_lib/recordsStore.js, reusing its transaction + RLS-scoping dance.
- * That is not possible without editing recordsStore.js, which this task does
- * not own: `withTenant`'s callback only ever receives the higher-level
- * `store` object (createDocument, listEntities, ...), never the raw `pg`
- * client underneath it, and there is no `users` table method on `store` to
- * call. So this file opens its own single-connection pool and replicates the
- * three-line scoping dance `withTenant` already does (resolve_tenant, then
- * `SET LOCAL app.tenant_id`) rather than duplicating none of it and guessing.
- * See HANDOFF.md for the one-line change to recordsStore.js that would let
- * this file delete its own pool and go through `withTenant` properly.
+ * That is not possible: `withTenant`'s callback only ever receives the
+ * higher-level `store` object (createDocument, listEntities, ...), never the
+ * raw `pg` client underneath it, and there is no `users` table method on
+ * `store` to call. So this file runs its own three-line scoping dance
+ * (resolve_tenant, then `SET LOCAL app.tenant_id`) rather than guessing at
+ * one — the same dance `withTenant` runs, just against a raw client.
  *
- * CONNECTION COST, ACCEPTED AT THIS SCALE: this is a second pool alongside
- * recordsStore.js's, so an authenticated request now opens up to two Postgres
- * connections instead of one. For a five-technician shop that is nothing;
- * `max: 1` here keeps it from ever being more than one extra connection at a
- * time. If DeepWell grows into many concurrently-active shops, this should be
- * consolidated into recordsStore.js's own pool (see HANDOFF.md) rather than
- * scaled up as two independent pools.
+ * POOL CONSOLIDATION (scale-readiness build, 2026-09): this used to open its
+ * own single-connection pg.Pool. recordsStore.js now exports `getPool()` for
+ * exactly this — one Postgres pool per warm instance instead of one per file
+ * that needs a raw client. The transaction/RLS-scoping logic below is
+ * unchanged; only where the connection comes from moved.
  */
-import pg from "pg";
-
-let pool;
-
-function getPool() {
-  if (!pool) {
-    const connectionString = process.env.NEON_CONNECTION_STRING;
-    if (!connectionString) throw new Error("NEON_CONNECTION_STRING is not set");
-    pool = new pg.Pool({
-      connectionString,
-      max: 1,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 8_000,
-    });
-  }
-  return pool;
-}
+import { getPool } from "./recordsStore.js";
 
 /**
  * users.role has a CHECK (role IN ('admin', 'user')) — it predates Clerk

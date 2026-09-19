@@ -1,9 +1,38 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { withTenant } from "./recordsStore.js";
-import { getApiKey, MODEL_TIMEOUT_MS } from "./claude.js";
+import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages } from "./extractFields.js";
 import { IngestError } from "./readDocument.js";
 import { deriveWarranty } from "./warrantyRules.js";
+import { withCache, modelCallLogLine } from "./promptCache.js";
+import { recordModelCall } from "./usage.js";
+
+/**
+ * buildExtractPrompt() (extractFields.js — not owned by this change, left
+ * untouched) returns one flat string: a per-document intro sentence + the
+ * page text, followed by a field guide + rules block that is IDENTICAL on
+ * every single call, for every document, forever (until extractFields.js's
+ * wording changes). That second part is the cacheable "extraction system
+ * prompt" the caching task calls for; the first part (the actual document
+ * text) obviously is not, since it's different on every document by design.
+ *
+ * Splitting on that fixed sentence — rather than copying the field guide and
+ * rules text a second time into this file — keeps there from ever being two
+ * copies of the same guidance to drift apart. If extractFields.js's wording
+ * ever changes, the marker just stops matching and this falls back to
+ * sending the whole prompt as one uncached user message (still correct,
+ * exactly today's behavior — just not cached), never to two different
+ * copies of the instructions reaching the model at once.
+ */
+const EXTRACT_STATIC_MARKER = "Read the pages and return every field the text actually states";
+
+/** Pure. @returns {{dynamic: string, stable: string}} */
+export function splitExtractPrompt(fullPrompt) {
+  const text = String(fullPrompt ?? "");
+  const idx = text.indexOf(EXTRACT_STATIC_MARKER);
+  if (idx === -1) return { dynamic: text, stable: "" };
+  return { dynamic: text.slice(0, idx).trimEnd(), stable: text.slice(idx).trimEnd() };
+}
 
 /**
  * Structured extraction with no HTTP in it, for the same reason as
@@ -40,15 +69,60 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
 
   const { pages: selected, truncated } = selectPages(pages);
   const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
-  const response = await client.messages.create({
+
+  // See splitExtractPrompt()'s doc comment above for why this is split
+  // rather than sent as the one flat string it used to be. withCache()
+  // (api/_lib/promptCache.js) only attaches cache_control when `stable` is
+  // actually long enough to be cached (Haiku: 2048 tokens, ~8192 chars) — as
+  // measured, today's field guide + rules text is well under that (~600
+  // tokens), so in practice this does NOT get a cache breakpoint yet. See
+  // handoffs/HANDOFF-B.md; this is the documented, intentional "skip rather
+  // than pad" case the task called for, not a bug.
+  const fullPrompt = buildExtractPrompt(selected, documentType || doc.document_type);
+  const { dynamic: dynamicPrompt, stable: stablePrompt } = splitExtractPrompt(fullPrompt);
+
+  const startedAt = Date.now();
+  const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
+  const response = await withBackoff(() => client.messages.create({
     model: EXTRACT_MODEL,
     max_tokens: 4000,
-    tools: [EXTRACT_TOOL],
+    ...(stablePrompt ? { system: [withCache({ type: "text", text: stablePrompt }, EXTRACT_MODEL)] } : {}),
+    tools: [withCache(EXTRACT_TOOL, EXTRACT_MODEL)],
     tool_choice: { type: "tool", name: EXTRACT_TOOL.name },
-    messages: [
-      { role: "user", content: buildExtractPrompt(selected, documentType || doc.document_type) },
-    ],
-  });
+    messages: [{ role: "user", content: dynamicPrompt }],
+  }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
+  const latencyMs = Date.now() - startedAt;
+
+  // One structured line per call, no PII (page text/field values never
+  // appear here) — so Vercel logs show cache hit rates.
+  console.log(
+    JSON.stringify(
+      modelCallLogLine({
+        route: "extract",
+        model: EXTRACT_MODEL,
+        inputTokens: response.usage?.input_tokens,
+        cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+        cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+        outputTokens: response.usage?.output_tokens,
+        latencyMs,
+      })
+    )
+  );
+
+  // Cost accounting, best-effort — see api/ask.js's identical comment.
+  // recordModelCall already swallows its own errors (usage.js), and this is
+  // wrapped again so a change there can never turn a successful extraction
+  // into a 500.
+  try {
+    await recordModelCall(ctx, {
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+      cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+      cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+    });
+  } catch (err) {
+    console.error("Failed to record extract usage:", err?.message);
+  }
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);

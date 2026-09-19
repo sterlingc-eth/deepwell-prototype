@@ -62,19 +62,23 @@
  *   is discarded once tenant_key is read off the row; every query still goes
  *   through the ordinary withTenant()/resolve_tenant() path unchanged.
  *
- * A SEPARATE POOL, ON PURPOSE
- *   recordsStore.js (not edited here — another engineer owns it) does not
- *   export its pool, only withTenant(), which is unusable before a tenant is
- *   known (see above). This file therefore keeps its own tiny pool against
- *   the same NEON_CONNECTION_STRING / deepwell_rls role. It is used for
- *   exactly one call shape (`SELECT * FROM resolve_api_key($1)` and the
- *   last_used_at touch the function itself performs) and nothing else ever
- *   runs on it — no app.tenant_id is ever set on this pool's connections, and
- *   none is needed, because resolve_api_key() is SECURITY DEFINER and RLS
- *   never applies to it in the first place.
+ * THE AUX POOL (POOL CONSOLIDATION, scale-readiness build, 2026-09)
+ *   This file, rateLimit.js and usage.js all need to run a query outside — or
+ *   before — an ordinary withTenant() transaction (resolve_api_key() has no
+ *   tenant yet; the daily-cap and usage queries run against a small aux pool
+ *   rather than opening a full tenant transaction for one narrow lookup).
+ *   `getAuxPool()` used to open its own separate pg.Pool for exactly that.
+ *   It now delegates to recordsStore.js's exported `getPool()` instead — one
+ *   Postgres pool per warm instance, not two — while keeping its name and
+ *   shape unchanged, since rateLimit.js and usage.js both import it by name.
+ *   None of the SECURITY DEFINER-function reasoning below changes: no
+ *   app.tenant_id is ever set on a connection checked out this way, and none
+ *   is needed, because resolve_api_key()/get_tenant_limits()/
+ *   increment_usage_counters()/get_usage_counters() are all SECURITY DEFINER
+ *   and RLS never applies to them in the first place.
  */
 import crypto from "node:crypto";
-import pg from "pg";
+import { getPool } from "./recordsStore.js";
 import { requireAuth, AuthError } from "./auth.js";
 
 export const KEY_PREFIX = "dw_live_";
@@ -83,29 +87,16 @@ const HEX64 = /^[0-9a-f]{64}$/;
 export const SCOPES = Object.freeze(["read", "ingest", "ask"]);
 
 /**
- * A tiny pool shared by every file in this auth/limiting group (apiKeyAuth,
- * rateLimit, usage), all of which need to run a query outside — or before —
- * an ordinary withTenant() transaction. recordsStore.js does not export its
- * pool (only withTenant()), so this is a second, deliberately small pool
- * against the same NEON_CONNECTION_STRING / deepwell_rls role. One module-
- * level singleton per serverless instance, same as recordsStore.js's own
- * pool, so importing this from three files still opens at most `max`
- * connections, not three times that.
+ * Shared by every file in this auth/limiting group (apiKeyAuth, rateLimit,
+ * usage), all of which need to run a query outside — or before — an ordinary
+ * withTenant() transaction: a handful of narrow, fast queries, never a
+ * transaction of their own. Kept as its own named export (rather than having
+ * each of those files import recordsStore.js's `getPool()` directly) so this
+ * group's "we run outside a tenant transaction" pattern stays named and
+ * greppable as one thing, even though the connections themselves now come
+ * from recordsStore.js's single shared pool.
  */
-let pool;
-export function getAuxPool() {
-  if (!pool) {
-    const connectionString = process.env.NEON_CONNECTION_STRING;
-    if (!connectionString) throw new Error("NEON_CONNECTION_STRING is not set");
-    pool = new pg.Pool({
-      connectionString,
-      max: 2, // small on purpose: a handful of narrow, fast queries, never a transaction
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 8_000,
-    });
-  }
-  return pool;
-}
+export const getAuxPool = getPool;
 
 /** Constant-shape check: does this bearer token look like one of our keys? */
 export function isApiKey(token) {

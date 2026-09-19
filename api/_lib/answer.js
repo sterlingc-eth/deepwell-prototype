@@ -98,6 +98,81 @@ const RULES = `Rules:
 - basis is "printed" unless you personally computed the value yourself — see the basis field description.
 - text is 1–3 sentences a dispatcher would say out loud.`;
 
+/**
+ * ---------------------------------------------------------------------------
+ * Prompt-caching split (added for /api/ask cost accounting — see
+ * scripts/verify-caching.mjs and handoffs/HANDOFF-B.md).
+ *
+ * buildPrompt() above stays exactly as it was: it's still exercised directly
+ * by scripts/verify-answer.mjs and scripts/verify-retrieval.mjs, and nothing
+ * here changes what it returns.
+ *
+ * /api/ask itself no longer sends one flat user-message string, because a
+ * flat string can't have an Anthropic cache breakpoint in the middle of it.
+ * Instead it sends three pieces, ordered so a cache breakpoint after each of
+ * the first two can be reused by the next call:
+ *
+ *   1. SYSTEM_PROMPT       — the task framing + RULES. Zero variables: the
+ *                            same text on every single call, for every
+ *                            tenant, forever (until this file changes).
+ *   2. buildContextBlock() — the retrieved passages/extractions for THIS
+ *                            question. Varies per call, but a follow-up
+ *                            question that retrieves the same top passages
+ *                            (the common case — "and when was it installed"
+ *                            right after "what's the warranty on unit 3")
+ *                            reproduces this block byte-for-byte, so it's
+ *                            the one placed behind a cache breakpoint, ahead
+ *                            of the question. This is the one that matters:
+ *                            it's usually the largest block by far (up to 12
+ *                            passages x 1200 chars), and it's the one that
+ *                            repeats across a real conversation.
+ *   3. buildQuestionBlock() — today's date + the question itself. Always
+ *                            different (today ticks daily even on a
+ *                            word-for-word repeated question), so it is
+ *                            NEVER given cache_control — see api/ask.js.
+ *
+ * Concatenating all three (in order, with the same blank-line join buildPrompt
+ * uses) reproduces buildPrompt()'s own text, so this is a pure decomposition,
+ * not a second, drifting copy of the wording.
+ */
+
+const PREAMBLE =
+  "You are a grounded question-answering assistant for an HVAC dispatch " +
+  'company. You will be given retrieved passages from the customer\'s own ' +
+  'documents, then a question. Answer using only the "answer" tool.';
+
+export const SYSTEM_PROMPT = `${PREAMBLE}\n\n${RULES}`;
+
+export function buildContextBlock({ passages, extractions } = {}) {
+  const ev =
+    (passages ?? [])
+      .map(
+        (p, i) =>
+          `[${i + 1}] documentId: ${p.documentId} | page: ${p.page} | file: ${p.filename}${
+            p.documentType ? ` (${p.documentType})` : ""
+          }\n${p.excerpt}`
+      )
+      .join("\n\n") || "(no passages matched)";
+
+  const factsBlock = extractions?.length
+    ? `\n\nALREADY-EXTRACTED FIELDS (verified by the pipeline; cite with location: { "field": "<field>" }, no page):\n` +
+      extractions
+        .map((x) => `- ${x.field} = ${x.value}  [documentId: ${x.documentId} | file: ${x.filename}]`)
+        .join("\n")
+    : "";
+
+  return `These passages were retrieved from the customer's own documents because they match the question. They are the only evidence you have.
+
+PASSAGES:
+${ev}${factsBlock}`;
+}
+
+export function buildQuestionBlock({ question, today }) {
+  return `Today's date: ${today}
+
+QUESTION: ${question}`;
+}
+
 export function buildPrompt({ question, today, passages, extractions }) {
   const ev =
     (passages ?? [])

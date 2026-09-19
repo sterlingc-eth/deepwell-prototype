@@ -23,13 +23,35 @@ import pg from 'pg';
 
 let pool;
 
-function getPool() {
+/**
+ * EXPORTED (scale-readiness build, 2026-09): members.js, opsStore.js,
+ * reviewStore.js and apiKeyAuth.js used to each open their own single-purpose
+ * pg.Pool against this same NEON_CONNECTION_STRING / deepwell_rls role —
+ * every one of them said so in its own header, and each was right that this
+ * module's `withTenant()` had no way to hand them a raw client. It does now:
+ * this is that raw client's pool, exported so those four files can open
+ * connections through it directly instead of maintaining four more copies of
+ * the same pg.Pool setup. They still run their own BEGIN/resolve_tenant/
+ * SET LOCAL/COMMIT dance on whatever client they check out — that transaction
+ * and RLS-scoping logic is unchanged and does not belong here — this only
+ * removes the redundant pools underneath it.
+ *
+ * `max` raised 3 -> 5 for exactly this reason: one instance's connection
+ * budget used to be spread across up to five separate pools (this one at 3,
+ * plus opsStore's 2, reviewStore's 3, members' 1, apiKeyAuth's 2 — as many as
+ * 11 connections from one warm instance), each capped low specifically
+ * because each was "supposedly small". Consolidated onto one pool, 5 is
+ * fewer total connections than before, not more, while still leaving several
+ * of those old call sites able to check out a connection without waiting on
+ * each other. Still well under Neon's pooler limits for a single instance.
+ */
+export function getPool() {
   if (!pool) {
     const connectionString = process.env.NEON_CONNECTION_STRING;
     if (!connectionString) throw new Error('NEON_CONNECTION_STRING is not set');
     pool = new pg.Pool({
       connectionString,
-      max: 3,                       // serverless: keep well under Neon's pooler limits
+      max: 5,                       // serverless: keep well under Neon's pooler limits
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 8_000,
     });

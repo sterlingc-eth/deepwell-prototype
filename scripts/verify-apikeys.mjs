@@ -172,7 +172,12 @@ async function burstTest(tenantSuffix, perMinute) {
 
 check('DEFAULT_LIMITS defines all three buckets this codebase rate-limits', ['ask', 'ingest', 'read'].every((b) => DEFAULT_LIMITS[b]?.perMinute > 0 && DEFAULT_LIMITS[b]?.perDay > 0));
 eq('ask defaults match spec (30/min, 500/day)', DEFAULT_LIMITS.ask, { perMinute: 30, perDay: 500 });
-eq('ingest defaults match spec (20/min, 300/day)', DEFAULT_LIMITS.ingest, { perMinute: 20, perDay: 300 });
+// Bumped by the scale-readiness build (handoffs/HANDOFF-D.md): `ingest`'s
+// perDay/perMinute now count UNITS (see `limit()`'s `cost` parameter), not
+// one raw HTTP call each, and are sized for a Shop plan's daily volume plus
+// headroom for a 50-file batch presign in one request — not the old
+// per-call-only numbers.
+eq('ingest defaults match spec (60/min, 2000/day)', DEFAULT_LIMITS.ingest, { perMinute: 60, perDay: 2000 });
 eq('read defaults match spec (120/min, 5000/day)', DEFAULT_LIMITS.read, { perMinute: 120, perDay: 5000 });
 
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nAll API key / rate limit checks passed.');

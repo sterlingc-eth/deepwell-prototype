@@ -121,6 +121,103 @@ export const MODEL_TIMEOUT_MS = 35_000;
 /** For routes with no maxDuration of their own, which get a shorter platform default. */
 export const FAST_MODEL_TIMEOUT_MS = 25_000;
 
+/**
+ * Does this Anthropic error mean "the model is temporarily out of capacity,
+ * try again shortly" — as opposed to every other kind of failure?
+ *
+ * Deliberately NARROWER than readDocument.js's own `isTransientError`: that
+ * one (rightly, for its own callers) also treats a timeout/AbortError and any
+ * 5xx as retriable, because the Inngest queue owns retrying a whole step and
+ * can afford to wait out a fresh attempt. `withBackoff` below is for the
+ * OPPOSITE situation — a call made synchronously inside a request that has a
+ * hard platform deadline — where retrying a call that failed by timing out
+ * would mean deliberately spending MORE of an already-exhausted budget on a
+ * second attempt of the same length. Only 429 (rate limited) and 529 /
+ * "overloaded_error" are retried here: both fail FAST (the API rejects the
+ * request up front, it does not hang for the full timeout first), so a short
+ * jittered pause and one more try is cheap in wall-clock time. Anything else
+ * — a timeout, a 500, a malformed request, a 401 — is handed straight back to
+ * the caller.
+ */
+export function isRetryableModelStatus(error) {
+  if (!error) return false;
+  const status = Number(error.status ?? error.statusCode ?? 0);
+  if (status === 429 || status === 529) return true;
+  const type = error.type || error.error?.type;
+  return type === "overloaded_error" || type === "rate_limit_error";
+}
+
+const DEFAULT_BACKOFF_ATTEMPTS = 3;
+const DEFAULT_BACKOFF_BASE_MS = 300;
+
+/**
+ * Retry `fn` on a 429/529/overloaded Anthropic error, with full-jitter
+ * exponential backoff, for a synchronous request path (ask/extract) that
+ * cannot afford the Inngest queue's own retry — the request itself has a
+ * hard platform ceiling (see MODEL_TIMEOUT_MS's own comment above) and must
+ * answer before it, one way or the other.
+ *
+ * @param {(attempt: number) => Promise<T>} fn      attempt is 0-based
+ * @param {{
+ *   attempts?: number,      total tries, not "retries after the first" — same convention as queue.js's RETRIES
+ *   baseMs?: number,        backoff base; attempt N waits a random amount in [0, baseMs * 2**N]
+ *   deadlineAt?: number,    absolute Date.now()-style ms after which no further attempt or wait is allowed
+ *   now?: () => number,     injectable clock, for tests
+ *   sleep?: (ms: number) => Promise<void>,  injectable delay, for tests — must resolve, never reject
+ *   random?: () => number,  injectable [0,1) source, for tests
+ * }} [options]
+ * @returns {Promise<T>}
+ *
+ * NEVER exceeds `deadlineAt`: before every attempt (including the first) and
+ * before every wait, the remaining budget is checked, and a wait is always
+ * capped to whatever budget remains rather than the full jittered value. A
+ * deadline that has already passed makes this throw immediately — the LAST
+ * error seen, or a dedicated error if it hasn't even tried once — rather than
+ * making one more attempt "since we're here"; the caller already has a
+ * platform deadline of its own and this must never be the reason it is
+ * blown.
+ */
+export async function withBackoff(fn, options = {}) {
+  const {
+    attempts = DEFAULT_BACKOFF_ATTEMPTS,
+    baseMs = DEFAULT_BACKOFF_BASE_MS,
+    deadlineAt = Infinity,
+    now = Date.now,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    random = Math.random,
+  } = options;
+
+  const maxAttempts = Math.max(1, Math.trunc(attempts) || 1);
+  let lastError;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (now() >= deadlineAt) {
+      throw lastError ?? new Error("withBackoff: deadline already passed before any attempt");
+    }
+
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      lastError = err;
+      if (!isRetryableModelStatus(err)) throw err;
+      if (attempt >= maxAttempts - 1) throw err;
+
+      // Full jitter: a uniformly random point in [0, cap], cap doubling each
+      // attempt — spreads out concurrent retries instead of having every
+      // caller that got 429'd at the same moment retry at the same moment.
+      const cap = baseMs * 2 ** attempt;
+      const jitterMs = random() * cap;
+      const remainingMs = deadlineAt - now();
+      if (remainingMs <= 0) throw err;
+
+      const delayMs = Math.min(jitterMs, remainingMs);
+      if (delayMs > 0) await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
 const ALLOWED_ORIGINS = [
   "https://deepwellinc.vercel.app",
   "https://deepwelltechnology.com",

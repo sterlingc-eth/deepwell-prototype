@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
+import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extractFields.js";
-import { extractDocumentFields, EXTRACT_MODEL } from "./_lib/extractDocument.js";
+import { extractDocumentFields, EXTRACT_MODEL, splitExtractPrompt } from "./_lib/extractDocument.js";
 import { sniffMagicBytes } from "./_lib/readDocument.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit } from "./_lib/rateLimit.js";
 import { recordModelCall } from "./_lib/usage.js";
+import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 
 /**
  * POST /api/extract
@@ -116,32 +117,59 @@ async function extractFromImage(req, res, { auth, imageData, mediaType, document
     return res.status(415).json({ error: message });
   }
 
+  // Same system/tools caching split as extractDocument.js's document path —
+  // see splitExtractPrompt()'s doc comment there. `stable` (field guide +
+  // rules) is currently well under Haiku's cacheable minimum, so withCache()
+  // correctly leaves it uncached; see handoffs/HANDOFF-B.md.
+  const fullPrompt = buildExtractPrompt(
+    [{ page_no: 1, text: "(the photograph above is page 1)" }],
+    documentType || "photograph of an equipment nameplate"
+  );
+  const { dynamic: dynamicPrompt, stable: stablePrompt } = splitExtractPrompt(fullPrompt);
+
   const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
-  const response = await client.messages.create({
+  const startedAt = Date.now();
+  const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
+  const response = await withBackoff(() => client.messages.create({
     model: EXTRACT_MODEL,
     max_tokens: 2000,
-    tools: [EXTRACT_TOOL],
+    ...(stablePrompt ? { system: [withCache({ type: "text", text: stablePrompt }, EXTRACT_MODEL)] } : {}),
+    tools: [withCache(EXTRACT_TOOL, EXTRACT_MODEL)],
     tool_choice: { type: "tool", name: EXTRACT_TOOL.name },
     messages: [
       {
         role: "user",
         content: [
           { type: "image", source: { type: "base64", media_type: type, data: imageData } },
-          {
-            type: "text",
-            text: buildExtractPrompt(
-              [{ page_no: 1, text: "(the photograph above is page 1)" }],
-              documentType || "photograph of an equipment nameplate"
-            ),
-          },
+          { type: "text", text: dynamicPrompt },
         ],
       },
     ],
-  });
+  }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
+  const latencyMs = Date.now() - startedAt;
+
+  console.log(
+    JSON.stringify(
+      modelCallLogLine({
+        route: "extract-image",
+        model: EXTRACT_MODEL,
+        inputTokens: response.usage?.input_tokens,
+        cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+        cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+        outputTokens: response.usage?.output_tokens,
+        latencyMs,
+      })
+    )
+  );
 
   await recordModelCall(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-    { inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }
+    {
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+      cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+      cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+    }
   );
 
   const toolUse = response.content.find((b) => b.type === "tool_use");

@@ -1,5 +1,6 @@
 import { ingestDocument, recordIngestFailure } from "../readDocument.js";
-import { listStuckDocuments, listTenantKeys } from "../opsStore.js";
+import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeys } from "../opsStore.js";
+import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { captureMessage, captureException } from "../telemetry.js";
 
 /**
@@ -29,6 +30,17 @@ import { captureMessage, captureException } from "../telemetry.js";
  * listTenantKeys() has a real cross-tenant path, this fallback becomes dead
  * code that can simply be deleted — it does not need to be threaded through
  * anywhere else.
+ *
+ * SCALE-READINESS ADDITION (2026-09): also finds and re-attempts documents
+ * the ingest queue deliberately deferred because a tenant's daily model-spend
+ * cap was already spent when they were uploaded (queue.js's cost guard,
+ * DAILY_BUDGET_EXCEEDED_MESSAGE) — a customer dropping in far more than a
+ * day's worth of documents at once produces exactly this, by design, and
+ * this nightly sweep is what makes the "resumes tomorrow" in that message
+ * literally true, on whatever day the tenant's usage has room again. Kept
+ * strictly separate from the "genuinely stuck" population above: matched by
+ * the EXACT deferral message (see listBudgetDeferredDocuments), so a document
+ * that failed for a real, permanent reason is never retried here.
  */
 export const config = {
   api: { bodyParser: { sizeLimit: "64kb" } },
@@ -67,7 +79,38 @@ export default async function handler(req, res) {
       .filter((t) => t && typeof t.tenant_key === "string" && t.tenant_key);
   }
 
-  const summary = { tenantsChecked: tenants.length, stuckFound: 0, recovered: 0, stillFailing: 0, errors: [] };
+  const summary = {
+    tenantsChecked: tenants.length,
+    stuckFound: 0,
+    recovered: 0,
+    stillFailing: 0,
+    budgetDeferredFound: 0,
+    budgetDeferredRecovered: 0,
+    budgetDeferredStillFailing: 0,
+    errors: [],
+  };
+
+  /**
+   * One attempt per document, ONE attempt only — this is a nightly safety
+   * net, not a retry loop. A document that fails here goes through
+   * recordIngestFailure exactly like any other permanent failure, and the
+   * tenant sees it (with `failMessage`) on their next visit instead of it
+   * silently sitting at 'received' again.
+   */
+  async function retryOnce(ctx, docs, failMessage) {
+    let recovered = 0;
+    let stillFailing = 0;
+    for (const doc of docs.slice(0, MAX_DOCS_PER_TENANT)) {
+      try {
+        await ingestDocument(ctx, doc.id);
+        recovered += 1;
+      } catch (err) {
+        stillFailing += 1;
+        await recordIngestFailure(ctx, doc.id, new Error(failMessage(err)));
+      }
+    }
+    return { recovered, stillFailing };
+  }
 
   for (const t of tenants) {
     const ctx = { tenantKey: t.tenant_key, tenantName: t.tenant_name ?? t.tenant_key };
@@ -81,32 +124,45 @@ export default async function handler(req, res) {
       continue;
     }
     summary.stuckFound += stuck.length;
+    const stuckResult = await retryOnce(
+      ctx,
+      stuck,
+      (err) =>
+        `This document was never read after upload, and the nightly recovery pass also failed ` +
+        `(${err?.message ?? "unknown error"}). Please re-upload it.`
+    );
+    summary.recovered += stuckResult.recovered;
+    summary.stillFailing += stuckResult.stillFailing;
 
-    for (const doc of stuck.slice(0, MAX_DOCS_PER_TENANT)) {
-      try {
-        // ONE attempt. This is a nightly safety net, not a retry loop — a
-        // document that fails here goes through recordIngestFailure exactly
-        // like any other permanent failure, and the tenant sees it on their
-        // next visit instead of it silently sitting at 'received' again.
-        await ingestDocument(ctx, doc.id);
-        summary.recovered += 1;
-      } catch (err) {
-        summary.stillFailing += 1;
-        await recordIngestFailure(
-          ctx,
-          doc.id,
-          new Error(
-            `This document was never read after upload, and the nightly recovery pass also failed ` +
-              `(${err?.message ?? "unknown error"}). Please re-upload it.`
-          )
-        );
-      }
+    // Documents the ingest queue deliberately deferred yesterday (or earlier
+    // today) because the tenant's daily model-spend cap was already spent —
+    // see the file header. Listed and retried separately from "stuck" above:
+    // these were never stuck, they were waiting for exactly this sweep.
+    let budgetDeferred;
+    try {
+      budgetDeferred = await listBudgetDeferredDocuments(ctx, DAILY_BUDGET_EXCEEDED_MESSAGE);
+    } catch (err) {
+      summary.errors.push({ tenant: t.tenant_key, phase: "list-budget-deferred", message: err?.message });
+      await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "list-budget-deferred" });
+      continue;
     }
+    summary.budgetDeferredFound += budgetDeferred.length;
+    const deferredResult = await retryOnce(
+      ctx,
+      budgetDeferred,
+      (err) =>
+        `This document was deferred by yesterday's daily processing limit, and today's retry also failed ` +
+        `(${err?.message ?? "unknown error"}). Please re-upload it.`
+    );
+    summary.budgetDeferredRecovered += deferredResult.recovered;
+    summary.budgetDeferredStillFailing += deferredResult.stillFailing;
   }
 
   await captureMessage(
     `cron-sweep: ${summary.tenantsChecked} tenant(s) checked, ${summary.stuckFound} stuck document(s) found, ` +
-      `${summary.recovered} recovered, ${summary.stillFailing} still failing.`,
+      `${summary.recovered} recovered, ${summary.stillFailing} still failing; ` +
+      `${summary.budgetDeferredFound} budget-deferred document(s) found, ` +
+      `${summary.budgetDeferredRecovered} recovered, ${summary.budgetDeferredStillFailing} still failing.`,
     { route: "/api/cron-sweep" }
   );
 

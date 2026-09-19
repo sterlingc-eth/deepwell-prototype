@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Plus, Upload, AlertTriangle, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { Plus, Upload, AlertTriangle, ChevronRight, X, FolderArchive } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { docCountsByStage, useGraph } from '../core/entityGraph';
@@ -7,6 +7,16 @@ import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSourc
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
 import { ingestFiles, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
+import {
+  startBulkImport,
+  walkZip,
+  sourceFromFile,
+  classifyEntry,
+  summarizeProgress,
+  truncateForDisplay,
+  type BulkFileState,
+  type WalkedFile,
+} from '../services/bulkImport';
 
 const SOURCE_LABEL: Record<IntakeSource, string> = { cabinet: 'Filing cabinet', email: 'Email', drive: 'Shared drive', truck: 'Truck' };
 const CURRENT_USER = 'You';
@@ -22,6 +32,34 @@ const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
   done: 'Read',
   error: 'Failed',
 };
+
+const BULK_STATUS_LABEL: Record<BulkFileState['status'], string> = {
+  pending: 'Waiting…',
+  hashing: 'Checking…',
+  uploading: 'Uploading…',
+  reading: 'Reading…',
+  queued: 'Queued…',
+  done: 'Read',
+  failed: 'Failed',
+  skipped: 'Skipped',
+  cancelled: 'Cancelled',
+};
+
+const SKIP_REASON_LABEL: Record<NonNullable<BulkFileState['skipReason']>, string> = {
+  macosx: 'macOS archive metadata',
+  dotfile: 'Hidden file',
+  directory: 'Folder',
+  empty: 'Empty file',
+  'too-large': 'Too large',
+  'unsupported-type': 'Unsupported type',
+};
+
+const ZIP_EXTENSION = /\.zip$/i;
+const BULK_ROW_LIMIT = 200;
+
+function isZipFile(file: File): boolean {
+  return ZIP_EXTENSION.test(file.name) || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+}
 
 const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -189,6 +227,134 @@ export function IntakeScreen() {
       if (tempId) reconcileIntakeDoc(tempId, patchFromIngestResult(result));
     });
   };
+  // ---- Bulk import: a dropped .zip export or a large multi-file selection ----
+  //
+  // Deliberately separate from `uploads`/`uploadFiles` above rather than
+  // merged into it: that path is proven for the common case (a handful of
+  // files added to a batch) and stays untouched. This one exists for the
+  // scale case — thousands of files from a ServiceTitan/Jobber/Housecall Pro
+  // export or a scanning vendor's delivery — where a different shape of
+  // progress reporting (skip reasons, a cap on rows rendered, a cancel
+  // button) actually matters.
+  const [bulkStates, setBulkStates] = useState<BulkFileState[]>([]);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const bulkInput = useRef<HTMLInputElement>(null);
+  const bulkCancelRef = useRef<(() => void) | null>(null);
+  const bulkReconciledRef = useRef<Set<number>>(new Set());
+
+  // Same reasoning as the `abortRef` effect above: a bulk run outlives the
+  // component if the screen is left mid-import, so it is cancelled on unmount.
+  useEffect(() => () => bulkCancelRef.current?.(), []);
+
+  const bulkSummary = useMemo(() => summarizeProgress(bulkStates), [bulkStates]);
+  const { shown: shownBulkRows, hiddenCount: hiddenBulkCount } = useMemo(
+    () => truncateForDisplay(bulkStates, BULK_ROW_LIMIT),
+    [bulkStates]
+  );
+
+  const toSkippedState = (path: string, reason: BulkFileState['skipReason'], detail: string): BulkFileState => ({
+    path,
+    name: path.split('/').filter(Boolean).pop() ?? path,
+    sizeBytes: 0,
+    status: 'skipped',
+    attempt: 0,
+    skipReason: reason,
+    error: detail,
+  });
+
+  const runBulkImport = (accepted: WalkedFile[], preSkipped: BulkFileState[]) => {
+    setBulkStates(preSkipped);
+    if (!accepted.length) {
+      setBulkRunning(false);
+      return;
+    }
+    const batchId = ensureBatch();
+    // Same reason as uploadFiles: capture the placeholder ids receiveDocs
+    // returns so each live BulkFileState can be folded back onto the right
+    // document once its upload/read finishes.
+    const tempIds = receiveDocs(batchId, accepted.map((s) => ({ filename: s.path, fileType: fileTypeOf(s.name) })));
+    bulkReconciledRef.current = new Set();
+
+    const handle = startBulkImport(
+      accepted,
+      { concurrency: 4, signal: abortRef.current?.signal },
+      {
+        onState: (states) => {
+          setBulkStates([...preSkipped, ...states]);
+          states.forEach((s, i) => {
+            if (bulkReconciledRef.current.has(i)) return;
+            const tempId = tempIds[i];
+            if (!tempId) return;
+            if ((s.status === 'done' || s.status === 'queued') && s.documentId) {
+              bulkReconciledRef.current.add(i);
+              reconcileIntakeDoc(tempId, { id: s.documentId, stage: s.status === 'done' ? 'classified' : 'received' });
+            } else if (s.status === 'failed' || s.status === 'cancelled') {
+              bulkReconciledRef.current.add(i);
+              reconcileIntakeDoc(tempId, { preview: `${s.name}\n\n${s.error ?? (s.status === 'cancelled' ? 'Cancelled' : 'Not uploaded')}` });
+            }
+          });
+        },
+        onDailyCapReached: () => {
+          setBulkNotice(
+            "Today's upload limit has been reached. Uploading has stopped — the files not yet started were not attempted. Try again after the limit resets (UTC midnight)."
+          );
+        },
+      }
+    );
+    bulkCancelRef.current = handle.cancel;
+    setBulkRunning(true);
+    void handle.result.finally(() => setBulkRunning(false));
+  };
+
+  /**
+   * A single .zip is unzipped client-side and walked for accept/skip; anything
+   * else (one or many plain files, or a folder drop) is classified the same
+   * way without ever going through jszip, which is only ever loaded for an
+   * actual zip.
+   */
+  const handleBulkFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setBulkNotice(null);
+
+    if (files.length === 1 && files[0] && isZipFile(files[0])) {
+      setBulkRunning(true);
+      try {
+        const walked = await walkZip(files[0]);
+        runBulkImport(
+          walked.accepted,
+          walked.skipped.map((s) => toSkippedState(s.path, s.reason, s.detail))
+        );
+      } catch (err) {
+        setBulkRunning(false);
+        setBulkNotice(err instanceof Error ? err.message : 'Could not read that zip file.');
+      }
+      return;
+    }
+
+    const accepted: WalkedFile[] = [];
+    const skipped: BulkFileState[] = [];
+    for (const file of files) {
+      const src = sourceFromFile(file);
+      const verdict = classifyEntry({ path: src.path, isDir: false, sizeBytes: src.sizeBytes });
+      if (verdict.accept) accepted.push(src);
+      else skipped.push(toSkippedState(src.path, verdict.reason, verdict.detail));
+    }
+    runBulkImport(accepted, skipped);
+  };
+
+  const onBulkDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = Array.from(e.dataTransfer?.files ?? []);
+    if (dropped.length) void handleBulkFiles(dropped);
+  };
+  const onBulkDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
   const processReceived = () => {
     if (!selected) return;
     for (const d of batchDocs(selected)) {
@@ -239,6 +405,83 @@ export function IntakeScreen() {
         <p className="text-caption text-ink-3 -mt-5">
           {total} documents · {counts.verified} answerable and counted · {counts.linked} answerable with “include unverified”
         </p>
+
+        {/* Bulk import: a .zip export from field-service software, a scanning
+            vendor's delivery, or just a lot of files at once. Separate from
+            the per-batch "Add files" button below — this is the scale path. */}
+        <section aria-labelledby="bulk-heading" className="dw-card p-5 space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="bulk-heading" className="text-h3">Bulk import</h2>
+            <p className="text-body text-ink-3">A .zip export, a folder, or many files at once — all go into “{selected?.name ?? 'a new batch'}”.</p>
+          </div>
+
+          <div
+            onDrop={onBulkDrop}
+            onDragOver={onBulkDragOver}
+            onDragLeave={() => setDragOver(false)}
+            className={[
+              'rounded-lg border-2 border-dashed p-6 text-center transition-colors duration-quick',
+              dragOver ? 'border-focus bg-surface-2' : 'border-line bg-surface',
+            ].join(' ')}
+          >
+            <FolderArchive className="w-6 h-6 mx-auto text-ink-3" aria-hidden="true" />
+            <p className="mt-2 text-body text-ink-2">Drag a .zip export or a folder of files here</p>
+            <input
+              ref={bulkInput}
+              type="file"
+              multiple
+              accept=".zip,.pdf,.jpg,.jpeg,.png,.webp,.tiff,.tif,.txt,.csv"
+              className="sr-only"
+              aria-label="Choose files or a zip for bulk import"
+              onChange={(e) => {
+                const fs = Array.from(e.target.files ?? []);
+                e.target.value = '';
+                void handleBulkFiles(fs);
+              }}
+            />
+            <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5 mt-3" disabled={bulkRunning} onClick={() => bulkInput.current?.click()}>
+              <Upload className="w-4 h-4" aria-hidden="true" /> {bulkRunning ? 'Importing…' : 'Choose files or a .zip'}
+            </button>
+          </div>
+
+          {bulkNotice && (
+            <p className="dw-pill-warn inline-flex items-start gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{bulkNotice}</span>
+            </p>
+          )}
+
+          {bulkStates.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p className="text-caption text-ink-3">
+                  {bulkSummary.total} files · {bulkSummary.uploaded} uploaded · {bulkSummary.queued} queued ·{' '}
+                  {bulkSummary.skipped} skipped · {bulkSummary.failed} failed
+                </p>
+                {bulkRunning && (
+                  <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1 ml-auto" onClick={() => bulkCancelRef.current?.()}>
+                    <X className="w-3.5 h-3.5" aria-hidden="true" /> Cancel
+                  </button>
+                )}
+              </div>
+              <ul className="border border-line rounded-lg bg-surface divide-y divide-line text-sm max-h-80 overflow-y-auto" aria-live="polite">
+                {shownBulkRows.map((s, i) => (
+                  <li key={`${s.path}-${i}`} className="flex items-center justify-between gap-3 px-4 py-2">
+                    <span className="truncate min-w-0 font-mono text-data" title={s.path}>{s.path}</span>
+                    {s.status === 'skipped' ? (
+                      <span className="dw-pill-muted shrink-0">{s.skipReason ? SKIP_REASON_LABEL[s.skipReason] : 'Skipped'}</span>
+                    ) : s.status === 'failed' || s.status === 'cancelled' ? (
+                      <span className="dw-pill-warn shrink-0"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />{s.error ?? BULK_STATUS_LABEL[s.status]}</span>
+                    ) : (
+                      <span className="shrink-0 text-ink-2">{BULK_STATUS_LABEL[s.status]}</span>
+                    )}
+                  </li>
+                ))}
+                {hiddenBulkCount > 0 && <li className="px-4 py-2 text-ink-3 text-caption">…and {hiddenBulkCount} more</li>}
+              </ul>
+            </div>
+          )}
+        </section>
 
         {showNew && (
           <form onSubmit={submitBatch} className="dw-card p-5 space-y-4" aria-label="New batch">

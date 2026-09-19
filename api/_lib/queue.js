@@ -1,5 +1,6 @@
 import { ingestDocument, recordIngestFailure } from "./readDocument.js";
 import { extractDocumentFields } from "./extractDocument.js";
+import { getDailyModelBudgetStatus } from "./rateLimit.js";
 
 /**
  * The ingestion queue.
@@ -144,6 +145,89 @@ function fatal(error) {
  */
 const RETRIES = 3;
 
+/* ---------------------------------------------------------- scale config */
+
+/**
+ * A customer dropping in 5,000 documents at once used to mean 5,000
+ * concurrent Inngest runs, each opening its own Postgres connections and
+ * racing every other tenant's traffic for the same Anthropic rate limit.
+ * These three env vars are the knobs that keep that bounded, all optional
+ * with defaults sized for this codebase's current infrastructure (a Neon
+ * pooler and an Anthropic Tier-1/2 account, ~50 req/min):
+ *
+ *   INGEST_CONCURRENCY_GLOBAL (default 6)  — at most this many read-document
+ *     runs in flight AT ONCE, across every tenant. Bounds shared, finite
+ *     things: the Anthropic rate limit and recordsStore.js's own Postgres
+ *     pool (5 connections per warm instance as of this build — see
+ *     recordsStore.js).
+ *   INGEST_CONCURRENCY_TENANT (default 3)  — at most this many of ONE
+ *     tenant's documents processing at once, so a single customer's bulk
+ *     drop cannot occupy the entire global budget above and starve every
+ *     other tenant's ordinary traffic for the length of their import.
+ *   INGEST_THROTTLE_PER_MIN (default 40)   — Inngest's `throttle` (not
+ *     `rateLimit`: rateLimit is LOSSY and silently drops runs over the cap;
+ *     throttle queues them and starts them as capacity frees up, which is
+ *     what a durable ingestion queue is for) caps how many read-document
+ *     RUNS START per minute, globally. 40 leaves headroom under a ~50/min
+ *     Anthropic budget for the ask/extract traffic sharing the same account,
+ *     without needing to know either function's own request rate exactly.
+ *
+ * All three are read fresh each time a function is built (see `load()`
+ * above) rather than cached at module scope, so scripts/verify-scale.mjs can
+ * assert the parsing against different `process.env` values without a
+ * module-cache reset trick — the resolve* functions below are pure.
+ */
+const DEFAULT_CONCURRENCY_GLOBAL = 6;
+const DEFAULT_CONCURRENCY_TENANT = 3;
+const DEFAULT_THROTTLE_PER_MIN = 40;
+
+/** A positive integer from an env string, or `fallback` for anything else
+ *  (unset, blank, zero, negative, NaN, non-numeric) — never a value that
+ *  would turn into a zero or negative Inngest limit. Pure; exported for
+ *  scripts/verify-scale.mjs. */
+export function parsePositiveIntEnv(raw, fallback) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : fallback;
+}
+
+/**
+ * `concurrency: [{ limit }, { key, limit }]` — inngest v4's actual shape
+ * (checked against node_modules/inngest/components/InngestFunction.d.ts:
+ * `concurrency?: number | ConcurrencyOption | RecursiveTuple<ConcurrencyOption, 2>`,
+ * i.e. AT MOST TWO entries, each `{limit: number, key?: string, scope?}`).
+ * `key` is a CEL expression evaluated against the triggering event —
+ * `"event.data.tenantKey"` reads the same field `enqueueDocument` above
+ * always sets, so every tenant's documents share one sub-queue no matter
+ * which Clerk org or API key key enqueued them. Pure; exported for
+ * scripts/verify-scale.mjs.
+ */
+export function resolveIngestConcurrency(env = process.env) {
+  return [
+    { limit: parsePositiveIntEnv(env.INGEST_CONCURRENCY_GLOBAL, DEFAULT_CONCURRENCY_GLOBAL) },
+    { key: "event.data.tenantKey", limit: parsePositiveIntEnv(env.INGEST_CONCURRENCY_TENANT, DEFAULT_CONCURRENCY_TENANT) },
+  ];
+}
+
+/**
+ * `throttle: { limit, period }` — inngest v4's actual shape (same file:
+ * `throttle?: { key?, limit, period, burst? }`, distinct from the separate,
+ * LOSSY `rateLimit` option — see the block comment above for why throttle,
+ * not rateLimit, is the right one here). Pure; exported for
+ * scripts/verify-scale.mjs.
+ */
+export function resolveIngestThrottle(env = process.env) {
+  return { limit: parsePositiveIntEnv(env.INGEST_THROTTLE_PER_MIN, DEFAULT_THROTTLE_PER_MIN), period: "1m" };
+}
+
+/**
+ * The message stamped on a document when the tenant's daily model-spend cap
+ * (rateLimit.js's getDailyModelBudgetStatus) is already exhausted. Exported
+ * so scripts/verify-scale.mjs can assert the queue never retries a document
+ * bearing it (NonRetriableError, not a transient one) and so the wording
+ * stays in exactly one place.
+ */
+export const DAILY_BUDGET_EXCEEDED_MESSAGE = "Daily processing limit reached — resumes tomorrow";
+
 /**
  * Write the failure onto the document ONLY when it is actually final.
  *
@@ -171,9 +255,12 @@ function buildFunctions(inngest, NonRetriableError) {
     {
       id: "read-document",
       name: "Read a stored document into page text",
-      // Protects two shared, finite things at once: the Anthropic rate limit and
-      // the Postgres pool, which recordsStore caps at 3 connections per instance.
-      concurrency: { limit: 5 },
+      // Protects three shared, finite things at once: the Anthropic rate
+      // limit, recordsStore's shared Postgres pool, and one tenant's own
+      // bulk import from starving every other tenant's traffic — see the
+      // "scale config" block above for what each env var controls.
+      concurrency: resolveIngestConcurrency(),
+      throttle: resolveIngestThrottle(),
       retries: RETRIES,
       // inngest v4 takes the trigger INSIDE the config object and the handler as
       // the second argument. The v3 three-argument form — (config, trigger,
@@ -186,6 +273,25 @@ function buildFunctions(inngest, NonRetriableError) {
       const { documentId, tenantKey, tenantName, userId, autoExtract } = event.data ?? {};
       if (!documentId || !tenantKey) throw new NonRetriableError("documentId and tenantKey are required");
       const ctx = { tenantKey, tenantName: tenantName ?? tenantKey };
+
+      // Cost guard: a customer's daily model-spend cap (tenants.limits.
+      // maxModelCallsPerDay, default sized for a Shop plan — see
+      // rateLimit.js) is checked BEFORE this run pays for another Anthropic
+      // call. Wrapped in step.run so a retried run doesn't re-spend this
+      // check pointlessly, though NonRetriableError below ends the run
+      // immediately when it fires, so there is nothing to retry anyway.
+      const budget = await step.run("check-daily-model-budget", () => getDailyModelBudgetStatus(ctx));
+      if (budget.exceeded) {
+        await recordIngestFailure(ctx, documentId, new Error(DAILY_BUDGET_EXCEEDED_MESSAGE));
+        // Permanent for TODAY, not forever — but there is no "retry tomorrow"
+        // concept in Inngest's retry model, and retrying within the next few
+        // minutes (this function's actual retry window) would just fail the
+        // same way and burn the retry budget on a document that was never
+        // going to succeed today. The cron sweep (cron-sweep.js) re-attempts
+        // documents stuck at 'received' on its own daily cadence, which is
+        // exactly the "resumes tomorrow" this message promises.
+        throw new NonRetriableError(DAILY_BUDGET_EXCEEDED_MESSAGE);
+      }
 
       // One step, not two. The page text of a long document is megabytes, and
       // handing it between steps would push it through Inngest's step-output

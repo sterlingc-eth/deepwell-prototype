@@ -16,17 +16,19 @@
  * transitions IN this file, reviewable in one place, rather than widening a
  * shared allowlist that every other caller of recordsStore.js also trusts.
  *
- * So this module keeps its own tiny pool and its own `withTenant`, structured
- * identically to recordsStore.js's (same isolation model: non-owner role,
- * one transaction per request, `SET LOCAL app.tenant_id`, an explicit tenant
- * predicate on every statement as belt-and-braces alongside RLS) — but
- * handing the callback the raw `pg` client, because every statement below is
- * bespoke enough that a generic column-allowlist updater would not fit it.
- * Bundled into api/review.js's own Vercel function, this pool is that
- * function's only pool (same reasoning as recordsStore.js's own header
- * comment: each function is bundled from its own directory with its own
- * module state), so it does not add connections beyond what api/records.ts's
- * pool already opens for ITS function.
+ * So this module runs its own `withTenant`, structured identically to
+ * recordsStore.js's (same isolation model: non-owner role, one transaction
+ * per request, `SET LOCAL app.tenant_id`, an explicit tenant predicate on
+ * every statement as belt-and-braces alongside RLS) — but handing the
+ * callback the raw `pg` client, because every statement below is bespoke
+ * enough that a generic column-allowlist updater would not fit it.
+ *
+ * POOL CONSOLIDATION (scale-readiness build, 2026-09): this used to open its
+ * own pg.Pool (max: 3), which — bundled into api/review.js's own Vercel
+ * function alongside recordsStore.js's pool wherever both are imported —
+ * meant that function opened two pools instead of one. recordsStore.js now
+ * exports `getPool()` for exactly this; the transaction/RLS-scoping logic
+ * below is unchanged, only where the connection comes from moved.
  *
  * State machine implemented here (each guarded in SQL, never trusting the
  * client's idea of the current stage):
@@ -70,23 +72,7 @@
  *                       must keep resolving to something, and merged_into is
  *                       how a reader discovers where it went.
  */
-import pg from 'pg';
-
-let pool;
-
-function getPool() {
-  if (!pool) {
-    const connectionString = process.env.NEON_CONNECTION_STRING;
-    if (!connectionString) throw new Error('NEON_CONNECTION_STRING is not set');
-    pool = new pg.Pool({
-      connectionString,
-      max: 3,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 8_000,
-    });
-  }
-  return pool;
-}
+import { getPool } from './recordsStore.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 

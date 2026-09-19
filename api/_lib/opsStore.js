@@ -17,33 +17,25 @@
  *      can do to a tenant's data lives in one file, reviewable on its own,
  *      never touching recordsStore.js.
  *
- * The tenancy mechanics below (own pool, deepwell_rls, resolve_tenant(),
+ * The tenancy mechanics below (deepwell_rls, resolve_tenant(),
  * SET LOCAL app.tenant_id) are copied from recordsStore.js's withTenant
  * rather than shared with it, which is a real duplication cost — but the
- * alternative was exporting recordsStore's internal pool or its private
- * makeStore(), which would have made recordsStore.js's "only these methods
- * touch the database" property untrue. If recordsStore.js's tenancy setup
- * ever changes (a new resolve_tenant signature, a different session
- * variable), this block has to change with it — there is no way around that
- * given the constraint that recordsStore.js itself stays untouched here.
+ * alternative was exporting recordsStore's private makeStore(), which would
+ * have made recordsStore.js's "only these methods touch the database"
+ * property untrue for its own callers. `client` here is the raw `pg` client,
+ * not that curated store object, because ops queries (arbitrary WHERE
+ * clauses, cross-table exports, multi-table deletes) don't fit a fixed
+ * per-entity method shape. If recordsStore.js's tenancy setup ever changes (a
+ * new resolve_tenant signature, a different session variable), this block has
+ * to change with it.
+ *
+ * POOL CONSOLIDATION (scale-readiness build, 2026-09): this used to open its
+ * own pg.Pool (max: 2). recordsStore.js now exports `getPool()` for exactly
+ * this — one Postgres pool per warm instance instead of one per file that
+ * needs a raw client. The transaction/RLS-scoping logic below is unchanged;
+ * only where the connection comes from moved.
  */
-import pg from 'pg';
-
-let pool;
-
-function getPool() {
-  if (!pool) {
-    const connectionString = process.env.NEON_CONNECTION_STRING;
-    if (!connectionString) throw new Error('NEON_CONNECTION_STRING is not set');
-    pool = new pg.Pool({
-      connectionString,
-      max: 2, // ops paths are low-volume (a daily cron, an occasional export/delete) — keep this well clear of recordsStore.js's own budget against Neon's pooler limits.
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 8_000,
-    });
-  }
-  return pool;
-}
+import { getPool } from './recordsStore.js';
 
 /**
  * Run `fn(client, tenantId)` inside a transaction scoped to the caller's
@@ -95,6 +87,40 @@ export async function listStuckDocuments(ctx, olderThanMinutes) {
         ORDER BY created_at ASC
         LIMIT 200`,
       [olderThanMinutes]
+    );
+    return rows;
+  });
+}
+
+/**
+ * Documents the ingest queue deliberately deferred because the tenant's
+ * daily model-spend cap was already spent (queue.js's cost guard —
+ * DAILY_BUDGET_EXCEEDED_MESSAGE), as opposed to ones that genuinely failed.
+ *
+ * Matched by the EXACT message queue.js stamps, passed in by the caller
+ * rather than hardcoded here — opsStore.js does not own queue.js and must
+ * never let the two copies of that string drift apart silently. A document
+ * that failed for a real, permanent reason (a corrupt PDF, an unsupported
+ * type) has a DIFFERENT extract_error and is correctly left alone by this
+ * query; only listStuckDocuments' "no reason at all" case and this exact,
+ * deliberate, resume-tomorrow case are ever auto-retried.
+ *
+ * No age filter (unlike listStuckDocuments): a budget-capped document was
+ * never "stuck" in the sense of something having silently gone wrong — it is
+ * exactly where it is supposed to be, waiting for the next day's cron sweep,
+ * however recently it was capped.
+ */
+export async function listBudgetDeferredDocuments(ctx, message) {
+  return withTenant(ctx, async (client) => {
+    const { rows } = await client.query(
+      `SELECT id, original_filename, created_at
+         FROM documents
+        WHERE stage = 'received'
+          AND extract_error = $1
+          AND ${TENANT}
+        ORDER BY created_at ASC
+        LIMIT 200`,
+      [message]
     );
     return rows;
   });

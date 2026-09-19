@@ -1,11 +1,20 @@
 import crypto from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS } from "./_lib/claude.js";
+import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit } from "./_lib/rateLimit.js";
 import { withTenant } from "./_lib/recordsStore.js";
-import { ANSWER_TOOL, buildPrompt, buildAllowed, shapeAnswer } from "./_lib/answer.js";
+import {
+  ANSWER_TOOL,
+  buildAllowed,
+  shapeAnswer,
+  SYSTEM_PROMPT,
+  buildContextBlock,
+  buildQuestionBlock,
+} from "./_lib/answer.js";
+import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
+import { recordModelCall } from "./_lib/usage.js";
 
 /**
  * SHA-256 of a question, never the question itself. Pure and exported so it
@@ -75,6 +84,7 @@ export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration
 const MAX_QUESTION = 2000;
 const MAX_PASSAGES = 12;
 const MAX_EXCERPT = 1200;
+export const ASK_MODEL = "claude-sonnet-4-5";
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
@@ -156,24 +166,90 @@ export default async function handler(req, res) {
     const allowed = buildAllowed({ passages: mappedPassages, extractions: mappedExtractions });
 
     // ---- 2. ask ------------------------------------------------------------
+    // Three separate blocks, not one flat prompt string, so an Anthropic
+    // cache breakpoint can land after the stable ones. See answer.js's
+    // "Prompt-caching split" comment for why the split falls exactly here.
+    //
+    //   system  -> SYSTEM_PROMPT: fixed task framing + RULES, identical on
+    //              every call for every tenant.
+    //   tools   -> ANSWER_TOOL: fixed schema.
+    //   content -> [context block (passages+extractions), question block],
+    //              IN THAT ORDER, with cache_control only on the context
+    //              block: a follow-up question that retrieves the same top
+    //              passages reuses the cache through the end of that block
+    //              and pays full price for only the (always-different)
+    //              question after it.
+    //
+    // withCache() (api/_lib/promptCache.js) only attaches cache_control when
+    // a block is actually long enough for Anthropic to cache (Sonnet: 1024
+    // tokens, ~4096 chars) — a too-short SYSTEM_PROMPT or ANSWER_TOOL is left
+    // alone rather than wasting one of the 4-per-request breakpoints. See
+    // handoffs/HANDOFF-B.md for current measured sizes.
+    const contextText = buildContextBlock({ passages: mappedPassages, extractions: mappedExtractions });
+    const questionText = buildQuestionBlock({
+      question,
+      today: today ?? new Date().toISOString().slice(0, 10),
+    });
+
     const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-5",
+    const startedAt = Date.now();
+    // Retries only 429/529/overloaded, with jitter, and never past the model
+    // timeout budget — a burst of questions during a big import must not turn
+    // into a wall of "try again" for the tech in the truck.
+    const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
+    const response = await withBackoff(() => client.messages.create({
+      model: ASK_MODEL,
       max_tokens: 1500,
-      tools: [ANSWER_TOOL],
+      system: [withCache({ type: "text", text: SYSTEM_PROMPT }, ASK_MODEL)],
+      tools: [withCache(ANSWER_TOOL, ASK_MODEL)],
       tool_choice: { type: "tool", name: "answer" },
       messages: [
         {
           role: "user",
-          content: buildPrompt({
-            question,
-            today: today ?? new Date().toISOString().slice(0, 10),
-            passages: mappedPassages,
-            extractions: mappedExtractions,
-          }),
+          content: [
+            withCache({ type: "text", text: contextText }, ASK_MODEL),
+            { type: "text", text: questionText }, // never cached — see above
+          ],
         },
       ],
-    });
+    }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
+    const latencyMs = Date.now() - startedAt;
+
+    // One structured line per call, no PII and no question text (see
+    // hashQuestion's doc comment above for why questions never get logged
+    // anywhere) — so Vercel logs show cache hit rates across tenants.
+    console.log(
+      JSON.stringify(
+        modelCallLogLine({
+          route: "ask",
+          model: ASK_MODEL,
+          inputTokens: response.usage?.input_tokens,
+          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          latencyMs,
+        })
+      )
+    );
+
+    // Cost accounting, not request rate limiting (./_lib/rateLimit.js already
+    // ran above) — best-effort and never fatal: recordModelCall already
+    // swallows its own errors (see usage.js), and this call is wrapped again
+    // for the same reason the audit write below is: a customer who got a
+    // correct, sourced answer must not see a 500 because bookkeeping failed.
+    try {
+      await recordModelCall(
+        { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+        {
+          inputTokens: response.usage?.input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+        }
+      );
+    } catch (err) {
+      console.error("Failed to record ask usage:", err?.message);
+    }
 
     // ---- 3. enforce sourcing ------------------------------------------------
     // allowComputed defaults to false here: nothing on this endpoint's

@@ -8,6 +8,7 @@
 import { buildSuggestions } from '../src/core/suggestions';
 import { parseDeepLink } from '../src/hooks/useDeepLink';
 import { describeFetchFailure, NETWORK_ERROR_MESSAGE } from '../src/services/ingestClient';
+import { truncateForDisplay, summarizeProgress, type BulkFileState } from '../src/services/bulkImport';
 import type { Entity } from '../src/core/types';
 
 let failures = 0;
@@ -93,6 +94,48 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   eq('JSON with no "error" key falls back to plain language', describeFetchFailure(JSON.stringify({ ok: false })), NETWORK_ERROR_MESSAGE);
   eq('JSON with a blank "error" string falls back to plain language', describeFetchFailure(JSON.stringify({ error: '   ' })), NETWORK_ERROR_MESSAGE);
   check('the fallback message is plain language, never a raw status line', !/^\d{3}\s/.test(NETWORK_ERROR_MESSAGE));
+}
+
+/* ------------------------------------------------------ bulk import UI helpers */
+//
+// The archive-walk/uploader logic itself (classifyEntry, backoff, concurrency,
+// batch presign shaping) is covered by scripts/verify-bulk.mjs. What belongs
+// here is the two functions IntakeScreen's bulk-import panel calls directly
+// to render: the row-count cap and the total/uploaded/queued/skipped/failed
+// summary.
+{
+  const state = (status: BulkFileState['status'], overrides: Partial<BulkFileState> = {}): BulkFileState => ({
+    path: `f-${status}`,
+    name: `f-${status}`,
+    sizeBytes: 100,
+    status,
+    attempt: 0,
+    ...overrides,
+  });
+
+  const { shown, hiddenCount } = truncateForDisplay(Array.from({ length: 250 }, (_, i) => i));
+  check('truncateForDisplay caps at 200 rows by default', shown.length === 200 && hiddenCount === 50);
+  eq('truncateForDisplay does not truncate under the cap', truncateForDisplay([1, 2, 3]), { shown: [1, 2, 3], hiddenCount: 0 });
+  eq('truncateForDisplay respects an explicit max', truncateForDisplay([1, 2, 3, 4], 2), { shown: [1, 2], hiddenCount: 2 });
+
+  const summary = summarizeProgress([
+    state('done'),
+    state('queued'),
+    state('queued'),
+    state('skipped'),
+    state('failed'),
+    state('cancelled'),
+    state('uploading'),
+  ]);
+  eq('summarizeProgress counts each bucket correctly, with queued files counted as uploaded too', summary, {
+    total: 7,
+    uploaded: 3, // 1 done + 2 queued
+    queued: 2,
+    skipped: 1,
+    failed: 2, // failed + cancelled
+    pending: 1, // uploading
+  });
+  eq('summarizeProgress on an empty run', summarizeProgress([]), { total: 0, uploaded: 0, queued: 0, skipped: 0, failed: 0, pending: 0 });
 }
 
 /* ------------------------------------------------------------------ done */
