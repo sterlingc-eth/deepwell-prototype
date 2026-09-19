@@ -42,10 +42,17 @@ export function Wordmark({ size = 'sm', animated = false }: WordmarkProps) {
         </g>
         <circle cx="50" cy="50" r="4" fill={FOREST} />
       </svg>
-      <span
-        className={`font-display font-semibold leading-none tracking-tight ${lg ? 'text-[34px]' : 'text-[22px]'}`}
-      >
-        <span className="text-[#04315A]">Deep</span><span className="text-[#0D3827]">Well</span>
+      <span className={`flex flex-col ${lg ? 'gap-1.5' : 'gap-1'}`}>
+        <span
+          className={`font-display font-semibold leading-none tracking-tight ${lg ? 'text-[34px]' : 'text-[22px]'}`}
+        >
+          <span className="text-[#04315A]">Deep</span><span className="text-[#0D3827]">Well</span>
+        </span>
+        <span
+          className={`font-mono font-medium uppercase leading-none text-[#0D3827]/70 ${lg ? 'text-[11px] tracking-[0.34em]' : 'text-[8px] tracking-[0.3em]'}`}
+        >
+          Technology
+        </span>
       </span>
     </span>
   );

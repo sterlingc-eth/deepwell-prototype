@@ -143,7 +143,7 @@ export function WarrantyExportScreen() {
                 <div className="border-b-2 border-stone-200 pb-4 mb-6 flex items-end justify-between">
                   <div>
                     <p className="text-[11px] tracking-[0.2em] uppercase text-stone-500">Warranty claim</p>
-                    <p className="font-display text-[26px] leading-tight mt-1" style={{ color: '#163C2C' }}>DeepWell</p>
+                    <p className="font-display text-[26px] leading-tight mt-1" style={{ color: '#163C2C' }}>DeepWell <span className="font-mono text-[11px] tracking-[0.3em] uppercase align-middle">Technology</span></p>
                   </div>
                   <p className="text-[12px] text-stone-500">Prepared {fmtDate(now)} · {units.length} unit{units.length === 1 ? '' : 's'}</p>
                 </div>
@@ -180,7 +180,7 @@ export function WarrantyExportScreen() {
                     </div>
                   );
                 })}
-                <p className="text-center text-[11px] text-stone-500 pt-6 mt-6 border-t border-stone-200">Every fact above traces to a verified document in DeepWell. Check details against the originals before submitting.</p>
+                <p className="text-center text-[11px] text-stone-500 pt-6 mt-6 border-t border-stone-200">Every fact above traces to a verified document in DeepWell Technology. Check details against the originals before submitting.</p>
               </div>
             </div>
           </section>

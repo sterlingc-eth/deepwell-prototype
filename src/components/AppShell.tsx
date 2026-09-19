@@ -46,7 +46,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             type="button"
             onClick={() => setCurrentScreen('ask')}
             className="flex items-center min-h-touch rounded-md -ml-1 focus-visible:outline-brass-300"
-            aria-label="DeepWell home"
+            aria-label="DeepWell Technology home"
           >
             <Wordmark />
           </button>
@@ -77,7 +77,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
 
           <a
             href="/"
-            aria-label="Back to the DeepWell website"
+            aria-label="Back to the DeepWell Technology website"
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
             <Globe className="w-5 h-5" aria-hidden="true" />
@@ -139,7 +139,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
 
       <footer className="border-t border-line">
         <div className="max-w-content mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-caption text-ink-3">
-          <span>DeepWell · Knowledge builds business.</span>
+          <span>DeepWell Technology · Knowledge builds business.</span>
           <span>Every answer shows its source.</span>
         </div>
       </footer>
