@@ -55,7 +55,7 @@ BEGIN
     SELECT conname FROM pg_constraint
      WHERE conrelid = 'users'::regclass
        AND contype = 'u'
-       AND conkey = ARRAY[v_attnum]  -- exactly one column, and it's this one
+       AND conkey::int[] = ARRAY[v_attnum]  -- exactly one column, and it's this one
   LOOP
     EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', r.conname);
   END LOOP;
@@ -83,7 +83,7 @@ BEGIN
     SELECT 1 FROM pg_constraint
      WHERE conrelid = 'users'::regclass
        AND contype = 'u'
-       AND conkey = ARRAY[v_tenant_attnum, v_clerk_attnum]
+       AND conkey::int[] = ARRAY[v_tenant_attnum, v_clerk_attnum]
   ) INTO v_exists;
 
   IF NOT v_exists THEN
@@ -345,7 +345,7 @@ END $$;
 SELECT con.conname
   FROM pg_constraint con
   JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attname = 'clerk_user_id'
- WHERE con.conrelid = 'users'::regclass AND con.contype = 'u' AND con.conkey = ARRAY[att.attnum];
+ WHERE con.conrelid = 'users'::regclass AND con.contype = 'u' AND con.conkey::int[] = ARRAY[att.attnum::int];
 
 -- Expect: exactly one row — the composite constraint this migration keeps.
 SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
