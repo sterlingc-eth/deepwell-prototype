@@ -123,6 +123,8 @@ export const FAST_MODEL_TIMEOUT_MS = 25_000;
 
 const ALLOWED_ORIGINS = [
   "https://deepwellinc.vercel.app",
+  "https://deepwelltechnology.com",
+  "https://www.deepwelltechnology.com",
   "http://localhost:5173",
   "http://localhost:4173",
 ];

@@ -51,6 +51,8 @@ import { upsertMember } from "./members.js";
 /** Origins whose tokens this API will accept. */
 const AUTHORIZED_PARTIES = [
   "https://deepwellinc.vercel.app",
+  "https://deepwelltechnology.com",
+  "https://www.deepwelltechnology.com",
   "http://localhost:5173",
   "http://localhost:4173",
 ];
