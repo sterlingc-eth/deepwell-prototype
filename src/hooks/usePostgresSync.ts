@@ -32,8 +32,8 @@ export interface PostgresSyncState {
   /** True once loaded and the tenant genuinely has nothing ingested yet. */
   isEmpty: boolean;
   /** Re-fetches everything and reseeds the graph, outside the hook's own
-   *  loading/error lifecycle. For a caller (Records' "Reclassify & verify
-   *  all") that just drove several server-side mutations whose true resulting
+   *  loading/error lifecycle. For a caller (DataHealthStrip's "Re-check all
+   *  documents with AI") that just drove several server-side mutations whose true resulting
    *  stage/completeness this store can't reconstruct from optimistic local
    *  patches alone — see `loadGraphFromServer` below, which this wraps. */
   refresh: () => Promise<void>;
@@ -299,8 +299,8 @@ function buildBatches(docs: Doc[]): Batch[] {
 
 /**
  * One full fetch-and-reseed pass, outside any hook lifecycle. `usePostgresSync`
- * runs this on mount/enable; `RecordsScreen`'s "Reclassify & verify all" also
- * calls it directly once its server-side batch actions finish, because those
+ * runs this on mount/enable; `DataHealthStrip`'s "Re-check all documents with
+ * AI" also calls it directly once its server-side batch actions finish, because those
  * actions' own optimistic local patches (typeId, verifiedBy) can't reconstruct
  * the real post-action `stage` the way a fresh read of `documents.stage` +
  * `maxStageFor` can — that gap is exactly why the health tiles used to need a

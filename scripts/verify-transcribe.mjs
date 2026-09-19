@@ -272,6 +272,22 @@ async function withFakeClient(handler, fn) {
   eq('the fast result is kept when the escalation call itself fails', result[0].text, '');
 }
 
+{
+  // A model call that returns zero pages (blank file, image with nothing
+  // legible on it) must NOT throw — that's now ingestDocument's job to
+  // classify as a terminal "no readable text" state via hasReadableText,
+  // not callTranscribe's job to reject outright. Previously this threw a
+  // plain Error (not an IngestError), which queue.js's fatal() would then
+  // treat as retryable — wasting retries on a file that will never produce
+  // different pages.
+  const { result, calls } = await withFakeClient(
+    () => fakeToolResponse([]),
+    () => extractWithClaude(Buffer.from('%PDF-fake'), 'application/pdf', {}, Date.now())
+  );
+  eq('a zero-page model response does not throw, and ships as an empty array', result, []);
+  eq('only the one fast call is made for an empty document (nothing to escalate)', calls.length, 1);
+}
+
 delete process.env.TRANSCRIBE_MODEL_FAST;
 delete process.env.TRANSCRIBE_MODEL_STRONG;
 

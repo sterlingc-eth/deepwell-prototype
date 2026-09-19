@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, AlertTriangle, Link2, GitMerge, Copy, ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
-import { AppShell } from '../components/AppShell';
+import { Check, AlertTriangle, Link2, GitMerge, Copy, Sparkles, Trash2 } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
-import { entitiesOfType, isRequirementMet, maxStageFor, useGraph } from '../core/entityGraph';
+import { conflictDocs, entitiesOfType, gapDocs, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
 import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
@@ -20,30 +19,76 @@ const CURRENT_USER = 'You';
 // when one of those requests fails and the optimistic change is rolled back)
 // is what tells a real account its change did NOT save; there is no more
 // blanket "nothing here is saved" banner because that stopped being true.
-const REVIEW_IS_DEMO_ONLY = import.meta.env.VITE_DEMO_MODE === 'true';
+// Optional chaining on purpose: this module is now also imported by the
+// pure-function test runner (scripts/verify-ui.ts, run via tsx), where
+// import.meta.env does not exist. Vite inlines it in the real build, so the
+// app sees a plain string either way (see entityGraph.ts's DEMO_MODE, same
+// reasoning).
+const REVIEW_IS_DEMO_ONLY = import.meta.env?.VITE_DEMO_MODE === 'true';
 
 type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'all';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'attention', label: 'Needs a person' },
-  { id: 'gaps', label: 'Missing fields' },
-  { id: 'unlinked', label: 'Unlinked inbox' },
+  { id: 'gaps', label: 'Missing info' },
+  { id: 'unlinked', label: 'Needs linking' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'duplicates', label: 'Duplicates' },
   { id: 'ready', label: 'Ready to verify' },
   { id: 'all', label: 'All' },
 ];
+const FILTER_IDS = FILTERS.map((f) => f.id);
 
-function matches(doc: Doc, f: Filter): boolean {
-  const has = (k: Doc['issues'][number]['kind']) => doc.issues.some((i) => i.kind === k);
+function isAttention(doc: Doc): boolean {
+  return doc.stage !== 'verified' && (doc.issues.length > 0 || doc.stage === 'received');
+}
+
+/** The id sets behind the 'gaps'/'unlinked'/'conflicts' filters, built once
+ *  per graph change from entityGraph.ts's own `gapDocs`/`unlinkedDocs`/
+ *  `conflictDocs` — the exact same helpers DataHealthStrip's tile counts
+ *  read. Passing these into `matches` (rather than each filter re-deriving
+ *  "is this doc unlinked/gappy/conflicted" from `doc.issues` on its own) is
+ *  what guarantees the queue's filtered list and the Dashboard tile it was
+ *  opened from always agree on what's included. */
+interface QueueSets {
+  unlinked: Set<string>;
+  gaps: Set<string>;
+  conflicts: Set<string>;
+}
+
+function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
   switch (f) {
-    case 'attention': return doc.stage !== 'verified' && (doc.issues.length > 0 || doc.stage === 'received');
-    case 'gaps': return has('missing-field');
-    case 'unlinked': return has('unlinked') || (doc.stage === 'extracted' && doc.linkedEntityIds.length === 0);
-    case 'conflicts': return has('conflict');
-    case 'duplicates': return has('duplicate');
+    case 'attention': return isAttention(doc);
+    case 'gaps': return sets.gaps.has(doc.id);
+    case 'unlinked': return sets.unlinked.has(doc.id);
+    case 'conflicts': return sets.conflicts.has(doc.id);
+    case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate');
     case 'ready': return doc.stage === 'linked' && doc.issues.length === 0;
     case 'all': return true;
   }
+}
+
+/** How many documents need a person right now — the same rule the "Needs a
+ *  person" filter uses. Exported so InboxScreen's tab badge and its
+ *  first-run redirect (App.tsx) don't reimplement it separately. */
+export function needsPersonCount(docs: Record<string, Doc>): number {
+  return Object.values(docs).filter(isAttention).length;
+}
+
+function queueSetsFor(graph: GraphSnapshot): QueueSets {
+  return {
+    unlinked: new Set(unlinkedDocs(graph).map((d) => d.id)),
+    gaps: new Set(gapDocs(graph).map((d) => d.id)),
+    conflicts: new Set(conflictDocs(graph).map((d) => d.id)),
+  };
+}
+
+/** Same predicate the on-screen filter buttons use, exposed for verify-ui.ts
+ *  so it can assert this queue and DataHealthStrip's tile counts can never
+ *  disagree — both read `unlinkedDocs`/`gapDocs`/`conflictDocs` from
+ *  entityGraph.ts, never their own re-derived notion of "unlinked". */
+export function docsMatchingFilter(graph: GraphSnapshot, f: Filter): Doc[] {
+  const sets = queueSetsFor(graph);
+  return Object.values(graph.docs).filter((d) => matches(d, f, sets));
 }
 
 function entityLabel(e: Entity): string {
@@ -55,28 +100,51 @@ function entityLabel(e: Entity): string {
 }
 
 /**
- * The review queue. A person resolves what the pipeline can't: required
- * fields that are missing, documents that won't link, two documents that
- * disagree, and duplicates. Every approval writes to the entity graph, so the
- * next answer on the Ask screen reflects it.
+ * The Inbox's "Needs a person" tab. A person resolves what the pipeline
+ * can't: required fields that are missing, documents that won't link, two
+ * documents that disagree, and duplicates. Every approval writes to the
+ * entity graph, so the next answer on the Ask screen reflects it.
+ *
+ * Rendered inside InboxScreen (which owns the AppShell + tab header) rather
+ * than as its own top-level screen — see the IA note in InboxScreen.tsx.
  */
-export function ReviewScreen() {
+export function ReviewBody() {
   const graph = useGraph();
   const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate, clearLastError, aiVerifyDoc, removeDoc } = useGraph();
   const lastError = useGraph((s) => s.lastError);
   const selectedDocumentId = useAppStore((s) => s.selectedDocumentId);
   const openDocument = useAppStore((s) => s.openDocument);
-  const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const askQuestion = useAppStore((s) => s.askQuestion);
+  const pendingReviewFilter = useAppStore((s) => s.pendingReviewFilter);
+  const clearPendingReviewFilter = useAppStore((s) => s.clearPendingReviewFilter);
 
   const [filter, setFilter] = useState<Filter>('attention');
   const [preview, setPreview] = useState<SourceRef | null>(null);
 
-  const queue = useMemo(
-    () => Object.values(graph.docs).filter((d) => matches(d, filter)).sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime()),
-    [graph.docs, filter],
+  // A caller (Dashboard's data-health tiles) can ask this tab to open
+  // already filtered — e.g. the "Needs linking" tile jumps here with
+  // `filter: 'unlinked'` pre-selected. Consumed once, then cleared so it
+  // doesn't reapply on a later, unrelated visit.
+  useEffect(() => {
+    if (!pendingReviewFilter) return;
+    if ((FILTER_IDS as string[]).includes(pendingReviewFilter)) setFilter(pendingReviewFilter as Filter);
+    clearPendingReviewFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReviewFilter]);
+
+  // Built from entityGraph.ts's own helpers — see the QueueSets comment on
+  // `matches` above for why this (and not a doc.issues re-derivation here)
+  // is what keeps this queue and DataHealthStrip's tile counts in agreement.
+  const sets = useMemo<QueueSets>(
+    () => queueSetsFor(graph),
+    [graph],
   );
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, Object.values(graph.docs).filter((d) => matches(d, f.id)).length])) as Record<Filter, number>, [graph.docs]);
+
+  const queue = useMemo(
+    () => Object.values(graph.docs).filter((d) => matches(d, filter, sets)).sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime()),
+    [graph.docs, filter, sets],
+  );
+  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, Object.values(graph.docs).filter((d) => matches(d, f.id, sets)).length])) as Record<Filter, number>, [graph.docs, sets]);
 
   const doc = selectedDocumentId ? graph.docs[selectedDocumentId] : undefined;
   useEffect(() => {
@@ -85,23 +153,13 @@ export function ReviewScreen() {
 
   // If the selected doc came from a deep link, switch to a filter that shows it
   useEffect(() => {
-    if (doc && !matches(doc, filter)) setFilter('all');
+    if (doc && !matches(doc, filter, sets)) setFilter('all');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.id]);
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-6">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <button type="button" onClick={() => setCurrentScreen('ingest')} className="dw-btn-tertiary -ml-3 mb-1">
-              <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Intake
-            </button>
-            <h1>Review queue</h1>
-            <p className="text-ink-2 mt-1">What the pipeline can't decide on its own. Zero is the target.</p>
-          </div>
-        </header>
-
         {REVIEW_IS_DEMO_ONLY && (
           <div
             role="status"
@@ -192,12 +250,12 @@ export function ReviewScreen() {
               }}
             />
           ) : (
-            <div className="dw-card p-8 text-ink-3">Select a document.</div>
+            <div className="dw-card p-8 text-ink-3">Nothing needs you right now — new uploads will show up here.</div>
           )}
         </div>
       </div>
       {preview && <DocumentPreview documentId={preview.documentId} location={preview.location} onClose={() => setPreview(null)} />}
-    </AppShell>
+    </>
   );
 }
 
@@ -279,9 +337,14 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
     <div className="dw-card divide-y divide-line min-w-0">
       <header className="p-5 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink-3">Currently:</span>
           <StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} />
-          <span className="text-ink-3">→ can reach</span>
-          <StagePill stage={next} />
+          {next !== doc.stage && (
+            <>
+              <span className="text-ink-3">· Next step:</span>
+              <StagePill stage={next} />
+            </>
+          )}
         </div>
         <h2 className="font-mono font-semibold text-h3 break-all">{doc.filename}</h2>
         <p className="text-body text-ink-3">
@@ -369,7 +432,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           <h3 className="text-h4">Extracted fields</h3>
           {missing.length > 0 && (
             <div className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 space-y-3">
-              <p className="flex items-center gap-2 text-warn-ink dark:text-brass-200 font-medium"><AlertTriangle className="w-4 h-4" aria-hidden="true" /> Blocked at Classified — required fields missing</p>
+              <p className="flex items-center gap-2 text-warn-ink dark:text-brass-200 font-medium"><AlertTriangle className="w-4 h-4" aria-hidden="true" /> Missing information — fill in the highlighted fields to continue.</p>
               {missing.map((requirement) => {
                 const label = requirementLabel(requirement);
                 return (
@@ -482,7 +545,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               </button>
             )}
             <button type="button" className="dw-btn-primary" disabled={!canAdvance} onClick={onApprove}>
-              <Check className="w-4 h-4" aria-hidden="true" /> {next === 'verified' ? 'Mark verified' : `Advance to ${STAGE_LABEL[next]}`}
+              <Check className="w-4 h-4" aria-hidden="true" /> {next === 'verified' ? 'Mark checked' : `Advance to ${STAGE_LABEL[next]}`}
             </button>
           </div>
         </footer>

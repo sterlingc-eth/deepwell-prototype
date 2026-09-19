@@ -299,7 +299,7 @@ export function BrowseScreen() {
   const setQuery = useAppStore((s) => s.setSearchQuery);
   const openEntity = useAppStore((s) => s.openEntity);
   const askQuestion = useAppStore((s) => s.askQuestion);
-  const [mainTab, setMainTab] = useState<'documents' | 'records'>('documents');
+  const [mainTab, setMainTab] = useState<'documents' | 'search'>('documents');
   const [kind, setKind] = useState<Kind>('all');
   const [debounced, setDebounced] = useState(query);
   useEffect(() => {
@@ -353,20 +353,20 @@ export function BrowseScreen() {
       <div className="space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1>Browse</h1>
-            <p className="text-ink-2 mt-1">Every document, or a plain list, when you'd rather scan than ask.</p>
+            <h1>Records</h1>
+            <p className="text-ink-2 mt-1">Every property, unit, and document you have on file.</p>
           </div>
-          {mainTab === 'records' && query.trim() && (
+          {mainTab === 'search' && query.trim() && (
             <button type="button" className="dw-btn-secondary" onClick={() => askQuestion(query)}>
-              Ask this instead <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              Ask about this <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </header>
 
-        <div role="tablist" aria-label="Browse view" className="flex flex-wrap gap-1.5">
+        <div role="tablist" aria-label="Records view" className="flex flex-wrap gap-1.5">
           {([
             { id: 'documents' as const, label: 'Documents', Icon: FolderOpen },
-            { id: 'records' as const, label: 'Records', Icon: Search },
+            { id: 'search' as const, label: 'Search', Icon: Search },
           ]).map((t) => (
             <button
               key={t.id}
@@ -415,7 +415,12 @@ export function BrowseScreen() {
                   </li>
                 );
               })}
-              {results.length === 0 && <li className="px-4 py-8 text-center text-ink-3">No records match. Try fewer words, or <button type="button" className="underline underline-offset-4" onClick={() => askQuestion(query)}>ask it as a question</button>.</li>}
+              {results.length === 0 && debounced.trim() === '' && kind === 'all' && (
+                <li className="px-4 py-8 text-center text-ink-3">No properties or units yet. They'll appear here once you add documents in Inbox.</li>
+              )}
+              {results.length === 0 && !(debounced.trim() === '' && kind === 'all') && (
+                <li className="px-4 py-8 text-center text-ink-3">No records match. Try fewer words, or <button type="button" className="underline underline-offset-4" onClick={() => askQuestion(query)}>ask it as a question</button>.</li>
+              )}
             </ul>
             <p className="text-caption text-ink-3">{results.length} shown{results.length === 60 ? ' (first 60)' : ''}</p>
           </div>

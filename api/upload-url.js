@@ -272,6 +272,12 @@ export async function createUploadUrls(auth, files) {
   );
 }
 
+// Same shape as customer-equipment.js's own UUID_RE, and for the same
+// reason: documents.id is a uuid column, and a merely-non-empty string like
+// "not-a-uuid" survives a truthiness check and only fails once bound against
+// it, as "invalid input syntax for type uuid" — a raw 500, not a 400.
+const DOCUMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Thrown for a bad `mode: 'get'` request. `.status` is the HTTP status to report. */
 export class DocumentGetError extends Error {
   constructor(message, status = 400) {
@@ -297,6 +303,9 @@ export class DocumentGetError extends Error {
 export async function getOriginalUrl(auth, documentId) {
   if (typeof documentId !== "string" || !documentId.trim()) {
     throw new DocumentGetError("documentId is required");
+  }
+  if (!DOCUMENT_ID_RE.test(documentId)) {
+    throw new DocumentGetError("documentId must be a uuid");
   }
   return withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },

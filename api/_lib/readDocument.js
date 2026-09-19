@@ -78,6 +78,22 @@ export function isTransientError(error) {
   return false;
 }
 
+const DOCUMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Pure: is `v` shaped like a real uuid? Every documents.id column IS a uuid;
+ * a value that is merely a non-empty string ("not-a-uuid") survives a bare
+ * typeof/truthiness check and then makes Postgres raise "invalid input
+ * syntax for type uuid" the moment it's bound against that column — a raw
+ * 500, not the clean 400 a bad request deserves. Exported so every route (and
+ * the Inngest queue worker, which calls ingestDocument/extractDocumentFields
+ * directly with no HTTP layer in front of it) can guard the same way, once,
+ * before ever reaching a query.
+ */
+export function isValidDocumentId(v) {
+  return typeof v === "string" && DOCUMENT_ID_RE.test(v);
+}
+
 /** Thrown for conditions the caller should report as 4xx, not retry forever. */
 export class IngestError extends Error {
   constructor(message, status = 400) {
@@ -144,6 +160,28 @@ const PAGES_TOOL = {
 export function alreadyIngested(doc) {
   return Boolean(doc) && Number(doc.page_count) > 0 && !doc.extract_error && doc.stage !== "received";
 }
+
+/**
+ * Did transcription actually find anything? Pure and exported so it can be
+ * unit tested without a database — see scripts/verify-transcribe.mjs.
+ *
+ * A page object with an empty (or whitespace-only) `text` is not a defect —
+ * chunkText('') and a legitimate blank page both look exactly like this — so
+ * this is the one place that decides "nothing here" for a whole document,
+ * rather than every caller re-deriving it from `pages.length` alone (which a
+ * single blank-text page would pass).
+ */
+export function hasReadableText(pages) {
+  return Array.isArray(pages) && pages.some((p) => String(p?.text ?? "").trim().length > 0);
+}
+
+/** User-facing message for a document that read cleanly but states nothing
+ *  extractable — a 0-byte upload, a blank page, a scan with nothing legible
+ *  on it. Exported so read-document.js/extractDocument.js can recognize this
+ *  exact terminal state without restating the wording. */
+export const NO_READABLE_TEXT_MESSAGE =
+  "No readable text was found in this file — it may be blank or a scan with nothing legible on it. " +
+  "Delete it, or replace it with a clearer copy and upload again.";
 
 /**
  * Total wall-clock budget this module gives itself for one ingestDocument
@@ -311,6 +349,10 @@ export function shouldEscalate(pages, threshold = 0.75) {
 export async function ingestDocument(ctx, documentId, { userId, force = false } = {}) {
   const startedAt = Date.now();
 
+  if (!isValidDocumentId(documentId)) {
+    throw new IngestError("documentId must be a uuid", 400);
+  }
+
   // Read the row in its own short transaction. The model call that follows can
   // take 30+ seconds, and holding a Postgres connection open across it would
   // exhaust the pool under any real upload burst.
@@ -371,6 +413,34 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     ...(p.model ? { model: p.model } : {}),
     ...(Number.isFinite(p.confidence) ? { confidence: p.confidence } : {}),
   }));
+
+  // A 0-byte upload, a blank scan, or a photo of nothing legible reads
+  // cleanly (no exception anywhere above) but states nothing extractable.
+  // That is a real, distinct outcome from "not read yet" (extractDocument.js's
+  // own 409) and from "we can't read this type at all" (415, above) — and
+  // without this check it used to sail through as a normal success: one
+  // blank-text page written, page_count > 0, stage advanced to 'read', no
+  // error anywhere. The document then sat there until something tried to
+  // EXTRACT it and got the confusing "run /api/read-document first" 409 (it
+  // had run) — which the queue's autoExtract chain does automatically and
+  // immediately, so this document was for all practical purposes stuck.
+  //
+  // Recorded exactly like the unsupported-content-type (415) case just above:
+  // markExtracted with a terminal error BEFORE throwing. Throwing (rather
+  // than returning a "success") is what stops the queue's read step ever
+  // reaching `if (autoExtract) step.sendEvent(...)` in queue.js — the SAME
+  // reason that case never chains into extraction either. document_type is
+  // set to 'other' (documentTypes.js's canonical id for "nothing to
+  // classify") so document-status.js's completeness comes back trivially
+  // satisfied instead of "Blocked at Classified", and the document reads as a
+  // clean, deletable failure rather than something stuck mid-pipeline.
+  if (!hasReadableText(pages)) {
+    await withTenant(ctx, async (db) => {
+      await db.markExtracted(documentId, { page_count: 0, error: NO_READABLE_TEXT_MESSAGE });
+      await db.updateDocument(documentId, { document_type: "other" });
+    });
+    throw new IngestError(NO_READABLE_TEXT_MESSAGE, 422);
+  }
 
   const written = await withTenant(ctx, async (db) => {
     const n = await db.upsertPages(documentId, pages);
@@ -448,13 +518,19 @@ function toolUseCount(response) {
  * output tokens for) only the flagged pages, keeping their original page
  * numbers so the merge in extractWithClaude lines up.
  *
- * `strict` controls what a `max_tokens` truncation or an empty result means:
- * true (the fast pass, and any legacy single-model call) throws, because a
- * silently-partial FIRST read of a document must not be recorded as
- * complete. false (an escalation re-run) logs and returns whatever pages did
- * parse, because the fast pass already produced a usable, complete-if-
- * imperfect result for the whole document — a failed escalation should
- * degrade to that, not fail the ingestion outright.
+ * `strict` controls what a `max_tokens` TRUNCATION means (a partial result,
+ * not a whole one): true (the fast pass, and any legacy single-model call)
+ * throws, because a silently-partial FIRST read of a document must not be
+ * recorded as complete. false (an escalation re-run) logs and returns
+ * whatever pages did parse, because the fast pass already produced a usable,
+ * complete-if-imperfect result for the whole document — a failed escalation
+ * should degrade to that, not fail the ingestion outright.
+ *
+ * An EMPTY result (zero pages back from the model at all) is not treated as
+ * a failure here regardless of `strict` — a genuinely blank document is a
+ * real, legitimate outcome, not a transcription defect. ingestDocument's own
+ * hasReadableText() check is what turns that into one clean terminal
+ * document state; this function just reports faithfully what came back.
  */
 async function callTranscribe({ model, bytes, contentType, timeoutMs, pageFilter, strict = true }) {
   const client = anthropicClientFactory(timeoutMs);
@@ -533,10 +609,6 @@ async function callTranscribe({ model, bytes, contentType, timeoutMs, pageFilter
     }))
     .sort((a, b) => a.page_no - b.page_no);
 
-  if (!pages.length) {
-    if (strict) throw new Error("No text could be read from this document");
-    return { pages: [], usage };
-  }
   return { pages, usage };
 }
 

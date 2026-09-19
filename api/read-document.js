@@ -1,6 +1,6 @@
 import { denyAuth } from "./_lib/auth.js";
 import { handleCors, handleError } from "./_lib/claude.js";
-import { ingestDocument, recordIngestFailure, isTransientError } from "./_lib/readDocument.js";
+import { ingestDocument, recordIngestFailure, isTransientError, isValidDocumentId } from "./_lib/readDocument.js";
 import { isQueueEnabled, enqueueDocument } from "./_lib/queue.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit } from "./_lib/rateLimit.js";
@@ -67,6 +67,13 @@ export default async function handler(req, res) {
   if (typeof documentId !== "string" || !documentId) {
     return res.status(400).json({ error: "documentId is required" });
   }
+  // Checked here (not just inside ingestDocument) so a malformed id never
+  // reaches enqueueDocument either — the queued path has no other guard
+  // before Inngest, and 500ing a document into existence in Inngest's retry
+  // history is worse than a clean 400 up front.
+  if (!isValidDocumentId(documentId)) {
+    return res.status(400).json({ error: "documentId must be a uuid" });
+  }
 
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
 
@@ -110,9 +117,14 @@ export default async function handler(req, res) {
     const transient = isTransientError(error);
 
     if (error?.name === "IngestError") {
-      // markExtracted already ran for the unsupported-type case; for the rest,
-      // record the reason so the document does not sit at 'received' silently.
-      if (error.status !== 415 && !transient) await recordIngestFailure(ctx, documentId, error);
+      // markExtracted already ran, inside ingestDocument itself, for both the
+      // unsupported-type case (415) and the no-readable-text case (422) — see
+      // readDocument.js. Recording it again here would just overwrite the
+      // same message with itself, so both are skipped; everything else still
+      // needs it so the document does not sit at 'received' silently.
+      if (error.status !== 415 && error.status !== 422 && !transient) {
+        await recordIngestFailure(ctx, documentId, error);
+      }
       return handleCors(res, req).status(error.status ?? 400).json({ error: error.message });
     }
 

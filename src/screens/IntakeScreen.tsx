@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
-import { Plus, Upload, AlertTriangle, ChevronRight, X, FolderArchive } from 'lucide-react';
-import { AppShell } from '../components/AppShell';
+import { Plus, Upload, AlertTriangle, ChevronRight, X, FolderArchive, FileUp } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { docCountsByStage, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
@@ -113,12 +112,14 @@ function issueSummary(doc: Doc): string | null {
 }
 
 /**
- * Intake is a workflow, not a drop zone. Files go into a named batch with a
- * source and a date range, then move Received → Classified → Extracted →
- * Linked → Verified. Nothing is answerable until Linked; nothing counts until
- * Verified.
+ * The Inbox's "Add files" tab. Files go into a named batch with a source and
+ * a date range, then move Uploaded → Sorted → Read → Matched → Checked.
+ * Nothing is answerable until Matched; nothing counts until Checked.
+ *
+ * Rendered inside InboxScreen (which owns the AppShell + tab header) rather
+ * than as its own top-level screen — see the IA note in InboxScreen.tsx.
  */
-export function IntakeScreen() {
+export function IntakeBody() {
   const graph = useGraph();
   const createBatch = useGraph((s) => s.createBatch);
   const receiveDocs = useGraph((s) => s.receiveDocs);
@@ -160,24 +161,29 @@ export function IntakeScreen() {
 
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // Upload progress, keyed by filename. Local to this screen on purpose: it is
-  // about the transfer, not about the document, and it should disappear when
-  // you navigate away.
-  const [uploads, setUploads] = useState<Record<string, IngestProgress>>({});
+  // Upload progress, keyed by filename. Lives in the Zustand store (not
+  // component state): the AppShell header's "Processing N of M…" indicator
+  // derives from it (store/appStore.ts's `selectIngestProgress`), and
+  // leaving this tab — or the whole Inbox screen — no longer resets it to
+  // empty defaults or loses visibility into whether the batch finished.
+  const uploads = useAppStore((s) => s.uploads);
+  const setUpload = useAppStore((s) => s.setUpload);
+  const seedUploads = useAppStore((s) => s.seedUploads);
   const uploading = Object.values(uploads).some((u) => u.status !== 'done' && u.status !== 'error' && u.status !== 'pending');
   // filename -> live document id, so the uploads list can show the doc's
-  // real, changing pipeline stage (Extracting/Linked/AI verified) instead of
+  // real, changing pipeline stage (Read/Matched/AI verified) instead of
   // freezing on "Read" the moment the upload+read step itself finishes.
-  const [uploadDocIds, setUploadDocIds] = useState<Record<string, string>>({});
+  const uploadDocIds = useAppStore((s) => s.uploadDocIds);
+  const setUploadDocId = useAppStore((s) => s.setUploadDocId);
 
-  // Cancels any in-flight upload or status poll the moment this screen is
-  // left, instead of an abandoned 15-minute poll loop running against a
-  // component nobody can see anymore.
+  // Deliberately NOT aborted on unmount (navigating to another screen, or
+  // switching Inbox tabs, no longer cancels an in-flight upload — see the
+  // comment on `uploads` above). Only an explicit user action (bulk import's
+  // Cancel button) or the whole app unloading stops one.
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
-    return () => controller.abort();
   }, []);
 
   /** Sample files have no bytes behind them — they seed the graph only. */
@@ -227,25 +233,17 @@ export function IntakeScreen() {
     // Captured directly from receiveDocs (not via addFiles) because the ids
     // it returns are what ties each real ingest result back to its placeholder.
     const tempIds = receiveDocs(batchId, files.map((f) => ({ filename: f.name, fileType: fileTypeOf(f.name) })));
-    setUploads((prev) => {
-      const next = { ...prev };
-      for (const f of files) next[f.name] = { filename: f.name, status: 'hashing' };
-      return next;
+    seedUploads(files.map((f) => f.name));
+    files.forEach((f, i) => {
+      const id = tempIds[i];
+      if (id) setUploadDocId(f.name, id);
     });
-    setUploadDocIds((prev) => {
-      const next = { ...prev };
-      files.forEach((f, i) => {
-        const id = tempIds[i];
-        if (id) next[f.name] = id;
-      });
-      return next;
-    });
-    const results = await ingestFiles(files, (p) => setUploads((prev) => ({ ...prev, [p.filename]: p })), 3, abortRef.current?.signal);
+    const results = await ingestFiles(files, (p) => setUpload(p.filename, p), 3, abortRef.current?.signal);
     results.forEach((result, i) => {
       const tempId = tempIds[i];
       if (tempId) {
         reconcileIntakeDoc(tempId, patchFromIngestResult(result));
-        setUploadDocIds((prev) => ({ ...prev, [result.filename]: result.documentId ?? tempId }));
+        setUploadDocId(result.filename, result.documentId ?? tempId);
       }
     });
   };
@@ -258,17 +256,23 @@ export function IntakeScreen() {
   // export or a scanning vendor's delivery — where a different shape of
   // progress reporting (skip reasons, a cap on rows rendered, a cancel
   // button) actually matters.
-  const [bulkStates, setBulkStates] = useState<BulkFileState[]>([]);
-  const [bulkRunning, setBulkRunning] = useState(false);
-  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  // bulkStates/bulkRunning/bulkNotice/bulkCancel live in the Zustand store
+  // (see the comment on `uploads` above) for the same reason: this run
+  // outlives whichever component instance started it, and a remounted
+  // Add-files tab (or the AppShell header, deriving `selectIngestProgress`)
+  // needs to see its real, current state — including a working Cancel
+  // button — not a fresh set of empty defaults.
+  const bulkStates = useAppStore((s) => s.bulkStates);
+  const setBulkStates = useAppStore((s) => s.setBulkStates);
+  const bulkRunning = useAppStore((s) => s.bulkRunning);
+  const setBulkRunning = useAppStore((s) => s.setBulkRunning);
+  const bulkNotice = useAppStore((s) => s.bulkNotice);
+  const setBulkNotice = useAppStore((s) => s.setBulkNotice);
+  const bulkCancel = useAppStore((s) => s.bulkCancel);
+  const setBulkCancel = useAppStore((s) => s.setBulkCancel);
   const [dragOver, setDragOver] = useState(false);
   const bulkInput = useRef<HTMLInputElement>(null);
-  const bulkCancelRef = useRef<(() => void) | null>(null);
   const bulkReconciledRef = useRef<Set<number>>(new Set());
-
-  // Same reasoning as the `abortRef` effect above: a bulk run outlives the
-  // component if the screen is left mid-import, so it is cancelled on unmount.
-  useEffect(() => () => bulkCancelRef.current?.(), []);
 
   const bulkSummary = useMemo(() => summarizeProgress(bulkStates), [bulkStates]);
   const { shown: shownBulkRows, hiddenCount: hiddenBulkCount } = useMemo(
@@ -325,7 +329,7 @@ export function IntakeScreen() {
         },
       }
     );
-    bulkCancelRef.current = handle.cancel;
+    setBulkCancel(handle.cancel);
     setBulkRunning(true);
     void handle.result.finally(() => setBulkRunning(false));
   };
@@ -390,17 +394,31 @@ export function IntakeScreen() {
   };
 
   return (
-    <AppShell>
-      <div className="space-y-8">
+    <div className="space-y-8">
+        {/* First-run: nothing added yet anywhere in the account. A big,
+            unmissable call to action instead of the ordinary batch/bulk-import
+            layout with six empty stage tiles above it. */}
+        {total === 0 && (
+          <div className="dw-card p-8 sm:p-10 text-center space-y-4">
+            <FileUp className="w-8 h-8 mx-auto text-ink-3" aria-hidden="true" />
+            <div>
+              <h2 className="text-h1">Add your first document.</h2>
+              <p className="text-ink-2 mt-1 max-w-prose mx-auto">
+                Drop in invoices, warranty cards, work orders, or a whole folder — we'll sort it out.
+              </p>
+            </div>
+            <button type="button" className="dw-btn-primary" disabled={uploading} onClick={() => bulkInput.current?.click()}>
+              <Upload className="w-4 h-4" aria-hidden="true" /> {uploading || bulkRunning ? 'Working…' : 'Add files'}
+            </button>
+          </div>
+        )}
+
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1>Intake</h1>
+            <h2 className="text-h1">Add files</h2>
             <p className="text-ink-2 mt-1">Every document moves through the pipeline. Nothing can fall in.</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" className="dw-btn-secondary" onClick={() => setCurrentScreen('review')}>
-              Review queue
-            </button>
             <button type="button" className="dw-btn-secondary" onClick={() => { setShowNew(true); window.setTimeout(() => nameRef.current?.focus(), 0); }}>
               <Plus className="w-4 h-4" aria-hidden="true" /> New batch
             </button>
@@ -481,7 +499,7 @@ export function IntakeScreen() {
                   {bulkSummary.skipped} skipped · {bulkSummary.failed} failed
                 </p>
                 {bulkRunning && (
-                  <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1 ml-auto" onClick={() => bulkCancelRef.current?.()}>
+                  <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1 ml-auto" onClick={() => bulkCancel?.()}>
                     <X className="w-3.5 h-3.5" aria-hidden="true" /> Cancel
                   </button>
                 )}
@@ -670,7 +688,6 @@ export function IntakeScreen() {
             )}
           </section>
         </div>
-      </div>
-    </AppShell>
+    </div>
   );
 }

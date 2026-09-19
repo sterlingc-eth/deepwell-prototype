@@ -115,8 +115,13 @@ eq('no classification rows -> not human-classified', wasClassifiedByHuman('other
 eq('no classification rows (undefined) -> not human-classified', wasClassifiedByHuman('other', undefined), false);
 eq(
   'a row matching the CURRENT type -> human-classified, do not touch',
-  wasClassifiedByHuman('other', [{ changes: { documentType: 'other' } }]),
+  wasClassifiedByHuman('work-order', [{ changes: { documentType: 'work-order' } }]),
   true
+);
+eq(
+  "a human picking 'other' is never protective — still reclassifiable",
+  wasClassifiedByHuman('other', [{ changes: { documentType: 'other' } }]),
+  false
 );
 eq(
   'a row for a DIFFERENT type than current -> not a match, safe to reclassify',

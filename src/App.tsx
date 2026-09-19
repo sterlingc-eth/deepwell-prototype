@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
-import { AlertTriangle, Inbox, Info } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 import { authHeader, setAuthTokenProvider } from './services/authToken';
 import { useAppStore } from './store/appStore';
 import { usePostgresSync } from './hooks/usePostgresSync';
 import { useDeepLink } from './hooks/useDeepLink';
-import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, IntakeScreen, LoginScreen, RecordsScreen, ReviewScreen } from './screens';
+import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen } from './screens';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import './index.css';
 
@@ -28,6 +28,7 @@ function App() {
     return () => setAuthTokenProvider(null);
   }, [getToken]);
   const currentScreen = useAppStore((s) => s.currentScreen);
+  const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
 
   // Fires once, the moment a signed-in user goes from having no active
   // Clerk organization to having one — creating a shop, accepting an invite,
@@ -72,6 +73,21 @@ function App() {
   // this is safe to call before the isLoaded/isSignedIn returns below.
   const sync = usePostgresSync(!DEMO_MODE && isLoaded && isSignedIn, orgId ?? userId ?? null);
 
+  // First-run: a brand-new shop with zero documents lands straight on the
+  // Inbox's "Add files" tab with its big call-to-action, instead of an Ask
+  // screen with nothing to ask about or a Dashboard full of zero-value
+  // tiles. Skipped whenever the URL itself asked for a specific screen (a
+  // deep link) — that request wins. Fires at most once per session.
+  const hadDeepLinkOnLoad = useRef(typeof window !== 'undefined' && window.location.search.length > 0);
+  const firstRunRedirectedRef = useRef(false);
+  useEffect(() => {
+    if (DEMO_MODE || firstRunRedirectedRef.current || hadDeepLinkOnLoad.current) return;
+    if (sync.status !== 'ready' || !sync.isEmpty) return;
+    if (currentScreen !== 'ask') return; // the app default — anything else was a deliberate navigation
+    firstRunRedirectedRef.current = true;
+    setCurrentScreen('ingest');
+  }, [sync.status, sync.isEmpty, currentScreen, setCurrentScreen]);
+
   // ?entity= / ?doc= / ?screen= in the URL open the right record once the
   // graph is loaded. Unconditional for the rules of hooks; it waits for the
   // graph internally and is a no-op without a query string.
@@ -110,12 +126,15 @@ function App() {
         return <AskScreen />;
       case 'entity':
         return <EntityScreen />;
-      case 'records':
-        return <RecordsScreen />;
+      // 'ingest' and 'review' both render the merged Inbox screen — which
+      // tab is active lives in the store's `inboxTab`, not in this switch
+      // (see store/appStore.ts's setCurrentScreen aliasing).
       case 'ingest':
-        return <IntakeScreen />;
       case 'review':
-        return <ReviewScreen />;
+        return <InboxScreen />;
+      // 'records' is a retired top-level id, aliased to 'dashboard' by the
+      // store the moment it's set — kept here too as a defensive fallback.
+      case 'records':
       case 'dashboard':
         return <DashboardScreen />;
       case 'browse':
@@ -146,12 +165,6 @@ function App() {
             <span className="font-medium">Couldn't load your records.</span>{' '}
             <span className="text-body">{sync.error} Showing whatever loaded earlier this session, if anything.</span>
           </p>
-        </div>
-      )}
-      {!DEMO_MODE && sync.status === 'ready' && sync.isEmpty && (
-        <div className="dw-card border-line px-5 py-3 m-4 mb-0 text-ink-2 flex items-start gap-2">
-          <Inbox className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-          <p>Nothing ingested yet for this account. Head to Intake to add your first document.</p>
         </div>
       )}
       {screen}

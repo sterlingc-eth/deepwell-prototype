@@ -1,5 +1,20 @@
 # Requests from agent-backend
 
+## whoever owns api/extract.js
+- UPDATE 2026-09-19 (limit-test fix pass): `api/upload-url.js`,
+  `api/_lib/readDocument.js`/`api/read-document.js`, and
+  `api/_lib/extractDocument.js` now validate `documentId` is uuid-shaped
+  before it reaches any `::uuid`-cast SQL (a malformed id was turning into an
+  uncaught 500 "invalid input syntax for type uuid" instead of a clean 400).
+  `api/extract.js` has the same gap: it only checks
+  `typeof documentId !== "string" || !documentId` before calling
+  `extractDocumentFields`. That function is out of my edit scope for this
+  task (not one of my owned files), so I didn't fix it — but it's the same
+  vulnerability class. Suggested fix: import `isValidDocumentId` from
+  `api/_lib/readDocument.js` (already exported) and return `400
+  { error: 'documentId must be a uuid' }` before calling
+  `extractDocumentFields`, same as the other endpoints.
+
 ## agent-docs-access
 - `api/_lib/routes/document-delete.js` did not exist when I finished, and
   `api/review.js` statically imports it for `case 'deleteDocuments'` — a

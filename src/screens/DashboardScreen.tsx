@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, AlertTriangle, Check, ClipboardList, Copy, FileText, Link2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, ShieldCheck, Upload } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { DataHealthStrip } from '../components/DataHealthStrip';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
-import { docCountsByStage, entitiesOfType, openConflicts, unlinkedDocs, useGraph } from '../core/entityGraph';
+import { docCountsByStage, entitiesOfType, useGraph } from '../core/entityGraph';
 import { dateOf, fmtDate, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { deepLinkFor } from '../hooks/useDeepLink';
@@ -56,6 +57,16 @@ const ALERT_CARDS: { key: AlertCardKey; title: string }[] = [
   { key: 'upsell', title: 'Upsell candidates' },
 ];
 
+/** Names the bucket instead of a generic "Nothing in this bucket right now." */
+const ALERT_EMPTY_LABEL: Record<AlertCardKey, string> = {
+  expired: 'No units expired right now.',
+  'expiring-30': 'No units expiring in 30 days right now.',
+  'expiring-90': 'No units expiring in 90 days right now.',
+  'expiring-365': 'No units expiring in 12 months right now.',
+  'unregistered-window-closing': 'No registrations closing soon.',
+  upsell: 'No upsell candidates right now.',
+};
+
 function itemsForCard(items: AttentionItem[], key: AlertCardKey): AttentionItem[] {
   return key === 'upsell' ? items.filter((i) => i.upsell.eligible) : items.filter((i) => i.tier === key);
 }
@@ -93,14 +104,13 @@ export function DashboardScreen() {
   const askQuestion = useAppStore((s) => s.askQuestion);
   const openEntity = useAppStore((s) => s.openEntity);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  const setInboxTab = useAppStore((s) => s.setInboxTab);
   const toggleSelectForExport = useAppStore((s) => s.toggleSelectForExport);
   const clearExportSelection = useAppStore((s) => s.clearExportSelection);
 
   const now = new Date();
   const counts = docCountsByStage(graph);
   const total = Object.values(graph.docs).length;
-  const unlinked = unlinkedDocs(graph).length;
-  const conflicts = openConflicts(graph).length;
 
   const units = useMemo(() => entitiesOfType(graph, 'equipment'), [graph]);
   // The real (non-demo) ingestion pipeline has no writer for `service` entities
@@ -233,7 +243,19 @@ export function DashboardScreen() {
           </button>
         </header>
 
-        {!DEMO_MODE && (
+        <DataHealthStrip />
+
+        {!DEMO_MODE && total === 0 ? (
+          <section aria-labelledby="alerts-heading" className="space-y-3">
+            <h2 id="alerts-heading" className="dw-label">Alerts</h2>
+            <div className="dw-card p-6 flex flex-wrap items-center justify-between gap-4">
+              <p className="text-ink-2">Your warranty alerts will show up here once you've added a few documents.</p>
+              <button type="button" className="dw-btn-primary shrink-0" onClick={() => { setCurrentScreen('ingest'); setInboxTab('add'); }}>
+                <Upload className="w-4 h-4" aria-hidden="true" /> Add documents
+              </button>
+            </div>
+          </section>
+        ) : !DEMO_MODE && (
           <section aria-labelledby="alerts-heading" className="space-y-3">
             <h2 id="alerts-heading" className="dw-label">Alerts</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -252,7 +274,12 @@ export function DashboardScreen() {
                       <p className="text-caption text-ink-3">{title}</p>
                       <ClipboardList className="w-4 h-4 text-ink-3" aria-hidden="true" />
                     </div>
-                    <p className="font-display text-h1 mt-1">{count}</p>
+                    <div className="flex items-end justify-between mt-1">
+                      <p className="font-display text-h1">{count}</p>
+                      <span className="flex items-center gap-0.5 text-caption text-ink-3">
+                        View list <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                      </span>
+                    </div>
                   </button>
                 );
               })}
@@ -297,7 +324,7 @@ export function DashboardScreen() {
                   </li>
                 ))}
                 {itemsForCard(attention?.items ?? [], openCard).length === 0 && (
-                  <li className="text-body text-ink-3">Nothing in this bucket right now.</li>
+                  <li className="text-body text-ink-3">{ALERT_EMPTY_LABEL[openCard]}</li>
                 )}
               </ul>
             )}
@@ -340,12 +367,10 @@ export function DashboardScreen() {
           </section>
         )}
 
-        <section aria-label="Overview" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <section aria-label="Overview" className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Documents', value: total, sub: `${counts.verified} verified`, Icon: FileText, onClick: () => setCurrentScreen('records') },
+            { label: 'Documents', value: total, sub: `${counts.verified} checked`, Icon: FileText, onClick: () => setCurrentScreen('browse') },
             { label: 'Units on record', value: units.length, sub: `${upcoming.length} under warranty`, Icon: ShieldCheck, onClick: () => askQuestion('Which units are out of warranty?') },
-            { label: 'Unlinked inbox', value: unlinked, sub: unlinked ? 'Target is zero' : 'Clear', Icon: Link2, onClick: () => setCurrentScreen('review') },
-            { label: 'Conflicts open', value: conflicts, sub: conflicts ? 'Need a decision' : 'Clear', Icon: AlertTriangle, onClick: () => setCurrentScreen('review') },
           ].map(({ label, value, sub, Icon, onClick }) => (
             <button key={label} type="button" onClick={onClick} className="dw-card p-4 text-left hover:shadow-lift transition-shadow duration-quick">
               <div className="flex items-start justify-between">

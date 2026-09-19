@@ -74,6 +74,21 @@ eq('several distinct uuids all survive', validateDocumentIds([UUID_A, UUID_B]).l
   }
   check('getOriginalUrl rejects a blank documentId (400)', ok);
 }
+{
+  // A malformed (non-uuid) documentId must never reach the ::uuid-cast SQL —
+  // Postgres raising "invalid input syntax for type uuid" from inside a
+  // catch-all is what turned this into a bare 500 in production.
+  let ok = false;
+  let message = null;
+  try {
+    await getOriginalUrl({ tenantId: 'user_x', orgId: null }, 'not-a-uuid');
+  } catch (err) {
+    ok = err instanceof DocumentGetError && err.status === 400;
+    message = err.message;
+  }
+  check('getOriginalUrl rejects a non-uuid-shaped documentId (400, not 500)', ok, message);
+  eq('the rejection message names the expected shape', message, 'documentId must be a uuid');
+}
 
 /* --------------------------------------------------- presign() GET URL shape */
 

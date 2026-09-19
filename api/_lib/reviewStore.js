@@ -561,6 +561,9 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
  *  document; only their `changes.documentType` is consulted. Exported so the
  *  rule is testable with no database (scripts/verify-review.mjs). */
 export function wasClassifiedByHuman(currentType, classificationRows) {
+  // A human choosing 'other' means "nothing fit", not a decision to protect —
+  // 'other' is the one type the pipeline must keep trying to improve on.
+  if (!currentType || currentType === 'other') return false;
   return (classificationRows ?? []).some((r) => r?.changes?.documentType === currentType);
 }
 

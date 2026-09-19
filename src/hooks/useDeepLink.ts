@@ -109,6 +109,9 @@ export function useDeepLink(): void {
       }
       if (params.docId && graph.docs[params.docId]) {
         openDocument(params.docId);
+        // 'review' is a retired screen id, kept as an alias in the store
+        // (setCurrentScreen) that lands on the Inbox's "Needs a person" tab
+        // with this document selected — see store/appStore.ts.
         setCurrentScreen(params.screen ?? 'review');
         return true;
       }

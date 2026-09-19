@@ -21,7 +21,14 @@ import {
   EXTRACT_TOOL,
   FIELD_KEYS,
 } from '../api/_lib/extractFields.js';
-import { sniff, sniffMagicBytes, chunkText } from '../api/_lib/readDocument.js';
+import {
+  sniff,
+  sniffMagicBytes,
+  chunkText,
+  isValidDocumentId,
+  hasReadableText,
+  NO_READABLE_TEXT_MESSAGE,
+} from '../api/_lib/readDocument.js';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_IDS, resolveDocumentType } from '../api/_lib/documentTypes.js';
 
 let failures = 0;
@@ -341,6 +348,44 @@ eq('null input is safe', selectPages(null, 100).pages, []);
   // chunkText still produces sane pages; unrelated to the HEIC fix but cheap
   // to guard since ingestDocument's control-char stripping runs on its output.
   eq('chunkText handles empty input', chunkText(''), [{ page_no: 1, text: '' }]);
+}
+
+/* --------------------------------------------------------- isValidDocumentId
+ * ingestDocument/extractDocumentFields both cast documentId ::uuid in SQL —
+ * a malformed value must be caught here, before it ever reaches Postgres and
+ * turns into a bare 500 ("invalid input syntax for type uuid"). */
+
+{
+  const UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+  check('a well-formed uuid is valid', isValidDocumentId(UUID) === true);
+  check('uppercase hex is still valid (case-insensitive)', isValidDocumentId(UUID.toUpperCase()) === true);
+  check('"not-a-uuid" is rejected', isValidDocumentId('not-a-uuid') === false);
+  check('empty string is rejected', isValidDocumentId('') === false);
+  check('null is rejected', isValidDocumentId(null) === false);
+  check('undefined is rejected', isValidDocumentId(undefined) === false);
+  check('a number is rejected', isValidDocumentId(12345) === false);
+  check('a uuid missing a segment is rejected', isValidDocumentId('3fa85f64-5717-4562-b3fc') === false);
+  check('a uuid with an extra character is rejected', isValidDocumentId(UUID + 'a') === false);
+  check('a uuid-shaped string with a non-hex character is rejected', isValidDocumentId('zfa85f64-5717-4562-b3fc-2c963f66afa6') === false);
+  check('SQL-injection-shaped input is rejected, not just non-uuid input', isValidDocumentId("' OR '1'='1") === false);
+}
+
+/* -------------------------------------------------------------- hasReadableText
+ * Distinguishes "never read" (no pages array yet) from "read but the file had
+ * nothing legible in it" (pages exist, every one is blank) — the latter must
+ * become a terminal state instead of forever asking for a re-read that will
+ * never produce different pages. */
+
+{
+  check('no pages at all is not readable text', hasReadableText([]) === false);
+  check('a single blank page is not readable text', hasReadableText([{ page_no: 1, text: '' }]) === false);
+  check('whitespace-only text is not readable text', hasReadableText([{ page_no: 1, text: '   \n\t  ' }]) === false);
+  check('several blank pages are still not readable text', hasReadableText([{ text: '' }, { text: '' }, { text: null }]) === false);
+  check('one non-blank page among blanks counts as readable', hasReadableText([{ text: '' }, { text: 'serial: 12345' }]) === true);
+  check('a single non-blank page is readable text', hasReadableText([{ page_no: 1, text: 'hello' }]) === true);
+  check('non-array input is treated as not readable (fails closed)', hasReadableText(null) === false);
+  check('a page missing the text field entirely is treated as blank', hasReadableText([{ page_no: 1 }]) === false);
+  check('NO_READABLE_TEXT_MESSAGE is a non-empty user-facing string', typeof NO_READABLE_TEXT_MESSAGE === 'string' && NO_READABLE_TEXT_MESSAGE.length > 0);
 }
 
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nAll extraction checks passed.');

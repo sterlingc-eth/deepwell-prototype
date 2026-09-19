@@ -519,6 +519,22 @@ export function gapDocs(g: GraphSnapshot): Doc[] {
 export function openConflicts(g: GraphSnapshot): Conflict[] {
   return Object.values(g.conflicts).filter((c) => !c.resolvedValue);
 }
+/**
+ * Documents named as a candidate in a still-open Conflict record, deduped.
+ * `openConflicts` is the source of truth for "is this still open"; this is
+ * the one place that turns those records into document rows, so any screen
+ * that needs to list or count the *documents* behind an open conflict (the
+ * Review queue's "Conflicts" filter, Dashboard's "Conflicts" tile) reads it
+ * from here instead of re-deriving its own notion of "conflicted doc" from
+ * `doc.issues` — which could silently drift from `graph.conflicts` over time.
+ */
+export function conflictDocs(g: GraphSnapshot): Doc[] {
+  const ids = new Set<DocumentId>();
+  for (const c of openConflicts(g)) {
+    for (const cand of c.candidates) ids.add(cand.documentId);
+  }
+  return Object.values(g.docs).filter((d) => ids.has(d.id));
+}
 export function duplicateDocs(g: GraphSnapshot): Doc[] {
   return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'duplicate'));
 }

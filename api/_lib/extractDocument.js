@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { withTenant, linkDocumentToCustomer } from "./recordsStore.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages } from "./extractFields.js";
-import { IngestError } from "./readDocument.js";
+import { IngestError, isValidDocumentId } from "./readDocument.js";
 import { deriveWarranty } from "./warrantyRules.js";
 import { withCache, modelCallLogLine } from "./promptCache.js";
 import { recordModelCall } from "./usage.js";
@@ -59,6 +59,15 @@ export const EXTRACT_MODEL = process.env.EXTRACT_MODEL || "claude-haiku-4-5";
  *                    pagesRead: number, pagesTotal: number}>}
  */
 export async function extractDocumentFields(ctx, documentId, { userId, documentType } = {}) {
+  // Every documents.id is a uuid; a malformed value survives a bare
+  // typeof/truthiness check and only fails once bound against that column,
+  // as "invalid input syntax for type uuid" — a raw 500, not a clean 400.
+  // Guarded here (not just at the HTTP route) so the Inngest queue worker,
+  // which calls this directly with no route in front of it, is covered too.
+  if (!isValidDocumentId(documentId)) {
+    throw new IngestError("documentId must be a uuid", 400);
+  }
+
   // Short transaction: the model call below must not hold a pool connection.
   const loaded = await withTenant(ctx, async (db) => {
     const doc = await db.getDocument(documentId);
@@ -70,7 +79,13 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
 
   const { doc, pages } = loaded;
   if (!pages.length || !pages.some((p) => (p.text ?? "").trim())) {
-    // Not an error the user caused — the document just has not been read yet.
+    // Two different situations, not one: a document read carries its own
+    // extract_error (see readDocument.js's hasReadableText/NO_READABLE_TEXT_MESSAGE)
+    // when the read genuinely ran and found nothing — surface THAT message
+    // rather than telling someone to go run a step that already ran. Only a
+    // document that has never had extract_error set at all gets the "not
+    // read yet" 409.
+    if (doc.extract_error) throw new IngestError(doc.extract_error, 422);
     throw new IngestError("This document has no page text yet. Run /api/read-document first.", 409);
   }
 

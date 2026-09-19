@@ -211,9 +211,9 @@ export function AskScreen() {
                   ))}
                 </ul>
                 <p className="text-ink-3">
-                  Nothing ingested yet — add a document and ask about it.{' '}
+                  Nothing added yet. Add a document, then ask about it.{' '}
                   <button type="button" onClick={() => setCurrentScreen('ingest')} className="dw-btn-primary !min-h-[36px] !py-1 ml-1 align-middle">
-                    Go to Intake <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    Add a document <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
                 </p>
               </>

@@ -1,12 +1,16 @@
 import { CheckCircle2, Link2, FileSearch, Tags, Inbox, Sparkles } from 'lucide-react';
 import type { PipelineStage } from '../core/types';
 
+// Display labels only — the underlying PipelineStage values (received,
+// classified, extracted, linked, verified) are unchanged everywhere else
+// (API payloads, entityGraph.ts, types.ts). A shop owner has never
+// "classified" anything; these are the plain-language equivalents.
 export const STAGE_LABEL: Record<PipelineStage, string> = {
-  received: 'Received',
-  classified: 'Classified',
-  extracted: 'Extracted',
-  linked: 'Linked',
-  verified: 'Verified',
+  received: 'Uploaded',
+  classified: 'Sorted',
+  extracted: 'Read',
+  linked: 'Matched',
+  verified: 'Checked',
 };
 
 const STAGE_STYLE: Record<PipelineStage, { className: string; Icon: typeof CheckCircle2 }> = {

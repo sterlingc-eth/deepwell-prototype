@@ -30,6 +30,7 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
   const schema = useGraph((s) => s.schema);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const openDocument = useAppStore((s) => s.openDocument);
+  const openEntity = useAppStore((s) => s.openEntity);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
 
@@ -191,19 +192,29 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
         </div>
 
         <footer className="px-5 py-3 border-t border-line flex flex-wrap gap-2 justify-end">
-          {doc.stage !== 'verified' && (
+          {doc.linkedEntityIds[0] && (
             <button
               type="button"
               className="dw-btn-secondary"
               onClick={() => {
                 onClose();
-                openDocument(doc.id);
-                setCurrentScreen('review');
+                openEntity(doc.linkedEntityIds[0] as string);
               }}
             >
-              Open in review
+              View record
             </button>
           )}
+          <button
+            type="button"
+            className="dw-btn-secondary"
+            onClick={() => {
+              onClose();
+              openDocument(doc.id);
+              setCurrentScreen('review');
+            }}
+          >
+            Fix this document
+          </button>
           <button type="button" className="dw-btn-primary" onClick={onClose}>
             Done
           </button>

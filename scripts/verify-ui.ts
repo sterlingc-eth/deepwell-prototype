@@ -5,14 +5,25 @@
  *
  *   npx tsx scripts/verify-ui.ts
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_DIR = fileURLToPath(new URL('.', import.meta.url));
 import { buildSuggestions } from '../src/core/suggestions';
 import { parseDeepLink } from '../src/hooks/useDeepLink';
 import { describeFetchFailure, NETWORK_ERROR_MESSAGE } from '../src/services/ingestClient';
 import { truncateForDisplay, summarizeProgress, type BulkFileState } from '../src/services/bulkImport';
-import { maxStageFor, recomputeIssues } from '../src/core/entityGraph';
+import { conflictDocs, gapDocs, maxStageFor, recomputeIssues, unlinkedDocs, type GraphSnapshot } from '../src/core/entityGraph';
 import { hvacSchema } from '../src/domains/hvac/schema';
 import * as hvacDocTypes from '../src/domains/hvac/documentTypes';
 import type { Doc, Entity } from '../src/core/types';
+import { STAGE_LABEL } from '../src/components/StagePill';
+import { PIPELINE_STAGES } from '../src/core/types';
+import { NAV } from '../src/components/AppShell';
+import { docsMatchingFilter } from '../src/screens/ReviewScreen';
+import { selectIngestProgress } from '../src/store/appStore';
+import type { IngestProgress } from '../src/services/ingestClient';
 // The real source of truth (handoffs/TEAM_BRIEF_2026-09-19.md) — agent-backend
 // owns this file. src/domains/hvac/documentTypes.ts is a hand-mirrored copy
 // (src/ cannot import api/, different tsconfig root); this import exists only
@@ -267,6 +278,159 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   const seededRecomputed = recomputeIssues(seeded, hvacSchema);
   eq('recomputeIssues: preserves a seeded unlinked issue instead of duplicating it', seededRecomputed.issues.length, 1);
   check('recomputeIssues: the preserved issue keeps its bestGuess', seededRecomputed.issues[0]?.kind === 'unlinked' && seededRecomputed.issues[0].bestGuess === 'prop-9');
+}
+
+/* ---------------------------------------------- UX flow / copy truth-pass */
+//
+// The 2026-09-19 UX flow spec (handoffs/UX_FLOW_SPEC_2026-09-19.md) retired a
+// batch of internal pipeline jargon from the UI, renamed the five pipeline
+// stages for display, and cut the nav down to exactly four items. These are
+// static checks — no DOM, no store — so a later edit that reintroduces the
+// jargon (or drifts the stage/nav shape) fails CI instead of shipping quietly.
+
+function listFilesRecursive(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...listFilesRecursive(full));
+    else if (/\.tsx?$/.test(name)) out.push(full);
+  }
+  return out;
+}
+
+{
+  const RETIRED_JARGON = ['Unlinked inbox', 'Blocked at Classified', 'Required-field gaps', 'can reach', 'Reclassify & verify'];
+  const scanned = [...listFilesRecursive(join(SCRIPT_DIR, '..', 'src', 'screens')), ...listFilesRecursive(join(SCRIPT_DIR, '..', 'src', 'components'))];
+  check(`scanned at least one screen and one component file (${scanned.length} files)`, scanned.length > 5);
+  for (const term of RETIRED_JARGON) {
+    const hits = scanned.filter((f) => readFileSync(f, 'utf8').includes(term));
+    check(`no retired jargon "${term}" in src/screens or src/components`, hits.length === 0, hits.join(', '));
+  }
+}
+
+{
+  eq('STAGE_LABEL maps all five pipeline stages to their plain-language display names', STAGE_LABEL, {
+    received: 'Uploaded',
+    classified: 'Sorted',
+    extracted: 'Read',
+    linked: 'Matched',
+    verified: 'Checked',
+  });
+  check('STAGE_LABEL has an entry for every PipelineStage value, no more, no fewer', PIPELINE_STAGES.every((s) => s in STAGE_LABEL) && Object.keys(STAGE_LABEL).length === PIPELINE_STAGES.length);
+}
+
+{
+  eq('the primary nav is exactly Ask, Inbox, Records, Dashboard, in that order', NAV.map((n) => n.label), ['Ask', 'Inbox', 'Records', 'Dashboard']);
+  check('the nav array has exactly 4 items', NAV.length === 4);
+}
+
+/* ------------------------------------- Review queue vs. tile-count agreement */
+//
+// Reviewer NO-GO fix: ReviewScreen's filter predicate and DataHealthStrip's
+// tile counts must always agree on which documents count as "unlinked" /
+// "gaps" / "conflicts" — both now read the exact same entityGraph.ts helpers
+// (unlinkedDocs/gapDocs/conflictDocs). This builds one fixture graph and
+// checks ReviewScreen's exported docsMatchingFilter returns the identical
+// document-id set as the bare helper, for every filter that's shared.
+{
+  const doc = (id: string, overrides: Partial<Doc> = {}): Doc => ({
+    id,
+    filename: `${id}.pdf`,
+    fileType: 'pdf',
+    pages: 1,
+    batchId: 'b1',
+    source: 'drive',
+    receivedAt: new Date('2026-01-01'),
+    typeId: null,
+    stage: 'classified',
+    extracted: [],
+    linkedEntityIds: [],
+    linkConfidence: 0,
+    issues: [],
+    preview: '',
+    ...overrides,
+  });
+
+  const fixture: GraphSnapshot = {
+    schema: hvacSchema,
+    entities: {},
+    batches: {},
+    docs: {
+      unlinkedDoc: doc('unlinkedDoc', { issues: [{ kind: 'unlinked', confidence: 0 }] }),
+      gapDoc: doc('gapDoc', { issues: [{ kind: 'missing-field', field: 'serial_number' }] }),
+      conflictDoc: doc('conflictDoc', { stage: 'linked' }),
+      cleanDoc: doc('cleanDoc', { stage: 'verified' }),
+    },
+    conflicts: {
+      c1: { id: 'c1', entityId: 'prop-1', field: 'address', candidates: [{ value: 'a', documentId: 'conflictDoc', location: {} }] },
+    },
+    lastError: null,
+  };
+
+  const ids = (list: Doc[]) => list.map((d) => d.id).sort();
+  const shared: [string, (g: GraphSnapshot) => Doc[]][] = [
+    ['unlinked', unlinkedDocs],
+    ['gaps', gapDocs],
+    ['conflicts', conflictDocs],
+  ];
+  for (const [filterId, helper] of shared) {
+    eq(
+      `ReviewScreen's "${filterId}" filter matches DataHealthStrip's helper on a fixture graph`,
+      ids(docsMatchingFilter(fixture, filterId as Parameters<typeof docsMatchingFilter>[1])),
+      ids(helper(fixture)),
+    );
+  }
+}
+
+/* ------------------------------------------- ingest progress idle detection */
+//
+// Reviewer NO-GO fix: selectIngestProgress (appStore.ts) derives the AppShell
+// header's "Processing N of M…" indicator straight from store state, so it
+// must go idle (null) exactly when every in-flight upload/bulk item has
+// settled, and never sit stuck non-null just because a component unmounted.
+{
+  const upload = (status: IngestProgress['status']): IngestProgress => ({ filename: `${status}.pdf`, status });
+
+  eq('selectIngestProgress: no uploads, no bulk run → idle', selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [] }), null);
+
+  eq(
+    'selectIngestProgress: one upload still hashing → not idle',
+    selectIngestProgress({ uploads: { a: upload('hashing') }, bulkRunning: false, bulkStates: [] }),
+    { current: 0, total: 1 },
+  );
+
+  eq(
+    'selectIngestProgress: every upload settled (done/error/pending) → idle',
+    selectIngestProgress({
+      uploads: { a: upload('done'), b: upload('error'), c: upload('pending') },
+      bulkRunning: false,
+      bulkStates: [],
+    }),
+    null,
+  );
+
+  eq(
+    'selectIngestProgress: one upload still in flight among settled ones → not idle',
+    selectIngestProgress({
+      uploads: { a: upload('done'), b: upload('uploading') },
+      bulkRunning: false,
+      bulkStates: [],
+    }),
+    { current: 1, total: 2 },
+  );
+
+  const bulkState = (status: BulkFileState['status']): BulkFileState => ({ path: status, name: status, sizeBytes: 1, status, attempt: 0 });
+  eq(
+    'selectIngestProgress: bulkRunning true → reflects bulk summary, not idle',
+    selectIngestProgress({ uploads: {}, bulkRunning: true, bulkStates: [bulkState('done'), bulkState('uploading')] }),
+    { current: 1, total: 2 },
+  );
+
+  eq(
+    'selectIngestProgress: bulkRunning flips to false after completion → idle even with stale settled bulkStates',
+    selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [bulkState('done'), bulkState('failed')] }),
+    null,
+  );
 }
 
 /* ------------------------------------------------------------------ done */

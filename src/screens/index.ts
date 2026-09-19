@@ -1,8 +1,6 @@
 export { AskScreen } from './AskScreen';
 export { EntityScreen } from './EntityScreen';
-export { RecordsScreen } from './RecordsScreen';
-export { IntakeScreen } from './IntakeScreen';
-export { ReviewScreen } from './ReviewScreen';
+export { InboxScreen } from './InboxScreen';
 export { DashboardScreen } from './DashboardScreen';
 export { BrowseScreen } from './BrowseScreen';
 export { LoginScreen } from './LoginScreen';

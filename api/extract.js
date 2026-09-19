@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isValidDocumentId } from "./_lib/readDocument.js";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extractFields.js";
@@ -58,6 +59,9 @@ export default async function handler(req, res) {
     }
     if (typeof documentId !== "string" || !documentId) {
       return res.status(400).json({ error: "documentId is required" });
+    }
+    if (!isValidDocumentId(documentId)) {
+      return res.status(400).json({ error: "documentId must be a uuid" });
     }
 
     const result = await extractDocumentFields(

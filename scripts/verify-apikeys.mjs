@@ -1,18 +1,24 @@
 /**
  * Unit checks for API-key authentication and rate limiting. No database, no
- * network — every check here is either a pure function or exercises the
- * in-memory burst limiter, which by design never talks to Postgres until
- * AFTER it has already decided the request survives (see rateLimit.js's
- * `limit()`: the daily-cap query only ever runs once the burst check passes).
- * NEON_CONNECTION_STRING is deliberately deleted before anything is imported
- * so a code path that DID try to reach Postgres would fail loudly here
- * instead of quietly reaching a real database.
+ * network — every check here is either a pure function, or exercises
+ * `limit()`'s documented FAIL-OPEN behavior when Postgres is unreachable
+ * (both the burst window and the daily cap are Postgres-backed — see
+ * rateLimit.js's module comment — so with no database neither can enforce
+ * anything, on purpose, rather than either silently disabling itself forever
+ * or wrongly blocking every request). NEON_CONNECTION_STRING is deliberately
+ * deleted before anything is imported so a code path that DID try to reach
+ * Postgres would fail loudly here instead of quietly reaching a real
+ * database.
+ *
+ * The burst window's actual arithmetic (the fixed-window math, the env
+ * override layer) is pure and tested directly against rateLimit.js's own
+ * exported functions below — no reimplementation, no black-box duplicate.
  *
  * What this guards: this is the boundary that decides who gets to call the
  * API at all, and how hard they're allowed to hit it. A key that a Clerk JWT
  * could satisfy, or a scope check that doesn't actually block, turns into an
- * integration surface with no auth on it; a sliding window that miscounts
- * turns into the uncapped Anthropic bill this whole change exists to prevent.
+ * integration surface with no auth on it; a window that miscounts turns into
+ * the uncapped Anthropic bill this whole change exists to prevent.
  *
  *   node scripts/verify-apikeys.mjs
  */
@@ -27,7 +33,16 @@ import {
   assertScope,
 } from '../api/_lib/apiKeyAuth.js';
 import { AuthError } from '../api/_lib/auth.js';
-import { limit, DEFAULT_LIMITS } from '../api/_lib/rateLimit.js';
+import {
+  limit,
+  DEFAULT_LIMITS,
+  WINDOW_MS,
+  minuteWindowStart,
+  secondsUntilNextWindow,
+  exceedsPerMinute,
+  parseLimitEnv,
+  envLimits,
+} from '../api/_lib/rateLimit.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -106,68 +121,70 @@ function assertThrows(fn) {
   check('a key with no scopes at all is rejected', err instanceof AuthError);
 }
 
-/* ------------------------------------------------------- sliding-window math
- * limit()'s daily (Postgres) check only ever runs once the in-memory burst
- * check passes (see rateLimit.js) — with NEON_CONNECTION_STRING unset, the
- * daily-cap lookup below fails closed to "skip the daily check" rather than
- * throwing, exactly as it does in production when the database is briefly
- * unreachable (see resolveTenantUuid's catch). That lets the burst limiter
- * itself be exercised end-to-end with no database at all. */
+/* ------------------------------------------------------- fixed-window math
+ * The burst window is now Postgres-backed (rate_limit_windows,
+ * increment_rate_limit_window — see M3-config/12-rate-limit-window.sql), so
+ * it can't be exercised end-to-end without a database. Its arithmetic is
+ * pure and exported, so it's tested directly instead. */
 
-class FakeRes {
-  constructor() { this.headers = {}; this.statusCode = null; this.body = null; }
-  setHeader(k, v) { this.headers[k] = v; return this; }
-  status(code) { this.statusCode = code; return this; }
-  json(body) { this.body = body; return this; }
+check('WINDOW_MS is one minute', WINDOW_MS === 60_000);
+
+eq('minuteWindowStart truncates down to the minute', minuteWindowStart(90_000), 60_000);
+eq('minuteWindowStart is idempotent on an exact boundary', minuteWindowStart(120_000), 120_000);
+eq('minuteWindowStart of 0 is 0', minuteWindowStart(0), 0);
+
+eq('secondsUntilNextWindow at the start of a window is ~60', secondsUntilNextWindow(60_000, 60_000), 60);
+eq('secondsUntilNextWindow one second before the boundary is 1', secondsUntilNextWindow(119_000, 60_000), 1);
+eq('secondsUntilNextWindow never returns less than 1 (past the boundary)', secondsUntilNextWindow(121_000, 60_000), 1);
+
+check('exceedsPerMinute is false at exactly the limit', exceedsPerMinute(5, 5) === false);
+check('exceedsPerMinute is true one past the limit', exceedsPerMinute(6, 5) === true);
+check('exceedsPerMinute is false comfortably under the limit', exceedsPerMinute(1, 5) === false);
+
+/* --------------------------------------------------------- env overrides
+ * "keep limits configurable via env" — parseLimitEnv/envLimits are the whole
+ * mechanism; resolveLimits (DB-backed, not tested here) layers on top. */
+
+eq('parseLimitEnv accepts a positive integer string', parseLimitEnv('42'), 42);
+eq('parseLimitEnv rejects undefined (falls back to default)', parseLimitEnv(undefined), undefined);
+eq('parseLimitEnv rejects an empty string', parseLimitEnv(''), undefined);
+eq('parseLimitEnv rejects zero (not a usable limit)', parseLimitEnv('0'), undefined);
+eq('parseLimitEnv rejects a negative number', parseLimitEnv('-5'), undefined);
+eq('parseLimitEnv rejects non-numeric garbage', parseLimitEnv('abc'), undefined);
+
+{
+  const withoutOverride = envLimits('ask', {});
+  eq('envLimits falls back to DEFAULT_LIMITS when no env var is set', withoutOverride, DEFAULT_LIMITS.ask);
+
+  const withOverride = envLimits('ask', { RATE_LIMIT_ASK_PER_MINUTE: '5', RATE_LIMIT_ASK_PER_DAY: '50' });
+  eq('envLimits honors RATE_LIMIT_<BUCKET>_PER_MINUTE / _PER_DAY', withOverride, { perMinute: 5, perDay: 50 });
+
+  const partialOverride = envLimits('read', { RATE_LIMIT_READ_PER_MINUTE: '9' });
+  eq('envLimits overrides only the var that is set, keeping the other default', partialOverride, { perMinute: 9, perDay: DEFAULT_LIMITS.read.perDay });
+
+  const unknownBucket = envLimits('bogus', {});
+  eq('envLimits falls back to the read defaults for an unrecognized bucket', unknownBucket, DEFAULT_LIMITS.read);
 }
 
-async function burstTest(tenantSuffix, perMinute) {
-  const auth = { tenantId: `user_verify_apikeys_${tenantSuffix}` };
-  const req = { headers: {} };
-  const results = [];
-  for (let i = 0; i < perMinute + 2; i++) {
-    const res = new FakeRes();
-    const ok = await limit(req, res, auth, 'read', { perMinute, perDay: 1_000_000 });
-    results.push({ ok, res });
+/* ------------------------------------------------------------- fail-open
+ * With no NEON_CONNECTION_STRING (deleted at the top of this file),
+ * resolveTenantUuid can't resolve a tenant, so limit() must fail OPEN —
+ * allow the request and write nothing to res — for both the burst and the
+ * daily check, rather than either silently disabling the cap forever or
+ * wrongly blocking every request when the database is briefly unreachable. */
+
+{
+  class FakeRes {
+    constructor() { this.headers = {}; this.statusCode = null; this.body = null; }
+    setHeader(k, v) { this.headers[k] = v; return this; }
+    status(code) { this.statusCode = code; return this; }
+    json(body) { this.body = body; return this; }
   }
-  return results;
-}
-
-{
-  const perMinute = 3;
-  const results = await burstTest('burst', perMinute);
-  const allowed = results.slice(0, perMinute).every((r) => r.ok === true);
-  check(`first ${perMinute} requests in a fresh window are allowed`, allowed, JSON.stringify(results.map((r) => r.ok)));
-
-  const blocked = results[perMinute];
-  check('the request past the per-minute limit is blocked', blocked.ok === false);
-  eq('a blocked request gets a 429', blocked.res.statusCode, 429);
-  check('a blocked request carries a Retry-After header', Number(blocked.res.headers['Retry-After']) > 0, JSON.stringify(blocked.res.headers));
-  check('Retry-After is within the 60s window, not some arbitrary number', Number(blocked.res.headers['Retry-After']) <= 60);
-  eq('the 429 body names the per-minute scope', blocked.res.body?.scope, 'per-minute');
-  check('the 429 body has a top-level error string', typeof blocked.res.body?.error === 'string' && blocked.res.body.error.length > 0);
-
-  const alsoBlocked = results[perMinute + 1];
-  check('every subsequent request in the same window stays blocked', alsoBlocked.ok === false);
-}
-
-{
-  // A different tenant+bucket key must not share the first tenant's window —
-  // this is the whole point of keying by (tenantId, bucket) in rateLimit.js.
   const res = new FakeRes();
-  const ok = await limit({ headers: {} }, res, { tenantId: 'user_verify_apikeys_isolated' }, 'read', { perMinute: 1, perDay: 1_000_000 });
-  check('a fresh tenant/bucket key starts with its own empty window', ok === true, JSON.stringify(res.body));
-}
-
-{
-  // The bucket, not just the tenant, has to isolate windows: the same tenant
-  // hammering 'ask' must not be throttled on 'ingest'.
-  const auth = { tenantId: 'user_verify_apikeys_bucket_isolation' };
-  const first = await limit({ headers: {} }, new FakeRes(), auth, 'ask', { perMinute: 1, perDay: 1_000_000 });
-  const second = await limit({ headers: {} }, new FakeRes(), auth, 'ask', { perMinute: 1, perDay: 1_000_000 });
-  const thirdOtherBucket = await limit({ headers: {} }, new FakeRes(), auth, 'ingest', { perMinute: 1, perDay: 1_000_000 });
-  check('same tenant, same bucket: second request in the window is blocked', first === true && second === false);
-  check('same tenant, DIFFERENT bucket: not blocked by the other bucket\'s window', thirdOtherBucket === true);
+  const auth = { tenantId: 'user_verify_apikeys_failopen' };
+  const ok = await limit({ headers: {} }, res, auth, 'read', { perMinute: 1, perDay: 1 });
+  check('limit() fails open (allows the request) when the database is unreachable', ok === true, JSON.stringify(res.body));
+  check('a fail-open call writes no response (caller proceeds normally)', res.statusCode === null && res.body === null);
 }
 
 check('DEFAULT_LIMITS defines all three buckets this codebase rate-limits', ['ask', 'ingest', 'read'].every((b) => DEFAULT_LIMITS[b]?.perMinute > 0 && DEFAULT_LIMITS[b]?.perDay > 0));
