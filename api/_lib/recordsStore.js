@@ -187,6 +187,9 @@ export function selectCustomerMatch(candidates, address) {
   return eligible.length === 1 ? eligible[0] : null;
 }
 
+/** Words too common to identify a page on their own; skipped by the plain-text fallback in searchPassages. */
+const STOPWORDS = new Set(['what','when','where','which','whose','does','did','the','this','that','these','those','with','from','have','has','had','was','were','will','still','under','about','there','their','them','they','into','onto','over','last','next','much','many','more','most','some','any','how','why','who','and','for','are','not','but','can','could','should','would','been','being','than','then','also','just','ever','every','each','tell','show','find','give','need','want','know','like','make','made','get','got','all','one','two','our','your','you','we','us','it','its','is','an','on','at','to','of','in','by','or','if','so','do','a','i','me','my','be','as','up','no','yes','year','years','month','months','week','weeks','day','days','ago','summer','winter','spring','fall','back','call','called','called','unit','units','system','job','work']);
+
 /**
  * Run `fn` inside a transaction scoped to the caller's tenant.
  * @param {{tenantKey: string, tenantName?: string}} ctx
@@ -530,6 +533,32 @@ function makeStore(db, tenantId) {
          ORDER BY rank DESC
          LIMIT $2`;
       push((await db.query(ftsSql, [question, limit])).rows, 'text');
+
+      // Belt and braces: if full-text search found nothing (an empty or
+      // stale tsv column did exactly this in production once), fall back to
+      // a plain case-insensitive match on the question's meaningful words so
+      // a name or address still finds its page.
+      if (rows.size === 0) {
+        const words = [...new Set(
+          (question.match(/[A-Za-z][A-Za-z'-]{3,}/g) ?? [])
+            .map((w) => w.toLowerCase())
+            .filter((w) => !STOPWORDS.has(w))
+        )].slice(0, 6);
+        for (const w of words) {
+          const r = await db.query(
+            `SELECT p.id, p.document_id, p.page_no,
+                    d.original_filename, d.document_type,
+                    substring(p.text from greatest(1, position(lower($2) in lower(p.text)) - 120) for 320) AS excerpt,
+                    0.5 AS rank
+               FROM document_pages p
+               JOIN documents d ON d.id = p.document_id
+              WHERE p.${TENANT} AND p.text ILIKE $1
+              LIMIT 4`,
+            [`%${w}%`, w]
+          );
+          push(r.rows, `word:${w}`);
+        }
+      }
 
       // Identifier-shaped tokens: anything with a digit and some length.
       // "1234ABC", "CG-4021-A", "40x25x1", "2019" all qualify; "the" does not.
