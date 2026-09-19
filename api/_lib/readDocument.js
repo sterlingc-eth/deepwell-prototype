@@ -38,7 +38,12 @@ const IPHONE_PHOTO_MESSAGE =
  * fatal to Postgres TEXT; the rest are junk no transcribed page has business
  * carrying. Tab, newline and carriage return are left alone. */
 function stripControlChars(s) {
-  return s.replace(/[ --]/g, '');
+  // Control characters only (NUL..US, and DEL) — never printable ones.
+  // An earlier form of this regex had its escapes mangled into a literal
+  // space-to-hyphen range, which deleted every space, comma, hyphen and
+  // dollar sign from transcribed pages ("TOTALDUE9127.00") and made
+  // word search impossible. Keep this written with explicit \x escapes.
+  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
 /**
@@ -730,3 +735,6 @@ export function sniff(bytes, filename = "") {
   const ext = filename.toLowerCase().split(".").pop();
   return EXT_MEDIA_TYPES[ext] ?? "application/octet-stream";
 }
+
+/** Test-only handle on the scrubber so the whitespace regression above stays caught. */
+export const __stripControlCharsForTests = stripControlChars;

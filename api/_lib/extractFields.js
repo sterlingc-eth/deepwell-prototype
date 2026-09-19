@@ -239,7 +239,10 @@ export function normalizeNumber(raw, { money }) {
  * carrying. Tab, newline and carriage return are left alone; real documents
  * have them. */
 export function stripControlChars(s) {
-  return s.replace(/[ --]/g, '');
+  // Written with explicit escapes on purpose: a copy of this regex with the
+  // raw control bytes inline was once mangled into a literal space-to-hyphen
+  // range by a file transfer, and stripped every space from page text.
+  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
 const MAX_VALUE_CHARS = 500;

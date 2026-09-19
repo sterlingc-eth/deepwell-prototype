@@ -283,3 +283,19 @@ if (failures) {
   process.exit(1);
 }
 console.log('All checks passed.');
+
+/* ---------------------------------------------------------- whitespace */
+// Regression: the control-char scrubber once had its escapes mangled into a
+// literal " -" range and deleted every space, comma, hyphen and "$" from
+// transcribed text. Printable characters must survive; only C0/DEL go.
+{
+  const { __stripControlCharsForTests: strip } = await import('../api/_lib/readDocument.js');
+  if (typeof strip === 'function') {
+    const kept = 'Bill to: Margaret Henderson, 3247 Elm St — TOTAL DUE $9,127.00 (S/N 4N2119-08772)';
+    check('printable text (spaces, commas, hyphens, $) survives the control-char scrub', strip(kept) === kept, strip(kept));
+    check('C0 control characters and DEL are removed', strip('a\u0000b\u0007c\u001Fd\u007Fe') === 'abcde');
+    check('newlines and tabs survive (page layout matters for headline excerpts)', strip('a\nb\tc') === 'a\nb\tc');
+  } else {
+    check('readDocument exports __stripControlCharsForTests', false, 'missing export');
+  }
+}

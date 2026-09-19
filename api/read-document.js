@@ -60,7 +60,10 @@ export default async function handler(req, res) {
 
   if (!(await limit(req, res, auth, "ingest"))) return; // 429 already written
 
-  const { documentId, sync = false, extract = true } = req.body ?? {};
+  // `force: true` re-reads a document that already has pages (after a
+  // transcription fix, say). Only honored on the inline path so the queue's
+  // idempotency guard keeps protecting bulk imports from double-paying.
+  const { documentId, sync = false, extract = true, force = false } = req.body ?? {};
   if (typeof documentId !== "string" || !documentId) {
     return res.status(400).json({ error: "documentId is required" });
   }
@@ -93,7 +96,7 @@ export default async function handler(req, res) {
 
   // ---- inline ------------------------------------------------------------
   try {
-    const result = await ingestDocument(ctx, documentId, { userId: auth.userId });
+    const result = await ingestDocument(ctx, documentId, { userId: auth.userId, force: force === true });
     return handleCors(res, req).status(200).json({ ...result, queued: false });
   } catch (error) {
     // Recording a failure is a one-way door on this path: the browser polls
