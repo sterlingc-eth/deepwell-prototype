@@ -45,7 +45,7 @@ const eq = (name, got, want) =>
   eq(
     'default concurrency is [global, tenant-keyed] with the documented defaults',
     defaultConcurrency,
-    [{ limit: 6 }, { key: 'event.data.tenantKey', limit: 3 }]
+    [{ limit: 5 }, { key: 'event.data.tenantKey', limit: 3 }]
   );
   check(
     'concurrency has AT MOST two entries (inngest v4 allows no more)',
@@ -62,7 +62,7 @@ const eq = (name, got, want) =>
   );
   check(
     'a bad env value for concurrency falls back rather than producing a zero/undefined limit',
-    resolveIngestConcurrency({ INGEST_CONCURRENCY_GLOBAL: 'nope' })[0].limit === 6
+    resolveIngestConcurrency({ INGEST_CONCURRENCY_GLOBAL: 'nope' })[0].limit === 5
   );
 
   eq('default throttle is 40/min', resolveIngestThrottle({}), { limit: 40, period: '1m' });

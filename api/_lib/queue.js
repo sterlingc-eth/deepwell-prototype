@@ -155,7 +155,7 @@ const RETRIES = 3;
  * with defaults sized for this codebase's current infrastructure (a Neon
  * pooler and an Anthropic Tier-1/2 account, ~50 req/min):
  *
- *   INGEST_CONCURRENCY_GLOBAL (default 6)  — at most this many read-document
+ *   INGEST_CONCURRENCY_GLOBAL (default 5)  — at most this many read-document
  *     runs in flight AT ONCE, across every tenant. Bounds shared, finite
  *     things: the Anthropic rate limit and recordsStore.js's own Postgres
  *     pool (5 connections per warm instance as of this build — see
@@ -177,7 +177,7 @@ const RETRIES = 3;
  * assert the parsing against different `process.env` values without a
  * module-cache reset trick — the resolve* functions below are pure.
  */
-const DEFAULT_CONCURRENCY_GLOBAL = 6;
+const DEFAULT_CONCURRENCY_GLOBAL = 5; // Inngest free tier caps at 5; raise via env after upgrading
 const DEFAULT_CONCURRENCY_TENANT = 3;
 const DEFAULT_THROTTLE_PER_MIN = 40;
 
