@@ -221,6 +221,12 @@ section{padding-block:clamp(48px,6vw,80px);border-top:1px solid var(--line)}
 .plan .btn{margin-top:auto;justify-content:center}
 .plans-4{grid-template-columns:repeat(4,1fr);gap:18px}
 .plan h3 .per{font-size:.9rem;font-weight:400;color:var(--muted);margin-left:2px}
+.plan ul.spec li{justify-content:space-between;gap:12px;font-size:.86rem}
+.plan ul.spec li::before{content:none}
+.plan ul.spec li span{color:var(--muted)}
+.plan ul.spec li b{font-weight:600;text-align:right}
+.annual{margin:20px 0 0;font-size:.92rem;color:var(--muted)}
+.annual b{color:var(--text)}
 .plan .math{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--brass-text);border-top:1px solid var(--line);padding-top:12px;margin:0}
 .rescue{margin-top:20px;border:1px solid var(--line);background:var(--surface);padding:24px 28px;display:flex;gap:24px;align-items:center;justify-content:space-between}
 .rescue h3{font-size:1.3rem;margin:6px 0}
@@ -848,33 +854,38 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
         <div class="eyebrow">Pricing</div>
         <h2>Pick your plan by team size. Everything else is unlimited.</h2>
       </div>
-      <p class="lede">Every plan includes unlimited technicians, unlimited questions, hosting, backups and setup by our team. The average callback costs a shop $300–600. Prevent one a month and any plan pays for itself. 14-day free trial on every plan, no card required. Annual prepay: one month free.</p>
+      <p class="lede">Every plan includes unlimited logins, unlimited questions, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 14-day free trial on every plan, no card required.</p>
     </div>
     <div class="plans plans-4">
       <div class="plan">
         <div class="tier">Solo</div>
         <h3>$99<span class="per">/mo</span></h3>
-        <p class="for">For the tech who works alone. One person, one price, your full archive.</p>
-        <ul>
-          <li>1 technician</li>
-          <li>Search by address, serial, customer, date</li>
-          <li>Warranty expiry alerts</li>
-          <li>Phone and desk access</li>
-          <li>Email support</li>
+        <p class="for">For the one-person operation. One tech, one price, your full archive.</p>
+        <ul class="spec">
+          <li><span>Technicians</span><b>1</b></li>
+          <li><span>Logins</span><b>Unlimited</b></li>
+          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Documents stored</span><b>25,000</b></li>
+          <li><span>New pages / month</span><b>750</b></li>
+          <li><span>Support</span><b>In-app + email</b></li>
+          <li><span>Onboarding</span><b>Self-serve</b></li>
         </ul>
         <p class="math">One prevented callback covers 3–6 months.</p>
-        <a class="btn btn-ghost" href="/app/">Start free trial</a>
+        <a class="btn btn-ghost" href="/app/">Get started</a>
       </div>
       <div class="plan featured">
         <div class="tier">Shop · most popular</div>
         <h3>$199<span class="per">/mo</span></h3>
-        <p class="for">Your whole crew, one price. 2–4 techs. Answer faster, stop the callback chain.</p>
-        <ul>
-          <li>Unlimited technicians and questions</li>
-          <li>Equipment, warranty and callback dashboards</li>
-          <li>Email intake and folder sync</li>
-          <li>Corrections and review queue</li>
-          <li>Priority email support</li>
+        <p class="for">For 2–4 technicians. Your whole crew, one price. Stop the callback chain.</p>
+        <ul class="spec">
+          <li><span>Technicians</span><b>2–4</b></li>
+          <li><span>Logins</span><b>Unlimited</b></li>
+          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Documents stored</span><b>100,000</b></li>
+          <li><span>New pages / month</span><b>2,000</b></li>
+          <li><span>Email intake</span><b>Yes</b></li>
+          <li><span>Support</span><b>Email, next day</b></li>
+          <li><span>Onboarding</span><b>Guided</b></li>
         </ul>
         <p class="math">Three techs preventing one callback a month each: $3,600–7,200 saved. You pay $199.</p>
         <a class="btn btn-primary" href="/app/">Get started</a>
@@ -882,13 +893,16 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
       <div class="plan">
         <div class="tier">Crew</div>
         <h3>$399<span class="per">/mo</span></h3>
-        <p class="for">For the growing team. 5–10 techs, multiple locations, phone support.</p>
-        <ul>
-          <li>Everything in Shop</li>
-          <li>Google Drive sync and branch scoping</li>
-          <li>One dispatch or accounting integration</li>
-          <li>Phone support</li>
-          <li>Data export any time</li>
+        <p class="for">For 5–10 technicians. Multiple locations, phone support.</p>
+        <ul class="spec">
+          <li><span>Technicians</span><b>5–10</b></li>
+          <li><span>Logins</span><b>Unlimited</b></li>
+          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Documents stored</span><b>500,000</b></li>
+          <li><span>New pages / month</span><b>5,000</b></li>
+          <li><span>Google Drive sync</span><b>Yes</b></li>
+          <li><span>Branch scoping</span><b>Up to 3</b></li>
+          <li><span>Support</span><b>Phone + email</b></li>
         </ul>
         <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
         <a class="btn btn-ghost" href="/app/">Get started</a>
@@ -896,23 +910,27 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
       <div class="plan">
         <div class="tier">Fleet</div>
         <h3>$899<span class="per">+/mo</span></h3>
-        <p class="for">Unlimited scale, custom fit. 11+ techs, multi-location, enterprise buyers.</p>
-        <ul>
-          <li>Everything in Crew, across branches</li>
-          <li>API access and unlimited integrations</li>
-          <li>Audit logs and role-based access</li>
-          <li>Dedicated onboarding lead and SLAs</li>
-          <li>Quarterly reviews</li>
+        <p class="for">For 11+ technicians or multi-location. Custom fit.</p>
+        <ul class="spec">
+          <li><span>Technicians</span><b>11+</b></li>
+          <li><span>Logins</span><b>Unlimited</b></li>
+          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Documents stored</span><b>Unlimited</b></li>
+          <li><span>New pages / month</span><b>10,000+</b></li>
+          <li><span>API access</span><b>Yes</b></li>
+          <li><span>Branches</span><b>Unlimited</b></li>
+          <li><span>Support</span><b>Dedicated + SLA</b></li>
         </ul>
         <p class="math">Per-tech pricing is what's killing you. This isn't per tech.</p>
         <a class="btn btn-ghost" href="#contact">Contact sales</a>
       </div>
     </div>
+    <p class="annual"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price.</p>
     <div class="rescue">
       <div>
         <div class="eyebrow">Records Rescue</div>
-        <h3>Still in boxes? We'll scan it for you.</h3>
-        <p>Send us the archive — drawers, binders, a decade of job sheets — and we digitize it straight into your account. <strong>$0.12 per page, $500 minimum.</strong> Searchable the day it lands.</p>
+        <h3>Have boxes of old invoices, tickets, or warranties?</h3>
+        <p>We'll scan, process, and upload them to your account so your history is complete from day one. <strong>$0.12 per page.</strong> $500 minimum (roughly 4,000 pages), included in your first month of service.</p>
       </div>
       <a class="btn btn-ghost" href="#contact">Ask about scanning</a>
     </div>
