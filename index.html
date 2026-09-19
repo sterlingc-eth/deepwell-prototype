@@ -114,7 +114,7 @@ a{color:inherit}
 
 /* hero */
 .hero{position:relative;overflow:hidden;background:var(--hero-grad)}
-.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;padding-block:clamp(56px,9vw,120px)}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;padding-block:clamp(48px,7vw,88px)}
 .hero-copy{display:flex;flex-direction:column;gap:28px;position:relative;z-index:2}
 .hero h1 em{font-style:italic;font-weight:400;color:var(--navy)}
 :root[data-theme="dark"] .hero h1 em{color:#9DC4B2}
@@ -170,8 +170,8 @@ header,section,footer{position:relative;z-index:1}
 @media (max-width:420px){.founder{flex-direction:column;gap:16px}}
 
 /* sections */
-section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
-.sec-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px;align-items:end;margin-bottom:clamp(36px,5vw,64px)}
+section{padding-block:clamp(48px,6vw,80px);border-top:1px solid var(--line)}
+.sec-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px;align-items:end;margin-bottom:clamp(28px,4vw,44px)}
 .sec-head .eyebrow{margin-bottom:16px}
 @media (max-width:860px){.sec-head{grid-template-columns:1fr}}
 
@@ -222,7 +222,7 @@ section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
 .plans-4{grid-template-columns:repeat(4,1fr);gap:18px}
 .plan h3 .per{font-size:.9rem;font-weight:400;color:var(--muted);margin-left:2px}
 .plan .math{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--brass-text);border-top:1px solid var(--line);padding-top:12px;margin:0}
-.rescue{margin-top:28px;border:1px solid var(--line);background:var(--surface);padding:24px 28px;display:flex;gap:24px;align-items:center;justify-content:space-between}
+.rescue{margin-top:20px;border:1px solid var(--line);background:var(--surface);padding:24px 28px;display:flex;gap:24px;align-items:center;justify-content:space-between}
 .rescue h3{font-size:1.3rem;margin:6px 0}
 .rescue p{color:var(--muted);font-size:.92rem;margin:0}
 @media (max-width:1100px){.plans-4{grid-template-columns:repeat(2,1fr)}}
@@ -271,7 +271,7 @@ section{padding-block:clamp(64px,8vw,112px);border-top:1px solid var(--line)}
 @media (max-width:860px){.people{grid-template-columns:1fr}}
 
 /* principles */
-.principles{display:grid;grid-template-columns:repeat(2,1fr);gap:40px 56px}
+.principles{display:grid;grid-template-columns:repeat(2,1fr);gap:28px 48px}
 .principle{display:grid;grid-template-columns:44px 1fr;gap:16px}
 .principle svg{width:44px;height:44px;stroke:var(--well);fill:none;stroke-width:1.5}
 :root[data-theme="dark"] .principle svg{stroke:#9DC4B2}
@@ -838,24 +838,6 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
         <blockquote>"How much warranty money did we leave on the table last year?"</blockquote>
         <p>See expiring coverage across every unit you've ever installed, which techs' jobs generate callbacks, and where your maintenance agreements are due.</p>
       </div>
-    </div>
-  </div>
-</section>
-
-<section id="industries">
-  <div class="wrap">
-    <div class="sec-head">
-      <div>
-        <div class="eyebrow">Where it works</div>
-        <h2>Built for HVAC first. Built to go further.</h2>
-      </div>
-      <p class="lede">The same platform fits any business whose knowledge lives in job records.</p>
-    </div>
-    <div class="verts">
-      <div class="vert now"><div class="st">Available now</div><h3>HVAC contractors</h3><p>Equipment, warranties, service history, maintenance agreements.</p></div>
-      <div class="vert"><div class="st">Next</div><h3>Plumbing &amp; electrical</h3><p>Fixtures, panels, permits, inspection records by property.</p></div>
-      <div class="vert"><div class="st">Next</div><h3>Property management</h3><p>Every unit's repairs, vendors, leases and warranties in one history.</p></div>
-      <div class="vert"><div class="st">Roadmap</div><h3>Fleet &amp; equipment rental</h3><p>Asset histories, service intervals, and manufacturer coverage.</p></div>
     </div>
   </div>
 </section>
