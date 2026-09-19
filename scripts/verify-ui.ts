@@ -11,8 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = fileURLToPath(new URL('.', import.meta.url));
 import { buildSuggestions } from '../src/core/suggestions';
+import { formatYmd } from '../src/core/answer';
 import { parseDeepLink } from '../src/hooks/useDeepLink';
-import { describeFetchFailure, NETWORK_ERROR_MESSAGE } from '../src/services/ingestClient';
+import { describeFetchFailure, NETWORK_ERROR_MESSAGE, chunkIds, pollDocumentStatusChunked } from '../src/services/ingestClient';
 import { truncateForDisplay, summarizeProgress, type BulkFileState } from '../src/services/bulkImport';
 import { conflictDocs, gapDocs, maxStageFor, recomputeIssues, unlinkedDocs, type GraphSnapshot } from '../src/core/entityGraph';
 import { hvacSchema } from '../src/domains/hvac/schema';
@@ -98,6 +99,52 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   );
   eq('leading "?" is optional (URLSearchParams tolerates it either way)', parseDeepLink('entity=eq-1'), { entityId: 'eq-1' });
   eq('an empty value is treated as absent', parseDeepLink('?entity=&doc=doc-1'), { docId: 'doc-1' });
+  eq('q param', parseDeepLink('?q=How much was the Henderson install?'), { question: 'How much was the Henderson install?' });
+  eq('a blank q is treated as absent', parseDeepLink('?q=%20%20'), {});
+  eq('q is trimmed', parseDeepLink(`?q=${encodeURIComponent('  hello  ')}`), { question: 'hello' });
+  {
+    const long = 'a'.repeat(2500);
+    const got = parseDeepLink(`?q=${long}`).question;
+    check('q is capped at 2000 chars', got?.length === 2000 && got === 'a'.repeat(2000), `got length ${got?.length}`);
+  }
+}
+
+/* ---------------------------------------------------------------- formatYmd */
+
+{
+  check('formatYmd formats a YYYY-MM-DD string without a timezone shift', formatYmd('2024-03-14') === 'Mar 14, 2024', formatYmd('2024-03-14'));
+  // The exact bug this guards: `new Date('2024-03-14')` parses as UTC
+  // midnight, and toLocaleDateString on that under a negative UTC offset
+  // (America/Phoenix) used to render "Mar 13, 2024" — a day early. Run this
+  // script under both TZ=America/Phoenix and TZ=UTC; formatYmd's output must
+  // not change either way.
+  check('formatYmd formats the equivalent Date the same way, in this process\'s TZ', formatYmd(new Date('2024-03-14')) === 'Mar 14, 2024', `TZ=${process.env.TZ ?? '(unset)'} got ${formatYmd(new Date('2024-03-14'))}`);
+  eq('formatYmd of null/undefined is empty', [formatYmd(null), formatYmd(undefined)], ['', '']);
+}
+
+/* -------------------------------------------------- document-status chunking */
+
+{
+  eq('chunkIds splits 250 ids into 100/100/50', chunkIds(Array.from({ length: 250 }, (_, i) => `id-${i}`)).map((c) => c.length), [100, 100, 50]);
+  eq('chunkIds of exactly one chunk stays one call', chunkIds(Array.from({ length: 50 }, (_, i) => `id-${i}`)).map((c) => c.length), [50]);
+  eq('chunkIds of empty input is no chunks', chunkIds([]), []);
+
+  // One failed chunk must not block the others' documents from settling —
+  // a bulk import tracking >100 docs whose 2nd request drops must still see
+  // the 1st and 3rd chunks' results. Top-level await: this file is run
+  // directly by tsx as an ES module, and every check below must finish (and
+  // increment `failures`) before the pass/fail summary prints at the bottom.
+  {
+    const calls: string[][] = [];
+    const ids = Array.from({ length: 250 }, (_, i) => `id-${i}`);
+    const rows = await pollDocumentStatusChunked(ids, async (c) => {
+      calls.push(c);
+      if (calls.length === 2) throw new Error('simulated dropped request');
+      return c.map((id) => ({ id, original_filename: id, stage: 'verified', page_count: 1, extracted_at: 'x', extract_error: null, field_count: 1 }));
+    });
+    eq('pollDocumentStatusChunked: fetcher is called once per chunk (3 calls for 250 ids)', calls.length, 3);
+    eq('pollDocumentStatusChunked: the failed chunk\'s ids are missing, the other two chunks\' are not', rows.map((r) => r.id).sort(), [...ids.slice(0, 100), ...ids.slice(200, 250)].sort());
+  }
 }
 
 /* ------------------------------------------------------- describeFetchFailure */
@@ -390,12 +437,14 @@ function listFilesRecursive(dir: string): string[] {
 // settled, and never sit stuck non-null just because a component unmounted.
 {
   const upload = (status: IngestProgress['status']): IngestProgress => ({ filename: `${status}.pdf`, status });
+  // No server-side processing tracked, for every case that isn't testing it.
+  const noProcessing = { processingPending: [] as string[], processingTotal: 0, processingStalled: false };
 
-  eq('selectIngestProgress: no uploads, no bulk run → idle', selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [] }), null);
+  eq('selectIngestProgress: no uploads, no bulk run → idle', selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [], ...noProcessing }), null);
 
   eq(
     'selectIngestProgress: one upload still hashing → not idle',
-    selectIngestProgress({ uploads: { a: upload('hashing') }, bulkRunning: false, bulkStates: [] }),
+    selectIngestProgress({ uploads: { a: upload('hashing') }, bulkRunning: false, bulkStates: [], ...noProcessing }),
     { current: 0, total: 1 },
   );
 
@@ -405,6 +454,7 @@ function listFilesRecursive(dir: string): string[] {
       uploads: { a: upload('done'), b: upload('error'), c: upload('pending') },
       bulkRunning: false,
       bulkStates: [],
+      ...noProcessing,
     }),
     null,
   );
@@ -415,6 +465,7 @@ function listFilesRecursive(dir: string): string[] {
       uploads: { a: upload('done'), b: upload('uploading') },
       bulkRunning: false,
       bulkStates: [],
+      ...noProcessing,
     }),
     { current: 1, total: 2 },
   );
@@ -422,14 +473,34 @@ function listFilesRecursive(dir: string): string[] {
   const bulkState = (status: BulkFileState['status']): BulkFileState => ({ path: status, name: status, sizeBytes: 1, status, attempt: 0 });
   eq(
     'selectIngestProgress: bulkRunning true → reflects bulk summary, not idle',
-    selectIngestProgress({ uploads: {}, bulkRunning: true, bulkStates: [bulkState('done'), bulkState('uploading')] }),
+    selectIngestProgress({ uploads: {}, bulkRunning: true, bulkStates: [bulkState('done'), bulkState('uploading')], ...noProcessing }),
     { current: 1, total: 2 },
   );
 
   eq(
     'selectIngestProgress: bulkRunning flips to false after completion → idle even with stale settled bulkStates',
-    selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [bulkState('done'), bulkState('failed')] }),
+    selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [bulkState('done'), bulkState('failed')], ...noProcessing }),
     null,
+  );
+
+  // Fix for QA FAIL #4: the client-side transfer settling must not hide
+  // server-side classify/extract/link/verify processing that is still going.
+  eq(
+    'selectIngestProgress: transfer done, server-side docs still pending → shows processing',
+    selectIngestProgress({ uploads: { a: upload('done') }, bulkRunning: false, bulkStates: [], processingPending: ['doc-1', 'doc-2'], processingTotal: 3, processingStalled: false }),
+    { current: 1, total: 3, stalled: false },
+  );
+
+  eq(
+    'selectIngestProgress: nothing uploaded this session, no server-side docs pending → idle',
+    selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [], ...noProcessing }),
+    null,
+  );
+
+  eq(
+    'selectIngestProgress: past the ten-minute cap → stalled, not idle',
+    selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [], processingPending: ['doc-1'], processingTotal: 2, processingStalled: true }),
+    { current: 1, total: 2, stalled: true },
   );
 }
 

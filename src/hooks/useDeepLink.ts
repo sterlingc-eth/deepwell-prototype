@@ -21,6 +21,10 @@ export interface DeepLinkParams {
   entityId?: string;
   docId?: string;
   screen?: Screen;
+  /** `?q=` — a bare question to ask immediately, e.g. a link shared from
+   *  outside the app ("ask DeepWell: ..."). Needs nothing from the graph, so
+   *  it never waits the way `entityId`/`docId` do. */
+  question?: string;
 }
 
 /**
@@ -36,6 +40,8 @@ export function parseDeepLink(search: string): DeepLinkParams {
   if (doc) out.docId = doc;
   const screen = params.get('screen');
   if (screen && isScreen(screen)) out.screen = screen;
+  const q = params.get('q')?.trim();
+  if (q) out.question = q.slice(0, 2000);
   return out;
 }
 
@@ -59,6 +65,7 @@ function cleanUrl(): void {
   url.searchParams.delete('entity');
   url.searchParams.delete('doc');
   url.searchParams.delete('screen');
+  url.searchParams.delete('q');
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -83,6 +90,7 @@ export function useDeepLink(): void {
   const openEntity = useAppStore((s) => s.openEntity);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  const askQuestion = useAppStore((s) => s.askQuestion);
   const handledRef = useRef(false);
 
   useEffect(() => {
@@ -90,7 +98,18 @@ export function useDeepLink(): void {
     handledRef.current = true;
 
     const params = parseDeepLink(window.location.search);
-    if (!params.entityId && !params.docId && !params.screen) return;
+    if (!params.entityId && !params.docId && !params.screen && !params.question) return;
+
+    // ?q= is a bare question, not a lookup — nothing to wait on the graph
+    // for. `askQuestion` prefills and submits the Ask box itself (the same
+    // path every "Ask about this" button in the app already uses), so this
+    // takes priority over a co-present ?screen= — asking the question IS the
+    // destination the link was for.
+    if (params.question) {
+      askQuestion(params.question);
+      cleanUrl();
+      return;
+    }
 
     // A bare ?screen= needs nothing from the graph — apply it immediately.
     if (!params.entityId && !params.docId) {

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { AlertTriangle, Info } from 'lucide-react';
 import { authHeader, setAuthTokenProvider } from './services/authToken';
+import { fetchDocumentStatus, isProcessingTerminal, pollDocumentStatusChunked } from './services/ingestClient';
 import { useAppStore } from './store/appStore';
 import { usePostgresSync } from './hooks/usePostgresSync';
 import { useDeepLink } from './hooks/useDeepLink';
@@ -55,17 +56,50 @@ function App() {
     prevOrgId.current = orgId;
     if (!isSignedIn || had || !orgId) return;
 
-    setMergeNotice(true);
-    const timer = window.setTimeout(() => setMergeNotice(false), 10_000);
+    // Once this browser has already run (or tried) the merge for this org, it
+    // must never ask again — without this, `had` is `null` on every fresh
+    // page load (this ref starts at whatever `orgId` was on first render,
+    // which is always `null` before Clerk resolves it), so the "just joined
+    // this org" branch above fires on every single reload, not just the one
+    // real transition. Wrapped in try/catch: a browser with storage blocked
+    // (private window, locked-down profile) just re-asks every time, which is
+    // no worse than before this fix, not a crash.
+    const storageKey = `deepwell.merged.${orgId}`;
+    try {
+      if (window.localStorage.getItem(storageKey) === '1') return;
+    } catch {
+      /* no localStorage — fall through and run the merge as normal */
+    }
+
+    let cancelled = false;
     void (async () => {
       try {
         const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
-        await fetch('/api/merge-tenant', { method: 'POST', headers, body: '{}' });
+        const res = await fetch('/api/merge-tenant', { method: 'POST', headers, body: '{}' });
+        if (cancelled) return;
+        // The banner text is only ever rendered from here on — after the
+        // call has actually started AND finished — never speculatively
+        // before we know there was anything to move.
+        const data: { moved?: Record<string, number> } = await res.json().catch(() => ({}));
+        const movedRows = Object.values(data.moved ?? {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
+        try {
+          window.localStorage.setItem(storageKey, '1');
+        } catch {
+          /* best effort — worst case this re-runs next reload */
+        }
+        if (movedRows > 0) {
+          setMergeNotice(true);
+          window.setTimeout(() => setMergeNotice(false), 10_000);
+        }
       } catch {
-        /* optimistic — see the comment above this effect */
+        /* optimistic — see the comment above this effect. Deliberately leave
+         * the storage flag unset on a real failure so a later reload can
+         * still retry the actual merge. */
       }
     })();
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+    };
   }, [isSignedIn, orgId]);
 
   // Only fetches while signed in, and never in demo mode. Runs unconditionally
@@ -92,6 +126,57 @@ function App() {
   // graph is loaded. Unconditional for the rules of hooks; it waits for the
   // graph internally and is a no-op without a query string.
   useDeepLink();
+
+  // Server-side pipeline polling behind the header's "Processing N of M…"
+  // pill (store/appStore.ts's selectIngestProgress). Lives here — mounted for
+  // the whole signed-in session — rather than in IntakeScreen, so it keeps
+  // running no matter which screen the person navigates to mid-upload.
+  // Capped at ten minutes of wall clock; past that this stops polling and the
+  // pill switches to "Still working on N — check Inbox" (see AppShell.tsx).
+  const processingPending = useAppStore((s) => s.processingPending);
+  const processingStartedAt = useAppStore((s) => s.processingStartedAt);
+  const settleProcessingDocs = useAppStore((s) => s.settleProcessingDocs);
+  const setProcessingStalled = useAppStore((s) => s.setProcessingStalled);
+  useEffect(() => {
+    if (DEMO_MODE || processingPending.length === 0) return;
+    const CAP_MS = 10 * 60 * 1000;
+    let cancelled = false;
+    let intervalId: number | null = null;
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (processingStartedAt !== null && Date.now() - processingStartedAt > CAP_MS) {
+        setProcessingStalled(true);
+        // Stop polling the moment the cap trips — a stalled run has nothing
+        // left to check for until the next upload starts a fresh one, so an
+        // interval left running here would just be a no-op timer forever.
+        if (intervalId !== null) {
+          window.clearInterval(intervalId);
+          intervalId = null;
+        }
+        return;
+      }
+      try {
+        // Chunked (≤100 ids/request, api/document-status.js's own cap) with
+        // each chunk isolated: a bulk import tracking hundreds of documents
+        // must not have one failed chunk's request stall every other
+        // chunk's documents from ever settling.
+        const rows = await pollDocumentStatusChunked(processingPending, fetchDocumentStatus);
+        if (cancelled) return;
+        const done = rows.filter(isProcessingTerminal).map((r) => r.id);
+        if (done.length) settleProcessingDocs(done);
+      } catch {
+        /* a dropped poll just tries again next tick */
+      }
+    };
+
+    void tick();
+    intervalId = window.setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      if (intervalId !== null) window.clearInterval(intervalId);
+    };
+  }, [processingPending, processingStartedAt, settleProcessingDocs, setProcessingStalled]);
 
   // Show loading screen while authentication is loading
   if (!isLoaded) {

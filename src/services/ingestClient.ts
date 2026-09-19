@@ -57,6 +57,11 @@ interface DocumentStatusRow {
   extracted_at: string | null;
   extract_error: string | null;
   field_count: string | number | null;
+  verified_by?: string | null;
+  /** Only present when the caller is api/document-status.js's own consumer
+   *  (App.tsx's processing poll) — required-field completeness for the
+   *  document's current type. Not requested by `waitForIngest` below. */
+  completeness?: { complete: boolean };
 }
 
 export async function sha256Hex(file: File): Promise<string> {
@@ -282,6 +287,59 @@ function isFinished(row: DocumentStatusRow, result: IngestResult): boolean {
 
 /** Shown for documents still processing when the poll gives up — a status, not a failure. Rendered in a neutral pill, never the warn pill an actual error gets. */
 export const STILL_PROCESSING_MESSAGE = 'Still processing — check Records in a few minutes';
+
+/**
+ * Terminal condition for the App-level "Processing N of M…" tracker (see
+ * store/appStore.ts's trackProcessingDocs and App.tsx's poll loop). Broader
+ * than `isFinished` above, which only covers the read/extract step: this
+ * covers the whole pipeline through classify/link/AI-verify, since the
+ * client-side upload+read can finish in seconds while the server keeps
+ * working for minutes after that.
+ */
+export function isProcessingTerminal(row: Pick<DocumentStatusRow, 'stage' | 'extract_error' | 'completeness'>): boolean {
+  if (row.extract_error) return true;
+  if (row.stage === 'verified') return true;
+  if ((row.stage === 'mapped' || row.stage === 'linked') && row.completeness?.complete) return true;
+  return false;
+}
+
+/** Must match MAX_IDS in api/document-status.js — a request over this limit
+ *  is rejected outright, so a bulk import tracking more than 100 documents
+ *  has to split its poll into chunks this size or smaller. */
+export const MAX_STATUS_IDS = 100;
+
+/** Splits ids into ≤`size` groups, preserving order (a local copy of
+ *  bulkImport.ts's `chunk` — not imported from there, since that module
+ *  imports FROM this one and importing it back would be circular). */
+export function chunkIds(ids: string[], size = MAX_STATUS_IDS): string[][] {
+  if (size <= 0) throw new Error('chunk size must be positive');
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Polls document status for however many ids are pending, chunked to
+ * MAX_STATUS_IDS per request. Chunks run with `Promise.allSettled`, not
+ * `Promise.all`: a dropped request for one chunk must not stop the others
+ * from reporting the documents that DID answer — otherwise one flaky
+ * request among several would stall an entire bulk import's "Processing N of
+ * M…" indicator from ever advancing. `fetcher` is injected so this is
+ * testable without a real network call (see scripts/verify-ui.ts).
+ */
+export async function pollDocumentStatusChunked(
+  ids: string[],
+  fetcher: (chunk: string[], signal?: AbortSignal) => Promise<DocumentStatusRow[]>,
+  signal?: AbortSignal
+): Promise<DocumentStatusRow[]> {
+  const chunks = chunkIds(ids);
+  const settled = await Promise.allSettled(chunks.map((c) => fetcher(c, signal)));
+  const rows: DocumentStatusRow[] = [];
+  for (const r of settled) {
+    if (r.status === 'fulfilled') rows.push(...r.value);
+  }
+  return rows;
+}
 
 /**
  * Wait for queued documents to finish reading.

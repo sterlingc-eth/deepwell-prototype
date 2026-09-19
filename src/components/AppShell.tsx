@@ -68,7 +68,9 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               className="inline-flex items-center gap-1.5 min-h-touch px-2 sm:px-3 rounded-md text-caption sm:text-body text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300 whitespace-nowrap"
             >
               <Inbox className="w-4 h-4 shrink-0" aria-hidden="true" />
-              Processing {ingestProgress.current} of {ingestProgress.total}…
+              {ingestProgress.stalled
+                ? `Still working on ${ingestProgress.total - ingestProgress.current} — check Inbox`
+                : `Processing ${ingestProgress.current} of ${ingestProgress.total}…`}
             </button>
           )}
 

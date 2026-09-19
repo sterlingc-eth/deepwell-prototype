@@ -20,7 +20,7 @@ import type {
   SourceRef,
 } from './types';
 import { PIPELINE_STAGES } from './types';
-import { reviewClient, type ReviewCompleteness } from '../services/reviewClient';
+import { reviewClient } from '../services/reviewClient';
 
 /**
  * Demo mode keeps the whole graph in memory on purpose (its own fixture data
@@ -61,6 +61,13 @@ export interface GraphSnapshot {
   /** Message from the last review action that failed to persist server-side,
    *  or null. Cleared on the next successful action and by clearLastError. */
   lastError: string | null;
+  /** Document ids with an AI-verify request in flight — the single-flight
+   *  guard for `aiVerifyDoc`, keyed by docId so a rapid double-click on
+   *  "Verify with AI" (which can fire two click events before React commits
+   *  a disabled button) cannot start a second request while the first is
+   *  still out. Set synchronously before the first `await`, so there is no
+   *  gap for a second call to slip through. */
+  aiVerifying: Record<DocumentId, boolean>;
 }
 
 interface GraphActions {
@@ -205,6 +212,7 @@ export const useGraph = create<GraphStore>((set, get) => ({
   batches: {},
   conflicts: {},
   lastError: null,
+  aiVerifying: {},
 
   seed: (schema, entities, docs, batches, conflicts) =>
     set({
@@ -347,20 +355,28 @@ export const useGraph = create<GraphStore>((set, get) => ({
 
   aiVerifyDoc: async (docId) => {
     if (DEMO_MODE) return false;
+    // Single-flight per doc: set BEFORE the first await, so a second call
+    // arriving before this one resolves (a double-click racing a re-render)
+    // sees the flag already up and bails instead of firing a second request
+    // that could resolve out of order and leave the doc in a self-contradictory
+    // state (see the caller — ReviewScreen.tsx — for the full reload that
+    // replaces this function's old local patch-from-partial-payload).
+    if (get().aiVerifying[docId]) return false;
+    set((s) => ({ aiVerifying: { ...s.aiVerifying, [docId]: true } }));
     try {
-      const { verified, completeness } = await reviewClient.aiVerify(docId);
-      set((s) => {
-        const doc = s.docs[docId];
-        if (!doc) return s;
-        const next: Doc = verified
-          ? { ...doc, stage: 'verified', verifiedBy: 'ai', verifiedAt: new Date(), completeness: completeness as ReviewCompleteness }
-          : { ...doc, completeness: completeness as ReviewCompleteness };
-        return { docs: { ...s.docs, [docId]: next }, lastError: null };
-      });
+      const { verified } = await reviewClient.aiVerify(docId);
+      set({ lastError: null });
       return verified;
     } catch (err) {
       set({ lastError: describeError(err) });
       return false;
+    } finally {
+      set((s) => {
+        if (!(docId in s.aiVerifying)) return s;
+        const aiVerifying = { ...s.aiVerifying };
+        delete aiVerifying[docId];
+        return { aiVerifying };
+      });
     }
   },
 

@@ -19,6 +19,17 @@ if (import.meta.env.VITE_DEMO_MODE === 'true') {
   bootstrapHvac()
 }
 
+// Chrome's back-forward cache can restore a full pre-navigation DOM/JS
+// snapshot on Back with no re-fetch of the current bundle — after a deploy,
+// that's the OLD app, indistinguishable from the real thing until something
+// breaks. `event.persisted` is only ever true for a bfcache restore (never a
+// normal load), so reloading there gets back onto whatever is live now.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload()
+  }
+})
+
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 if (!clerkPublishableKey) {

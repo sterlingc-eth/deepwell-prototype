@@ -43,5 +43,15 @@
       "path": "/api/account?action=sweep",
       "schedule": "17 9 * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/app",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/app/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    }
   ]
 }

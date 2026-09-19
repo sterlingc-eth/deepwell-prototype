@@ -175,6 +175,10 @@ export function IntakeBody() {
   // freezing on "Read" the moment the upload+read step itself finishes.
   const uploadDocIds = useAppStore((s) => s.uploadDocIds);
   const setUploadDocId = useAppStore((s) => s.setUploadDocId);
+  // Registers real document ids for the header's "Processing N of M…" pill —
+  // the actual polling loop lives in App.tsx, not here, so it survives
+  // navigating away from Inbox mid-processing (see store/appStore.ts).
+  const trackProcessingDocs = useAppStore((s) => s.trackProcessingDocs);
 
   // Deliberately NOT aborted on unmount (navigating to another screen, or
   // switching Inbox tabs, no longer cancels an in-flight upload — see the
@@ -245,6 +249,7 @@ export function IntakeBody() {
         reconcileIntakeDoc(tempId, patchFromIngestResult(result));
         setUploadDocId(result.filename, result.documentId ?? tempId);
       }
+      if (result.documentId && !result.error) trackProcessingDocs([result.documentId]);
     });
   };
   // ---- Bulk import: a dropped .zip export or a large multi-file selection ----
@@ -316,6 +321,7 @@ export function IntakeBody() {
             if ((s.status === 'done' || s.status === 'queued') && s.documentId) {
               bulkReconciledRef.current.add(i);
               reconcileIntakeDoc(tempId, { id: s.documentId, stage: s.status === 'done' ? 'classified' : 'received' });
+              trackProcessingDocs([s.documentId]);
             } else if (s.status === 'failed' || s.status === 'cancelled') {
               bulkReconciledRef.current.add(i);
               reconcileIntakeDoc(tempId, { preview: `${s.name}\n\n${s.error ?? (s.status === 'cancelled' ? 'Cancelled' : 'Not uploaded')}` });

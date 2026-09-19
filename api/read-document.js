@@ -3,7 +3,7 @@ import { handleCors, handleError } from "./_lib/claude.js";
 import { ingestDocument, recordIngestFailure, isTransientError, isValidDocumentId } from "./_lib/readDocument.js";
 import { isQueueEnabled, enqueueDocument } from "./_lib/queue.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
-import { limit } from "./_lib/rateLimit.js";
+import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
 
 /**
  * POST /api/read-document
@@ -103,9 +103,23 @@ export default async function handler(req, res) {
 
   // ---- inline ------------------------------------------------------------
   try {
+    // B1 (2026-09-19 adversarial audit): the queue's Inngest wrapper has
+    // always checked the daily model-spend budget before spending it (see
+    // queue.js) — this inline path (the documented DEFAULT when
+    // INNGEST_EVENT_KEY/INNGEST_SIGNING_KEY are unset, or a `sync: true`
+    // caller) never did, so a deployment running without the queue had NO
+    // budget enforcement on ingestion at all. Checked before ingestDocument
+    // regardless of this document's content type (plain text costs no model
+    // call either way, but knowing that would mean fetching its bytes just to
+    // find out — cheaper and simpler to check once, unconditionally, exactly
+    // like the queue's own check does).
+    await assertModelBudget(ctx);
     const result = await ingestDocument(ctx, documentId, { userId: auth.userId, force: force === true });
     return handleCors(res, req).status(200).json({ ...result, queued: false });
   } catch (error) {
+    if (error?.name === "ModelBudgetExceededError") {
+      return sendModelBudgetExceeded(handleCors(res, req), error);
+    }
     // Recording a failure is a one-way door on this path: the browser polls
     // document-status and treats any extract_error as terminal, so a document
     // stamped here is a document the technician is told to give up on. That is

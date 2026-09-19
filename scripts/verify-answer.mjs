@@ -330,6 +330,74 @@ for (const [name, raw] of Object.entries({
   check('api/ask.js pins temperature to 0 for the model call', /temperature:\s*0\b/.test(askSrc));
 }
 
+/* ------------------------------------- H4: verifiedCount/unverifiedCount ---
+ * 2026-09-19 adversarial audit: verifiedCount used to mean "number of
+ * distinct cited documents" and unverifiedCount was hardcoded to 0 — so a UI
+ * trusting these fields to communicate confidence was told every answer is
+ * 100% verified, always, regardless of whether the underlying documents had
+ * ever cleared AI/human verification (stage === 'verified'). Now computed
+ * from the cited documents' real stage, which buildAllowed carries through
+ * from searchPassages/searchExtractions (recordsStore.js). */
+
+{
+  const passagesWithStage = [
+    { documentId: 'doc-verified', filename: 'a.pdf', page: 1, excerpt: 'x', stage: 'verified' },
+    { documentId: 'doc-linked', filename: 'b.pdf', page: 1, excerpt: 'y', stage: 'linked' },
+  ];
+  const allowedWithStage = buildAllowed({ passages: passagesWithStage });
+
+  check('buildAllowed tracks a verified document\'s stage', allowedWithStage.stageByDoc.get('doc-verified') === 'verified');
+  check('buildAllowed tracks an unverified document\'s stage', allowedWithStage.stageByDoc.get('doc-linked') === 'linked');
+
+  const twoFacts = [
+    { label: 'A', value: '1', sources: [{ documentId: 'doc-verified', location: { page: 1 } }] },
+    { label: 'B', value: '2', sources: [{ documentId: 'doc-linked', location: { page: 1 } }] },
+  ];
+  const out = shapeAnswer({ text: 'x', facts: twoFacts, confidence: 0.9 }, allowedWithStage);
+  eq('one cited document at stage=verified counts toward verifiedCount', out.verifiedCount, 1);
+  eq('one cited document NOT at stage=verified counts toward unverifiedCount', out.unverifiedCount, 1);
+}
+
+{
+  // Both citations point at the same verified document — verifiedCount
+  // counts distinct DOCUMENTS, not facts or sources.
+  const allowedBothVerified = buildAllowed({
+    passages: [{ documentId: 'doc-v', filename: 'a.pdf', page: 1, excerpt: 'x', stage: 'verified' },
+               { documentId: 'doc-v', filename: 'a.pdf', page: 2, excerpt: 'y', stage: 'verified' }],
+  });
+  const out = shapeAnswer(
+    {
+      text: 'x',
+      facts: [
+        { label: 'A', value: '1', sources: [{ documentId: 'doc-v', location: { page: 1 } }] },
+        { label: 'B', value: '2', sources: [{ documentId: 'doc-v', location: { page: 2 } }] },
+      ],
+      confidence: 0.9,
+    },
+    allowedBothVerified
+  );
+  eq('two facts citing the same verified document count as one verifiedCount', out.verifiedCount, 1);
+  eq('unverifiedCount is 0 when every cited document is verified', out.unverifiedCount, 0);
+}
+
+{
+  // No stage info at all (an older caller, or a document row with no stage
+  // column returned) must fail closed to "not verified", never crash and
+  // never silently claim verification it can't back up.
+  const out = shapeAnswer({ text: 'Expires 2034-03-10.', facts: [fact()], confidence: 0.9 }, ALLOWED);
+  eq('a fact with no stage information on its document counts as unverified, not verified', [out.verifiedCount, out.unverifiedCount], [0, 1]);
+}
+
+{
+  // A dropped, ungrounded fact contributes to NEITHER count — only facts that
+  // actually survive shapeAnswer's citation check are counted.
+  const out = shapeAnswer(
+    { text: 'x', facts: [fact({ sources: [{ documentId: 'doc-NEVER-RETRIEVED', location: { page: 1 } }] })], confidence: 0.9 },
+    ALLOWED
+  );
+  eq('an ungrounded (dropped) fact counts toward neither verifiedCount nor unverifiedCount', [out.verifiedCount, out.unverifiedCount], [0, 0]);
+}
+
 /* -------------------------------------------------------------- buildAllowed */
 
 {

@@ -9,6 +9,7 @@ import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
 import { str } from '../core/answer';
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
+import { loadGraphFromServer } from '../hooks/usePostgresSync';
 
 const CURRENT_USER = 'You';
 
@@ -287,17 +288,31 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const canAdvance = next !== doc.stage && !duplicate;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [linkChoice, setLinkChoice] = useState<string>(unlinked?.kind === 'unlinked' && unlinked.bestGuess ? unlinked.bestGuess : '');
-  const [aiBusy, setAiBusy] = useState(false);
+  // Single-flight guard lives in the graph store (entityGraph.ts's
+  // aiVerifying), not component state — it's set synchronously before the
+  // network call starts, so a double-click can't slip a second request in
+  // before a re-render disables this button.
+  const aiBusy = !!graph.aiVerifying[doc.id];
   const [aiMsg, setAiMsg] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   const runAiVerify = async () => {
-    setAiBusy(true);
     setAiMsg(null);
     const verified = await onAiVerify();
-    setAiBusy(false);
+    // Reload this document's truth from the server rather than trusting the
+    // AI-verify response's partial payload — that's what used to leave the
+    // panel showing "AI verified" and "still needs a person" at once when two
+    // requests landed out of order (see entityGraph.ts's aiVerifyDoc).
+    if (!REVIEW_IS_DEMO_ONLY) {
+      try {
+        await loadGraphFromServer();
+      } catch {
+        /* a reload glitch just leaves the last-good data on screen; lastError
+         * from the aiVerify call itself already surfaced any real failure */
+      }
+    }
     setAiMsg(verified ? 'Verified by AI.' : 'Not confident enough yet — this still needs a person.');
   };
 
@@ -339,7 +354,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink-3">Currently:</span>
           <StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} />
-          {next !== doc.stage && (
+          {doc.stage !== 'verified' && next !== doc.stage && (
             <>
               <span className="text-ink-3">· Next step:</span>
               <StagePill stage={next} />

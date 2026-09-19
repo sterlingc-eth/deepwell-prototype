@@ -213,6 +213,11 @@ export function buildAllowed({ passages = [], extractions = [] } = {}) {
   const docs = new Set();
   const pages = new Map(); // documentId -> Set<page number>
   const fields = new Map(); // documentId -> Set<field name>
+  // documentId -> that document's pipeline stage ('received'/.../'verified'),
+  // as recordsStore.js's searchPassages/searchExtractions now return it
+  // (H4, 2026-09-19 adversarial audit) — see shapeAnswer's verifiedCount/
+  // unverifiedCount below, the only consumer of this map.
+  const stageByDoc = new Map();
 
   for (const p of passages ?? []) {
     if (!p || typeof p.documentId !== "string") continue;
@@ -221,6 +226,7 @@ export function buildAllowed({ passages = [], extractions = [] } = {}) {
       if (!pages.has(p.documentId)) pages.set(p.documentId, new Set());
       pages.get(p.documentId).add(p.page);
     }
+    if (typeof p.stage === "string" && !stageByDoc.has(p.documentId)) stageByDoc.set(p.documentId, p.stage);
   }
   for (const x of extractions ?? []) {
     if (!x || typeof x.documentId !== "string") continue;
@@ -229,8 +235,9 @@ export function buildAllowed({ passages = [], extractions = [] } = {}) {
       if (!fields.has(x.documentId)) fields.set(x.documentId, new Set());
       fields.get(x.documentId).add(x.field);
     }
+    if (typeof x.stage === "string" && !stageByDoc.has(x.documentId)) stageByDoc.set(x.documentId, x.stage);
   }
-  return { docs, pages, fields };
+  return { docs, pages, fields, stageByDoc };
 }
 
 /** Does this one source cite a specific, real piece of evidence? */
@@ -306,6 +313,19 @@ export function shapeAnswer(raw, allowed, { allowComputed = false, candidates = 
         .slice(0, 8)
         .map((c) => ({ documentId: c.documentId, location: {} }));
 
+  // H4 (2026-09-19 adversarial audit): verifiedCount used to mean "number of
+  // distinct cited documents" and unverifiedCount was hardcoded to 0 — so a
+  // UI trusting these fields to communicate confidence was told every answer
+  // is 100% verified, always, regardless of whether the underlying documents
+  // had ever been through AI or human verification (stage === 'verified').
+  // Computed here from the ACTUALLY-CITED documents' real stage, not from
+  // retrieval's whole candidate set — a document that was merely retrieved
+  // but cited by nothing surviving shapeAnswer's grounding check should not
+  // count either way.
+  const citedDocIds = new Set(facts.flatMap((f) => f.sources.map((s) => s.documentId)));
+  const verifiedCount = [...citedDocIds].filter((id) => safeAllowed.stageByDoc?.get(id) === "verified").length;
+  const unverifiedCount = citedDocIds.size - verifiedCount;
+
   return {
     kind: facts.length ? "answer" : "no-answer",
     text,
@@ -320,8 +340,8 @@ export function shapeAnswer(raw, allowed, { allowComputed = false, candidates = 
       : 0,
     entityId: typeof input.entityId === "string" ? input.entityId : undefined,
     interpretation: typeof input.interpretation === "string" ? input.interpretation : undefined,
-    verifiedCount: new Set(facts.flatMap((f) => f.sources.map((s) => s.documentId))).size,
-    unverifiedCount: 0,
+    verifiedCount,
+    unverifiedCount,
     closest,
   };
 }

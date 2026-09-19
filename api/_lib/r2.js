@@ -90,6 +90,26 @@ export function presign(method, key, expiresIn = 900, extraQuery = {}, now = new
 /** Exported for the test vector only. */
 export const __internals = { uriEncode, sha256Hex, hmac };
 
+/**
+ * Thrown by getObject() below with a real `.status` attached — a plain Error
+ * with the status only embedded in its message (what this used to throw)
+ * looks, to both queue.js's fatal() and readDocument.js's isTransientError(),
+ * exactly like a transient network blip: neither one parses a status code out
+ * of message text. A permanently-missing (404, the object was deleted or the
+ * key never existed) or forbidden (403) object then got the full retry
+ * treatment before failing — wasted run attempts on something that could
+ * never succeed no matter how many times it was retried. A genuine 5xx from
+ * R2 itself is the one case that IS worth retrying, and isTransientError's
+ * existing `status >= 500` check already covers that once `.status` is real.
+ */
+export class R2Error extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "R2Error";
+    this.status = status;
+  }
+}
+
 /** Fetch an object's bytes. Used by extraction, which runs server-side. */
 export async function getObject(key) {
   const url = presign('GET', key, 120);
@@ -106,7 +126,7 @@ export async function getObject(key) {
     // Cancel rather than abandon: an unconsumed body holds its connection open
     // until garbage collection.
     await r.body?.cancel().catch(() => {});
-    throw new Error(`R2 GET ${key} failed: ${r.status}`);
+    throw new R2Error(`R2 GET ${key} failed: ${r.status}`, r.status);
   }
   return Buffer.from(await r.arrayBuffer());
 }

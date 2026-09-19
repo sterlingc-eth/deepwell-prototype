@@ -3,6 +3,7 @@ import { withTenant, linkDocumentToCustomer } from "./recordsStore.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages } from "./extractFields.js";
 import { IngestError, isValidDocumentId } from "./readDocument.js";
+import { assertModelBudget } from "./rateLimit.js";
 import { deriveWarranty } from "./warrantyRules.js";
 import { withCache, modelCallLogLine } from "./promptCache.js";
 import { recordModelCall } from "./usage.js";
@@ -54,11 +55,22 @@ export const EXTRACT_MODEL = process.env.EXTRACT_MODEL || "claude-haiku-4-5";
 
 /**
  * @param {{tenantKey: string, tenantName?: string}} ctx
+ * @param {{userId?: string, documentType?: string, modelAttempts?: number}} [opts]
+ *   `modelAttempts` (H2, 2026-09-19 adversarial audit): withBackoff's own
+ *   retry count for the Anthropic call below. Left undefined (withBackoff's
+ *   default of 3) on the inline/sync path — a synchronous request has no
+ *   other retry mechanism backing it up. The Inngest `extract-fields`
+ *   function (queue.js) passes 1: under the queue, retrying the WHOLE step
+ *   already re-runs this call, so nesting withBackoff's own 3 attempts inside
+ *   that step's 3 Inngest retries could multiply one document's spend up to
+ *   9x under a sustained 429/529 — bounded, but never checked against the
+ *   daily budget below or against itself. One layer of retry should own a
+ *   429, not two.
  * @returns {Promise<{documentId: string, entityId: string|null, customerId: string|null,
  *                    fields: object[], dropped: object[], truncated: boolean, model: string,
  *                    pagesRead: number, pagesTotal: number}>}
  */
-export async function extractDocumentFields(ctx, documentId, { userId, documentType } = {}) {
+export async function extractDocumentFields(ctx, documentId, { userId, documentType, modelAttempts } = {}) {
   // Every documents.id is a uuid; a malformed value survives a bare
   // typeof/truthiness check and only fails once bound against that column,
   // as "invalid input syntax for type uuid" — a raw 500, not a clean 400.
@@ -67,6 +79,15 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   if (!isValidDocumentId(documentId)) {
     throw new IngestError("documentId must be a uuid", 400);
   }
+
+  // B1 (2026-09-19 adversarial audit): the daily model-spend cap used to be
+  // enforced at exactly one of four billed call sites (the Inngest read
+  // step) — this is a second one. Checked before the (cheap) document load
+  // below so an exhausted tenant never even pays for that query, let alone
+  // the Anthropic call. Covers BOTH callers of this function: the Inngest
+  // extract-fields worker (queue.js) and /api/extract's stored-document path
+  // — one check, both paths, rather than two call sites that could drift.
+  await assertModelBudget(ctx);
 
   // Short transaction: the model call below must not hold a pool connection.
   const loaded = await withTenant(ctx, async (db) => {
@@ -112,7 +133,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     tools: [withCache(EXTRACT_TOOL, EXTRACT_MODEL)],
     tool_choice: { type: "tool", name: EXTRACT_TOOL.name },
     messages: [{ role: "user", content: dynamicPrompt }],
-  }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
+  }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt, attempts: modelAttempts });
   const latencyMs = Date.now() - startedAt;
 
   // One structured line per call, no PII (page text/field values never

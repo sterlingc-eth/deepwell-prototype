@@ -165,6 +165,17 @@ function send429(res, retryAfterSeconds, body) {
   res.status(429).json({ error: "Too many requests", ...body });
 }
 
+/** Pure: whole seconds from `now` until the next UTC-midnight reset — the
+ *  daily counters' own reset point, and (via getDailyModelBudgetStatus below)
+ *  the same "resumes tomorrow" boundary the model-spend budget uses. Exported
+ *  so both the request-rate daily cap and the model-spend budget compute the
+ *  same number the same way, and so it's testable with no clock. */
+export function secondsUntilUtcMidnight(now = Date.now()) {
+  const d = new Date(now);
+  const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((midnight - now) / 1000));
+}
+
 /**
  * Enforce the rate limit for one request. Call this AFTER auth has resolved
  * (`auth` is whatever requireAuthOrKey() returned) and BEFORE doing any real
@@ -252,11 +263,7 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
     }
 
     if (requestsToday != null && requestsToday > limits.perDay) {
-      // Seconds until UTC midnight — the daily counter's own reset point.
-      const nowDate = new Date();
-      const midnight = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate() + 1);
-      const retryAfter = (midnight - now) / 1000;
-      send429(res, retryAfter, {
+      send429(res, secondsUntilUtcMidnight(now), {
         details: `Daily limit of ${limits.perDay} ${bucket} units reached for this tenant.`,
         scope: "per-day",
       });
@@ -330,4 +337,72 @@ export async function getDailyModelBudgetStatus(ctx) {
     console.error("rateLimit: could not read daily model budget, allowing ingestion:", err?.message);
     return { exceeded: false, used: 0, limit: DEFAULT_MAX_MODEL_CALLS_PER_DAY };
   }
+}
+
+/**
+ * The message every model-spend-gated endpoint shows once a tenant's daily
+ * budget is exhausted. One string, in one place, so a customer sees the same
+ * wording whether they hit it uploading, asking, or extracting.
+ */
+export const DAILY_MODEL_BUDGET_MESSAGE = "Daily AI budget reached — resumes tomorrow";
+
+/**
+ * Thrown by assertModelBudget() below. `.status` is 429 (same family as the
+ * request-rate limiter's 429, and the same status a caller should treat as
+ * "retryable, just not yet") and `.retryAfterSeconds` is how long until the
+ * daily counter resets, for a caller that wants to set a Retry-After header.
+ * A distinct name (not IngestError, not a bare Error) so queue.js's fatal()
+ * can recognize this exact condition and stop retrying THIS run immediately
+ * — retrying within the same run cannot succeed; the budget resets at UTC
+ * midnight, not on the next attempt a few seconds later.
+ */
+export class ModelBudgetExceededError extends Error {
+  constructor(message = DAILY_MODEL_BUDGET_MESSAGE, retryAfterSeconds = secondsUntilUtcMidnight()) {
+    super(message);
+    this.name = "ModelBudgetExceededError";
+    this.status = 429;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+/**
+ * Call this immediately before ANY Anthropic call that bills a tenant's daily
+ * model-spend cap — B1 of the 2026-09-19 adversarial audit found this budget
+ * enforced at exactly one of four billed call sites (the Inngest read step)
+ * and silently absent everywhere else (extractDocumentFields, /api/extract's
+ * image path, /api/ask, and the inline ingestion path when the queue is
+ * off). One shared assertion here, called from every one of those sites,
+ * means there is exactly one place the rule can be gotten wrong instead of
+ * four.
+ *
+ * Throws ModelBudgetExceededError when the tenant's daily cap is already
+ * spent; otherwise returns the same status getDailyModelBudgetStatus does, in
+ * case a caller wants it (nobody currently does, but returning it rather than
+ * void costs nothing and avoids a second round trip for a caller that later
+ * wants to log `used`/`limit`).
+ *
+ * FAILS OPEN, same as getDailyModelBudgetStatus itself: a lookup failure
+ * there comes back `exceeded: false`, so a broken budget check degrades to
+ * "no extra cap today," never to "nothing works today."
+ */
+export async function assertModelBudget(ctx) {
+  const status = await getDailyModelBudgetStatus(ctx);
+  if (status.exceeded) {
+    throw new ModelBudgetExceededError();
+  }
+  return status;
+}
+
+/**
+ * Map a ModelBudgetExceededError onto a clean HTTP response: 429, a
+ * Retry-After header, and the same message on every route that calls this —
+ * the "one shared helper... that each endpoint maps to a clean JSON 429 with
+ * Retry-After" B1 asks for. Callers still check `error?.name ===
+ * "ModelBudgetExceededError"` themselves (this file exports no generic error
+ * middleware), but they all format the response through here so the shape
+ * can't drift between routes.
+ */
+export function sendModelBudgetExceeded(res, err) {
+  res.setHeader("Retry-After", String(Math.max(1, Math.ceil(err?.retryAfterSeconds ?? secondsUntilUtcMidnight()))));
+  res.status(err?.status ?? 429).json({ error: err?.message ?? DAILY_MODEL_BUDGET_MESSAGE });
 }

@@ -4,7 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { StagePill } from '../components/StagePill';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
 import { entitiesOfType, useGraph } from '../core/entityGraph';
-import { dateOf, fmtDate, fmtMoney, normalize, numOf, str } from '../core/answer';
+import { dateOf, fmtDate, formatYmd, fmtMoney, normalize, numOf, str } from '../core/answer';
 import type { Doc, Entity } from '../core/types';
 import { DOCUMENT_TYPES } from '../domains/hvac/documentTypes';
 import { deleteDocuments } from '../services/documentClient';
@@ -24,7 +24,10 @@ const KINDS: { id: Kind; label: string }[] = [
 ];
 
 function haystack(e: Entity, g: ReturnType<typeof useGraph.getState>): string {
-  const parts = Object.values(e.fields).map((v) => (v instanceof Date ? fmtDate(v) : v === null ? '' : String(v)));
+  // Every Date-valued entity field here is a bare calendar day (warranty
+  // expiry, install date, a visit date) — formatYmd, not fmtDate, is what
+  // keeps it timezone-safe (see core/answer.ts).
+  const parts = Object.values(e.fields).map((v) => (v instanceof Date ? formatYmd(v) : v === null ? '' : String(v)));
   for (const key of ['propertyId', 'equipmentId', 'technicianId']) {
     const ref = g.entities[str(e, key)];
     if (ref) parts.push(str(ref, 'address'), str(ref, 'serial'), str(ref, 'name'));
@@ -342,7 +345,7 @@ export function BrowseScreen() {
       case 'equipment':
         return { title: str(e, 'serial'), sub: `${str(e, 'manufacturer')} ${str(e, 'equipmentType')} · ${str(e, 'model')} · ${p ? str(p, 'address') : ''}`, mono: true, badge: <WarrantyStatusBadge warranty={{ warrantyExpiry: dateOf(e, 'warrantyExpiry') }} /> };
       case 'service':
-        return { title: str(e, 'workPerformed'), sub: `${fmtDate(dateOf(e, 'date'))} · ${str(e, 'technicianName')} · ${p ? str(p, 'address') : ''} · ${fmtMoney(numOf(e, 'cost'))}`, mono: false, badge: null };
+        return { title: str(e, 'workPerformed'), sub: `${formatYmd(dateOf(e, 'date'))} · ${str(e, 'technicianName')} · ${p ? str(p, 'address') : ''} · ${fmtMoney(numOf(e, 'cost'))}`, mono: false, badge: null };
       default:
         return { title: str(e, 'name'), sub: str(e, 'specialty'), mono: false, badge: null };
     }

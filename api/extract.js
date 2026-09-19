@@ -6,7 +6,7 @@ import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extrac
 import { extractDocumentFields, EXTRACT_MODEL, splitExtractPrompt } from "./_lib/extractDocument.js";
 import { sniffMagicBytes } from "./_lib/readDocument.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
-import { limit } from "./_lib/rateLimit.js";
+import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
 import { recordModelCall } from "./_lib/usage.js";
 import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 
@@ -71,6 +71,15 @@ export default async function handler(req, res) {
     );
     return handleCors(res, req).status(200).json(result);
   } catch (error) {
+    // B1 (2026-09-19 adversarial audit): checked before the generic handler
+    // for the same reason as ask.js — a clean 429 + Retry-After, one shared
+    // shape across every model-budget-gated endpoint. Covers both paths this
+    // handler can take: extractDocumentFields throws it internally (the
+    // stored-document path, gated inside extractDocument.js) and
+    // extractFromImage below calls assertModelBudget directly.
+    if (error?.name === "ModelBudgetExceededError") {
+      return sendModelBudgetExceeded(handleCors(res, req), error);
+    }
     // IngestError carries a status the caller should see (404 / 409); anything
     // else goes through handleError, which never leaks internals.
     if (error?.name === "IngestError") {
@@ -91,6 +100,11 @@ async function extractFromImage(req, res, { auth, imageData, mediaType, document
   if (typeof imageData !== "string" || !imageData) {
     return res.status(400).json({ error: "imageData must be a base64 string" });
   }
+
+  // B1: this path spends a Haiku call exactly like extractDocumentFields does,
+  // but never goes through it (no document is stored for a photographed
+  // plate), so it needs its own budget check rather than inheriting one.
+  await assertModelBudget({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId });
   // base64 carries 3 bytes per 4 characters.
   if (imageData.length * 0.75 > MAX_IMAGE_BYTES) {
     return res.status(413).json({ error: "Image is too large" });

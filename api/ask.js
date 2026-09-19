@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
-import { limit } from "./_lib/rateLimit.js";
+import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
 import { withTenant } from "./_lib/recordsStore.js";
 import {
   ANSWER_TOOL,
@@ -359,6 +359,7 @@ export default async function handler(req, res) {
       documentType: p.document_type,
       page: p.page_no,
       excerpt: String(p.excerpt ?? "").slice(0, MAX_EXCERPT),
+      stage: p.stage,
     }));
     const mappedExtractions = extractions.map((x) => ({
       documentId: x.document_id,
@@ -366,11 +367,22 @@ export default async function handler(req, res) {
       field: x.field_key,
       value: x.value,
       entityType: x.entity_type,
+      stage: x.stage,
     }));
 
     // What a citation is allowed to point at: exactly the documents (and,
     // per document, the pages/fields) retrieval returned above.
     const allowed = buildAllowed({ passages: mappedPassages, extractions: mappedExtractions });
+
+    // B1 (2026-09-19 adversarial audit): /api/ask is the single most
+    // expensive call site in the codebase (Sonnet, one call per question) and
+    // used to be gated only by the `ask` bucket's REQUEST-count cap above —
+    // a different number from the tenant's daily model-spend budget, and the
+    // only one of the two ever checked here. Checked AFTER retrieval (a
+    // question retrieval finds nothing already short-circuits above with no
+    // model call) and right before the one Anthropic call this route makes,
+    // so a tenant that is over budget never pays for it.
+    await assertModelBudget({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId });
 
     // ---- 2. ask ------------------------------------------------------------
     // Three separate blocks, not one flat prompt string, so an Anthropic
@@ -513,6 +525,14 @@ export default async function handler(req, res) {
 
     return handleCors(res, req).status(200).json({ success: true, data });
   } catch (error) {
+    // Checked before the generic handler: handleError's own 429 branch would
+    // catch this too (status 429), but with a different message and no
+    // Retry-After header — every model-budget-gated endpoint should answer
+    // this exact condition the same way (see rateLimit.js's
+    // sendModelBudgetExceeded doc comment).
+    if (error?.name === "ModelBudgetExceededError") {
+      return sendModelBudgetExceeded(handleCors(res, req), error);
+    }
     return handleError(res, error, req, { tenantId: auth.tenantId });
   }
 }

@@ -129,10 +129,41 @@ export async function enqueueDocument({ documentId, tenantKey, tenantName, userI
 
 /* ------------------------------------------------------------- the workers */
 
-/** 4xx conditions are the document's fault, not the infrastructure's. Do not retry them. */
-function fatal(error) {
+/**
+ * 4xx conditions are the document's fault, not the infrastructure's. Do not
+ * retry them. Exported for scripts/verify-hardening.mjs (H3, 2026-09-19
+ * adversarial audit) — it used to be reachable only through the two Inngest
+ * function closures, which meant its classification rules could only be
+ * tested by standing up a fake Inngest run.
+ *
+ * Three cases beyond the original IngestError-4xx rule, each traced against a
+ * real failure the original rule missed:
+ *
+ *   - A document deleted mid-ingestion: the page-write's INSERT violates its
+ *     FK to `documents` (ON DELETE CASCADE requires the parent row to still
+ *     exist). That's a plain `pg` error — `err.name` is `"error"`, `err.code`
+ *     is Postgres's own '23503' — not an IngestError, so the original rule
+ *     never caught it and Inngest retried the whole step, billing a second
+ *     full-price transcription of a document Postgres was always going to
+ *     refuse to accept again.
+ *   - An R2 object that is permanently missing (404) or forbidden (403): see
+ *     r2.js's R2Error — retrying can never make a deleted object exist again.
+ *     A genuine 5xx from R2 is NOT included here on purpose; that one really
+ *     might succeed on retry.
+ *   - The daily model-spend budget (rateLimit.js's ModelBudgetExceededError):
+ *     retrying THIS run cannot succeed — the budget resets at UTC midnight,
+ *     not a few seconds later — so this is fatal (deferred, recorded, not
+ *     retried) regardless of its 429-shaped `.status`, unlike an ordinary
+ *     429 from Anthropic itself, which the IngestError branch below still
+ *     excludes on purpose (that one DOES clear up in seconds).
+ */
+export function fatal(error) {
   const status = error?.status;
-  return error?.name === "IngestError" && status >= 400 && status < 500 && status !== 429;
+  if (error?.name === "IngestError" && status >= 400 && status < 500 && status !== 429) return true;
+  if (error?.name === "ModelBudgetExceededError") return true;
+  if (error?.code === "23503") return true;
+  if (error?.name === "R2Error" && (status === 404 || status === 403 || status === 400)) return true;
+  return false;
 }
 
 /**
@@ -322,7 +353,17 @@ function buildFunctions(inngest, NonRetriableError) {
     {
       id: "extract-fields",
       name: "Extract structured fields from page text",
-      concurrency: { limit: 5 },
+      // H1 (2026-09-19 adversarial audit): this used to be `{ limit: 5 }` —
+      // global only, no per-tenant key — while readDocument's own concurrency
+      // above deliberately caps one tenant at 3 of the global 5 slots so a
+      // single bulk import can't starve every other tenant. Missing that same
+      // key here let a single tenant's burst occupy all 5 global extraction
+      // slots, which both defeated readDocument's own per-tenant cap one step
+      // later AND increased how many of that tenant's OWN documents run
+      // findOrCreateEquipment/findOrCreateCustomer concurrently (B2) — up to 5
+      // at once instead of the 3 the read step caps it to. Same helper, same
+      // env vars, same shape as readDocument's — not a second, drifting copy.
+      concurrency: resolveIngestConcurrency(),
       retries: RETRIES,
       triggers: [{ event: EVENTS.read }],
     },
@@ -333,7 +374,16 @@ function buildFunctions(inngest, NonRetriableError) {
 
       return step.run("extract", async () => {
         try {
-          const r = await extractDocumentFields(ctx, documentId, { userId });
+          // H2: attempts=1 — under the queue, Inngest's own `retries: RETRIES`
+          // above already re-runs this whole step on failure. Leaving
+          // extractDocumentFields's internal withBackoff at its inline-path
+          // default of 3 would nest a second retry loop inside the first,
+          // multiplying one document's Anthropic spend up to RETRIES x 3 = 9x
+          // under a sustained 429/529 before either succeeding or giving up —
+          // never checked against the daily budget above or against itself.
+          // Inngest already waits between attempts, so it alone should own
+          // backing off a 429 here.
+          const r = await extractDocumentFields(ctx, documentId, { userId, modelAttempts: 1 });
           // The full field list is the route's return value, not the queue's;
           // keep the step output small.
           return { documentId, fields: r.fields.length, entityId: r.entityId, truncated: r.truncated };

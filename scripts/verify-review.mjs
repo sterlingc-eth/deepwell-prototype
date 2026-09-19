@@ -169,5 +169,28 @@ check('reclassifyDocuments is exported as a function', typeof reclassifyDocument
   eq('reclassifyDocuments no-ops with no documentIds at all', result, { changes: [], remaining: 0 });
 }
 
+/* ----------------------------------------------- B1: reclassify's budget check
+ * 2026-09-19 adversarial audit: reclassify's Haiku fallback was one of four
+ * billed call sites with no daily-budget check. The check
+ * (getDailyModelBudgetStatus, called once before the per-document loop) FAILS
+ * OPEN with no database — same principle as every other rate/budget lookup in
+ * this codebase — so a non-empty id list must still run to completion (every
+ * per-document DB call also fails, is caught, and is skipped) rather than the
+ * new budget check itself becoming a new way for this endpoint to throw. */
+{
+  let threw = null;
+  let result;
+  try {
+    result = await reclassifyDocuments({ tenantKey: 'unused' }, {
+      documentIds: ['3fa85f64-5717-4562-b3fc-2c963f66afa6'],
+    });
+  } catch (err) {
+    threw = err;
+  }
+  check('reclassifyDocuments does not throw when the budget check has no database (fails open)', threw === null, threw?.message);
+  eq('a non-empty id list with no reachable database yields no changes, nothing left pending',
+    result, { changes: [], remaining: 0 });
+}
+
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

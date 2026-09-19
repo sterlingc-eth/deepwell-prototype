@@ -13,7 +13,7 @@
  */
 import { isPlaceholderSerial, normalizeMatchText, DOCUMENT_UPDATE_COLUMNS } from '../api/_lib/recordsStore.js';
 import { isTransientError, decodeText } from '../api/_lib/readDocument.js';
-import { objectKey } from '../api/_lib/r2.js';
+import { objectKey, R2Error } from '../api/_lib/r2.js';
 import { deriveWarranty, isPlausibleToday, isValidYmd } from '../api/_lib/warrantyRules.js';
 import { isQueueEnabled } from '../api/_lib/queue.js';
 import { normalizeNumber, normalizeFields, isFutureDate } from '../api/_lib/extractFields.js';
@@ -128,6 +128,24 @@ check('a plain Error is NOT transient', !isTransientError(new Error('boom')));
 check('a TypeError is NOT transient', !isTransientError(new TypeError('x is not a function')));
 check('null is NOT transient', !isTransientError(null));
 check('undefined is NOT transient', !isTransientError(undefined));
+
+/* ------------------------- a missing R2 object must carry a real status ---
+ *
+ * The bug (H3, 2026-09-19 adversarial audit): getObject used to throw a bare
+ * `Error` with the status only embedded in its message text
+ * ("R2 GET x failed: 404") — neither isTransientError nor queue.js's fatal()
+ * parse a status out of message text, so a permanently-missing object got
+ * classified exactly like a transient network blip and retried three times
+ * under the queue before finally failing. R2Error attaches a real `.status`,
+ * which isTransientError's existing generic `status >= 500` check already
+ * handles correctly once it's real — no change needed to isTransientError
+ * itself, only to what r2.js throws. */
+
+check('R2Error is a real Error subclass', new R2Error('x', 404) instanceof Error);
+check('R2Error carries the status it was given', new R2Error('x', 404).status === 404);
+check('a 404 R2Error is NOT transient (permanently missing, retrying can never help)', !isTransientError(new R2Error('R2 GET x failed: 404', 404)));
+check('a 403 R2Error is NOT transient', !isTransientError(new R2Error('R2 GET x failed: 403', 403)));
+check('a 5xx R2Error IS transient (R2 itself having a bad moment, worth retrying)', isTransientError(new R2Error('R2 GET x failed: 503', 503)));
 
 /* ------------------------- a half-configured queue must fall back to inline */
 //

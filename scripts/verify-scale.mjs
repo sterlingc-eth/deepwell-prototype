@@ -15,9 +15,18 @@ import {
   resolveIngestConcurrency,
   resolveIngestThrottle,
   DAILY_BUDGET_EXCEEDED_MESSAGE,
+  fatal,
 } from '../api/_lib/queue.js';
 import { isRetryableModelStatus, withBackoff } from '../api/_lib/claude.js';
-import { DEFAULT_LIMITS } from '../api/_lib/rateLimit.js';
+import {
+  DEFAULT_LIMITS,
+  assertModelBudget,
+  ModelBudgetExceededError,
+  DAILY_MODEL_BUDGET_MESSAGE,
+  secondsUntilUtcMidnight,
+} from '../api/_lib/rateLimit.js';
+import { R2Error } from '../api/_lib/r2.js';
+import { IngestError } from '../api/_lib/readDocument.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -258,6 +267,73 @@ const eq = (name, got, want) =>
     typeof DAILY_BUDGET_EXCEEDED_MESSAGE === 'string' && /tomorrow/i.test(DAILY_BUDGET_EXCEEDED_MESSAGE));
 }
 
+/* ---------------------------------------- B1: shared model-budget assertion
+ * 2026-09-19 adversarial audit: the daily model-spend cap was enforced at
+ * exactly one of four billed call sites. assertModelBudget/
+ * ModelBudgetExceededError are the one shared helper now called from all
+ * four (extractDocumentFields, /api/extract's image path, /api/ask, and the
+ * inline ingestion path) — see rateLimit.js. No database here, so this
+ * exercises the documented FAIL-OPEN path (same principle as every other
+ * budget/rate lookup in this codebase): with no NEON_CONNECTION_STRING,
+ * getDailyModelBudgetStatus can't reach Postgres and reports "not exceeded"
+ * rather than either blocking every request or disabling the cap forever. */
+{
+  check('DAILY_MODEL_BUDGET_MESSAGE is human-readable and mentions the budget resets', typeof DAILY_MODEL_BUDGET_MESSAGE === 'string' && /daily/i.test(DAILY_MODEL_BUDGET_MESSAGE));
+
+  const err = new ModelBudgetExceededError();
+  check('ModelBudgetExceededError carries the shared message by default', err.message === DAILY_MODEL_BUDGET_MESSAGE);
+  check('ModelBudgetExceededError is a 429', err.status === 429);
+  check('ModelBudgetExceededError has a distinct name (not IngestError, not a bare Error)', err.name === 'ModelBudgetExceededError');
+  check('ModelBudgetExceededError carries a positive retryAfterSeconds by default', err.retryAfterSeconds > 0);
+
+  let threw = null;
+  let status;
+  try {
+    status = await assertModelBudget({ tenantKey: 'user_verify_scale_budget' });
+  } catch (e) {
+    threw = e;
+  }
+  check('assertModelBudget fails open (does not throw) when the database is unreachable', threw === null, threw?.message);
+  check('the fail-open status reports not-exceeded', status?.exceeded === false, JSON.stringify(status));
+
+  eq('secondsUntilUtcMidnight at exactly midnight UTC is a full day', secondsUntilUtcMidnight(Date.UTC(2026, 0, 1, 0, 0, 0)), 86400);
+  eq('secondsUntilUtcMidnight one second before midnight is 1', secondsUntilUtcMidnight(Date.UTC(2026, 0, 1, 23, 59, 59)), 1);
+  check('secondsUntilUtcMidnight never returns less than 1', secondsUntilUtcMidnight(Date.UTC(2026, 0, 2, 0, 0, 0) - 1) >= 1);
+}
+
+/* --------------------------------------------------- H3: fatal() classification
+ * 2026-09-19 adversarial audit: fatal() used to recognize only a non-429 4xx
+ * IngestError. Traced against real Postgres, two real failures slipped past
+ * it — a document deleted mid-ingestion (a plain pg FK-violation error, not
+ * an IngestError) and a permanently-missing R2 object (a bare Error with no
+ * `.status`) — both got the full Inngest retry treatment before finally
+ * failing, wasting a paid transcription call and delaying the eventual
+ * failure. fatal() is exported specifically so this classification can be
+ * pinned without standing up a fake Inngest run. */
+{
+  check('an IngestError 404 (document not found) is fatal', fatal(new IngestError('Document not found', 404)));
+  check('an IngestError 409 (not read yet) is fatal', fatal(new IngestError('not read yet', 409)));
+  check('an IngestError 429 is NOT fatal (Anthropic rate limits clear up in seconds)', !fatal(new IngestError('rate limited', 429)));
+  check('an IngestError 500-shaped status is NOT fatal (infrastructure, not the document)', !fatal(new IngestError('boom', 500)));
+
+  const fkViolation = Object.assign(new Error('insert or update on table "document_pages" violates foreign key constraint'), { name: 'error', code: '23503' });
+  check('a Postgres FK-violation error (23503) is fatal — the parent document is gone, retrying can never succeed', fatal(fkViolation));
+  const otherPgError = Object.assign(new Error('deadlock detected'), { name: 'error', code: '40P01' });
+  check('a different pg error code is NOT fatal (a real deadlock legitimately clears on retry)', !fatal(otherPgError));
+
+  check('an R2Error 404 (permanently missing object) is fatal', fatal(new R2Error('R2 GET x failed: 404', 404)));
+  check('an R2Error 403 (forbidden) is fatal', fatal(new R2Error('R2 GET x failed: 403', 403)));
+  check('an R2Error 400 is fatal', fatal(new R2Error('R2 GET x failed: 400', 400)));
+  check('an R2Error 500 (R2 having a bad moment) is NOT fatal — worth retrying', !fatal(new R2Error('R2 GET x failed: 500', 500)));
+  check('a plain Error naming "404" in its message is NOT fatal by text alone (R2Error requires the real .status)', !fatal(new Error('R2 GET x failed: 404')));
+
+  check('a ModelBudgetExceededError is fatal despite its 429 status — retrying THIS run cannot succeed', fatal(new ModelBudgetExceededError()));
+
+  check('a plain Error is not fatal', !fatal(new Error('boom')));
+  check('null is not fatal', !fatal(null));
+  check('undefined is not fatal', !fatal(undefined));
+}
+
 /* --------------------------- consolidated modules import without a pool -- */
 //
 // With NEON_CONNECTION_STRING unset, importing any of these four files (or
@@ -325,6 +401,50 @@ const eq = (name, got, want) =>
   }
   const recordsText = fs.readFileSync(new URL('../api/_lib/recordsStore.js', import.meta.url), 'utf8');
   check('recordsStore.js exports getPool (not just an internal function)', /export function getPool/.test(recordsText));
+}
+
+/* ------------------------ H1: extract-fields shares readDocument's concurrency
+ * 2026-09-19 adversarial audit: extract-fields used to declare
+ * `concurrency: { limit: 5 }` — global only, no per-tenant key — which both
+ * starved every other tenant's extraction during one tenant's burst AND
+ * (worsening B2) let up to 5 of one tenant's OWN documents run
+ * findOrCreateEquipment/findOrCreateCustomer at once instead of the 3 the
+ * read step caps a single tenant to. Source-level check (not just an import
+ * check) because the actual defect was a literal `{ limit: 5 }` in the
+ * function's own config object, not something reachable by calling
+ * resolveIngestConcurrency() in isolation. */
+{
+  const fs = await import('node:fs');
+  const queueText = fs.readFileSync(new URL('../api/_lib/queue.js', import.meta.url), 'utf8');
+  const extractFieldsBlock = queueText.slice(
+    queueText.indexOf('id: "extract-fields"'),
+    queueText.indexOf('triggers: [{ event: EVENTS.read }]')
+  );
+  check('extract-fields no longer hardcodes a global-only concurrency limit', !/concurrency:\s*\{\s*limit:\s*5\s*\}/.test(extractFieldsBlock));
+  check('extract-fields uses the same resolveIngestConcurrency() helper as read-document', /concurrency:\s*resolveIngestConcurrency\(\)/.test(extractFieldsBlock));
+  check('the extraction event payload still carries tenantKey (enqueueDocument\'s "queue-extraction" sendEvent)',
+    /name:\s*EVENTS\.read[\s\S]{0,200}tenantKey/.test(queueText));
+}
+
+/* ------------------------------- H2: no nested retry multiplication in the queue
+ * 2026-09-19 adversarial audit: extractDocumentFields's own withBackoff
+ * (default 3 attempts) nested inside Inngest's `retries: RETRIES` (also 3)
+ * could multiply one document's Anthropic spend up to 3x3=9 attempts under a
+ * sustained 429/529. Source-level check: queue.js's extract-fields function
+ * must pass modelAttempts: 1 (let Inngest alone own retrying), while
+ * extractDocument.js's own withBackoff call must actually forward that
+ * option through — a caller passing it into a parameter nothing reads would
+ * look identical from queue.js's side and still retry 3x3. */
+{
+  const fs = await import('node:fs');
+  const queueText = fs.readFileSync(new URL('../api/_lib/queue.js', import.meta.url), 'utf8');
+  check('queue.js\'s extract-fields step calls extractDocumentFields with modelAttempts: 1',
+    /extractDocumentFields\(ctx, documentId, \{ userId, modelAttempts: 1 \}\)/.test(queueText));
+
+  const extractDocText = fs.readFileSync(new URL('../api/_lib/extractDocument.js', import.meta.url), 'utf8');
+  check('extractDocumentFields accepts a modelAttempts option', /modelAttempts/.test(extractDocText));
+  check('extractDocumentFields forwards modelAttempts into withBackoff as `attempts`',
+    /withBackoff\(\(\) => client\.messages\.create[\s\S]{0,800}attempts:\s*modelAttempts/.test(extractDocText));
 }
 
 /* ------------------------------------------------------------------ done */

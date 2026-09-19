@@ -81,6 +81,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer } from './recordsStore.js';
 import { getApiKey, withBackoff } from './claude.js';
+import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
 import {
   normalizeDocumentType,
@@ -669,6 +670,19 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
   const changes = [];
   let remaining = 0;
 
+  // B1 (2026-09-19 adversarial audit): reclassify's Haiku fallback was the
+  // fourth billed call site with no daily-budget check at all. Checked ONCE,
+  // before the loop, not per document: the whole point of this loop is that
+  // its heuristic-only path (facts/filename, no model call) keeps working for
+  // every eligible document regardless of budget, so this doesn't throw and
+  // abort the batch — it just makes `budget` below always resolve to "don't
+  // call the model", which is exactly what an exhausted tenant should get:
+  // every document the heuristic can place still gets reclassified, and the
+  // rest count toward `remaining` (the same signal a genuinely exhausted
+  // MAX_RECLASSIFY_MODEL_CALLS already produces) rather than a 429 that would
+  // also block the heuristic-only documents in the same batch.
+  const budgetStatus = await getDailyModelBudgetStatus(ctx);
+
   for (const id of ids) {
     try {
       const change = await withRecordsTenant(ctx, async (db) => {
@@ -689,7 +703,9 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
         if (resolved === 'other') resolved = inferDocumentType(facts, doc.original_filename);
 
         if (resolved === 'other') {
-          const budget = modelCalls < MAX_RECLASSIFY_MODEL_CALLS ? modelCallBudget(deadlineAt - Date.now()) : null;
+          const budget = modelCalls < MAX_RECLASSIFY_MODEL_CALLS && !budgetStatus.exceeded
+            ? modelCallBudget(deadlineAt - Date.now())
+            : null;
           if (budget != null) {
             const pages = await db.listPages(id);
             const text = pages.map((p) => p.text).filter(Boolean).join('\n').slice(0, RECLASSIFY_TEXT_CHARS).trim();

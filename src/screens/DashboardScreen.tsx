@@ -4,7 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
 import { docCountsByStage, entitiesOfType, useGraph } from '../core/entityGraph';
-import { dateOf, fmtDate, str } from '../core/answer';
+import { dateOf, formatYmd, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { deepLinkFor } from '../hooks/useDeepLink';
 import { useAppStore } from '../store/appStore';
@@ -343,7 +343,7 @@ export function DashboardScreen() {
                     <button type="button" onClick={() => openEntity(e.id)} className="font-mono text-data underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 truncate">
                       {str(e, 'serial')}
                     </button>
-                    <span>{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ')} · expires {fmtDate(dateOf(e, 'warrantyExpiry'))}</span>
+                    <span>{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ')} · expires {formatYmd(dateOf(e, 'warrantyExpiry'))}</span>
                   </li>
                 ))}
                 {coveredUnits.length === 0 && <li className="text-body text-ink-3">None yet.</li>}
@@ -413,7 +413,7 @@ export function DashboardScreen() {
                         <span className="block text-body text-ink-3">{str(e, 'manufacturer')} {str(e, 'equipmentType')} · {str(e, 'model')}</span>
                       </td>
                       <td className="px-4 py-3 text-ink-2">{p ? str(p, 'address') : '—'}</td>
-                      <td className="px-4 py-3 text-ink-2">{dateOf(e, 'warrantyExpiry') ? fmtDate(dateOf(e, 'warrantyExpiry')) : '—'}</td>
+                      <td className="px-4 py-3 text-ink-2">{dateOf(e, 'warrantyExpiry') ? formatYmd(dateOf(e, 'warrantyExpiry')) : '—'}</td>
                       <td className="px-4 py-3"><WarrantyStatusBadge warranty={{ warrantyExpiry: dateOf(e, 'warrantyExpiry') }} /></td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1.5">
@@ -460,7 +460,7 @@ export function DashboardScreen() {
                       {reasons.map((r) => <li key={r} className="dw-pill-warn">{r}</li>)}
                     </ul>
                     <p className="mt-2 text-body text-ink-3">
-                      {hasServiceRecords ? `Last service: ${last ? fmtDate(last) : 'none on record'}` : 'Service visits: not tracked yet'} · Ask about this property <ArrowRight className="inline w-3.5 h-3.5" aria-hidden="true" />
+                      {hasServiceRecords ? `Last service: ${last ? formatYmd(last) : 'none on record'}` : 'Service visits: not tracked yet'} · Ask about this property <ArrowRight className="inline w-3.5 h-3.5" aria-hidden="true" />
                     </p>
                   </button>
                 </li>

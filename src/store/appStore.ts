@@ -45,6 +45,9 @@ export type PendingReviewFilter = string;
 export interface IngestProgressSummary {
   current: number;
   total: number;
+  /** Past the ten-minute server-side processing cap — still `total - current`
+   *  behind, but no longer being polled (see App.tsx's poll loop). */
+  stalled?: boolean;
 }
 
 /** True once a single-file upload row has nothing left to wait on: it either
@@ -64,16 +67,29 @@ function isUploadSettled(u: IngestProgress): boolean {
  * exactly when every in-flight item has finished or failed, from any
  * subscriber, at any time, regardless of what mounted or unmounted it.
  */
-export function selectIngestProgress(s: Pick<AppState, 'uploads' | 'bulkRunning' | 'bulkStates'>): IngestProgressSummary | null {
+export function selectIngestProgress(
+  s: Pick<AppState, 'uploads' | 'bulkRunning' | 'bulkStates' | 'processingPending' | 'processingTotal' | 'processingStalled'>
+): IngestProgressSummary | null {
   if (s.bulkRunning) {
     const summary = summarizeProgress(s.bulkStates);
     return { current: summary.uploaded + summary.skipped + summary.failed, total: summary.total };
   }
   const entries = Object.values(s.uploads);
-  if (entries.length === 0 || entries.every(isUploadSettled)) return null;
-  const total = entries.length;
-  const done = entries.filter((u) => u.status === 'done' || u.status === 'error').length;
-  return { current: done, total };
+  if (entries.length > 0 && !entries.every(isUploadSettled)) {
+    const total = entries.length;
+    const done = entries.filter((u) => u.status === 'done' || u.status === 'error').length;
+    return { current: done, total };
+  }
+  // The client-side transfer (upload + read) is done, or never ran this
+  // session — but the server's own classify/extract/link/verify pipeline can
+  // keep working for minutes after that. `processingPending` tracks exactly
+  // that: documents this tab uploaded, not yet at a terminal server state
+  // (see trackProcessingDocs and the poll loop in App.tsx), so leaving Inbox
+  // mid-processing doesn't lose the indicator the way it used to.
+  if (s.processingPending.length > 0 || s.processingStalled) {
+    return { current: s.processingTotal - s.processingPending.length, total: s.processingTotal, stalled: s.processingStalled };
+  }
+  return null;
 }
 
 interface AppState {
@@ -103,6 +119,25 @@ interface AppState {
   seedUploads: (filenames: string[]) => void;
   uploadDocIds: Record<string, string>;
   setUploadDocId: (filename: string, id: string) => void;
+
+  // Server-side pipeline tracking for the "Processing N of M…" header pill —
+  // see selectIngestProgress above. Lives here (not component state) so the
+  // poll loop that drives it (App.tsx, mounted for the whole signed-in
+  // session) keeps running no matter which screen is on screen.
+  processingPending: string[];
+  processingTotal: number;
+  processingStartedAt: number | null;
+  processingStalled: boolean;
+  /** Start tracking real document ids this tab just uploaded. Ids already
+   *  pending are ignored; if nothing was pending before, this starts a fresh
+   *  run (resets the total and the ten-minute clock). */
+  trackProcessingDocs: (ids: string[]) => void;
+  /** Mark ids as having reached a terminal server-side state (verified, a
+   *  hard extract error, or complete enough at mapped/linked) — see
+   *  ingestClient.ts's `isProcessingTerminal`. Once nothing is left pending,
+   *  the run resets so the next upload starts a clean count. */
+  settleProcessingDocs: (ids: string[]) => void;
+  setProcessingStalled: (v: boolean) => void;
 
   bulkStates: BulkFileState[];
   setBulkStates: (states: BulkFileState[]) => void;
@@ -180,6 +215,34 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   uploadDocIds: {},
   setUploadDocId: (filename, id) => set((s) => ({ uploadDocIds: { ...s.uploadDocIds, [filename]: id } })),
+
+  processingPending: [],
+  processingTotal: 0,
+  processingStartedAt: null,
+  processingStalled: false,
+  trackProcessingDocs: (ids) =>
+    set((s) => {
+      const fresh = ids.filter((id) => !s.processingPending.includes(id));
+      if (!fresh.length) return s;
+      const wasEmpty = s.processingPending.length === 0;
+      return {
+        processingPending: [...s.processingPending, ...fresh],
+        processingTotal: wasEmpty ? fresh.length : s.processingTotal + fresh.length,
+        processingStartedAt: s.processingStartedAt ?? Date.now(),
+        processingStalled: false,
+      };
+    }),
+  settleProcessingDocs: (ids) =>
+    set((s) => {
+      const pending = s.processingPending.filter((id) => !ids.includes(id));
+      if (pending.length === s.processingPending.length) return s;
+      const cleared = pending.length === 0;
+      return {
+        processingPending: pending,
+        ...(cleared ? { processingTotal: 0, processingStartedAt: null, processingStalled: false } : {}),
+      };
+    }),
+  setProcessingStalled: (v) => set({ processingStalled: v }),
 
   bulkStates: [],
   setBulkStates: (states) => set({ bulkStates: states }),

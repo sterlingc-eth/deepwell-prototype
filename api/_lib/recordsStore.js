@@ -596,7 +596,7 @@ function makeStore(db, tenantId) {
                  ), '')::tsquery AS tsq
         )
         SELECT p.id, p.document_id, p.page_no,
-               d.original_filename, d.document_type,
+               d.original_filename, d.document_type, d.stage,
                ts_headline('english', p.text, q.tsq,
                  'MaxFragments=2, MaxWords=55, MinWords=20, FragmentDelimiter=" … ", StartSel="", StopSel=""') AS excerpt,
                ts_rank_cd(p.tsv, q.tsq) AS rank
@@ -621,7 +621,7 @@ function makeStore(db, tenantId) {
         for (const w of words) {
           const r = await db.query(
             `SELECT p.id, p.document_id, p.page_no,
-                    d.original_filename, d.document_type,
+                    d.original_filename, d.document_type, d.stage,
                     substring(p.text from greatest(1, position(lower($2) in lower(p.text)) - 120) for 320) AS excerpt,
                     0.5 AS rank
                FROM document_pages p
@@ -645,7 +645,7 @@ function makeStore(db, tenantId) {
         const like = `%${token}%`;
         const r = await db.query(
           `SELECT p.id, p.document_id, p.page_no,
-                  d.original_filename, d.document_type,
+                  d.original_filename, d.document_type, d.stage,
                   substring(p.text from greatest(1, position($2 in p.text) - 120) for 320) AS excerpt,
                   1.0 AS rank
              FROM document_pages p
@@ -672,7 +672,7 @@ function makeStore(db, tenantId) {
       if (!tokens.length) return [];
       return many(
         `SELECT x.id, x.document_id, x.entity_id, x.field_key, x.value, x.confidence,
-                d.original_filename, e.entity_type, e.data
+                d.original_filename, d.stage, e.entity_type, e.data
            FROM extractions x
            JOIN documents d ON d.id = x.document_id
       LEFT JOIN entities  e ON e.id = x.entity_id
@@ -885,6 +885,29 @@ function makeStore(db, tenantId) {
         if (v) incoming[k] = v;
       }
 
+      // B2 (2026-09-19 adversarial audit, PROVEN against real Postgres): two
+      // concurrent extraction transactions for the same tenant naming the
+      // same brand-new serial (an install invoice split into two files, an
+      // install + a same-day filter-change ticket) both reached the SELECT
+      // below before either committed its INSERT, both saw "nothing exists",
+      // and both inserted — two equipment rows for one physical unit, its
+      // history split between them forever after (nothing self-heals it:
+      // later documents deterministically match the earlier-created row).
+      //
+      // pg_advisory_xact_lock serializes concurrent creators of the SAME
+      // (tenant, serial) pair without a schema change: the second transaction
+      // blocks here until the first COMMITs or ROLLBACKs, at which point its
+      // own SELECT sees the just-inserted row and takes the existing-entity
+      // path instead of creating a duplicate. Session-level (`_xact_`, not
+      // the non-transactional variant) so the lock releases automatically at
+      // COMMIT/ROLLBACK regardless of how this function returns — no matching
+      // unlock call to forget. hashtext() collapses the key to a bigint;
+      // Postgres advisory locks take an integer, not a string, and a 64-bit
+      // hash collision between two different (tenant, serial) pairs would
+      // only ever cost unrelated inserts a moment of serialization, never a
+      // wrong match (the SELECT itself is still keyed on the real serial).
+      await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:equipment:${serial.toLowerCase()}`]);
+
       const existing = await one(
         `SELECT id, data FROM entities
           WHERE entity_type = 'equipment' AND ${TENANT}
@@ -989,6 +1012,18 @@ function makeStore(db, tenantId) {
         const v = String(facts?.[k] ?? '').trim();
         if (v) incoming[k] = v;
       }
+
+      // B2, same race as findOrCreateEquipment above, same fix: serialize
+      // concurrent creators of the same (tenant, normalized name) before the
+      // candidate SELECT so two documents naming a brand-new customer at the
+      // same moment can't both decide "nobody exists yet" and both insert.
+      // Keyed on the customer name alone (not name+address): the whole point
+      // of selectCustomerMatch's address-narrowing below is that MULTIPLE
+      // real customers can share a name, and every one of them still needs to
+      // serialize against every other insert under that same name — locking
+      // only by the more specific key would let two inserts for the address-
+      // ambiguous case race past each other.
+      await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:customer:${name.toLowerCase()}`]);
 
       const candidates = await many(
         `SELECT id, data FROM entities
