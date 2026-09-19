@@ -9,6 +9,12 @@ import { warrantyStatus } from '../components/WarrantyStatusBadge';
 import { EVAL_NOW, EVAL_QUESTIONS } from '../eval/questions';
 import { answerSync } from '../services/answerService.mock';
 import { useAppStore } from '../store/appStore';
+import { loadGraphFromServer } from '../hooks/usePostgresSync';
+
+/** Safety cap on reclassify rounds: `reclassify` caps its own model calls per
+ *  request, so a stubborn batch (no page text, model keeps saying 'other')
+ *  could otherwise loop forever chewing through requests for no gain. */
+const MAX_RECLASSIFY_ROUNDS = 5;
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -36,20 +42,37 @@ export function RecordsScreen() {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
 
-  // "Reclassify & verify all": a no-model cleanup pass over every synced
-  // document (reviewStore.js's reclassifyDocuments only touches legacy/null
-  // types, so re-running this is always safe), then an AI-verify attempt on
-  // whatever still isn't verified. Sequential on purpose — this is an
-  // occasional maintenance action, not something to hammer the API with.
+  // "Reclassify & verify all": cleans up every synced document's type
+  // (reviewStore.js's reclassifyDocuments touches legacy/null/'other' types
+  // and may make a few cheap model calls for ones its heuristic can't place —
+  // safe to re-run), then an AI-verify attempt on whatever still isn't
+  // verified. Sequential on purpose — this is an occasional maintenance
+  // action, not something to hammer the API with.
+  //
+  // `reclassify` returns `remaining`: how many of the ids it was just given
+  // are STILL 'other' after that pass (its own model-call budget is capped
+  // per request). We loop, resubmitting only the docs still typed 'other' in
+  // the local graph (an unchanged doc keeps whatever typeId it already had,
+  // so this is exactly the same set the server just told us about — no extra
+  // round trip to ask which ids those are).
   const runReclassifyAndVerifyAll = async () => {
     setBulkRunning(true);
     setBulkProgress('Reclassifying…');
-    const ids = Object.keys(useGraph.getState().docs);
-    for (let i = 0; i < ids.length; i += 100) {
-      const batch = ids.slice(i, i + 100);
-      await reclassifyDocs(batch);
-      setBulkProgress(`Reclassifying… ${Math.min(i + batch.length, ids.length)}/${ids.length}`);
+    let ids = Object.keys(useGraph.getState().docs);
+    let totalChanged = 0;
+    for (let round = 0; round < MAX_RECLASSIFY_ROUNDS && ids.length > 0; round++) {
+      let remaining = 0;
+      for (let i = 0; i < ids.length; i += 100) {
+        const batch = ids.slice(i, i + 100);
+        const { changed, remaining: r } = await reclassifyDocs(batch);
+        totalChanged += changed;
+        remaining += r;
+        setBulkProgress(`Reclassifying… round ${round + 1}, ${Math.min(i + batch.length, ids.length)}/${ids.length}`);
+      }
+      if (remaining === 0) break;
+      ids = Object.values(useGraph.getState().docs).filter((d) => d.typeId === 'other').map((d) => d.id);
     }
+
     const toVerify = Object.values(useGraph.getState().docs).filter((d) => d.stage !== 'verified');
     let verified = 0;
     for (const doc of toVerify) {
@@ -57,7 +80,20 @@ export function RecordsScreen() {
       if (ok) verified += 1;
       setBulkProgress(`Verifying with AI… ${toVerify.indexOf(doc) + 1}/${toVerify.length}`);
     }
-    setBulkProgress(`Done — reclassified ${ids.length} document${ids.length === 1 ? '' : 's'}, AI-verified ${verified} of ${toVerify.length} candidate${toVerify.length === 1 ? '' : 's'}.`);
+
+    // Re-sync from the server rather than trusting our own optimistic patches:
+    // reclassify/aiVerify only ever set typeId/verifiedBy locally, never the
+    // real backend `stage` those changes may have unlocked — which is exactly
+    // why the tiles used to need a manual reload to catch up.
+    setBulkProgress('Refreshing…');
+    try {
+      await loadGraphFromServer();
+    } catch {
+      /* best effort — the optimistic local state above still reflects the run */
+    }
+
+    const stillNeedAPerson = Object.values(useGraph.getState().docs).filter((d) => d.stage !== 'verified').length;
+    setBulkProgress(`Reclassified ${totalChanged} · AI-verified ${verified} · Still need a person ${stillNeedAPerson}`);
     setBulkRunning(false);
   };
   const batches = Object.values(graph.batches);

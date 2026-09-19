@@ -59,8 +59,14 @@ export default async function handler(req, res) {
         }
         return rows.map((d) => {
           const type = normalizeDocumentType(d.document_type);
-          const completeness = completenessFor(type, toCompletenessFields(byDoc.get(d.id) ?? []));
-          return { ...d, document_type: type, completeness };
+          // `d` (from getIngestStatus) never carried a `fields` column, only a
+          // count — so the spread below never produced one either, and the
+          // browser's default of [] made every document look field-less even
+          // with extractions on file. toCompletenessFields already applies
+          // corrected_value; reuse it for both completeness and the response.
+          const docFields = toCompletenessFields(byDoc.get(d.id) ?? []);
+          const completeness = completenessFor(type, docFields);
+          return { ...d, document_type: type, completeness, fields: docFields };
         });
       }
     );

@@ -84,8 +84,10 @@ interface GraphActions {
    *  it's complete and confident enough. Resolves false (no throw) when it
    *  isn't; a real transport failure sets `lastError` same as the others. */
   aiVerifyDoc: (docId: DocumentId) => Promise<boolean>;
-  /** Review: batch, no-model reclassification of legacy/unknown types. Resolves the number actually changed. */
-  reclassifyDocs: (docIds: DocumentId[]) => Promise<number>;
+  /** Review: batch reclassification of legacy/unknown/'other' types. Resolves
+   *  the number actually changed and how many of `docIds` are still 'other'
+   *  (the caller should resubmit exactly those until `remaining` is 0). */
+  reclassifyDocs: (docIds: DocumentId[]) => Promise<{ changed: number; remaining: number }>;
   /** Review: drop a document locally after its server-side delete succeeded. */
   removeDoc: (docId: DocumentId) => void;
   /** Intake: create a batch. */
@@ -363,9 +365,9 @@ export const useGraph = create<GraphStore>((set, get) => ({
   },
 
   reclassifyDocs: async (docIds) => {
-    if (DEMO_MODE || !docIds.length) return 0;
+    if (DEMO_MODE || !docIds.length) return { changed: 0, remaining: 0 };
     try {
-      const { changes } = await reviewClient.reclassify(docIds);
+      const { changes, remaining } = await reviewClient.reclassify(docIds);
       set((s) => {
         const docs = { ...s.docs };
         for (const c of changes) {
@@ -374,10 +376,10 @@ export const useGraph = create<GraphStore>((set, get) => ({
         }
         return { docs, lastError: null };
       });
-      return changes.length;
+      return { changed: changes.length, remaining };
     } catch (err) {
       set({ lastError: describeError(err) });
-      return 0;
+      return { changed: 0, remaining: 0 };
     }
   },
 

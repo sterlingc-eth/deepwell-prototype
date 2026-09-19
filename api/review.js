@@ -27,6 +27,10 @@ import { deleteDocuments } from './_lib/routes/document-delete.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
+  // reclassify can make up to 20 sequential model calls (see reviewStore.js's
+  // RECLASSIFY_DEADLINE_MS); the platform default ceiling is shorter than
+  // that could need.
+  maxDuration: 60,
 };
 
 const ACTIONS = new Set([

@@ -558,6 +558,67 @@ function toYmd(t) {
 
 const DAY = 86_400_000;
 
+const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+const MONTH_ABBR = MONTH_NAMES.map((m) => m.slice(0, 3));
+
+/**
+ * Parse a printed date in one of several shapes extraction is known to
+ * return, without ever inventing a day this system can't back.
+ *
+ * A maintenance agreement that says "installed 06/2021" gives extraction no
+ * day to report — extraction correctly returns only what's printed (see the
+ * module comment's HONESTY RULES), and this file was previously throwing that
+ * whole fact away because `isValidYmd` only accepts YYYY-MM-DD. The unit then
+ * showed "No warranty on file" even though it was, in fact, printed and
+ * computable to the month.
+ *
+ * Accepted: `YYYY-MM-DD` (day precision), `YYYY-MM`, `MM/YYYY`,
+ * `MM/DD/YYYY` (day precision), and `Month YYYY` / `Mon YYYY` (case-
+ * insensitive, full or 3-letter month name). Every month-only shape is
+ * anchored to the 1st with `precision: 'month'` — that day is an arithmetic
+ * placeholder, never asserted as something the document said.
+ *
+ * @param {unknown} raw
+ * @returns {{ymd: string, precision: 'day'|'month'}|null}
+ */
+export function normalizeDate(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+
+  if (parseYmd(s) !== null) return { ymd: s, precision: 'day' };
+
+  let m = /^(\d{4})-(\d{1,2})$/.exec(s);
+  if (m) {
+    const ymd = `${m[1]}-${m[2].padStart(2, '0')}-01`;
+    return parseYmd(ymd) !== null ? { ymd, precision: 'month' } : null;
+  }
+
+  // MM/DD/YYYY before MM/YYYY — both start the same way, but this one has an
+  // extra segment.
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (m) {
+    const ymd = `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+    return parseYmd(ymd) !== null ? { ymd, precision: 'day' } : null;
+  }
+
+  m = /^(\d{1,2})\/(\d{4})$/.exec(s);
+  if (m) {
+    const ymd = `${m[2]}-${m[1].padStart(2, '0')}-01`;
+    return parseYmd(ymd) !== null ? { ymd, precision: 'month' } : null;
+  }
+
+  m = /^([a-zA-Z]+)\.?\s+(\d{4})$/.exec(s);
+  if (m) {
+    const word = m[1].toLowerCase();
+    const idx = MONTH_NAMES.indexOf(word) !== -1 ? MONTH_NAMES.indexOf(word) : MONTH_ABBR.indexOf(word.slice(0, 3));
+    if (idx === -1) return null;
+    const ymd = `${m[2]}-${String(idx + 1).padStart(2, '0')}-01`;
+    return parseYmd(ymd) !== null ? { ymd, precision: 'month' } : null;
+  }
+
+  return null;
+}
+
 export function addDays(ymd, days) {
   const t = parseYmd(ymd);
   return t === null ? null : toYmd(t + days * DAY);
@@ -639,10 +700,12 @@ function describePendingOptions(pending) {
  *                         this is testable and so a batch run is self-consistent
  * @returns {{
  *   brand: string|null, brandLabel: string|null, brandVerified: boolean,
- *   installDate: string|null, registrationOnFile: string|null,
+ *   installDate: string|null, installDatePrecision: 'day'|'month'|null,
+ *   registrationOnFile: string|null, registrationPrecision: 'day'|'month'|null,
  *   registrationDeadline: string|null, daysToRegister: number|null,
  *   registrationState: 'on_file'|'due'|'window_closed'|'unknown',
  *   expires: string|null, expiresBasis: 'printed'|'computed'|null,
+ *   expiresPrecision: 'day'|'month'|null,
  *   termYears: number|null, termConditional: boolean,
  *   daysToExpiry: number|null, action: string|null, notes: string[]
  * }}
@@ -653,22 +716,34 @@ export function deriveWarranty(facts = {}, today = null) {
   const entry = brand ? BRAND_RULES[brand] : null;
   const rule = entry?.rule ?? null;
 
-  const installDate = parseYmd(facts.installation_date) !== null ? facts.installation_date : null;
-  const registrationOnFile =
-    parseYmd(facts.warranty_registered_date) !== null ? facts.warranty_registered_date : null;
-  const printedExpiry = parseYmd(facts.warranty_expires) !== null ? facts.warranty_expires : null;
+  // Accepts YYYY-MM-DD, YYYY-MM, MM/YYYY, MM/DD/YYYY and "Month YYYY" — see
+  // normalizeDate. A month-only source (a maintenance agreement that only
+  // ever prints "installed 06/2021") is real, usable data, not a rejected one.
+  const installParsed = normalizeDate(facts.installation_date);
+  const installDate = installParsed?.ymd ?? null;
+  const installDatePrecision = installParsed?.precision ?? null;
+
+  const registrationParsed = normalizeDate(facts.warranty_registered_date);
+  const registrationOnFile = registrationParsed?.ymd ?? null;
+  const registrationPrecision = registrationParsed?.precision ?? null;
+
+  const printedExpiryParsed = normalizeDate(facts.warranty_expires);
+  const printedExpiry = printedExpiryParsed?.ymd ?? null;
 
   const out = {
     brand,
     brandLabel: entry?.label ?? (facts.manufacturer ? String(facts.manufacturer) : null),
     brandVerified: Boolean(rule),
     installDate,
+    installDatePrecision,
     registrationOnFile,
+    registrationPrecision,
     registrationDeadline: null,
     daysToRegister: null,
     registrationState: registrationOnFile ? 'on_file' : 'unknown',
     expires: null,
     expiresBasis: null,
+    expiresPrecision: null,
     termYears: null,
     // True only when termYears is a guaranteed floor standing in for a
     // registered term this rule can't pin down without a fact we don't have —
@@ -686,6 +761,8 @@ export function deriveWarranty(facts = {}, today = null) {
     for (const caveat of entry.caveats) notes.push(`${entry.label}: ${caveat}`);
   }
   if (!installDate) notes.push('No installation date on file.');
+  if (installDatePrecision === 'month') notes.push('Installation date is month precision — exact day unknown; the 1st is used for arithmetic only.');
+  if (registrationPrecision === 'month') notes.push('Registration date is month precision — exact day unknown; the 1st is used for arithmetic only.');
 
   // ---- 1. registration window -------------------------------------------
   if (rule && installDate) {
@@ -704,6 +781,8 @@ export function deriveWarranty(facts = {}, today = null) {
   if (printedExpiry) {
     out.expires = printedExpiry;
     out.expiresBasis = 'printed';
+    out.expiresPrecision = printedExpiryParsed.precision;
+    if (printedExpiryParsed.precision === 'month') notes.push('Printed expiry is month precision — exact day unknown; the 1st is used for arithmetic only.');
   } else if (rule && installDate) {
     // Registered within the window earns the long term. Absence of a
     // registration date is NOT evidence of non-registration — it means we
@@ -731,6 +810,10 @@ export function deriveWarranty(facts = {}, today = null) {
     }
     out.expires = addYears(installDate, out.termYears);
     out.expiresBasis = 'computed';
+    // A computed expiry can only be as precise as the install date it's
+    // anchored to — addYears preserves day-of-month, so month precision
+    // carries straight through.
+    out.expiresPrecision = installDatePrecision;
 
     if (!registrationOnFile) {
       if (rule.registeredPartsYears != null) {
@@ -810,6 +893,12 @@ export function describeWarranty(stable, today, { expiringWithinDays = 365 } = {
       ? ` Coverage may run longer if ${label}'s registration condition is confirmed — check before treating this as final.`
       : '';
 
+  // The expiry itself may only be known to the month (see normalizeDate /
+  // deriveWarranty) — an "expired 3 days ago" reading day precision, then
+  // computed off a placeholder day-of-month, would overstate how exactly this
+  // is known.
+  const precisionCaveat = stable?.expiresPrecision === 'month' ? ' Month precision — exact day unknown.' : '';
+
   if (out.registrationState === 'due' && rule) {
     out.urgency = out.daysToRegister <= 14 ? 'register_urgent' : 'register_soon';
     out.action =
@@ -832,10 +921,10 @@ export function describeWarranty(stable, today, { expiringWithinDays = 365 } = {
           `${rule.unregisteredPartsYears} years, not up to ${maxRegisteredTerm(rule)}.`;
   } else if (out.daysToExpiry !== null && out.daysToExpiry < 0) {
     out.urgency = 'expired';
-    out.action = `Parts warranty expired ${Math.abs(out.daysToExpiry)} day(s) ago${computed}.${ceilingCaveat}`;
+    out.action = `Parts warranty expired ${Math.abs(out.daysToExpiry)} day(s) ago${computed}.${precisionCaveat}${ceilingCaveat}`;
   } else if (out.daysToExpiry !== null && out.daysToExpiry <= expiringWithinDays) {
     out.urgency = 'expiring';
-    out.action = `Parts warranty ends in ${out.daysToExpiry} day(s)${computed} — extended-warranty opportunity.${ceilingCaveat}`;
+    out.action = `Parts warranty ends in ${out.daysToExpiry} day(s)${computed} — extended-warranty opportunity.${precisionCaveat}${ceilingCaveat}`;
   }
 
   return out;

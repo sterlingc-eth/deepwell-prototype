@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { withTenant } from "./recordsStore.js";
+import { withTenant, linkDocumentToCustomer } from "./recordsStore.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages } from "./extractFields.js";
 import { IngestError } from "./readDocument.js";
@@ -196,13 +196,14 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     warranty = deriveWarranty(known);
     if (entity?.id) await db.setEquipmentWarranty(entity.id, warranty);
 
-    // Customer resolution never blocks equipment/warranty writes above: a
-    // document with no readable customer name (facts.customer_name empty)
-    // still gets its equipment and warranty recorded, it just isn't linked to
-    // anyone yet. findOrCreateCustomer returns null rather than a fabricated
-    // customer in that case — see its doc comment in recordsStore.js for the
-    // matching key and its known limitations.
-    const customer = entity?.id ? await db.findOrCreateCustomer(facts) : null;
+    // Customer resolution runs regardless of whether an equipment entity was
+    // found: a document with no serial (a dispatch note, a proposal, a
+    // letter) still names a customer, and that customer is how such a
+    // document reaches stage 'linked' below. findOrCreateCustomer returns
+    // null rather than a fabricated customer when the document names nobody
+    // — see its doc comment in recordsStore.js for the matching key and its
+    // known limitations.
+    const customer = await db.findOrCreateCustomer(facts);
     const linked = customer?.id && entity?.id
       ? await db.setEquipmentCustomer(entity.id, customer.id)
       : 0;
@@ -232,8 +233,19 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
 
     // The pipeline just attached this document to an entity. Say so in the
     // stage, so the client's "is this document linked" question has an honest
-    // answer without a human having to click anything.
-    if (entity?.id) await db.markLinked(documentId);
+    // answer without a human having to click anything. A document with no
+    // equipment entity (no serial) but a resolved customer links straight to
+    // that customer instead — see linkDocumentToCustomer's doc comment.
+    let documentCustomerLinked = false;
+    if (entity?.id) {
+      await db.markLinked(documentId);
+    } else if (customer?.id) {
+      const customerFields = fields.filter((f) => f.field_key === 'customer_name' || f.field_key === 'service_address');
+      const customerConfidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
+      documentCustomerLinked = await linkDocumentToCustomer(db, {
+        documentId, entityId: null, customerId: customer.id, confidence: customerConfidence,
+      });
+    }
 
     // AI self-verification: every required field for this type is present at
     // AI_VERIFY_MIN_CONFIDENCE or better, and the document is actually linked
@@ -267,6 +279,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         // no customer to link — the two are distinguishable via customer_id
         // above being non-null with customer_linked false.
         customer_linked: linked > 0,
+        document_customer_linked: documentCustomerLinked,
         document_type: resolvedType,
         document_type_confidence: classification.confidence,
         document_type_source: classification.source,

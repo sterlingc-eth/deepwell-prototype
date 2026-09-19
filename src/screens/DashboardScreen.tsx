@@ -41,14 +41,17 @@ interface AttentionResponse {
   };
 }
 
-/** Alert cards shown on the dashboard, in priority order. `upsell` is not a
- *  tier — it's `item.upsell.eligible` across every item, so a unit can show
- *  up here and in another card too. */
-type AlertCardKey = 'expired' | 'expiring-30' | 'expiring-90' | 'unregistered-window-closing' | 'upsell';
+/** Alert cards shown on the dashboard, in priority order: the five real
+ *  `alertTier` buckets this feature computes, plus `upsell` (not a tier —
+ *  it's `item.upsell.eligible` across every item, so a unit can show up here
+ *  and in another card too). Always rendered, 0 included, so the owner can
+ *  tell the feature is working even on a quiet day. */
+type AlertCardKey = 'expired' | 'expiring-30' | 'expiring-90' | 'expiring-365' | 'unregistered-window-closing' | 'upsell';
 const ALERT_CARDS: { key: AlertCardKey; title: string }[] = [
   { key: 'expired', title: 'Expired' },
   { key: 'expiring-30', title: 'Expiring in 30 days' },
   { key: 'expiring-90', title: 'Expiring in 90 days' },
+  { key: 'expiring-365', title: 'Expiring in 12 months' },
   { key: 'unregistered-window-closing', title: 'Registration closing' },
   { key: 'upsell', title: 'Upsell candidates' },
 ];
@@ -168,6 +171,16 @@ export function DashboardScreen() {
       });
   };
 
+  // Client-side, independent of /api/warranty-attention: that endpoint only
+  // ever returns actionable rows (see its own filter), so tier:'ok' units and
+  // units with no derivable warranty never appear in `attention.items` at
+  // all — there is nothing there to build a "Covered" or "no warranty on
+  // file" list from. Both are cheap to derive from what's already loaded.
+  const coveredUnits = units.filter((e) => warrantyStatus(dateOf(e, 'warrantyExpiry'), now).status === 'active');
+  // Genuinely actionable, unlike a computed alert: the shop can fix this by
+  // registering the unit or simply entering the install date on file.
+  const noWarrantyUnits = units.filter((e) => warrantyStatus(dateOf(e, 'warrantyExpiry'), now).status === 'unknown');
+
   const byExpiry = [...units].sort((a, b) => {
     const da = dateOf(a, 'warrantyExpiry');
     const db = dateOf(b, 'warrantyExpiry');
@@ -220,12 +233,12 @@ export function DashboardScreen() {
           </button>
         </header>
 
-        {attention && attention.items.length > 0 && (
+        {!DEMO_MODE && (
           <section aria-labelledby="alerts-heading" className="space-y-3">
             <h2 id="alerts-heading" className="dw-label">Alerts</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {ALERT_CARDS.map(({ key, title }) => {
-                const count = itemsForCard(attention.items, key).length;
+                const count = itemsForCard(attention?.items ?? [], key).length;
                 const isOpen = openCard === key;
                 return (
                   <button
@@ -246,7 +259,7 @@ export function DashboardScreen() {
             </div>
             {openCard && (
               <ul className="space-y-2">
-                {itemsForCard(attention.items, openCard).map((item) => (
+                {itemsForCard(attention?.items ?? [], openCard).map((item) => (
                   <li key={item.entityId} className="dw-card p-3 flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-mono text-data text-ink">{item.serialNumber ?? '—'}</p>
@@ -283,10 +296,46 @@ export function DashboardScreen() {
                     </div>
                   </li>
                 ))}
-                {itemsForCard(attention.items, openCard).length === 0 && (
+                {itemsForCard(attention?.items ?? [], openCard).length === 0 && (
                   <li className="text-body text-ink-3">Nothing in this bucket right now.</li>
                 )}
               </ul>
+            )}
+
+            {/* Always visible (not gated on there being anything to act on) so
+                the owner can see the feature is actually looking at their
+                units, not just silent. Derived client-side — see the
+                comment on coveredUnits/noWarrantyUnits above. */}
+            <details className="dw-card p-3">
+              <summary className="cursor-pointer text-body text-ink-2">
+                Covered · {coveredUnits.length} unit{coveredUnits.length === 1 ? '' : 's'}
+              </summary>
+              <ul className="mt-2 space-y-1.5">
+                {coveredUnits.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between gap-3 text-body text-ink-3">
+                    <button type="button" onClick={() => openEntity(e.id)} className="font-mono text-data underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 truncate">
+                      {str(e, 'serial')}
+                    </button>
+                    <span>{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ')} · expires {fmtDate(dateOf(e, 'warrantyExpiry'))}</span>
+                  </li>
+                ))}
+                {coveredUnits.length === 0 && <li className="text-body text-ink-3">None yet.</li>}
+              </ul>
+            </details>
+
+            {noWarrantyUnits.length > 0 && (
+              <div className="dw-card p-3 space-y-2">
+                <p className="text-body text-ink-2 font-medium">No warranty on file — needs install date · {noWarrantyUnits.length}</p>
+                <ul className="space-y-1.5">
+                  {noWarrantyUnits.map((e) => (
+                    <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-body text-ink-3">
+                      <span className="font-mono text-data">{str(e, 'serial')}</span>
+                      <span className="min-w-0 flex-1">{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ') || 'Unknown unit'}</span>
+                      <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-0.5" onClick={() => openEntity(e.id)}>Add install date</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </section>
         )}

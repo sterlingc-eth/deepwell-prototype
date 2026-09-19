@@ -23,9 +23,24 @@
     `stage`, and `completeness: { type, required, present, missing,
     minConfidence, complete }`.
   - `POST /api/review` gained three actions: `aiVerify` ({ documentId }),
-    `reclassify` ({ documentIds: string[] ≤100 }, no model call, skips
-    already-canonical types), and `deleteDocuments` (see above — not
-    functional yet).
+    `reclassify` ({ documentIds: string[] ≤100 }, and `deleteDocuments` (see
+    above — not functional yet).
   - AI-verified documents show `stage: 'verified'` with `verified_by: 'ai'`
     (vs a human's display-label string) — same field, different value, no
     schema change needed on your side beyond checking `verified_by === 'ai'`.
+  - UPDATE 2026-09-19 (bug-fix pass): `reclassify` no longer skips 'other' —
+    it was being treated as an already-canonical, already-decided type, which
+    is why real docs got stuck as "other" forever. It now ALSO makes up to 20
+    cheap Haiku calls per request (only for docs its filename/fact heuristic
+    still can't place) and returns `{ changes, remaining }` — `remaining` is
+    how many documents still need another pass (still 'other' after this
+    one). Please loop "Reclassify & verify all" while `remaining > 0`,
+    calling with the SAME still-'other' documentIds each time, same as you'd
+    already do for a >100-doc batch. Response shape for each entry in
+    `changes` is unchanged ({ documentId, from, to }). A human's own
+    classification (via `classifyDocument`) is still never overwritten.
+  - `POST /api/document-status` rows now also include `fields:
+    [{field_key, value, confidence}]` (corrected_value applied), reusing the
+    extractions batch already fetched. This was silently missing before —
+    the response object never had a `fields` key at all, so any client
+    default of `[]` was masking it.

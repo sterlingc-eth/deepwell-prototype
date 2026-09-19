@@ -16,6 +16,10 @@ import {
   assertNonEmptyString,
   canVerify,
   nextStageAfterCorrection,
+  wasClassifiedByHuman,
+  modelCallBudget,
+  MODEL_CALL_MIN_BUDGET_MS,
+  MODEL_CALL_MAX_TIMEOUT_MS,
   ReviewError,
   aiVerifyDocument,
   reclassifyDocuments,
@@ -105,6 +109,42 @@ eq('correcting a received document leaves it received', nextStageAfterCorrection
 // Idempotent: applying it twice must not fall through to 'received' or anywhere else.
 eq('applying the rule twice from verified settles at linked, not further', nextStageAfterCorrection(nextStageAfterCorrection('verified')), 'linked');
 
+/* ------------------------------------------------------- wasClassifiedByHuman */
+
+eq('no classification rows -> not human-classified', wasClassifiedByHuman('other', []), false);
+eq('no classification rows (undefined) -> not human-classified', wasClassifiedByHuman('other', undefined), false);
+eq(
+  'a row matching the CURRENT type -> human-classified, do not touch',
+  wasClassifiedByHuman('other', [{ changes: { documentType: 'other' } }]),
+  true
+);
+eq(
+  'a row for a DIFFERENT type than current -> not a match, safe to reclassify',
+  wasClassifiedByHuman('other', [{ changes: { documentType: 'work-order' } }]),
+  false
+);
+eq(
+  'most recent of several rows is the one that matches',
+  wasClassifiedByHuman('invoice', [{ changes: { documentType: 'other' } }, { changes: { documentType: 'invoice' } }]),
+  true
+);
+eq('a row with no changes payload is safe', wasClassifiedByHuman('other', [{}]), false);
+eq('a null row in the list is safe', wasClassifiedByHuman('other', [null]), false);
+
+/* ------------------------------------------------------------ modelCallBudget */
+// The fix for the NO-GO blocker: 20 sequential model calls must never be able
+// to run past api/review.js's 60s function ceiling.
+
+eq('plenty of time left -> capped at MAX, not the full remainder', modelCallBudget(45_000), MODEL_CALL_MAX_TIMEOUT_MS);
+eq('remainder smaller than the cap -> use the remainder', modelCallBudget(10_000), 10_000);
+eq('exactly at the minimum budget -> still allowed', modelCallBudget(MODEL_CALL_MIN_BUDGET_MS), MODEL_CALL_MIN_BUDGET_MS);
+eq('just under the minimum -> refuse (null), count toward remaining', modelCallBudget(MODEL_CALL_MIN_BUDGET_MS - 1), null);
+eq('no time left -> refuse', modelCallBudget(0), null);
+eq('negative remaining (deadline already passed) -> refuse', modelCallBudget(-500), null);
+eq('NaN is safe and refuses', modelCallBudget(NaN), null);
+eq('undefined is safe and refuses', modelCallBudget(undefined), null);
+check('a granted budget never exceeds the per-call cap', modelCallBudget(999_999) <= MODEL_CALL_MAX_TIMEOUT_MS);
+
 /* --------------------------------------------------- new review.js actions */
 // No database here — this just pins the module's public shape and its
 // no-DB-call fast paths, so a signature change or a broken import surfaces
@@ -117,11 +157,11 @@ check('reclassifyDocuments is exported as a function', typeof reclassifyDocument
 {
   // Empty/no-id input must short-circuit before ever touching the database.
   const result = await reclassifyDocuments({ tenantKey: 'unused' }, { documentIds: [] });
-  eq('reclassifyDocuments no-ops on an empty id list without a db call', result, { changes: [] });
+  eq('reclassifyDocuments no-ops on an empty id list without a db call', result, { changes: [], remaining: 0 });
 }
 {
   const result = await reclassifyDocuments({ tenantKey: 'unused' }, {});
-  eq('reclassifyDocuments no-ops with no documentIds at all', result, { changes: [] });
+  eq('reclassifyDocuments no-ops with no documentIds at all', result, { changes: [], remaining: 0 });
 }
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);

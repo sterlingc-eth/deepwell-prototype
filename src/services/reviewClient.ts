@@ -176,9 +176,12 @@ export const reviewClient = {
     });
   },
 
-  /** Batch, no-model reclassification of legacy/unknown document_type values (≤100 ids). */
+  /** Batch reclassification of legacy/unknown/'other' document_type values
+   *  (≤100 ids; may make a few cheap model calls for stubborn ones). `remaining`
+   *  is how many of THESE ids are still 'other' after this pass — the caller
+   *  loops, resubmitting only the still-'other' ids, until it hits 0. */
   reclassify(documentIds: string[]) {
-    if (!documentIds.length) return Promise.resolve<{ changes: ReclassifyChange[] }>({ changes: [] });
-    return postJson<{ changes: ReclassifyChange[] }>({ action: 'reclassify', documentIds });
+    if (!documentIds.length) return Promise.resolve<{ changes: ReclassifyChange[]; remaining: number }>({ changes: [], remaining: 0 });
+    return postJson<{ changes: ReclassifyChange[]; remaining: number }>({ action: 'reclassify', documentIds });
   },
 };

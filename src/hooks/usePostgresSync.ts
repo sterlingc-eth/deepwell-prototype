@@ -16,10 +16,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { recordsStore } from '../services/recordsStoreClient';
 import { reviewClient, type DocumentLink, type Correction } from '../services/reviewClient';
+import { authHeader } from '../services/authToken';
 import { maxStageFor, recomputeIssues, useGraph } from '../core/entityGraph';
 import { hvacSchema } from '../domains/hvac';
 import { normalizeDocumentType } from '../domains/hvac/documentTypes';
-import type { Batch, Doc, Entity, FieldValue, FileType, PipelineStage } from '../core/types';
+import type { Batch, Doc, DocCompleteness, Entity, FieldValue, FileType, PipelineStage } from '../core/types';
 import type { Entity as ApiEntity } from '../services/postgresRecordsStore';
 
 export type SyncStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -30,9 +31,16 @@ export interface PostgresSyncState {
   error: string | null;
   /** True once loaded and the tenant genuinely has nothing ingested yet. */
   isEmpty: boolean;
+  /** Re-fetches everything and reseeds the graph, outside the hook's own
+   *  loading/error lifecycle. For a caller (Records' "Reclassify & verify
+   *  all") that just drove several server-side mutations whose true resulting
+   *  stage/completeness this store can't reconstruct from optimistic local
+   *  patches alone — see `loadGraphFromServer` below, which this wraps. */
+  refresh: () => Promise<void>;
 }
 
-const IDLE: PostgresSyncState = { status: 'idle', error: null, isEmpty: false };
+const noopRefresh = async () => {};
+const IDLE: PostgresSyncState = { status: 'idle', error: null, isEmpty: false, refresh: noopRefresh };
 
 /**
  * The real `documents` row (see M3-config/01-create-schema.sql +
@@ -132,7 +140,7 @@ function deriveStage(row: DocumentRow, doc: Doc): PipelineStage {
   return ceiling === 'verified' ? 'linked' : ceiling;
 }
 
-function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLink[], corrections: Correction[]): Doc {
+function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLink[], corrections: Correction[], completeness?: DocCompleteness): Doc {
   const receivedAt = toDateOrNull(row.created_at) ?? new Date();
   const preview = row.extract_error
     ? `${row.original_filename}\n\nExtraction failed: ${row.extract_error}`
@@ -191,6 +199,11 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
     issues: [],
     verifiedBy: row.verified_by ?? undefined,
     verifiedAt: toDateOrNull(row.verified_at) ?? undefined,
+    // POST /api/document-status's completeness (required fields → present/missing
+    // → minConfidence) — this is what Review's "why the AI accepted this" panel
+    // reads for an AI-verified doc. Fetched in one more bulk round trip below,
+    // same degrade-gracefully treatment as extractions/links/corrections.
+    completeness,
     preview,
   };
 
@@ -285,6 +298,101 @@ function buildBatches(docs: Doc[]): Batch[] {
 }
 
 /**
+ * One full fetch-and-reseed pass, outside any hook lifecycle. `usePostgresSync`
+ * runs this on mount/enable; `RecordsScreen`'s "Reclassify & verify all" also
+ * calls it directly once its server-side batch actions finish, because those
+ * actions' own optimistic local patches (typeId, verifiedBy) can't reconstruct
+ * the real post-action `stage` the way a fresh read of `documents.stage` +
+ * `maxStageFor` can — that gap is exactly why the health tiles used to need a
+ * manual reload to catch up.
+ *
+ * @param tenantKey Handed to `recordsStore.connect()` for parity with the
+ *   hook's effect; the server derives the real tenant from the verified Clerk
+ *   token regardless of what is sent here.
+ * @returns whether the tenant genuinely has nothing ingested yet.
+ */
+export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: boolean }> {
+  await recordsStore.connect(tenantKey);
+  const [docRows, entityRows] = await Promise.all([
+    recordsStore.listDocuments() as unknown as Promise<DocumentRow[]>,
+    recordsStore.listEntities(),
+  ]);
+
+  // Four more round trips for every document's fields, links, corrections and
+  // AI-verification completeness — not one per document each. Failure in any
+  // one of them degrades to the old behaviour (documents missing that one
+  // enhancement) rather than failing the whole sync.
+  const documentIds = docRows.map((r) => r.id);
+  const byDoc = new Map<string, ExtractionRow[]>();
+  try {
+    const rows = (await recordsStore.listExtractionsByDocuments(documentIds)) as unknown as ExtractionRow[];
+    for (const x of rows) {
+      const list = byDoc.get(x.document_id);
+      if (list) list.push(x);
+      else byDoc.set(x.document_id, [x]);
+    }
+  } catch {
+    /* fields are an enhancement to the sync, not a precondition of it */
+  }
+
+  const linksByDoc = new Map<string, DocumentLink[]>();
+  try {
+    const { links } = await reviewClient.listLinks(documentIds);
+    for (const l of links) {
+      const list = linksByDoc.get(l.document_id);
+      if (list) list.push(l);
+      else linksByDoc.set(l.document_id, [l]);
+    }
+  } catch {
+    /* manual links are an enhancement to the sync, not a precondition of it */
+  }
+
+  const correctionsByDoc = new Map<string, Correction[]>();
+  try {
+    const { corrections } = await reviewClient.listCorrections(documentIds);
+    for (const c of corrections) {
+      const list = correctionsByDoc.get(c.document_id);
+      if (list) list.push(c);
+      else correctionsByDoc.set(c.document_id, [c]);
+    }
+  } catch {
+    /* corrections are an enhancement to the sync, not a precondition of it */
+  }
+
+  // POST /api/document-status's completeness ({required, present, missing,
+  // minConfidence}) — what Review's AI-verified panel shows as "why the AI
+  // accepted this". Capped at 100 ids per call server-side, so this chunks the
+  // same way listCorrections/listLinks do internally.
+  const completenessByDoc = new Map<string, DocCompleteness>();
+  try {
+    for (let i = 0; i < documentIds.length; i += 100) {
+      const batch = documentIds.slice(i, i + 100);
+      if (!batch.length) continue;
+      const res = await fetch('/api/document-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ documentIds: batch }),
+      });
+      if (!res.ok) continue;
+      const { documents } = (await res.json()) as { documents: { id: string; completeness?: DocCompleteness }[] };
+      for (const d of documents) {
+        if (d.completeness) completenessByDoc.set(d.id, d.completeness);
+      }
+    }
+  } catch {
+    /* completeness is an enhancement (why-AI-verified) to the sync, not a precondition of it */
+  }
+
+  const docs = docRows.map((r) =>
+    toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [], completenessByDoc.get(r.id))
+  );
+  const entities = entityRows.map(toEntity);
+  useGraph.getState().seed(hvacSchema, entities, docs, buildBatches(docs), []);
+
+  return { isEmpty: docs.length === 0 && entities.length === 0 };
+}
+
+/**
  * @param enabled Only fetches while true — pass `isLoaded && isSignedIn`
  *   (and `false` outright in demo mode) so this never fires while signed out
  *   or races the fixture bootstrap. Flipping it fires a fresh load; flipping
@@ -295,7 +403,6 @@ function buildBatches(docs: Doc[]): Batch[] {
  *   verified Clerk token regardless of what is sent here.
  */
 export function usePostgresSync(enabled: boolean, tenantKey: string | null): PostgresSyncState {
-  const seed = useGraph((s) => s.seed);
   const [state, setState] = useState<PostgresSyncState>(IDLE);
   const requestId = useRef(0);
 
@@ -307,67 +414,13 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
 
     const id = ++requestId.current;
     let cancelled = false;
-    setState({ status: 'loading', error: null, isEmpty: false });
 
-    void (async () => {
+    const run = async () => {
+      setState((s) => ({ status: 'loading', error: null, isEmpty: false, refresh: s.refresh }));
       try {
-        await recordsStore.connect(tenantKey ?? '');
-        const [docRows, entityRows] = await Promise.all([
-          recordsStore.listDocuments() as unknown as Promise<DocumentRow[]>,
-          recordsStore.listEntities(),
-        ]);
+        const { isEmpty } = await loadGraphFromServer(tenantKey ?? '');
         if (cancelled || requestId.current !== id) return;
-
-        // Three more round trips for every document's fields, links and
-        // corrections — not one per document each. Failure in any one of
-        // them degrades to the old behaviour (documents missing that one
-        // enhancement) rather than failing the whole sync.
-        const documentIds = docRows.map((r) => r.id);
-        const byDoc = new Map<string, ExtractionRow[]>();
-        try {
-          const rows = (await recordsStore.listExtractionsByDocuments(documentIds)) as unknown as ExtractionRow[];
-          for (const x of rows) {
-            const list = byDoc.get(x.document_id);
-            if (list) list.push(x);
-            else byDoc.set(x.document_id, [x]);
-          }
-        } catch {
-          /* fields are an enhancement to the sync, not a precondition of it */
-        }
-
-        const linksByDoc = new Map<string, DocumentLink[]>();
-        try {
-          const { links } = await reviewClient.listLinks(documentIds);
-          for (const l of links) {
-            const list = linksByDoc.get(l.document_id);
-            if (list) list.push(l);
-            else linksByDoc.set(l.document_id, [l]);
-          }
-        } catch {
-          /* manual links are an enhancement to the sync, not a precondition of it */
-        }
-
-        const correctionsByDoc = new Map<string, Correction[]>();
-        try {
-          const { corrections } = await reviewClient.listCorrections(documentIds);
-          for (const c of corrections) {
-            const list = correctionsByDoc.get(c.document_id);
-            if (list) list.push(c);
-            else correctionsByDoc.set(c.document_id, [c]);
-          }
-        } catch {
-          /* corrections are an enhancement to the sync, not a precondition of it */
-        }
-
-        if (cancelled || requestId.current !== id) return;
-
-        const docs = docRows.map((r) =>
-          toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [])
-        );
-        const entities = entityRows.map(toEntity);
-        seed(hvacSchema, entities, docs, buildBatches(docs), []);
-
-        setState({ status: 'ready', error: null, isEmpty: docs.length === 0 && entities.length === 0 });
+        setState({ status: 'ready', error: null, isEmpty, refresh: run });
       } catch (err) {
         if (cancelled || requestId.current !== id) return;
         // A 401 (session resolved by Clerk client-side but rejected by the
@@ -376,14 +429,15 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
         // same as a network failure. Surfacing it as `status: 'error'` rather
         // than leaving `isEmpty` true is the whole point: a denied request
         // must not render the same as a real, empty tenant.
-        setState({ status: 'error', error: err instanceof Error ? err.message : String(err), isEmpty: false });
+        setState({ status: 'error', error: err instanceof Error ? err.message : String(err), isEmpty: false, refresh: run });
       }
-    })();
+    };
+    void run();
 
     return () => {
       cancelled = true;
     };
-  }, [enabled, tenantKey, seed]);
+  }, [enabled, tenantKey]);
 
   return state;
 }

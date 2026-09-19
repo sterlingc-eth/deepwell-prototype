@@ -187,6 +187,56 @@ export function selectCustomerMatch(candidates, address) {
   return eligible.length === 1 ? eligible[0] : null;
 }
 
+/**
+ * Pure: should a document get a customer-only document_entity_links row?
+ * No — a document with no serial (a dispatch note, a proposal, a letter)
+ * still names a customer and must reach stage 'linked' to ever be
+ * AI-verified; without this it sat in "Unlinked inbox" forever. Exported so
+ * the decision itself is testable with no database (scripts/verify-customer-link.mjs).
+ */
+export function needsCustomerLink({ entityId, customerId, hasAnyLink }) {
+  return !entityId && !!customerId && !hasAnyLink;
+}
+
+/**
+ * Link a document straight to the customer entity it names, when it has no
+ * equipment entity (and therefore no other link) to attach to. Shared by
+ * extractDocument.js (right after extraction) and reviewStore.js's
+ * aiVerifyDocument (to repair a document extracted before this existed, with
+ * no re-extraction — pressing "Reclassify & verify all" must fix it too).
+ *
+ * Uses `db.raw` for document_entity_links and the stage transition, which
+ * recordsStore.js's curated store deliberately does not otherwise expose —
+ * see the module comment on `raw` above. Mirrors reviewStore.linkDocument's
+ * forward-only stage UPDATE exactly, just triggered by an AI link instead of
+ * a human's.
+ *
+ * @returns {Promise<boolean>} whether a link was actually inserted.
+ */
+export async function linkDocumentToCustomer(db, { documentId, entityId = null, customerId, confidence = 0.6 } = {}) {
+  if (!documentId || !customerId) return false;
+
+  const existing = await db.raw(
+    `SELECT 1 FROM document_entity_links WHERE document_id = $1 AND ${TENANT} LIMIT 1`,
+    [documentId]
+  );
+  if (!needsCustomerLink({ entityId, customerId, hasAnyLink: existing.rowCount > 0 })) return false;
+
+  await db.raw(
+    `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
+     VALUES ($1,$2,$3,$4,'ai',NOW())
+     ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
+    [db.tenantId, documentId, customerId, confidence]
+  );
+
+  await db.raw(
+    `UPDATE documents SET stage = 'linked'
+      WHERE id = $1 AND ${TENANT} AND stage IN ('received', 'read', 'mapped')`,
+    [documentId]
+  );
+  return true;
+}
+
 /** Words too common to identify a page on their own; skipped by the plain-text fallback in searchPassages. */
 const STOPWORDS = new Set(['what','when','where','which','whose','does','did','the','this','that','these','those','with','from','have','has','had','was','were','will','still','under','about','there','their','them','they','into','onto','over','last','next','much','many','more','most','some','any','how','why','who','and','for','are','not','but','can','could','should','would','been','being','than','then','also','just','ever','every','each','tell','show','find','give','need','want','know','like','make','made','get','got','all','one','two','our','your','you','we','us','it','its','is','an','on','at','to','of','in','by','or','if','so','do','a','i','me','my','be','as','up','no','yes','year','years','month','months','week','weeks','day','days','ago','summer','winter','spring','fall','back','call','called','called','unit','units','system','job','work']);
 
@@ -838,6 +888,7 @@ function makeStore(db, tenantId) {
       const existing = await one(
         `SELECT id, data FROM entities
           WHERE entity_type = 'equipment' AND ${TENANT}
+            AND merged_into IS NULL
             AND lower(data->>'serial_number') = lower($1)
           ORDER BY created_at LIMIT 1`,
         [serial]
@@ -942,6 +993,7 @@ function makeStore(db, tenantId) {
       const candidates = await many(
         `SELECT id, data FROM entities
           WHERE entity_type = 'customer' AND ${TENANT}
+            AND merged_into IS NULL
             AND lower(data->>'customer_name') = lower($1)
           ORDER BY created_at LIMIT 200`,
         [name]

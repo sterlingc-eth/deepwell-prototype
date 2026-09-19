@@ -11,7 +11,7 @@
  *
  *   node scripts/verify-customer-link.mjs
  */
-import { normalizeMatchText, selectCustomerMatch } from '../api/_lib/recordsStore.js';
+import { normalizeMatchText, selectCustomerMatch, needsCustomerLink } from '../api/_lib/recordsStore.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -100,6 +100,37 @@ eq(
   // right one. The addressless row is no longer a wildcard that matches
   // everyone of that name.
   smithA
+);
+
+/* ------------------------------------------------------------ needsCustomerLink */
+// The decision behind linkDocumentToCustomer: a document with no equipment
+// entity (no serial) must still reach 'linked' via its customer, exactly
+// once, and never when it already has some other link.
+
+eq(
+  'no equipment entity + a resolved customer + no existing link -> link it',
+  needsCustomerLink({ entityId: null, customerId: 'cust-1', hasAnyLink: false }),
+  true
+);
+eq(
+  'has an equipment entity -> never link to the customer instead',
+  needsCustomerLink({ entityId: 'equip-1', customerId: 'cust-1', hasAnyLink: false }),
+  false
+);
+eq(
+  'no customer resolved -> nothing to link',
+  needsCustomerLink({ entityId: null, customerId: null, hasAnyLink: false }),
+  false
+);
+eq(
+  'already has a link -> no-op, do not add a second one',
+  needsCustomerLink({ entityId: null, customerId: 'cust-1', hasAnyLink: true }),
+  false
+);
+eq(
+  'has an equipment entity AND already linked -> still no',
+  needsCustomerLink({ entityId: 'equip-1', customerId: 'cust-1', hasAnyLink: true }),
+  false
 );
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);

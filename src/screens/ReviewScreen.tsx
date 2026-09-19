@@ -288,12 +288,32 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           {graph.batches[doc.batchId]?.name} · received {doc.receivedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </p>
         {doc.verifiedBy === 'ai' && (
-          <div className="rounded-lg border border-ok/40 bg-ok-bg dark:bg-forest-800 p-3 flex items-start gap-2">
-            <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-ok-ink dark:text-ok-bg" aria-hidden="true" />
-            <p className="text-body text-ok-ink dark:text-ok-bg">
-              <span className="font-medium">AI verified{doc.completeness ? ` · ${Math.round(doc.completeness.minConfidence * 100)}% confidence` : ''}.</span>{' '}
-              Looks wrong? Correct a field below — that clears the AI verification and puts this back in review.
-            </p>
+          <div className="rounded-lg border border-ok/40 bg-ok-bg dark:bg-forest-800 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-ok-ink dark:text-ok-bg" aria-hidden="true" />
+              <p className="text-body text-ok-ink dark:text-ok-bg">
+                <span className="font-medium">AI verified{doc.completeness ? ` · ${Math.round(doc.completeness.minConfidence * 100)}% confidence` : ''}.</span>{' '}
+                Looks wrong? Correct a field below — that clears the AI verification and puts this back in review.
+              </p>
+            </div>
+            {/* Why the AI accepted this: every required field, the value it
+                read, and that field's confidence — so a person can see the
+                basis for the verification instead of taking it on faith. */}
+            {type && (
+              <ul className="text-caption text-ok-ink dark:text-ok-bg divide-y divide-ok/20">
+                {type.requiredFields.map((requirement) => {
+                  const keys = requirement.split('|');
+                  const f = doc.extracted.find((x) => keys.includes(x.name) && (x.correctedValue ?? x.value).trim());
+                  return (
+                    <li key={requirement} className="py-1 flex items-center justify-between gap-3">
+                      <span>{requirementLabel(requirement)}</span>
+                      <span className="font-mono truncate max-w-[40%]">{f ? (f.correctedValue ?? f.value) : '—'}</span>
+                      <span className="shrink-0">{f ? `${Math.round(f.confidence * 100)}%` : '—'}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 pt-1">

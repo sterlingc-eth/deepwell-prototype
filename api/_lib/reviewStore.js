@@ -78,14 +78,20 @@
  *                       whose type is null or a legacy id; never touches an
  *                       already-canonical value.
  */
-import { getPool, withTenant as withRecordsTenant } from './recordsStore.js';
+import Anthropic from '@anthropic-ai/sdk';
+import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer } from './recordsStore.js';
+import { getApiKey, withBackoff } from './claude.js';
+import { withCache } from './promptCache.js';
 import {
   normalizeDocumentType,
   inferDocumentType,
+  isReclassifiable,
   completenessFor,
   toCompletenessFields,
-  isLegacyOrUnknownType,
   AI_VERIFY_MIN_CONFIDENCE,
+  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_DEFINITIONS,
+  DOCUMENT_TYPE_IDS,
 } from './documentTypes.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -506,8 +512,25 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     if (!doc) throw new ReviewError('Document not found', 404);
 
     const rows = await db.listExtractionsByDocument(documentId); // SELECT * includes corrected_value
+    const completenessFields = toCompletenessFields(rows);
+
+    // Repair a document stuck unlinked (no equipment entity, so nothing ever
+    // ran findOrCreateCustomer for it, or it ran before this existed) — same
+    // helper extractDocument.js calls right after extraction, so pressing
+    // "Reclassify & verify all" fixes old documents with no re-extraction.
+    // Skipped once the document already has any link — cheap, no-op writes.
+    if (doc.stage !== 'linked' && doc.stage !== 'verified' && !rows.some((r) => r.entity_id)) {
+      const facts = Object.fromEntries(completenessFields.map((f) => [f.field_key, f.value]));
+      const customer = await db.findOrCreateCustomer(facts);
+      if (customer?.id) {
+        const customerFields = completenessFields.filter((f) => f.field_key === 'customer_name' || f.field_key === 'service_address');
+        const confidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
+        await linkDocumentToCustomer(db, { documentId, entityId: null, customerId: customer.id, confidence });
+      }
+    }
+
     const type = normalizeDocumentType(doc.document_type);
-    const completeness = completenessFor(type, toCompletenessFields(rows));
+    const completeness = completenessFor(type, completenessFields);
 
     let verified = false;
     if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
@@ -524,56 +547,184 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
       });
     }
 
-    const document = verified ? await db.getDocument(documentId) : doc;
+    // Re-fetch rather than trusting the pre-repair `doc`: the link-repair
+    // above (or verifyByAi) may have changed stage since it was read.
+    const document = (await db.getDocument(documentId)) ?? doc;
     return { document, completeness, verified };
   });
 }
 
+/** Pure: did a human ever explicitly set this document's CURRENT type? An
+ *  automated reclassification must never overwrite that, even when the type
+ *  is 'other' or otherwise looks reclassifiable. `classificationRows` is a
+ *  set of audit_log rows for action='review.document_classified' on this
+ *  document; only their `changes.documentType` is consulted. Exported so the
+ *  rule is testable with no database (scripts/verify-review.mjs). */
+export function wasClassifiedByHuman(currentType, classificationRows) {
+  return (classificationRows ?? []).some((r) => r?.changes?.documentType === currentType);
+}
+
+const RECLASSIFY_MODEL = process.env.EXTRACT_MODEL || 'claude-haiku-4-5';
+const MAX_RECLASSIFY_MODEL_CALLS = 20;
+const RECLASSIFY_TEXT_CHARS = 1500;
+
 /**
- * Batch, no-model reclassification. Only touches documents whose
- * document_type is null or a legacy/free-text value — a document already
- * carrying a canonical id was decided by a human or a previous AI pass, and
- * this must not silently relabel it. Capped at 100 ids per call; this loops
- * per document (not the batched "one query" shape document-status.js uses)
- * because it is an explicit, occasional maintenance action, not something
- * polled.
+ * Overall wall-clock budget for ALL of reclassifyDocuments' model calls in
+ * one request — api/review.js's function ceiling is 60s (maxDuration); 45s
+ * leaves headroom for the DB round-trips around each call and the response
+ * itself. MIN_BUDGET_MS: once less than this remains, a fresh model call
+ * (its own request + possible retry) would not reliably finish before the
+ * ceiling, so it is skipped rather than risked — that document just counts
+ * toward `remaining`. MAX_CALL_TIMEOUT_MS caps any single call so one slow
+ * response can't eat the whole remaining budget.
+ */
+export const RECLASSIFY_DEADLINE_MS = 45_000;
+export const MODEL_CALL_MIN_BUDGET_MS = 8_000;
+export const MODEL_CALL_MAX_TIMEOUT_MS = 12_000;
+
+/**
+ * Pure: given how much time remains before reclassifyDocuments' overall
+ * deadline, decide whether another model call is worth attempting and, if
+ * so, what per-call timeout to give it. Returns null to mean "don't call —
+ * count this document toward `remaining` instead". Exported so the budgeting
+ * rule is testable with no clock, no network (scripts/verify-review.mjs).
+ */
+export function modelCallBudget(remainingMs) {
+  if (!Number.isFinite(remainingMs) || remainingMs < MODEL_CALL_MIN_BUDGET_MS) return null;
+  return Math.min(remainingMs, MODEL_CALL_MAX_TIMEOUT_MS);
+}
+
+const RECLASSIFY_TOOL = {
+  name: 'classify_document',
+  description: 'Pick exactly one canonical document type id for this HVAC business document.',
+  input_schema: {
+    type: 'object',
+    properties: { document_type: { type: 'string', enum: DOCUMENT_TYPES.map((t) => t.id) } },
+    required: ['document_type'],
+  },
+};
+
+// Static first, so this is the cacheable half of the prompt (see
+// promptCache.js) — identical on every call, for every document, forever.
+const RECLASSIFY_SYSTEM_PROMPT = `You classify HVAC business documents into exactly one type.
+
+TYPES:
+${DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYPE_DEFINITIONS[t.id] ?? ''}`).join('\n')}
+
+Use "other" only when nothing above clearly fits. Reply using the classify_document tool.`;
+
+/** One cheap Haiku call, bounded by `timeoutMs` (from modelCallBudget) both
+ *  as the request's own timeout and as withBackoff's deadline, so a retry
+ *  inside this call can never overrun the caller's remaining budget. Returns
+ *  a canonical type id, or null on any failure or unusable answer — never
+ *  throws, since one bad classification must not fail the whole batch. */
+async function classifyByModel(client, { filename, text, timeoutMs }) {
+  try {
+    const dynamicPrompt = `Filename: ${filename || '(none)'}\n\nText:\n${text}`;
+    const response = await withBackoff(() => client.messages.create({
+      model: RECLASSIFY_MODEL,
+      max_tokens: 50,
+      system: [withCache({ type: 'text', text: RECLASSIFY_SYSTEM_PROMPT }, RECLASSIFY_MODEL)],
+      tools: [withCache(RECLASSIFY_TOOL, RECLASSIFY_MODEL)],
+      tool_choice: { type: 'tool', name: RECLASSIFY_TOOL.name },
+      messages: [{ role: 'user', content: dynamicPrompt }],
+    }, { timeout: timeoutMs }), { deadlineAt: Date.now() + timeoutMs });
+    const raw = response.content.find((b) => b.type === 'tool_use')?.input?.document_type;
+    return typeof raw === 'string' && DOCUMENT_TYPE_IDS.has(raw) ? raw : null;
+  } catch (err) {
+    console.error('reclassify model call failed:', err?.message);
+    return null;
+  }
+}
+
+/**
+ * Batch reclassification. Touches documents whose document_type is null, a
+ * legacy/free-text value, or the canonical-but-meaningless 'other' — see
+ * isReclassifiable. Never overwrites a type a HUMAN explicitly set to what it
+ * currently is (wasClassifiedByHuman, checked against this document's own
+ * audit_log rows). For each eligible document: (1) the deterministic
+ * heuristic (facts, then filename); (2) if that still says 'other' and the
+ * document has page text, one Haiku call — bounded by MAX_RECLASSIFY_MODEL_CALLS
+ * AND by the shared RECLASSIFY_DEADLINE_MS wall-clock budget (modelCallBudget)
+ * — `remaining` tells the caller how many documents still need another pass.
+ * Capped at 100 ids per call.
+ *
+ * ONE TRANSACTION PER DOCUMENT, not one for the whole batch: up to 20 model
+ * calls plus their DB round-trips can approach api/review.js's 60s function
+ * ceiling, and a single all-or-nothing transaction would roll back every
+ * already-processed document if a later one errored or the function was
+ * killed mid-call. A document that fails is logged and skipped, not fatal to
+ * the rest of the batch.
  */
 export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkId) {
   const ids = [...new Set((documentIds ?? []).filter(isUuid))].slice(0, 100);
-  if (!ids.length) return { changes: [] };
+  if (!ids.length) return { changes: [], remaining: 0 };
 
-  return withRecordsTenant(ctx, async (db) => {
-    const changes = [];
-    for (const id of ids) {
-      const doc = await db.getDocument(id);
-      if (!doc) continue;
-      if (doc.document_type && !isLegacyOrUnknownType(doc.document_type)) continue;
+  const deadlineAt = Date.now() + RECLASSIFY_DEADLINE_MS;
+  let modelCalls = 0;
+  let client = null;
+  const changes = [];
+  let remaining = 0;
 
-      const rows = await db.listExtractionsByDocument(id);
-      const facts = Object.fromEntries(
-        toCompletenessFields(rows).map((f) => [f.field_key, f.value])
-      );
-      const resolved = doc.document_type
-        ? normalizeDocumentType(doc.document_type, facts)
-        : inferDocumentType(facts, doc.original_filename);
+  for (const id of ids) {
+    try {
+      const change = await withRecordsTenant(ctx, async (db) => {
+        const doc = await db.getDocument(id);
+        if (!doc) return null;
+        if (!isReclassifiable(doc.document_type)) return null;
 
-      if (resolved !== doc.document_type) {
+        const classificationRows = await db.getAuditLog({
+          action: 'review.document_classified', resource_type: 'document', resource_id: id,
+        });
+        if (wasClassifiedByHuman(doc.document_type, classificationRows)) return null;
+
+        const rows = await db.listExtractionsByDocument(id);
+        const facts = Object.fromEntries(
+          toCompletenessFields(rows).map((f) => [f.field_key, f.value])
+        );
+        let resolved = doc.document_type ? normalizeDocumentType(doc.document_type, facts) : 'other';
+        if (resolved === 'other') resolved = inferDocumentType(facts, doc.original_filename);
+
+        if (resolved === 'other') {
+          const budget = modelCalls < MAX_RECLASSIFY_MODEL_CALLS ? modelCallBudget(deadlineAt - Date.now()) : null;
+          if (budget != null) {
+            const pages = await db.listPages(id);
+            const text = pages.map((p) => p.text).filter(Boolean).join('\n').slice(0, RECLASSIFY_TEXT_CHARS).trim();
+            if (text) {
+              modelCalls++;
+              client ??= new Anthropic({ apiKey: getApiKey(), timeout: MODEL_CALL_MAX_TIMEOUT_MS, maxRetries: 0 });
+              const modelType = await classifyByModel(client, { filename: doc.original_filename, text, timeoutMs: budget });
+              if (modelType && modelType !== 'other') resolved = modelType;
+            }
+          }
+          if (resolved === 'other') { remaining++; return null; }
+        }
+
+        if (resolved === doc.document_type) return null;
         await db.updateDocument(id, { document_type: resolved });
-        changes.push({ documentId: id, from: doc.document_type, to: resolved });
-      }
+        return { documentId: id, from: doc.document_type, to: resolved };
+      });
+      if (change) changes.push(change);
+    } catch (err) {
+      console.error('reclassifyDocuments: document failed, continuing:', id, err?.message);
     }
+  }
 
-    if (changes.length) {
+  if (changes.length) {
+    // Its own short transaction: the summary log must not be lost just
+    // because it runs after the per-document loop, but it also must not
+    // force the per-document work back into one shared transaction.
+    await withRecordsTenant(ctx, async (db) => {
       await db.logAction({
         clerk_user_id: actorClerkId,
         action: 'review.reclassified',
         resource_type: 'document',
         changes: { count: changes.length, changes },
       });
-    }
+    });
+  }
 
-    return { changes };
-  });
+  return { changes, remaining };
 }
 
 /** Every corrected field for a set of documents, in one query. Only rows with

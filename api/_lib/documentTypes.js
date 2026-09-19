@@ -141,6 +141,20 @@ export function isLegacyOrUnknownType(raw) {
 }
 
 /**
+ * True when `raw` is a candidate for automated reclassification: missing, a
+ * legacy id, free text, OR the canonical-but-meaningless 'other'. Unlike
+ * isLegacyOrUnknownType above, this treats 'other' as NOT decided — 'other'
+ * is what every document gets before anything actually classified it, so
+ * reclassifyDocuments must not read it as "someone already decided this".
+ */
+export function isReclassifiable(raw) {
+  if (raw == null || raw === '') return true;
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'other') return true;
+  return isLegacyOrUnknownType(raw);
+}
+
+/**
  * canonical / legacy / free-text -> canonical id. Never returns null or
  * 'unclassified' — the fallback is always 'other'.
  *
@@ -155,6 +169,41 @@ export function normalizeDocumentType(raw, facts = {}) {
     return (facts?.cost || facts?.invoice_number) ? 'invoice' : 'startup-sheet';
   }
   return LEGACY_MAP[s] ?? 'other';
+}
+
+/**
+ * Filename keyword -> canonical type. Checked only as a fallback, between the
+ * strong per-field signals above and the weak single-fact guesses below (see
+ * inferDocumentType) — a named file ("07-dispatch-note-....txt") is a better
+ * signal than "has exactly one weak fact", but a real extracted fact (cost,
+ * work_performed, a permit number) still wins outright. Order matters: more
+ * specific patterns (purchase order, service ticket) are checked before the
+ * generic ones they could otherwise collide with.
+ */
+const FILENAME_PATTERNS = [
+  [/purchase[-_ ]?order|\bpo[-_]?\d+\b/i, 'purchase-order'],
+  [/service[-_ ]?ticket/i, 'service-ticket'],
+  [/dispatch/i, 'dispatch-note'],
+  [/work[-_ ]?order/i, 'work-order'],
+  [/(maintenance|service)[-_ ]?agreement|\bmsa\b/i, 'maintenance-agreement'],
+  [/proposal|quote|estimate/i, 'proposal-quote'],
+  [/inspection/i, 'inspection-report'],
+  [/nameplate|data[-_ ]?plate/i, 'nameplate-photo'],
+  [/warrant(y|ies)/i, 'warranty-registration'],
+  [/permit/i, 'permit'],
+  [/invoice/i, 'invoice'],
+];
+
+/** Pure: filename -> canonical type, or null if nothing matches. Exported so
+ *  the pattern list itself is directly testable (scripts/verify-doctypes.mjs)
+ *  independent of inferDocumentType's fact-priority ordering. */
+export function inferTypeFromFilename(filename) {
+  const name = String(filename ?? '').toLowerCase();
+  if (!name) return null;
+  for (const [re, type] of FILENAME_PATTERNS) {
+    if (re.test(name)) return type;
+  }
+  return null;
 }
 
 /**
@@ -181,6 +230,13 @@ export function inferDocumentType(facts = {}, filename = '') {
   if (has('work_performed')) return 'service-ticket';
   if (has('service_date') && has('technician')) return 'work-order';
   if (has('installation_date')) return 'startup-sheet';
+
+  // Filename beats the weak single-fact guesses below (a lone service_date,
+  // a lone customer_name) — those are the exact cases where 'other'/legacy
+  // docs like a dispatch note with no technician were misclassified.
+  const byName = inferTypeFromFilename(name);
+  if (byName) return byName;
+
   if (has('service_date')) return 'inspection-report';
   if (isPhoto && (has('serial_number') || has('model'))) return 'nameplate-photo';
   if (has('serial_number') || has('model')) return 'equipment-record';

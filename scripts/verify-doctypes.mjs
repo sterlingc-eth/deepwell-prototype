@@ -12,7 +12,9 @@ import {
   AI_VERIFY_MIN_CONFIDENCE,
   normalizeDocumentType,
   isLegacyOrUnknownType,
+  isReclassifiable,
   inferDocumentType,
+  inferTypeFromFilename,
   resolveDocumentType,
   completenessFor,
   toCompletenessFields,
@@ -52,6 +54,16 @@ check('normalizeDocumentType never returns something outside the canonical set',
   DOCUMENT_TYPES.concat([{ id: 'warranty' }, { id: 'garbage' }, { id: null }])
     .every((t) => DOCUMENT_TYPE_IDS.has(normalizeDocumentType(t.id))));
 
+/* --------------------------------------------------------- isReclassifiable */
+
+eq('null is reclassifiable', isReclassifiable(null), true);
+eq('empty string is reclassifiable', isReclassifiable(''), true);
+eq('legacy warranty is reclassifiable', isReclassifiable('warranty'), true);
+eq('canonical "other" IS reclassifiable — the bug this build fixes', isReclassifiable('other'), true);
+eq('"Other" (mixed case) is reclassifiable', isReclassifiable('Other'), true);
+eq('canonical invoice is NOT reclassifiable', isReclassifiable('invoice'), false);
+eq('canonical service-ticket is NOT reclassifiable', isReclassifiable('service-ticket'), false);
+
 /* ------------------------------------------------------ isLegacyOrUnknownType */
 
 eq('null is legacy/unknown', isLegacyOrUnknownType(null), true);
@@ -80,6 +92,44 @@ eq('customer_name alone infers correspondence', inferDocumentType({ customer_nam
 eq('nothing at all infers other', inferDocumentType({}), 'other');
 eq('undefined facts is safe and infers other', inferDocumentType(undefined), 'other');
 check('inferDocumentType always returns a canonical id', DOCUMENT_TYPE_IDS.has(inferDocumentType({})));
+
+/* ------------------------------------------------------- inferTypeFromFilename */
+// The specific production bug: 'other'-typed docs whose facts alone don't say
+// enough must still be caught by a strong filename match.
+
+eq('service-ticket filename', inferTypeFromFilename('03-service-ticket-3247-elm-capacitor.pdf'), 'service-ticket');
+eq('dispatch note filename', inferTypeFromFilename('07-dispatch-note-2025-11-03.txt'), 'dispatch-note');
+eq('dispatch note filename, different naming', inferTypeFromFilename('08-dispatch-note-rosa-delgado.txt'), 'dispatch-note');
+eq('work-order filename', inferTypeFromFilename('work-order-4521.pdf'), 'work-order');
+eq('invoice filename', inferTypeFromFilename('invoice_9981.pdf'), 'invoice');
+eq('warranty filename', inferTypeFromFilename('warranty-card.pdf'), 'warranty-registration');
+eq('warranty filename, plural', inferTypeFromFilename('warranties-2024.pdf'), 'warranty-registration');
+eq('permit filename', inferTypeFromFilename('city-permit-2201.pdf'), 'permit');
+eq('nameplate filename', inferTypeFromFilename('nameplate_photo.jpg'), 'nameplate-photo');
+eq('data plate filename', inferTypeFromFilename('data-plate.jpg'), 'nameplate-photo');
+eq('maintenance agreement filename', inferTypeFromFilename('maintenance-agreement-2024.pdf'), 'maintenance-agreement');
+eq('service agreement filename', inferTypeFromFilename('service_agreement.pdf'), 'maintenance-agreement');
+eq('proposal filename', inferTypeFromFilename('proposal-elm-st.pdf'), 'proposal-quote');
+eq('quote filename', inferTypeFromFilename('quote_9981.pdf'), 'proposal-quote');
+eq('inspection filename', inferTypeFromFilename('inspection-report-elm.pdf'), 'inspection-report');
+eq('purchase order filename, spelled out', inferTypeFromFilename('purchase-order-771.pdf'), 'purchase-order');
+eq('purchase order filename, PO- number', inferTypeFromFilename('PO-4521.pdf'), 'purchase-order');
+eq('unmatched filename returns null', inferTypeFromFilename('scan.pdf'), null);
+eq('empty filename returns null', inferTypeFromFilename(''), null);
+eq('null filename returns null', inferTypeFromFilename(null), null);
+eq('case-insensitive match', inferTypeFromFilename('DISPATCH-NOTE.TXT'), 'dispatch-note');
+
+// inferDocumentType: the filename fallback fires exactly for the failing
+// production docs, but never overrides a stronger extracted fact.
+eq('dispatch-note doc with weak facts (service_date only) resolved by filename',
+  inferDocumentType({ service_address: '3247 Elm St', service_date: '2025-11-03' }, '07-dispatch-note-2025-11-03.txt'),
+  'dispatch-note');
+eq('service-ticket doc with no work_performed extracted still resolved by filename',
+  inferDocumentType({ service_address: '3247 Elm St' }, '03-service-ticket-3247-elm-capacitor.pdf'),
+  'service-ticket');
+eq('a real cost still wins over a conflicting filename', inferDocumentType({ cost: '150.00' }, '07-dispatch-note.txt'), 'invoice');
+eq('work_performed still wins over a conflicting filename', inferDocumentType({ work_performed: 'replaced capacitor' }, 'invoice-draft.pdf'), 'service-ticket');
+eq('permit_number still wins over a conflicting filename', inferDocumentType({ permit_number: 'P-1' }, 'invoice.pdf'), 'permit');
 
 /* ------------------------------------------------------------ resolveDocumentType */
 

@@ -11,6 +11,7 @@
 import {
   BRAND_RULES,
   normalizeBrand,
+  normalizeDate,
   deriveWarranty,
   describeWarranty,
   daysBetween,
@@ -121,6 +122,25 @@ eq('financing arm is not a manufacturer (Carrier)', normalizeBrand('Carrier Fina
 eq('warehouse is not a manufacturer (Bryant)', normalizeBrand('Bryant Furnace Warehouse'), null);
 eq('brand written last is refused (Rheem)', normalizeBrand('water heater, Rheem'), null);
 
+/* ---------------------------------------------------------- normalizeDate */
+// A maintenance agreement that prints "installed 06/2021" gives extraction no
+// day to report; these formats must not be silently discarded (that was the
+// live bug — see the Trane/Plaza Dental cases below).
+
+eq('YYYY-MM-DD, day precision', normalizeDate('2021-06-15'), { ymd: '2021-06-15', precision: 'day' });
+eq('YYYY-MM anchors to the 1st, month precision', normalizeDate('2021-06'), { ymd: '2021-06-01', precision: 'month' });
+eq('MM/YYYY anchors to the 1st, month precision', normalizeDate('06/2021'), { ymd: '2021-06-01', precision: 'month' });
+eq('MM/DD/YYYY, day precision', normalizeDate('6/15/2021'), { ymd: '2021-06-15', precision: 'day' });
+eq('padded MM/DD/YYYY', normalizeDate('06/05/2021'), { ymd: '2021-06-05', precision: 'day' });
+eq('full "Month YYYY", month precision', normalizeDate('June 2021'), { ymd: '2021-06-01', precision: 'month' });
+eq('abbreviated "Mon YYYY"', normalizeDate('Jun 2021'), { ymd: '2021-06-01', precision: 'month' });
+eq('case-insensitive month name', normalizeDate('september 2026'), { ymd: '2026-09-01', precision: 'month' });
+eq('4-letter abbreviation ("Sept")', normalizeDate('Sept 2026'), { ymd: '2026-09-01', precision: 'month' });
+eq('garbage rejected, not guessed', normalizeDate('installed sometime'), null);
+eq('impossible month rejected', normalizeDate('2021-13'), null);
+eq('empty rejected', normalizeDate(''), null);
+eq('null rejected', normalizeDate(null), null);
+
 /* ------------------------------------------------------------ date math */
 
 eq('days between', daysBetween('2024-03-04', '2024-05-03'), 60);
@@ -136,6 +156,65 @@ eq('bad date', daysBetween('nope', '2024-03-04'), null);
   eq('printed expiry used', w.expires, '2030-01-01');
   eq('basis is printed', w.expiresBasis, 'printed');
   check('no term invented when printed', w.termYears === null);
+}
+
+/* ------------------------------------------- month-precision dates (live bug) */
+// The Plaza Dental maintenance agreement: "installed 06/2021", "Trane parts
+// warranty: 5 years from install (expires 06/2026)". Before normalizeDate this
+// was silently rejected and the unit showed "No warranty on file" instead of
+// EXPIRED (today 2026-09-19).
+{
+  const w = deriveWarranty(
+    { manufacturer: 'Trane', installation_date: '06/2021', warranty_expires: '2026-06' },
+    '2026-09-19'
+  );
+  eq('printed month-precision expiry is used, not discarded', w.expires, '2026-06-01');
+  eq('basis is printed even at month precision', w.expiresBasis, 'printed');
+  eq('precision recorded as month', w.expiresPrecision, 'month');
+  check('printed expiry beats the brand-rule computation', w.termYears === null, JSON.stringify(w));
+  check('note flags month precision on the expiry', w.notes.some((n) => /Printed expiry is month precision/.test(n)), w.notes.join(' | '));
+  // The tile-level status (alertTier, what the Dashboard badge actually
+  // shows) now correctly reads EXPIRED instead of "no warranty on file" —
+  // the exact live bug. (A registration window that closed years earlier
+  // takes priority in describeWarranty's own `action` sentence, by design —
+  // see the on-file case right below for that message's wording.)
+  eq('alertTier: expired, not unknown', alertTier(w, '2026-09-19'), 'expired');
+}
+{
+  // Same facts, but registered within the window, so describeWarranty's
+  // action sentence isn't preempted by a registration-window message — this
+  // is where "expired" and the precision caveat actually show up in the text.
+  const w = deriveWarranty(
+    { manufacturer: 'Trane', installation_date: '2021-06-01', warranty_registered_date: '2021-06-15', warranty_expires: '2026-06' },
+    '2026-09-19'
+  );
+  check('reads as expired in the action text once registration is on file', /expired/.test(w.action || ''), w.action);
+  check('action names the month-precision caveat', /Month precision/.test(w.action || ''), w.action);
+}
+{
+  // Same maintenance agreement, but without a printed expiry — the computed
+  // one must inherit month precision from the (month-only) install date.
+  // Registered promptly (2021-07), so the term is earned and describeWarranty's
+  // action sentence reports the expiry rather than a registration message.
+  const w = deriveWarranty({ manufacturer: 'Trane', installation_date: '06/2021', warranty_registered_date: '07/2021' }, '2026-09-19');
+  eq('install date parsed at month precision', w.installDatePrecision, 'month');
+  eq('computed expiry anchors to the 1st', w.expires, '2031-06-01');
+  eq('basis is computed', w.expiresBasis, 'computed');
+  eq('computed expiry inherits month precision from the install date', w.expiresPrecision, 'month');
+  check('note flags month precision on the install date', w.notes.some((n) => /Installation date is month precision/.test(n)), w.notes.join(' | '));
+  check('registered term earned (10 years)', w.termYears === 10, w.termYears);
+  check('reads as active, well before its (computed) expiry', w.action === null || /opportunity/.test(w.action), w.action);
+}
+{
+  // MM/DD/YYYY and "Month YYYY" registration dates both resolve, at their
+  // correct precision, and still drive the registration-window math.
+  const dayReg = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2024-03-04', warranty_registered_date: '03/10/2024' }, '2026-09-16');
+  eq('MM/DD/YYYY registration date resolves to day precision', dayReg.registrationPrecision, 'day');
+  eq('term earned exactly as with a YYYY-MM-DD registration date', dayReg.termYears, 10);
+
+  const monthReg = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2024-03-04', warranty_registered_date: 'March 2024' }, '2026-09-16');
+  eq('"Month YYYY" registration date resolves to month precision', monthReg.registrationPrecision, 'month');
+  eq('still registered in time (anchored to the 1st, before the deadline)', monthReg.termYears, 10);
 }
 
 /* ------------------------------------- registration still open (the feature) */
