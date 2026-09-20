@@ -32,13 +32,13 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
     <article className="dw-card overflow-hidden animate-rise" aria-live="polite" aria-labelledby="answer-text">
       <header className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-line">
         <p className="text-caption text-ink-3 mb-2 truncate">
-          {answer.interpretation ? answer.interpretation : `Asked: “${question}”`}
+          <span className="font-medium text-ink-2">Donovan</span> · {answer.interpretation ? answer.interpretation : `Asked: “${question}”`}
         </p>
-        <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] dark:text-[30px] dark:leading-[38px]'].join(' ')}>
+        <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] field:text-[30px] field:leading-[38px]'].join(' ')}>
           {answer.text}
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-body text-ink-2 dark:text-body-lg">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-body text-ink-2 field:text-body-lg">
           <span className="inline-flex items-center gap-1.5">
             {includeUnverified ? <ShieldQuestion className="w-4 h-4 text-warn" aria-hidden="true" /> : <ShieldCheck className="w-4 h-4 text-ok" aria-hidden="true" />}
             {isEmpty

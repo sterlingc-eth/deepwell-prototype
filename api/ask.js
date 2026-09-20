@@ -19,6 +19,7 @@ import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 import { recordModelCall } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
+import { startTimer, formatServerTiming } from "./_lib/timing.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -36,9 +37,21 @@ async function checkAskGate(auth) {
 
 async function checkAskGateInner(auth) {
   return withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (db) => {
-    const { rows } = await db.raw(`SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1`, [db.tenantId]);
-    const documentsStored = await db.countDocuments();
-    return gateAsk(rows[0] ?? {}, { documentsStored });
+    // Latency fix (2026-09-20, handoffs/ASK_LATENCY_2026-09-20.md): this used
+    // to be two sequential queries (the tenant row, then countDocuments()) —
+    // two round trips inside a withTenant transaction that already costs
+    // BEGIN + resolve_tenant + SET LOCAL + COMMIT on top. One query, one
+    // round trip, same two facts.
+    const { rows } = await db.raw(
+      `SELECT
+         (SELECT row_to_json(t) FROM (
+            SELECT plan, billing_status, trial_ends_at, current_period_end
+              FROM tenants WHERE id = $1
+          ) t) AS tenant,
+         (SELECT count(*)::int FROM documents WHERE tenant_id = $1) AS documents_stored`,
+      [db.tenantId]
+    );
+    return gateAsk(rows[0]?.tenant ?? {}, { documentsStored: rows[0]?.documents_stored ?? 0 });
   });
 }
 
@@ -362,21 +375,84 @@ async function runMetaQuestion(db, meta) {
   return listDocumentTypes(db);
 }
 
+/**
+ * Evidence retrieval for one question: the customer-number scope (if any)
+ * plus the two independent reads (searchPassages/searchExtractions), all in
+ * ONE withTenant transaction — was three separate withTenant calls (each its
+ * own connect + BEGIN + resolve_tenant + SET LOCAL + COMMIT), now one, with
+ * the two searches themselves run with Promise.all since neither depends on
+ * the other. See handoffs/ASK_LATENCY_2026-09-20.md.
+ *
+ * Same failure semantics as before: a customer-scope lookup failure falls
+ * back to an unscoped search (not an error); a search failure returns empty
+ * results (the same "nothing matched" the honest no-answer path already
+ * handles) rather than a 500.
+ */
+function retrieveEvidence(ctxArg, question, customerNumber, timer) {
+  return timer.time("retrieve", async () => {
+    try {
+      return await withTenant(ctxArg, async (db) => {
+        let documentIdsFilter = null;
+        if (customerNumber) {
+          const scopeStart = Date.now();
+          try {
+            const resolved = await resolveCustomerDocumentIds(db, customerNumber);
+            documentIdsFilter = resolved.documentIds; // null (unknown number) or a real (possibly empty) list
+          } catch (err) {
+            console.error("Customer-number scoping failed, answering unscoped:", err?.message);
+          } finally {
+            timer.add("scope", Date.now() - scopeStart);
+          }
+        }
+        const [passages, extractions] = await Promise.all([
+          db.searchPassages(question, MAX_PASSAGES, { documentIds: documentIdsFilter }),
+          db.searchExtractions(question, 25, { documentIds: documentIdsFilter }),
+        ]);
+        return { passages, extractions };
+      });
+    } catch (err) {
+      // A retrieval failure must not take the endpoint down. It also must
+      // NOT be papered over with a second, untrustworthy evidence source —
+      // see the file header. Log it and fall through to the same honest
+      // no-answer that "nothing matched" gets: a customer can't act any
+      // differently on the difference between "we found nothing" and "we
+      // couldn't check", and guessing is worse than either.
+      console.error("Retrieval failed:", err?.message);
+      return { passages: [], extractions: [] };
+    }
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  // Server-Timing + the ASK_DEBUG_TIMINGS escape hatch (both handoffs/
+  // ASK_LATENCY_2026-09-20.md) — ms only, no PII, no question text.
+  const timer = startTimer();
+  const send = (status, body) => {
+    const header = formatServerTiming(timer.snapshot());
+    if (header && !res.headersSent) res.setHeader("Server-Timing", header);
+    if (process.env.ASK_DEBUG_TIMINGS === "1" && body?.data && typeof body.data === "object") {
+      body.data.timingsMs = timer.snapshot();
+    }
+    return handleCors(res, req).status(status).json(body);
+  };
+
   let auth;
   try {
-    auth = await requireAuthOrKey(req);
-    assertScope(auth, "ask");
+    auth = await timer.time("auth", async () => {
+      const a = await requireAuthOrKey(req);
+      assertScope(a, "ask");
+      return a;
+    });
   } catch (err) {
     return denyAuth(res, err);
   }
 
   // The single most rate-limit-relevant route in the codebase: every call is
   // a model call. 429 is already written when this returns false.
-  if (!(await limit(req, res, auth, "ask"))) return;
+  if (!(await timer.time("limit", () => limit(req, res, auth, "ask")))) return;
 
   try {
     const { question, today } = req.body ?? {};
@@ -387,23 +463,49 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Question is too long" });
     }
 
-    const gate = await checkAskGate(auth);
+    const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+    const meta = classifyMetaQuestion(question);
+    const customerNumber = extractCustomerNumber(question);
+
+    // ---- overlap, not a chain (handoffs/ASK_LATENCY_2026-09-20.md) --------
+    // Three independent reads that used to run one after another. `limit`
+    // above stays first (it writes the 429 itself and must do so before
+    // anything else responds); everything below it is safe to overlap:
+    //   - assertModelBudget is a single already-combined round trip
+    //     (getDailyModelBudgetStatus) on its own connection/pool. Fired now
+    //     so its latency overlaps the gate check and retrieval instead of
+    //     stacking after both — it is only actually CONSULTED (awaited)
+    //     right before the model call below, exactly where it always was;
+    //     starting it early changes nothing about when it's enforced. The
+    //     `.catch` silences the "unhandled rejection" warning for a request
+    //     that never reaches the model at all (blocked by billing, or
+    //     answered by the meta-router) and therefore never awaits it again.
+    //   - checkAskGate needs its own connection regardless.
+    //   - retrieveEvidence needs its own connection regardless, and doesn't
+    //     depend on the gate's answer — skipped here for a meta question,
+    //     which answers from a single deterministic query instead; on the
+    //     rare case the meta query itself fails, retrieval is (re)run
+    //     inline below, same as the very first implementation.
+    // Pool is max 5 (recordsStore.js) — cap this request at 2 concurrent
+    // connections: gate→budget chained on one, retrieval on the other.
+    const gatePromise = timer.time("gate", () => checkAskGate(auth));
+    const budgetPromise = gatePromise.then(() => timer.time("budget", () => assertModelBudget(ctxArg)));
+    budgetPromise.catch(() => {});
+    const retrievalPromise = meta ? null : retrieveEvidence(ctxArg, question, customerNumber, timer);
+
+    const gate = await gatePromise;
     if (!gate.allowed) {
-      return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
+      if (retrievalPromise) await retrievalPromise; // don't leak an in-flight transaction on the way out
+      return send(gate.status, { error: gate.error, url: gate.url });
     }
 
     // ---- 0. meta-question pre-router (no model, no retrieval) --------------
-    const meta = classifyMetaQuestion(question);
     if (meta) {
       try {
-        const data = await withTenant(
-          { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-          (db) => runMetaQuestion(db, meta)
-        );
-        try {
-          await withTenant(
-            { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-            (db) => db.logAction({
+        const data = await timer.time("retrieve", () => withTenant(ctxArg, (db) => runMetaQuestion(db, meta)));
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, (db) => db.logAction({
               action: "document.queried",
               resource_type: "question",
               clerk_user_id: auth.userId,
@@ -412,12 +514,12 @@ export default async function handler(req, res) {
                 documents: [...new Set(data.sources.map((s) => s.documentId))],
                 passages: 0,
               },
-            })
-          );
-        } catch (err) {
-          console.error("Failed to write document.queried audit row (meta):", err?.message);
-        }
-        return handleCors(res, req).status(200).json({ success: true, data });
+            }));
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (meta):", err?.message);
+          }
+        });
+        return send(200, { success: true, data });
       } catch (err) {
         // A broken meta-query must not 500 a cheap question — fall through to
         // the normal retrieval+model path rather than failing the request.
@@ -425,51 +527,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // ---- 1. retrieve -------------------------------------------------------
-    // A question naming a customer number ("C-00012: when's the warranty up")
-    // is restricted to that customer's own documents (section D,
-    // handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md) — resolved BEFORE
-    // retrieval, in its own try/catch so a lookup failure degrades to an
-    // unscoped answer rather than a 500 (this route's existing "fail toward
-    // an honest answer, never a crash" rule — see the retrieval catch below).
-    let documentIdsFilter = null;
-    const customerNumber = extractCustomerNumber(question);
-    if (customerNumber) {
-      try {
-        const resolved = await withTenant(
-          { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-          (db) => resolveCustomerDocumentIds(db, customerNumber)
-        );
-        documentIdsFilter = resolved.documentIds; // null (unknown number) or a real (possibly empty) list
-      } catch (err) {
-        console.error("Customer-number scoping failed, answering unscoped:", err?.message);
-      }
-    }
-
-    let passages = [];
-    let extractions = [];
-    try {
-      const found = await withTenant(
-        { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-        async (db) => ({
-          passages: await db.searchPassages(question, MAX_PASSAGES, { documentIds: documentIdsFilter }),
-          extractions: await db.searchExtractions(question, 25, { documentIds: documentIdsFilter }),
-        })
-      );
-      passages = found.passages;
-      extractions = found.extractions;
-    } catch (err) {
-      // A retrieval failure must not take the endpoint down. It also must
-      // NOT be papered over with a second, untrustworthy evidence source —
-      // see the file header. Log it and fall through to the same honest
-      // no-answer that "nothing matched" gets: a customer can't act any
-      // differently on the difference between "we found nothing" and "we
-      // couldn't check", and guessing is worse than either.
-      console.error("Retrieval failed:", err?.message);
-    }
+    // ---- 1. retrieve (already in flight above unless meta fell through) ---
+    const { passages, extractions } = retrievalPromise
+      ? await retrievalPromise
+      : await retrieveEvidence(ctxArg, question, customerNumber, timer);
 
     if (passages.length === 0 && extractions.length === 0) {
-      return handleCors(res, req).status(200).json({
+      return send(200, {
         success: true,
         data: {
           kind: "no-answer",
@@ -515,8 +579,10 @@ export default async function handler(req, res) {
     // only one of the two ever checked here. Checked AFTER retrieval (a
     // question retrieval finds nothing already short-circuits above with no
     // model call) and right before the one Anthropic call this route makes,
-    // so a tenant that is over budget never pays for it.
-    await assertModelBudget({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId });
+    // so a tenant that is over budget never pays for it. Already IN FLIGHT
+    // (fired concurrently with the gate check and retrieval above) — this
+    // just consults the result at the same point in the flow it always was.
+    await budgetPromise;
 
     // ---- 2. ask ------------------------------------------------------------
     // Three separate blocks, not one flat prompt string, so an Anthropic
@@ -576,42 +642,7 @@ export default async function handler(req, res) {
       ],
     }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
     const latencyMs = Date.now() - startedAt;
-
-    // One structured line per call, no PII and no question text (see
-    // hashQuestion's doc comment above for why questions never get logged
-    // anywhere) — so Vercel logs show cache hit rates across tenants.
-    console.log(
-      JSON.stringify(
-        modelCallLogLine({
-          route: "ask",
-          model: ASK_MODEL,
-          inputTokens: response.usage?.input_tokens,
-          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
-          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-          outputTokens: response.usage?.output_tokens,
-          latencyMs,
-        })
-      )
-    );
-
-    // Cost accounting, not request rate limiting (./_lib/rateLimit.js already
-    // ran above) — best-effort and never fatal: recordModelCall already
-    // swallows its own errors (see usage.js), and this call is wrapped again
-    // for the same reason the audit write below is: a customer who got a
-    // correct, sourced answer must not see a 500 because bookkeeping failed.
-    try {
-      await recordModelCall(
-        { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-        {
-          inputTokens: response.usage?.input_tokens,
-          outputTokens: response.usage?.output_tokens,
-          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
-          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-        }
-      );
-    } catch (err) {
-      console.error("Failed to record ask usage:", err?.message);
-    }
+    timer.add("model", latencyMs);
 
     // ---- 3. enforce sourcing ------------------------------------------------
     // allowComputed defaults to false here: nothing on this endpoint's
@@ -629,23 +660,58 @@ export default async function handler(req, res) {
     ];
     const data = shapeAnswer(toolUse?.input, allowed, { candidates });
 
-    // ---- 4. audit -----------------------------------------------------------
-    // "Who saw this customer's document" has to be answerable, and until now
-    // nothing wrote a row here at all: a question could cite any document in
-    // the tenant's corpus and audit_log would never know it happened. One row
-    // per question, scoped to the tenant by the same withTenant() used for
-    // retrieval above. The question text itself is NEVER stored — see
+    // One structured line per call, no PII and no question text (see
+    // hashQuestion's doc comment above for why questions never get logged
+    // anywhere) — so Vercel logs show cache hit rates across tenants. Logged
+    // (and the response sent) BEFORE the bookkeeping below runs — neither
+    // needs the customer to wait on it. `timingsMs` is the same snapshot the
+    // Server-Timing header below carries; see handoffs/ASK_LATENCY_2026-09-20.md.
+    console.log(
+      JSON.stringify(
+        modelCallLogLine({
+          route: "ask",
+          model: ASK_MODEL,
+          inputTokens: response.usage?.input_tokens,
+          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          latencyMs,
+          timingsMs: timer.snapshot(),
+        })
+      )
+    );
+
+    // ---- respond FIRST, bookkeeping after (2026-09-20, handoffs/
+    // ASK_LATENCY_2026-09-20.md) --------------------------------------------
+    // The customer already has a correct, sourced answer at this point.
+    // Recording spend and writing the audit row are real work that must
+    // still happen, but neither should make the customer wait on it — this
+    // sends the response now, then keeps the function alive (Vercel does not
+    // freeze a serverless function until its handler's own promise settles)
+    // to finish both, same non-fatal try/catch semantics as before, just run
+    // together instead of one after the other after the response.
+    send(200, { success: true, data });
+
+    // ---- 4. bookkeeping (post-response) ------------------------------------
+    // "Who saw this customer's document" has to be answerable, and cost
+    // accounting is not request rate limiting (./_lib/rateLimit.js already
+    // ran above) — both best-effort and non-fatal: a customer who already got
+    // their answer must not see anything different because either write
+    // failed after the fact. The question text itself is NEVER stored — see
     // hashQuestion's doc comment — only its hash, which documents were cited,
     // and how many passages were considered.
-    //
-    // Best-effort and non-fatal: a customer who asked a question and got a
-    // correct, sourced answer must not see a 500 because the audit write
-    // failed after the fact.
-    try {
-      const citedDocumentIds = [...new Set((data.sources ?? []).map((s) => s.documentId))];
-      await withTenant(
-        { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-        (db) =>
+    const citedDocumentIds = [...new Set((data.sources ?? []).map((s) => s.documentId))];
+    await Promise.allSettled([
+      timer.time("bookkeeping", () =>
+        recordModelCall(ctxArg, {
+          inputTokens: response.usage?.input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+        }).catch((err) => console.error("Failed to record ask usage:", err?.message))
+      ),
+      timer.time("bookkeeping", () =>
+        withTenant(ctxArg, (db) =>
           db.logAction({
             action: "document.queried",
             resource_type: "question",
@@ -656,13 +722,21 @@ export default async function handler(req, res) {
               passages: passages.length,
             },
           })
-      );
-    } catch (err) {
-      console.error("Failed to write document.queried audit row:", err?.message);
-    }
-
-    return handleCors(res, req).status(200).json({ success: true, data });
+        ).catch((err) => console.error("Failed to write document.queried audit row:", err?.message))
+      ),
+    ]);
   } catch (error) {
+    try {
+      const header = formatServerTiming(timer.snapshot());
+      if (header && !res.headersSent) res.setHeader("Server-Timing", header);
+    } catch { /* never let timing observability break error reporting */ }
+    if (res.headersSent) {
+      // Only reachable if the post-response bookkeeping above somehow threw
+      // past its own per-promise .catch — the customer already has their
+      // answer, so there is nothing left to send.
+      console.error("ask: error after response already sent:", error?.message);
+      return;
+    }
     // Checked before the generic handler: handleError's own 429 branch would
     // catch this too (status 429), but with a different message and no
     // Retry-After header — every model-budget-gated endpoint should answer

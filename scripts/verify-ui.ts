@@ -470,7 +470,7 @@ function listFilesRecursive(dir: string): string[] {
 }
 
 {
-  eq('the primary nav is exactly Ask, Inbox, Records, Dashboard, in that order', NAV.map((n) => n.label), ['Ask', 'Inbox', 'Records', 'Dashboard']);
+  eq('the primary nav is exactly Ask, Dashboard, Inbox, Records, in that order (owner 2026-09-20: Dashboard beside Ask)', NAV.map((n) => n.label), ['Ask', 'Dashboard', 'Inbox', 'Records']);
   check('the nav array has exactly 4 items', NAV.length === 4);
 }
 

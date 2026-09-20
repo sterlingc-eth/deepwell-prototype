@@ -13,7 +13,7 @@ Vite+React+TS at `src/` · Vercel serverless JS at `api/` (**exactly 12 files �
 - **Never read, type, or paste credentials** (keys, secrets, connection strings). He pastes them into Vercel/Clerk himself.
 - **Never write DDL to production Neon** — he pastes migrations in the SQL editor (paste SQL text, not filenames).
 - Every build goes through the dedicated reviewer agent before it ships (GO/NO-GO). Cheapest model that works (sonnet agents; haiku in product).
-- Product tone: plain English, no pipeline jargon (see `handoffs/UX_FLOW_SPEC_2026-09-19.md`). Nav is exactly Ask · Inbox · Records · Dashboard.
+- Product tone: plain English, no pipeline jargon (see `handoffs/UX_FLOW_SPEC_2026-09-19.md`). Nav is exactly Ask · Dashboard · Inbox · Records.
 
 ## What shipped (12+ reviewed rounds, ~1,700 verify checks green)
 Auto-classification (15 types) + AI auto-verify · delete · Open original · Ask grounding + model-free meta router · new IA + jargon removal · API & UI break-tests · adversarial backend hardening (budget guard, advisory locks, tenant-keyed concurrency, PG rate limiter) · multi-unit extraction + month-precision dates · 20-item website launch checklist · Stripe billing (checkout/portal/webhook/gating/trial) · **customer profiles with C-00001 numbers** (list, profile page, timeline, assign/merge) · **Team screen** (Clerk org invites, seats vs plan) · **prompt caching fixed** (prefixes now above Haiku's 2048 minimum, 1h TTL on ingest) + cost cuts · **warranty notifications** (in-app bell + daily email digest via Resend, tier-transition dedupe).

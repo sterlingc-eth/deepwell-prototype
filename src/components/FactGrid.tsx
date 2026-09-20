@@ -35,7 +35,7 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity }: FactGr
           const linkable = !!(f.entityId && onOpenEntity);
           return (
             <div key={`${f.label}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(140px,30%)_minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-3 py-2.5 items-baseline">
-              <dt className="text-body text-ink-3 sm:text-body-lg dark:text-body-lg col-span-2 sm:col-span-1">{f.label}</dt>
+              <dt className="text-body text-ink-3 sm:text-body-lg field:text-body-lg col-span-2 sm:col-span-1">{f.label}</dt>
               <dd className="min-w-0 text-ink">
                 {f.status ? (
                   <span className={PILL[f.status]}>{f.value}</span>

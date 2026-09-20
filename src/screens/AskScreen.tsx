@@ -141,8 +141,8 @@ export function AskScreen() {
     <AppShell width="ask">
       <div className="space-y-8">
         <header className="space-y-2">
-          <h1 className={asked ? 'text-h2 sm:text-h1' : 'text-display sm:text-display-lg'}>Ask your records.</h1>
-          {!asked && <p className="text-ink-2 text-body-lg dark:text-body-xl">One question. One answer, with the documents it came from.</p>}
+          <h1 className={asked ? 'text-h2 sm:text-h1' : 'text-display sm:text-display-lg'}>Ask Donovan.</h1>
+          {!asked && <p className="text-ink-2 text-body-lg field:text-body-xl">Donovan reads your records and answers with the documents it came from.</p>}
         </header>
 
         <form onSubmit={onSubmit} role="search" aria-label="Ask a question" className="space-y-3">
@@ -166,12 +166,12 @@ export function AskScreen() {
                   if (input) clear();
                 }
               }}
-              placeholder="Ask anything — an address, a serial, a name, a question…"
+              placeholder="Ask Donovan anything — an address, a serial, a name, a question…"
               autoComplete="off"
               spellCheck={false}
               rows={1}
               enterKeyHint="search"
-              className="dw-input pr-[7.5rem] text-body-lg dark:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4 resize-none overflow-y-auto max-h-48"
+              className="dw-input pr-[7.5rem] text-body-lg field:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4 resize-none overflow-y-auto max-h-48"
               style={{ minHeight: fieldMode ? 60 : 56 }}
             />
             <div className="absolute inset-y-0 right-1.5 flex items-center gap-1">
@@ -188,14 +188,16 @@ export function AskScreen() {
               </button>
             </div>
           </div>
-          <p className="text-caption text-ink-3">
-            <kbd className="dw-kbd">Enter</kbd> to ask · <kbd className="dw-kbd">Esc</kbd> to clear
+          <p className="text-caption text-ink-3" aria-live="polite">
+            {loading
+              ? <span className="inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Donovan is reading your records…</span>
+              : <><kbd className="dw-kbd">Enter</kbd> to ask · <kbd className="dw-kbd">Esc</kbd> to clear</>}
           </p>
         </form>
 
         {error && (
           <div role="alert" className="dw-card border-bad/40 px-5 py-4 text-bad-ink dark:text-bad-bg">
-            <p className="font-medium">Couldn't get an answer.</p>
+            <p className="font-medium">Donovan couldn't get an answer.</p>
             <p className="text-body mt-1">{error}</p>
             {billingUrl && (
               <button type="button" onClick={() => setCurrentScreen('billing')} className="dw-btn-primary !min-h-[36px] !py-1 mt-3">

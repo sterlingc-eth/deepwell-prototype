@@ -122,9 +122,15 @@ export function modelCallLogLine({
   cacheCreationInputTokens = 0,
   outputTokens = 0,
   latencyMs = 0,
+  // Optional: a stage->ms map (api/_lib/timing.js's timer.snapshot()) — e.g.
+  // /api/ask's {auth, limit, gate, scope, retrieve, budget, model, total}.
+  // Folded in as `timings_ms` only when actually given, so every existing
+  // caller (extractDocument.js) that never passes it gets the exact same
+  // line as before.
+  timingsMs,
 } = {}) {
   const n = (v) => Math.max(0, Math.trunc(v) || 0);
-  return {
+  const line = {
     route: typeof route === "string" ? route : "unknown",
     model: typeof model === "string" ? model : "unknown",
     input_tokens: n(inputTokens),
@@ -133,4 +139,12 @@ export function modelCallLogLine({
     output_tokens: n(outputTokens),
     latency_ms: n(latencyMs),
   };
+  if (timingsMs && typeof timingsMs === "object") {
+    const timings_ms = {};
+    for (const [k, v] of Object.entries(timingsMs)) {
+      if (Number.isFinite(v)) timings_ms[k] = Math.round(v);
+    }
+    line.timings_ms = timings_ms;
+  }
+  return line;
 }

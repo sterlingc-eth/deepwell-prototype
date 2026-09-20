@@ -26,6 +26,7 @@ const FIELD_MODE_KEY = 'deepwell.fieldMode';
 
 function readFieldMode(): boolean {
   try {
+    // Default is Office view (dark). Field view (light, larger type) is opt-in.
     return window.localStorage.getItem(FIELD_MODE_KEY) === '1';
   } catch {
     return false;
@@ -34,7 +35,9 @@ function readFieldMode(): boolean {
 
 function applyFieldMode(on: boolean) {
   try {
-    document.documentElement.classList.toggle('dark', on);
+    // Office view = `.dark` colors. Field view = light colors + `.field` ergonomics.
+    document.documentElement.classList.toggle('dark', !on);
+    document.documentElement.classList.toggle('field', on);
     window.localStorage.setItem(FIELD_MODE_KEY, on ? '1' : '0');
   } catch {
     /* storage unavailable — theme still applied to the document */
@@ -213,7 +216,7 @@ interface AppState {
 }
 
 const initialFieldMode = readFieldMode();
-if (initialFieldMode) applyFieldMode(true);
+applyFieldMode(initialFieldMode); // always: Office (dark) is the default and needs the class
 
 export const useAppStore = create<AppState>((set) => ({
   currentScreen: 'ask',

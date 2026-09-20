@@ -44,10 +44,18 @@ export const ANSWER_TOOL = {
       text: {
         type: "string",
         description:
-          "1–3 plain-English sentences answering the question. If the evidence doesn't support an answer, say so plainly and do not guess.",
+          "1–2 plain-English sentences answering the question. If the evidence doesn't support an answer, say so plainly and do not guess.",
       },
       facts: {
         type: "array",
+        // Output-token cut (2026-09-20, owner cost/latency decision): a
+        // dispatcher acts on the handful of facts that answer the question,
+        // never a full dump of every field retrieval turned up — see
+        // handoffs/ASK_LATENCY_2026-09-20.md. Enforced again in RULES below
+        // since a tool schema's maxItems is a hint some models don't hard-stop
+        // on; shapeAnswer() does not additionally truncate, so this is the
+        // only cap and must stay in sync with the RULES wording.
+        maxItems: 5,
         items: {
           type: "object",
           properties: {
@@ -74,10 +82,15 @@ export const ANSWER_TOOL = {
                     type: "object",
                     properties: { page: { type: "number" }, field: { type: "string" } },
                   },
-                  excerpt: { type: "string" },
                 },
                 required: ["documentId", "location"],
               },
+              // No `excerpt` field: nothing downstream ever reads a source's
+              // excerpt (src/components/SourceList.tsx renders from the
+              // locally-synced document, not from the answer payload) — see
+              // handoffs/ASK_LATENCY_2026-09-20.md. Dropping it from the
+              // schema means the model has nothing there to spend output
+              // tokens re-copying passage text into.
             },
           },
           required: ["label", "value", "sources"],
@@ -97,9 +110,10 @@ const RULES = `Rules:
 - For an already-extracted field, location must be { "field": "<field name exactly as shown>" } — those aren't tied to a single page here, so do not invent a page number for one.
 - Never invent a document, a page, a date, a serial, a model number, or a price. If the evidence does not answer the question, set text to "Nothing in your records answers that." and return no facts.
 - If two passages disagree, say so in text and cite both rather than picking one.
+- Return at most 5 facts — only the ones that answer the question, never an exhaustive dump of everything retrieved.
 - Facts are a key/value grid: keep labels short ("Warranty", "Installed by", "Cost"). Use status "ok" for an active warranty, "warn" for one expiring within 90 days, "bad" for expired.
 - basis is "printed" unless you personally computed the value yourself — see the basis field description.
-- text is 1–3 sentences a dispatcher would say out loud.`;
+- text is 1–2 sentences a dispatcher would say out loud. No filler, no restating the question.`;
 
 /**
  * ---------------------------------------------------------------------------

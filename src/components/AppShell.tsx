@@ -16,16 +16,16 @@ interface NavItem {
   matches: Screen[];
 }
 
-// Exactly four primary destinations — Ask, Inbox, Records, Dashboard. Browse
+// Exactly four primary destinations — Ask, Dashboard, Inbox, Records. Browse
 // merged into Records (as its Documents/Search tabs); the old standalone
 // Records screen's health metrics moved into Dashboard's "Data health"
 // strip; 'review' and 'records' are retired ids kept as aliases (see
 // store/appStore.ts) so they still light up the right item here.
 export const NAV: NavItem[] = [
   { screen: 'ask', label: 'Ask', icon: AskMark, matches: ['ask', 'entity'] },
+  { screen: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, matches: ['dashboard', 'warranty-export', 'records'] },
   { screen: 'ingest', label: 'Inbox', icon: Inbox, matches: ['ingest', 'review'] },
   { screen: 'browse', label: 'Records', icon: Database, matches: ['browse', 'customer'] },
-  { screen: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, matches: ['dashboard', 'warranty-export', 'records'] },
 ];
 
 interface AppShellProps {
@@ -144,12 +144,13 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             type="button"
             role="switch"
             aria-checked={fieldMode}
-            aria-label={fieldMode ? 'Truck view on. Switch to office view' : 'Truck view off. Switch to truck view'}
+            aria-label={fieldMode ? 'Field view on. Switch to Office view' : 'Office view on. Switch to Field view'}
+            title={fieldMode ? 'Field view: light, larger type for outdoors. Click for Office view.' : 'Office view: dark. Click for Field view (light, larger type).'}
             onClick={() => setFieldMode(!fieldMode)}
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
             {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
-            <span className="hidden md:inline text-body">Truck view</span>
+            <span className="hidden md:inline text-body">{fieldMode ? 'Field view' : 'Office view'}</span>
           </button>
 
           {/* A tech who works two shops switches their active org here — the
@@ -220,7 +221,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
 
       <footer className="border-t border-line">
         <div className="max-w-content mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-caption text-ink-3">
-          <span>DeepWell Technology · Knowledge builds business.</span>
+          <span>DeepWell Technology · Knowledge Builds Business.</span>
           <span className="flex items-center gap-4">
             <span>Every answer shows its source.</span>
             <a href="/" className="inline-flex items-center gap-1 hover:text-ink-2 transition-colors duration-quick">

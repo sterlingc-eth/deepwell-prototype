@@ -6,7 +6,7 @@ import type { Config } from 'tailwindcss';
  * Brand (from the logo): forest green, navy, a single brass accent.
  * Neutrals are green-biased so the greys sit naturally next to the forest.
  * Semantic roles (bg / surface / text / border ...) are CSS variables set in
- * index.css so light (office) and field (dark, high-contrast) themes share
+ * index.css so Office (dark, default) and Field (light + larger type) views share
  * one component vocabulary.
  */
 export default {
@@ -146,5 +146,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `.field` = Field view ergonomics (bigger type/targets). Colors live on
+    // `.dark` (Office view) — the two are independent, see src/index.css.
+    ({ addVariant }: { addVariant: (n: string, v: string) => void }) => addVariant('field', '.field &'),
+  ],
 } satisfies Config;

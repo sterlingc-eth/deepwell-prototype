@@ -16,9 +16,9 @@ Nav has 5 top-level items plus two icon buttons ("Website", "Field") that all re
 | 4 | **Dashboard** | "What needs attention today — warranties, gaps, alerts." | Existing `DashboardScreen` (alerts, expiry table, at-risk equipment) **plus** a new top "Data health" strip carrying today's Records-screen tiles (Documents, AI verified, Unlinked inbox → "Needs linking", Gaps → "Missing info", Conflicts) so there is exactly one place that answers "is my data OK." |
 | 5 | *(remove from top nav)* Browse | — | Content absorbed into Records (#3) as its Documents/Records tabs, already how `BrowseScreen` is internally structured. Removes the Records-vs-Browse naming collision (BrowseScreen literally has an internal tab called "Records"). |
 | — | Website (icon, top right) | External marketing site | Move out of the primary nav row entirely into the org-switcher/account menu (it's not part of using the product) or drop it — a signed-in user managing paperwork has no task need for the marketing site, and it currently sits at the same visual weight as "Dashboard." |
-| — | Field (icon, top right) | Toggle high-contrast/larger-text mode for outdoor/truck use | Rename to **"Truck view"** or **"Outdoor mode"** — "Field" beside a nav that has nothing else called "field" reads as a place, not a toggle. Keep as icon toggle, just relabel. |
+| — | Field (icon, top right) | Toggle high-contrast/larger-text mode for outdoor/truck use | Rename to **"Field view"** or **"Outdoor mode"** — "Field" beside a nav that has nothing else called "field" reads as a place, not a toggle. Keep as icon toggle, just relabel. |
 
-Net result: **4 primary nav items** (Ask, Inbox, Records, Dashboard) instead of 5 screens + 2 ambiguous icons, and the review queue — the daily task — is one click from a labeled nav item instead of a button buried inside Intake.
+Net result: **4 primary nav items** (Ask, Dashboard, Inbox, Records) instead of 5 screens + 2 ambiguous icons, and the review queue — the daily task — is one click from a labeled nav item instead of a button buried inside Intake.
 
 ---
 
@@ -89,7 +89,7 @@ Net result: **4 primary nav items** (Ask, Inbox, Records, Dashboard) instead of 
 
 12. **Merge the two nav-adjacent icon links into the account area.**
     Current: "Website" (external link to marketing site) and "Field" (mode toggle) sit at the same visual rank as Ask/Records/Intake/Dashboard/Browse in `AppShell.tsx:78-97`.
-    Proposed: move "Website" into the org-switcher dropdown or drop it; rename "Field" to "Truck view" (or "Outdoor mode") per IA table.
+    Proposed: move "Website" into the org-switcher dropdown or drop it; rename "Field" to "Field view" (or "Outdoor mode") per IA table.
     Files: `src/components/AppShell.tsx`.
     Why: confirmed live — both render as unlabeled-on-mobile icon buttons in the same row as core nav, and neither is a "place in the app," which is what everything else in that row is.
 
@@ -134,7 +134,7 @@ Net result: **4 primary nav items** (Ask, Inbox, Records, Dashboard) instead of 
 | "→ can reach" | Review panel header | **"Currently: X · Next step: Y"** |
 | Reclassify & verify all | Records button | **Re-check all documents with AI** |
 | Mapped, facets, extractions | Backend/services code only (`postgresRecordsStore.ts`, `reviewClient.ts`) — **not currently shown in the UI** | No change needed; flagged here only as terms that must never leak into future UI copy. |
-| Field (mode toggle) | AppShell icon | **Truck view** (or Outdoor mode) |
+| Field (mode toggle) | AppShell icon | **Field view** (or Outdoor mode) |
 | Browse / Records (two different screens with overlapping meaning) | Nav | Merge into one **Records** screen, tabs "Documents" / "Search" |
 | "Select a document." (shown on empty queue) | Review panel | **"Nothing needs you right now — new uploads will show up here."** |
 

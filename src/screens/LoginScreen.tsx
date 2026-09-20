@@ -12,7 +12,7 @@ export function LoginScreen() {
         <h1 className="m-0">
           <Wordmark size="lg" animated />
         </h1>
-        <p className="text-forest-100 mt-4 text-body-lg">Knowledge builds business.</p>
+        <p className="text-forest-100 mt-4 text-body-lg">Knowledge Builds Business.</p>
       </div>
 
       <div

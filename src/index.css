@@ -4,7 +4,9 @@
 
 /* ------------------------------------------------------------------ */
 /* Semantic tokens                                                     */
-/* Light = office. `.dark` = field mode: high contrast, larger type.   */
+/* `.dark` = Office view (dark colors, the default). No class = Field  */
+/* view (light colors for sunlight). `.field` = Field ergonomics: larger */
+/* type and touch targets. Colors and ergonomics are independent.        */
 /* ------------------------------------------------------------------ */
 @layer base {
   :root {
@@ -48,8 +50,8 @@
     margin: 0;
   }
 
-  /* Field mode: everything one step larger, min 18px body */
-  .dark body {
+  /* Field view: everything one step larger, min 18px body */
+  .field body {
     @apply text-body-xl;
   }
 
@@ -117,7 +119,7 @@
     min-height: 44px;
     padding: 10px 18px;
   }
-  .dark .dw-btn { min-height: 48px; padding: 12px 20px; }
+  .field .dw-btn { min-height: 48px; padding: 12px 20px; }
 
   .dw-btn-primary {
     @apply dw-btn bg-forest-700 text-stone-0 hover:bg-forest-800 active:bg-forest-900;
@@ -159,7 +161,7 @@
   .dw-pill-info { @apply dw-pill bg-info-bg text-info-ink; }
   .dw-pill-muted{ @apply dw-pill bg-surface-2 text-ink-2; }
 
-  /* Field mode pills keep text legible on dark surfaces */
+  /* Office (dark) pills keep text legible on dark surfaces */
   .dark .dw-pill-ok   { background: #16432a; color: #b9e6c9; }
   .dark .dw-pill-warn { background: #4d3300; color: #ffd98a; }
   .dark .dw-pill-bad  { background: #5a1a13; color: #ffc1b8; }

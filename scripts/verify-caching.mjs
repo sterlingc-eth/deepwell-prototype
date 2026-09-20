@@ -35,6 +35,7 @@ import {
   TRANSCRIBE_SYSTEM_PROMPT,
   resolveTranscribeModels,
 } from '../api/_lib/readDocument.js';
+import { startTimer, formatServerTiming } from '../api/_lib/timing.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -340,6 +341,53 @@ const eq = (name, got, want) =>
       cacheable(text, model),
       `est. ${estimateTokens(text)} tokens`);
   }
+}
+
+/* --------------------------------------- /api/ask latency instrumentation
+ * api/_lib/timing.js — the Server-Timing helper added for
+ * handoffs/ASK_LATENCY_2026-09-20.md. Pure formatting checks (no clock, no
+ * DB) plus a couple of real-clock sanity checks on the timer itself.
+ */
+{
+  eq('formatServerTiming: basic map', formatServerTiming({ auth: 12, limit: 3 }), 'auth;dur=12, limit;dur=3');
+  eq('formatServerTiming: rounds fractional ms', formatServerTiming({ model: 1801.6 }), 'model;dur=1802');
+  eq('formatServerTiming: drops non-finite/negative entries', formatServerTiming({ a: 1, b: NaN, c: -5, d: Infinity }), 'a;dur=1');
+  eq('formatServerTiming: empty map -> empty string', formatServerTiming({}), '');
+  eq('formatServerTiming: null/undefined -> empty string', formatServerTiming(null), '');
+  eq('formatServerTiming: preserves insertion order', formatServerTiming({ z: 1, a: 2 }), 'z;dur=1, a;dur=2');
+
+  const timer = startTimer();
+  timer.add('scope', 10);
+  timer.add('scope', 5); // accumulates across repeat calls
+  eq('timer.add accumulates repeat calls to the same stage', timer.snapshot().scope, 15);
+
+  await timer.time('retrieve', () => new Promise((r) => setTimeout(r, 20)));
+  // >= 1 rather than >= 20: setTimeout is a floor, not a guarantee, and a
+  // busy CI runner can fire it a hair early — this only needs to prove the
+  // stage recorded *some* real elapsed time, not clock-precise timing.
+  check('timer.time records a positive duration for an async stage', timer.snapshot().retrieve >= 1);
+
+  let threw = false;
+  try {
+    await timer.time('model', () => { throw new Error('boom'); });
+  } catch {
+    threw = true;
+  }
+  check('timer.time still records timing and rethrows when fn throws', threw && timer.snapshot().model >= 0);
+
+  check('snapshot() always includes total', Number.isFinite(startTimer().snapshot().total));
+}
+
+/* --------------------------------------- /api/ask output-token trims
+ * handoffs/ASK_LATENCY_2026-09-20.md: facts capped and sources no longer
+ * carry an unused excerpt field — checked against the real schema object so
+ * a future edit that removes the cap or re-adds excerpt fails a test.
+ */
+{
+  eq('ANSWER_TOOL caps facts at 5', ANSWER_TOOL.input_schema.properties.facts.maxItems, 5);
+  check('ANSWER_TOOL fact sources no longer declare an excerpt field',
+    !('excerpt' in (ANSWER_TOOL.input_schema.properties.facts.items.properties.sources.items.properties ?? {})));
+  check('SYSTEM_PROMPT still tells the model to cap facts at 5', /at most 5 facts/i.test(SYSTEM_PROMPT));
 }
 
 /* ------------------------------------------------------------------ done */
