@@ -1,5 +1,6 @@
 import type { Answer, AnswerProvider, Fact } from '../core/types';
 import { authHeader } from './authToken';
+import { messageFromResponse } from './httpError';
 import type { GraphSnapshot } from '../core/entityGraph';
 
 /**
@@ -34,6 +35,24 @@ import type { GraphSnapshot } from '../core/entityGraph';
  * defensively against malformed JSON, not to re-referee it against the
  * wrong evidence set.
  */
+/**
+ * Thrown by the Claude-backed provider on a non-2xx response. `.status` and
+ * `.url` let AskScreen tell a subscription-required 402 (billing's exact
+ * shape: `{ error, url: "/app/?screen=billing" }`, per handoffs/BILLING_RULES.md)
+ * apart from an ordinary failure, so it can offer "See plans" instead of just
+ * an error line.
+ */
+export class AskApiError extends Error {
+  status: number;
+  url?: string;
+  constructor(message: string, status: number, url?: string) {
+    super(message);
+    this.name = 'AskApiError';
+    this.status = status;
+    this.url = url;
+  }
+}
+
 export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '/api/ask'): AnswerProvider {
   return {
     async ask(question, opts) {
@@ -49,13 +68,17 @@ export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '
         // the Ask screen. Same guard the ingest and records clients already use.
         const raw = await res.text().catch(() => '');
         let message = `${res.status} ${res.statusText}`;
+        let parsedBody: unknown = null;
         try {
-          const parsed = JSON.parse(raw) as { error?: string };
+          parsedBody = JSON.parse(raw);
+          const parsed = parsedBody as { error?: string };
           if (parsed?.error) message = parsed.error;
         } catch {
           /* not JSON — keep the status line rather than dumping the page */
         }
-        throw new Error(message);
+        if (res.status === 429) message = messageFromResponse(res, parsedBody, message);
+        const billingUrl = (parsedBody as { url?: string } | null)?.url;
+        throw new AskApiError(message, res.status, billingUrl);
       }
       const body = (await res.json()) as { success: boolean; data?: Partial<Answer>; error?: string };
       if (!body.success || !body.data) throw new Error(body.error ?? 'Answer service returned no data');

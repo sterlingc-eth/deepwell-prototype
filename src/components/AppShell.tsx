@@ -1,9 +1,10 @@
 import type { ComponentType, ReactNode } from 'react';
-import { Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe } from 'lucide-react';
+import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe } from 'lucide-react';
 import { AskMark } from './AskMark';
 import { OrganizationSwitcher, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
 import { useAppStore, selectIngestProgress, type Screen } from '../store/appStore';
+import { billingBannerFor } from '../services/billingClient';
 
 interface NavItem {
   screen: Screen;
@@ -37,6 +38,8 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const fieldMode = useAppStore((s) => s.fieldMode);
   const setFieldMode = useAppStore((s) => s.setFieldMode);
   const ingestProgress = useAppStore(selectIngestProgress);
+  const billingStatus = useAppStore((s) => s.billingStatus);
+  const banner = billingBannerFor(billingStatus);
   const { signOut } = useClerk();
 
   // The one-line sub-bar shown below `sm`, so a phone-width session always
@@ -102,6 +105,18 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               for a signed-in user, so it lives in the footer, not this row —
               see the footer below. */}
 
+          {/* Billing lives in the account area, not the primary nav — it's
+              not one of the four destinations NAV enumerates above. */}
+          <button
+            type="button"
+            onClick={() => setCurrentScreen('billing')}
+            aria-current={currentScreen === 'billing' ? 'page' : undefined}
+            className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
+          >
+            <CreditCard className="w-5 h-5" aria-hidden="true" />
+            <span className="hidden md:inline text-body">Billing</span>
+          </button>
+
           <button
             type="button"
             role="switch"
@@ -148,6 +163,25 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
         <div className="sm:hidden bg-surface-2 border-b border-line px-4 py-1.5 text-caption text-ink-2 font-medium">
           {activeLabel}
         </div>
+      )}
+
+      {/* Global billing banner: trial countdown, a failed payment, or a
+          never-subscribed tenant that's used up its free preview. Hidden on
+          Billing itself — the person is already looking at the answer. */}
+      {banner && currentScreen !== 'billing' && (
+        <button
+          type="button"
+          onClick={() => setCurrentScreen('billing')}
+          className={[
+            'w-full text-left px-4 sm:px-6 py-2 flex items-center gap-2 text-body transition-colors duration-quick',
+            banner.kind === 'past_due' || banner.kind === 'cap' ? 'bg-warn-bg text-warn-ink hover:brightness-95' : 'bg-info-bg text-info-ink hover:brightness-95',
+          ].join(' ')}
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span className="max-w-content mx-auto w-full flex items-center gap-2">
+            {banner.message} <span className="underline font-medium">Go to Billing</span>
+          </span>
+        </button>
       )}
 
       <main

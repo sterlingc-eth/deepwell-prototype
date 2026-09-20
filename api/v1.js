@@ -1,6 +1,7 @@
 import equipment from "./_lib/routes/v1-equipment.js";
 import warranty from "./_lib/routes/v1-warranty.js";
 import ingest from "./_lib/routes/v1-ingest.js";
+import customerEquipment from "./_lib/routes/customer-equipment.js";
 
 /**
  * The public API surface, behind one function.
@@ -14,12 +15,17 @@ import ingest from "./_lib/routes/v1-ingest.js";
  *   GET  /api/v1/warranty?withinDays=…
  *   POST /api/v1/ingest
  *
+ * `customer-equipment` is the RETIRED api/customer-equipment.js (billing
+ * brief, 2026-09-20): same handler, same body shape, reachable at the old
+ * POST /api/customer-equipment path via vercel.json's rewrite. Its body is
+ * small (customerId + two optional fields) and fits under the sizeLimit below.
+ *
  * The handlers themselves live in api/_lib/routes/, where Vercel does not
  * count them.
  */
 export const config = { api: { bodyParser: { sizeLimit: "16kb" } }, maxDuration: 60 };
 
-const RESOURCES = { equipment, warranty, ingest };
+const RESOURCES = { equipment, warranty, ingest, "customer-equipment": customerEquipment };
 
 export default async function handler(req, res) {
   const resource = String(req.query?.resource ?? "");

@@ -12,6 +12,10 @@ import { useGraph } from '../core/entityGraph';
 import { createMockProvider } from './answerService.mock';
 import { createClaudeProvider } from './answerService.claude';
 
+// Re-exported so screens (AskScreen) can `instanceof` check a 402 without
+// reaching past this module into the provider-specific file directly.
+export { AskApiError } from './answerService.claude';
+
 export type ProviderName = 'mock' | 'claude';
 
 function chooseProvider(): ProviderName {

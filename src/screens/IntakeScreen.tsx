@@ -224,6 +224,11 @@ export function IntakeBody() {
     return id;
   };
 
+  // Set when an upload comes back 402 (subscription required / free preview
+  // used up — see handoffs/BILLING_RULES.md) so a friendly inline banner with
+  // a "See plans" button can show instead of just the per-file error text.
+  const [billingNotice, setBillingNotice] = useState<{ message: string; url: string } | null>(null);
+
   const uploadFiles = async (files: File[]) => {
     if (!files.length) return;
     // A .zip on this "Add files" zone is a bulk export, not one document —
@@ -250,6 +255,7 @@ export function IntakeBody() {
         setUploadDocId(result.filename, result.documentId ?? tempId);
       }
       if (result.documentId && !result.error) trackProcessingDocs([result.documentId]);
+      if (result.error && result.billingUrl) setBillingNotice({ message: result.error, url: result.billingUrl });
     });
   };
   // ---- Bulk import: a dropped .zip export or a large multi-file selection ----
@@ -401,6 +407,16 @@ export function IntakeBody() {
 
   return (
     <div className="space-y-8">
+        {billingNotice && (
+          <div role="alert" className="dw-card border-bad/40 px-5 py-4 text-bad-ink dark:text-bad-bg flex flex-wrap items-center gap-3">
+            <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <p className="flex-1 min-w-[16rem]">{billingNotice.message}</p>
+            <button type="button" onClick={() => setCurrentScreen('billing')} className="dw-btn-primary !min-h-[36px] !py-1">
+              See plans
+            </button>
+          </div>
+        )}
+
         {/* First-run: nothing added yet anywhere in the account. A big,
             unmissable call to action instead of the ordinary batch/bulk-import
             layout with six empty stage tiles above it. */}

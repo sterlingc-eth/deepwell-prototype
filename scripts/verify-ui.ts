@@ -13,7 +13,18 @@ const SCRIPT_DIR = fileURLToPath(new URL('.', import.meta.url));
 import { buildSuggestions } from '../src/core/suggestions';
 import { formatYmd } from '../src/core/answer';
 import { parseDeepLink } from '../src/hooks/useDeepLink';
+import {
+  annualPrice,
+  billingBannerFor,
+  daysUntil,
+  isValidPlanId,
+  recordsRescueTotalCents,
+  resolveRecordsRescueQuantity,
+  RECORDS_RESCUE_MIN_PAGES,
+  type BillingStatus,
+} from '../src/services/billingClient';
 import { describeFetchFailure, NETWORK_ERROR_MESSAGE, chunkIds, pollDocumentStatusChunked } from '../src/services/ingestClient';
+import { messageFromResponse, parseRetryAfterSeconds, isDailyCap, type ResponseLike } from '../src/services/httpError';
 import { truncateForDisplay, summarizeProgress, type BulkFileState } from '../src/services/bulkImport';
 import { conflictDocs, gapDocs, maxStageFor, recomputeIssues, unlinkedDocs, type GraphSnapshot } from '../src/core/entityGraph';
 import { hvacSchema } from '../src/domains/hvac/schema';
@@ -107,6 +118,16 @@ const eq = (name: string, got: unknown, want: unknown): void =>
     const got = parseDeepLink(`?q=${long}`).question;
     check('q is capped at 2000 chars', got?.length === 2000 && got === 'a'.repeat(2000), `got length ${got?.length}`);
   }
+
+  // ?plan= / ?interval= — the marketing site's pricing buttons and the
+  // Records Rescue CTA (index.html) land here; see useDeepLink.ts's
+  // isValidPlanId gate and handoffs/STRIPE_BRIEF_2026-09-20.md.
+  eq('a valid plan defaults interval to month', parseDeepLink('?plan=shop'), { plan: 'shop', interval: 'month' });
+  eq('a valid plan with interval=year is kept', parseDeepLink('?plan=solo&interval=year'), { plan: 'solo', interval: 'year' });
+  eq('an unrecognized interval falls back to month', parseDeepLink('?plan=crew&interval=biweekly'), { plan: 'crew', interval: 'month' });
+  eq('an invalid plan id is dropped entirely, including interval', parseDeepLink('?plan=enterprise&interval=year'), {});
+  eq('an empty plan is dropped', parseDeepLink('?plan=&interval=year'), {});
+  check('isValidPlanId accepts exactly the four catalog ids', ['solo', 'shop', 'crew', 'fleet'].every(isValidPlanId) && !isValidPlanId('enterprise') && !isValidPlanId(null) && !isValidPlanId(undefined));
 }
 
 /* ---------------------------------------------------------------- formatYmd */
@@ -160,6 +181,70 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   eq('JSON with no "error" key falls back to plain language', describeFetchFailure(JSON.stringify({ ok: false })), NETWORK_ERROR_MESSAGE);
   eq('JSON with a blank "error" string falls back to plain language', describeFetchFailure(JSON.stringify({ error: '   ' })), NETWORK_ERROR_MESSAGE);
   check('the fallback message is plain language, never a raw status line', !/^\d{3}\s/.test(NETWORK_ERROR_MESSAGE));
+}
+
+/* ------------------------------------------------------------ messageFromResponse */
+//
+// Shared 429 message builder every service client's postJson uses
+// (ingestClient, answerService.claude, reviewClient, documentClient) — see
+// src/services/httpError.ts's file comment for the two response shapes
+// api/_lib/rateLimit.js actually sends.
+{
+  const res = (status: number, retryAfter: string | null): ResponseLike => ({
+    status,
+    headers: { get: (name: string) => (name === 'Retry-After' ? retryAfter : null) },
+  });
+
+  eq(
+    'messageFromResponse: numeric Retry-After appends a seconds hint',
+    messageFromResponse(res(429, '42'), { error: 'Too many requests', details: 'More than 30 ask units in the last minute.', scope: 'per-minute' }, 'fallback'),
+    'Too many requests — More than 30 ask units in the last minute. Try again in 42 s.',
+  );
+
+  {
+    const fixedNow = Date.parse('2026-09-19T12:00:00Z');
+    const httpDate = new Date(fixedNow + 15_000).toUTCString();
+    // messageFromResponse has no `now` parameter (it measures from the real
+    // clock, same as a live Retry-After header would be), so this checks
+    // against the actual wall clock rather than `fixedNow`.
+    const realNow = Date.now();
+    const liveHttpDate = new Date(realNow + 15_000).toUTCString();
+    eq(
+      'messageFromResponse: an HTTP-date Retry-After is converted to seconds-from-now',
+      messageFromResponse(res(429, liveHttpDate), { error: 'Too many requests' }, 'fallback'),
+      'Too many requests Try again in 15 s.',
+    );
+    eq('parseRetryAfterSeconds: HTTP-date form, computed against a fixed now', parseRetryAfterSeconds(httpDate, fixedNow), 15);
+    eq('parseRetryAfterSeconds: numeric form ignores now', parseRetryAfterSeconds('7', fixedNow), 7);
+    eq('parseRetryAfterSeconds: missing header is undefined', parseRetryAfterSeconds(null), undefined);
+    eq('parseRetryAfterSeconds: garbage header is undefined', parseRetryAfterSeconds('not-a-date-or-number', fixedNow), undefined);
+  }
+
+  eq(
+    'messageFromResponse: a scope:"per-day" body says "tomorrow", not a seconds count, even with Retry-After set',
+    messageFromResponse(res(429, '86399'), { error: 'Too many requests', details: 'Daily limit of 2000 ingest units reached for this tenant.', scope: 'per-day' }, 'fallback'),
+    'Too many requests — Daily limit of 2000 ingest units reached for this tenant. Try again tomorrow.',
+  );
+  check('isDailyCap: scope "per-day" is a daily cap', isDailyCap({ scope: 'per-day' }));
+  check('isDailyCap: scope "per-minute" is not', !isDailyCap({ scope: 'per-minute' }));
+
+  eq(
+    'messageFromResponse: the daily model-spend budget body (no scope, "resumes tomorrow") also says "tomorrow"',
+    messageFromResponse(res(429, '3600'), { error: 'Daily AI budget reached — resumes tomorrow' }, 'fallback'),
+    'Daily AI budget reached — resumes tomorrow Try again tomorrow.',
+  );
+  check('isDailyCap: recognizes the daily-budget wording with no scope field', isDailyCap({ error: 'Daily AI budget reached — resumes tomorrow' }));
+
+  eq(
+    'messageFromResponse: a plain 500 with no error/details body falls back to the caller-supplied fallback, untouched',
+    messageFromResponse(res(500, null), null, '500 Internal Server Error'),
+    '500 Internal Server Error',
+  );
+  eq(
+    'messageFromResponse: a 429 with no Retry-After header and no daily indication appends nothing',
+    messageFromResponse(res(429, null), { error: 'Too many requests' }, 'fallback'),
+    'Too many requests',
+  );
 }
 
 /* ------------------------------------------------------ bulk import UI helpers */
@@ -502,6 +587,87 @@ function listFilesRecursive(dir: string): string[] {
     selectIngestProgress({ uploads: {}, bulkRunning: false, bulkStates: [], processingPending: ['doc-1'], processingTotal: 2, processingStalled: true }),
     { current: 1, total: 2, stalled: true },
   );
+}
+
+/* ---------------------------------------------------- billing: status reducer */
+//
+// billingClient.ts's daysUntil/billingBannerFor drive AppShell's global
+// banner and BillingScreen's trial countdown — see handoffs/BILLING_RULES.md.
+// Pure functions, tested here with a fixed `now` so the checks never flake
+// near a day boundary.
+{
+  const NOW = new Date('2026-09-20T12:00:00Z');
+
+  eq('daysUntil: null/undefined input is null', [daysUntil(null, NOW), daysUntil(undefined, NOW)], [null, null]);
+  eq('daysUntil: an unparseable date is null', daysUntil('not-a-date', NOW), null);
+  eq('daysUntil: exactly 3 days out rounds to 3', daysUntil('2026-09-23T12:00:00Z', NOW), 3);
+  eq('daysUntil: 3 days + 1 hour rounds UP to 4 (never undercounts a trial)', daysUntil('2026-09-23T13:00:00Z', NOW), 4);
+  eq('daysUntil: a past date clamps to 0, never negative', daysUntil('2026-09-01T00:00:00Z', NOW), 0);
+  eq('daysUntil: 30 minutes out still rounds up to 1', daysUntil('2026-09-20T12:30:00Z', NOW), 1);
+
+  const status = (overrides: Partial<BillingStatus> = {}): BillingStatus => ({
+    plan: null,
+    status: 'none',
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    limits: {},
+    usage: { documentsStored: 0, pagesThisMonth: 0 },
+    ...overrides,
+  });
+
+  eq('billingBannerFor: null status → no banner', billingBannerFor(null, NOW), null);
+  eq('billingBannerFor: active, under cap → no banner', billingBannerFor(status({ plan: 'solo', status: 'active' }), NOW), null);
+  eq(
+    'billingBannerFor: trialing shows a pluralized days-left count',
+    billingBannerFor(status({ plan: 'solo', status: 'trialing', trialEndsAt: '2026-09-23T12:00:00Z' }), NOW),
+    { kind: 'trialing', message: 'Your free trial ends in 3 days.' },
+  );
+  eq(
+    'billingBannerFor: exactly 1 day left is singular, not "1 days"',
+    billingBannerFor(status({ plan: 'solo', status: 'trialing', trialEndsAt: '2026-09-21T12:00:00Z' }), NOW),
+    { kind: 'trialing', message: 'Your free trial ends in 1 day.' },
+  );
+  eq(
+    'billingBannerFor: a trial whose end has already passed says "ends today", not a negative count',
+    billingBannerFor(status({ plan: 'solo', status: 'trialing', trialEndsAt: '2026-09-01T00:00:00Z' }), NOW),
+    { kind: 'trialing', message: 'Your free trial ends today.' },
+  );
+  eq(
+    'billingBannerFor: past_due always warns, regardless of usage',
+    billingBannerFor(status({ plan: 'shop', status: 'past_due' }), NOW),
+    { kind: 'past_due', message: 'Your last payment failed. Update billing to keep uploading.' },
+  );
+  eq(
+    'billingBannerFor: never-subscribed under the free-preview cap → no banner',
+    billingBannerFor(status({ status: 'none', usage: { documentsStored: 2, pagesThisMonth: 0 } }), NOW),
+    null,
+  );
+  eq(
+    'billingBannerFor: never-subscribed at the free-preview cap → the trial nudge',
+    billingBannerFor(status({ status: 'none', usage: { documentsStored: 3, pagesThisMonth: 0 } }), NOW),
+    { kind: 'cap', message: 'Free preview used up. Start your 30-day trial to keep going.' },
+  );
+  eq('billingBannerFor: canceled shows no banner (upload/ask already hard-block with their own 402)', billingBannerFor(status({ status: 'canceled' }), NOW), null);
+
+  eq('annualPrice: one month free is 11x monthly, for every catalog price', [annualPrice(99), annualPrice(199), annualPrice(399), annualPrice(899)], [1089, 2189, 4389, 9889]);
+}
+
+/* --------------------------------------------------- billing: Records Rescue */
+//
+// resolveRecordsRescueQuantity/recordsRescueTotalCents must match
+// api/_lib/billing.js's identical functions exactly — this is the number
+// BillingScreen shows the person before checkout charges the real thing.
+{
+  eq('resolveRecordsRescueQuantity: below the minimum clamps up to it', resolveRecordsRescueQuantity(100), RECORDS_RESCUE_MIN_PAGES);
+  eq('resolveRecordsRescueQuantity: exactly the minimum is unchanged', resolveRecordsRescueQuantity(RECORDS_RESCUE_MIN_PAGES), RECORDS_RESCUE_MIN_PAGES);
+  eq('resolveRecordsRescueQuantity: above the minimum is unchanged', resolveRecordsRescueQuantity(10_000), 10_000);
+  eq('resolveRecordsRescueQuantity: a fractional page count truncates', resolveRecordsRescueQuantity(5000.9), 5000);
+  eq('resolveRecordsRescueQuantity: garbage input (NaN/negative) clamps to the minimum', [resolveRecordsRescueQuantity(NaN), resolveRecordsRescueQuantity(-50)], [RECORDS_RESCUE_MIN_PAGES, RECORDS_RESCUE_MIN_PAGES]);
+
+  eq('recordsRescueTotalCents: at the minimum is ~$500 (4,167 * $0.12)', recordsRescueTotalCents(RECORDS_RESCUE_MIN_PAGES), 50_004);
+  eq('recordsRescueTotalCents: below the minimum is still priced at the minimum', recordsRescueTotalCents(1), 50_004);
+  eq('recordsRescueTotalCents: 10,000 pages at $0.12/page', recordsRescueTotalCents(10_000), 120_000);
 }
 
 /* ------------------------------------------------------------------ done */

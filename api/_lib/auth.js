@@ -151,8 +151,9 @@ const ROLE_RANK = { member: 1, admin: 2 };
  * "admin" one). A solo tenant (no shop) has no org role at all and therefore
  * never satisfies any role requirement — see hasShop().
  *
- * This is NOT wired into any route here: api/ is owned by other engineers.
- * See HANDOFF.md for which routes should call this and with which role.
+ * Wired in wherever an admin-only action needs it: api/billing.js
+ * (checkout/portal), api/_lib/routes/{keys,tenant-delete,tenant-export,
+ * document-delete}.js — each guards with `if (hasShop(auth)) requireRole(auth, 'admin')`.
  *
  * @param {{orgRole: 'admin'|'member'|null}|null|undefined} auth
  * @param {'admin'|'member'} role

@@ -10,8 +10,9 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore, type Screen } from '../store/appStore';
 import { useGraph } from '../core/entityGraph';
+import { isValidPlanId, type BillingInterval } from '../services/billingClient';
 
-const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'warranty-export'];
+const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'warranty-export', 'billing'];
 
 function isScreen(value: string): value is Screen {
   return (SCREENS as readonly string[]).includes(value);
@@ -25,6 +26,12 @@ export interface DeepLinkParams {
    *  outside the app ("ask DeepWell: ..."). Needs nothing from the graph, so
    *  it never waits the way `entityId`/`docId` do. */
   question?: string;
+  /** `?plan=` — a marketing-site pricing button (index.html) or Records
+   *  Rescue CTA. Only a recognized plan id is accepted; an unknown value is
+   *  dropped, same as an unknown `screen`. */
+  plan?: string;
+  /** `?interval=` — 'month' (the default) or 'year', alongside `plan`. */
+  interval?: BillingInterval;
 }
 
 /**
@@ -42,6 +49,11 @@ export function parseDeepLink(search: string): DeepLinkParams {
   if (screen && isScreen(screen)) out.screen = screen;
   const q = params.get('q')?.trim();
   if (q) out.question = q.slice(0, 2000);
+  const plan = params.get('plan');
+  if (isValidPlanId(plan)) {
+    out.plan = plan;
+    out.interval = params.get('interval') === 'year' ? 'year' : 'month';
+  }
   return out;
 }
 
@@ -66,6 +78,8 @@ function cleanUrl(): void {
   url.searchParams.delete('doc');
   url.searchParams.delete('screen');
   url.searchParams.delete('q');
+  url.searchParams.delete('plan');
+  url.searchParams.delete('interval');
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -91,6 +105,7 @@ export function useDeepLink(): void {
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const askQuestion = useAppStore((s) => s.askQuestion);
+  const setPendingPlan = useAppStore((s) => s.setPendingPlan);
   const handledRef = useRef(false);
 
   useEffect(() => {
@@ -98,6 +113,22 @@ export function useDeepLink(): void {
     handledRef.current = true;
 
     const params = parseDeepLink(window.location.search);
+
+    // `?plan=&interval=` (a marketing-site pricing button, or the Records
+    // Rescue CTA carrying just `?screen=billing`) — store the pick and land
+    // on Billing. This is safe to apply immediately, signed in or not: App.tsx
+    // still shows LoginScreen/OnboardingScreen ahead of any screen while
+    // auth/org aren't ready, and `currentScreen` simply carries 'billing'
+    // through to the moment it actually renders one — Billing opens with the
+    // plan preselected the first time the app has anywhere to render it, and
+    // nothing here ever calls Stripe or redirects off-app.
+    if (params.plan) {
+      setPendingPlan({ plan: params.plan, interval: params.interval ?? 'month' });
+      setCurrentScreen('billing');
+      cleanUrl();
+      return;
+    }
+
     if (!params.entityId && !params.docId && !params.screen && !params.question) return;
 
     // ?q= is a bare question, not a lookup — nothing to wait on the graph

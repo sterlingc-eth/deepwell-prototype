@@ -2,7 +2,7 @@ import { handleCors, handleError } from "../claude.js";
 import { denyAuth } from "../auth.js";
 import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
 import { limit } from "../rateLimit.js";
-import { getCustomerEquipment, getEquipmentBySerial } from "../../customer-equipment.js";
+import { getCustomerEquipment, getEquipmentBySerial } from "./customer-equipment.js";
 
 /**
  * GET /api/v1-equipment?serial=<serial>

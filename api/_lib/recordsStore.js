@@ -342,6 +342,24 @@ function makeStore(db, tenantId) {
       }
       return many(`SELECT * FROM documents WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 500`, vals);
     },
+    // ---- billing read helpers (api/_lib/billing.js, api/_lib/plan.js) -------
+    // Real COUNT queries, not listDocuments' capped-at-500 rows — billing caps
+    // (tenants.limits.documentsStored / pagesPerMonth) need the true total.
+    countDocuments: async () => {
+      const r = await one(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT}`, []);
+      return r?.n ?? 0;
+    },
+    // Pages ingested since `sinceIso` (a document's page rows land at ingest
+    // time, so "this month's pages" = document_pages created since the 1st).
+    countPagesSince: async (sinceIso) => {
+      const r = await one(
+        `SELECT count(*)::int AS n FROM document_pages dp
+           JOIN documents d ON d.id = dp.document_id
+          WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND dp.created_at >= $1`,
+        [sinceIso]
+      );
+      return r?.n ?? 0;
+    },
     // `stage` and `storage_key` are DELIBERATELY NOT in this list, and that is
     // a security boundary rather than tidiness.
     //

@@ -28,6 +28,7 @@
  */
 
 import { authHeader } from './authToken.ts';
+import { messageFromResponse } from './httpError.ts';
 
 export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'pending' | 'done' | 'error';
 
@@ -41,6 +42,10 @@ export interface IngestResult {
   /** The server chained field extraction behind the read; wait for that too. */
   awaitingExtraction?: boolean;
   error?: string;
+  /** Set alongside `error` only for a 402 (subscription required / free
+   *  preview used up — see handoffs/BILLING_RULES.md) so the caller can offer
+   *  a "See plans" button instead of just showing the message. */
+  billingUrl?: string;
 }
 
 export interface IngestProgress {
@@ -125,7 +130,8 @@ export async function postJson<T>(url: string, body: unknown, signal?: AbortSign
     } catch {
       /* not JSON — a 500 from Vercel is an HTML page */
     }
-    throw new IngestHttpError(describeFetchFailure(raw), res.status, parsedBody);
+    const message = res.status === 429 ? messageFromResponse(res, parsedBody, describeFetchFailure(raw)) : describeFetchFailure(raw);
+    throw new IngestHttpError(message, res.status, parsedBody);
   }
   return res.json() as Promise<T>;
 }
@@ -237,8 +243,9 @@ export async function ingestFile(
       return { filename: file.name, error: 'Cancelled' };
     }
     const error = err instanceof Error ? err.message : String(err);
+    const billingUrl = err instanceof IngestHttpError && err.status === 402 ? (err.body as { url?: string } | null)?.url : undefined;
     report('error', error);
-    return { filename: file.name, error };
+    return { filename: file.name, error, billingUrl };
   }
 }
 

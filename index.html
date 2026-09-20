@@ -235,6 +235,7 @@ section{padding-block:clamp(48px,6vw,80px);border-top:1px solid var(--line)}
 .annual{margin:20px 0 0;font-size:.92rem;color:var(--muted)}
 .annual b{color:var(--text)}
 .plan .math{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--brass-text);border-top:1px solid var(--line);padding-top:12px;margin:0}
+.trial-badge{align-self:flex-start;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
 .rescue{margin-top:20px;border:1px solid var(--line);background:var(--surface);padding:24px 28px;display:flex;gap:24px;align-items:center;justify-content:space-between}
 .rescue h3{font-size:1.3rem;margin:6px 0}
 .rescue p{color:var(--muted);font-size:.92rem;margin:0}
@@ -861,11 +862,12 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
         <div class="eyebrow">Pricing</div>
         <h2>Pick your plan by team size. Everything else is unlimited.</h2>
       </div>
-      <p class="lede">Every plan includes unlimited logins, unlimited questions, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 14-day free trial on every plan, no card required.</p>
+      <p class="lede">Every plan includes unlimited logins, unlimited questions, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 30-day free trial on Solo — card required, you won't be charged until the trial ends.</p>
     </div>
     <div class="plans plans-4">
       <div class="plan">
         <div class="tier">Solo</div>
+        <span class="trial-badge">30-day free trial</span>
         <h3>$99<span class="per">/mo</span></h3>
         <p class="for">For the one-person operation. One tech, one price, your full archive.</p>
         <ul class="spec">
@@ -878,7 +880,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Onboarding</span><b>Self-serve</b></li>
         </ul>
         <p class="math">One prevented callback covers 3–6 months.</p>
-        <a class="btn btn-ghost" href="#contact">Get started</a>
+        <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Get started</a>
       </div>
       <div class="plan featured">
         <div class="tier">Shop · most popular</div>
@@ -895,7 +897,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Onboarding</span><b>Guided</b></li>
         </ul>
         <p class="math">Three techs preventing one callback a month each: $3,600–7,200 saved. You pay $199.</p>
-        <a class="btn btn-primary" href="#contact">Get started</a>
+        <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Get started</a>
       </div>
       <div class="plan">
         <div class="tier">Crew</div>
@@ -912,7 +914,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Support</span><b>Phone + email</b></li>
         </ul>
         <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
-        <a class="btn btn-ghost" href="#contact">Get started</a>
+        <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Get started</a>
       </div>
       <div class="plan">
         <div class="tier">Fleet</div>
@@ -929,7 +931,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
           <li><span>Support</span><b>Dedicated + SLA</b></li>
         </ul>
         <p class="math">Per-tech pricing is what's killing you. This isn't per tech.</p>
-        <a class="btn btn-ghost" href="#contact">Contact sales</a>
+        <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
     <p class="annual"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price.</p>
@@ -939,7 +941,7 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
         <h3>Have boxes of old invoices, tickets, or warranties?</h3>
         <p>We'll scan, process, and upload them to your account so your history is complete from day one. <strong>$0.12 per page.</strong> $500 minimum (roughly 4,000 pages), included in your first month of service.</p>
       </div>
-      <a class="btn btn-ghost" href="#contact">Ask about scanning</a>
+      <a class="btn btn-ghost" href="/app/?screen=billing">Ask about scanning</a>
     </div>
   </div>
 </section>
@@ -982,7 +984,6 @@ footer a{color:var(--muted);text-decoration:none;margin-left:18px}
       <p class="lede" style="color:rgba(255,255,255,.8)">Send us a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you'll ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="mailto:deepwellincorporated@gmail.com?subject=Records%20audit">deepwellincorporated@gmail.com</a>
-        <a class="btn btn-ghost" href="tel:+10000000000">Call the studio</a>
       </div>
     </div>
     <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge builds business." width="900" height="750" loading="lazy" decoding="async"></div>

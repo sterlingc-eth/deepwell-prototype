@@ -18,6 +18,10 @@
       "destination": "/api/v1?resource=:resource"
     },
     {
+      "source": "/api/customer-equipment",
+      "destination": "/api/v1?resource=customer-equipment"
+    },
+    {
       "source": "/api/keys",
       "destination": "/api/account?action=keys"
     },

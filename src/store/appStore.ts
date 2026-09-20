@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { IngestProgress } from '../services/ingestClient';
 import { summarizeProgress, type BulkFileState } from '../services/bulkImport';
+import type { BillingInterval, BillingStatus } from '../services/billingClient';
 
 export type Screen =
   | 'ask'
@@ -10,7 +11,14 @@ export type Screen =
   | 'dashboard'
   | 'browse'
   | 'entity'
-  | 'warranty-export';
+  | 'warranty-export'
+  | 'billing';
+
+/** `?plan=&interval=` deep link, held until Billing opens and preselects it. */
+export interface PendingPlan {
+  plan: string;
+  interval: BillingInterval;
+}
 
 const FIELD_MODE_KEY = 'deepwell.fieldMode';
 
@@ -178,6 +186,16 @@ interface AppState {
   selectedForExport: string[];
   toggleSelectForExport: (entityId: string) => void;
   clearExportSelection: () => void;
+
+  // Billing: the account's current subscription state (AppShell's global
+  // banner and BillingScreen both read this rather than each fetching their
+  // own copy), and a `?plan=&interval=` deep link waiting for Billing to open
+  // and preselect it.
+  billingStatus: BillingStatus | null;
+  setBillingStatus: (status: BillingStatus | null) => void;
+  pendingPlan: PendingPlan | null;
+  setPendingPlan: (plan: PendingPlan | null) => void;
+  clearPendingPlan: () => void;
 }
 
 const initialFieldMode = readFieldMode();
@@ -286,4 +304,10 @@ export const useAppStore = create<AppState>((set) => ({
         : [...state.selectedForExport, entityId],
     })),
   clearExportSelection: () => set({ selectedForExport: [] }),
+
+  billingStatus: null,
+  setBillingStatus: (status) => set({ billingStatus: status }),
+  pendingPlan: null,
+  setPendingPlan: (plan) => set({ pendingPlan: plan }),
+  clearPendingPlan: () => set({ pendingPlan: null }),
 }));

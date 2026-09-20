@@ -4,6 +4,38 @@ import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { denyAuth } from "./_lib/auth.js";
 import { limit } from "./_lib/rateLimit.js";
+import { gateUpload } from "./_lib/plan.js";
+
+const MS_PER_MONTH = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Billing gate (handoffs/BILLING_RULES.md): only for NEW-upload paths (single
+ * and batch), never for `mode: 'get'` — reading a document you already have
+ * is not new ingestion. One extra withTenant round trip per request; cheap
+ * next to the R2 presign + document-row work that follows it.
+ */
+async function checkUploadGate(auth) {
+  // Fail OPEN: a billing lookup that errors (e.g. migration 14 not applied
+  // yet, or a DB blip) must never turn into a 500 for every customer.
+  try {
+    return await checkUploadGateInner(auth);
+  } catch (err) {
+    console.error("billing gate failed open (checkUploadGate):", err?.message);
+    return { allowed: true };
+  }
+}
+
+async function checkUploadGateInner(auth) {
+  return withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (db) => {
+    const { rows } = await db.raw(
+      `SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1`,
+      [db.tenantId]
+    );
+    const documentsStored = await db.countDocuments();
+    const pagesThisMonth = await db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString());
+    return gateUpload(rows[0] ?? {}, { documentsStored, pagesThisMonth });
+  });
+}
 
 /**
  * POST /api/upload-url
@@ -368,6 +400,12 @@ export default async function handler(req, res) {
       const result = await getOriginalUrl(auth, req.body.documentId);
       return handleCors(res, req).status(200).json(result);
     }
+
+    const gate = await checkUploadGate(auth);
+    if (!gate.allowed) {
+      return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
+    }
+
     // Batch shape: { files: [...] } -> { results: [...] }. One request, one
     // rate-limit charge and one usage_counters increment cover the whole
     // batch today — see the daily-cap note in HANDOFF-C.md for the tradeoff.

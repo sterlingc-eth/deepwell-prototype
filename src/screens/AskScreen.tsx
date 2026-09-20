@@ -7,7 +7,7 @@ import { SerialCapture } from '../components/SerialCapture';
 import type { Answer, SourceRef } from '../core/types';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions } from '../core/suggestions';
-import { ask } from '../services/answerService';
+import { ask, AskApiError } from '../services/answerService';
 import { useAppStore } from '../store/appStore';
 
 // Shown only when the account has nothing ingested yet, so there is nothing
@@ -39,6 +39,9 @@ export function AskScreen() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set alongside `error` only for a 402 (subscription required / free
+  // preview used up) — AskApiError's own `url`, defaulting to Billing.
+  const [billingUrl, setBillingUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [capture, setCapture] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -57,12 +60,16 @@ export function AskScreen() {
       setInput('');
       setLoading(true);
       setError(null);
+      setBillingUrl(null);
       if (opts.record !== false) pushRecentQuestion(q);
       try {
         const a = await ask(q, { includeUnverified });
         if (id === requestId.current) setAnswer(a);
       } catch (e) {
-        if (id === requestId.current) setError(e instanceof Error ? e.message : 'Something went wrong answering that.');
+        if (id === requestId.current) {
+          setError(e instanceof Error ? e.message : 'Something went wrong answering that.');
+          if (e instanceof AskApiError && e.status === 402) setBillingUrl(e.url ?? '/app/?screen=billing');
+        }
       } finally {
         if (id === requestId.current) setLoading(false);
       }
@@ -107,6 +114,7 @@ export function AskScreen() {
     setAsked(null);
     setAnswer(null);
     setError(null);
+    setBillingUrl(null);
     inputRef.current?.focus();
   };
 
@@ -170,6 +178,11 @@ export function AskScreen() {
           <div role="alert" className="dw-card border-bad/40 px-5 py-4 text-bad-ink dark:text-bad-bg">
             <p className="font-medium">Couldn't get an answer.</p>
             <p className="text-body mt-1">{error}</p>
+            {billingUrl && (
+              <button type="button" onClick={() => setCurrentScreen('billing')} className="dw-btn-primary !min-h-[36px] !py-1 mt-3">
+                See plans
+              </button>
+            )}
           </div>
         )}
 

@@ -1,12 +1,13 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
-import { AlertTriangle, Info } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { authHeader, setAuthTokenProvider } from './services/authToken';
 import { fetchDocumentStatus, isProcessingTerminal, pollDocumentStatusChunked } from './services/ingestClient';
+import { billingClient } from './services/billingClient';
 import { useAppStore } from './store/appStore';
 import { usePostgresSync } from './hooks/usePostgresSync';
 import { useDeepLink } from './hooks/useDeepLink';
-import { AskScreen, BrowseScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen } from './screens';
+import { AskScreen, BillingScreen, BrowseScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen } from './screens';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import './index.css';
 
@@ -122,10 +123,54 @@ function App() {
     setCurrentScreen('ingest');
   }, [sync.status, sync.isEmpty, currentScreen, setCurrentScreen]);
 
-  // ?entity= / ?doc= / ?screen= in the URL open the right record once the
-  // graph is loaded. Unconditional for the rules of hooks; it waits for the
-  // graph internally and is a no-op without a query string.
+  // ?entity= / ?doc= / ?screen= / ?plan= in the URL open the right record (or
+  // Billing) once the graph is loaded. Unconditional for the rules of hooks;
+  // it waits for the graph internally and is a no-op without a query string.
   useDeepLink();
+
+  // Billing status backs AppShell's global banner and BillingScreen's own
+  // display — fetched once here (not per-screen) so the banner can show on
+  // any screen, not just Billing. Best-effort: a failed fetch just means no
+  // banner shows this session, never a hard error blocking the app.
+  const setBillingStatus = useAppStore((s) => s.setBillingStatus);
+  useEffect(() => {
+    if (DEMO_MODE || !isSignedIn || !orgId) return;
+    let cancelled = false;
+    void billingClient
+      .status()
+      .then((status) => {
+        if (!cancelled) setBillingStatus(status);
+      })
+      .catch(() => {
+        /* best effort — see comment above */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, orgId, setBillingStatus]);
+
+  // `?billing=success|cancel` — Stripe Checkout's return trip. A toast plus a
+  // fresh status fetch (the webhook that actually updates billing_status can
+  // land a beat after the redirect, but re-fetching now catches it as soon as
+  // it does rather than waiting for next reload). Read and scrubbed once, on
+  // mount, the same way useDeepLink handles its own query params.
+  const [billingToast, setBillingToast] = useState<'success' | 'cancel' | null>(null);
+  const billingToastHandledRef = useRef(false);
+  useEffect(() => {
+    if (billingToastHandledRef.current) return;
+    billingToastHandledRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get('billing');
+    if (billing !== 'success' && billing !== 'cancel') return;
+    setBillingToast(billing);
+    params.delete('billing');
+    const url = new URL(window.location.href);
+    url.search = params.toString();
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    if (billing === 'success' && !DEMO_MODE) {
+      void billingClient.status().then(setBillingStatus).catch(() => {});
+    }
+  }, [setBillingStatus]);
 
   // Server-side pipeline polling behind the header's "Processing N of M…"
   // pill (store/appStore.ts's selectIngestProgress). Lives here — mounted for
@@ -224,6 +269,8 @@ function App() {
         return <DashboardScreen />;
       case 'browse':
         return <BrowseScreen />;
+      case 'billing':
+        return <BillingScreen />;
       case 'warranty-export':
         return (
           <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
@@ -237,6 +284,25 @@ function App() {
 
   return (
     <>
+      {billingToast && (
+        <div
+          role="status"
+          className={[
+            'dw-card px-5 py-3 m-4 mb-0 flex items-start gap-2',
+            billingToast === 'success' ? 'border-ok/40 text-ok-ink dark:text-ok-bg' : 'border-line text-ink-2',
+          ].join(' ')}
+        >
+          {billingToast === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          )}
+          <p className="flex-1">{billingToast === 'success' ? 'Billing updated — thanks!' : 'Checkout canceled — nothing was charged.'}</p>
+          <button type="button" onClick={() => setBillingToast(null)} aria-label="Dismiss" className="text-ink-3 hover:text-ink shrink-0">
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {mergeNotice && (
         <div className="dw-card border-line px-5 py-3 m-4 mb-0 text-ink-2 flex items-start gap-2">
           <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />

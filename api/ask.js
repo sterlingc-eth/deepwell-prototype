@@ -16,6 +16,29 @@ import {
 import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 import { recordModelCall } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
+import { gateAsk } from "./_lib/plan.js";
+
+/** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
+ * past-due grace and past-grace alike — only a never-subscribed tenant past
+ * its free preview, or a canceled subscription, blocks it. */
+async function checkAskGate(auth) {
+  // Fail OPEN: a billing lookup that errors (e.g. migration 14 not applied
+  // yet, or a DB blip) must never turn into a 500 for every customer.
+  try {
+    return await checkAskGateInner(auth);
+  } catch (err) {
+    console.error("billing gate failed open (checkAskGate):", err?.message);
+    return { allowed: true };
+  }
+}
+
+async function checkAskGateInner(auth) {
+  return withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (db) => {
+    const { rows } = await db.raw(`SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1`, [db.tenantId]);
+    const documentsStored = await db.countDocuments();
+    return gateAsk(rows[0] ?? {}, { documentsStored });
+  });
+}
 
 /**
  * SHA-256 of a question, never the question itself. Pure and exported so it
@@ -85,7 +108,10 @@ export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration
 const MAX_QUESTION = 2000;
 const MAX_PASSAGES = 12;
 const MAX_EXCERPT = 1200;
-export const ASK_MODEL = "claude-sonnet-4-5";
+// Haiku by default (owner decision 2026-09-20: cost). Set ASK_MODEL in Vercel
+// env to switch without a deploy. Retrieval is what makes answers right;
+// the model only phrases and cites what retrieval returned.
+export const ASK_MODEL = process.env.ASK_MODEL || "claude-haiku-4-5";
 
 /**
  * ---------------------------------------------------------------------------
@@ -283,6 +309,11 @@ export default async function handler(req, res) {
     }
     if (question.length > MAX_QUESTION) {
       return res.status(400).json({ error: "Question is too long" });
+    }
+
+    const gate = await checkAskGate(auth);
+    if (!gate.allowed) {
+      return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
     }
 
     // ---- 0. meta-question pre-router (no model, no retrieval) --------------

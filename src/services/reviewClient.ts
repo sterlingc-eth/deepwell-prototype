@@ -7,6 +7,7 @@
  */
 
 import { authHeader } from './authToken';
+import { messageFromResponse } from './httpError';
 
 const API_URL = '/api/review';
 
@@ -22,12 +23,15 @@ async function postJson<T>(body: unknown): Promise<T> {
     // text and try to parse, same as ingestClient.ts and recordsStoreClient.ts.
     const raw = await res.text().catch(() => '');
     let message = `${res.status} ${res.statusText}`;
+    let parsedBody: unknown = null;
     try {
-      const parsed = JSON.parse(raw);
+      parsedBody = JSON.parse(raw);
+      const parsed = parsedBody as { error?: string };
       if (parsed?.error) message = parsed.error;
     } catch {
       /* not JSON — keep the status */
     }
+    if (res.status === 429) message = messageFromResponse(res, parsedBody, message);
     throw new Error(message);
   }
   return res.json() as Promise<T>;

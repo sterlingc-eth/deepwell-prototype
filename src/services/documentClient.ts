@@ -5,6 +5,7 @@
  * generic interface.
  */
 import { authHeader } from './authToken';
+import { messageFromResponse } from './httpError';
 
 const REVIEW_URL = '/api/review';
 const UPLOAD_URL_URL = '/api/upload-url';
@@ -23,12 +24,15 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     // text and try to parse, same as reviewClient.ts and ingestClient.ts.
     const raw = await res.text().catch(() => '');
     let message = `${res.status} ${res.statusText}`;
+    let parsedBody: unknown = null;
     try {
-      const parsed = JSON.parse(raw);
+      parsedBody = JSON.parse(raw);
+      const parsed = parsedBody as { error?: string };
       if (parsed?.error) message = parsed.error;
     } catch {
       /* not JSON — keep the status */
     }
+    if (res.status === 429) message = messageFromResponse(res, parsedBody, message);
     throw new Error(message);
   }
   return res.json() as Promise<T>;
