@@ -32,6 +32,9 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
   const openDocument = useAppStore((s) => s.openDocument);
   const openEntity = useAppStore((s) => s.openEntity);
   const openCustomer = useAppStore((s) => s.openCustomer);
+  const currentScreen = useAppStore((s) => s.currentScreen);
+  const selectedEntityId = useAppStore((s) => s.selectedEntityId);
+  const customerRef = useAppStore((s) => s.customerRef);
   const entities = useGraph((s) => s.entities);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
@@ -198,21 +201,38 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
             // A linked customer takes priority — that's the record most
             // often worth opening from a document (invoice, warranty card),
             // and it's what CUSTOMER_PROFILES_BRIEF_2026-09-20.md section E
-            // asks this link to prefer when one exists.
-            const customerId = doc.linkedEntityIds.find((id) => entities[id]?.type === 'customer');
-            const targetId = customerId ?? doc.linkedEntityIds[0];
-            if (!targetId) return null;
+            // asks this link to prefer when one exists. Owner bug
+            // (2026-09-20): opened from an equipment page, this pointed at
+            // the very record already on screen, so the click "did nothing".
+            // Never offer the record the person is already looking at; fall
+            // back to a customer matched by name when no link exists.
+            const onEntity = currentScreen === 'entity' ? selectedEntityId : null;
+            const onCustomer = currentScreen === 'customer' ? customerRef : null;
+            const linkedCustomer = doc.linkedEntityIds.find((id) => entities[id]?.type === 'customer');
+            const extractedName = doc.extracted.find((f) => f.name === 'customer_name')?.value;
+            const byName = !linkedCustomer && extractedName
+              ? Object.values(entities).find(
+                  (e) => e.type === 'customer' && String(e.fields.name ?? '').trim().toLowerCase() === String(extractedName).trim().toLowerCase()
+                )?.id
+              : undefined;
+            const customerId = linkedCustomer ?? byName;
+            const otherEntity = doc.linkedEntityIds.find((id) => id !== onEntity && entities[id]?.type !== 'customer');
+            let target: { kind: 'customer' | 'entity'; id: string; label: string } | null = null;
+            if (customerId && customerId !== onCustomer) target = { kind: 'customer', id: customerId, label: 'View customer' };
+            else if (otherEntity) target = { kind: 'entity', id: otherEntity, label: 'View record' };
+            if (!target) return null;
+            const t = target;
             return (
               <button
                 type="button"
                 className="dw-btn-secondary"
                 onClick={() => {
                   onClose();
-                  if (customerId) openCustomer(customerId);
-                  else openEntity(targetId);
+                  if (t.kind === 'customer') openCustomer(t.id);
+                  else openEntity(t.id);
                 }}
               >
-                View record
+                {t.label}
               </button>
             );
           })()}

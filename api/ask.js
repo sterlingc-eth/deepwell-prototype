@@ -21,6 +21,8 @@ import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
+import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
+import { runFastPath } from "./_lib/fastPathQuery.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -491,6 +493,13 @@ export default async function handler(req, res) {
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
     const meta = classifyMetaQuestion(question);
+    // Fast path (handoffs/FAST_PATH_2026-09-20.md): a model-free field lookup
+    // straight from `extractions`, tried after the meta-router and before
+    // retrieval/the answer cache — see the block below. Never attempted for a
+    // meta question (the meta-router already owns those) or when
+    // ASK_FAST_PATH=0. classifyFastPath is pure (no DB) so this costs nothing
+    // when it returns null, which most non-meta questions still will.
+    const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
@@ -525,7 +534,11 @@ export default async function handler(req, res) {
     const gatePromise = timer.time("gate", () => checkAskGate(auth));
     const budgetPromise = gatePromise.then(() => timer.time("budget", () => assertModelBudget(ctxArg)));
     budgetPromise.catch(() => {});
-    const retrievalPromise = meta
+    // Neither a meta question nor a fast-path candidate needs retrieval fired
+    // early — both may answer without it. A fast-path candidate that turns out
+    // to have no DB answer (ambiguous subject, no value on file) re-runs
+    // retrieval inline below, same fallback shape as the meta-router's own.
+    const retrievalPromise = meta || fastPathIntent
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
 
@@ -563,7 +576,58 @@ export default async function handler(req, res) {
       }
     }
 
-    // ---- 1. retrieve (already in flight above unless meta fell through) ---
+    // ---- 0.5 fast-path pre-router (no model, DB only) ----------------------
+    // Distinct from the meta-router above: meta answers deterministic
+    // inventory questions ("how many documents"); this answers a specific
+    // field lookup ("what's the serial on the unit at 3247 Elm") straight from
+    // `extractions`, with the same citation contract the model path enforces
+    // (see fastPath.js buildFieldAnswer/buildWarrantyAnswer). Cheap to run and
+    // cheap to be wrong about deciding NOT to answer, so it is tried whenever
+    // classification found an intent, and any failure — DB error, ambiguous
+    // subject, no value on file — falls through to retrieval+model rather than
+    // ever guessing or 500ing. Not cached (see askCache.js's shouldCache — a
+    // fast answer is already ~0.3s, caching it buys nothing) but still
+    // audit-logged, same as every other answer this endpoint gives.
+    if (fastPathIntent) {
+      let fastData = null;
+      try {
+        fastData = await timer.time("fast", () =>
+          withTenant(ctxArg, (db) => runFastPath(db, fastPathIntent, { today: todayResolved }))
+        );
+      } catch (err) {
+        console.error("Fast path failed, falling through to retrieval+model:", err?.message);
+      }
+      console.log(JSON.stringify({
+        route: "ask",
+        fast_intent: fastPathIntent.intent,
+        fast_hit: Boolean(fastData),
+      }));
+      if (fastData) {
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, (db) => db.logAction({
+              action: "document.queried",
+              resource_type: "question",
+              clerk_user_id: auth.userId,
+              changes: {
+                question_hash: hashQuestion(question),
+                documents: [...new Set((fastData.sources ?? []).map((s) => s.documentId))],
+                passages: 0,
+                fast: true,
+              },
+            }));
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (fast path):", err?.message);
+          }
+        });
+        return send(200, { success: true, data: fastData, fast: true });
+      }
+      // fastData is null: DB found nothing certain enough. Retrieval was never
+      // started above (retrievalPromise is null for a fast-path candidate), so
+      // run it now, inline — identical fallback shape to the meta-router's own.
+    }
+
+    // ---- 1. retrieve (already in flight above unless meta or fast path fell through) ---
     const { passages, extractions, cacheHit, cachedAnswer, corpusStamp } = retrievalPromise
       ? await retrievalPromise
       : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
