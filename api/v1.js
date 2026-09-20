@@ -3,6 +3,7 @@ import warranty from "./_lib/routes/v1-warranty.js";
 import ingest from "./_lib/routes/v1-ingest.js";
 import customerEquipment from "./_lib/routes/customer-equipment.js";
 import { customers, customer } from "./_lib/routes/customers.js";
+import exportCsv from "./_lib/routes/export-csv.js";
 
 /**
  * The public API surface, behind one function.
@@ -28,7 +29,7 @@ import { customers, customer } from "./_lib/routes/customers.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "16kb" } }, maxDuration: 60 };
 
-const RESOURCES = { equipment, warranty, ingest, "customer-equipment": customerEquipment, customers, customer };
+const RESOURCES = { equipment, warranty, ingest, "customer-equipment": customerEquipment, customers, customer, export: exportCsv };
 
 export default async function handler(req, res) {
   const resource = String(req.query?.resource ?? "");

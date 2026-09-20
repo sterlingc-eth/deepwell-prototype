@@ -4,6 +4,7 @@ import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { withTenant, normalizeMatchText } from "../recordsStore.js";
 import { alertTier, daysBetween, isPlausibleToday } from "../warrantyRules.js";
+import { findDuplicateCustomerPairs } from "../integrity.js";
 
 /**
  * GET /api/v1/customers?q=&sort=name|recent|docs&limit=200
@@ -190,7 +191,18 @@ export async function customers(req, res) {
       mergedInto: null,
     }));
 
-    return handleCors(res, req).status(200).json(data);
+    // Duplicate suggestions (handoffs/DATA_INTEGRITY_2026-09-20.md bug A /
+    // section D): pairs scoring >= CUSTOMER_MATCH_THRESHOLD among exactly the
+    // customers this call returned — same set the screen is showing, so a
+    // scoped/filtered view surfaces only its own duplicates. Response shape
+    // was a bare array; now an object with the array nested under
+    // `customers` plus this new field, kept backward-compatible in name only
+    // (frontend reads `.customers` going forward — see the handoff).
+    const duplicates = findDuplicateCustomerPairs(
+      rows.map((r) => ({ id: r.id, customerNumber: r.customer_number, name: r.data?.customer_name, address: r.data?.service_address }))
+    );
+
+    return handleCors(res, req).status(200).json({ customers: data, duplicates });
   } catch (error) {
     return handleError(res, error, req);
   }

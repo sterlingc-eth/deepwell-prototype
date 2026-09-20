@@ -4,6 +4,7 @@ import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { captureMessage, captureException } from "../telemetry.js";
 import { runWarrantyNotificationSweep } from "../notify.js";
 import { runOutreachSweep } from "./outreach.js";
+import { integrityFixTenant } from "./integrity.js";
 
 /**
  * GET /api/cron-sweep
@@ -97,6 +98,9 @@ export default async function handler(req, res) {
     budgetDeferredFound: 0,
     budgetDeferredRecovered: 0,
     budgetDeferredStillFailing: 0,
+    integrityMerged: 0,
+    integrityLinked: 0,
+    integritySkippedTenants: 0,
     errors: [],
   };
 
@@ -166,6 +170,28 @@ export default async function handler(req, res) {
     );
     summary.budgetDeferredRecovered += deferredResult.recovered;
     summary.budgetDeferredStillFailing += deferredResult.stillFailing;
+
+    // Data integrity (handoffs/DATA_INTEGRITY_2026-09-20.md, section D):
+    // deterministic, no model calls. Only score >= 0.95 duplicate-customer
+    // merges are auto-applied unattended — anything lower stays a suggestion
+    // the Customers screen surfaces (GET /api/v1/customers's `duplicates`).
+    // Every link fix runs regardless of score, since a link is reversible
+    // (unlinkDocument) and never merges two records into one.
+    if (Date.now() < deadlineAt) {
+      try {
+        const fixed = await integrityFixTenant(ctx, {
+          apply: ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits'],
+          minMergeScore: 0.95,
+        });
+        summary.integrityMerged += fixed.merged.length;
+        summary.integrityLinked += fixed.documentsLinked.length + fixed.equipmentLinked.length + fixed.unitsCreated.length;
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "integrity-fix", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "integrity-fix" });
+      }
+    } else {
+      summary.integritySkippedTenants += 1;
+    }
   }
 
   // Warranty-expiration notifications (handoffs/NOTIFICATIONS.md). Its own
@@ -200,7 +226,9 @@ export default async function handler(req, res) {
       `${summary.notifications?.notified ?? 0} notified, ${summary.notifications?.emailsSent ?? 0} digest(s) sent, ` +
       `${summary.notifications?.skipped ?? 0} tenant(s) skipped (deadline); ` +
       `outreach: ${summary.outreach?.tenantsChecked ?? 0} tenant(s), ${summary.outreach?.drafted ?? 0} drafted, ` +
-      `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed.`,
+      `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed; ` +
+      `integrity: ${summary.integrityMerged} merged, ${summary.integrityLinked} linked, ` +
+      `${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
     { route: "/api/cron-sweep" }
   );
 

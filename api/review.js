@@ -21,9 +21,22 @@
  *      is a separate value this file derives from `auth.userId` and appends
  *      itself, exactly as api/records.ts appends `clerk_user_id`.
  */
-import { requireAuth, denyAuth } from './_lib/auth.js';
+import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from './_lib/auth.js';
 import * as reviewStore from './_lib/reviewStore.js';
 import { deleteDocuments } from './_lib/routes/document-delete.js';
+import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
+
+// Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
+// renumbers/retires customer or equipment records, so on a Clerk org tenant
+// only an admin may trigger one. A solo tenant (no org) is its own admin.
+function requireAdminForMerge(auth) {
+  try {
+    if (hasShop(auth)) requireRole(auth, 'admin');
+  } catch (err) {
+    if (err instanceof AuthError) throw new reviewStore.ReviewError(err.message, err.status);
+    throw err;
+  }
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
@@ -50,6 +63,8 @@ const ACTIONS = new Set([
   'updateCustomer',
   'assignDocumentCustomer',
   'mergeCustomers',
+  'integrityScan',
+  'integrityFix',
 ]);
 
 export default async (req, res) => {
@@ -100,6 +115,7 @@ export default async (req, res) => {
         result = await reviewStore.unverifyDocument(ctx, payload, auth.userId);
         break;
       case 'mergeEntities':
+        requireAdminForMerge(auth);
         result = await reviewStore.mergeEntities(ctx, payload, auth.userId);
         break;
       case 'listLinks':
@@ -127,7 +143,14 @@ export default async (req, res) => {
         result = await reviewStore.assignDocumentCustomer(ctx, payload, auth.userId);
         break;
       case 'mergeCustomers':
+        requireAdminForMerge(auth);
         result = await reviewStore.mergeCustomers(ctx, payload, auth.userId);
+        break;
+      case 'integrityScan':
+        result = await integrityScan(ctx);
+        break;
+      case 'integrityFix':
+        result = await integrityFix(ctx, payload, auth);
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

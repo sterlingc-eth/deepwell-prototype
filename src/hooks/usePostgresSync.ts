@@ -87,7 +87,11 @@ function fileTypeOf(row: DocumentRow): FileType {
   return 'text';
 }
 
-/** One `extractions` row as the bulk action returns it. */
+/** One `extractions` row as the bulk action returns it.
+ *  `unit_index` is selected by listExtractionsByDocuments (2026-09-20).
+ *  (handoffs/REQUESTS_frontend.md asks agent-backend to add it) — declared
+ *  optional here so wiring it through below is a no-op today and correct the
+ *  moment the column ships. */
 interface ExtractionRow {
   id: string;
   document_id: string;
@@ -95,6 +99,7 @@ interface ExtractionRow {
   field_key: string;
   value: string | null;
   confidence: number | null;
+  unit_index?: number | null;
 }
 
 /**
@@ -185,6 +190,7 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
         // join away. An uncited fact is honest; an invented page is not.
         location: {},
         target: x.entity_id && field ? { entityId: x.entity_id, field } : undefined,
+        unitIndex: x.unit_index ?? undefined,
         ...(correction
           ? {
               correctedValue: correction.corrected_value,

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Copy, Sparkles } from 'lucide-react';
+import { Copy, Download, Loader2, Sparkles } from 'lucide-react';
 import { STAGE_LABEL } from './StagePill';
+import { IntegrityPanel } from './IntegrityPanel';
 import { conflictDocs, docCountsByStage, duplicateDocs, gapDocs, unlinkedDocs, useGraph } from '../core/entityGraph';
 import { PIPELINE_STAGES } from '../core/types';
 import { useAppStore } from '../store/appStore';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
+import { downloadExportCsv } from '../services/exportClient';
 
 /** Safety cap on reclassify rounds: `reclassify` caps its own model calls per
  *  request, so a stubborn batch (no page text, model keeps saying 'other')
@@ -38,6 +40,19 @@ export function DataHealthStrip() {
 
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+  const runExport = async () => {
+    setExporting(true);
+    setExportErr(null);
+    try {
+      await downloadExportCsv('documents');
+    } catch (e) {
+      setExportErr(e instanceof Error ? e.message : 'Could not download that export.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // "Re-check all documents with AI": cleans up every synced document's type
   // (reviewStore.js's reclassifyDocuments touches legacy/null/'other' types
@@ -111,9 +126,17 @@ export function DataHealthStrip() {
               <Sparkles className="w-4 h-4" aria-hidden="true" /> {bulkRunning ? 'Working…' : 'Re-check all documents with AI'}
             </button>
           )}
+          {!DEMO_MODE && total > 0 && (
+            <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1.5" disabled={exporting} onClick={() => void runExport()}>
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Export CSV
+            </button>
+          )}
           {bulkProgress && <span className="text-caption text-ink-3">{bulkProgress}</span>}
         </div>
       </div>
+      {exportErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{exportErr}</p>}
+
+      {!DEMO_MODE && <IntegrityPanel onApplied={() => void loadGraphFromServer()} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Stat label="Documents" value={total} sub={`${counts.verified} checked · ${Math.round((counts.verified / Math.max(total, 1)) * 100)}%`} onClick={() => setCurrentScreen('browse')} />

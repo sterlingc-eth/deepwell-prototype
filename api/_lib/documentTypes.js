@@ -277,6 +277,11 @@ export function toCompletenessFields(rows) {
       field_key: r?.field_key,
       value: hasCorrection ? corrected : r?.value,
       confidence: hasCorrection ? 1 : Number(r?.confidence ?? 0),
+      // M3-config/19: null on a row extracted before that migration, or for
+      // a document-scoped field — passed through so the browser can group a
+      // multi-unit document's per-unit fields (recordsStore.js's
+      // listExtractionsByDocuments/listExtractionsByDocument both select it).
+      unit_index: r?.unit_index ?? null,
     };
   });
 }

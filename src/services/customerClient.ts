@@ -92,10 +92,28 @@ export interface CustomerSummary {
   equipmentCount: number;
   lastActivity: string | null;
   warrantyAlerts: number;
+  /** Not sent by the API today (countWarrantyAlerts folds both tiers into
+   *  warrantyAlerts) — declared for forward compat, see core/customerFilters.ts. */
+  expiringCount?: number;
+  expiredCount?: number;
   mergedInto: string | null;
 }
 
 export type CustomerSort = 'name' | 'recent' | 'docs';
+
+/** One GET /api/v1/customers `duplicates` entry
+ *  (handoffs/DATA_INTEGRITY_2026-09-20.md) — every pair already scores >= 0.9. */
+export interface CustomerDuplicatePair {
+  keepId: string;
+  dropId: string;
+  score: number;
+  reason: string;
+}
+
+interface CustomersResponse {
+  customers: CustomerSummary[];
+  duplicates?: CustomerDuplicatePair[];
+}
 
 export interface CustomerEquipment {
   id: string;
@@ -181,9 +199,24 @@ function buildQuery(params: Record<string, string | number | undefined | null>):
   return s ? `?${s}` : '';
 }
 
+/** GET /api/v1/customers now nests the array as `.customers` plus a
+ *  `.duplicates` list (handoffs/DATA_INTEGRITY_2026-09-20.md); a bare array
+ *  is accepted too so this survives a partial rollout either direction. */
+function normalizeCustomersResponse(data: CustomersResponse | CustomerSummary[]): CustomersResponse {
+  return Array.isArray(data) ? { customers: data, duplicates: [] } : { customers: data.customers, duplicates: data.duplicates ?? [] };
+}
+
 export const customerClient = {
   list(opts: { q?: string; sort?: CustomerSort; limit?: number } = {}): Promise<CustomerSummary[]> {
-    return getJson<CustomerSummary[]>(`${CUSTOMERS_URL}${buildQuery({ q: opts.q, sort: opts.sort, limit: opts.limit })}`);
+    return customerClient.listFull(opts).then((r) => r.customers);
+  },
+
+  /** Same query as `list`, but also returns the likely-duplicate pairs the
+   *  Customers tab's banner needs (owner request 2026-09-20, item 2). */
+  listFull(opts: { q?: string; sort?: CustomerSort; limit?: number } = {}): Promise<CustomersResponse> {
+    return getJson<CustomersResponse | CustomerSummary[]>(`${CUSTOMERS_URL}${buildQuery({ q: opts.q, sort: opts.sort, limit: opts.limit })}`).then(
+      normalizeCustomersResponse
+    );
   },
 
   /** Looks up by either a customer's uuid (`id`) or its display number

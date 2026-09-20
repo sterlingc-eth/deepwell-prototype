@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronDown, ChevronUp, FolderOpen, Loader2, Search, Trash2, Users } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, Download, FolderOpen, Loader2, Search, Trash2, Users } from 'lucide-react';
+import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
 import { StagePill } from '../components/StagePill';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
@@ -90,6 +91,19 @@ function DocumentsTab() {
   const [error, setError] = useState<string | null>(null);
   const [emptyText, setEmptyText] = useState('');
   const [emptying, setEmptying] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+  const runExport = async () => {
+    setExporting(true);
+    setExportErr(null);
+    try {
+      await downloadExportCsv('documents');
+    } catch (e) {
+      setExportErr(e instanceof Error ? e.message : 'Could not download that export.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const rows = useMemo(() => {
     const q = normalize(filter);
@@ -195,12 +209,16 @@ function DocumentsTab() {
       </div>
 
       {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
+      {exportErr && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportErr}</p>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-caption text-ink-3">
           {rows.length} of {totalCount} document{totalCount === 1 ? '' : 's'}{selected.size ? ` · ${selected.size} selected` : ''}
         </p>
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={exporting || totalCount === 0} onClick={() => void runExport()}>
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Download className="w-3.5 h-3.5" aria-hidden="true" />} Export CSV
+          </button>
           {selected.size > 0 && (
             confirmingBulk ? (
               <span className="flex items-center gap-2">

@@ -20,6 +20,7 @@
  *     platform role with BYPASSRLS cannot silently open a cross-tenant read.
  */
 import pg from 'pg';
+import { customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname } from './integrity.js';
 
 let pool;
 
@@ -165,7 +166,15 @@ export function normalizeMatchText(raw) {
  *                          document did not state one
  * @returns {{id: string, data: object}|null}
  */
-export function selectCustomerMatch(candidates, address) {
+/**
+ * @param {{id: string, data: object}[]} candidates
+ * @param {string|{name?: string, address?: string}} incoming  a plain address
+ *   string (legacy call shape, still supported) or {name, address} — passing
+ *   `name` enables the fuzzy path below.
+ */
+export function selectCustomerMatch(candidates, incoming) {
+  const { name = '', address = '' } = typeof incoming === 'string' ? { address: incoming } : (incoming ?? {});
+
   if (!address) {
     // No address to disambiguate with. Only a single same-named candidate is
     // safe, and even that is a judgement call — see the header note.
@@ -188,28 +197,44 @@ export function selectCustomerMatch(candidates, address) {
   // and merge. A false merge is neither visible nor reversible.
   const eligible = candidates.filter((c) => {
     const existingAddr = normalizeMatchText(c.data?.service_address);
-    return existingAddr && existingAddr.toLowerCase() === address.toLowerCase();
+    if (existingAddr && existingAddr.toLowerCase() === address.toLowerCase()) return true;
+    // Fuzzy path (2026-09-20, bug A): the same household under a differently
+    // worded name/address — "Castillo" @ "1519 W Juniper" and "Ray & Linda
+    // Castillo" @ "1519 W Juniper Ave, Mesa AZ 85202". Only reached when the
+    // caller passed a name AND the candidate has one; see integrity.js's
+    // customerMatchScore for the actual rule (address normalization +
+    // surname/substring name matching).
+    if (name && c.data?.customer_name) {
+      return customerMatchScore(
+        { name, address },
+        { name: c.data.customer_name, address: c.data.service_address }
+      ) >= CUSTOMER_MATCH_THRESHOLD;
+    }
+    return false;
   });
   return eligible.length === 1 ? eligible[0] : null;
 }
 
 /**
- * Pure: should a document get a customer-only document_entity_links row?
- * No — a document with no serial (a dispatch note, a proposal, a letter)
- * still names a customer and must reach stage 'linked' to ever be
- * AI-verified; without this it sat in "Unlinked inbox" forever. Exported so
- * the decision itself is testable with no database (scripts/verify-customer-link.mjs).
- */
-export function needsCustomerLink({ entityId, customerId, hasAnyLink }) {
-  return !entityId && !!customerId && !hasAnyLink;
-}
-
-/**
- * Link a document straight to the customer entity it names, when it has no
- * equipment entity (and therefore no other link) to attach to. Shared by
- * extractDocument.js (right after extraction) and reviewStore.js's
- * aiVerifyDocument (to repair a document extracted before this existed, with
- * no re-extraction — pressing "Reclassify & verify all" must fix it too).
+ * Link a document to the customer entity it names — regardless of whether it
+ * ALSO has an equipment entity linked. Shared by extractDocument.js (right
+ * after extraction) and reviewStore.js's aiVerifyDocument (to repair a
+ * document extracted before this existed, with no re-extraction — pressing
+ * "Reclassify & verify all" must fix it too).
+ *
+ * BUG B FIX (2026-09-20, handoffs/DATA_INTEGRITY_2026-09-20.md): this used to
+ * run only when the document had NO equipment entity, on the theory that an
+ * equipment link already got it to stage 'linked' so a customer link was
+ * redundant. That left `entities.customer_id` (set via setEquipmentCustomer)
+ * as the ONLY record of the customer relationship for any document that also
+ * named equipment — nothing in `document_entity_links` pointed at the
+ * customer entity itself, so a document could show its equipment linked and
+ * its customer "not linked to a customer yet" at the same time (the
+ * Margaret Henderson production defect). Now unconditional: every document
+ * with a resolved customer gets its own document_entity_links row to that
+ * customer, on top of whatever equipment links it also has. Idempotent via
+ * ON CONFLICT DO NOTHING, so calling this from both the equipment and
+ * customer-only paths is safe.
  *
  * Uses `db.raw` for document_entity_links and the stage transition, which
  * recordsStore.js's curated store deliberately does not otherwise expose —
@@ -217,18 +242,13 @@ export function needsCustomerLink({ entityId, customerId, hasAnyLink }) {
  * forward-only stage UPDATE exactly, just triggered by an AI link instead of
  * a human's.
  *
- * @returns {Promise<boolean>} whether a link was actually inserted.
+ * @returns {Promise<boolean>} whether a link was actually inserted (false
+ *   when one already existed — not an error).
  */
-export async function linkDocumentToCustomer(db, { documentId, entityId = null, customerId, confidence = 0.6 } = {}) {
+export async function linkDocumentToCustomer(db, { documentId, customerId, confidence = 0.6 } = {}) {
   if (!documentId || !customerId) return false;
 
-  const existing = await db.raw(
-    `SELECT 1 FROM document_entity_links WHERE document_id = $1 AND ${TENANT} LIMIT 1`,
-    [documentId]
-  );
-  if (!needsCustomerLink({ entityId, customerId, hasAnyLink: existing.rowCount > 0 })) return false;
-
-  await db.raw(
+  const inserted = await db.raw(
     `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
      VALUES ($1,$2,$3,$4,'ai',NOW())
      ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
@@ -240,7 +260,7 @@ export async function linkDocumentToCustomer(db, { documentId, entityId = null, 
       WHERE id = $1 AND ${TENANT} AND stage IN ('received', 'read', 'mapped')`,
     [documentId]
   );
-  return true;
+  return inserted.rowCount > 0;
 }
 
 /**
@@ -313,6 +333,25 @@ export async function documentsHaveUpdatedAt(db) {
   return documentsUpdatedAt;
 }
 export function _resetDocumentsUpdatedAtProbe() { documentsUpdatedAt = null; }
+
+/** Same contract as documentsHaveUpdatedAt, for extractions.unit_index
+ *  (M3-config/19). Guards every read/write of that column so a deploy that
+ *  lands before the migration is pasted degrades to "always NULL" instead of
+ *  a 42703 undefined_column error. */
+let extractionsUnitIndex = null;
+export async function extractionsHaveUnitIndex(db) {
+  if (extractionsUnitIndex !== null) return extractionsUnitIndex;
+  try {
+    const r = await db.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'extractions' AND column_name = 'unit_index'`
+    );
+    extractionsUnitIndex = r.rowCount > 0;
+  } catch {
+    return false;
+  }
+  return extractionsUnitIndex;
+}
+export function _resetExtractionsUnitIndexProbe() { extractionsUnitIndex = null; }
 
 function makeStore(db, tenantId) {
   const one = async (sql, params) => (await db.query(sql, params)).rows[0] ?? null;
@@ -501,13 +540,24 @@ function makeStore(db, tenantId) {
     updateFacet: updater('facets', ['mapped_entity_type', 'mapped_field_key', 'mapping_confidence', 'mapping_method', 'value_raw']),
 
     // ---- extractions ----
-    createExtraction: (e) => one(
-      `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
-                                confidence, source_facet_id, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING id`,
-      [tenantId, e.document_id, e.entity_id ?? null, e.field_key, e.value ?? null,
-       e.confidence ?? null, e.source_facet_id ?? null]
-    ),
+    createExtraction: async (e) => {
+      if (await extractionsHaveUnitIndex(db)) {
+        return one(
+          `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
+                                    confidence, source_facet_id, unit_index, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING id`,
+          [tenantId, e.document_id, e.entity_id ?? null, e.field_key, e.value ?? null,
+           e.confidence ?? null, e.source_facet_id ?? null, e.unit_index ?? null]
+        );
+      }
+      return one(
+        `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
+                                  confidence, source_facet_id, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING id`,
+        [tenantId, e.document_id, e.entity_id ?? null, e.field_key, e.value ?? null,
+         e.confidence ?? null, e.source_facet_id ?? null]
+      );
+    },
     getExtraction: (id) => one(`SELECT * FROM extractions WHERE id = $1 AND ${TENANT}`, [id]),
     listExtractionsByDocument: (documentId) =>
       many(`SELECT * FROM extractions WHERE document_id = $1 AND ${TENANT} ORDER BY id`, [documentId]),
@@ -525,11 +575,15 @@ function makeStore(db, tenantId) {
      * linked" about the document that created it. One query, capped so a
      * document dense with repeatable fields cannot blow up the response.
      */
-    listExtractionsByDocuments: (documentIds) => {
+    listExtractionsByDocuments: async (documentIds) => {
       const ids = [...new Set((documentIds ?? []).filter((x) => typeof x === 'string'))].slice(0, 500);
-      if (!ids.length) return Promise.resolve([]);
+      if (!ids.length) return [];
+      // Guarded select (M3-config/19): NULL AS unit_index on a warm instance
+      // that hasn't picked up the migration yet, same idiom as touch/
+      // documentsHaveUpdatedAt above.
+      const unitIndexCol = (await extractionsHaveUnitIndex(db)) ? 'unit_index' : 'NULL::smallint AS unit_index';
       return many(
-        `SELECT id, document_id, entity_id, field_key, value, confidence, corrected_value
+        `SELECT id, document_id, entity_id, field_key, value, confidence, corrected_value, ${unitIndexCol}
            FROM extractions
           WHERE document_id = ANY($1::uuid[]) AND ${TENANT}
           ORDER BY document_id, id
@@ -890,10 +944,30 @@ function makeStore(db, tenantId) {
       // to its own facet on (mapped_field_key, value_raw), which is unique here
       // because normalizeFields() has already collapsed duplicates — relying on
       // RETURNING coming back in VALUES order would be relying on luck.
+      //
+      // unit_index (M3-config/19) rides along in the same `input` unnest
+      // either way — it costs nothing as an extra virtual column even before
+      // the migration lands — but is only projected into the extractions
+      // INSERT when the real column exists, guarded the same way as every
+      // other unit_index read/write in this file (extractionsHaveUnitIndex).
+      const hasUnitIndex = await extractionsHaveUnitIndex(db);
+      const extractionsInsert = hasUnitIndex
+        ? `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
+                                    confidence, source_facet_id, unit_index, created_at)
+           SELECT $1, $2, $9, i.field_key, i.value, i.confidence, ins.id, i.unit_index, NOW()
+             FROM input i
+             JOIN ins ON ins.mapped_field_key = i.field_key AND ins.value_raw = i.value
+           RETURNING id`
+        : `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
+                                    confidence, source_facet_id, created_at)
+           SELECT $1, $2, $9, i.field_key, i.value, i.confidence, ins.id, NOW()
+             FROM input i
+             JOIN ins ON ins.mapped_field_key = i.field_key AND ins.value_raw = i.value
+           RETURNING id`;
       const r = await db.query(
         `WITH input AS (
-           SELECT * FROM unnest($3::text[], $4::text[], $5::int[], $6::numeric[], $7::text[])
-                     AS t(field_key, value, page_no, confidence, verbatim)
+           SELECT * FROM unnest($3::text[], $4::text[], $5::int[], $6::numeric[], $7::text[], $10::smallint[])
+                     AS t(field_key, value, page_no, confidence, verbatim, unit_index)
          ), ins AS (
            INSERT INTO facets (tenant_id, document_id, page_no, segment_id, label_raw,
                                value_raw, confidence, mapped_field_key, mapping_method, created_at)
@@ -902,12 +976,7 @@ function makeStore(db, tenantId) {
              FROM input i
            RETURNING id, mapped_field_key, value_raw
          )
-         INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
-                                  confidence, source_facet_id, created_at)
-         SELECT $1, $2, $9, i.field_key, i.value, i.confidence, ins.id, NOW()
-           FROM input i
-           JOIN ins ON ins.mapped_field_key = i.field_key AND ins.value_raw = i.value
-         RETURNING id`,
+         ${extractionsInsert}`,
         [
           tenantId,
           documentId,
@@ -918,6 +987,7 @@ function makeStore(db, tenantId) {
           fields.map((f) => f.verbatim ?? null),
           FIELD_EXTRACT_SEGMENT,
           entityId,
+          fields.map((f) => f.unit_index ?? null),
         ]
       );
 
@@ -1125,16 +1195,25 @@ function makeStore(db, tenantId) {
       // ambiguous case race past each other.
       await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:customer:${name.toLowerCase()}`]);
 
+      // Bug A fix (2026-09-20): exact-name-only candidates missed the same
+      // household spelled two ways ("Castillo" vs "Ray & Linda Castillo").
+      // Widened with a surname ILIKE, so selectCustomerMatch's fuzzy path
+      // (customerMatchScore: normalized address + surname/substring name
+      // match) gets a chance to see the row at all. `%` and `_` are escaped
+      // since a real customer name essentially never contains them, but a
+      // stray one must not turn into an unbounded LIKE wildcard.
+      const surname = normalizeSurname(name).replace(/[%_]/g, '\\$&');
       const candidates = await many(
         `SELECT id, data, customer_number FROM entities
           WHERE entity_type = 'customer' AND ${TENANT}
             AND merged_into IS NULL
-            AND lower(data->>'customer_name') = lower($1)
+            AND ( lower(data->>'customer_name') = lower($1)
+               OR ($2::text <> '' AND lower(data->>'customer_name') LIKE '%' || $2 || '%' ESCAPE '\\') )
           ORDER BY created_at LIMIT 200`,
-        [name]
+        [name, surname]
       );
 
-      const existing = selectCustomerMatch(candidates, address);
+      const existing = selectCustomerMatch(candidates, { name, address });
 
       if (!existing) {
         // SECURITY DEFINER, advisory-locked per tenant (M3-config/15-customer-
@@ -1164,6 +1243,30 @@ function makeStore(db, tenantId) {
         );
       }
       return { id: existing.id, created: false, customerNumber: existing.customer_number };
+    },
+
+    /**
+     * Read-only sibling of findOrCreateCustomer: same candidate query and the
+     * same selectCustomerMatch decision, but never creates anything. Used by
+     * api/_lib/routes/integrity.js's scan/fix, which must never mutate data
+     * while merely looking for a suggestion.
+     */
+    suggestCustomer: async ({ customer_name, service_address } = {}) => {
+      const name = normalizeMatchText(customer_name);
+      if (!name) return null;
+      const address = normalizeMatchText(service_address);
+      const surname = normalizeSurname(name).replace(/[%_]/g, '\\$&');
+      const candidates = await many(
+        `SELECT id, data, customer_number FROM entities
+          WHERE entity_type = 'customer' AND ${TENANT}
+            AND merged_into IS NULL
+            AND ( lower(data->>'customer_name') = lower($1)
+               OR ($2::text <> '' AND lower(data->>'customer_name') LIKE '%' || $2 || '%' ESCAPE '\\') )
+          ORDER BY created_at LIMIT 200`,
+        [name, surname]
+      );
+      const match = selectCustomerMatch(candidates, { name, address });
+      return match?.id ?? null;
     },
 
     /**

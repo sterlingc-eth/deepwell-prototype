@@ -149,7 +149,7 @@ const eq = (name, got, want) =>
 
   const hybrid = resolveTranscribeModels({});
   eq('with no env set, the fast model defaults to claude-haiku-4-5', hybrid.fast, 'claude-haiku-4-5');
-  eq('with no env set, the strong model defaults to claude-sonnet-4-5', hybrid.strong, 'claude-sonnet-4-5');
+  eq('with no env set, the strong model defaults to claude-haiku-4-5 (owner 2026-09-20: Haiku everywhere; Sonnet is opt-in via TRANSCRIBE_MODEL_STRONG)', hybrid.strong, 'claude-haiku-4-5');
   check('with no legacy var, escalation stays enabled', hybrid.legacy === false);
 
   const overridden = resolveTranscribeModels({ TRANSCRIBE_MODEL_FAST: 'fast-x', TRANSCRIBE_MODEL_STRONG: 'strong-y' });

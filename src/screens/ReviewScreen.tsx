@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, AlertTriangle, Link2, GitMerge, Copy, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
+import { Check, AlertTriangle, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { conflictDocs, entitiesOfType, gapDocs, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
 import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
-import { str } from '../core/answer';
+import { groupExtractionsByUnit } from '../domains/hvac/units';
+import { normalize, str } from '../core/answer';
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
 import { customerClient, type CustomerSummary } from '../services/customerClient';
@@ -122,7 +123,7 @@ function customerEntityFor(doc: Doc, entities: Record<string, Entity>): Entity |
  * Disabled in demo mode — there is no backend customer API to call there
  * (same gate DashboardScreen's warranty-attention fetch uses).
  */
-function LinkedCustomerSection({ doc, current, isDemo }: { doc: Doc; current: Entity | null; isDemo: boolean }) {
+function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: Doc; current: Entity | null; isDemo: boolean; suggestedName: string | null }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CustomerSummary[]>([]);
@@ -130,6 +131,7 @@ function LinkedCustomerSection({ doc, current, isDemo }: { doc: Doc; current: En
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [suggestBusy, setSuggestBusy] = useState(false);
 
   useEffect(() => {
     if (!open || isDemo) return;
@@ -174,12 +176,42 @@ function LinkedCustomerSection({ doc, current, isDemo }: { doc: Doc; current: En
     }
   };
 
+  /** One-click "Link to <name>" when the document has a customer_name
+   *  extraction and isn't linked yet (owner request 2026-09-20, item 4).
+   *  Same exact-normalized-name match rule DashboardScreen's viewCustomer
+   *  uses, so this never guesses a fuzzy match into the wrong customer — no
+   *  match found just opens the existing search box prefilled instead. */
+  const linkToSuggested = async () => {
+    if (!suggestedName) return;
+    setSuggestBusy(true);
+    setErr(null);
+    try {
+      const rows = await customerClient.list({ q: suggestedName, sort: 'name', limit: 5 });
+      const match = rows.find((r) => r.name && normalize(r.name) === normalize(suggestedName));
+      if (match) {
+        await assign(match.id);
+      } else {
+        setQuery(suggestedName);
+        setOpen(true);
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not search for that customer.');
+    } finally {
+      setSuggestBusy(false);
+    }
+  };
+
   return (
     <section className="p-5 space-y-3">
       <h3 className="flex items-center gap-2 text-h4"><UserCog className="w-4 h-4" aria-hidden="true" /> Customer</h3>
       <p className="text-ink-2">
         {current ? (str(current, 'customer_name') || str(current, 'name') || 'Unnamed') : 'Not linked to a customer yet.'}
       </p>
+      {!isDemo && !open && !current && suggestedName && (
+        <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" disabled={suggestBusy} onClick={() => void linkToSuggested()}>
+          {suggestBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <UserCog className="w-4 h-4" aria-hidden="true" />} Link to {suggestedName}
+        </button>
+      )}
       {isDemo ? (
         <p className="text-caption text-ink-3">Demo data — customer profiles aren't available here.</p>
       ) : open ? (
@@ -391,6 +423,38 @@ export function ReviewBody() {
   );
 }
 
+/** One group's rows (shared fields, or one unit's fields) — factored out of
+ *  DocPanel so grouping by unit (owner request 2026-09-20, item 4) doesn't
+ *  duplicate this markup per group. */
+function FieldRows({ fields, onCorrect }: { fields: Doc['extracted']; onCorrect: (fieldName: string, value: string) => void }) {
+  return (
+    <ul className="divide-y divide-line border border-line rounded-lg">
+      {fields.map((f) => {
+        const value = f.correctedValue ?? f.value;
+        const low = f.confidence < 0.85;
+        return (
+          <li key={f.name} className="px-3 py-2.5 grid sm:grid-cols-[minmax(120px,30%)_1fr] gap-x-4 gap-y-1 items-center">
+            <div>
+              <p className="text-body text-ink-3">{fieldLabel(f.name)}</p>
+              <p className={`text-caption ${low ? 'text-warn-ink dark:text-brass-200' : 'text-ink-3'}`}>{Math.round(f.confidence * 100)}% confidence{f.correctedBy ? ` · corrected by ${f.correctedBy}` : ''}</p>
+            </div>
+            <div className="flex gap-2">
+              <label className="sr-only" htmlFor={`field-${f.name}`}>{f.name}</label>
+              <input
+                id={`field-${f.name}`}
+                className={`dw-input !min-h-[44px] font-mono text-data ${low ? 'border-warn' : ''}`}
+                defaultValue={value}
+                onBlur={(e) => { if (e.target.value.trim() && e.target.value !== value) onCorrect(f.name, e.target.value.trim()); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 interface DocPanelProps {
   doc: Doc;
   conflicts: Conflict[];
@@ -478,6 +542,18 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   };
 
   const linkedLabels = doc.linkedEntityIds.map((id) => graph.entities[id]).filter((e): e is Entity => !!e);
+
+  // "Link to <name>" one-click suggestion (owner request 2026-09-20, item 4):
+  // whatever the document's own customer_name extraction says, corrected
+  // value wins same as everywhere else a fact is read.
+  const customerNameField = doc.extracted.find((f) => f.name === 'customer_name');
+  const suggestedCustomerName = customerNameField ? (customerNameField.correctedValue ?? customerNameField.value).trim() || null : null;
+
+  const grouped = useMemo(() => groupExtractionsByUnit(doc.extracted), [doc.extracted]);
+  const currentCustomer = customerEntityFor(doc, graph.entities);
+  const customerStatusLine = currentCustomer
+    ? `Customer: ${str(currentCustomer, 'customer_name') || str(currentCustomer, 'name') || 'Unnamed'}`
+    : 'Customer: not linked yet';
 
   return (
     <div className="dw-card divide-y divide-line min-w-0">
@@ -591,31 +667,27 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               })}
             </div>
           )}
-          <ul className="divide-y divide-line border border-line rounded-lg">
-            {doc.extracted.map((f) => {
-              const value = f.correctedValue ?? f.value;
-              const low = f.confidence < 0.85;
-              return (
-                <li key={f.name} className="px-3 py-2.5 grid sm:grid-cols-[minmax(120px,30%)_1fr] gap-x-4 gap-y-1 items-center">
-                  <div>
-                    <p className="text-body text-ink-3">{fieldLabel(f.name)}</p>
-                    <p className={`text-caption ${low ? 'text-warn-ink dark:text-brass-200' : 'text-ink-3'}`}>{Math.round(f.confidence * 100)}% confidence{f.correctedBy ? ` · corrected by ${f.correctedBy}` : ''}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <label className="sr-only" htmlFor={`field-${f.name}`}>{f.name}</label>
-                    <input
-                      id={`field-${f.name}`}
-                      className={`dw-input !min-h-[44px] font-mono text-data ${low ? 'border-warn' : ''}`}
-                      defaultValue={value}
-                      onBlur={(e) => { if (e.target.value.trim() && e.target.value !== value) onCorrect(f.name, e.target.value.trim()); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-            {doc.extracted.length === 0 && <li className="px-3 py-4 text-ink-3">Nothing extracted yet.</li>}
-          </ul>
+          {grouped.shared.length > 0 && (
+            <div>
+              {grouped.units.length > 0 && <p className="dw-label mb-1.5">Document details</p>}
+              <FieldRows fields={grouped.shared} onCorrect={onCorrect} />
+            </div>
+          )}
+          {grouped.units.map((u) => (
+            <div key={u.unitIndex} className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="dw-label">{u.label}</p>
+                {u.equipmentEntityId ? (
+                  <span className="dw-pill-info">Linked to equipment</span>
+                ) : (
+                  <span className="dw-pill-muted">Not linked to equipment yet</span>
+                )}
+                <span className="text-caption text-ink-3">{customerStatusLine}</span>
+              </div>
+              <FieldRows fields={u.fields} onCorrect={onCorrect} />
+            </div>
+          ))}
+          {doc.extracted.length === 0 && <p className="px-3 py-4 text-ink-3">Nothing extracted yet.</p>}
         </section>
       )}
 
@@ -641,7 +713,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       {/* Customer link — search/create, independent of the equipment/property
           link below (a document can name a customer with no serial at all). */}
       {!duplicate && doc.typeId && missing.length === 0 && (
-        <LinkedCustomerSection doc={doc} current={customerEntityFor(doc, graph.entities)} isDemo={REVIEW_IS_DEMO_ONLY} />
+        <LinkedCustomerSection doc={doc} current={currentCustomer} isDemo={REVIEW_IS_DEMO_ONLY} suggestedName={suggestedCustomerName} />
       )}
 
       {/* Link */}

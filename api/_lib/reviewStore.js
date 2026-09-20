@@ -83,6 +83,7 @@ import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, docum
 import { getApiKey, withBackoff } from './claude.js';
 import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
+import { coalesceEntityData } from './integrity.js';
 import {
   normalizeDocumentType,
   inferDocumentType,
@@ -440,7 +441,7 @@ export async function mergeEntities(ctx, { keepId, dropId }, actorClerkId) {
 
   return withTenant(ctx, async (client, tenantId) => {
     const rows = (await client.query(
-      `SELECT id, entity_type, merged_into FROM entities WHERE id = ANY($1::uuid[]) AND ${TENANT}`,
+      `SELECT id, entity_type, merged_into, data FROM entities WHERE id = ANY($1::uuid[]) AND ${TENANT}`,
       [[keepId, dropId]]
     )).rows;
     const keep = rows.find((r) => r.id === keepId);
@@ -448,6 +449,11 @@ export async function mergeEntities(ctx, { keepId, dropId }, actorClerkId) {
     if (!keep || !drop) throw new ReviewError('Both entities must exist in this tenant', 404);
     if (keep.entity_type !== drop.entity_type) throw new ReviewError('Cannot merge entities of different types', 400);
     if (drop.merged_into) throw new ReviewError('Entity has already been merged', 409);
+
+    // Fill-only: the survivor never loses a value the dropped row had
+    // (phone/email/notes/aliases) — see integrity.js's coalesceEntityData.
+    const coalescedData = coalesceEntityData(keep.data, drop.data);
+    await client.query(`UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`, [keepId, coalescedData]);
 
     await client.query(`UPDATE extractions SET entity_id = $2 WHERE entity_id = $1 AND ${TENANT}`, [dropId, keepId]);
 
@@ -532,7 +538,7 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
       if (customer?.id) {
         const customerFields = completenessFields.filter((f) => f.field_key === 'customer_name' || f.field_key === 'service_address');
         const confidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
-        await linkDocumentToCustomer(db, { documentId, entityId: null, customerId: customer.id, confidence });
+        await linkDocumentToCustomer(db, { documentId, customerId: customer.id, confidence });
       }
     }
 

@@ -41,6 +41,10 @@ import { sentThisMonth, type OutreachMessage } from '../src/services/outreachCli
 import { docsMatchingFilter } from '../src/screens/ReviewScreen';
 import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
+import { DEFAULT_CUSTOMER_FILTERS, matchesCustomerFilters, type CustomerFilters } from '../src/core/customerFilters';
+import { pairKey, reduceDuplicates, visibleDuplicates } from '../src/core/duplicates';
+import { groupExtractionsByUnit } from '../src/domains/hvac/units';
+import type { CustomerSummary } from '../src/services/customerClient';
 // The real source of truth (handoffs/TEAM_BRIEF_2026-09-19.md) — agent-backend
 // owns this file. src/domains/hvac/documentTypes.ts is a hand-mirrored copy
 // (src/ cannot import api/, different tsconfig root); this import exists only
@@ -809,6 +813,101 @@ function listFilesRecursive(dir: string): string[] {
   eq('sentThisMonth: ignores a message sent last month', sentThisMonth([msg({ sentAt: '2026-08-30T00:00:00Z' })], now), 0);
   eq('sentThisMonth: ignores a failed send even if sentAt is set', sentThisMonth([msg({ status: 'failed' })], now), 0);
   eq('sentThisMonth: sums multiple sent messages this month', sentThisMonth([msg({ id: 'a' }), msg({ id: 'b' })], now), 2);
+}
+
+/* --------------------------------------------------------- customer filters
+ * Owner request 2026-09-20, item 1: the Customers tab's filter row. */
+{
+  const customer = (over: Partial<CustomerSummary>): CustomerSummary => ({
+    id: 'c1', customerNumber: 'C-00001', name: 'Ray Castillo', serviceAddress: '1 Main St', city: 'Sterling',
+    phone: null, email: null, documentCount: 1, equipmentCount: 1, lastActivity: '2026-09-01', warrantyAlerts: 0,
+    mergedInto: null, ...over,
+  });
+  const now = new Date('2026-09-20T00:00:00Z');
+
+  check('matchesCustomerFilters: defaults match everything', matchesCustomerFilters(customer({}), DEFAULT_CUSTOMER_FILTERS, now));
+  check('matchesCustomerFilters: alerts=none excludes a customer with alerts', !matchesCustomerFilters(customer({ warrantyAlerts: 1 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'none' }, now));
+  check('matchesCustomerFilters: alerts=none keeps a customer with no alerts', matchesCustomerFilters(customer({ warrantyAlerts: 0 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'none' }, now));
+  check('matchesCustomerFilters: alerts=expiring with no breakdown falls back to "has any alert"', matchesCustomerFilters(customer({ warrantyAlerts: 1 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'expiring' }, now));
+  check('matchesCustomerFilters: alerts=expired reads a real breakdown when present', !matchesCustomerFilters(customer({ warrantyAlerts: 1, expiringCount: 1, expiredCount: 0 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'expired' }, now));
+
+  check('matchesCustomerFilters: equipment=has excludes zero units', !matchesCustomerFilters(customer({ equipmentCount: 0 }), { ...DEFAULT_CUSTOMER_FILTERS, equipment: 'has' }, now));
+  check('matchesCustomerFilters: equipment=none excludes a customer with units', !matchesCustomerFilters(customer({ equipmentCount: 2 }), { ...DEFAULT_CUSTOMER_FILTERS, equipment: 'none' }, now));
+
+  check('matchesCustomerFilters: city filter is case-insensitive', matchesCustomerFilters(customer({ city: 'Sterling' }), { ...DEFAULT_CUSTOMER_FILTERS, city: 'sterling' }, now));
+  check('matchesCustomerFilters: city filter excludes a different city', !matchesCustomerFilters(customer({ city: 'Reston' }), { ...DEFAULT_CUSTOMER_FILTERS, city: 'Sterling' }, now));
+  check('matchesCustomerFilters: null city on the row never matches a chosen city', !matchesCustomerFilters(customer({ city: null }), { ...DEFAULT_CUSTOMER_FILTERS, city: 'Sterling' }, now));
+
+  check('matchesCustomerFilters: lastActivity=30 keeps recent activity', matchesCustomerFilters(customer({ lastActivity: '2026-09-10' }), { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 30 }, now));
+  check('matchesCustomerFilters: lastActivity=30 excludes stale activity', !matchesCustomerFilters(customer({ lastActivity: '2026-01-01' }), { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 30 }, now));
+  check('matchesCustomerFilters: lastActivity filter excludes a customer with no activity on file', !matchesCustomerFilters(customer({ lastActivity: null }), { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 90 }, now));
+
+  const combo: CustomerFilters = { alerts: 'any', equipment: 'has', city: 'Sterling', lastActivity: 90 };
+  check('matchesCustomerFilters: combines every criterion (AND, not OR)', matchesCustomerFilters(customer({ equipmentCount: 1, city: 'Sterling', lastActivity: '2026-09-01' }), combo, now));
+  check('matchesCustomerFilters: one failing criterion excludes the row', !matchesCustomerFilters(customer({ equipmentCount: 0, city: 'Sterling', lastActivity: '2026-09-01' }), combo, now));
+}
+
+/* ------------------------------------------------------- duplicates banner
+ * Owner request 2026-09-20, item 2: dismiss ("Not the same") and merge both
+ * remove a pair from the banner for the rest of the session. */
+{
+  const pair = { keepId: 'k1', dropId: 'd1' };
+  const other = { keepId: 'k2', dropId: 'd2' };
+  eq('pairKey: joins keep/drop', pairKey(pair), 'k1:d1');
+
+  const original: Set<string> = new Set();
+  const afterDismiss = reduceDuplicates(original, { type: 'dismiss', ...pair });
+  check('reduceDuplicates: dismiss adds the pair\'s key', afterDismiss.has('k1:d1'));
+  check('reduceDuplicates: never mutates the set passed in', original.size === 0);
+  const afterMerge = reduceDuplicates(afterDismiss, { type: 'merge', ...other });
+  check('reduceDuplicates: merge adds without disturbing an earlier dismiss', afterMerge.has('k1:d1') && afterMerge.has('k2:d2'));
+
+  eq('visibleDuplicates: hides a dismissed pair, keeps the rest', visibleDuplicates([pair, other], new Set(['k1:d1'])), [other]);
+  eq('visibleDuplicates: an untouched set hides nothing', visibleDuplicates([pair, other], new Set()), [pair, other]);
+}
+
+/* ---------------------------------------------------------- unit grouping
+ * Owner request 2026-09-20, item 4: a multi-unit document's fields grouped
+ * per unit instead of ReviewScreen rendering duplicate flat rows. */
+{
+  type F = { name: string; value: string; correctedValue?: string; unitIndex?: number; target?: { entityId: string; field: string } };
+  const f = (name: string, value: string, over: Partial<F> = {}): F => ({ name, value, ...over });
+
+  // No unit_index anywhere, no equipment fields at all -> everything shared, no units.
+  eq(
+    'groupExtractionsByUnit: an invoice with no equipment fields has no unit sections',
+    groupExtractionsByUnit([f('customer_name', 'Ray Castillo'), f('cost', '450')]),
+    { shared: [f('customer_name', 'Ray Castillo'), f('cost', '450')], units: [] },
+  );
+
+  // No unit_index, but equipment fields present -> one implicit unit.
+  {
+    const fields = [f('customer_name', 'Ray Castillo'), f('serial_number', 'ABC123'), f('model', 'YSC060'), f('manufacturer', 'Trane')];
+    const g = groupExtractionsByUnit(fields);
+    eq('groupExtractionsByUnit: no unit_index but equipment fields -> shared keeps only document-level fields', g.shared, [f('customer_name', 'Ray Castillo')]);
+    eq('groupExtractionsByUnit: no unit_index -> exactly one implicit unit', g.units.length, 1);
+    eq('groupExtractionsByUnit: implicit unit label joins manufacturer/model/serial', g.units[0]?.label, 'Unit 1 · Trane YSC060 · serial ABC123');
+  }
+
+  // Real unit_index tagging -> two separate unit sections, shared fields kept out of both.
+  {
+    const fields = [
+      f('customer_name', 'Plaza Dental'),
+      f('equipment_id', 'RTU-1', { unitIndex: 1 }),
+      f('serial_number', '21341ABCD', { unitIndex: 1, target: { entityId: 'eq-1', field: 'serial' } }),
+      f('manufacturer', 'Trane', { unitIndex: 1 }),
+      f('model', 'YSC060E3RHA', { unitIndex: 1 }),
+      f('equipment_id', 'RTU-2', { unitIndex: 2 }),
+      f('serial_number', '99887766', { unitIndex: 2 }),
+    ];
+    const g = groupExtractionsByUnit(fields);
+    eq('groupExtractionsByUnit: shared fields exclude every unit-tagged field', g.shared, [f('customer_name', 'Plaza Dental')]);
+    eq('groupExtractionsByUnit: one group per distinct unit_index, in order', g.units.map((u) => u.unitIndex), [1, 2]);
+    eq('groupExtractionsByUnit: full label — tag, nameplate, serial', g.units[0]?.label, 'Unit 1 · RTU-1 · Trane YSC060E3RHA · serial 21341ABCD');
+    eq('groupExtractionsByUnit: a unit with a linked extraction reports its equipment entity id', g.units[0]?.equipmentEntityId, 'eq-1');
+    check('groupExtractionsByUnit: a unit with no linked extraction reports no equipment entity id', g.units[1]?.equipmentEntityId === null);
+    eq('groupExtractionsByUnit: a corrected value wins over the raw one in the label', groupExtractionsByUnit([f('equipment_id', 'x', { unitIndex: 1 }), f('serial_number', 'raw', { unitIndex: 1, correctedValue: 'fixed' })]).units[0]?.label, 'Unit 1 · x · serial fixed');
+  }
 }
 
 /* ------------------------------------------------------------------ done */

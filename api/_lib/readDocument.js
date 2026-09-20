@@ -299,7 +299,12 @@ export function resolveTranscribeModels(env = process.env) {
   }
   return {
     fast: env.TRANSCRIBE_MODEL_FAST || "claude-haiku-4-5",
-    strong: env.TRANSCRIBE_MODEL_STRONG || "claude-sonnet-4-5",
+    // Owner decision (2026-09-20): Haiku everywhere. Escalation re-reads a
+    // page with the strong prompt on Haiku; set TRANSCRIBE_MODEL_STRONG to
+    // "claude-sonnet-4-5" in Vercel only if handwritten/blurry pages prove
+    // to need it. The usage dashboard showed Sonnet still burning ~150K
+    // tokens/day from this one path.
+    strong: env.TRANSCRIBE_MODEL_STRONG || "claude-haiku-4-5",
     legacy: false,
   };
 }

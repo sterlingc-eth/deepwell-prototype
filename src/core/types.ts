@@ -100,6 +100,12 @@ export interface ExtractedField {
   correctedValue?: string;
   correctedBy?: string;
   correctedAt?: Date;
+  /** Which physical unit (1, 2, 3, …) this field belongs to, for a document
+   *  covering more than one piece of equipment — undefined for document-level
+   *  fields and for any document extracted before unit_index was surfaced to
+   *  the browser (see src/domains/hvac/units.ts's groupExtractionsByUnit,
+   *  which degrades gracefully when this is never set). */
+  unitIndex?: number;
 }
 
 /** Required-field completeness for one document, as api/_lib/documentTypes.js's

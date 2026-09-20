@@ -17,6 +17,7 @@ import {
   completenessFor,
   AI_VERIFY_MIN_CONFIDENCE,
 } from "./documentTypes.js";
+import { integrityFixDocument } from "./routes/integrity.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -293,9 +294,19 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // — see its doc comment in recordsStore.js for the matching key and its
     // known limitations.
     const customer = await db.findOrCreateCustomer(facts);
-    const linked = customer?.id && entity?.id
-      ? await db.setEquipmentCustomer(entity.id, customer.id)
-      : 0;
+    // Bug C fix (2026-09-20): every unit's equipment gets the customer, not
+    // just the first — a multi-unit document used to leave RTU-2/RTU-3
+    // ownerless even though the customer was resolved correctly.
+    const linkedEquipmentIds = [];
+    if (customer?.id) {
+      const targets = isMultiUnit ? unitResults.map((u) => u.entity) : [entity];
+      for (const target of targets) {
+        if (target?.id && (await db.setEquipmentCustomer(target.id, customer.id)) > 0) {
+          linkedEquipmentIds.push(target.id);
+        }
+      }
+    }
+    const linked = linkedEquipmentIds.length;
 
     // Two units sharing an identical printed value (the same model number on
     // RTU-1 and RTU-2, most often) is a real, legitimate case that
@@ -348,11 +359,21 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
           }
         }
       }
-    } else if (customer?.id) {
+    }
+    // Bug B fix (2026-09-20): a resolved customer gets its OWN
+    // document_entity_links row unconditionally — not only when there was no
+    // equipment entity. Before this, a document that linked to equipment
+    // never got a customer link at all (only entities.customer_id, via
+    // setEquipmentCustomer above), so the review/customer screens had
+    // nothing to read "this document is linked to its customer" from — the
+    // Margaret Henderson production defect (equipment linked, customer
+    // shown as "not linked to a customer yet"). Idempotent with the above:
+    // ON CONFLICT DO NOTHING in linkDocumentToCustomer.
+    if (customer?.id) {
       const customerFields = fields.filter((f) => f.field_key === 'customer_name' || f.field_key === 'service_address');
       const customerConfidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
       documentCustomerLinked = await linkDocumentToCustomer(db, {
-        documentId, entityId: null, customerId: customer.id, confidence: customerConfidence,
+        documentId, customerId: customer.id, confidence: customerConfidence,
       });
     }
 
@@ -409,6 +430,13 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       aiVerified,
     };
   });
+
+  // Deterministic, cheap, no model call: catches a customer link this pass
+  // still missed (e.g. the matching customer was created a moment later by a
+  // concurrent document) so a new document never sits unlinked waiting for
+  // the nightly sweep (handoffs/DATA_INTEGRITY_2026-09-20.md). Best-effort —
+  // integrityFixDocument never throws.
+  await integrityFixDocument(ctx, documentId);
 
   return {
     documentId,

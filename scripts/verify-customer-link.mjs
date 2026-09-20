@@ -11,7 +11,7 @@
  *
  *   node scripts/verify-customer-link.mjs
  */
-import { normalizeMatchText, selectCustomerMatch, needsCustomerLink } from '../api/_lib/recordsStore.js';
+import { normalizeMatchText, selectCustomerMatch } from '../api/_lib/recordsStore.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -102,36 +102,29 @@ eq(
   smithA
 );
 
-/* ------------------------------------------------------------ needsCustomerLink */
-// The decision behind linkDocumentToCustomer: a document with no equipment
-// entity (no serial) must still reach 'linked' via its customer, exactly
-// once, and never when it already has some other link.
+/* ---------------------------------------------------- selectCustomerMatch fuzzy */
+// Bug A fix (2026-09-20, handoffs/DATA_INTEGRITY_2026-09-20.md): passing
+// {name, address} (instead of a bare address string) opens a fuzzy path via
+// integrity.js's customerMatchScore, on top of the strict-equality path
+// above, which the string-argument tests already cover unchanged.
 
-eq(
-  'no equipment entity + a resolved customer + no existing link -> link it',
-  needsCustomerLink({ entityId: null, customerId: 'cust-1', hasAnyLink: false }),
-  true
-);
-eq(
-  'has an equipment entity -> never link to the customer instead',
-  needsCustomerLink({ entityId: 'equip-1', customerId: 'cust-1', hasAnyLink: false }),
-  false
-);
-eq(
-  'no customer resolved -> nothing to link',
-  needsCustomerLink({ entityId: null, customerId: null, hasAnyLink: false }),
-  false
-);
-eq(
-  'already has a link -> no-op, do not add a second one',
-  needsCustomerLink({ entityId: null, customerId: 'cust-1', hasAnyLink: true }),
-  false
-);
-eq(
-  'has an equipment entity AND already linked -> still no',
-  needsCustomerLink({ entityId: 'equip-1', customerId: 'cust-1', hasAnyLink: true }),
-  false
-);
+{
+  const castillo = { id: 'castillo-1', customer_number: 'C-00003', data: { customer_name: 'Castillo', service_address: '1519 W Juniper' } };
+  const got = selectCustomerMatch([castillo], { name: 'Ray & Linda Castillo', address: '1519 W Juniper Ave, Mesa AZ 85202' });
+  check('fuzzy: differently-worded name/address for the same household matches', got === castillo, `got ${JSON.stringify(got)}`);
+}
+{
+  const castillo = { id: 'castillo-1', data: { customer_name: 'Castillo', service_address: '1519 W Juniper' } };
+  const got = selectCustomerMatch([castillo], { name: 'Someone Else', address: '1519 E Juniper' });
+  check('fuzzy: different street direction never matches, even with no strict address hit', got === null, `got ${JSON.stringify(got)}`);
+}
+{
+  // No `name` on the incoming side -> only the strict-equality path runs
+  // (unchanged behavior), never the fuzzy one.
+  const castillo = { id: 'castillo-1', data: { customer_name: 'Castillo', service_address: '1519 W Juniper' } };
+  const got = selectCustomerMatch([castillo], { address: '1519 W Juniper Ave, Mesa AZ 85202' });
+  check('fuzzy path skipped with no incoming name', got === null, `got ${JSON.stringify(got)}`);
+}
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

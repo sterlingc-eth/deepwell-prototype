@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="AI answers from your HVAC records — work orders, warranties and photos, searchable in seconds.">
+<meta name="description" content="AI answers from your records — work orders, warranties and photos, searchable in seconds.">
 <meta property="og:title" content="DeepWell Technology — Knowledge Builds Business.">
 <meta property="og:description" content="One question answered right. For example, a $300 callback avoided. Your records, answerable in seconds.">
 <meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
@@ -13,15 +13,15 @@
 <meta property="og:url" content="https://deepwelltechnology.com/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="DeepWell Technology — AI answers from your HVAC records">
-<meta name="twitter:description" content="AI answers from your HVAC records — work orders, warranties and photos, searchable in seconds.">
+<meta name="twitter:title" content="DeepWell Technology — AI answers from your records">
+<meta name="twitter:description" content="AI answers from your records — work orders, warranties and photos, searchable in seconds.">
 <meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
 <link rel="canonical" href="https://deepwelltechnology.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0B1613">
-<title>DeepWell Technology — AI answers from your HVAC records</title>
+<title>DeepWell Technology — AI answers from your records</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -243,20 +243,26 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 @media (max-width:860px){.steps{grid-template-columns:1fr}.step + .step{padding-left:0;border-left:0;border-top:1px solid var(--line)}}
 
 /* onboard */
-.onboard{margin-top:clamp(20px,3vw,32px);border:1px solid var(--line-strong);background:var(--surface);padding:20px 24px;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:24px;align-items:center;border-left:4px solid var(--brass)}
+.onboard{margin-top:clamp(14px,2vw,22px);border:1px solid var(--line-strong);background:var(--surface);padding:14px 22px;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:24px;align-items:center;border-left:4px solid var(--brass)}
 .onboard .eyebrow{margin-bottom:10px}
 .onboard p{color:var(--muted)}
 @media (max-width:860px){.onboard{grid-template-columns:1fr}}
 /* verticals */
+#where{padding-block:clamp(4px,.6vw,8px)}
+#where .sec-head{grid-template-columns:1fr;margin-bottom:0}
+#where .sec-head .eyebrow{margin-bottom:2px}
+#where h2{font-size:clamp(1.05rem,1.8vw,1.25rem)}
 .verts{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);background:var(--surface)}
-.vert{padding:24px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px;min-height:150px}
+.verts-3{grid-template-columns:repeat(3,1fr)}
+.vert{padding:6px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;min-height:0}
 .vert:last-child{border-right:0}
-.vert .st{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.vert .st{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
 .vert.now .st{color:var(--brass-text)}
-.vert h3{font-size:1.15rem}
-.vert p{font-size:.88rem;color:var(--muted)}
+.vert h3{font-size:1rem;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.vert p{font-size:.84rem;color:var(--muted)}
 @media (max-width:860px){.verts{grid-template-columns:1fr 1fr}.vert{border-bottom:1px solid var(--line)}.vert:nth-child(2n){border-right:0}}
 @media (max-width:480px){.verts{grid-template-columns:1fr}.vert{border-right:0}}
+@media (max-width:860px){.verts-3{grid-template-columns:1fr}.verts-3 .vert{border-right:0;border-bottom:1px solid var(--line)}.verts-3 .vert:last-child{border-bottom:0}}
 /* plans */
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .plan{border:1px solid var(--line);background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:10px}
@@ -443,7 +449,7 @@ footer a{color:var(--muted);text-decoration:none}
   <div class="wrap">
     <div class="hero-copy dw-observe">
       <div class="hero-eyebrow-row">
-      <div class="eyebrow">Records that answer back — for HVAC shops</div>
+      <div class="eyebrow">Records that answer back.</div>
       <svg class="hero-micro" viewBox="0 0 118 36" aria-hidden="true" focusable="false">
         <g class="hm-doc-g">
           <rect class="hm-doc-page" x="2" y="4" width="20" height="28" rx="2"/>
@@ -577,7 +583,8 @@ footer a{color:var(--muted);text-decoration:none}
         <div class="when">Paper · PDF · spreadsheets · photos · email</div>
         <p>Scan the cabinet, forward the inbox, drop the shared drive, upload from a phone in the field. Handwriting, carbon copies and nameplate photos included. Nothing has to be renamed or filed first.</p>
         <ul>
-          <li>Drag-and-drop. Email intake &amp; folder sync <span class="pill-soon">Coming soon</span></li>
+          <li>Drag-and-drop upload</li>
+          <li>Email intake &amp; folder sync <span class="pill-soon">Coming soon</span></li>
           <li>Reads handwritten and low-quality scans</li>
           <li>Searchable within minutes of upload</li>
         </ul>
@@ -600,17 +607,10 @@ footer a{color:var(--muted);text-decoration:none}
         <div class="when">Desk · phone · truck</div>
         <p>Type a question the way you'd ask a coworker. Get the answer, with the source attached. Dashboards surface what's expiring, what's due, and what's slipping.</p>
         <ul>
-          <li>Warranty &amp; maintenance dashboards. Callbacks <span class="pill-soon">Coming soon</span></li>
-          <li>CSV, dispatch &amp; accountant export <span class="pill-soon">Coming soon</span></li>
+          <li>Warranty &amp; maintenance dashboards</li>
+          <li>CSV export for dispatch &amp; accounting</li>
         </ul>
       </div>
-    </div>
-    <div class="onboard">
-      <div>
-        <div class="eyebrow">Included with every account</div>
-        <h3>White-glove setup by the DeepWell Technology team</h3>
-      </div>
-      <p>Our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon.</p>
     </div>
   </div>
 </section>
@@ -993,6 +993,31 @@ footer a{color:var(--muted);text-decoration:none}
   </div>
 </section>
 
+<section id="where">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Where it works</div>
+        <h2>Built for your company. Built to go further.</h2>
+      </div>
+    </div>
+    <div class="verts verts-3">
+      <div class="vert now">
+        <div class="st">Trade businesses · live today</div>
+        <h3>HVAC, plumbing, electrical &amp; more</h3>
+      </div>
+      <div class="vert">
+        <div class="st">Roadmap</div>
+        <h3>Property management <span class="pill-soon">Next</span></h3>
+      </div>
+      <div class="vert">
+        <div class="st">Roadmap</div>
+        <h3>Fleet &amp; equipment rental <span class="pill-soon">Next</span></h3>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="plans">
   <div class="wrap">
     <div class="sec-head">
@@ -1072,16 +1097,23 @@ footer a{color:var(--muted);text-decoration:none}
         <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
+    <div class="onboard">
+      <div>
+        <div class="eyebrow">Included with every plan</div>
+        <h3>White-glove setup by the DeepWell Technology team</h3>
+      </div>
+      <p>Our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon.</p>
+    </div>
     <p class="annual"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price.</p>
     <div class="rescue">
       <div>
         <div class="eyebrow">Records Rescue</div>
-        <h3>Have boxes of old invoices, tickets, or warranties?</h3>
-        <p>We'll scan, process, and upload them to your account so your history is complete from day one. <strong>$0.12 per page.</strong> $500 minimum (roughly 4,000 pages), included in your first month of service.</p>
+        <h3>Start with one box.</h3>
+        <p>Send one sample folder or box of old invoices, tickets, or warranties — we'll digitize it free so you can see the result before committing to the rest.</p>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;flex:none">
-        <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20scanning">Ask about scanning</a>
-        <p style="margin:0;font-size:.82rem;color:var(--muted)">or <a href="/app/?screen=billing" style="color:var(--text);text-decoration:underline">start your account and buy it under Billing</a></p>
+        <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box — free demo</a>
+        <p style="margin:0;font-size:.82rem;color:var(--muted)">Full service: <strong>$0.12/page</strong> · $500 min — or <a href="/app/?screen=billing" style="color:var(--text);text-decoration:underline">buy it under Billing</a></p>
       </div>
     </div>
   </div>
@@ -1109,7 +1141,7 @@ footer a{color:var(--muted);text-decoration:none}
       </div>
       <div class="cost-card dw-observe dw-once">
         <div class="where">A claim denied because nobody registered it</div>
-        <p>Most manufacturers require registration within 60–90 days of install or the parts term is cut in half — Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane all drop from 10 yr registered to 5 yr unregistered <span class="mono" style="font-size:.74rem;color:var(--faint)">(docs/HVAC_WARRANTY_RESEARCH.md)</span>. Miss it, and a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
+        <p>Most manufacturers require registration within 60–90 days of install or the parts term is cut in half — Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane all drop from 10 yr registered to 5 yr unregistered <span class="mono" style="font-size:.74rem;color:var(--faint)">(based on published manufacturer registration windows)</span>. Miss it, and a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
       </div>
     </div>
     <p class="cost-note">Your numbers will differ. DeepWell watches every expiry — bell alert plus daily digest — then drafts the customer's extended-warranty email for an admin to approve and send, or run fully automatic. Both ship today.</p>

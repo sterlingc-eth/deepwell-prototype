@@ -96,6 +96,45 @@ export interface ReviewEntity {
   [key: string]: unknown;
 }
 
+/* ---------------------------------------------------------- integrity check
+ * handoffs/DATA_INTEGRITY_2026-09-20.md's integrityScan/integrityFix actions
+ * (owner request 2026-09-20, item 3). Same POST /api/review dispatch as
+ * everything else in this file. */
+
+export interface IntegrityDuplicateCustomer { keepId: string; dropId: string; score: number; reason: string }
+export interface IntegrityUnlinkedDocument { documentId: string; hasCustomerName: boolean; hasAddress: boolean; hasSerial: boolean; suggestedCustomerId: string | null }
+export interface IntegrityEquipmentWithoutCustomer { equipmentId: string; suggestedCustomerId: string | null }
+export interface IntegrityMultiUnitUnderLinked { documentId: string; unitsExtracted: number; unitsLinked: number }
+export interface IntegrityOrphanEquipment { equipmentId: string }
+
+export interface IntegrityScanResult {
+  duplicateCustomers: IntegrityDuplicateCustomer[];
+  unlinkedDocuments: IntegrityUnlinkedDocument[];
+  equipmentWithoutCustomer: IntegrityEquipmentWithoutCustomer[];
+  multiUnitDocsUnderLinked: IntegrityMultiUnitUnderLinked[];
+  orphanEquipment: IntegrityOrphanEquipment[];
+  counts: {
+    duplicateCustomers: number;
+    unlinkedDocuments: number;
+    equipmentWithoutCustomer: number;
+    multiUnitDocsUnderLinked: number;
+    orphanEquipment: number;
+  };
+}
+
+export type IntegrityApplyAction = 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits';
+
+export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits'];
+
+export interface IntegrityFixResult {
+  dryRun: boolean;
+  merged: { keepId: string; dropId: string; score: number }[];
+  documentsLinked: { documentId: string; customerId: string }[];
+  equipmentLinked: { equipmentId: string; customerId: string }[];
+  unitsCreated: { documentId: string; equipmentId: string; serial: string }[];
+  skipped: { documentId: string; reason: string }[];
+}
+
 export const reviewClient = {
   /** Correct an extracted field, or add one that was never extracted. */
   correctField(documentId: string, fieldKey: string, value: string, by: string) {
@@ -187,5 +226,18 @@ export const reviewClient = {
   reclassify(documentIds: string[]) {
     if (!documentIds.length) return Promise.resolve<{ changes: ReclassifyChange[]; remaining: number }>({ changes: [], remaining: 0 });
     return postJson<{ changes: ReclassifyChange[]; remaining: number }>({ action: 'reclassify', documentIds });
+  },
+
+  /** "Check records" — duplicate customers, unlinked documents, equipment
+   *  without a customer, under-linked multi-unit documents. Read-only. */
+  integrityScan() {
+    return postJson<IntegrityScanResult>({ action: 'integrityScan' });
+  },
+
+  /** "Fix everything Donovan is sure about" — admin-only in the UI (the
+   *  server itself also requires admin when the tenant is a Clerk org).
+   *  Idempotent: safe to call again after a partial failure. */
+  integrityFix(apply: IntegrityApplyAction[] = ALL_INTEGRITY_FIXES, dryRun = false) {
+    return postJson<IntegrityFixResult>({ action: 'integrityFix', apply, dryRun });
   },
 };

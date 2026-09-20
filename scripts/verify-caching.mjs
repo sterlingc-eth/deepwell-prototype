@@ -441,8 +441,8 @@ const eq = (name, got, want) =>
     { label: 'extract stable field/type guide', text: extractStable, model: EXTRACT_MODEL, expectCacheable: false },
     // NOT owned by this change (readDocument.js) — same, for its Haiku (fast) pass.
     { label: 'transcribe TRANSCRIBE_SYSTEM_PROMPT vs. fast model', text: TRANSCRIBE_SYSTEM_PROMPT, model: transcribeFast, expectCacheable: false },
-    // Its Sonnet (strong) pass uses the unchanged, already-correct 1024 minimum.
-    { label: 'transcribe TRANSCRIBE_SYSTEM_PROMPT vs. strong model', text: TRANSCRIBE_SYSTEM_PROMPT, model: transcribeStrong, expectCacheable: true },
+    // Strong pass now defaults to Haiku too (owner 2026-09-20) — same 4096 minimum, same gap as the fast pass (see REQUESTS_ask-cache-agent.md).
+    { label: 'transcribe TRANSCRIBE_SYSTEM_PROMPT vs. strong model', text: TRANSCRIBE_SYSTEM_PROMPT, model: transcribeStrong, expectCacheable: false },
   ];
   for (const { label, text, model, expectCacheable, requireMargin } of stablePrefixes) {
     const isCacheable = cacheable(text, model);

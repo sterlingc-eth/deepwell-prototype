@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { IngestProgress } from '../services/ingestClient';
 import { summarizeProgress, type BulkFileState } from '../services/bulkImport';
 import type { BillingInterval, BillingStatus } from '../services/billingClient';
+import { DEFAULT_CUSTOMER_FILTERS, type CustomerFilters } from '../core/customerFilters';
 
 export type Screen =
   | 'ask'
@@ -208,6 +209,12 @@ interface AppState {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 
+  // Customers tab filters (owner request 2026-09-20, item 1) — kept in the
+  // store, not component state, so they survive navigating away and back
+  // within this session (per-tab-visit persistence, not localStorage).
+  customerFilters: CustomerFilters;
+  setCustomerFilters: (filters: CustomerFilters) => void;
+
   // Multi-select for the warranty claim packet (equipment entity ids)
   selectedForExport: string[];
   toggleSelectForExport: (entityId: string) => void;
@@ -330,6 +337,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
+
+  customerFilters: DEFAULT_CUSTOMER_FILTERS,
+  setCustomerFilters: (filters) => set({ customerFilters: filters }),
 
   selectedForExport: [],
   toggleSelectForExport: (entityId) =>
