@@ -79,7 +79,7 @@
  *                       already-canonical value.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer } from './recordsStore.js';
+import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, documentsHaveUpdatedAt } from './recordsStore.js';
 import { getApiKey, withBackoff } from './claude.js';
 import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
@@ -272,8 +272,14 @@ export async function classifyDocument(ctx, { documentId, documentType }, actorC
   assertNonEmptyString('documentType', documentType);
 
   return withTenant(ctx, async (client, tenantId) => {
+    // updated_at bump (M3-config/17-ask-cache-and-search-index.sql): a
+    // reclassification changes document_type, which changes the label shown
+    // on every answer that cites this document, but touches no other table
+    // and no other timestamp — this is the one write path
+    // api/_lib/askCache.js's corpus_stamp would otherwise miss entirely.
+    const touch = (await documentsHaveUpdatedAt(client)) ? ', updated_at = NOW()' : '';
     const r = await client.query(
-      `UPDATE documents SET document_type = $2 WHERE id = $1 AND ${TENANT} RETURNING *`,
+      `UPDATE documents SET document_type = $2${touch} WHERE id = $1 AND ${TENANT} RETURNING *`,
       [documentId, documentType]
     );
     if (!r.rowCount) throw new ReviewError('Document not found', 404);

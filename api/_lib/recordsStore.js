@@ -290,6 +290,24 @@ export async function withTenant(ctx, fn) {
   }
 }
 
+/** Memoized per warm instance: does documents.updated_at exist yet
+ *  (M3-config/17)? null = unknown. Re-probed only on cold start, same
+ *  contract as askCache.js's tableExists. Exported for reviewStore.js. */
+let documentsUpdatedAt = null;
+export async function documentsHaveUpdatedAt(db) {
+  if (documentsUpdatedAt !== null) return documentsUpdatedAt;
+  try {
+    const r = await db.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'documents' AND column_name = 'updated_at'`
+    );
+    documentsUpdatedAt = r.rowCount > 0;
+  } catch {
+    return false; // don't memoize a transient failure
+  }
+  return documentsUpdatedAt;
+}
+export function _resetDocumentsUpdatedAtProbe() { documentsUpdatedAt = null; }
+
 function makeStore(db, tenantId) {
   const one = async (sql, params) => (await db.query(sql, params)).rows[0] ?? null;
   const many = async (sql, params) => (await db.query(sql, params)).rows;
@@ -301,9 +319,15 @@ function makeStore(db, tenantId) {
     return { sets, values: cols.map((c) => updates[c]) };
   };
 
-  const updater = (table, allowed) => async (id, updates) => {
+  // `touch`: tables the Ask answer cache's corpus_stamp watches via
+  // max(updated_at) (api/_lib/askCache.js) — every update must bump it, or a
+  // cached answer can outlive the change it no longer reflects. Guarded by
+  // documentsHaveUpdatedAt() so a deploy that lands before migration 17 is
+  // pasted degrades to "no bump" instead of breaking ingestion with 42703.
+  const updater = (table, allowed, { touch = false } = {}) => async (id, updates) => {
     const { sets, values } = setClause(updates, allowed);
     if (!sets.length) return;
+    if (touch && (await documentsHaveUpdatedAt(db))) sets.push('updated_at = NOW()');
     await db.query(
       `UPDATE ${table} SET ${sets.join(', ')} WHERE id = $1 AND ${TENANT}`,
       [id, ...values]
@@ -391,7 +415,7 @@ function makeStore(db, tenantId) {
      */
     raw: (sql, params) => db.query(sql, params),
 
-    updateDocument: updater('documents', DOCUMENT_UPDATE_COLUMNS),
+    updateDocument: updater('documents', DOCUMENT_UPDATE_COLUMNS, { touch: true }),
 
     /**
      * Clear a stale extraction error after a successful extraction.

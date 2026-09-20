@@ -20,6 +20,7 @@ import { recordModelCall } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
+import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -143,7 +144,7 @@ export const ASK_MODEL = process.env.ASK_MODEL || "claude-haiku-4-5";
  * classifyMetaQuestion is exported so scripts/verify-retrieval.mjs can check
  * both the positive phrasings and those negatives without a database.
  */
-function normalizeQuestion(q) {
+export function normalizeQuestion(q) {
   return String(q ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/[?!.]+$/, "");
 }
 
@@ -388,7 +389,12 @@ async function runMetaQuestion(db, meta) {
  * results (the same "nothing matched" the honest no-answer path already
  * handles) rather than a 500.
  */
-function retrieveEvidence(ctxArg, question, customerNumber, timer) {
+// EMPTY_RETRIEVAL: the shared "nothing here" return shape, extended with the
+// cache bookkeeping fields (questionHash/corpusStamp) every caller destructures
+// regardless of which branch produced it.
+const EMPTY_RETRIEVAL = { passages: [], extractions: [], cacheHit: false, cachedAnswer: null, questionHash: null, corpusStamp: null };
+
+function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, questionHash }) {
   return timer.time("retrieve", async () => {
     try {
       return await withTenant(ctxArg, async (db) => {
@@ -404,11 +410,31 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer) {
             timer.add("scope", Date.now() - scopeStart);
           }
         }
+
+        // ---- answer cache (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md) -----
+        // Stamp + cache row in the SAME round trip as each other (see
+        // askCache.js's COMBINED_SQL), inside this same withTenant
+        // transaction — no extra connection just to check the cache.
+        let corpusStamp = null;
+        let cachedAnswer = null;
+        await timer.time("cache", async () => {
+          try {
+            const entry = await getCacheEntry(db, { questionHash, today });
+            corpusStamp = entry.corpusStamp;
+            if (isCacheHit(entry.row, entry.corpusStamp)) cachedAnswer = entry.row.answer;
+          } catch (err) {
+            console.error("Ask cache lookup failed, answering without cache:", err?.message);
+          }
+        });
+        if (cachedAnswer) {
+          return { passages: [], extractions: [], cacheHit: true, cachedAnswer, questionHash, corpusStamp };
+        }
+
         const [passages, extractions] = await Promise.all([
           db.searchPassages(question, MAX_PASSAGES, { documentIds: documentIdsFilter }),
           db.searchExtractions(question, 25, { documentIds: documentIdsFilter }),
         ]);
-        return { passages, extractions };
+        return { passages, extractions, cacheHit: false, cachedAnswer: null, questionHash, corpusStamp };
       });
     } catch (err) {
       // A retrieval failure must not take the endpoint down. It also must
@@ -418,7 +444,7 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer) {
       // differently on the difference between "we found nothing" and "we
       // couldn't check", and guessing is worse than either.
       console.error("Retrieval failed:", err?.message);
-      return { passages: [], extractions: [] };
+      return EMPTY_RETRIEVAL;
     }
   });
 }
@@ -466,6 +492,14 @@ export default async function handler(req, res) {
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
     const meta = classifyMetaQuestion(question);
     const customerNumber = extractCustomerNumber(question);
+    // Resolved once, reused for both the answer cache key's `today` and the
+    // question block the model sees (buildQuestionBlock, below) — was
+    // computed twice (inconsistently) before the cache needed it up front.
+    const todayResolved = today ?? new Date().toISOString().slice(0, 10);
+    // Cache key (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): normalized so
+    // near-identical phrasings ("What's the warranty?" / "whats the warranty")
+    // share a cache entry — same normalization the meta-router already uses.
+    const questionHash = hashQuestion(normalizeQuestion(question));
 
     // ---- overlap, not a chain (handoffs/ASK_LATENCY_2026-09-20.md) --------
     // Three independent reads that used to run one after another. `limit`
@@ -491,7 +525,9 @@ export default async function handler(req, res) {
     const gatePromise = timer.time("gate", () => checkAskGate(auth));
     const budgetPromise = gatePromise.then(() => timer.time("budget", () => assertModelBudget(ctxArg)));
     budgetPromise.catch(() => {});
-    const retrievalPromise = meta ? null : retrieveEvidence(ctxArg, question, customerNumber, timer);
+    const retrievalPromise = meta
+      ? null
+      : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
 
     const gate = await gatePromise;
     if (!gate.allowed) {
@@ -528,9 +564,29 @@ export default async function handler(req, res) {
     }
 
     // ---- 1. retrieve (already in flight above unless meta fell through) ---
-    const { passages, extractions } = retrievalPromise
+    const { passages, extractions, cacheHit, cachedAnswer, corpusStamp } = retrievalPromise
       ? await retrievalPromise
-      : await retrieveEvidence(ctxArg, question, customerNumber, timer);
+      : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
+
+    // ---- cache hit: no retrieval was even needed above, no model call -----
+    if (cacheHit) {
+      const data = { ...cachedAnswer, cached: true };
+      send(200, { success: true, data });
+      await timer.time("bookkeeping", () =>
+        withTenant(ctxArg, (db) => db.logAction({
+          action: "document.queried",
+          resource_type: "question",
+          clerk_user_id: auth.userId,
+          changes: {
+            question_hash: hashQuestion(question),
+            documents: [...new Set((data.sources ?? []).map((s) => s.documentId))],
+            passages: 0,
+            cached: true,
+          },
+        })).catch((err) => console.error("Failed to write document.queried audit row (cache hit):", err?.message))
+      );
+      return;
+    }
 
     if (passages.length === 0 && extractions.length === 0) {
       return send(200, {
@@ -607,7 +663,7 @@ export default async function handler(req, res) {
     const contextText = buildContextBlock({ passages: contextPassages, extractions: mappedExtractions });
     const questionText = buildQuestionBlock({
       question,
-      today: today ?? new Date().toISOString().slice(0, 10),
+      today: todayResolved,
     });
 
     const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
@@ -724,6 +780,19 @@ export default async function handler(req, res) {
           })
         ).catch((err) => console.error("Failed to write document.queried audit row:", err?.message))
       ),
+      // Cache write (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): a cache
+      // miss above means `corpusStamp` came from the SAME transaction that
+      // just ran retrieval, so it is still the stamp this answer was built
+      // against — safe to store alongside it even though this write lands in
+      // a brand-new transaction after the retrieval one already committed.
+      timer.time("bookkeeping", () => {
+        if (!ASK_CACHE_ENABLED || !corpusStamp || !shouldCache(data.kind, passages.length, extractions.length)) {
+          return Promise.resolve();
+        }
+        return withTenant(ctxArg, (db) =>
+          upsertCacheEntry(db, { questionHash, corpusStamp, today: todayResolved, answer: data })
+        ).catch((err) => console.error("Failed to upsert ask cache row:", err?.message));
+      }),
     ]);
   } catch (error) {
     try {

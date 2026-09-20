@@ -203,7 +203,11 @@ export function secondsUntilUtcMidnight(now = Date.now()) {
 // until fixed. One line per (table, message) per instance per 10 minutes.
 const LOG_EVERY_MS = 10 * 60 * 1000;
 const lastLogged = new Map();
-function logOnce(table, err) {
+// Exported (2026-09-20) so api/_lib/askCache.js can use the same "log once
+// per 10 min per (table, message)" throttle for its own missing-table case
+// (ask_answer_cache, before the owner pastes M3-config/17-*.sql) instead of
+// keeping a second copy of this Map.
+export function logOnce(table, err) {
   const key = `${table}:${err?.message ?? ""}`;
   const now = Date.now();
   if ((lastLogged.get(key) ?? 0) + LOG_EVERY_MS > now) return;
