@@ -292,11 +292,15 @@ function findShopContactLeaks(customers, contactCtx) {
  * the same terms if that ever changes. `linked_by IN ('ai','ai:name-only')`
  * is an ALLOW-list rather than excluding 'human' by name, so it fails closed
  * against any value it doesn't recognize — a Clerk user id, a future
- * provenance string, anything. A document a human has already reviewed
- * (`verified_by IS NOT NULL` or `stage = 'verified'`) is excluded too, even
- * if its link still happens to say 'ai' — a verified document's customer was
- * implicitly confirmed as part of that review and must not be silently
- * relinked afterward. `isEligibleForRelink` below pins this exact rule as a
+ * provenance string, anything. A document a HUMAN has already reviewed
+ * (`verified_by` set to anything other than 'ai') is excluded too, even if
+ * its link still happens to say 'ai' — a person's verification implicitly
+ * confirmed the customer and must not be silently relinked afterward.
+ * Auto-verification (recordsStore.js's aiVerify stamps `verified_by = 'ai'`,
+ * stage 'verified') is NOT a human review: the limit test of 2026-09-20
+ * showed every pipeline document lands at stage 'verified'/'ai', so
+ * excluding those would make this step a no-op on exactly the documents it
+ * exists to repair (Desert Ridge Dental → Plaza Dental Group). `isEligibleForRelink` below pins this exact rule as a
  * plain function, re-applied in JS as defense in depth.
  */
 /**
@@ -310,8 +314,10 @@ function findShopContactLeaks(customers, contactCtx) {
  */
 export function isEligibleForRelink({ linkedBy, verifiedBy, stage }) {
   if (linkedBy !== 'ai' && linkedBy !== 'ai:name-only') return false;
-  if (verifiedBy) return false;
-  if (stage === 'verified') return false;
+  // A human verification (any verified_by other than the pipeline's own
+  // 'ai' stamp) locks the link. stage alone says nothing about who did it.
+  if (verifiedBy && verifiedBy !== 'ai') return false;
+  if (stage === 'verified' && verifiedBy && verifiedBy !== 'ai') return false;
   return true;
 }
 
@@ -328,7 +334,7 @@ async function loadMismatchedDirectLinks(db) {
        JOIN documents d ON d.id = l.document_id
       WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND l.${TENANT}
         AND l.linked_by IN ('ai', 'ai:name-only')
-        AND d.verified_by IS NULL AND d.stage <> 'verified'
+        AND (d.verified_by IS NULL OR d.verified_by = 'ai')
       LIMIT ${DOCUMENT_SCAN_LIMIT}`,
     []
   );

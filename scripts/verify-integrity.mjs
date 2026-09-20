@@ -641,9 +641,9 @@ check('an ai link on an unverified document is eligible', isEligibleForRelink({ 
 check('an ai:name-only link on an unverified document is eligible', isEligibleForRelink({ linkedBy: 'ai:name-only', verifiedBy: null, stage: 'linked' }));
 check('a human-chosen link ("human") is NEVER eligible, whatever the stage', !isEligibleForRelink({ linkedBy: 'human', verifiedBy: null, stage: 'linked' }));
 check('a link attributed to a Clerk user id is NEVER eligible (fails closed on an unrecognized value)', !isEligibleForRelink({ linkedBy: 'user_2abc123', verifiedBy: null, stage: 'linked' }));
-check('an ai link on a document with verified_by set is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'ai', stage: 'linked' }));
+check('an ai link on an AUTO-verified document (verified_by = ai, the pipeline stamp) IS eligible — auto-verify is not a human review', isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'ai', stage: 'verified' }));
 check('an ai link on a document with verified_by set to a human name is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'Dana', stage: 'linked' }));
-check('an ai link whose document stage is "verified" is NOT eligible, even with no verified_by', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: null, stage: 'verified' }));
+check('an ai link on a HUMAN-verified document (stage verified, verified_by a person) is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'user_2abc123', stage: 'verified' }));
 check('a missing linkedBy is NOT eligible (fails closed)', !isEligibleForRelink({ linkedBy: null, verifiedBy: null, stage: 'linked' }));
 check('a missing linkedBy is NOT eligible (undefined too)', !isEligibleForRelink({}));
 
