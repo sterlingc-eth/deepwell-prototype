@@ -260,6 +260,17 @@ export function handleError(res, error, req, extra = {}) {
     return handleCors(res, req).status(503).json({ error: error.message });
   }
 
+  // A Postgres "undefined column / table / function" error means a migration
+  // in M3-config/ has not been applied to this database yet. Say so plainly
+  // (no schema detail) instead of a generic 500, so the UI and the owner can
+  // tell "run the migration" apart from "something broke".
+  if (error?.code === "42703" || error?.code === "42P01" || error?.code === "42883") {
+    return handleCors(res, req).status(503).json({
+      error: "This feature needs a database update that hasn't been applied yet. Please try again later.",
+      code: "migration_pending",
+    });
+  }
+
   if (status === 401 || msg.includes("401") || msg.includes("authentication") || msg.includes("API key") || msg.includes("CLAUDE_API_KEY")) {
     return handleCors(res, req).status(401).json({ error: "Authentication failed" });
   }
