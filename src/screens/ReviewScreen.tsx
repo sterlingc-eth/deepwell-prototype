@@ -127,6 +127,10 @@ function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: D
   const hasCustomerFacts = doc.extracted.some(
     (f) => (f.name === 'customer_name' || f.name === 'service_address') && (f.correctedValue ?? f.value).trim()
   );
+  // Limit-test defect D (2026-09-20): this doc was linked by name alone and
+  // that surname now matches 2+ customers — see usePostgresSync.ts's
+  // addAmbiguousNameLinkIssues for how this issue is computed.
+  const ambiguous = doc.issues.find((i): i is Extract<typeof i, { kind: 'ambiguous-name-link' }> => i.kind === 'ambiguous-name-link');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CustomerSummary[]>([]);
@@ -217,6 +221,12 @@ function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: D
             ? 'Names a customer but hasn’t linked yet — use the suggestion below or search.'
             : 'This document doesn’t state a customer or service address.'}
       </p>
+      {ambiguous && (
+        <p role="alert" className="flex items-center gap-1 text-caption text-warn-ink dark:text-brass-200">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          Two customers named {ambiguous.surname.charAt(0).toUpperCase() + ambiguous.surname.slice(1)} — confirm which one below.
+        </p>
+      )}
       {!isDemo && !open && !current && suggestedName && (
         <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" disabled={suggestBusy} onClick={() => void linkToSuggested()}>
           {suggestBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <UserCog className="w-4 h-4" aria-hidden="true" />} Link to {suggestedName}

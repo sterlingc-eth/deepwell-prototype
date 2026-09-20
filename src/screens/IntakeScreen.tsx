@@ -28,6 +28,7 @@ const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
   reading: 'Reading…',
   queued: 'Queued…',
   pending: STILL_PROCESSING_MESSAGE,
+  waiting: "Waiting for the server's rate limit…",
   done: 'Read',
   error: 'Failed',
 };
@@ -108,6 +109,7 @@ function issueSummary(doc: Doc): string | null {
   if (i.kind === 'unlinked') return 'Not linked';
   if (i.kind === 'conflict') return 'Conflict';
   if (i.kind === 'duplicate') return 'Duplicate';
+  if (i.kind === 'ambiguous-name-link') return 'Two customers share this name — confirm which one';
   return null;
 }
 

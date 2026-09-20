@@ -124,7 +124,15 @@ export type DocumentIssue =
   | { kind: 'missing-field'; field: string }
   | { kind: 'unlinked'; bestGuess?: EntityId; confidence: number }
   | { kind: 'conflict'; conflictId: string }
-  | { kind: 'duplicate'; of: DocumentId };
+  | { kind: 'duplicate'; of: DocumentId }
+  // Limit-test defect D (2026-09-20): this document was linked to its
+  // customer by name alone (no address to disambiguate), and that surname
+  // now matches 2+ other non-merged customers — order-dependent at the time
+  // it was linked, invisible after. `candidateIds` includes the currently-
+  // linked customer. Computed client-side in usePostgresSync.ts from each
+  // link's `linked_by` (server value 'ai:name-only') plus the already-synced
+  // customer entities — no extra round trip.
+  | { kind: 'ambiguous-name-link'; surname: string; candidateIds: EntityId[] };
 
 export interface Doc {
   id: DocumentId;

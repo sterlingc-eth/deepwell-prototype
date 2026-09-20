@@ -32,7 +32,13 @@ import {
   MAX_FILE_RETRIES,
   DEFAULT_BULK_CONCURRENCY,
 } from '../src/services/bulkImport.ts';
-import { IngestHttpError } from '../src/services/ingestClient.ts';
+import {
+  IngestHttpError,
+  isDailyCapIngestError,
+  isRetryableIngestStatus,
+  MAX_INGEST_RATE_LIMIT_RETRIES,
+  IngestRateGate,
+} from '../src/services/ingestClient.ts';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -214,6 +220,75 @@ const eq = (name, got, want) =>
       controller.signal
     );
     check('aborting mid-run stops later items from starting', started < 20, `${started} of 20 started`);
+  })();
+}
+
+/* -------------------------------------------- ingestClient.ts rate-limit backoff */
+// Limit-test defect E (2026-09-20): the single-file "Add files" path had no
+// 429/503 retry at all, unlike bulkImport.ts's dedicated uploader. These
+// mirror the isRetryableStatus/isDailyCapError checks above, for
+// ingestFile/ingestFiles' own error classifiers.
+{
+  const perMinute = new IngestHttpError('Too many requests', 429, { scope: 'per-minute' });
+  const noScope = new IngestHttpError('Too many requests', 429, {});
+  const perDay = new IngestHttpError('Too many requests', 429, { scope: 'per-day' });
+  const unavailable = new IngestHttpError('Service unavailable', 503, {});
+  const tooLarge = new IngestHttpError('File too large', 413, {});
+  const billing = new IngestHttpError('Subscription required', 402, {});
+
+  check('a per-minute 429 is retryable', isRetryableIngestStatus(perMinute));
+  check('...and is NOT the daily cap', !isDailyCapIngestError(perMinute));
+  check('a 429 with no scope at all is treated as retryable (per-minute-shaped)', isRetryableIngestStatus(noScope));
+  check('a per-day 429 is recognized as the daily cap', isDailyCapIngestError(perDay));
+  check('...and is NOT retried (retrying cannot succeed today)', !isRetryableIngestStatus(perDay));
+  check('503 is retryable', isRetryableIngestStatus(unavailable));
+  check('413 is never retryable', !isRetryableIngestStatus(tooLarge));
+  check('402 is never retryable', !isRetryableIngestStatus(billing));
+  check('a plain Error (not IngestHttpError) is never retryable or the daily cap', !isRetryableIngestStatus(new Error('boom')) && !isDailyCapIngestError(new Error('boom')));
+  check('MAX_INGEST_RATE_LIMIT_RETRIES is 3 (15s/30s/60s tiers)', MAX_INGEST_RATE_LIMIT_RETRIES === 3);
+}
+
+{
+  // IngestRateGate: a shared backoff window, honoring Retry-After when the
+  // server sent one — proven here with small (millisecond-scale)
+  // retryAfterSeconds values so the test runs fast rather than waiting out
+  // the real 15s/30s/60s tiers.
+  await (async () => {
+    const gate = new IngestRateGate();
+    const t0 = Date.now();
+    gate.noteRateLimited(new IngestHttpError('rate limited', 429, {}, 0.02), 1); // 20ms
+    await gate.wait();
+    const elapsed = Date.now() - t0;
+    check('wait() honors a small Retry-After delay (waits at least ~15ms)', elapsed >= 15, `elapsed ${elapsed}ms`);
+    check('wait() does not wildly overshoot the requested delay', elapsed < 500, `elapsed ${elapsed}ms`);
+  })();
+
+  await (async () => {
+    // A shared window: a SECOND, shorter-delay notification must not shrink
+    // an already-longer wait already in effect (Math.max semantics) — this
+    // is what keeps 3 concurrent workers from each independently resetting
+    // the window to their own (possibly shorter) retry.
+    const gate = new IngestRateGate();
+    const t0 = Date.now();
+    gate.noteRateLimited(new IngestHttpError('rate limited', 429, {}, 0.06), 1); // 60ms — the longer one
+    gate.noteRateLimited(new IngestHttpError('rate limited', 429, {}, 0.01), 1); // 10ms — must not shorten it
+    await gate.wait();
+    const elapsed = Date.now() - t0;
+    check('a shorter second notification does not shrink the shared window', elapsed >= 45, `elapsed ${elapsed}ms`);
+  })();
+
+  await (async () => {
+    // No Retry-After header -> falls back to the fixed attempt-1 tier
+    // (15s) — too slow to actually wait out in a unit test, so this just
+    // confirms wait() respects an abort instead of hanging the whole suite.
+    const controller = new AbortController();
+    const gate = new IngestRateGate(controller.signal);
+    gate.noteRateLimited(new IngestHttpError('rate limited', 429, {}), 1); // no retryAfterSeconds -> 15s tier
+    const t0 = Date.now();
+    setTimeout(() => controller.abort(), 20);
+    await gate.wait();
+    const elapsed = Date.now() - t0;
+    check('an aborted signal cuts the fixed-tier wait short instead of blocking ~15s', elapsed < 500, `elapsed ${elapsed}ms`);
   })();
 }
 

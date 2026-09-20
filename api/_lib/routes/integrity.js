@@ -18,21 +18,25 @@ import { withTenant as withRecordsTenant, linkDocumentToCustomer, linkDocumentTo
 import { mergeCustomers, ReviewError, isUuid } from '../reviewStore.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
 import {
-  customerMatchScore, findDuplicateCustomerPairs, isUnlinkedDocument,
+  findDuplicateCustomerPairs, isUnlinkedDocument,
   isEquipmentMissingCustomer, multiUnitUnderLinked, CUSTOMER_MATCH_THRESHOLD,
   unitIndexBackfillPlan, groupExtractionRowsByUnit, coalesceEntityData,
-  isLikelyShopAddress, normalizeAddressKey,
+  isLikelyShopAddress, normalizeAddressKey, normalizeSurname, compareNamesStrict,
+  isAddressOnlyCustomer, isLikelyShopPhone, isLikelyShopEmail, buildContactAddressCounts,
 } from '../integrity.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const CUSTOMER_SCAN_LIMIT = 500;
 const DOCUMENT_SCAN_LIMIT = 1000;
 // Destructive/irreversible-feeling actions, admin-gated (integrityFix below)
-// regardless of what else is in `apply`.
-const ADMIN_ONLY_ACTIONS = new Set(['mergeDuplicates', 'retireShopCustomers']);
+// regardless of what else is in `apply`. stripShopContact and
+// relinkMismatchedNames (limit-test defects A/C, 2026-09-20) join this list:
+// both rewrite/repoint an existing customer's data rather than only adding a
+// link or filling a blank, so they get the same admin gate as mergeDuplicates.
+const ADMIN_ONLY_ACTIONS = new Set(['mergeDuplicates', 'retireShopCustomers', 'stripShopContact', 'relinkMismatchedNames']);
 const APPLY_ACTIONS = new Set([
   'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
-  'retireShopCustomers',
+  'retireShopCustomers', 'stripShopContact', 'relinkMismatchedNames',
 ]);
 
 // ------------------------------------------------------------------ reads --
@@ -193,9 +197,11 @@ async function loadOrphanEquipment(db) {
  *  retireShopCustomers acts on; `placeholderCustomerId: null` means the
  *  pattern was detected but nothing was ever created from it, nothing to
  *  retire). Reviewer follow-up, 2026-09-20 — see integrity.js's
- *  isLikelyShopAddress doc comment for the two signals. */
-async function loadSuspectedShopAddresses(db) {
-  const shopContext = await db.loadShopAddressContext();
+ *  isLikelyShopAddress doc comment for the two signals. `shopContext`, when
+ *  passed, is reused instead of re-querying (integrityScan already computes
+ *  it once for the whole scan). */
+async function loadSuspectedShopAddresses(db, shopContext) {
+  shopContext = shopContext ?? await db.loadShopAddressContext();
   const flagged = Object.entries(shopContext.letterheadCounts)
     .filter(([addrKey]) => isLikelyShopAddress(addrKey, shopContext))
     .map(([addressKey, counts]) => ({ addressKey, ...counts }));
@@ -239,20 +245,199 @@ async function loadShopCustomersToRetire(db) {
   return targets;
 }
 
+/** Builds isLikelyShopPhone/isLikelyShopEmail's ctx from a scan's already-
+ *  loaded `customers` rows plus the tenant's own configured phone/email
+ *  (carried on `shopContext` — see recordsStore.js's computeShopAddressContext,
+ *  extended for this). Pure once `customers`/`shopContext` are in hand — no
+ *  extra query beyond what integrityScan/applyIntegrityFix already run. */
+function buildContactCtx(customers, shopContext) {
+  const { phoneAddressCounts, emailAddressCounts } = buildContactAddressCounts(customers);
+  return {
+    tenantPhoneKey: shopContext?.tenantPhoneKey ?? null,
+    tenantEmailKey: shopContext?.tenantEmailKey ?? null,
+    phoneAddressCounts,
+    emailAddressCounts,
+  };
+}
+
+/** Limit-test defect A (2026-09-20): customers whose phone/email is a likely
+ *  shop value under `contactCtx` — stripShopContact's scan+fix target list.
+ *  Pure once `customers` is in hand. */
+function findShopContactLeaks(customers, contactCtx) {
+  const leaks = [];
+  for (const c of customers) {
+    if (c.phone && isLikelyShopPhone(c.phone, contactCtx)) leaks.push({ customerId: c.id, field: 'phone', value: c.phone });
+    if (c.email && isLikelyShopEmail(c.email, contactCtx)) leaks.push({ customerId: c.id, field: 'email', value: c.email });
+  }
+  return leaks;
+}
+
+/**
+ * Limit-test defect C repair target (2026-09-20): a document whose DIRECT
+ * customer link (document_entity_links -> a customer entity) disagrees at
+ * the name level with what the document itself extracted as customer_name —
+ * "a different business at the same address was silently absorbed" damage
+ * done before the selectCustomerMatch fix above existed. Ignores address-only
+ * placeholder customers (nothing to disagree with — a placeholder's name IS
+ * the address) and merged-away rows (already excluded by the `merged_into IS
+ * NULL` filter on the join).
+ *
+ * Review fix (2026-09-20, reviewer NO-GO item 1): relinkMismatchedNames
+ * unlinks and re-links whatever this returns, so it must never include a
+ * link a HUMAN made. ReviewScreen's "Change customer…" (LinkedCustomerSection
+ * -> customerClient.assignDocument) writes `linked_by = 'human'`
+ * (reviewStore.js's assignDocumentCustomer), never 'ai' or 'ai:name-only';
+ * the generic entity-link picker (reviewStore.js's linkDocument, `linked_by =
+ * by`) never offers a customer as a link target today, but is excluded on
+ * the same terms if that ever changes. `linked_by IN ('ai','ai:name-only')`
+ * is an ALLOW-list rather than excluding 'human' by name, so it fails closed
+ * against any value it doesn't recognize — a Clerk user id, a future
+ * provenance string, anything. A document a human has already reviewed
+ * (`verified_by IS NOT NULL` or `stage = 'verified'`) is excluded too, even
+ * if its link still happens to say 'ai' — a verified document's customer was
+ * implicitly confirmed as part of that review and must not be silently
+ * relinked afterward. `isEligibleForRelink` below pins this exact rule as a
+ * plain function, re-applied in JS as defense in depth.
+ */
+/**
+ * Pure: the same eligibility rule the SQL above encodes (`linked_by IN
+ * ('ai','ai:name-only')` and not verified), pinned as a plain function per
+ * reviewStore.js's own pattern ("a future edit to the SQL can be checked
+ * against the same rule without a database") — see scripts/verify-integrity.mjs.
+ * Applied again in JS below as defense in depth, not instead of the SQL
+ * filter: a link a human made, or a document a human has already verified,
+ * must never be a relinkMismatchedNames candidate, however the row got here.
+ */
+export function isEligibleForRelink({ linkedBy, verifiedBy, stage }) {
+  if (linkedBy !== 'ai' && linkedBy !== 'ai:name-only') return false;
+  if (verifiedBy) return false;
+  if (stage === 'verified') return false;
+  return true;
+}
+
+async function loadMismatchedDirectLinks(db) {
+  const rows = await db.raw(
+    `SELECT l.document_id, l.entity_id AS customer_id, e.data AS customer_data,
+            l.linked_by, d.verified_by, d.stage,
+            (SELECT COALESCE(x.corrected_value, x.value) FROM extractions x
+              WHERE x.document_id = l.document_id AND x.field_key = 'customer_name' AND x.value IS NOT NULL
+                AND x.${TENANT}
+              ORDER BY x.confidence DESC NULLS LAST, x.id LIMIT 1) AS doc_customer_name
+       FROM document_entity_links l
+       JOIN entities e ON e.id = l.entity_id
+       JOIN documents d ON d.id = l.document_id
+      WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND l.${TENANT}
+        AND l.linked_by IN ('ai', 'ai:name-only')
+        AND d.verified_by IS NULL AND d.stage <> 'verified'
+      LIMIT ${DOCUMENT_SCAN_LIMIT}`,
+    []
+  );
+  return rows.rows
+    .filter((r) => isEligibleForRelink({ linkedBy: r.linked_by, verifiedBy: r.verified_by, stage: r.stage }))
+    .filter((r) => r.doc_customer_name && String(r.doc_customer_name).trim() && !isAddressOnlyCustomer(r.customer_data))
+    .filter((r) => compareNamesStrict(r.doc_customer_name, r.customer_data?.customer_name) === 'no-match')
+    .map((r) => ({ documentId: r.document_id, customerId: r.customer_id, docCustomerName: r.doc_customer_name }));
+}
+
+/**
+ * Limit-test defect B, item 3 (2026-09-20): a document whose DIRECT customer
+ * (document_entity_links -> customer) differs from the customer its LINKED
+ * UNIT belongs to (entities.customer_id, reached either via
+ * document_entity_links or extractions.entity_id) — the
+ * 36-service-ticket-paterson shape: direct link -> "Paterson", unit link ->
+ * "Patterson". Needs-attention only; no auto-fix (which of the two
+ * customers is "right" is a judgement call this scan does not make).
+ */
+async function loadSplitLinkDocuments(db) {
+  const rows = await db.raw(
+    `WITH direct_customer AS (
+       SELECT l.document_id, l.entity_id AS customer_id
+         FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+        WHERE e.entity_type = 'customer' AND l.${TENANT}
+     ),
+     unit_customer AS (
+       SELECT x.document_id, eq.customer_id
+         FROM extractions x JOIN entities eq ON eq.id = x.entity_id
+        WHERE eq.entity_type = 'equipment' AND eq.customer_id IS NOT NULL AND x.${TENANT}
+        UNION
+       SELECT l.document_id, eq.customer_id
+         FROM document_entity_links l JOIN entities eq ON eq.id = l.entity_id
+        WHERE eq.entity_type = 'equipment' AND eq.customer_id IS NOT NULL AND l.${TENANT}
+     )
+     SELECT dc.document_id, dc.customer_id AS direct_customer_id, uc.customer_id AS unit_customer_id
+       FROM direct_customer dc JOIN unit_customer uc ON uc.document_id = dc.document_id
+      WHERE dc.customer_id IS DISTINCT FROM uc.customer_id
+      LIMIT ${DOCUMENT_SCAN_LIMIT}`,
+    []
+  );
+  return rows.rows.map((r) => ({ documentId: r.document_id, directCustomerId: r.direct_customer_id, unitCustomerId: r.unit_customer_id }));
+}
+
+/**
+ * Limit-test defect D (2026-09-20): a document linked to its customer purely
+ * by name (`linked_by = 'ai:name-only'` — see recordsStore.js's
+ * findOrCreateCustomer/selectCustomerMatch matchBasis, and
+ * linkDocumentToCustomer's `linkedBy`) whose surname now matches TWO OR MORE
+ * non-merged customers — order-dependent at the moment it was linked
+ * (25-correspondence-castillo.pdf's case), and invisible after. Needs-
+ * attention only; no auto-fix (deciding which customer is right needs a
+ * person). `customers` is the scan's already-loaded list — no extra query.
+ */
+async function loadAmbiguousNameOnlyLinks(db, customers) {
+  const rows = await db.raw(
+    `SELECT l.document_id, l.entity_id AS customer_id
+       FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+      WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND l.linked_by = 'ai:name-only'
+        AND l.${TENANT}
+      LIMIT ${DOCUMENT_SCAN_LIMIT}`,
+    []
+  );
+  if (!rows.rows.length) return [];
+
+  const bySurname = new Map();
+  const customerById = new Map();
+  for (const c of customers) {
+    customerById.set(c.id, c);
+    const s = normalizeSurname(c.name);
+    if (!s) continue;
+    if (!bySurname.has(s)) bySurname.set(s, []);
+    bySurname.get(s).push(c.id);
+  }
+
+  const out = [];
+  for (const r of rows.rows) {
+    const cust = customerById.get(r.customer_id);
+    const surname = normalizeSurname(cust?.name);
+    const candidates = surname ? (bySurname.get(surname) ?? []) : [];
+    if (candidates.length >= 2) out.push({ documentId: r.document_id, customerId: r.customer_id, candidates });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- scan API --
 
 export async function integrityScan(ctx) {
   return withRecordsTenant(ctx, async (db) => {
-    const [customers, docCandidates, equipCandidates, multiUnitCandidates, orphanEquipment, suspectedShopAddresses] = await Promise.all([
+    const [customers, docCandidates, equipCandidates, multiUnitCandidates, orphanEquipment, shopContext, mismatchedNameLinks, splitLinkDocuments] = await Promise.all([
       loadCustomersForScan(db),
       loadUnlinkedCandidates(db),
       loadEquipmentMissingCustomer(db),
       loadMultiUnitCandidates(db),
       loadOrphanEquipment(db),
-      loadSuspectedShopAddresses(db),
+      db.loadShopAddressContext(),
+      loadMismatchedDirectLinks(db),
+      loadSplitLinkDocuments(db),
     ]);
+    const suspectedShopAddresses = await loadSuspectedShopAddresses(db, shopContext);
 
-    const duplicateCustomers = findDuplicateCustomerPairs(customers);
+    // Limit-test defect A (2026-09-20): a phone/email shared as a likely shop
+    // value is excluded from evaluateCustomerMatch's identity check entirely
+    // (see integrity.js's buildMatchEvidence) — otherwise every customer that
+    // still carries the leaked shop number "matches" every other on phone.
+    const contactCtx = buildContactCtx(customers, shopContext);
+    const duplicateCustomers = findDuplicateCustomerPairs(customers, { ctx: contactCtx });
+    const shopContactLeaks = findShopContactLeaks(customers, contactCtx);
+    const ambiguousNameOnlyLinks = await loadAmbiguousNameOnlyLinks(db, customers);
 
     const unlinkedRows = docCandidates.filter(isUnlinkedDocument);
     const unlinkedDocuments = [];
@@ -281,6 +466,10 @@ export async function integrityScan(ctx) {
       multiUnitDocsUnderLinked,
       orphanEquipment,
       suspectedShopAddresses,
+      shopContactLeaks,
+      mismatchedNameLinks,
+      splitLinkDocuments,
+      ambiguousNameOnlyLinks,
       counts: {
         duplicateCustomers: duplicateCustomers.length,
         unlinkedDocuments: unlinkedDocuments.length,
@@ -288,6 +477,10 @@ export async function integrityScan(ctx) {
         multiUnitDocsUnderLinked: multiUnitDocsUnderLinked.length,
         orphanEquipment: orphanEquipment.length,
         suspectedShopAddresses: suspectedShopAddresses.length,
+        shopContactLeaks: shopContactLeaks.length,
+        mismatchedNameLinks: mismatchedNameLinks.length,
+        splitLinkDocuments: splitLinkDocuments.length,
+        ambiguousNameOnlyLinks: ambiguousNameOnlyLinks.length,
       },
     };
   });
@@ -367,6 +560,84 @@ async function createMissingUnitsForDocument(ctx, { documentId }, { dryRun }) {
   });
 }
 
+/**
+ * Limit-test defect C repair (2026-09-20): a document flagged by
+ * loadMismatchedDirectLinks — its DIRECT customer link disagrees at the name
+ * level with what it actually extracted. Unlinks it from the wrong customer,
+ * re-resolves via the (now name-checked) findOrCreateCustomer, links to the
+ * result, and moves any equipment unit THIS document introduced (its serial
+ * appears on no other document already tied to the old customer) over to the
+ * new one — reusing linkDocumentToCustomer/findOrCreateCustomer rather than
+ * reimplementing linking. Returns `{documentId, fromCustomerId, toCustomerId,
+ * unitsMoved}`.
+ */
+async function relinkMismatchedNameDocument(ctx, { documentId, customerId: oldCustomerId }) {
+  return withRecordsTenant(ctx, async (db) => {
+    const rows = await db.listExtractionsByDocument(documentId);
+    const facts = {};
+    for (const r of rows) {
+      const v = r.corrected_value ?? r.value;
+      if (v != null && String(v).trim() !== '' && facts[r.field_key] == null) facts[r.field_key] = v;
+    }
+    const docSerials = new Set(
+      rows
+        .filter((r) => r.field_key === 'serial_number')
+        .map((r) => String(r.corrected_value ?? r.value ?? '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    await db.raw(
+      `DELETE FROM document_entity_links WHERE document_id = $1 AND entity_id = $2 AND ${TENANT}`,
+      [documentId, oldCustomerId]
+    );
+
+    const newCustomer = await db.findOrCreateCustomer(facts);
+    let unitsMoved = 0;
+    if (newCustomer?.id && newCustomer.id !== oldCustomerId) {
+      await linkDocumentToCustomer(db, {
+        documentId, customerId: newCustomer.id, confidence: 0.75,
+        linkedBy: newCustomer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+      });
+
+      if (docSerials.size) {
+        // Every serial this document shares with some OTHER document already
+        // tied to the old customer stays put — this document didn't
+        // introduce it. Only a serial appearing on no document but this one
+        // moves with it.
+        const otherDocs = await db.raw(
+          `SELECT DISTINCT l.document_id FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+             WHERE e.customer_id = $1 AND e.entity_type = 'equipment' AND l.${TENANT} AND l.document_id <> $2
+            UNION
+           SELECT DISTINCT x.document_id FROM extractions x JOIN entities e ON e.id = x.entity_id
+             WHERE e.customer_id = $1 AND e.entity_type = 'equipment' AND x.${TENANT} AND x.document_id <> $2`,
+          [oldCustomerId, documentId]
+        );
+        const otherDocIds = otherDocs.rows.map((r) => r.document_id);
+        let otherSerials = new Set();
+        if (otherDocIds.length) {
+          const otherRows = await db.raw(
+            `SELECT DISTINCT lower(COALESCE(corrected_value, value)) AS serial FROM extractions
+              WHERE field_key = 'serial_number' AND document_id = ANY($1::uuid[]) AND ${TENANT}`,
+            [otherDocIds]
+          );
+          otherSerials = new Set(otherRows.rows.map((r) => r.serial).filter(Boolean));
+        }
+        for (const serial of docSerials) {
+          if (otherSerials.has(serial)) continue;
+          const r = await db.raw(
+            `UPDATE entities SET customer_id = $3, updated_at = NOW()
+               WHERE entity_type = 'equipment' AND customer_id = $1 AND merged_into IS NULL
+                 AND lower(data->>'serial_number') = $2 AND ${TENANT}`,
+            [oldCustomerId, serial, newCustomer.id]
+          );
+          unitsMoved += r.rowCount;
+        }
+      }
+    }
+    return { documentId, fromCustomerId: oldCustomerId, toCustomerId: newCustomer?.id ?? null, unitsMoved };
+  });
+}
+
 // ---- Inbox link-sweep debounce (reviewer follow-up, 2026-09-20) -----------
 // usePostgresSync.ts's runInboxLinkSweep already guards itself to once per
 // browser tab per page load, but that is a CLIENT guard — nothing stops two
@@ -441,9 +712,13 @@ async function debounceLinkSweep(ctx) {
  * Customers-tab banner, however high its score.
  *
  * `dryRun` is left undefined rather than defaulted here on purpose:
- * `retireShopCustomers` treats anything OTHER than the explicit boolean
- * `false` as dry-run (see below) — stricter than every other action, which
- * default to NOT dry-run (`effectiveDryRun`) exactly as before.
+ * `retireShopCustomers`, `stripShopContact` and `relinkMismatchedNames` each
+ * treat anything OTHER than the explicit boolean `false` as dry-run (see
+ * below) — stricter than every other action, which default to NOT dry-run
+ * (`effectiveDryRun`) exactly as before. All three rewrite or repoint an
+ * existing record rather than only adding a link or filling a blank, so an
+ * admin has to ask for them twice: once by naming the action, once by
+ * passing `dryRun: false`.
  */
 async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_MATCH_THRESHOLD } = {}, actorClerkId) {
   const applySet = new Set((Array.isArray(apply) ? apply : []).filter((a) => APPLY_ACTIONS.has(a)));
@@ -455,7 +730,10 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     return { skipped: true, reason: 'recent' };
   }
 
-  const result = { dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [], survivorsHealed: [], shopCustomersRetired: [], skipped: [] };
+  const result = {
+    dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [],
+    survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [], skipped: [],
+  };
 
   if (applySet.has('mergeDuplicates')) {
     const customers = await withRecordsTenant(ctx, loadCustomersForScan);
@@ -507,7 +785,10 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
       // customer" for a human, not silently attributed to the shop.
       const customer = await withRecordsTenant(ctx, (db) => db.findOrCreateCustomer({ customer_name: r.customerName, service_address: r.serviceAddress }, shopContext));
       if (!customer?.id) { result.skipped.push({ documentId: r.documentId, reason: 'no customer name or address to resolve (or a likely shop address)' }); continue; }
-      const didLink = await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, { documentId: r.documentId, customerId: customer.id, confidence: 0.75 }));
+      const didLink = await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, {
+        documentId: r.documentId, customerId: customer.id, confidence: 0.75,
+        linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+      }));
       result.documentsLinked.push({ documentId: r.documentId, customerId: customer.id, alreadyLinked: !didLink });
     }
     if (result.documentsLinked.length) {
@@ -619,6 +900,65 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     }
   }
 
+  if (applySet.has('stripShopContact')) {
+    // Review fix (2026-09-20, reviewer NO-GO item 2): same stricter default
+    // as retireShopCustomers above — anything other than the EXPLICIT
+    // boolean `dryRun: false` previews only. Removing a field from
+    // `entities.data` is not something a person can eyeball-undo the way
+    // linkDocuments/linkEquipmentCustomers's fill-a-blank additions are, so
+    // it gets the same "ask twice" gate rather than the plain
+    // `effectiveDryRun` every additive fix uses.
+    const stripDryRun = dryRun !== false;
+    // Limit-test defect A (2026-09-20): remove a leaked shop phone/email from
+    // `entities.data` outright rather than trying to guess a real value to
+    // replace it with — a wrong phone is worse than no phone. Computed fresh
+    // (not reused from a scan the caller may not have run) but cheap: one
+    // customer list read plus the tenant-context lookup.
+    const customers = await withRecordsTenant(ctx, loadCustomersForScan);
+    const shopContext = await withRecordsTenant(ctx, (db) => db.loadShopAddressContext());
+    const contactCtx = buildContactCtx(customers, shopContext);
+    const leaks = findShopContactLeaks(customers, contactCtx);
+    for (const leak of leaks) {
+      if (stripDryRun) { result.shopContactStripped.push(leak); continue; }
+      await withRecordsTenant(ctx, (db) => db.raw(
+        `UPDATE entities SET data = data - $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
+        [leak.customerId, leak.field]
+      ));
+      result.shopContactStripped.push(leak);
+    }
+    if (result.shopContactStripped.length && !stripDryRun) {
+      await withRecordsTenant(ctx, (db) => db.logAction({
+        clerk_user_id: actorClerkId, action: 'integrity.strip_shop_contact', resource_type: 'tenant',
+        changes: { count: result.shopContactStripped.length },
+      }));
+    }
+  }
+
+  if (applySet.has('relinkMismatchedNames')) {
+    // Review fix (2026-09-20, reviewer NO-GO item 2): same stricter default
+    // as retireShopCustomers/stripShopContact — this unlinks a document from
+    // one customer and links it to another, which is exactly the kind of
+    // change a person cannot eyeball-undo. Requires the EXPLICIT boolean
+    // `dryRun: false`; anything else (including simply omitting `dryRun`)
+    // previews only.
+    const relinkDryRun = dryRun !== false;
+    const candidates = await withRecordsTenant(ctx, loadMismatchedDirectLinks);
+    for (const c of candidates) {
+      if (relinkDryRun) {
+        result.mismatchedNamesRelinked.push({ documentId: c.documentId, fromCustomerId: c.customerId, toCustomerId: null, unitsMoved: 0 });
+        continue;
+      }
+      const r = await relinkMismatchedNameDocument(ctx, { documentId: c.documentId, customerId: c.customerId });
+      result.mismatchedNamesRelinked.push(r);
+    }
+    if (result.mismatchedNamesRelinked.length && !relinkDryRun) {
+      await withRecordsTenant(ctx, (db) => db.logAction({
+        clerk_user_id: actorClerkId, action: 'integrity.relink_mismatched_names', resource_type: 'tenant',
+        changes: { count: result.mismatchedNamesRelinked.length },
+      }));
+    }
+  }
+
   return result;
 }
 
@@ -679,7 +1019,10 @@ export async function integrityFixDocument(ctx, documentId) {
       // branch for why.
       const customer = await withRecordsTenant(ctx, (db) => db.findOrCreateCustomer({ customer_name: docRow.customerName, service_address: docRow.serviceAddress }));
       if (customer?.id) {
-        await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, { documentId, customerId: customer.id, confidence: 0.75 }));
+        await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, {
+          documentId, customerId: customer.id, confidence: 0.75,
+          linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+        }));
         documentsLinked.push({ documentId, customerId: customer.id });
       }
     }

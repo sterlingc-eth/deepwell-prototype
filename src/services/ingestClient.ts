@@ -28,9 +28,9 @@
  */
 
 import { authHeader } from './authToken.ts';
-import { messageFromResponse } from './httpError.ts';
+import { messageFromResponse, parseRetryAfterSeconds } from './httpError.ts';
 
-export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'pending' | 'done' | 'error';
+export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'pending' | 'waiting' | 'done' | 'error';
 
 export interface IngestResult {
   filename: string;
@@ -107,11 +107,16 @@ export function describeFetchFailure(rawBody: string): string {
 export class IngestHttpError extends Error {
   status: number;
   body: unknown;
-  constructor(message: string, status: number, body: unknown) {
+  /** Seconds from the response's `Retry-After` header, when the server sent
+   *  one on a 429 — see rateLimit.js's send429. Undefined for any other
+   *  status, or a 429 with no such header. */
+  retryAfterSeconds?: number;
+  constructor(message: string, status: number, body: unknown, retryAfterSeconds?: number) {
     super(message);
     this.name = 'IngestHttpError';
     this.status = status;
     this.body = body;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -131,7 +136,8 @@ export async function postJson<T>(url: string, body: unknown, signal?: AbortSign
       /* not JSON — a 500 from Vercel is an HTML page */
     }
     const message = res.status === 429 ? messageFromResponse(res, parsedBody, describeFetchFailure(raw)) : describeFetchFailure(raw);
-    throw new IngestHttpError(message, res.status, parsedBody);
+    const retryAfterSeconds = res.status === 429 ? parseRetryAfterSeconds(res.headers.get('Retry-After')) : undefined;
+    throw new IngestHttpError(message, res.status, parsedBody, retryAfterSeconds);
   }
   return res.json() as Promise<T>;
 }
@@ -188,64 +194,139 @@ export async function readDocument(
   return postJson('/api/read-document', { documentId }, signal);
 }
 
+/**
+ * "Add files" 429/503 backoff (2026-09-20 limit test, defect E): the
+ * single-file path (`ingestFile`/`ingestFiles`) had no retry at all, unlike
+ * bulkImport.ts's dedicated drop-zone uploader — a 40-file picker selection
+ * at concurrency 3 could trip the per-minute ingest-unit limiter on roughly a
+ * third of its files with no recovery. `isDailyCapIngestError` and
+ * `isRetryableIngestStatus` mirror bulkImport.ts's own `isDailyCapError`/
+ * `isRetryableStatus`: a 'per-day' 429 (or 402/413) can never succeed on
+ * retry and is surfaced immediately; a 'per-minute' 429 (or a missing scope
+ * — the daily model-spend budget's 429 carries no `scope` at all but is a
+ * `/api/ask` shape ingestFiles never sees) or a 503 is a transient condition
+ * worth waiting out.
+ */
+export function isDailyCapIngestError(err: unknown): boolean {
+  if (!(err instanceof IngestHttpError) || err.status !== 429) return false;
+  const body = err.body as { scope?: string } | null | undefined;
+  return body?.scope === 'per-day';
+}
+
+export function isRetryableIngestStatus(err: unknown): boolean {
+  if (!(err instanceof IngestHttpError)) return false;
+  if (err.status === 503) return true;
+  if (err.status !== 429) return false;
+  return !isDailyCapIngestError(err);
+}
+
+/** Fixed backoff tiers for a rate-limited retry with no `Retry-After` header
+ *  — 1-indexed by attempt (attempt 1 -> 15s, 2 -> 30s, 3 -> 60s). */
+const INGEST_RATE_LIMIT_DELAYS_MS = [15_000, 30_000, 60_000];
+export const MAX_INGEST_RATE_LIMIT_RETRIES = INGEST_RATE_LIMIT_DELAYS_MS.length;
+
+function ingestRetryDelayMs(err: unknown, attempt: number): number {
+  const retryAfter = err instanceof IngestHttpError ? err.retryAfterSeconds : undefined;
+  if (typeof retryAfter === 'number' && Number.isFinite(retryAfter) && retryAfter >= 0) return retryAfter * 1000;
+  const idx = Math.min(Math.max(attempt, 1), INGEST_RATE_LIMIT_DELAYS_MS.length) - 1;
+  return INGEST_RATE_LIMIT_DELAYS_MS[idx] as number;
+}
+
+/**
+ * One shared backoff window across every worker in an `ingestFiles()` run —
+ * same idea as bulkImport.ts's `RateGate`: one worker hitting the per-minute
+ * limit backs the WHOLE run off, rather than each of the 3 concurrent
+ * workers independently retrying and collectively still hammering the
+ * limiter at 3x the rate any one file's own retry intended.
+ */
+export class IngestRateGate {
+  private resumeAt = 0;
+  private signal?: AbortSignal;
+  constructor(signal?: AbortSignal) {
+    this.signal = signal;
+  }
+  noteRateLimited(err: unknown, attempt: number): void {
+    this.resumeAt = Math.max(this.resumeAt, Date.now() + ingestRetryDelayMs(err, attempt));
+  }
+  async wait(): Promise<void> {
+    const remaining = this.resumeAt - Date.now();
+    if (remaining > 0) await sleep(remaining, this.signal);
+  }
+}
+
 /** Ingest one file. Resolves with a result rather than throwing, so one bad
  *  file in a batch of forty does not abandon the other thirty-nine.
  *
  *  `signal` cancels the in-flight request(s) — the caller aborting on
  *  unmount stops promptly instead of the upload or poll continuing to run
- *  (and to call onProgress) against a screen nobody is looking at. */
+ *  (and to call onProgress) against a screen nobody is looking at.
+ *
+ *  `gate`, when passed, retries a per-minute 429 or a 503 up to
+ *  MAX_INGEST_RATE_LIMIT_RETRIES times, waiting on the SHARED window above
+ *  before each retry — see the module comment just above. A 'per-day' 429,
+ *  a 402, or a 413 is never retried, whether or not a gate was passed. */
 export async function ingestFile(
   file: File,
   onProgress?: (p: IngestProgress) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  gate?: IngestRateGate
 ): Promise<IngestResult> {
   const report = (status: IngestStatus, error?: string) =>
     onProgress?.({ filename: file.name, status, error });
 
-  try {
-    report('hashing');
-    const sha256 = await sha256Hex(file);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await gate?.wait();
+      report('hashing');
+      const sha256 = await sha256Hex(file);
 
-    report('uploading');
-    const { documentId, uploadUrl, alreadyUploaded } = await requestUploadUrl(
-      { filename: file.name, sha256, contentType: file.type || undefined, sizeBytes: file.size },
-      signal
-    );
+      report('uploading');
+      const { documentId, uploadUrl, alreadyUploaded } = await requestUploadUrl(
+        { filename: file.name, sha256, contentType: file.type || undefined, sizeBytes: file.size },
+        signal
+      );
 
-    if (alreadyUploaded) {
+      if (alreadyUploaded) {
+        report('done');
+        return { filename: file.name, documentId, duplicate: true };
+      }
+
+      if (uploadUrl) {
+        await putFile(uploadUrl, file, signal);
+      }
+
+      report('reading');
+      const read = await readDocument(documentId as string, signal);
+
+      if (read.queued) {
+        report('queued');
+        return {
+          filename: file.name,
+          documentId,
+          queued: true,
+          awaitingExtraction: read.extract !== false,
+        };
+      }
+
       report('done');
-      return { filename: file.name, documentId, duplicate: true };
+      return { filename: file.name, documentId, pages: read.pages };
+    } catch (err) {
+      if (isAbortError(err)) {
+        // Deliberately cancelled (screen unmounted) — not a failure, and
+        // nobody is watching this progress anymore, so stay quiet.
+        return { filename: file.name, error: 'Cancelled' };
+      }
+      if (gate && isRetryableIngestStatus(err) && attempt <= MAX_INGEST_RATE_LIMIT_RETRIES) {
+        gate.noteRateLimited(err, attempt);
+        report('waiting', "Waiting for the server's rate limit…");
+        await gate.wait();
+        continue;
+      }
+      const error = err instanceof Error ? err.message : String(err);
+      const billingUrl = err instanceof IngestHttpError && err.status === 402 ? (err.body as { url?: string } | null)?.url : undefined;
+      report('error', error);
+      return { filename: file.name, error, billingUrl };
     }
-
-    if (uploadUrl) {
-      await putFile(uploadUrl, file, signal);
-    }
-
-    report('reading');
-    const read = await readDocument(documentId as string, signal);
-
-    if (read.queued) {
-      report('queued');
-      return {
-        filename: file.name,
-        documentId,
-        queued: true,
-        awaitingExtraction: read.extract !== false,
-      };
-    }
-
-    report('done');
-    return { filename: file.name, documentId, pages: read.pages };
-  } catch (err) {
-    if (isAbortError(err)) {
-      // Deliberately cancelled (screen unmounted) — not a failure, and
-      // nobody is watching this progress anymore, so stay quiet.
-      return { filename: file.name, error: 'Cancelled' };
-    }
-    const error = err instanceof Error ? err.message : String(err);
-    const billingUrl = err instanceof IngestHttpError && err.status === 402 ? (err.body as { url?: string } | null)?.url : undefined;
-    report('error', error);
-    return { filename: file.name, error, billingUrl };
   }
 }
 
@@ -432,6 +513,7 @@ export async function ingestFiles(
 ): Promise<IngestResult[]> {
   const results: IngestResult[] = new Array(files.length);
   let next = 0;
+  const gate = new IngestRateGate(signal);
 
   const worker = async () => {
     for (;;) {
@@ -439,7 +521,7 @@ export async function ingestFiles(
       const i = next++;
       const file = files[i];
       if (!file) return;
-      results[i] = await ingestFile(file, onProgress, signal);
+      results[i] = await ingestFile(file, onProgress, signal, gate);
     }
   };
 

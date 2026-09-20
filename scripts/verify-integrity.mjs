@@ -11,7 +11,10 @@ import {
   csvCell, csvRow, CUSTOMER_MATCH_THRESHOLD, CUSTOMER_SUGGEST_THRESHOLD, coalesceEntityData,
   nameTokenCount, preferFullerName, preferFullerAddress, evaluateCustomerMatch, buildMatchEvidence,
   normalizeUnitKey, normalizeCityKey, normalizeZipKey, normalizePhoneKey, normalizeEmailKey,
+  compareNamesStrict, damerauLevenshteinDistance, SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
+  buildContactAddressCounts, isLikelyShopPhone, isLikelyShopEmail, SHOP_CONTACT_ADDRESS_FLOOR,
 } from '../api/_lib/integrity.js';
+import { isEligibleForRelink } from '../api/_lib/routes/integrity.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -541,6 +544,108 @@ eq('dangerous prefix past leading spaces is still caught', csvCell('  =evil()'),
 // live formula in an exported sheet.
 eq('a real negative number also gets quoted (accepted safety tradeoff)', csvCell(-42.5), "'-42.5");
 eq('a dangerous leading char plus a comma still quotes AND prefixes', csvCell('=A,B'), '"\'=A,B"');
+
+/* ------------------------------------------------ limit-test defect A: shop contact */
+
+eq('damerauLevenshteinDistance: identical strings -> 0', damerauLevenshteinDistance('castillo', 'castillo'), 0);
+eq('damerauLevenshteinDistance: one substitution -> 1', damerauLevenshteinDistance('paterson', 'patersan'), 1);
+eq('damerauLevenshteinDistance: one insertion (Paterson/Patterson) -> 1', damerauLevenshteinDistance('paterson', 'patterson'), 1);
+eq('damerauLevenshteinDistance: adjacent transposition -> 1', damerauLevenshteinDistance('castro', 'castor'), 1);
+
+{
+  // A phone/email on 3+ DISTINCT customer addresses reads as a shared shop
+  // number/inbox; on only 2 it's still ambiguous (a real shared household
+  // phone happens), so it must NOT be flagged.
+  const threeAddresses = [
+    { address: '1 Elm St', phone: '480-555-9999', email: 'shop@acmehvac.com' },
+    { address: '2 Oak St', phone: '480-555-9999', email: 'shop@acmehvac.com' },
+    { address: '3 Pine St', phone: '480-555-9999', email: 'shop@acmehvac.com' },
+  ];
+  const ctx3 = buildContactAddressCounts(threeAddresses);
+  eq('SHOP_CONTACT_ADDRESS_FLOOR is 3', SHOP_CONTACT_ADDRESS_FLOOR, 3);
+  eq('3 customers, 3 addresses, same phone -> phoneAddressCounts hits the floor', ctx3.phoneAddressCounts['4805559999'], SHOP_CONTACT_ADDRESS_FLOOR);
+  check('...isLikelyShopPhone -> true', isLikelyShopPhone('480-555-9999', ctx3) === true);
+  check('...isLikelyShopEmail -> true', isLikelyShopEmail('shop@acmehvac.com', ctx3) === true);
+
+  const twoAddresses = threeAddresses.slice(0, 2);
+  const ctx2 = buildContactAddressCounts(twoAddresses);
+  check('only 2 distinct addresses share the number -> isLikelyShopPhone false', isLikelyShopPhone('480-555-9999', ctx2) === false);
+  check('only 2 distinct addresses share the email -> isLikelyShopEmail false', isLikelyShopEmail('shop@acmehvac.com', ctx2) === false);
+
+  check('tenant\'s own configured phone is always a shop phone, however few addresses', isLikelyShopPhone('480-555-9999', { tenantPhoneKey: '4805559999' }) === true);
+  check('a phone/email with no ctx at all is never flagged', isLikelyShopPhone('480-555-9999') === false && isLikelyShopEmail('shop@acmehvac.com') === false);
+
+  // Per buildMatchEvidence's own doc comment: before this fix, every
+  // customer carrying the same leaked shop phone "matched" on phone, and
+  // the auto-tier logic (contactConfirmed) treated that coincidence as
+  // confirmation — inflating tier from 'suggest' to 'auto' for a pair that
+  // is otherwise only a subset-name + same-address coincidence, not a
+  // phone-confirmed one.
+  const a = { name: 'Smith', address: '1519 W Juniper', phone: '480-555-9999' };
+  const b = { name: 'John Smith', address: '1519 W Juniper', phone: '480-555-9999' };
+  const withoutCtx = evaluateCustomerMatch(a, b);
+  check('without shop ctx, the shared shop phone reads as a real match signal', withoutCtx.evidence.matches.includes('phone'), JSON.stringify(withoutCtx));
+  eq('...which (wrongly) confirms tier auto', withoutCtx.tier, 'auto');
+
+  const withCtx = evaluateCustomerMatch(a, b, ctx3);
+  check('with shop ctx, that same shared phone is ignored entirely (not a match, not a conflict)', !withCtx.evidence.matches.includes('phone') && !withCtx.evidence.conflicts.includes('phone'), JSON.stringify(withCtx));
+  eq('...so it no longer confirms — tier demoted to suggest, a human decides', withCtx.tier, 'suggest');
+  eq('...score (name+address strength) is unaffected by the ctx change', withCtx.score, withoutCtx.score);
+}
+
+/* --------------------------------------------- limit-test defect B: surname-fuzzy */
+
+eq('compareNamesStrict: "Castro" vs "Castillo" -> no-match (too different, not a misspelling)', compareNamesStrict('Castro', 'Castillo'), 'no-match');
+eq('compareNamesStrict: "Paterson" vs "Patterson" (1-edit, both >= 5 chars) -> surname-fuzzy', compareNamesStrict('Paterson', 'Patterson'), 'surname-fuzzy');
+eq('compareNamesStrict: same surname spelled the same way is still "surname" (not fuzzy), whatever the first names', compareNamesStrict('Li Chen', 'Lu Chen'), 'surname');
+check(`SURNAME_FUZZY_MIN_LENGTH is ${SURNAME_FUZZY_MIN_LENGTH}, MAX_DISTANCE is ${SURNAME_FUZZY_MAX_DISTANCE}`, SURNAME_FUZZY_MIN_LENGTH >= 5 && SURNAME_FUZZY_MAX_DISTANCE === 1);
+
+{
+  // A likely misspelling at the SAME address is suggest-tier evidence, never
+  // strong enough to auto-merge on its own.
+  const fuzzy = evaluateCustomerMatch(
+    { name: 'Bob Paterson', address: '44 Cedar Ln' },
+    { name: 'Bob Patterson', address: '44 Cedar Ln' }
+  );
+  check('surname-fuzzy + same address -> never tier auto', fuzzy.tier !== 'auto', JSON.stringify(fuzzy));
+  check('...but still scores enough to surface as a suggestion', fuzzy.score >= CUSTOMER_SUGGEST_THRESHOLD, JSON.stringify(fuzzy));
+
+  const fuzzyDiffAddress = evaluateCustomerMatch(
+    { name: 'Bob Paterson', address: '44 Cedar Ln' },
+    { name: 'Bob Patterson', address: '900 Baseline Rd' }
+  );
+  eq('surname-fuzzy WITHOUT a matching address scores 0 (no relation to lean on)', fuzzyDiffAddress.score, 0);
+
+  // Genuinely different surnames (castro/castillo, the limit-test trap that
+  // must stay separate) at the SAME address: too different to be a
+  // misspelling (no-match), so this is weaker than even the surname-fuzzy
+  // case above and must never reach tier auto.
+  const diffSurnameSameAddr = evaluateCustomerMatch(
+    { name: 'Castro', address: '1519 W Juniper' },
+    { name: 'Castillo', address: '1519 W Juniper' }
+  );
+  check('castro/castillo at the same address: score stays below the suggest floor', diffSurnameSameAddr.score < CUSTOMER_SUGGEST_THRESHOLD, JSON.stringify(diffSurnameSameAddr));
+  check('...and never tier auto', diffSurnameSameAddr.tier !== 'auto', JSON.stringify(diffSurnameSameAddr));
+}
+
+/* --------------------------------- review fix: relinkMismatchedNames eligibility */
+// Reviewer NO-GO item 1 (2026-09-20): relinkMismatchedNames must never touch
+// a human-chosen link (ReviewScreen's "Change customer…" writes
+// linked_by='human', reviewStore.js's assignDocumentCustomer) or a document a
+// human has already verified — pinning the SQL's WHERE clause as a plain
+// function per reviewStore.js's own "check the SQL against the same rule
+// without a database" pattern. An ALLOW-list (not "exclude 'human'"), so it
+// fails closed against any value it doesn't recognize too.
+
+check('an ai link on an unverified document is eligible', isEligibleForRelink({ linkedBy: 'ai', verifiedBy: null, stage: 'linked' }));
+check('an ai:name-only link on an unverified document is eligible', isEligibleForRelink({ linkedBy: 'ai:name-only', verifiedBy: null, stage: 'linked' }));
+check('a human-chosen link ("human") is NEVER eligible, whatever the stage', !isEligibleForRelink({ linkedBy: 'human', verifiedBy: null, stage: 'linked' }));
+check('a link attributed to a Clerk user id is NEVER eligible (fails closed on an unrecognized value)', !isEligibleForRelink({ linkedBy: 'user_2abc123', verifiedBy: null, stage: 'linked' }));
+check('an ai link on a document with verified_by set is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'ai', stage: 'linked' }));
+check('an ai link on a document with verified_by set to a human name is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'Dana', stage: 'linked' }));
+check('an ai link whose document stage is "verified" is NOT eligible, even with no verified_by', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: null, stage: 'verified' }));
+check('a missing linkedBy is NOT eligible (fails closed)', !isEligibleForRelink({ linkedBy: null, verifiedBy: null, stage: 'linked' }));
+check('a missing linkedBy is NOT eligible (undefined too)', !isEligibleForRelink({}));
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

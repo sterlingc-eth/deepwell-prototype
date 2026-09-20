@@ -120,6 +120,23 @@ export interface IntegritySuspectedShopAddress {
   placeholderCustomerId?: string | null;
 }
 
+/** Limit-test defect A (2026-09-20): a customer whose phone/email is a
+ *  likely shop (contractor letterhead) value — see api/_lib/integrity.js's
+ *  isLikelyShopPhone/isLikelyShopEmail. stripShopContact's target list. */
+export interface IntegrityShopContactLeak { customerId: string; field: 'phone' | 'email'; value: string }
+/** Limit-test defect C (2026-09-20): a document whose direct customer link
+ *  disagrees at the name level with its own extracted customer_name —
+ *  relinkMismatchedNames' target list. */
+export interface IntegrityMismatchedNameLink { documentId: string; customerId: string; docCustomerName: string }
+/** Limit-test defect B, item 3 (2026-09-20): a document whose direct
+ *  customer differs from its linked unit's customer — needs a person,
+ *  never auto-fixed. */
+export interface IntegritySplitLinkDocument { documentId: string; directCustomerId: string | null; unitCustomerId: string | null }
+/** Limit-test defect D (2026-09-20): a document linked to its customer by
+ *  name alone, whose surname now matches 2+ non-merged customers — needs a
+ *  person, never auto-fixed. */
+export interface IntegrityAmbiguousNameOnlyLink { documentId: string; customerId: string; candidates: string[] }
+
 export interface IntegrityScanResult {
   duplicateCustomers: IntegrityDuplicateCustomer[];
   unlinkedDocuments: IntegrityUnlinkedDocument[];
@@ -127,6 +144,10 @@ export interface IntegrityScanResult {
   multiUnitDocsUnderLinked: IntegrityMultiUnitUnderLinked[];
   orphanEquipment: IntegrityOrphanEquipment[];
   suspectedShopAddresses: IntegritySuspectedShopAddress[];
+  shopContactLeaks: IntegrityShopContactLeak[];
+  mismatchedNameLinks: IntegrityMismatchedNameLink[];
+  splitLinkDocuments: IntegritySplitLinkDocument[];
+  ambiguousNameOnlyLinks: IntegrityAmbiguousNameOnlyLink[];
   counts: {
     duplicateCustomers: number;
     unlinkedDocuments: number;
@@ -134,14 +155,30 @@ export interface IntegrityScanResult {
     multiUnitDocsUnderLinked: number;
     orphanEquipment: number;
     suspectedShopAddresses: number;
+    shopContactLeaks: number;
+    mismatchedNameLinks: number;
+    splitLinkDocuments: number;
+    ambiguousNameOnlyLinks: number;
   };
 }
 
 export type IntegrityApplyAction =
   | 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits'
-  | 'healMergedSurvivors' | 'retireShopCustomers';
+  | 'healMergedSurvivors' | 'retireShopCustomers' | 'stripShopContact' | 'relinkMismatchedNames';
 
-export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors'];
+// Review fix (2026-09-20, reviewer NO-GO item 2): relinkMismatchedNames is
+// deliberately NOT in this list. It repoints a document from one customer to
+// another — not merely adding a link or filling a blank the way every other
+// action here does — so "Fix everything" never applies it unattended.
+// IntegrityPanel surfaces it as its own reviewable action instead, from the
+// scan's `mismatchedNameLinks` list, with its own explicit confirm.
+// stripShopContact stays in this list: it is safe by construction (its
+// target already cleared the 3+ distinct-address floor, or matches the
+// tenant's own configured contact exactly — never a judgement call).
+export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = [
+  'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
+  'stripShopContact',
+];
 
 /** The ordinary result of an integrityFix call. */
 export interface IntegrityFixApplied {
@@ -152,6 +189,8 @@ export interface IntegrityFixApplied {
   unitsCreated: { documentId: string; equipmentId: string; serial: string }[];
   survivorsHealed: { survivorId: string }[];
   shopCustomersRetired: { customerId: string; addressKey: string; documentIds: string[] }[];
+  shopContactStripped: IntegrityShopContactLeak[];
+  mismatchedNamesRelinked: { documentId: string; fromCustomerId: string; toCustomerId: string | null; unitsMoved: number }[];
   skipped: { documentId: string | null; reason: string }[];
 }
 

@@ -135,6 +135,7 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
                   {i.kind === 'unlinked' && <span>Not linked to any record{i.bestGuess ? ` (best guess ${Math.round(i.confidence * 100)}%)` : ''}</span>}
                   {i.kind === 'conflict' && <span>Disagrees with another document — needs a decision</span>}
                   {i.kind === 'duplicate' && <span>Duplicate of a document already in the system</span>}
+                  {i.kind === 'ambiguous-name-link' && <span>Two customers named {i.surname} — confirm which one</span>}
                 </li>
               ))}
             </ul>

@@ -374,6 +374,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       const customerConfidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
       documentCustomerLinked = await linkDocumentToCustomer(db, {
         documentId, customerId: customer.id, confidence: customerConfidence,
+        linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
       });
     }
 

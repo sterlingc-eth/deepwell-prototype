@@ -306,6 +306,74 @@ function buildBatches(docs: Doc[]): Batch[] {
   });
 }
 
+/** Honorifics/filler tokens stripped before taking the last remaining token
+ *  as the surname — mirrors api/_lib/integrity.js's HONORIFICS set exactly. */
+const CLIENT_HONORIFICS = new Set(['mr', 'mrs', 'ms', 'dr', 'the']);
+
+/**
+ * Local re-implementation of api/_lib/integrity.js's `normalizeSurname` —
+ * src/ cannot import api/ (see src/core/duplicates.ts's own comment on the
+ * same constraint), so this is a small, intentionally-duplicated copy used
+ * only to detect the surname on a name-only link (limit-test defect D,
+ * addAmbiguousNameLinkIssues below). Keep in sync with the server version if
+ * that heuristic ever changes.
+ */
+function clientNormalizeSurname(raw: unknown): string {
+  let s = String(raw ?? '').toLowerCase().trim();
+  if (!s) return '';
+  const hadThe = /^the\s+/.test(s);
+  if (s.includes(',')) s = s.split(',')[0] ?? s; // "Castillo, Ray" -> "Castillo"
+  s = s.replace(/^the\s+/, '').replace(/\./g, '');
+  const tokens = s
+    .split(/[\s&]+|\band\b/i)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .filter((t) => t.length > 1 && !CLIENT_HONORIFICS.has(t));
+  let surname = tokens[tokens.length - 1] ?? '';
+  if (hadThe && surname.endsWith('s') && surname.length > 3) surname = surname.slice(0, -1);
+  return surname;
+}
+
+/**
+ * Limit-test defect D (2026-09-20): a document linked to its customer by
+ * name alone (no address to disambiguate — the server records this as
+ * `linked_by: 'ai:name-only'`, see recordsStore.js's findOrCreateCustomer
+ * `matchBasis`) goes invisible the moment a LATER document introduces a
+ * second customer with the same surname: the link was correct when it was
+ * made, and nothing about it looks wrong afterward. Computed here,
+ * client-side, from data this sync already fetched (each link's `linked_by`
+ * plus the customer entities already in `entityRows`) rather than a new
+ * round trip or threading a server-side scan through the whole issues
+ * pipeline. Mutates each affected `doc.issues` in place.
+ */
+function addAmbiguousNameLinkIssues(docs: Doc[], entityRows: ApiEntity[], linksByDoc: Map<string, DocumentLink[]>): void {
+  const customers = entityRows.filter(
+    (e) => e.entity_type === 'customer' && !(e as unknown as { merged_into?: string | null }).merged_into
+  );
+  if (customers.length < 2) return;
+
+  const surnameGroups = new Map<string, string[]>();
+  for (const c of customers) {
+    const surname = clientNormalizeSurname((c.data as Record<string, unknown> | undefined)?.customer_name);
+    if (!surname) continue;
+    const list = surnameGroups.get(surname);
+    if (list) list.push(c.id);
+    else surnameGroups.set(surname, [c.id]);
+  }
+
+  for (const doc of docs) {
+    const nameOnlyLink = (linksByDoc.get(doc.id) ?? []).find((l) => l.linked_by === 'ai:name-only');
+    if (!nameOnlyLink) continue;
+    const customer = customers.find((c) => c.id === nameOnlyLink.entity_id);
+    if (!customer) continue;
+    const surname = clientNormalizeSurname((customer.data as Record<string, unknown> | undefined)?.customer_name);
+    const candidateIds = surname ? surnameGroups.get(surname) : undefined;
+    if (candidateIds && candidateIds.length >= 2) {
+      doc.issues.push({ kind: 'ambiguous-name-link', surname, candidateIds });
+    }
+  }
+}
+
 /**
  * One full fetch-and-reseed pass, outside any hook lifecycle. `usePostgresSync`
  * runs this on mount/enable; `DataHealthStrip`'s "Re-check all documents with
@@ -396,6 +464,7 @@ export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: bo
     toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [], completenessByDoc.get(r.id))
   );
   const entities = entityRows.map(toEntity);
+  addAmbiguousNameLinkIssues(docs, entityRows, linksByDoc);
   useGraph.getState().seed(hvacSchema, entities, docs, buildBatches(docs), []);
 
   return { isEmpty: docs.length === 0 && entities.length === 0 };

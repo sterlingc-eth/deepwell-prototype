@@ -554,7 +554,10 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
       if (customer?.id) {
         const customerFields = completenessFields.filter((f) => f.field_key === 'customer_name' || f.field_key === 'service_address');
         const confidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
-        await linkDocumentToCustomer(db, { documentId, customerId: customer.id, confidence });
+        await linkDocumentToCustomer(db, {
+          documentId, customerId: customer.id, confidence,
+          linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+        });
       }
     }
 

@@ -101,6 +101,11 @@ export default async function handler(req, res) {
     integrityMerged: 0,
     integrityLinked: 0,
     integrityHealed: 0,
+    integrityContactStripped: 0,
+    // Review fix (2026-09-20): relinkMismatchedNames runs dry-run only from
+    // cron (see below) — this is how many documents it WOULD relink, not how
+    // many it did. An admin applies them from the Customers-tab panel.
+    integrityNamesRelinkable: 0,
     integritySkippedTenants: 0,
     errors: [],
   };
@@ -177,16 +182,35 @@ export default async function handler(req, res) {
     // merges are auto-applied unattended — anything lower stays a suggestion
     // the Customers screen surfaces (GET /api/v1/customers's `duplicates`).
     // Every link fix runs regardless of score, since a link is reversible
-    // (unlinkDocument) and never merges two records into one.
+    // (unlinkDocument) and never merges two records into one. stripShopContact
+    // is safe to auto-apply too (its target is a phone/email that already
+    // cleared the floor of 3+ distinct customer addresses, or an exact match
+    // on the tenant's own configured contact — never a judgement call), so it
+    // gets `dryRun: false` explicitly, same as everything else here.
+    //
+    // relinkMismatchedNames does NOT: unlinking a document from one customer
+    // and repointing it at another is exactly the kind of change nobody
+    // should wake up to unattended, however confident the match. Review fix
+    // (2026-09-20, reviewer NO-GO item 2): run it dry-run only here — log
+    // what it WOULD relink so an admin can see the count and act on it from
+    // the Customers-tab panel, never apply it from cron.
     if (Date.now() < deadlineAt) {
       try {
         const fixed = await integrityFixTenant(ctx, {
-          apply: ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors'],
+          apply: [
+            'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
+            'stripShopContact',
+          ],
           minMergeScore: 0.95,
+          dryRun: false,
         });
         summary.integrityMerged += fixed.merged.length;
         summary.integrityLinked += fixed.documentsLinked.length + fixed.equipmentLinked.length + fixed.unitsCreated.length;
         summary.integrityHealed += fixed.survivorsHealed.length;
+        summary.integrityContactStripped += fixed.shopContactStripped?.length ?? 0;
+
+        const relinkPreview = await integrityFixTenant(ctx, { apply: ['relinkMismatchedNames'], dryRun: true });
+        summary.integrityNamesRelinkable += relinkPreview.mismatchedNamesRelinked?.length ?? 0;
       } catch (err) {
         summary.errors.push({ tenant: t.tenant_key, phase: "integrity-fix", message: err?.message });
         await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "integrity-fix" });
@@ -230,7 +254,9 @@ export default async function handler(req, res) {
       `outreach: ${summary.outreach?.tenantsChecked ?? 0} tenant(s), ${summary.outreach?.drafted ?? 0} drafted, ` +
       `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed; ` +
       `integrity: ${summary.integrityMerged} merged, ${summary.integrityLinked} linked, ` +
-      `${summary.integrityHealed} survivor(s) healed, ${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
+      `${summary.integrityHealed} survivor(s) healed, ${summary.integrityContactStripped} shop contact field(s) stripped, ` +
+      `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
+      `${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
     { route: "/api/cron-sweep" }
   );
 

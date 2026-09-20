@@ -227,16 +227,59 @@ export function preferFullerName(keepName, dropName) {
 }
 
 /**
+ * Damerau-Levenshtein distance (insertions, deletions, substitutions and
+ * adjacent transpositions each cost 1) between two strings. No dependency —
+ * this is the only place that needs it (compareNamesStrict's 'surname-fuzzy'
+ * relation, limit-test defect B: "Paterson" vs "Patterson"), and both inputs
+ * are already-normalized surnames, well under 100 characters.
+ */
+export function damerauLevenshteinDistance(a, b) {
+  const s = String(a ?? '');
+  const t = String(b ?? '');
+  const al = s.length;
+  const bl = t.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+  const d = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) d[i][0] = i;
+  for (let j = 0; j <= bl; j++) d[0][j] = j;
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && s[i - 1] === t[j - 2] && s[i - 2] === t[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[al][bl];
+}
+
+/** Both surnames need at least this many characters before a 1-edit
+ *  difference is trusted as a misspelling rather than two genuinely
+ *  different short names ("Li" vs "Lu" is 1 edit and two different people).
+ *  Exported for scripts/verify-integrity.mjs. */
+export const SURNAME_FUZZY_MIN_LENGTH = 5;
+export const SURNAME_FUZZY_MAX_DISTANCE = 1;
+
+/**
  * 'equal' (same set of name tokens, any order — "Castillo, Ray" / "Ray
  *   Castillo") | 'subset' (one name's tokens are a strict subset of the
  *   other's — "Castillo" ⊂ "Ray & Linda Castillo", "Plaza Dental" ⊂ "Plaza
  *   Dental Group") | 'surname' (same last name via normalizeSurname, but
  *   NOT a subset — different first names: "John Smith" vs "Jane Smith")
- *   | 'no-match' | 'unknown' (either side has no usable name).
+ *   | 'surname-fuzzy' (surnames differ by at most SURNAME_FUZZY_MAX_DISTANCE
+ *   edits, both at least SURNAME_FUZZY_MIN_LENGTH characters — "Paterson" vs
+ *   "Patterson"; a likely misspelling, not the same string) | 'no-match'
+ *   | 'unknown' (either side has no usable name).
  * Owner rule (2026-09-20 "strict rules" follow-up): 'surname' alone is never
- * enough to auto-merge — only 'equal'/'subset' are.
+ * enough to auto-merge — only 'equal'/'subset' are. Limit-test defect B
+ * (2026-09-20): 'surname-fuzzy' is even weaker evidence than 'surname' and is
+ * never enough either — see evaluateCustomerMatch's scoring below.
+ * Exported for recordsStore.js's selectCustomerMatch (bug C fix) and
+ * scripts/verify-*.mjs.
  */
-function compareNamesStrict(a, b) {
+export function compareNamesStrict(a, b) {
   const na = normalizeNamePlain(a);
   const nb = normalizeNamePlain(b);
   if (!na || !nb) return 'unknown';
@@ -250,6 +293,12 @@ function compareNamesStrict(a, b) {
   const sa = normalizeSurname(a);
   const sb = normalizeSurname(b);
   if (sa && sb && sa === sb) return 'surname';
+  if (
+    sa && sb && sa.length >= SURNAME_FUZZY_MIN_LENGTH && sb.length >= SURNAME_FUZZY_MIN_LENGTH &&
+    damerauLevenshteinDistance(sa, sb) <= SURNAME_FUZZY_MAX_DISTANCE
+  ) {
+    return 'surname-fuzzy';
+  }
   return 'no-match';
 }
 
@@ -273,15 +322,28 @@ const IDENTITY_FIELD_CHECKS = [
  * Pure: compares `a`/`b` field by field over IDENTITY_FIELD_CHECKS.
  * `{matches, missing, conflicts}` — each a list of field keys. A field
  * absent on BOTH sides is left out of all three lists (nothing to say about
- * it either way). Exported for scripts/verify-integrity.mjs.
+ * it either way).
+ *
+ * `ctx`, when passed (routes/integrity.js's shop-contact context — see
+ * isLikelyShopPhone/isLikelyShopEmail above), makes phone/email that are a
+ * likely SHOP value on BOTH sides count for nothing at all — not a match,
+ * not a conflict, not missing. Limit-test defect A follow-up: before every
+ * customer's `phone` carried the same leaked shop number, that number read as
+ * strong positive identity evidence (`matches.includes('phone')`), so every
+ * pair of customers "matched" on phone and the hard veto/auto-tier logic
+ * below treated coincidence as confirmation. A shop number tells you nothing
+ * about whether two CUSTOMERS are the same customer, so it is excluded
+ * entirely rather than scored either way. Exported for scripts/verify-integrity.mjs.
  */
-export function buildMatchEvidence(a, b) {
+export function buildMatchEvidence(a, b, ctx) {
   const matches = [];
   const missing = [];
   const conflicts = [];
   for (const f of IDENTITY_FIELD_CHECKS) {
     const na = f.normalize(f.get(a));
     const nb = f.normalize(f.get(b));
+    if (ctx && f.key === 'phone' && isLikelyShopPhone(na, ctx) && isLikelyShopPhone(nb, ctx)) continue;
+    if (ctx && f.key === 'email' && isLikelyShopEmail(na, ctx) && isLikelyShopEmail(nb, ctx)) continue;
     if (!na && !nb) continue;
     if (!na || !nb) { missing.push(f.key); continue; }
     (na === nb ? matches : conflicts).push(f.key);
@@ -312,10 +374,87 @@ function describeMatch({ addrMatch, nameRel, evidence }) {
   if (nameRel === 'equal') bits.push('same name');
   else if (nameRel === 'subset') bits.push('one name is part of the other');
   else if (nameRel === 'surname') bits.push('same surname, different first name');
+  else if (nameRel === 'surname-fuzzy') bits.push('surname is a likely misspelling of the other');
   let base = bits.join(' and ') || (addrMatch ? 'same address' : 'possible match');
   base = base.charAt(0).toUpperCase() + base.slice(1);
   const missingBits = evidence.missing.map((k) => `${k} missing on one record`);
   return [base, ...missingBits].join('; ');
+}
+
+// ------------------------------------------------------- shop contact leaks
+// Limit-test defect A (2026-09-20): the contractor's own letterhead
+// phone/email leaking into `customer_phone`/`customer_email` extractions and
+// from there into every customer's `data.phone`/`data.email` (fill-once, so
+// once it lands it never self-heals). Same two-signal shape as
+// isLikelyShopAddress above: the tenant's own configured phone/email, OR a
+// pattern signal — but for contact info the pattern lives on the CUSTOMER
+// rows themselves (a phone/email is a shop number when it sits on several
+// customers at DIFFERENT street addresses; no real household has 3 addresses)
+// rather than on extraction letterhead tags, since a phone/email has no
+// document-scoped "shop_address"-style counterpart worth aggregating the same
+// way (shop_phone/shop_email are still recorded — see extractFields.js — and
+// used directly at write time in recordsStore.js's findOrCreateCustomer,
+// which is the cheaper, per-document check; this pure pair is for the
+// tenant-wide scan/veto, where the "on file" list of customers is what's
+// available).
+
+/** Minimum number of DISTINCT normalized street addresses one phone/email
+ *  must appear on, across a tenant's customers, to be treated as a shared
+ *  shop number rather than a coincidence. Exported for scripts/verify-integrity.mjs. */
+export const SHOP_CONTACT_ADDRESS_FLOOR = 3;
+
+/**
+ * Pure. `customers`: [{address, phone?, email?}] (a tenant's customer list,
+ * e.g. routes/integrity.js's loadCustomersForScan). Returns
+ * `{phoneAddressCounts, emailAddressCounts}` — one count per normalized
+ * phone/email key, of how many DISTINCT normalized street addresses it
+ * appears on. A customer with no address on file contributes nothing (there
+ * is no address to count), same "nothing to say either way" treatment as
+ * buildMatchEvidence's `missing`.
+ */
+export function buildContactAddressCounts(customers) {
+  const phoneBuckets = new Map();
+  const emailBuckets = new Map();
+  for (const c of Array.isArray(customers) ? customers : []) {
+    const streetKey = normalizeAddressKey(c?.address);
+    if (!streetKey) continue;
+    const phoneKey = normalizePhoneKey(c?.phone);
+    if (phoneKey) {
+      if (!phoneBuckets.has(phoneKey)) phoneBuckets.set(phoneKey, new Set());
+      phoneBuckets.get(phoneKey).add(streetKey);
+    }
+    const emailKey = normalizeEmailKey(c?.email);
+    if (emailKey) {
+      if (!emailBuckets.has(emailKey)) emailBuckets.set(emailKey, new Set());
+      emailBuckets.get(emailKey).add(streetKey);
+    }
+  }
+  const toCounts = (buckets) => Object.fromEntries([...buckets].map(([k, set]) => [k, set.size]));
+  return { phoneAddressCounts: toCounts(phoneBuckets), emailAddressCounts: toCounts(emailBuckets) };
+}
+
+/**
+ * True when `phone` looks like the contractor's own shop number rather than
+ * a real customer's: it matches the tenant's own configured phone (`ctx.
+ * tenantPhoneKey`), or it sits on SHOP_CONTACT_ADDRESS_FLOOR or more distinct
+ * customer addresses (`ctx.phoneAddressCounts`, from buildContactAddressCounts).
+ * `phone` may be raw or already-normalized — normalizePhoneKey is idempotent
+ * on a digits-only string. Exported for scripts/verify-integrity.mjs and
+ * routes/integrity.js's stripShopContact.
+ */
+export function isLikelyShopPhone(phone, ctx = {}) {
+  const key = normalizePhoneKey(phone);
+  if (!key) return false;
+  if (ctx.tenantPhoneKey && key === ctx.tenantPhoneKey) return true;
+  return (ctx.phoneAddressCounts?.[key] ?? 0) >= SHOP_CONTACT_ADDRESS_FLOOR;
+}
+
+/** Email counterpart of isLikelyShopPhone — see its doc comment. */
+export function isLikelyShopEmail(email, ctx = {}) {
+  const key = normalizeEmailKey(email);
+  if (!key) return false;
+  if (ctx.tenantEmailKey && key === ctx.tenantEmailKey) return true;
+  return (ctx.emailAddressCounts?.[key] ?? 0) >= SHOP_CONTACT_ADDRESS_FLOOR;
 }
 
 /**
@@ -325,19 +464,28 @@ function describeMatch({ addrMatch, nameRel, evidence }) {
  *   - HARD VETO first (owner "strict rules" follow-up, 2026-09-20): any
  *     identity field (phone/email/street/unit/city/zip) present and
  *     DIFFERING on both sides -> score 0, tier null, reason
- *     'conflict:<field>' — never a duplicate, whatever else matches.
+ *     'conflict:<field>' — never a duplicate, whatever else matches. A
+ *     phone/email that is a likely SHOP value on both sides (`ctx`) is
+ *     excluded from this check entirely — see buildMatchEvidence.
  *   - otherwise scored by address + name relation (compareNamesStrict):
- *     same street + equal/subset name -> 0.97; same street + surname-only
- *     or name unknown -> 0.6; same street, unrelated names -> 0.3 (two
- *     families sharing a building); no usable address + equal/subset name
- *     -> 0.55 (a hint); anything else -> 0.
+ *     same street + equal/subset name -> 0.97; same street + surname-only,
+ *     surname-fuzzy (a likely misspelling — limit-test defect B), or name
+ *     unknown -> 0.6; same street, unrelated names -> 0.3 (two families
+ *     sharing a building); no usable address + equal/subset name -> 0.55 (a
+ *     hint); anything else -> 0.
  *   - `tier: 'auto'` only when the street matches, the name is equal/subset
- *     (never surname-only), AND phone or email positively confirms it (or
- *     neither side has contact info to check) — see contactConfirmed.
- *     Otherwise `tier: 'suggest'` (or null when vetoed): a human decides.
+ *     (never surname-only or surname-fuzzy), AND phone or email positively
+ *     confirms it (or neither side has contact info to check) — see
+ *     contactConfirmed. Otherwise `tier: 'suggest'` (or null when vetoed): a
+ *     human decides.
+ *
+ * `ctx`, optional (default none — every existing caller is unaffected):
+ * routes/integrity.js's shop-contact context (tenantPhoneKey/tenantEmailKey +
+ * phoneAddressCounts/emailAddressCounts, see isLikelyShopPhone/isLikelyShopEmail
+ * and buildContactAddressCounts above), threaded through to buildMatchEvidence.
  */
-export function evaluateCustomerMatch(a, b) {
-  const evidence = buildMatchEvidence(a, b);
+export function evaluateCustomerMatch(a, b, ctx) {
+  const evidence = buildMatchEvidence(a, b, ctx);
   if (evidence.conflicts.length) {
     return { score: 0, tier: null, evidence, reason: `conflict:${evidence.conflicts[0]}` };
   }
@@ -345,9 +493,10 @@ export function evaluateCustomerMatch(a, b) {
   const addrMatch = evidence.matches.includes('street');
   const nameRel = compareNamesStrict(a?.name, b?.name);
   const nameIsFull = nameRel === 'equal' || nameRel === 'subset';
+  const nameIsWeakHint = nameRel === 'surname' || nameRel === 'surname-fuzzy' || nameRel === 'unknown';
 
   let score;
-  if (addrMatch) score = nameIsFull ? 0.97 : (nameRel === 'surname' || nameRel === 'unknown') ? 0.6 : 0.3;
+  if (addrMatch) score = nameIsFull ? 0.97 : nameIsWeakHint ? 0.6 : 0.3;
   else score = nameIsFull ? 0.55 : 0;
 
   const tier = addrMatch && nameIsFull && contactConfirmed(a, b, evidence) ? 'auto' : 'suggest';
@@ -403,7 +552,7 @@ function pickKeepDrop(a, b) {
  * for an HVAC tenant's customer list; the caller caps `customers` before
  * calling this (routes/integrity.js).
  */
-export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_SUGGEST_THRESHOLD } = {}) {
+export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_SUGGEST_THRESHOLD, ctx } = {}) {
   const list = Array.isArray(customers) ? customers : [];
   const pairs = [];
   for (let i = 0; i < list.length; i++) {
@@ -411,7 +560,7 @@ export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_SUG
       const a = list[i];
       const b = list[j];
       if (!a?.id || !b?.id || a.id === b.id) continue;
-      const { score, tier, evidence, reason } = evaluateCustomerMatch(a, b);
+      const { score, tier, evidence, reason } = evaluateCustomerMatch(a, b, ctx);
       if (score < threshold) continue;
       const [keep, drop] = pickKeepDrop(a, b);
       pairs.push({ keepId: keep.id, dropId: drop.id, score, tier, evidence, reason });

@@ -23,6 +23,7 @@ import pg from 'pg';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress,
+  normalizePhoneKey, normalizeEmailKey, compareNamesStrict,
 } from './integrity.js';
 
 let pool;
@@ -200,13 +201,34 @@ export function selectCustomerMatch(candidates, incoming) {
   // and merge. A false merge is neither visible nor reversible.
   const eligible = candidates.filter((c) => {
     const existingAddr = normalizeMatchText(c.data?.service_address);
-    if (existingAddr && existingAddr.toLowerCase() === address.toLowerCase()) return true;
+    if (existingAddr && existingAddr.toLowerCase() === address.toLowerCase()) {
+      // Bug C fix (2026-09-20 limit test): an exact address match used to be
+      // eligible REGARDLESS OF NAME — which is exactly how "Desert Ridge
+      // Dental" (a different business at the same suite) got silently
+      // absorbed into the pre-existing "Plaza Dental Group". An address
+      // match is no longer enough on its own: when both sides actually name
+      // someone, the names must agree at least at the surname level (equal,
+      // subset, or same surname — never a bare 'surname-fuzzy' near-miss or
+      // 'no-match'). A candidate with no name on file, or an incoming
+      // document with no name at all, has nothing to disagree on and stays
+      // eligible on the address alone — the address-only path
+      // (findOrCreateCustomerByAddress) never reaches this function at all,
+      // so `name` here is always a real extracted customer_name when set.
+      const candidateName = normalizeMatchText(c.data?.customer_name);
+      if (!name || !candidateName) return true;
+      const rel = compareNamesStrict(name, candidateName);
+      return rel === 'equal' || rel === 'subset' || rel === 'surname';
+    }
     // Fuzzy path (2026-09-20, bug A): the same household under a differently
     // worded name/address — "Castillo" @ "1519 W Juniper" and "Ray & Linda
     // Castillo" @ "1519 W Juniper Ave, Mesa AZ 85202". Only reached when the
     // caller passed a name AND the candidate has one; see integrity.js's
     // customerMatchScore for the actual rule (address normalization +
-    // surname/substring name matching).
+    // surname/substring name matching). A 'surname-fuzzy' near-miss (limit-
+    // test defect B: "Paterson" vs "Patterson") scores at most 0.6 there,
+    // well under CUSTOMER_MATCH_THRESHOLD, so it never auto-links here either
+    // — it surfaces instead as a 'suggest'-tier pair in the duplicates
+    // banner (findDuplicateCustomerPairs).
     if (name && c.data?.customer_name) {
       return customerMatchScore(
         { name, address },
@@ -248,14 +270,21 @@ export function selectCustomerMatch(candidates, incoming) {
  * @returns {Promise<boolean>} whether a link was actually inserted (false
  *   when one already existed — not an error).
  */
-export async function linkDocumentToCustomer(db, { documentId, customerId, confidence = 0.6 } = {}) {
+export async function linkDocumentToCustomer(db, { documentId, customerId, confidence = 0.6, linkedBy = 'ai' } = {}) {
   if (!documentId || !customerId) return false;
 
+  // `linkedBy` carries provenance beyond "a person did this or the AI did"
+  // (see the 'ai'/'human' values elsewhere in this file): limit-test defect D
+  // (2026-09-20) marks a match resolved with no address at all — the single
+  // same-name candidate, findOrCreateCustomer's matchBasis: 'name-only' — as
+  // 'ai:name-only' rather than plain 'ai', so routes/integrity.js's
+  // ambiguousNameOnlyLinks scan can find exactly these links later without a
+  // schema change.
   const inserted = await db.raw(
     `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
-     VALUES ($1,$2,$3,$4,'ai',NOW())
+     VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
-    [db.tenantId, documentId, customerId, confidence]
+    [db.tenantId, documentId, customerId, confidence, linkedBy]
   );
 
   await db.raw(
@@ -381,9 +410,18 @@ export function _resetExtractionsUnitIndexProbe() { extractionsUnitIndex = null;
  */
 async function computeShopAddressContext(db, tenantId) {
   let tenantAddressKey = null;
+  let tenantPhoneKey = null;
+  let tenantEmailKey = null;
   try {
-    const r = await db.query(`SELECT settings->>'address' AS address FROM tenants WHERE id = $1`, [tenantId]);
+    // Same row, same query, as the phone/email tenant lookup below
+    // (loadTenantContactKeys) — folded in here too so a caller that already
+    // has a `shopContext` (routes/integrity.js's bulk loops) gets the
+    // contact-leak signal (limit-test defect A) for free, with no second
+    // round trip.
+    const r = await db.query(`SELECT settings->>'address' AS address, settings->>'phone' AS phone, settings->>'email' AS email FROM tenants WHERE id = $1`, [tenantId]);
     tenantAddressKey = normalizeAddressKey(r.rows[0]?.address ?? '') || null;
+    tenantPhoneKey = normalizePhoneKey(r.rows[0]?.phone ?? '') || null;
+    tenantEmailKey = normalizeEmailKey(r.rows[0]?.email ?? '') || null;
   } catch (err) {
     console.error('computeShopAddressContext: tenant address lookup failed (skipping that signal):', err?.message);
   }
@@ -438,7 +476,30 @@ async function computeShopAddressContext(db, tenantId) {
     console.error('computeShopAddressContext: letterhead aggregate failed (skipping that signal):', err?.message);
   }
 
-  return { tenantAddressKey, letterheadCounts };
+  return { tenantAddressKey, tenantPhoneKey, tenantEmailKey, letterheadCounts };
+}
+
+/**
+ * Cheap, tenant-row-only counterpart of computeShopAddressContext's tenant
+ * lookup, for findOrCreateCustomer's per-document phone/email filtering
+ * (limit-test defect A) — that path runs on every single extraction, so it
+ * does NOT pay for the full letterheadCounts extraction scan the way the
+ * address-only path's shopContext does; it only needs the tenant's own
+ * configured phone/email. A caller that already has a full shopContext
+ * (routes/integrity.js's bulk loops, or a repeat call within one document)
+ * should pass that instead — it carries the same two keys for free.
+ */
+async function loadTenantContactKeys(db, tenantId) {
+  try {
+    const r = await db.query(`SELECT settings->>'phone' AS phone, settings->>'email' AS email FROM tenants WHERE id = $1`, [tenantId]);
+    return {
+      tenantPhoneKey: normalizePhoneKey(r.rows[0]?.phone ?? '') || null,
+      tenantEmailKey: normalizeEmailKey(r.rows[0]?.email ?? '') || null,
+    };
+  } catch (err) {
+    console.error('loadTenantContactKeys: tenant contact lookup failed (skipping that signal):', err?.message);
+    return { tenantPhoneKey: null, tenantEmailKey: null };
+  }
 }
 
 /**
@@ -505,7 +566,7 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
     if (changed) {
       await db.query(`UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`, [existing.id, data]);
     }
-    return { id: existing.id, created: false, customerNumber: existing.customer_number };
+    return { id: existing.id, created: false, customerNumber: existing.customer_number, matchBasis: 'address' };
   }
   if (matches.length > 1) return null; // ambiguous (a landlord/HOA address) — refuse, don't guess
 
@@ -516,7 +577,7 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
      VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING id, customer_number`,
     [tenantId, { service_address: rawAddress, customer_name: addressOnlyCustomerName(rawAddress), name_source: 'address' }, numRow?.num ?? null]
   )).rows[0];
-  return { id: created.id, created: true, customerNumber: created.customer_number };
+  return { id: created.id, created: true, customerNumber: created.customer_number, matchBasis: 'created' };
 }
 
 function makeStore(db, tenantId) {
@@ -1357,9 +1418,31 @@ function makeStore(db, tenantId) {
       // handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md section A. Same
       // fill-once merge as every other field on this row (below): a value
       // already on file is never overwritten by a later document.
-      const phone = String(facts?.customer_phone ?? '').trim();
+      //
+      // Limit-test defect A (2026-09-20): a value equal to THIS document's
+      // own shop_phone/shop_email extraction, or to the tenant's own
+      // configured phone/email, is never written as a customer's contact
+      // info — that is the contractor's own letterhead number, not the
+      // customer's, and writing it here is exactly how every customer ended
+      // up sharing the shop's phone. Checked before the fill-once merge
+      // below, so a customer can never acquire it even on an otherwise-blank
+      // phone/email field.
+      let phone = String(facts?.customer_phone ?? '').trim();
+      let email = String(facts?.customer_email ?? '').trim();
+      if (phone || email) {
+        const phoneKey = normalizePhoneKey(phone);
+        const emailKey = normalizeEmailKey(email);
+        const docShopPhoneKey = normalizePhoneKey(facts?.shop_phone ?? '');
+        const docShopEmailKey = normalizeEmailKey(facts?.shop_email ?? '');
+        if (phone && docShopPhoneKey && phoneKey === docShopPhoneKey) phone = '';
+        if (email && docShopEmailKey && emailKey === docShopEmailKey) email = '';
+        if (phone || email) {
+          const tenantKeys = shopContext ?? await loadTenantContactKeys(db, tenantId);
+          if (phone && tenantKeys.tenantPhoneKey && phoneKey === tenantKeys.tenantPhoneKey) phone = '';
+          if (email && tenantKeys.tenantEmailKey && emailKey === tenantKeys.tenantEmailKey) email = '';
+        }
+      }
       if (phone) incoming.phone = phone;
-      const email = String(facts?.customer_email ?? '').trim();
       if (email) incoming.email = email;
 
       // B2, same race as findOrCreateEquipment above, same fix: serialize
@@ -1382,7 +1465,7 @@ function makeStore(db, tenantId) {
       // since a real customer name essentially never contains them, but a
       // stray one must not turn into an unbounded LIKE wildcard.
       const surname = normalizeSurname(name).replace(/[%_]/g, '\\$&');
-      const candidates = await many(
+      let candidates = await many(
         `SELECT id, data, customer_number FROM entities
           WHERE entity_type = 'customer' AND ${TENANT}
             AND merged_into IS NULL
@@ -1391,6 +1474,39 @@ function makeStore(db, tenantId) {
           ORDER BY created_at LIMIT 200`,
         [name, surname]
       );
+
+      // Bug B fix (2026-09-20 limit test): a misspelled surname at the same
+      // address ("Paterson" vs "Patterson") never matched the surname ILIKE
+      // above — different strings, not substrings of each other — so
+      // selectCustomerMatch never even saw the near-miss candidate to decide
+      // on. normalizeAddressKey has no SQL equivalent, so this is a broader
+      // SELECT (every customer with an address on file, capped the same as
+      // findOrCreateCustomerByAddress's own query) filtered in JS and merged
+      // in, deduplicated by id. selectCustomerMatch still decides: a
+      // surname-fuzzy near-miss scores well under CUSTOMER_MATCH_THRESHOLD
+      // (integrity.js's compareNamesStrict/evaluateCustomerMatch) and is
+      // never auto-linked — this only makes sure it's SEEN, so a new
+      // customer is created (not silently missed) and the pair surfaces in
+      // the duplicates banner instead of vanishing entirely.
+      if (address) {
+        const addrKey = normalizeAddressKey(address);
+        if (addrKey) {
+          const byId = new Map(candidates.map((c) => [c.id, c]));
+          const addressRows = await many(
+            `SELECT id, data, customer_number FROM entities
+              WHERE entity_type = 'customer' AND ${TENANT}
+                AND merged_into IS NULL
+                AND data->>'service_address' IS NOT NULL
+              ORDER BY created_at LIMIT 200`,
+            []
+          );
+          for (const row of addressRows) {
+            if (byId.has(row.id)) continue;
+            if (normalizeAddressKey(row.data?.service_address) === addrKey) byId.set(row.id, row);
+          }
+          candidates = [...byId.values()];
+        }
+      }
 
       const existing = selectCustomerMatch(candidates, { name, address });
 
@@ -1427,7 +1543,7 @@ function makeStore(db, tenantId) {
                 `UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
                 [placeholder.id, data]
               );
-              return { id: placeholder.id, created: false, customerNumber: placeholder.customer_number };
+              return { id: placeholder.id, created: false, customerNumber: placeholder.customer_number, matchBasis: 'address-upgrade' };
             }
           }
         }
@@ -1443,7 +1559,7 @@ function makeStore(db, tenantId) {
            VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING id, customer_number`,
           [tenantId, incoming, numRow?.num ?? null]
         );
-        return { id: created.id, created: true, customerNumber: created.customer_number };
+        return { id: created.id, created: true, customerNumber: created.customer_number, matchBasis: 'created' };
       }
 
       const data = { ...(existing.data ?? {}) };
@@ -1457,7 +1573,16 @@ function makeStore(db, tenantId) {
           [existing.id, data]
         );
       }
-      return { id: existing.id, created: false, customerNumber: existing.customer_number };
+      // Limit-test defect D (2026-09-20): a name-only match (no incoming
+      // address at all — selectCustomerMatch's `!address` branch, the single
+      // same-name candidate) is right most of the time but is genuinely
+      // ambiguous the moment a second same-surname customer shows up later —
+      // order-dependent at link time, invisible after. `matchBasis` records
+      // which path resolved this so the caller (extractDocument.js,
+      // reviewStore.js, routes/integrity.js) can mark the resulting link
+      // 'ai:name-only' instead of plain 'ai', which is what
+      // routes/integrity.js's ambiguousNameOnlyLinks scan looks for.
+      return { id: existing.id, created: false, customerNumber: existing.customer_number, matchBasis: address ? 'address' : 'name-only' };
     },
 
     /**

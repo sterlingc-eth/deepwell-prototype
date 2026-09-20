@@ -12,6 +12,7 @@
  *   node scripts/verify-customer-link.mjs
  */
 import { normalizeMatchText, selectCustomerMatch } from '../api/_lib/recordsStore.js';
+import { compareNamesStrict } from '../api/_lib/integrity.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -124,6 +125,30 @@ eq(
   const castillo = { id: 'castillo-1', data: { customer_name: 'Castillo', service_address: '1519 W Juniper' } };
   const got = selectCustomerMatch([castillo], { address: '1519 W Juniper Ave, Mesa AZ 85202' });
   check('fuzzy path skipped with no incoming name', got === null, `got ${JSON.stringify(got)}`);
+}
+
+/* ------------------------------------------ selectCustomerMatch, defect C/B */
+// Limit-test defect C (2026-09-20): an exact address match must ALSO agree
+// on name (at least surname-level) before it's eligible — otherwise a
+// different business/family at the same address/suite gets silently
+// absorbed into whoever was there first.
+
+{
+  const plazaDental = { id: 'plaza-1', data: { customer_name: 'Plaza Dental Group', service_address: '900 Suite 4' } };
+  const got = selectCustomerMatch([plazaDental], { name: 'Desert Ridge Dental', address: '900 Suite 4' });
+  eq('different name, same address -> null (never silently absorbed)', got, null);
+  check('sanity: these two names really are "no-match"', compareNamesStrict('Desert Ridge Dental', 'Plaza Dental Group') === 'no-match');
+}
+
+// Limit-test defect B (2026-09-20): a likely-misspelled surname at the same
+// address is suggest-tier evidence (see verify-integrity.mjs), never enough
+// to auto-link — selectCustomerMatch's eligible set only allows
+// equal/subset/surname, not surname-fuzzy.
+{
+  const paterson = { id: 'pat-1', data: { customer_name: 'Bob Paterson', service_address: '44 Cedar Ln' } };
+  const got = selectCustomerMatch([paterson], { name: 'Bob Patterson', address: '44 Cedar Ln' });
+  eq('misspelled-surname match at the same address -> null (never auto-linked)', got, null);
+  check('sanity: these two surnames really are "surname-fuzzy"', compareNamesStrict('Bob Paterson', 'Bob Patterson') === 'surname-fuzzy');
 }
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);

@@ -67,6 +67,8 @@ export const FIELD_LABELS: Record<string, string> = {
   refrigerant: 'Refrigerant',
   service_address: 'Service address',
   shop_address: 'Shop address',
+  shop_phone: 'Shop phone',
+  shop_email: 'Shop email',
   customer_name: 'Customer',
   installation_date: 'Installation date',
   warranty_expires: 'Warranty expires',
