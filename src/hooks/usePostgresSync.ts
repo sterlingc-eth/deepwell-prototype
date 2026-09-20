@@ -271,6 +271,9 @@ function toEntity(row: ApiEntity): Entity {
     }
     const warranty = data.warranty as { expires?: unknown } | undefined;
     fields.warrantyExpiry = toDateOrNull(warranty?.expires);
+    // entities.customer_id is a real column (setEquipmentCustomer), not a
+    // data key — surface it so screens can walk unit → customer.
+    if (row.customer_id) fields.customerId = String(row.customer_id);
   } else {
     for (const [k, v] of Object.entries(data)) {
       if (typeof v === 'string' || typeof v === 'number' || v === null) fields[k] = v;

@@ -118,24 +118,55 @@ export function duplicateReason(name, address, otherName, otherAddress) {
 export function deriveCity(address) {
   const parts = String(address ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length < 2) return null;
-  // "123 Main St, Phoenix, AZ 85001" -> take the middle segment; a 2-segment
-  // address ("123 Main St, Phoenix") takes the last.
-  return parts.length >= 3 ? parts[1] : parts[1] ?? null;
+  // Owner bugs (2026-09-20): "880 S Dobson Rd, Suite 110, Chandler, AZ 85224"
+  // returned "Suite 110"; "12 Main St, Apt 4B, Tempe AZ 85281" (no comma
+  // before the state) returned nothing at all. Skip unit/suite/floor segments
+  // and street lines outright; for everything else, strip a TRAILING state
+  // (+ zip) off the segment rather than discarding the whole segment, so a
+  // city glued to its state with no comma ("Tempe AZ 85281") still yields
+  // "Tempe" instead of being thrown out as if it were state+zip alone.
+  const UNIT_RE = /^(suite|ste\.?|unit|apt\.?|apartment|bldg\.?|building|floor|fl\.?|#|room|rm\.?|lot|space|spc\.?)\b/i;
+  const STREET_RE = /^\d+\s/;
+  const TRAILING_STATE_ZIP_RE = /\s*,?\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?$/;
+  const TRAILING_STATE_RE = /\s*,?\s*[A-Z]{2}$/;
+  const candidates = [];
+  for (const raw of parts.slice(1)) {
+    if (UNIT_RE.test(raw) || STREET_RE.test(raw)) continue;
+    const stripped = raw.replace(TRAILING_STATE_ZIP_RE, "").replace(TRAILING_STATE_RE, "").trim();
+    if (!stripped || /\d/.test(stripped)) continue; // nothing left (state/zip only), or still has digits
+    candidates.push(stripped);
+  }
+  if (!candidates.length) return null;
+  return candidates[candidates.length - 1] || null;
 }
 
-/** Count of units whose warranty tier is exactly 'expired' or 'expiring-90'
- *  — the two tiers the brief names for the customer list's `warrantyAlerts`
- *  badge. `warranties` is the raw jsonb array recordsStore.js's
- *  listCustomersSummary returns (each entry is one unit's data->'warranty',
- *  or null for a unit with none on file). */
-export function countWarrantyAlerts(warranties, today) {
-  let n = 0;
+/** Per-tier alert breakdown across a customer's units — {expiring, expired}.
+ *  `warranties` is the raw jsonb array recordsStore.js's listCustomersSummary
+ *  returns (each entry is one unit's data->'warranty', or null for a unit
+ *  with none on file). 'expiring' folds alertTier()'s 'expiring-30' AND
+ *  'expiring-90' together: those tiers are mutually exclusive buckets of the
+ *  same "coming due soon" fact (a unit expiring in 9 days is at least as
+ *  urgent as one expiring in 80 — excluding the more urgent tier, as an
+ *  earlier version of this file did, made "Expiring soon" miss exactly the
+ *  units that most needed it). 'expiring-365'/'ok'/'unknown'/
+ *  'unregistered-window-closing' are not alerts here; the last is its own
+ *  separate signal surfaced via /api/warranty-attention, not this badge. */
+export function tallyWarrantyAlerts(warranties, today) {
+  let expiring = 0;
+  let expired = 0;
   for (const w of warranties ?? []) {
     if (!w) continue;
     const tier = alertTier(w, today);
-    if (tier === "expired" || tier === "expiring-90") n++;
+    if (tier === "expired") expired++;
+    else if (tier === "expiring-30" || tier === "expiring-90") expiring++;
   }
-  return n;
+  return { expiring, expired };
+}
+
+/** Combined count, for the table's single-number badge column. */
+export function countWarrantyAlerts(warranties, today) {
+  const { expiring, expired } = tallyWarrantyAlerts(warranties, today);
+  return expiring + expired;
 }
 
 const clampLimit = (v, fallback, max) => {
@@ -187,6 +218,7 @@ export async function customers(req, res) {
       documentCount: r.doc_count,
       equipmentCount: r.equipment_count,
       lastActivity: r.last_activity ? new Date(r.last_activity).toISOString() : null,
+      alerts: tallyWarrantyAlerts(r.warranties, today),
       warrantyAlerts: countWarrantyAlerts(r.warranties, today),
       mergedInto: null,
     }));

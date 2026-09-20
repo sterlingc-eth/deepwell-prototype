@@ -111,6 +111,7 @@ export interface Entity {
   data: Record<string, any>;
   created_at: Date;
   updated_at: Date;
+  customer_id?: string | null;
 }
 
 export interface Proposal {

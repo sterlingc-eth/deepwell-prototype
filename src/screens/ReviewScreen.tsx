@@ -41,7 +41,10 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 const FILTER_IDS = FILTERS.map((f) => f.id);
 
-function isAttention(doc: Doc): boolean {
+/** Shared with BrowseScreen.tsx's Documents-tab Stage filter, so "Needs a
+ *  person" always means the exact same set of documents everywhere it's
+ *  offered — never a second, slightly different definition. */
+export function isAttention(doc: Doc): boolean {
   return doc.stage !== 'verified' && (doc.issues.length > 0 || doc.stage === 'received');
 }
 

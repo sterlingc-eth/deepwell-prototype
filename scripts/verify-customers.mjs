@@ -22,6 +22,7 @@ import {
   duplicateReason,
   deriveCity,
   countWarrantyAlerts,
+  tallyWarrantyAlerts,
   CUSTOMER_NUMBER_RE,
 } from '../api/_lib/routes/customers.js';
 import {
@@ -122,36 +123,38 @@ eq('case-insensitive name match', duplicateReason('john smith', '1 Main St', 'JO
 eq('missing address on both sides never "matches"', duplicateReason('John Smith', '', 'John Smith', ''), 'same name');
 eq('empty name on both sides never "matches" as a name', duplicateReason('', '1 Main St', '', '1 Main St'), 'same address');
 
-/* ------------------------------------------------------------------------- deriveCity */
+/* ------------------------------------------------------------------------- deriveCity
+ * Owner request 2026-09-20, item 1's exact four cases. */
 
-eq('street, city, state zip', deriveCity('123 Main St, Phoenix, AZ 85001'), 'Phoenix');
+eq('street, suite, city, state zip', deriveCity('880 S Dobson Rd, Suite 110, Chandler, AZ 85224'), 'Chandler');
+eq('street, city, state zip', deriveCity('3247 Elm St, Mesa, AZ 85204'), 'Mesa');
+eq('no comma at all -> null (nothing to derive from)', deriveCity('1519 W Juniper'), null);
+eq('street, apt, city+state+zip with NO comma before the state', deriveCity('12 Main St, Apt 4B, Tempe AZ 85281'), 'Tempe');
 eq('street, city (no state)', deriveCity('123 Main St, Phoenix'), 'Phoenix');
-eq('no comma at all -> null (nothing to derive from)', deriveCity('123 Main St'), null);
 eq('empty address -> null', deriveCity(''), null);
 eq('null address -> null', deriveCity(null), null);
 
-/* --------------------------------------------------------------------- countWarrantyAlerts */
+/* --------------------------------------------------------------- tallyWarrantyAlerts */
 
 {
-  // countWarrantyAlerts counts exactly the two tiers the brief names —
-  // alertTier()'s buckets are mutually exclusive, so a unit expiring in the
-  // next 30 days (its own 'expiring-30' tier) is deliberately NOT counted
-  // here; only 'expired' and 'expiring-90' are. See the brief's exact
-  // wording ("warrantyAlerts (count of units with tier expired/expiring-90)")
-  // and handoffs/REQUESTS_customers_backend.md for the ambiguity this left.
+  // 'expiring' folds alertTier()'s 'expiring-30' AND 'expiring-90' together —
+  // a unit due in 5 days is at least as much an alert as one due in 71 (see
+  // tallyWarrantyAlerts's doc comment for why an earlier version excluded
+  // 'expiring-30' and why that was wrong).
   const today = '2026-09-20';
   const warranties = [
-    { expires: '2026-08-01' },              // ~50 days ago -> expired
-    { expires: '2026-09-25' },              // 5 days out -> expiring-30 (NOT counted)
-    { expires: '2026-11-30' },              // ~71 days out -> expiring-90
-    { expires: '2027-09-01' },              // far out -> ok / expiring-365
-    null,                                    // no warranty on file
+    { expires: '2026-08-01' }, // ~50 days ago -> expired
+    { expires: '2026-09-25' }, // 5 days out -> expiring-30
+    { expires: '2026-11-30' }, // ~71 days out -> expiring-90
+    { expires: '2027-09-01' }, // far out -> ok / expiring-365
+    null,                       // no warranty on file
   ];
-  const n = countWarrantyAlerts(warranties, today);
-  check('counts only expired + expiring-90, skips expiring-30/ok/none', n === 2, `got ${n}`);
+  eq('tallies expired separately from expiring-30/expiring-90', tallyWarrantyAlerts(warranties, today), { expiring: 2, expired: 1 });
+  eq('countWarrantyAlerts is the sum of the tally', countWarrantyAlerts(warranties, today), 3);
 }
-eq('no units -> zero alerts', countWarrantyAlerts([], '2026-09-20'), 0);
-eq('all-null warranties -> zero alerts', countWarrantyAlerts([null, null], '2026-09-20'), 0);
+eq('no units -> zero alerts', tallyWarrantyAlerts([], '2026-09-20'), { expiring: 0, expired: 0 });
+eq('all-null warranties -> zero alerts', tallyWarrantyAlerts([null, null], '2026-09-20'), { expiring: 0, expired: 0 });
+eq('no units -> countWarrantyAlerts is zero', countWarrantyAlerts([], '2026-09-20'), 0);
 
 /* ---------------------------------------------------------------- filterCustomerPatch */
 

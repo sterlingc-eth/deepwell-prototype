@@ -1,37 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronUp, Download, GitMerge, Loader2, Plus, Search, Users2, X } from 'lucide-react';
+import { AlertTriangle, Download, GitMerge, Loader2, Plus, Search, Users2, X } from 'lucide-react';
 import { formatYmd } from '../core/answer';
-import { customerClient, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSort, type CustomerSummary } from '../services/customerClient';
-import { DEFAULT_CUSTOMER_FILTERS, matchesCustomerFilters, type AlertsFilter, type EquipmentFilter, type LastActivityFilter } from '../core/customerFilters';
+import { customerClient, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSummary } from '../services/customerClient';
+import {
+  ACTIVITY_OPTIONS,
+  ALERTS_OPTIONS,
+  CUSTOMER_SORT_OPTIONS,
+  DEFAULT_CUSTOMER_FILTERS,
+  EQUIPMENT_OPTIONS,
+  cityOptions,
+  describeActiveFilters,
+  matchesCustomerFilters,
+  matchesSearch,
+  sortCustomers,
+  type AlertsFilter,
+  type CustomerFilters,
+  type CustomerSortBy,
+  type EquipmentFilter,
+  type LastActivityFilter,
+} from '../core/customerFilters';
 import { defaultKeepId, pairKey, reduceDuplicates, visibleDuplicates } from '../core/duplicates';
 import { downloadExportCsv } from '../services/exportClient';
 import { IntegrityPanel } from '../components/IntegrityPanel';
 import { useAppStore } from '../store/appStore';
-
-type SortCol = 'name' | 'recent' | 'docs';
-const SORTS: { id: SortCol; label: string }[] = [
-  { id: 'recent', label: 'Recent activity' },
-  { id: 'name', label: 'Name' },
-  { id: 'docs', label: 'Documents' },
-];
-
-const ALERTS_OPTIONS: { id: AlertsFilter; label: string }[] = [
-  { id: 'any', label: 'Any alert status' },
-  { id: 'expiring', label: 'Expiring' },
-  { id: 'expired', label: 'Expired' },
-  { id: 'none', label: 'No alerts' },
-];
-const EQUIPMENT_OPTIONS: { id: EquipmentFilter; label: string }[] = [
-  { id: 'any', label: 'Any equipment' },
-  { id: 'has', label: 'Has units' },
-  { id: 'none', label: 'No units on file' },
-];
-const ACTIVITY_OPTIONS: { id: LastActivityFilter; label: string }[] = [
-  { id: 'any', label: 'Any time' },
-  { id: 30, label: 'Last 30 days' },
-  { id: 90, label: 'Last 90 days' },
-  { id: 365, label: 'Last 365 days' },
-];
 
 /**
  * "Customers" tab on Records (BrowseScreen.tsx) — a searchable, filterable
@@ -48,31 +39,36 @@ export function CustomersScreen() {
   const filters = useAppStore((s) => s.customerFilters);
   const setFilters = useAppStore((s) => s.setCustomerFilters);
 
+  // Search, the four filter dropdowns, and sort are three independent pieces
+  // of state on purpose (owner requirement: "changing a filter must never
+  // reset the search text or the sort") — none of the handlers below ever
+  // touches more than one of them.
   const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
-  const [sort, setSort] = useState<SortCol>('recent');
+  const [sortBy, setSortBy] = useState<CustomerSortBy>('recent');
   const [rows, setRows] = useState<CustomerSummary[]>([]);
   const [duplicates, setDuplicates] = useState<CustomerDuplicatePair[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(query.trim()), 200);
-    return () => window.clearTimeout(t);
-  }, [query]);
-
+  // Every dropdown, the search box, and sort all operate client-side over
+  // this one fetched page (see core/customerFilters.ts's file comment) — the
+  // full semantics (phone/email in search, a padded "C-3" match, surname
+  // sort, per-tier alert breakdown) need real app logic no ILIKE query can
+  // do, and this screen already caps at 200 rows either way. So there is
+  // exactly one network fetch, on mount and after anything that changes the
+  // underlying data (create/merge) — never on a keystroke or a filter change.
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
     return customerClient
-      .listFull({ q: debounced || undefined, sort: sort as CustomerSort, limit: 200 })
+      .listFull({ sort: 'recent', limit: 200 })
       .then((data) => {
         setRows(data.customers);
         setDuplicates(data.duplicates ?? []);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load customers.'))
       .finally(() => setLoading(false));
-  }, [debounced, sort]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -191,13 +187,24 @@ export function CustomersScreen() {
     }
   };
 
-  // ------------------------------------------------------------------ filter
-  const cities = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.city).filter((c): c is string => !!c))).sort((a, b) => a.localeCompare(b)),
-    [rows]
-  );
-  const shown = useMemo(() => rows.filter((r) => matchesCustomerFilters(r, filters)), [rows, filters]);
-  const filtersActive = JSON.stringify(filters) !== JSON.stringify(DEFAULT_CUSTOMER_FILTERS);
+  // --------------------------------------------------------- filter/sort/search
+  // Pipeline order: search -> the four dropdowns (AND'd) -> sort. Sort never
+  // hides a row, so it runs last, over whatever the first two steps left.
+  // City's own option list is built from the raw fetched page, not from
+  // whatever's already narrowed by search/the other dropdowns — a facet
+  // control's own choices shouldn't shrink or reorder just because a sibling
+  // filter (or the box itself) is mid-edit.
+  const cities = useMemo(() => cityOptions(rows), [rows]);
+  const searched = useMemo(() => rows.filter((r) => matchesSearch(r, query)), [rows, query]);
+  const filtered = useMemo(() => searched.filter((r) => matchesCustomerFilters(r, filters)), [searched, filters]);
+  const shown = useMemo(() => sortCustomers(filtered, sortBy), [filtered, sortBy]);
+
+  const activeChips = useMemo(() => describeActiveFilters(filters), [filters]);
+  const searchActive = query.trim().length > 0;
+  const anyActive = searchActive || activeChips.length > 0;
+  const activeCount = activeChips.length + (searchActive ? 1 : 0);
+  const clearOne = (key: keyof CustomerFilters) => setFilters({ ...filters, [key]: DEFAULT_CUSTOMER_FILTERS[key] });
+  const clearAll = () => { setFilters(DEFAULT_CUSTOMER_FILTERS); setQuery(''); };
 
   return (
     <div className="space-y-4">
@@ -339,34 +346,44 @@ export function CustomersScreen() {
           <select id="filter-equipment" className="dw-input !w-auto !min-h-[36px] !py-1" value={filters.equipment} onChange={(e) => setFilters({ ...filters, equipment: e.target.value as EquipmentFilter })}>
             {EQUIPMENT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
-          <label className="sr-only" htmlFor="filter-city">City</label>
-          <select id="filter-city" className="dw-input !w-auto !min-h-[36px] !py-1" value={filters.city ?? ''} onChange={(e) => setFilters({ ...filters, city: e.target.value || null })}>
-            <option value="">Any city</option>
-            {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          {/* Hidden outright below 2 distinct cities — nothing to filter by. */}
+          {cities.length >= 2 && (
+            <>
+              <label className="sr-only" htmlFor="filter-city">City</label>
+              <select id="filter-city" className="dw-input !w-auto !min-h-[36px] !py-1" value={filters.city ?? ''} onChange={(e) => setFilters({ ...filters, city: e.target.value || null })}>
+                <option value="">Any city</option>
+                {cities.map((c) => <option key={c.city} value={c.city}>{c.city} ({c.count})</option>)}
+              </select>
+            </>
+          )}
           <label className="sr-only" htmlFor="filter-activity">Last activity</label>
           <select id="filter-activity" className="dw-input !w-auto !min-h-[36px] !py-1" value={String(filters.lastActivity)} onChange={(e) => setFilters({ ...filters, lastActivity: (e.target.value === 'any' ? 'any' : Number(e.target.value)) as LastActivityFilter })}>
-            {ACTIVITY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            {ACTIVITY_OPTIONS.map((o) => <option key={String(o.id)} value={o.id}>{o.label}</option>)}
           </select>
-          {filtersActive && (
-            <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" onClick={() => setFilters(DEFAULT_CUSTOMER_FILTERS)}>
-              <X className="w-3.5 h-3.5" aria-hidden="true" /> Clear filters
-            </button>
-          )}
+          <span className="w-px self-stretch bg-line mx-1" aria-hidden="true" />
+          <label className="sr-only" htmlFor="customer-sort">Sort by</label>
+          <select id="customer-sort" className="dw-input !w-auto !min-h-[36px] !py-1" value={sortBy} onChange={(e) => setSortBy(e.target.value as CustomerSortBy)}>
+            {CUSTOMER_SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>Sort: {o.label}</option>)}
+          </select>
         </div>
-        <div role="tablist" aria-label="Sort customers" className="flex flex-wrap gap-1.5">
-          {SORTS.map((s) => (
-            <button
-              key={s.id}
-              role="tab"
-              aria-selected={sort === s.id}
-              onClick={() => setSort(s.id)}
-              className={['dw-btn !min-h-[36px] !py-1 !px-3 text-body', sort === s.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
-            >
-              {sort === s.id ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronUp className="w-3.5 h-3.5 opacity-0" aria-hidden="true" />} {s.label}
+
+        {anyActive && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {searchActive && (
+              <button type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => setQuery('')}>
+                Search: "{query.trim()}" <X className="w-3 h-3" aria-hidden="true" />
+              </button>
+            )}
+            {activeChips.map((chip) => (
+              <button key={chip.key} type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => clearOne(chip.key)}>
+                {chip.label} <X className="w-3 h-3" aria-hidden="true" />
+              </button>
+            ))}
+            <button type="button" className="dw-btn-tertiary !min-h-[28px] !py-0.5 !px-2 text-caption" onClick={clearAll}>
+              Clear all
             </button>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
@@ -409,7 +426,12 @@ export function CustomersScreen() {
             {!loading && shown.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-ink-3">
-                  {debounced || filtersActive ? 'No customers match this search and these filters.' : 'No customers yet. They appear automatically as documents come in, or add one above.'}
+                  <p>{anyActive ? 'No customers match these filters.' : 'No customers yet. They appear automatically as documents come in, or add one above.'}</p>
+                  {anyActive && (
+                    <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 mt-2" onClick={clearAll}>
+                      Clear all
+                    </button>
+                  )}
                 </td>
               </tr>
             )}
@@ -424,7 +446,10 @@ export function CustomersScreen() {
         </table>
       </div>
       <p className="text-caption text-ink-3">
-        {shown.length} of {rows.length} customer{rows.length === 1 ? '' : 's'}{rows.length === 200 ? ' (first 200)' : ''}
+        {anyActive
+          ? `${shown.length} of ${rows.length} customer${rows.length === 1 ? '' : 's'} · ${activeCount} filter${activeCount === 1 ? '' : 's'}`
+          : `${rows.length} customer${rows.length === 1 ? '' : 's'}`}
+        {rows.length === 200 ? ' (first 200)' : ''}
       </p>
     </div>
   );

@@ -41,7 +41,16 @@ import { sentThisMonth, type OutreachMessage } from '../src/services/outreachCli
 import { docsMatchingFilter } from '../src/screens/ReviewScreen';
 import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
-import { DEFAULT_CUSTOMER_FILTERS, matchesCustomerFilters, type CustomerFilters } from '../src/core/customerFilters';
+import {
+  DEFAULT_CUSTOMER_FILTERS,
+  cityOptions,
+  customerSortName,
+  describeActiveFilters,
+  matchesCustomerFilters,
+  matchesSearch,
+  sortCustomers,
+  type CustomerFilters,
+} from '../src/core/customerFilters';
 import { pairKey, reduceDuplicates, visibleDuplicates, nameTokenCount, defaultKeepId } from '../src/core/duplicates';
 import { groupExtractionsByUnit } from '../src/domains/hvac/units';
 import type { CustomerSummary } from '../src/services/customerClient';
@@ -816,35 +825,82 @@ function listFilesRecursive(dir: string): string[] {
 }
 
 /* --------------------------------------------------------- customer filters
- * Owner request 2026-09-20, item 1: the Customers tab's filter row. */
+ * Owner feedback 2026-09-20: "the filters don't fully work as they should —
+ * seems like you just threw those filters in and didn't logically set them
+ * up." One 6-customer fixture, built to hit every branch of every function
+ * in core/customerFilters.ts, used across all the blocks below. */
 {
-  const customer = (over: Partial<CustomerSummary>): CustomerSummary => ({
-    id: 'c1', customerNumber: 'C-00001', name: 'Ray Castillo', serviceAddress: '1 Main St', city: 'Sterling',
-    phone: null, email: null, documentCount: 1, equipmentCount: 1, lastActivity: '2026-09-01', warrantyAlerts: 0,
-    mergedInto: null, ...over,
-  });
+  type C = CustomerSummary;
+  const c1: C = { id: 'c1', customerNumber: 'C-00001', name: 'Ray Castillo', serviceAddress: '1 Main St', city: 'Sterling', phone: '555-123-4567', email: 'ray@example.com', documentCount: 3, equipmentCount: 2, lastActivity: '2026-09-15', warrantyAlerts: 1, alerts: { expiring: 1, expired: 0 }, mergedInto: null };
+  const c2: C = { id: 'c2', customerNumber: 'C-00002', name: 'Acme HVAC LLC', serviceAddress: null, city: 'Sterling', phone: null, email: null, documentCount: 1, equipmentCount: 0, lastActivity: null, warrantyAlerts: 1, alerts: { expiring: 0, expired: 1 }, mergedInto: null };
+  const c3: C = { id: 'c3', customerNumber: 'C-00003', name: 'Jane Diaz', serviceAddress: '2 Oak Ave', city: 'Reston', phone: null, email: 'jane@example.com', documentCount: 10, equipmentCount: 5, lastActivity: '2026-01-01', warrantyAlerts: 2, alerts: { expiring: 1, expired: 1 }, mergedInto: null };
+  const c4: C = { id: 'c4', customerNumber: 'C-00004', name: 'Bob Smith', serviceAddress: '4 Pine Ln', city: null, phone: '555-999-8888', email: null, documentCount: 1, equipmentCount: 1, lastActivity: '2026-09-19', warrantyAlerts: 0, alerts: { expiring: 0, expired: 0 }, mergedInto: null };
+  const c5: C = { id: 'c5', customerNumber: 'C-00005', name: 'Zach Young', serviceAddress: null, city: 'Reston', phone: null, email: null, documentCount: 0, equipmentCount: 0, lastActivity: null, warrantyAlerts: 0, alerts: { expiring: 0, expired: 0 }, mergedInto: null };
+  const c6: C = { id: 'c6', customerNumber: 'C-00006', name: 'Desert Comfort Cooling', serviceAddress: null, city: 'Tempe', phone: null, email: null, documentCount: 2, equipmentCount: 3, lastActivity: '2026-09-18', warrantyAlerts: 0, alerts: { expiring: 0, expired: 0 }, mergedInto: null };
+  const all: C[] = [c1, c2, c3, c4, c5, c6];
   const now = new Date('2026-09-20T00:00:00Z');
+  const ids = (rows: C[]) => rows.map((r) => r.id);
 
-  check('matchesCustomerFilters: defaults match everything', matchesCustomerFilters(customer({}), DEFAULT_CUSTOMER_FILTERS, now));
-  check('matchesCustomerFilters: alerts=none excludes a customer with alerts', !matchesCustomerFilters(customer({ warrantyAlerts: 1 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'none' }, now));
-  check('matchesCustomerFilters: alerts=none keeps a customer with no alerts', matchesCustomerFilters(customer({ warrantyAlerts: 0 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'none' }, now));
-  check('matchesCustomerFilters: alerts=expiring with no breakdown falls back to "has any alert"', matchesCustomerFilters(customer({ warrantyAlerts: 1 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'expiring' }, now));
-  check('matchesCustomerFilters: alerts=expired reads a real breakdown when present', !matchesCustomerFilters(customer({ warrantyAlerts: 1, expiringCount: 1, expiredCount: 0 }), { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'expired' }, now));
+  /* ---- matchesCustomerFilters: alerts (any/expiring/expired/attention/none) */
+  check('alerts=any matches everyone', all.every((c) => matchesCustomerFilters(c, DEFAULT_CUSTOMER_FILTERS, now)));
+  eq('alerts=expiring keeps only expiring>0', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'expiring' }, now)).map((c) => c.id), ['c1', 'c3']);
+  eq('alerts=expired keeps only expired>0', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'expired' }, now)).map((c) => c.id), ['c2', 'c3']);
+  eq('alerts=attention keeps either>0 (union, not just both)', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'attention' }, now)).map((c) => c.id), ['c1', 'c2', 'c3']);
+  eq('alerts=none keeps only both-zero', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, alerts: 'none' }, now)).map((c) => c.id), ['c4', 'c5', 'c6']);
 
-  check('matchesCustomerFilters: equipment=has excludes zero units', !matchesCustomerFilters(customer({ equipmentCount: 0 }), { ...DEFAULT_CUSTOMER_FILTERS, equipment: 'has' }, now));
-  check('matchesCustomerFilters: equipment=none excludes a customer with units', !matchesCustomerFilters(customer({ equipmentCount: 2 }), { ...DEFAULT_CUSTOMER_FILTERS, equipment: 'none' }, now));
+  /* ---- equipment (any/has/none) */
+  eq('equipment=has keeps equipmentCount>0', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, equipment: 'has' }, now)).map((c) => c.id), ['c1', 'c3', 'c4', 'c6']);
+  eq('equipment=none keeps equipmentCount===0', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, equipment: 'none' }, now)).map((c) => c.id), ['c2', 'c5']);
 
-  check('matchesCustomerFilters: city filter is case-insensitive', matchesCustomerFilters(customer({ city: 'Sterling' }), { ...DEFAULT_CUSTOMER_FILTERS, city: 'sterling' }, now));
-  check('matchesCustomerFilters: city filter excludes a different city', !matchesCustomerFilters(customer({ city: 'Reston' }), { ...DEFAULT_CUSTOMER_FILTERS, city: 'Sterling' }, now));
-  check('matchesCustomerFilters: null city on the row never matches a chosen city', !matchesCustomerFilters(customer({ city: null }), { ...DEFAULT_CUSTOMER_FILTERS, city: 'Sterling' }, now));
+  /* ---- city (case-insensitive; null row never matches a chosen city) */
+  eq('city=Sterling (typed lowercase) keeps only Sterling rows', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, city: 'sterling' }, now)).map((c) => c.id), ['c1', 'c2']);
+  check('a null-city row never matches a chosen city', !matchesCustomerFilters(c4, { ...DEFAULT_CUSTOMER_FILTERS, city: 'Sterling' }, now));
 
-  check('matchesCustomerFilters: lastActivity=30 keeps recent activity', matchesCustomerFilters(customer({ lastActivity: '2026-09-10' }), { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 30 }, now));
-  check('matchesCustomerFilters: lastActivity=30 excludes stale activity', !matchesCustomerFilters(customer({ lastActivity: '2026-01-01' }), { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 30 }, now));
-  check('matchesCustomerFilters: lastActivity filter excludes a customer with no activity on file', !matchesCustomerFilters(customer({ lastActivity: null }), { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 90 }, now));
+  /* ---- lastActivity (default never hides for missing activity; a window does) */
+  check('lastActivity=any never excludes for missing activity', matchesCustomerFilters(c2, DEFAULT_CUSTOMER_FILTERS, now));
+  eq('lastActivity=30 keeps only activity within 30 days, excludes null', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 30 }, now)).map((c) => c.id), ['c1', 'c4', 'c6']);
+  eq('lastActivity=90 widens the window but still excludes null and the Jan 1 row', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 90 }, now)).map((c) => c.id), ['c1', 'c4', 'c6']);
+  eq('lastActivity=365 finally includes the stale Jan 1 row, still excludes null', all.filter((c) => matchesCustomerFilters(c, { ...DEFAULT_CUSTOMER_FILTERS, lastActivity: 365 }, now)).map((c) => c.id), ['c1', 'c3', 'c4', 'c6']);
 
-  const combo: CustomerFilters = { alerts: 'any', equipment: 'has', city: 'Sterling', lastActivity: 90 };
-  check('matchesCustomerFilters: combines every criterion (AND, not OR)', matchesCustomerFilters(customer({ equipmentCount: 1, city: 'Sterling', lastActivity: '2026-09-01' }), combo, now));
-  check('matchesCustomerFilters: one failing criterion excludes the row', !matchesCustomerFilters(customer({ equipmentCount: 0, city: 'Sterling', lastActivity: '2026-09-01' }), combo, now));
+  /* ---- combined AND, not OR */
+  const combo: CustomerFilters = { alerts: 'any', equipment: 'has', city: 'Reston', lastActivity: 'any' };
+  eq('every criterion ANDs together', all.filter((c) => matchesCustomerFilters(c, combo, now)).map((c) => c.id), ['c3']);
+
+  /* ---- describeActiveFilters: chips */
+  eq('defaults produce no chips', describeActiveFilters(DEFAULT_CUSTOMER_FILTERS), []);
+  eq(
+    'one chip per non-default dropdown, in a stable order',
+    describeActiveFilters({ alerts: 'expired', equipment: 'any', city: 'Reston', lastActivity: 90 }),
+    [{ key: 'alerts', label: 'Expired' }, { key: 'city', label: 'City: Reston' }, { key: 'lastActivity', label: 'Last 90 days' }],
+  );
+
+  /* ---- cityOptions: distinct, sorted, counted; hidden below 2 */
+  eq('cityOptions: distinct non-null cities, sorted, with counts', cityOptions(all), [{ city: 'Reston', count: 2 }, { city: 'Sterling', count: 2 }, { city: 'Tempe', count: 1 }]);
+  eq('cityOptions: a single-city subset -> length 1 (screen hides the control)', cityOptions([c1, c2]).length, 1);
+  eq('cityOptions: no cities at all -> empty', cityOptions([c4]), []);
+
+  /* ---- customerSortName: surname for a person, full name for a company */
+  eq('customerSortName: a person sorts by surname', customerSortName('Ray Castillo'), 'castillo');
+  eq('customerSortName: a company (business-marker word) sorts by its full name', customerSortName('Acme HVAC LLC'), 'acme hvac llc');
+  eq('customerSortName: blank/null -> empty key', [customerSortName(null), customerSortName('')], ['', '']);
+
+  /* ---- sortCustomers: never filters, only reorders; every mode */
+  eq('sortCustomers never drops or adds a row', sortCustomers(all, 'recent').length, all.length);
+  eq('sort=name: surname/company-name A-Z', ids(sortCustomers(all, 'name')), ['c2', 'c1', 'c6', 'c3', 'c4', 'c5']);
+  eq('sort=docs: most documents first, ties keep original order', ids(sortCustomers(all, 'docs')), ['c3', 'c1', 'c6', 'c2', 'c4', 'c5']);
+  eq('sort=equipment: most equipment first', ids(sortCustomers(all, 'equipment')), ['c3', 'c6', 'c1', 'c4', 'c2', 'c5']);
+  eq('sort=alerts: highest combined alert count first', ids(sortCustomers(all, 'alerts')), ['c3', 'c1', 'c2', 'c4', 'c5', 'c6']);
+  eq('sort=recent: most recent activity first, no-activity rows always last (in original order)', ids(sortCustomers(all, 'recent')), ['c4', 'c6', 'c1', 'c3', 'c2', 'c5']);
+
+  /* ---- matchesSearch: name/number/address/phone/email, case/punctuation-insensitive, padded number */
+  check('matchesSearch: empty query matches everyone', all.every((c) => matchesSearch(c, '')));
+  check('matchesSearch: matches by name, case-insensitively', matchesSearch(c1, 'castillo') && matchesSearch(c1, 'CASTILLO'));
+  check('matchesSearch: matches by street address', matchesSearch(c1, 'main st') && !matchesSearch(c3, 'main st'));
+  check('matchesSearch: matches by phone', matchesSearch(c1, '123-4567') && !matchesSearch(c4, '123-4567'));
+  check('matchesSearch: matches by email', matchesSearch(c3, 'jane@example') && !matchesSearch(c1, 'jane@example'));
+  check('matchesSearch: "C-3" matches the zero-padded "C-00003"', matchesSearch(c3, 'C-3') && !matchesSearch(c1, 'C-3'));
+  check('matchesSearch: "c-00003" (already padded) still matches, case-insensitively', matchesSearch(c3, 'c-00003'));
+  check('matchesSearch: no match anywhere -> false', !matchesSearch(c1, 'nonexistent-zzz'));
 }
 
 /* ------------------------------------------------------- duplicates banner

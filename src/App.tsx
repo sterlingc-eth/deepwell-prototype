@@ -5,6 +5,7 @@ import { authHeader, setAuthTokenProvider } from './services/authToken';
 import { fetchDocumentStatus, isProcessingTerminal, pollDocumentStatusChunked } from './services/ingestClient';
 import { billingClient } from './services/billingClient';
 import { useAppStore } from './store/appStore';
+import { DEFAULT_CUSTOMER_FILTERS } from './core/customerFilters';
 import { usePostgresSync } from './hooks/usePostgresSync';
 import { useDeepLink } from './hooks/useDeepLink';
 import { AskScreen, BillingScreen, BrowseScreen, CustomerProfileScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen, TeamScreen } from './screens';
@@ -119,7 +120,23 @@ function App() {
   // Only fetches while signed in, and never in demo mode. Runs unconditionally
   // (rules of hooks) — the `enabled` flag is what actually gates the fetch, so
   // this is safe to call before the isLoaded/isSignedIn returns below.
-  const sync = usePostgresSync(!DEMO_MODE && isLoaded && isSignedIn, orgId ?? userId ?? null);
+  const tenantKey = orgId ?? userId ?? null;
+  const sync = usePostgresSync(!DEMO_MODE && isLoaded && isSignedIn, tenantKey);
+
+  // Customers tab filters persist for the session (appStore), but a switch
+  // to a different tenant (another shop, or back to solo) must not carry a
+  // stale filter into data it was never chosen against — reset to defaults
+  // whenever the effective tenant actually changes. `prevTenantKey` starts at
+  // the first render's value, so this only fires on a real switch, never on
+  // ordinary login/reload.
+  const prevTenantKey = useRef(tenantKey);
+  const setCustomerFilters = useAppStore((s) => s.setCustomerFilters);
+  useEffect(() => {
+    if (prevTenantKey.current !== tenantKey) {
+      prevTenantKey.current = tenantKey;
+      setCustomerFilters(DEFAULT_CUSTOMER_FILTERS);
+    }
+  }, [tenantKey, setCustomerFilters]);
 
   // First-run: a brand-new shop with zero documents lands straight on the
   // Inbox's "Add files" tab with its big call-to-action, instead of an Ask

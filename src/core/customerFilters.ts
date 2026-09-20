@@ -1,22 +1,30 @@
 /**
- * Pure filter predicate for the Customers tab (owner request 2026-09-20,
- * item 1). Combines with the existing search box: the screen narrows by
- * `q` server-side, then applies this client-side over whatever page came
- * back, same as it already does for `sort`.
+ * Pure filter/sort/search logic for the Customers tab (owner feedback
+ * 2026-09-20: "the filters don't fully work as they should — seems like you
+ * just threw those filters in and didn't logically set them up"). Every
+ * function here is pure and fully covered in scripts/verify-ui.ts's
+ * "customer filters" fixture (6 customers, one per branch) — no DOM, no
+ * store, no network, so the semantics can never silently drift from what's
+ * tested.
  *
- * Alerts: GET /api/v1/customers's `warrantyAlerts` is a single combined
- * count (api/_lib/routes/customers.js's countWarrantyAlerts folds 'expired'
- * and 'expiring-90' together) — there is no per-row tier breakdown to filter
- * on yet. `expiredCount`/`expiringCount` are declared as optional on
- * CustomerSummary so this degrades honestly: with no breakdown, 'expiring'
- * and 'expired' both fall back to "has any alert" (warrantyAlerts > 0)
- * rather than inventing a distinction the data doesn't support. See
- * handoffs/REQUESTS_frontend.md for the backend ask to split it for real.
+ * The screen (CustomersScreen.tsx) does exactly this, in this order, over
+ * whatever page of rows it has:
+ *   1. matchesSearch   — the free-text box (name/number/address/phone/email)
+ *   2. matchesCustomerFilters — the four dropdowns (AND together)
+ *   3. sortCustomers   — a single "Sort by" select; NOT a filter, so it never
+ *      changes which rows are shown, only their order.
+ *
+ * `alerts` (GET /api/v1/customers) is now a real per-tier breakdown
+ * (api/_lib/routes/customers.js's tallyWarrantyAlerts, mirroring alertTier
+ * per unit) — {expiring, expired} — not a fabricated split of one combined
+ * count. "Expiring soon" includes both the 30- and 90-day alertTier tiers
+ * (see that file's comment for why: a unit due in 9 days is at least as
+ * urgent as one due in 80).
  */
 import { normalize } from './answer';
 import type { CustomerSummary } from '../services/customerClient';
 
-export type AlertsFilter = 'any' | 'expiring' | 'expired' | 'none';
+export type AlertsFilter = 'any' | 'expiring' | 'expired' | 'attention' | 'none';
 export type EquipmentFilter = 'any' | 'has' | 'none';
 export type LastActivityFilter = 'any' | 30 | 90 | 365;
 
@@ -34,16 +42,47 @@ export const DEFAULT_CUSTOMER_FILTERS: CustomerFilters = {
   lastActivity: 'any',
 };
 
+export const ALERTS_OPTIONS: { id: AlertsFilter; label: string }[] = [
+  { id: 'any', label: 'Any alert status' },
+  { id: 'expiring', label: 'Expiring soon' },
+  { id: 'expired', label: 'Expired' },
+  { id: 'attention', label: 'Needs attention' },
+  { id: 'none', label: 'No alerts' },
+];
+export const ALERTS_LABEL: Record<AlertsFilter, string> = Object.fromEntries(ALERTS_OPTIONS.map((o) => [o.id, o.label])) as Record<AlertsFilter, string>;
+
+export const EQUIPMENT_OPTIONS: { id: EquipmentFilter; label: string }[] = [
+  { id: 'any', label: 'Any equipment' },
+  { id: 'has', label: 'Has units' },
+  { id: 'none', label: 'No units on file' },
+];
+export const EQUIPMENT_LABEL: Record<EquipmentFilter, string> = Object.fromEntries(EQUIPMENT_OPTIONS.map((o) => [o.id, o.label])) as Record<EquipmentFilter, string>;
+
+export const ACTIVITY_OPTIONS: { id: LastActivityFilter; label: string }[] = [
+  { id: 'any', label: 'Any time' },
+  { id: 30, label: 'Last 30 days' },
+  { id: 90, label: 'Last 90 days' },
+  { id: 365, label: 'Last 365 days' },
+];
+export const ACTIVITY_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_OPTIONS.map((o) => [String(o.id), o.label]));
+
+/** The four dropdowns, AND'd together — never OR'd, never a fifth hidden
+ *  condition. `now` is injectable so tests never depend on the real clock. */
 export function matchesCustomerFilters(c: CustomerSummary, f: CustomerFilters, now: Date = new Date()): boolean {
-  if (f.alerts === 'none' && c.warrantyAlerts > 0) return false;
-  if (f.alerts === 'expiring' && !((c.expiringCount ?? c.warrantyAlerts) > 0)) return false;
-  if (f.alerts === 'expired' && !((c.expiredCount ?? c.warrantyAlerts) > 0)) return false;
+  const expiring = c.alerts.expiring > 0;
+  const expired = c.alerts.expired > 0;
+  if (f.alerts === 'expiring' && !expiring) return false;
+  if (f.alerts === 'expired' && !expired) return false;
+  if (f.alerts === 'attention' && !(expiring || expired)) return false;
+  if (f.alerts === 'none' && (expiring || expired)) return false;
 
   if (f.equipment === 'has' && c.equipmentCount <= 0) return false;
   if (f.equipment === 'none' && c.equipmentCount > 0) return false;
 
   if (f.city && normalize(c.city ?? '') !== normalize(f.city)) return false;
 
+  // Default ('any') never hides a customer for having no activity on file —
+  // only picking an actual window does, and only then.
   if (f.lastActivity !== 'any') {
     if (!c.lastActivity) return false;
     const days = (now.getTime() - new Date(c.lastActivity).getTime()) / 86400000;
@@ -51,4 +90,109 @@ export function matchesCustomerFilters(c: CustomerSummary, f: CustomerFilters, n
   }
 
   return true;
+}
+
+/** Which of the four dropdowns are off their default, as removable-chip
+ *  {key, label} pairs, in a stable display order. Purely descriptive — the
+ *  screen wires each chip's "x" to resetting that one key. */
+export function describeActiveFilters(f: CustomerFilters): { key: keyof CustomerFilters; label: string }[] {
+  const out: { key: keyof CustomerFilters; label: string }[] = [];
+  if (f.alerts !== 'any') out.push({ key: 'alerts', label: ALERTS_LABEL[f.alerts] });
+  if (f.equipment !== 'any') out.push({ key: 'equipment', label: EQUIPMENT_LABEL[f.equipment] });
+  if (f.city) out.push({ key: 'city', label: `City: ${f.city}` });
+  if (f.lastActivity !== 'any') out.push({ key: 'lastActivity', label: ACTIVITY_LABEL[String(f.lastActivity)] ?? `Last ${f.lastActivity} days` });
+  return out;
+}
+
+/** City options for the dropdown: distinct non-null cities from the CURRENT
+ *  (already search/filtered-by-everything-else) list, sorted A-Z, each
+ *  carrying how many rows have it. The screen hides the whole control when
+ *  this returns fewer than 2 — a single city is nothing to filter by. */
+export interface CityOption { city: string; count: number }
+export function cityOptions(rows: CustomerSummary[]): CityOption[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    if (r.city) counts.set(r.city, (counts.get(r.city) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([city, count]) => ({ city, count })).sort((a, b) => a.city.localeCompare(b.city));
+}
+
+/** A name that reads as a company rather than a person — company names sort
+ *  by their full text; a person's name sorts by surname (owner: "Name A-Z").
+ *  Conservative: only names with an unambiguous business marker are treated
+ *  as companies, so an ordinary "First Last" always falls through to the
+ *  surname rule. */
+const COMPANY_HINT_RE = /\b(llc|l\.l\.c\.?|inc|inc\.?|incorporated|corp|corporation|co\.|company|group|hoa|association|assoc|properties|management|mgmt|plumbing|hvac|heating|cooling|mechanical|services|holdings|partners|church|school|district)\b/i;
+
+/** The key `sortCustomers`'s 'name' mode compares: the surname (last
+ *  whitespace-separated token) for a person, the full name for a company,
+ *  case-insensitively. Exported so the fixture tests can pin it directly. */
+export function customerSortName(name: string | null): string {
+  const n = (name ?? '').trim();
+  if (!n) return '';
+  if (COMPANY_HINT_RE.test(n)) return n.toLowerCase();
+  const tokens = n.split(/\s+/).filter(Boolean);
+  return (tokens[tokens.length - 1] ?? n).toLowerCase();
+}
+
+export type CustomerSortBy = 'recent' | 'name' | 'docs' | 'equipment' | 'alerts';
+export const CUSTOMER_SORT_OPTIONS: { id: CustomerSortBy; label: string }[] = [
+  { id: 'recent', label: 'Recent activity' },
+  { id: 'name', label: 'Name A–Z' },
+  { id: 'docs', label: 'Most documents' },
+  { id: 'equipment', label: 'Most equipment' },
+  { id: 'alerts', label: 'Alerts first' },
+];
+
+/** Sort is never a filter: it reorders, it never hides a row. A stable sort
+ *  (ties broken by original position) so re-sorting the same list twice
+ *  never visibly shuffles rows that compare equal. */
+export function sortCustomers(rows: CustomerSummary[], by: CustomerSortBy): CustomerSummary[] {
+  const totalAlerts = (c: CustomerSummary) => c.alerts.expiring + c.alerts.expired;
+  const cmp = (a: CustomerSummary, b: CustomerSummary): number => {
+    switch (by) {
+      case 'name':
+        return customerSortName(a.name).localeCompare(customerSortName(b.name));
+      case 'docs':
+        return b.documentCount - a.documentCount;
+      case 'equipment':
+        return b.equipmentCount - a.equipmentCount;
+      case 'alerts':
+        return totalAlerts(b) - totalAlerts(a);
+      case 'recent':
+      default:
+        // Most recent first; no activity on file always sorts last.
+        if (!a.lastActivity && !b.lastActivity) return 0;
+        if (!a.lastActivity) return 1;
+        if (!b.lastActivity) return -1;
+        return b.lastActivity.localeCompare(a.lastActivity);
+    }
+  };
+  return rows
+    .map((r, i) => ({ r, i }))
+    .sort((x, y) => cmp(x.r, y.r) || x.i - y.i)
+    .map((x) => x.r);
+}
+
+/** The search box: name, customer number, address, phone, email — combined,
+ *  case/punctuation-insensitive (via `normalize`, shared with Ask's matcher).
+ *  A query shaped like a customer-number fragment ("C-3") also matches the
+ *  padded real number ("C-00003") by comparing digit runs numerically, so a
+ *  person typing the number they can see on a printed slip doesn't have to
+ *  know it's zero-padded to 5 digits. */
+export function matchesSearch(c: CustomerSummary, query: string): boolean {
+  const q = normalize(query);
+  if (!q) return true;
+
+  const fields = [c.name, c.customerNumber, c.serviceAddress, c.phone, c.email]
+    .filter((v): v is string => !!v)
+    .map((v) => normalize(v));
+  if (fields.some((f) => f.includes(q))) return true;
+
+  const m = query.trim().match(/^c-?\s*(\d{1,5})$/i);
+  if (m && c.customerNumber) {
+    const cm = c.customerNumber.match(/^c-?(\d+)$/i);
+    if (cm && Number(cm[1]) === Number(m[1])) return true;
+  }
+  return false;
 }

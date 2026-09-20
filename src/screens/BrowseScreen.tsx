@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronDown, ChevronUp, Download, FolderOpen, Loader2, Search, Trash2, Users } from 'lucide-react';
+import { ArrowRight, Download, FolderOpen, Loader2, Search, Trash2, Users, X } from 'lucide-react';
 import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
 import { StagePill } from '../components/StagePill';
@@ -9,6 +9,7 @@ import { dateOf, fmtDate, formatYmd, fmtMoney, normalize, numOf, str } from '../
 import type { Doc, Entity } from '../core/types';
 import { DOCUMENT_TYPES } from '../domains/hvac/documentTypes';
 import { deleteDocuments } from '../services/documentClient';
+import { isAttention } from './ReviewScreen';
 import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
 
@@ -62,10 +63,56 @@ function customerFor(doc: Doc, entities: Record<string, Entity>): Entity | null 
     const e = entities[id];
     if (e?.type === 'customer') return e;
   }
+  // Owner (2026-09-20): most rows showed "—" although the document is linked
+  // to a unit that belongs to a customer. Fall back to the unit's customer.
+  for (const id of doc.linkedEntityIds) {
+    const e = entities[id];
+    const cid = e?.fields?.customerId;
+    if (e?.type === 'equipment' && typeof cid === 'string' && entities[cid]?.type === 'customer') return entities[cid];
+  }
   return null;
 }
 
-type DocSort = 'date' | 'name' | 'type';
+type DocSort = 'date-desc' | 'date-asc' | 'name' | 'type';
+const DOC_SORT_OPTIONS: { id: DocSort; label: string }[] = [
+  { id: 'date-desc', label: 'Received newest' },
+  { id: 'date-asc', label: 'Received oldest' },
+  { id: 'name', label: 'Name' },
+  { id: 'type', label: 'Type' },
+];
+
+type DocStageFilter = 'any' | 'checked' | 'attention' | 'processing';
+const DOC_STAGE_OPTIONS: { id: DocStageFilter; label: string }[] = [
+  { id: 'any', label: 'Any stage' },
+  { id: 'checked', label: 'Checked' },
+  { id: 'attention', label: 'Needs a person' },
+  { id: 'processing', label: 'Processing' },
+];
+
+/** The exact same "needs a person" definition ReviewScreen's queue and
+ *  DataHealthStrip's tile use — 'processing' is everything else short of
+ *  Checked (on track, nothing flagged, just not there yet). */
+function docStageBucket(doc: Doc): Exclude<DocStageFilter, 'any'> {
+  if (doc.stage === 'verified') return 'checked';
+  if (isAttention(doc)) return 'attention';
+  return 'processing';
+}
+
+interface CountOption { id: string; label: string; count: number }
+/** Distinct-value facet options with counts, built from the FULL unfiltered
+ *  doc list so a select's own choices never shrink because of a sibling
+ *  filter (or itself) mid-edit — same reasoning as the Customers tab's city
+ *  facet (core/customerFilters.ts). Hidden by the caller below 2 options. */
+function countOptions(values: { id: string; label: string }[]): CountOption[] {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const v of values) {
+    const cur = counts.get(v.id);
+    counts.set(v.id, { label: v.label, count: (cur?.count ?? 0) + 1 });
+  }
+  return [...counts.entries()]
+    .map(([id, v]) => ({ id, label: v.label, count: v.count }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
 
 /**
  * Documents tab: every synced document in one table — filter, sort,
@@ -83,8 +130,10 @@ function DocumentsTab() {
   const openCustomer = useAppStore((s) => s.openCustomer);
 
   const [filter, setFilter] = useState('');
-  const [sort, setSort] = useState<DocSort>('date');
-  const [sortDesc, setSortDesc] = useState(true);
+  const [typeFilter, setTypeFilter] = useState('any');
+  const [stageFilter, setStageFilter] = useState<DocStageFilter>('any');
+  const [customerFilter, setCustomerFilter] = useState('any');
+  const [sort, setSort] = useState<DocSort>('date-desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -105,32 +154,58 @@ function DocumentsTab() {
     }
   };
 
+  // Every doc, decorated once — the base every filter/facet below reads, so
+  // "options present" and "rows shown" can never quietly disagree.
+  const allRows = useMemo(
+    () =>
+      Object.values(docs).map((doc) => {
+        const customer = customerFor(doc, entities);
+        return {
+          doc,
+          typeId: doc.typeId ?? 'unclassified',
+          typeLabel: (doc.typeId && DOCUMENT_TYPE_LABEL.get(doc.typeId)) || 'Unclassified',
+          linked: linkedLabel(doc, entities),
+          customer,
+          customerName: customer ? str(customer, 'customer_name') || str(customer, 'name') : '',
+          stageBucket: docStageBucket(doc),
+        };
+      }),
+    [docs, entities]
+  );
+
+  const typeOptions = useMemo(() => countOptions(allRows.map((r) => ({ id: r.typeId, label: r.typeLabel }))), [allRows]);
+  const customerOptions = useMemo(
+    () => countOptions(allRows.filter((r) => r.customer).map((r) => ({ id: r.customer!.id, label: r.customerName || 'Unnamed' }))),
+    [allRows]
+  );
+
   const rows = useMemo(() => {
     const q = normalize(filter);
-    let list = Object.values(docs).map((doc) => {
-      const customer = customerFor(doc, entities);
-      return {
-        doc,
-        typeLabel: (doc.typeId && DOCUMENT_TYPE_LABEL.get(doc.typeId)) || 'Unclassified',
-        linked: linkedLabel(doc, entities),
-        customer,
-        customerName: customer ? str(customer, 'customer_name') || str(customer, 'name') : '',
-      };
-    });
+    let list = allRows;
     if (q) {
       list = list.filter(({ doc, typeLabel, linked, customerName }) =>
         normalize(`${doc.filename} ${typeLabel} ${linked} ${customerName}`).includes(q)
       );
     }
-    list.sort((a, b) => {
-      let cmp = 0;
-      if (sort === 'date') cmp = a.doc.receivedAt.getTime() - b.doc.receivedAt.getTime();
-      else if (sort === 'name') cmp = a.doc.filename.localeCompare(b.doc.filename);
-      else cmp = a.typeLabel.localeCompare(b.typeLabel);
-      return sortDesc ? -cmp : cmp;
+    if (typeFilter !== 'any') list = list.filter((r) => r.typeId === typeFilter);
+    if (stageFilter !== 'any') list = list.filter((r) => r.stageBucket === stageFilter);
+    if (customerFilter === 'none') list = list.filter((r) => !r.customer);
+    else if (customerFilter !== 'any') list = list.filter((r) => r.customer?.id === customerFilter);
+
+    return [...list].sort((a, b) => {
+      switch (sort) {
+        case 'date-asc': return a.doc.receivedAt.getTime() - b.doc.receivedAt.getTime();
+        case 'name': return a.doc.filename.localeCompare(b.doc.filename);
+        case 'type': return a.typeLabel.localeCompare(b.typeLabel);
+        case 'date-desc':
+        default: return b.doc.receivedAt.getTime() - a.doc.receivedAt.getTime();
+      }
     });
-    return list;
-  }, [docs, entities, filter, sort, sortDesc]);
+  }, [allRows, filter, typeFilter, stageFilter, customerFilter, sort]);
+
+  const filtersActive = typeFilter !== 'any' || stageFilter !== 'any' || customerFilter !== 'any';
+  const anyActive = filtersActive || filter.trim().length > 0;
+  const clearAll = () => { setFilter(''); setTypeFilter('any'); setStageFilter('any'); setCustomerFilter('any'); };
 
   // Selection can only ever hold ids currently in view; a doc removed out
   // from under it (deleted elsewhere) should not linger as a phantom count.
@@ -140,14 +215,6 @@ function DocumentsTab() {
       return next.size === prev.size ? prev : next;
     });
   }, [docs]);
-
-  const toggleSort = (col: DocSort) => {
-    if (sort === col) setSortDesc((d) => !d);
-    else { setSort(col); setSortDesc(true); }
-  };
-
-  const sortIcon = (col: DocSort) =>
-    sort === col ? (sortDesc ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />) : null;
 
   const toggleOne = (id: string) =>
     setSelected((prev) => {
@@ -208,12 +275,71 @@ function DocumentsTab() {
         />
       </div>
 
+      <div className="dw-card p-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {typeOptions.length >= 2 && (
+            <>
+              <label className="sr-only" htmlFor="doc-filter-type">Type</label>
+              <select id="doc-filter-type" className="dw-input !w-auto !min-h-[36px] !py-1" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="any">Any type</option>
+                {typeOptions.map((o) => <option key={o.id} value={o.id}>{o.label} ({o.count})</option>)}
+              </select>
+            </>
+          )}
+          <label className="sr-only" htmlFor="doc-filter-stage">Stage</label>
+          <select id="doc-filter-stage" className="dw-input !w-auto !min-h-[36px] !py-1" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as DocStageFilter)}>
+            {DOC_STAGE_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+          {customerOptions.length >= 2 && (
+            <>
+              <label className="sr-only" htmlFor="doc-filter-customer">Customer</label>
+              <select id="doc-filter-customer" className="dw-input !w-auto !min-h-[36px] !py-1" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}>
+                <option value="any">Any customer</option>
+                <option value="none">No customer linked</option>
+                {customerOptions.map((o) => <option key={o.id} value={o.id}>{o.label} ({o.count})</option>)}
+              </select>
+            </>
+          )}
+          <span className="w-px self-stretch bg-line mx-1" aria-hidden="true" />
+          <label className="sr-only" htmlFor="doc-sort">Sort by</label>
+          <select id="doc-sort" className="dw-input !w-auto !min-h-[36px] !py-1" value={sort} onChange={(e) => setSort(e.target.value as DocSort)}>
+            {DOC_SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>Sort: {o.label}</option>)}
+          </select>
+        </div>
+        {anyActive && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {filter.trim() && (
+              <button type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => setFilter('')}>
+                Search: "{filter.trim()}" <X className="w-3 h-3" aria-hidden="true" />
+              </button>
+            )}
+            {typeFilter !== 'any' && (
+              <button type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => setTypeFilter('any')}>
+                {typeOptions.find((o) => o.id === typeFilter)?.label ?? typeFilter} <X className="w-3 h-3" aria-hidden="true" />
+              </button>
+            )}
+            {stageFilter !== 'any' && (
+              <button type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => setStageFilter('any')}>
+                {DOC_STAGE_OPTIONS.find((o) => o.id === stageFilter)?.label} <X className="w-3 h-3" aria-hidden="true" />
+              </button>
+            )}
+            {customerFilter !== 'any' && (
+              <button type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => setCustomerFilter('any')}>
+                {customerFilter === 'none' ? 'No customer linked' : (customerOptions.find((o) => o.id === customerFilter)?.label ?? 'Customer')} <X className="w-3 h-3" aria-hidden="true" />
+              </button>
+            )}
+            <button type="button" className="dw-btn-tertiary !min-h-[28px] !py-0.5 !px-2 text-caption" onClick={clearAll}>Clear all</button>
+          </div>
+        )}
+      </div>
+
       {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
       {exportErr && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportErr}</p>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-caption text-ink-3">
-          {rows.length} of {totalCount} document{totalCount === 1 ? '' : 's'}{selected.size ? ` · ${selected.size} selected` : ''}
+          {anyActive ? `${rows.length} of ${totalCount} document${totalCount === 1 ? '' : 's'}` : `${totalCount} document${totalCount === 1 ? '' : 's'}`}
+          {selected.size ? ` · ${selected.size} selected` : ''}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={exporting || totalCount === 0} onClick={() => void runExport()}>
@@ -249,18 +375,12 @@ function DocumentsTab() {
               <th className="px-3 py-2 w-10">
                 <input type="checkbox" aria-label="Select all shown" checked={allVisibleSelected} onChange={toggleAll} />
               </th>
-              <th className="px-3 py-2">
-                <button type="button" className="flex items-center gap-1" onClick={() => toggleSort('name')}>Filename {sortIcon('name')}</button>
-              </th>
-              <th className="px-3 py-2">
-                <button type="button" className="flex items-center gap-1" onClick={() => toggleSort('type')}>Type {sortIcon('type')}</button>
-              </th>
+              <th className="px-3 py-2">Filename</th>
+              <th className="px-3 py-2">Type</th>
               <th className="px-3 py-2">Stage</th>
               <th className="px-3 py-2">Customer</th>
               <th className="px-3 py-2">Linked to</th>
-              <th className="px-3 py-2">
-                <button type="button" className="flex items-center gap-1" onClick={() => toggleSort('date')}>Received {sortIcon('date')}</button>
-              </th>
+              <th className="px-3 py-2">Received</th>
               <th className="px-3 py-2 w-20" />
             </tr>
           </thead>
@@ -298,7 +418,10 @@ function DocumentsTab() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-ink-3">
-                  {totalCount === 0 ? 'No documents yet.' : 'No documents match this filter.'}
+                  <p>{totalCount === 0 ? 'No documents yet.' : 'No documents match these filters.'}</p>
+                  {totalCount > 0 && anyActive && (
+                    <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 mt-2" onClick={clearAll}>Clear all</button>
+                  )}
                 </td>
               </tr>
             )}
@@ -350,7 +473,8 @@ export function BrowseScreen() {
   const setQuery = useAppStore((s) => s.setSearchQuery);
   const openEntity = useAppStore((s) => s.openEntity);
   const askQuestion = useAppStore((s) => s.askQuestion);
-  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search'>('documents');
+  // Customers first (owner, 2026-09-20): the shop's people are the entry point; documents hang off them.
+  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search'>('customers');
   const [kind, setKind] = useState<Kind>('all');
   const [debounced, setDebounced] = useState(query);
   useEffect(() => {

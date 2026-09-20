@@ -1443,8 +1443,12 @@ function makeStore(db, tenantId) {
      * the caller, or null) matches name, address or customer number.
      * `warranties` is the raw jsonb array of each owned unit's
      * data->'warranty' — alertTier() (warrantyRules.js) is applied to it in
-     * JS (see customers.js's countWarrantyAlerts), not here, so this store
-     * never has to duplicate that date math in SQL.
+     * JS (see customers.js's tallyWarrantyAlerts), not here, so this store
+     * never has to duplicate that date math in SQL. `last_activity` is the
+     * max of: a linked document's created_at, a unit's extracted
+     * service_date, and a unit's own updated_at (install/warranty edits) —
+     * so a customer whose only recent event is a new/edited piece of
+     * equipment doesn't read as stale.
      */
     listCustomersSummary: ({ like = null, sort = 'recent', limit = 200 } = {}) => {
       const lim = Math.min(Math.max(Number(limit) || 200, 1), 200);
@@ -1461,7 +1465,7 @@ function makeStore(db, tenantId) {
                                     OR customer_number ILIKE $1)
          ),
          equip AS (
-           SELECT id, customer_id, data->'warranty' AS warranty
+           SELECT id, customer_id, data->'warranty' AS warranty, updated_at
              FROM entities WHERE entity_type = 'equipment' AND customer_id IS NOT NULL AND ${TENANT}
          ),
          doc_union AS (
@@ -1490,12 +1494,12 @@ function makeStore(db, tenantId) {
             GROUP BY eq.customer_id
          ),
          equip_agg AS (
-           SELECT customer_id, COUNT(*) AS n FROM equip GROUP BY customer_id
+           SELECT customer_id, COUNT(*) AS n, MAX(updated_at) AS last_equip_update FROM equip GROUP BY customer_id
          )
          SELECT c.id, c.customer_number, c.data,
                 COALESCE(da.doc_count, 0)::int AS doc_count,
                 COALESCE(ea.n, 0)::int         AS equipment_count,
-                GREATEST(da.last_doc, sa.last_service::timestamptz) AS last_activity,
+                GREATEST(da.last_doc, sa.last_service::timestamptz, ea.last_equip_update) AS last_activity,
                 COALESCE(
                   (SELECT jsonb_agg(eq.warranty) FROM equip eq WHERE eq.customer_id = c.id AND eq.warranty IS NOT NULL),
                   '[]'::jsonb

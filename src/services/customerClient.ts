@@ -91,11 +91,12 @@ export interface CustomerSummary {
   documentCount: number;
   equipmentCount: number;
   lastActivity: string | null;
+  /** Combined count (expiring + expired) — kept for the table's badge column. */
   warrantyAlerts: number;
-  /** Not sent by the API today (countWarrantyAlerts folds both tiers into
-   *  warrantyAlerts) — declared for forward compat, see core/customerFilters.ts. */
-  expiringCount?: number;
-  expiredCount?: number;
+  /** Per-tier breakdown the Alerts filter actually reads (see
+   *  core/customerFilters.ts / api/_lib/routes/customers.js's
+   *  tallyWarrantyAlerts). 'expiring' covers both the 30- and 90-day tiers. */
+  alerts: { expiring: number; expired: number };
   mergedInto: string | null;
 }
 
