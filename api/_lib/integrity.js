@@ -127,6 +127,25 @@ export function nameTokenCount(raw) {
  * is untouched — preserving that as an alias is coalesceEntityData's own
  * job, not this rule's. Exported for scripts/verify-integrity.mjs.
  */
+/**
+ * Pure: which of two address strings should survive when both name the SAME
+ * building (same normalizeAddressKey street identity) — the fuller string
+ * wins, e.g. "1519 W Juniper" -> "1519 W Juniper Ave, Mesa AZ 85202" (owner
+ * 2026-09-20: a merge run before this fix kept the terse address a customer
+ * happened to be created with, over the fuller one a later document supplied
+ * for the dropped record). A DIFFERENT street key means a different address
+ * entirely, not a fuller version of this one — untouched. Exported for
+ * scripts/verify-integrity.mjs.
+ */
+export function preferFullerAddress(keepAddr, dropAddr) {
+  const keep = String(keepAddr ?? '').trim();
+  const drop = String(dropAddr ?? '').trim();
+  if (!keep) return drop;
+  if (!drop || keep === drop) return keep;
+  if (normalizeAddressKey(keep) !== normalizeAddressKey(drop)) return keep;
+  return drop.length > keep.length ? drop : keep;
+}
+
 export function preferFullerName(keepName, dropName) {
   const keep = String(keepName ?? '').trim();
   const drop = String(dropName ?? '').trim();
@@ -502,15 +521,25 @@ const isBlank = (v) => v == null || String(v).trim() === '';
  *     (shorter) name is preserved as an alias instead. Any other differing
  *     name (including an unrelated one, e.g. a company name) is preserved as
  *     an alias, never overwritten.
+ *   - `service_address`/`billing_address`: fill-only when one side is blank;
+ *     when BOTH name the same building (preferFullerAddress), the fuller
+ *     string is adopted even though `keep`'s wasn't blank — a terse address
+ *     is never allowed to shadow a fuller one for the same place.
  * Pure — no db, no mutation of the inputs.
  */
+const ADDRESS_KEYS = ['service_address', 'billing_address'];
+
 export function coalesceEntityData(keep, drop) {
   const k = { ...(keep ?? {}) };
   const d = drop ?? {};
 
   for (const [key, value] of Object.entries(d)) {
-    if (key === 'notes' || key === 'customer_name' || ARRAY_UNION_KEYS.includes(key)) continue;
+    if (key === 'notes' || key === 'customer_name' || ARRAY_UNION_KEYS.includes(key) || ADDRESS_KEYS.includes(key)) continue;
     if (isBlank(k[key]) && !isBlank(value)) k[key] = value;
+  }
+
+  for (const key of ADDRESS_KEYS) {
+    if (!isBlank(d[key])) k[key] = preferFullerAddress(k[key], d[key]);
   }
 
   for (const key of ARRAY_UNION_KEYS) {

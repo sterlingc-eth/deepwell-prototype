@@ -9,7 +9,7 @@ import {
   isUnlinkedDocument, isEquipmentMissingCustomer, multiUnitUnderLinked,
   unitIndexAssignments, unitIndexBackfillPlan, groupExtractionRowsByUnit,
   csvCell, csvRow, CUSTOMER_MATCH_THRESHOLD, CUSTOMER_SUGGEST_THRESHOLD, coalesceEntityData,
-  nameTokenCount, preferFullerName, evaluateCustomerMatch, buildMatchEvidence,
+  nameTokenCount, preferFullerName, preferFullerAddress, evaluateCustomerMatch, buildMatchEvidence,
   normalizeUnitKey, normalizeCityKey, normalizeZipKey, normalizePhoneKey, normalizeEmailKey,
 } from '../api/_lib/integrity.js';
 
@@ -464,6 +464,49 @@ eq(
     pair && pair.keepId === 'lower' && pair.dropId === 'higher',
     JSON.stringify(pair)
   );
+}
+
+/* ------------------------------------------------------- preferFullerAddress
+ * Owner 2026-09-20: a merge before the coalesce fix kept "1519 W Juniper"
+ * over the fuller "1519 W Juniper Ave, Mesa AZ 85202" the dropped record had. */
+
+eq(
+  'same street, drop has the fuller address -> fuller wins',
+  preferFullerAddress('1519 W Juniper', '1519 W Juniper Ave, Mesa AZ 85202'),
+  '1519 W Juniper Ave, Mesa AZ 85202'
+);
+eq(
+  'same street, keep already has the fuller address -> unchanged',
+  preferFullerAddress('1519 W Juniper Ave, Mesa AZ 85202', '1519 W Juniper'),
+  '1519 W Juniper Ave, Mesa AZ 85202'
+);
+eq(
+  'different street -> keep untouched, never treated as "fuller"',
+  preferFullerAddress('1519 W Juniper', '1519 E Juniper Ave, Mesa AZ 85202'),
+  '1519 W Juniper'
+);
+eq('blank keep takes drop outright', preferFullerAddress('', '1519 W Juniper'), '1519 W Juniper');
+eq('blank drop leaves keep alone', preferFullerAddress('1519 W Juniper', ''), '1519 W Juniper');
+eq('identical strings -> unchanged', preferFullerAddress('1519 W Juniper', '1519 W Juniper'), '1519 W Juniper');
+
+/* ------------------------------------------------- healMergedSurvivors case
+ * The Castillo merge: the owner merged before the coalesce fix deployed, so
+ * the survivor (C-00003 "Castillo", "1519 W Juniper") lost the dropped
+ * record's fuller name and fuller address. coalesceEntityData alone (what
+ * healMergedSurvivors runs per pair, in api/_lib/routes/integrity.js) must
+ * restore both, and a second run over the same pair must be a no-op. */
+{
+  const survivor = { customer_name: 'Castillo', service_address: '1519 W Juniper', phone: '480-555-0100' };
+  const dropped = { customer_name: 'Ray & Linda Castillo', service_address: '1519 W Juniper Ave, Mesa AZ 85202', email: 'castillo@example.com' };
+  const healed = coalesceEntityData(survivor, dropped);
+  eq('Castillo case: fuller name restored', healed.customer_name, 'Ray & Linda Castillo');
+  eq('Castillo case: fuller address restored', healed.service_address, '1519 W Juniper Ave, Mesa AZ 85202');
+  eq('Castillo case: survivor\'s own phone kept (never lost)', healed.phone, '480-555-0100');
+  eq('Castillo case: dropped\'s email filled in (never lost)', healed.email, 'castillo@example.com');
+  eq('Castillo case: shorter name preserved as an alias, not dropped', healed.aliases, ['Castillo']);
+
+  const healedAgain = coalesceEntityData(healed, dropped);
+  eq('Castillo case: healing an already-healed survivor a second time is a no-op', healedAgain, healed);
 }
 
 /* --------------------------------------------------------------------- csv */

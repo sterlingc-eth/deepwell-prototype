@@ -75,7 +75,7 @@ during rollout since the array is still there, just nested.
 }
 ```
 
-`{ action: 'integrityFix', apply: ['mergeDuplicates','linkDocuments','linkEquipmentCustomers','createMissingUnits'], dryRun: false }` ->
+`{ action: 'integrityFix', apply: ['mergeDuplicates','linkDocuments','linkEquipmentCustomers','createMissingUnits','healMergedSurvivors'], dryRun: false }` ->
 ```json
 {
   "dryRun": false,
@@ -83,6 +83,7 @@ during rollout since the array is still there, just nested.
   "documentsLinked": [{ "documentId": "uuid", "customerId": "uuid" }],
   "equipmentLinked": [{ "equipmentId": "uuid", "customerId": "uuid" }],
   "unitsCreated": [{ "documentId": "uuid", "equipmentId": "uuid", "serial": "..." }],
+  "survivorsHealed": [{ "survivorId": "uuid" }],
   "skipped": [{ "documentId": "uuid", "reason": "score below threshold" }]
 }
 ```
@@ -91,7 +92,23 @@ requests (mirrors `selectCustomerMatch`'s own bar). Every action is
 idempotent — running it twice with the same `apply` list is a no-op the
 second time. Every applied action is audit-logged as `integrity.<verb>`.
 Admin-only when the tenant is a Clerk org (same `hasShop`/`requireRole`
-pattern as `deleteDocuments`).
+pattern as `deleteDocuments`) — this also now covers `mergeEntities` and
+`mergeCustomers` directly (2026-09-20 NO-GO fix; previously ungated).
+
+**`healMergedSurvivors`** (2026-09-20 follow-up): a merge applied before the
+`coalesceEntityData` fix below shipped could have silently dropped the
+dropped record's fuller name/address/phone/etc. This step finds every
+already-merged entity whose `merged_into` points at a still-live survivor,
+re-runs `coalesceEntityData(survivor.data, dropped.data)` — fill-only,
+`preferFullerName`, and (new) `preferFullerAddress` for `service_address`/
+`billing_address` when both name the same street — and updates the survivor
+only when the result actually differs. Chained merges (survivor itself later
+merged again) are left for the pass after that link resolves. Idempotent: a
+second run computes the same coalesced value and writes nothing.
+
+`mergeEntities`/`mergeCustomers` themselves also now coalesce `data` at merge
+time (same `coalesceEntityData`), so `healMergedSurvivors` only matters for
+merges that happened before this fix deployed — new merges never need it.
 
 ### GET /api/v1/export?kind=documents|customers|equipment
 
@@ -108,8 +125,9 @@ address).
 
 Runs `integrityFix` per tenant inside the shared 45s deadline, auto-applying
 only score >= 0.95 merges plus all link fixes (`linkDocuments`,
-`linkEquipmentCustomers`, `createMissingUnits`); lower-score duplicate pairs
-are left as suggestions (surfaced via `GET /api/v1/customers`'s `duplicates`).
+`linkEquipmentCustomers`, `createMissingUnits`, `healMergedSurvivors`);
+lower-score duplicate pairs are left as suggestions (surfaced via
+`GET /api/v1/customers`'s `duplicates`).
 Also runs for the just-extracted document at the end of
 `extractDocumentFields`, so a new document never sits unlinked waiting for the
 nightly pass.

@@ -20,13 +20,15 @@ import { hasShop, requireRole, AuthError } from '../auth.js';
 import {
   customerMatchScore, findDuplicateCustomerPairs, isUnlinkedDocument,
   isEquipmentMissingCustomer, multiUnitUnderLinked, CUSTOMER_MATCH_THRESHOLD,
-  unitIndexBackfillPlan, groupExtractionRowsByUnit,
+  unitIndexBackfillPlan, groupExtractionRowsByUnit, coalesceEntityData,
 } from '../integrity.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const CUSTOMER_SCAN_LIMIT = 500;
 const DOCUMENT_SCAN_LIMIT = 1000;
-const APPLY_ACTIONS = new Set(['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits']);
+const APPLY_ACTIONS = new Set([
+  'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
+]);
 
 // ------------------------------------------------------------------ reads --
 
@@ -137,6 +139,27 @@ async function loadMultiUnitCandidates(db) {
     []
   );
   return rows.rows.map((r) => ({ documentId: r.document_id, serialValues: r.values ?? [], linkedEquipmentCount: Number(r.linked_count) || 0 }));
+}
+
+/** Every merged (dropped) entity whose merged_into points at a currently
+ *  LIVE survivor (survivor.merged_into IS NULL) — healMergedSurvivors'
+ *  candidate set. A chain (X merged into Y, Y later merged into Z) is left
+ *  for a later pass once Y itself is a live survivor pointed at by nothing
+ *  further, rather than guessed at here. */
+async function loadMergedSurvivorCandidates(db) {
+  const rows = await db.raw(
+    `SELECT dropped.id AS dropped_id, dropped.data AS dropped_data,
+            survivor.id AS survivor_id, survivor.data AS survivor_data
+       FROM entities dropped
+       JOIN entities survivor ON survivor.id = dropped.merged_into
+      WHERE dropped.merged_into IS NOT NULL AND survivor.merged_into IS NULL AND dropped.${TENANT}
+      LIMIT ${CUSTOMER_SCAN_LIMIT}`,
+    []
+  );
+  return rows.rows.map((r) => ({
+    droppedId: r.dropped_id, droppedData: r.dropped_data,
+    survivorId: r.survivor_id, survivorData: r.survivor_data,
+  }));
 }
 
 async function loadOrphanEquipment(db) {
@@ -292,7 +315,7 @@ async function createMissingUnitsForDocument(ctx, { documentId }, { dryRun }) {
  */
 async function applyIntegrityFix(ctx, { apply, dryRun = false, minMergeScore = CUSTOMER_MATCH_THRESHOLD } = {}, actorClerkId) {
   const applySet = new Set((Array.isArray(apply) ? apply : []).filter((a) => APPLY_ACTIONS.has(a)));
-  const result = { dryRun: !!dryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [], skipped: [] };
+  const result = { dryRun: !!dryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [], survivorsHealed: [], skipped: [] };
 
   if (applySet.has('mergeDuplicates')) {
     const customers = await withRecordsTenant(ctx, loadCustomersForScan);
@@ -361,6 +384,34 @@ async function applyIntegrityFix(ctx, { apply, dryRun = false, minMergeScore = C
       await withRecordsTenant(ctx, (db) => db.logAction({
         clerk_user_id: actorClerkId, action: 'integrity.create_missing_units', resource_type: 'tenant',
         changes: { count: result.unitsCreated.length },
+      }));
+    }
+  }
+
+  if (applySet.has('healMergedSurvivors')) {
+    const rows = await withRecordsTenant(ctx, loadMergedSurvivorCandidates);
+    // One survivor can have more than one dropped row pointing at it; fold
+    // them in one at a time. coalesceEntityData is fill-only/prefer-fuller,
+    // so folding an already-healed pair again changes nothing — idempotent.
+    const bySurvivor = new Map();
+    for (const r of rows) {
+      if (!bySurvivor.has(r.survivorId)) bySurvivor.set(r.survivorId, { data: r.survivorData ?? {}, dropped: [] });
+      bySurvivor.get(r.survivorId).dropped.push(r.droppedData ?? {});
+    }
+    for (const [survivorId, { data, dropped }] of bySurvivor) {
+      const healed = dropped.reduce((acc, d) => coalesceEntityData(acc, d), data);
+      if (JSON.stringify(healed) === JSON.stringify(data)) continue; // already healed, nothing changed
+      if (dryRun) { result.survivorsHealed.push({ survivorId }); continue; }
+      await withRecordsTenant(ctx, (db) => db.raw(
+        `UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
+        [survivorId, healed]
+      ));
+      result.survivorsHealed.push({ survivorId });
+    }
+    if (result.survivorsHealed.length && !dryRun) {
+      await withRecordsTenant(ctx, (db) => db.logAction({
+        clerk_user_id: actorClerkId, action: 'integrity.heal_survivor', resource_type: 'tenant',
+        changes: { count: result.survivorsHealed.length },
       }));
     }
   }

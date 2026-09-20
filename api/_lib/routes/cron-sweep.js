@@ -100,6 +100,7 @@ export default async function handler(req, res) {
     budgetDeferredStillFailing: 0,
     integrityMerged: 0,
     integrityLinked: 0,
+    integrityHealed: 0,
     integritySkippedTenants: 0,
     errors: [],
   };
@@ -180,11 +181,12 @@ export default async function handler(req, res) {
     if (Date.now() < deadlineAt) {
       try {
         const fixed = await integrityFixTenant(ctx, {
-          apply: ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits'],
+          apply: ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors'],
           minMergeScore: 0.95,
         });
         summary.integrityMerged += fixed.merged.length;
         summary.integrityLinked += fixed.documentsLinked.length + fixed.equipmentLinked.length + fixed.unitsCreated.length;
+        summary.integrityHealed += fixed.survivorsHealed.length;
       } catch (err) {
         summary.errors.push({ tenant: t.tenant_key, phase: "integrity-fix", message: err?.message });
         await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "integrity-fix" });
@@ -228,7 +230,7 @@ export default async function handler(req, res) {
       `outreach: ${summary.outreach?.tenantsChecked ?? 0} tenant(s), ${summary.outreach?.drafted ?? 0} drafted, ` +
       `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed; ` +
       `integrity: ${summary.integrityMerged} merged, ${summary.integrityLinked} linked, ` +
-      `${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
+      `${summary.integrityHealed} survivor(s) healed, ${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
     { route: "/api/cron-sweep" }
   );
 

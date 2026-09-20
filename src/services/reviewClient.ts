@@ -122,9 +122,9 @@ export interface IntegrityScanResult {
   };
 }
 
-export type IntegrityApplyAction = 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits';
+export type IntegrityApplyAction = 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits' | 'healMergedSurvivors';
 
-export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits'];
+export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors'];
 
 export interface IntegrityFixResult {
   dryRun: boolean;

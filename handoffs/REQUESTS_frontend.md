@@ -56,6 +56,16 @@
   until they exist, both options degrade to "has any alert" (documented
   in-code) rather than a fabricated distinction.
 
+- New integrityFix apply action `healMergedSurvivors` (2026-09-20 follow-up:
+  a merge run before the coalesce fix silently dropped a dropped record's
+  fuller name/address — this step repairs any already-merged survivor,
+  fill-only, in place). It's in the nightly cron apply list already
+  (`api/_lib/routes/cron-sweep.js`). Please add `'healMergedSurvivors'` to
+  `IntegrityApplyAction` and `ALL_INTEGRITY_FIXES` in
+  `src/services/reviewClient.ts` so the "Fix everything" button also runs
+  it — it's additive and idempotent, no response-shape change (result gains
+  a `survivorsHealed: [{survivorId}]` array alongside the existing ones).
+
 ## Note on the brief's item 6 (IntakeScreen) "when Advance is refused, show
 the reason inline"
 - Intake has no "Advance" control — only Review does (the footer's
