@@ -192,14 +192,19 @@ export async function customers(req, res) {
     }));
 
     // Duplicate suggestions (handoffs/DATA_INTEGRITY_2026-09-20.md bug A /
-    // section D): pairs scoring >= CUSTOMER_MATCH_THRESHOLD among exactly the
-    // customers this call returned — same set the screen is showing, so a
-    // scoped/filtered view surfaces only its own duplicates. Response shape
-    // was a bare array; now an object with the array nested under
-    // `customers` plus this new field, kept backward-compatible in name only
-    // (frontend reads `.customers` going forward — see the handoff).
+    // section D, tightened by the 2026-09-20 "strict rules" follow-up) among
+    // exactly the customers this call returned — same set the screen is
+    // showing, so a scoped/filtered view surfaces only its own duplicates.
+    // phone/email feed evaluateCustomerMatch's hard-veto + auto-tier contact
+    // check. Response shape was a bare array; now an object with the array
+    // nested under `customers` plus this new field, kept backward-compatible
+    // in name only (frontend reads `.customers` going forward — see the
+    // handoff).
     const duplicates = findDuplicateCustomerPairs(
-      rows.map((r) => ({ id: r.id, customerNumber: r.customer_number, name: r.data?.customer_name, address: r.data?.service_address }))
+      rows.map((r) => ({
+        id: r.id, customerNumber: r.customer_number, name: r.data?.customer_name,
+        address: r.data?.service_address, phone: r.data?.phone, email: r.data?.email,
+      }))
     );
 
     return handleCors(res, req).status(200).json({ customers: data, duplicates });

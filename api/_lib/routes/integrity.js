@@ -32,13 +32,18 @@ const APPLY_ACTIONS = new Set(['mergeDuplicates', 'linkDocuments', 'linkEquipmen
 
 async function loadCustomersForScan(db) {
   const rows = await db.raw(
-    `SELECT id, customer_number, data->>'customer_name' AS name, data->>'service_address' AS address
+    `SELECT id, customer_number, data->>'customer_name' AS name, data->>'service_address' AS address,
+            data->>'phone' AS phone, data->>'email' AS email
        FROM entities
       WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
       ORDER BY created_at LIMIT ${CUSTOMER_SCAN_LIMIT}`,
     []
   );
-  return rows.rows.map((r) => ({ id: r.id, customerNumber: r.customer_number, name: r.name, address: r.address }));
+  // phone/email feed evaluateCustomerMatch's hard-veto + auto-tier contact
+  // check (integrity.js, owner "strict rules" follow-up 2026-09-20).
+  return rows.rows.map((r) => ({
+    id: r.id, customerNumber: r.customer_number, name: r.name, address: r.address, phone: r.phone, email: r.email,
+  }));
 }
 
 /** One row per document that names a customer_name/service_address, with
@@ -279,6 +284,11 @@ async function createMissingUnitsForDocument(ctx, { documentId }, { dryRun }) {
  * `minMergeScore`: floor for auto-merging duplicate customers (default the
  * same 0.9 bar selectCustomerMatch itself uses); cron-sweep.js passes 0.95
  * for its unattended nightly run and leaves lower-score pairs as suggestions.
+ * Owner "strict rules" follow-up (2026-09-20): a high score alone is no
+ * longer enough here — only `tier === 'auto'` pairs are ever merged
+ * unattended (evaluateCustomerMatch, via findDuplicateCustomerPairs); a
+ * suggest-tier pair (e.g. matching name/address but phone only on one side)
+ * is left for a human in the Customers-tab banner, however high its score.
  */
 async function applyIntegrityFix(ctx, { apply, dryRun = false, minMergeScore = CUSTOMER_MATCH_THRESHOLD } = {}, actorClerkId) {
   const applySet = new Set((Array.isArray(apply) ? apply : []).filter((a) => APPLY_ACTIONS.has(a)));
@@ -286,7 +296,8 @@ async function applyIntegrityFix(ctx, { apply, dryRun = false, minMergeScore = C
 
   if (applySet.has('mergeDuplicates')) {
     const customers = await withRecordsTenant(ctx, loadCustomersForScan);
-    const pairs = findDuplicateCustomerPairs(customers, { threshold: Math.max(minMergeScore, CUSTOMER_MATCH_THRESHOLD) });
+    const pairs = findDuplicateCustomerPairs(customers, { threshold: Math.max(minMergeScore, CUSTOMER_MATCH_THRESHOLD) })
+      .filter((p) => p.tier === 'auto');
     for (const pair of pairs) {
       if (dryRun) { result.merged.push(pair); continue; }
       try {

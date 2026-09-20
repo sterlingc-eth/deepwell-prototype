@@ -3,7 +3,7 @@ import { AlertTriangle, ChevronDown, ChevronUp, Download, GitMerge, Loader2, Plu
 import { formatYmd } from '../core/answer';
 import { customerClient, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSort, type CustomerSummary } from '../services/customerClient';
 import { DEFAULT_CUSTOMER_FILTERS, matchesCustomerFilters, type AlertsFilter, type EquipmentFilter, type LastActivityFilter } from '../core/customerFilters';
-import { pairKey, reduceDuplicates, visibleDuplicates } from '../core/duplicates';
+import { defaultKeepId, pairKey, reduceDuplicates, visibleDuplicates } from '../core/duplicates';
 import { downloadExportCsv } from '../services/exportClient';
 import { IntegrityPanel } from '../components/IntegrityPanel';
 import { useAppStore } from '../store/appStore';
@@ -109,16 +109,38 @@ export function CustomersScreen() {
   const [mergingKey, setMergingKey] = useState<string | null>(null);
   const [mergeAllBusy, setMergeAllBusy] = useState(false);
   const [mergeErr, setMergeErr] = useState<string | null>(null);
-  const nameById = useMemo(() => new Map(rows.map((r) => [r.id, r.name || r.customerNumber || 'Unnamed'])), [rows]);
+  // Which side of each pair the person picked to keep, overriding the
+  // fuller-name default below (owner feedback 2026-09-20: "give me an
+  // option on which account to merge into the other"). Keyed by pairKey.
+  const [chosenKeep, setChosenKeep] = useState<Record<string, string>>({});
+  const customerById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
   const visibleDups = useMemo(() => visibleDuplicates(duplicates, dismissed), [duplicates, dismissed]);
+  // "Merge all" only ever sweeps the tier the backend would also auto-merge
+  // unattended (owner "strict rules" follow-up 2026-09-20) — a suggest-tier
+  // pair (e.g. matching name/address but phone confirmed on only one side)
+  // always waits for a person to look at it individually.
+  const autoDups = useMemo(() => visibleDups.filter((p) => p.tier === 'auto'), [visibleDups]);
+
+  /** The id to keep for this pair: the person's explicit pick if they made
+   *  one, else the fuller-name default (more name tokens; tie -> lower
+   *  customer number — same rule the backend's nightly auto-merge uses). */
+  const keepIdFor = (p: CustomerDuplicatePair): string => {
+    const picked = chosenKeep[pairKey(p)];
+    if (picked === p.keepId || picked === p.dropId) return picked;
+    const a = customerById.get(p.keepId);
+    const b = customerById.get(p.dropId);
+    return a && b ? defaultKeepId(a, b) : p.keepId;
+  };
 
   const dismissPair = (p: CustomerDuplicatePair) => setDismissed((d) => reduceDuplicates(d, { type: 'dismiss', ...p }));
 
   const mergePair = async (p: CustomerDuplicatePair) => {
+    const keepId = keepIdFor(p);
+    const dropId = keepId === p.keepId ? p.dropId : p.keepId;
     setMergingKey(pairKey(p));
     setMergeErr(null);
     try {
-      await customerClient.merge(p.keepId, p.dropId);
+      await customerClient.merge(keepId, dropId);
       setDismissed((d) => reduceDuplicates(d, { type: 'merge', ...p }));
       await load();
     } catch (e) {
@@ -129,13 +151,21 @@ export function CustomersScreen() {
   };
 
   const mergeAll = async () => {
+    if (!window.confirm(`Merge all ${autoDups.length} matching pair${autoDups.length === 1 ? '' : 's'}? Keeps the record with the fuller name for each pair. This can't be undone.`)) {
+      return;
+    }
     setMergeAllBusy(true);
     setMergeErr(null);
     try {
-      // duplicates from the API already score >= 0.9 (the same bar the
-      // owner asked "Merge all" to respect) — nothing more to filter here.
-      for (const p of visibleDups) {
-        await customerClient.merge(p.keepId, p.dropId);
+      // Only the auto tier — name, address, and phone/email (where present)
+      // all agree with no conflicting field. A suggest-tier pair is never
+      // swept in bulk, however high its score.
+      // Always the fuller-name default here, ignoring any per-pair pick —
+      // "Merge all" is a bulk action, not a review of each choice.
+      for (const p of autoDups) {
+        const keepId = defaultKeepId(customerById.get(p.keepId) ?? { id: p.keepId, name: null }, customerById.get(p.dropId) ?? { id: p.dropId, name: null });
+        const dropId = keepId === p.keepId ? p.dropId : p.keepId;
+        await customerClient.merge(keepId, dropId);
         setDismissed((d) => reduceDuplicates(d, { type: 'merge', ...p }));
       }
       await load();
@@ -234,28 +264,67 @@ export function CustomersScreen() {
             <h3 className="flex items-center gap-2 text-h4">
               <Users2 className="w-4 h-4 text-warn" aria-hidden="true" /> Donovan found {visibleDups.length} customer{visibleDups.length === 1 ? '' : 's'} that look like the same household
             </h3>
-            <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={mergeAllBusy} onClick={() => void mergeAll()}>
-              {mergeAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge all
-            </button>
+            {/* Only ever sweeps the auto tier — a suggest-tier pair (partial
+               phone/email confirmation) always needs a person's own click. */}
+            {autoDups.length > 0 && (
+              <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={mergeAllBusy} onClick={() => void mergeAll()}>
+                {mergeAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge all ({autoDups.length})
+              </button>
+            )}
           </div>
           {mergeErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{mergeErr}</p>}
-          <ul className="divide-y divide-line border border-line rounded-lg">
-            {visibleDups.map((p) => (
-              <li key={pairKey(p)} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
-                <span className="min-w-0">
-                  <span className="text-ink">Keep <span className="font-medium">{nameById.get(p.keepId) ?? p.keepId}</span></span>
-                  <span className="text-ink-3"> · drop </span>
-                  <span className="text-ink">{nameById.get(p.dropId) ?? p.dropId}</span>
-                  <span className="block text-caption text-ink-3">{p.reason} · {Math.round(p.score * 100)}% match</span>
-                </span>
-                <span className="flex items-center gap-2 shrink-0">
-                  <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={mergingKey === pairKey(p)} onClick={() => void mergePair(p)}>
-                    {mergingKey === pairKey(p) ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge
-                  </button>
-                  <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" onClick={() => dismissPair(p)}>Not the same</button>
-                </span>
-              </li>
-            ))}
+          <ul className="space-y-3">
+            {visibleDups.map((p) => {
+              const key = pairKey(p);
+              const options = [customerById.get(p.keepId), customerById.get(p.dropId)].filter((c): c is CustomerSummary => !!c);
+              const keepId = keepIdFor(p);
+              const keptName = options.find((c) => c.id === keepId)?.name || options.find((c) => c.id === keepId)?.customerNumber || 'Unnamed';
+              return (
+                <li key={key} className="border border-line rounded-lg p-3 space-y-2.5">
+                  <p className="text-caption text-ink-3">
+                    {p.reason} · {Math.round(p.score * 100)}% match
+                    {p.tier === 'suggest' && <span className="dw-pill-warn inline-flex ml-2 !py-0">Needs your review</span>}
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {options.map((c) => (
+                      <label
+                        key={c.id}
+                        className={[
+                          'flex items-start gap-2 rounded-lg border p-2.5 cursor-pointer',
+                          keepId === c.id ? 'border-forest-700 dark:border-brass-300 bg-surface-2' : 'border-line',
+                        ].join(' ')}
+                      >
+                        <input
+                          type="radio"
+                          name={`keep-${key}`}
+                          className="mt-1 shrink-0"
+                          checked={keepId === c.id}
+                          onChange={() => setChosenKeep((cur) => ({ ...cur, [key]: c.id }))}
+                        />
+                        <span className="min-w-0 text-body">
+                          <span className="block text-caption font-medium text-ink-3">Keep this one</span>
+                          <span className="block font-medium text-ink">{c.name || 'Unnamed'}</span>
+                          <span className="block text-caption text-ink-3 font-mono">{c.customerNumber ?? '—'}</span>
+                          <span className="block text-caption text-ink-2">{c.serviceAddress ?? 'No address on file'}</span>
+                          <span className="block text-caption text-ink-3">
+                            {c.documentCount} doc{c.documentCount === 1 ? '' : 's'} · {c.equipmentCount} unit{c.equipmentCount === 1 ? '' : 's'}
+                          </span>
+                          {(c.phone || c.email) && (
+                            <span className="block text-caption text-ink-3">{[c.phone, c.email].filter(Boolean).join(' · ')}</span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={mergingKey === key} onClick={() => void mergePair(p)}>
+                      {mergingKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge into {keptName}
+                    </button>
+                    <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" onClick={() => dismissPair(p)}>Not the same</button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

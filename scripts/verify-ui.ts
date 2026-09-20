@@ -42,7 +42,7 @@ import { docsMatchingFilter } from '../src/screens/ReviewScreen';
 import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
 import { DEFAULT_CUSTOMER_FILTERS, matchesCustomerFilters, type CustomerFilters } from '../src/core/customerFilters';
-import { pairKey, reduceDuplicates, visibleDuplicates } from '../src/core/duplicates';
+import { pairKey, reduceDuplicates, visibleDuplicates, nameTokenCount, defaultKeepId } from '../src/core/duplicates';
 import { groupExtractionsByUnit } from '../src/domains/hvac/units';
 import type { CustomerSummary } from '../src/services/customerClient';
 // The real source of truth (handoffs/TEAM_BRIEF_2026-09-19.md) — agent-backend
@@ -864,6 +864,25 @@ function listFilesRecursive(dir: string): string[] {
 
   eq('visibleDuplicates: hides a dismissed pair, keeps the rest', visibleDuplicates([pair, other], new Set(['k1:d1'])), [other]);
   eq('visibleDuplicates: an untouched set hides nothing', visibleDuplicates([pair, other], new Set()), [pair, other]);
+}
+
+/* -------------------------------------------------- duplicates keep-chooser
+ * Owner feedback 2026-09-20: "give me an option on which account to merge
+ * into the other; I wanted to keep the one with both their names ('Ray &
+ * Linda Castillo') instead of just the last name ('Castillo')". */
+{
+  eq('nameTokenCount: "Ray & Linda Castillo" is 3 tokens ("&" is a separator)', nameTokenCount('Ray & Linda Castillo'), 3);
+  eq('nameTokenCount: a surname alone is 1 token', nameTokenCount('Castillo'), 1);
+  eq('nameTokenCount: blank/null -> 0', nameTokenCount(null), 0);
+
+  const fuller = { id: 'full', name: 'Ray & Linda Castillo', customerNumber: 'C-00004' };
+  const surnameOnly = { id: 'surname', name: 'Castillo', customerNumber: 'C-00003' };
+  check('defaultKeepId: the fuller name wins even with the higher customer number', defaultKeepId(fuller, surnameOnly) === 'full');
+  check('defaultKeepId: order of arguments does not matter', defaultKeepId(surnameOnly, fuller) === 'full');
+
+  const lower = { id: 'lower', name: 'Ray Castillo', customerNumber: 'C-00002' };
+  const higher = { id: 'higher', name: 'Ray Castillo', customerNumber: 'C-00009' };
+  check('defaultKeepId: equal name fullness falls back to the lower customer number', defaultKeepId(higher, lower) === 'lower');
 }
 
 /* ---------------------------------------------------------- unit grouping

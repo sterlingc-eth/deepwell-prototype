@@ -102,11 +102,25 @@ export interface CustomerSummary {
 export type CustomerSort = 'name' | 'recent' | 'docs';
 
 /** One GET /api/v1/customers `duplicates` entry
- *  (handoffs/DATA_INTEGRITY_2026-09-20.md) — every pair already scores >= 0.9. */
+ *  (handoffs/DATA_INTEGRITY_2026-09-20.md, tightened 2026-09-20 "strict
+ *  rules" follow-up). `tier`: 'auto' only when name, address, and phone/email
+ *  (where present) all agree with no conflicting identity field anywhere —
+ *  safe to merge unattended. 'suggest' means at least one of those is only
+ *  partly confirmed (e.g. phone on just one record) — a human decides.
+ *  `evidence` lists which identity fields matched, were missing on one side,
+ *  or conflicted (api/_lib/integrity.js's evaluateCustomerMatch). */
+export interface CustomerMatchEvidence {
+  matches: string[];
+  missing: string[];
+  conflicts: string[];
+}
+
 export interface CustomerDuplicatePair {
   keepId: string;
   dropId: string;
   score: number;
+  tier: 'auto' | 'suggest';
+  evidence: CustomerMatchEvidence;
   reason: string;
 }
 

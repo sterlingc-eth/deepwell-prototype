@@ -37,12 +37,43 @@ export function normalizeAddressKey(raw) {
   return tokens.join(' ');
 }
 
-/** 'match' | 'differ' | 'unknown' (either side has no usable address). */
-function compareAddresses(a, b) {
-  const ka = normalizeAddressKey(a);
-  const kb = normalizeAddressKey(b);
-  if (!ka || !kb) return 'unknown';
-  return ka === kb ? 'match' : 'differ';
+/** Unit/suite/apt number pulled out of a full address string — the one
+ *  piece normalizeAddressKey deliberately drops. "100 Main St Apt 2" -> "2".
+ *  Exported for scripts/verify-integrity.mjs. */
+export function normalizeUnitKey(raw) {
+  const m = String(raw ?? '').match(/\b(?:unit|suite|ste|apt|apartment|no\.?|number)\.?\s*#?\s*([a-z0-9-]+)/i);
+  return m ? m[1].toLowerCase() : '';
+}
+
+/** City + zip pulled out of the "city, state zip" tail of an address string
+ *  (everything after the first comma). No comma at all -> both empty
+ *  (a bare street line like "1519 W Juniper" carries no city/zip either
+ *  side can conflict on — that's `missing`, never `conflict`). */
+function parseCityZip(raw) {
+  const parts = String(raw ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return { city: '', zip: '' };
+  const tail = parts[parts.length - 1];
+  const zipMatch = tail.match(/(\d{5})(?:-\d{4})?/);
+  const zip = zipMatch ? zipMatch[1] : '';
+  let rest = (zip ? tail.replace(zipMatch[0], '') : tail).trim();
+  const tokens = rest.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1 && /^[a-z]{2}$/i.test(tokens[tokens.length - 1])) tokens.pop(); // drop state abbrev
+  let city = tokens.join(' ').toLowerCase();
+  if (!city && parts.length >= 3) city = parts[parts.length - 2].toLowerCase(); // "St, Suite 2, Mesa, AZ 85202"
+  return { city, zip };
+}
+
+/** Exported for scripts/verify-integrity.mjs. */
+export function normalizeCityKey(raw) { return parseCityZip(raw).city; }
+export function normalizeZipKey(raw) { return parseCityZip(raw).zip; }
+
+/** Digits only — "(480) 555-1234" and "480-555-1234" compare equal. */
+export function normalizePhoneKey(raw) {
+  return String(raw ?? '').replace(/\D/g, '');
+}
+
+export function normalizeEmailKey(raw) {
+  return String(raw ?? '').trim().toLowerCase();
 }
 
 // -------------------------------------------------------------------- names
@@ -75,47 +106,180 @@ export function normalizeSurname(raw) {
   return surname;
 }
 
-/** 'match' | 'no-match' | 'unknown' (either side has no usable name). */
-function compareNames(a, b) {
+/** How many "name tokens" a name carries — "Ray & Linda Castillo" -> 3,
+ *  "Castillo" -> 1. Used to prefer a fuller name over a surname-only one.
+ *  Exported so preferFullerName and findDuplicateCustomerPairs's keep/drop
+ *  ordering are checked against the exact same count
+ *  (scripts/verify-integrity.mjs). */
+export function nameTokenCount(raw) {
+  return normalizeNamePlain(raw).split(' ').filter(Boolean).length;
+}
+
+/**
+ * Pure: which of two matching customer_name values should survive a merge
+ * (owner request 2026-09-20 follow-up: "keep 'Ray & Linda Castillo', not
+ * just 'Castillo'"). Strict-subset rule only — this is name ADOPTION, not
+ * general dedup, so it only fires when both sides plainly name the same
+ * family (same surname via normalizeSurname): the record naming more people
+ * wins. Two equally-full names ("Castillo, Ray" vs "Ray Castillo") are left
+ * as `keepName` — nothing to gain by picking one over the other. A
+ * different surname (company names: "Plaza Dental" vs "Plaza Dental Group")
+ * is untouched — preserving that as an alias is coalesceEntityData's own
+ * job, not this rule's. Exported for scripts/verify-integrity.mjs.
+ */
+export function preferFullerName(keepName, dropName) {
+  const keep = String(keepName ?? '').trim();
+  const drop = String(dropName ?? '').trim();
+  if (!keep) return drop;
+  if (!drop || keep.toLowerCase() === drop.toLowerCase()) return keep;
+
+  const keepSurname = normalizeSurname(keep);
+  const dropSurname = normalizeSurname(drop);
+  if (!keepSurname || keepSurname !== dropSurname) return keep;
+
+  return nameTokenCount(drop) > nameTokenCount(keep) ? drop : keep;
+}
+
+/**
+ * 'equal' (same set of name tokens, any order — "Castillo, Ray" / "Ray
+ *   Castillo") | 'subset' (one name's tokens are a strict subset of the
+ *   other's — "Castillo" ⊂ "Ray & Linda Castillo", "Plaza Dental" ⊂ "Plaza
+ *   Dental Group") | 'surname' (same last name via normalizeSurname, but
+ *   NOT a subset — different first names: "John Smith" vs "Jane Smith")
+ *   | 'no-match' | 'unknown' (either side has no usable name).
+ * Owner rule (2026-09-20 "strict rules" follow-up): 'surname' alone is never
+ * enough to auto-merge — only 'equal'/'subset' are.
+ */
+function compareNamesStrict(a, b) {
   const na = normalizeNamePlain(a);
   const nb = normalizeNamePlain(b);
   if (!na || !nb) return 'unknown';
-  if (na === nb || na.includes(nb) || nb.includes(na)) return 'match'; // "Plaza Dental" / "Plaza Dental Group"
+  const ta = na.split(' ').filter(Boolean);
+  const tb = nb.split(' ').filter(Boolean);
+  const setA = new Set(ta);
+  const setB = new Set(tb);
+  if (setA.size === setB.size && [...setA].every((t) => setB.has(t))) return 'equal';
+  if (ta.length < tb.length && ta.every((t) => setB.has(t))) return 'subset';
+  if (tb.length < ta.length && tb.every((t) => setA.has(t))) return 'subset';
   const sa = normalizeSurname(a);
   const sb = normalizeSurname(b);
-  if (sa && sb && sa === sb) return 'match';
+  if (sa && sb && sa === sb) return 'surname';
   return 'no-match';
 }
 
 // ------------------------------------------------------------------- score
 
-/**
- * Pure duplicate-customer score, 0..1. `a`/`b` are {name, address} — raw,
- * unnormalized text straight off a customer entity's data.
- *
- * Rules (handoffs/DATA_INTEGRITY_2026-09-20.md bug A):
- *   - addresses that normalize to DIFFERENT street lines -> always low,
- *     whatever the names say: two houses are two households
- *     ("1519 W Juniper" vs "1519 E Juniper" must never merge).
- *   - same normalized street line + matching name/surname -> high (>=0.95):
- *     the Castillo case, and "Plaza Dental Group" / "Plaza Dental".
- *   - same street line, names unrelated -> moderate-low: two different
- *     families sharing one apartment address (unit stripped) must not merge
- *     just because the street line matched.
- *   - matching name with no usable address on either side -> moderate: a
- *     hint worth a human's look, never enough to auto-merge alone.
- */
-export function customerMatchScore(a, b) {
-  const addr = compareAddresses(a?.address, b?.address);
-  const name = compareNames(a?.name, b?.name);
+// The 6 identity fields a hard veto is checked against (owner "strict
+// rules" follow-up, 2026-09-20): a value present and DIFFERING on both
+// sides on any one of these means never a duplicate, whatever else matches.
+// A value missing on one side is not a conflict — fill-only merge still
+// applies to it.
+const IDENTITY_FIELD_CHECKS = [
+  { key: 'phone', get: (c) => c?.phone, normalize: normalizePhoneKey },
+  { key: 'email', get: (c) => c?.email, normalize: normalizeEmailKey },
+  { key: 'street', get: (c) => c?.address, normalize: normalizeAddressKey },
+  { key: 'unit', get: (c) => c?.address, normalize: normalizeUnitKey },
+  { key: 'city', get: (c) => c?.address, normalize: normalizeCityKey },
+  { key: 'zip', get: (c) => c?.address, normalize: normalizeZipKey },
+];
 
-  if (addr === 'differ') return 0.15;
-  if (addr === 'match') return name === 'match' ? 0.97 : name === 'unknown' ? 0.6 : 0.3;
-  // addr === 'unknown'
-  return name === 'match' ? 0.55 : 0;
+/**
+ * Pure: compares `a`/`b` field by field over IDENTITY_FIELD_CHECKS.
+ * `{matches, missing, conflicts}` — each a list of field keys. A field
+ * absent on BOTH sides is left out of all three lists (nothing to say about
+ * it either way). Exported for scripts/verify-integrity.mjs.
+ */
+export function buildMatchEvidence(a, b) {
+  const matches = [];
+  const missing = [];
+  const conflicts = [];
+  for (const f of IDENTITY_FIELD_CHECKS) {
+    const na = f.normalize(f.get(a));
+    const nb = f.normalize(f.get(b));
+    if (!na && !nb) continue;
+    if (!na || !nb) { missing.push(f.key); continue; }
+    (na === nb ? matches : conflicts).push(f.key);
+  }
+  return { matches, missing, conflicts };
+}
+
+/** True when phone or email positively confirms these are the same
+ *  customer, OR neither side has any contact info to check at all (nothing
+ *  to confirm — name + address alone stand, same as before this rule
+ *  existed). False whenever contact info exists but is only PARTIALLY on
+ *  file (present on one side, missing on the other) — not proof either way,
+ *  so a human decides. */
+function contactConfirmed(a, b, evidence) {
+  if (evidence.matches.includes('phone') || evidence.matches.includes('email')) return true;
+  const noContactEitherSide =
+    !normalizePhoneKey(a?.phone) && !normalizePhoneKey(b?.phone) &&
+    !normalizeEmailKey(a?.email) && !normalizeEmailKey(b?.email);
+  return noContactEitherSide;
+}
+
+/** Short human-readable line for the duplicates banner, e.g. "Same address
+ *  and name" or "Same address; one name is part of the other; phone missing
+ *  on one record". */
+function describeMatch({ addrMatch, nameRel, evidence }) {
+  const bits = [];
+  if (addrMatch) bits.push('same address');
+  if (nameRel === 'equal') bits.push('same name');
+  else if (nameRel === 'subset') bits.push('one name is part of the other');
+  else if (nameRel === 'surname') bits.push('same surname, different first name');
+  let base = bits.join(' and ') || (addrMatch ? 'same address' : 'possible match');
+  base = base.charAt(0).toUpperCase() + base.slice(1);
+  const missingBits = evidence.missing.map((k) => `${k} missing on one record`);
+  return [base, ...missingBits].join('; ');
+}
+
+/**
+ * Pure duplicate-customer evaluation. `a`/`b` are {name, address, phone?,
+ * email?} — raw, unnormalized text straight off a customer entity's data.
+ * Returns `{score, tier, evidence, reason}`:
+ *   - HARD VETO first (owner "strict rules" follow-up, 2026-09-20): any
+ *     identity field (phone/email/street/unit/city/zip) present and
+ *     DIFFERING on both sides -> score 0, tier null, reason
+ *     'conflict:<field>' — never a duplicate, whatever else matches.
+ *   - otherwise scored by address + name relation (compareNamesStrict):
+ *     same street + equal/subset name -> 0.97; same street + surname-only
+ *     or name unknown -> 0.6; same street, unrelated names -> 0.3 (two
+ *     families sharing a building); no usable address + equal/subset name
+ *     -> 0.55 (a hint); anything else -> 0.
+ *   - `tier: 'auto'` only when the street matches, the name is equal/subset
+ *     (never surname-only), AND phone or email positively confirms it (or
+ *     neither side has contact info to check) — see contactConfirmed.
+ *     Otherwise `tier: 'suggest'` (or null when vetoed): a human decides.
+ */
+export function evaluateCustomerMatch(a, b) {
+  const evidence = buildMatchEvidence(a, b);
+  if (evidence.conflicts.length) {
+    return { score: 0, tier: null, evidence, reason: `conflict:${evidence.conflicts[0]}` };
+  }
+
+  const addrMatch = evidence.matches.includes('street');
+  const nameRel = compareNamesStrict(a?.name, b?.name);
+  const nameIsFull = nameRel === 'equal' || nameRel === 'subset';
+
+  let score;
+  if (addrMatch) score = nameIsFull ? 0.97 : (nameRel === 'surname' || nameRel === 'unknown') ? 0.6 : 0.3;
+  else score = nameIsFull ? 0.55 : 0;
+
+  const tier = addrMatch && nameIsFull && contactConfirmed(a, b, evidence) ? 'auto' : 'suggest';
+  return { score, tier, evidence, reason: describeMatch({ addrMatch, nameRel, evidence }) };
+}
+
+/** Backward-compatible score-only entry point (recordsStore.js's
+ *  findOrCreateCustomer fuzzy match uses just the number). */
+export function customerMatchScore(a, b) {
+  return evaluateCustomerMatch(a, b).score;
 }
 
 export const CUSTOMER_MATCH_THRESHOLD = 0.9;
+/** Floor for even SUGGESTING a duplicate pair in the banner/scan — well
+ *  below CUSTOMER_MATCH_THRESHOLD (which stays the bar for auto-linking a
+ *  document to an existing customer, recordsStore.js). Auto- vs
+ *  suggest-tier is decided by `tier` above, not by this score alone. */
+export const CUSTOMER_SUGGEST_THRESHOLD = 0.55;
 
 /** 'C-00003' -> 3; anything unparseable sorts last (never chosen as the keep
  *  side over a real number). Local, standalone copy of the same "keep the
@@ -127,14 +291,33 @@ function customerNumberOrdinal(customerNumber) {
   return m ? Number(m[1]) : Infinity;
 }
 
+/** Same default the Customers-tab duplicates chooser uses (src/core/duplicates.ts
+ *  defaultKeepId): the fuller name wins ("Ray & Linda Castillo" beats
+ *  "Castillo"); a tie goes to the lower customer_number. Nightly auto-merge
+ *  and "Fix everything" go through this function with no human in the loop,
+ *  so it must pick the same survivor a human would by default. */
+function pickKeepDrop(a, b) {
+  const ta = nameTokenCount(a?.name);
+  const tb = nameTokenCount(b?.name);
+  if (ta !== tb) return ta > tb ? [a, b] : [b, a];
+  return customerNumberOrdinal(a?.customerNumber) <= customerNumberOrdinal(b?.customerNumber) ? [a, b] : [b, a];
+}
+
 /**
  * All same-household pairs among a tenant's customers. `customers`:
- * [{id, name, address, customerNumber}]. Returns
- * [{keepId, dropId, score, reason}], keep = the lower customer_number (older
- * identity). O(n^2) — fine for an HVAC tenant's customer list; the caller
- * caps `customers` before calling this (routes/integrity.js).
+ * [{id, name, address, customerNumber, phone?, email?}]. Returns
+ * [{keepId, dropId, score, tier, evidence, reason}], keep = the fuller name
+ * (tie: the lower customer_number — see pickKeepDrop). `threshold` defaults
+ * to CUSTOMER_SUGGEST_THRESHOLD — low enough to surface a suggest-tier pair
+ * in the banner; the score-0 hard veto (evaluateCustomerMatch) already keeps
+ * out anything with a conflicting identity field regardless of threshold.
+ * mergeDuplicates (routes/integrity.js) filters the result to `tier ===
+ * 'auto'` itself before merging anything — this function never decides
+ * who's allowed to auto-merge, only who's worth mentioning. O(n^2) — fine
+ * for an HVAC tenant's customer list; the caller caps `customers` before
+ * calling this (routes/integrity.js).
  */
-export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_MATCH_THRESHOLD } = {}) {
+export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_SUGGEST_THRESHOLD } = {}) {
   const list = Array.isArray(customers) ? customers : [];
   const pairs = [];
   for (let i = 0; i < list.length; i++) {
@@ -142,16 +325,10 @@ export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_MAT
       const a = list[i];
       const b = list[j];
       if (!a?.id || !b?.id || a.id === b.id) continue;
-      const score = customerMatchScore(a, b);
+      const { score, tier, evidence, reason } = evaluateCustomerMatch(a, b);
       if (score < threshold) continue;
-      const [keep, drop] = customerNumberOrdinal(a.customerNumber) <= customerNumberOrdinal(b.customerNumber)
-        ? [a, b] : [b, a];
-      pairs.push({
-        keepId: keep.id,
-        dropId: drop.id,
-        score,
-        reason: score >= 0.95 ? 'same address, matching name' : 'likely same household',
-      });
+      const [keep, drop] = pickKeepDrop(a, b);
+      pairs.push({ keepId: keep.id, dropId: drop.id, score, tier, evidence, reason });
     }
   }
   return pairs.sort((x, y) => y.score - x.score);
@@ -318,8 +495,13 @@ const isBlank = (v) => v == null || String(v).trim() === '';
  *   - `aliases` and `former_numbers` are unioned (deduped, order-stable).
  *   - `notes` are concatenated (drop's notes appended on a new line) rather
  *     than fill-or-keep, so neither side's notes are lost.
- *   - `customer_name`: kept as-is when both sides agree or `keep` has one;
- *     a differing drop-side name is preserved as an alias, never overwritten.
+ *   - `customer_name`: kept as-is when both sides agree, or filled from
+ *     `drop` when `keep` has none. When `drop`'s name is strictly fuller
+ *     than `keep`'s (same family, more people named — see preferFullerName),
+ *     the fuller name is ADOPTED onto the survivor and `keep`'s original
+ *     (shorter) name is preserved as an alias instead. Any other differing
+ *     name (including an unrelated one, e.g. a company name) is preserved as
+ *     an alias, never overwritten.
  * Pure — no db, no mutation of the inputs.
  */
 export function coalesceEntityData(keep, drop) {
@@ -348,8 +530,17 @@ export function coalesceEntityData(keep, drop) {
   if (!keepName && dropName) {
     k.customer_name = dropName;
   } else if (dropName && dropName.toLowerCase() !== keepName.toLowerCase()) {
+    const chosen = preferFullerName(keepName, dropName);
     const aliases = new Set((Array.isArray(k.aliases) ? k.aliases : []).map(String));
-    aliases.add(dropName);
+    if (chosen.toLowerCase() === dropName.toLowerCase()) {
+      // drop's name is the fuller one (e.g. "Ray & Linda Castillo" over
+      // "Castillo") — adopt it, keep the shorter name as an alias instead
+      // of discarding it.
+      k.customer_name = chosen;
+      aliases.add(keepName);
+    } else {
+      aliases.add(dropName);
+    }
     k.aliases = [...aliases];
   }
 

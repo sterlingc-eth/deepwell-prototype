@@ -8,7 +8,9 @@ import {
   normalizeAddressKey, normalizeSurname, customerMatchScore, findDuplicateCustomerPairs,
   isUnlinkedDocument, isEquipmentMissingCustomer, multiUnitUnderLinked,
   unitIndexAssignments, unitIndexBackfillPlan, groupExtractionRowsByUnit,
-  csvCell, csvRow, CUSTOMER_MATCH_THRESHOLD, coalesceEntityData,
+  csvCell, csvRow, CUSTOMER_MATCH_THRESHOLD, CUSTOMER_SUGGEST_THRESHOLD, coalesceEntityData,
+  nameTokenCount, preferFullerName, evaluateCustomerMatch, buildMatchEvidence,
+  normalizeUnitKey, normalizeCityKey, normalizeZipKey, normalizePhoneKey, normalizeEmailKey,
 } from '../api/_lib/integrity.js';
 
 let failures = 0;
@@ -95,8 +97,13 @@ eq('unknown vs unknown (no name, no address either side) -> 0', customerMatchSco
   ];
   const pairs = findDuplicateCustomerPairs(customers);
   eq('exactly one duplicate pair found among three customers', pairs.length, 1);
-  check('keep is the lower customer_number (C-00003)', pairs[0]?.keepId === 'c3', JSON.stringify(pairs[0]));
-  check('drop is the higher customer_number (C-00004)', pairs[0]?.dropId === 'c4', JSON.stringify(pairs[0]));
+  // Owner request 2026-09-20 follow-up: the fuller name ("Ray & Linda
+  // Castillo") wins the keep slot even though its customer_number (C-00004)
+  // is higher — chooseSurvivorNumber (reviewStore.js) still puts the lower
+  // number C-00003 back onto the survivor at merge time regardless of which
+  // id is "keep" here.
+  check('keep is the fuller name (c4, "Ray & Linda Castillo") despite the higher customer_number', pairs[0]?.keepId === 'c4', JSON.stringify(pairs[0]));
+  check('drop is the surname-only record (c3) despite the lower customer_number', pairs[0]?.dropId === 'c3', JSON.stringify(pairs[0]));
 
   // Idempotency of fix planning: once the pair is "merged" (the dropped
   // customer removed from the list — what mergeCustomers leaves behind),
@@ -104,6 +111,141 @@ eq('unknown vs unknown (no name, no address either side) -> 0', customerMatchSco
   const afterMerge = customers.filter((c) => c.id !== pairs[0].dropId);
   eq('re-planning after a merge finds no more pairs for it', findDuplicateCustomerPairs(afterMerge).length, 0);
 }
+
+/* ---------------------------------------------------- "strict rules" follow-up
+ * Owner 2026-09-20: "the AI needs to ensure name, address, email, phone
+ * number and all information matches prior to recommending merges."
+ * evaluateCustomerMatch is the single entry point behind customerMatchScore
+ * AND findDuplicateCustomerPairs' tier/evidence. */
+
+eq('normalizeUnitKey: "Apt 2" -> "2"', normalizeUnitKey('100 Main St Apt 2'), '2');
+eq('normalizeUnitKey: "Suite 4B" -> "4b"', normalizeUnitKey('9 Oak Ct Suite 4B'), '4b');
+eq('normalizeUnitKey: no unit marker -> empty', normalizeUnitKey('1519 W Juniper'), '');
+eq('normalizeCityKey: pulls the city out of the "city state zip" tail', normalizeCityKey('1519 W Juniper Ave, Mesa AZ 85202'), 'mesa');
+eq('normalizeCityKey: no comma at all -> empty (not a conflict candidate)', normalizeCityKey('1519 W Juniper'), '');
+eq('normalizeZipKey: pulls the 5-digit zip', normalizeZipKey('1519 W Juniper Ave, Mesa AZ 85202'), '85202');
+eq('normalizePhoneKey: punctuation-insensitive', normalizePhoneKey('(480) 555-1234'), '4805551234');
+eq('normalizeEmailKey: case-insensitive', normalizeEmailKey('Ray@Example.com'), 'ray@example.com');
+
+// --- hard veto: a conflicting identity field always wins, however well the
+// rest matches (item 1: "ensure ... all information matches").
+{
+  const conflict = (label, a, b, field) => {
+    const r = evaluateCustomerMatch(a, b);
+    check(`${label}: hard veto (score 0)`, r.score === 0, JSON.stringify(r));
+    eq(`${label}: reason names the conflicting field`, r.reason, `conflict:${field}`);
+    check(`${label}: tier is null (never a duplicate)`, r.tier === null, JSON.stringify(r));
+  };
+
+  conflict(
+    'same address+surname, different phones',
+    { name: 'Ray Castillo', address: '1519 W Juniper', phone: '480-555-1111' },
+    { name: 'Ray Castillo', address: '1519 W Juniper', phone: '480-555-2222' },
+    'phone'
+  );
+  conflict(
+    'same address+surname, different emails',
+    { name: 'Ray Castillo', address: '1519 W Juniper', email: 'ray@example.com' },
+    { name: 'Ray Castillo', address: '1519 W Juniper', email: 'ray.castillo@other.com' },
+    'email'
+  );
+  conflict(
+    'apartment building, different unit numbers',
+    { name: 'Nguyen', address: '200 Baseline Rd Apt 3' },
+    { name: 'Nguyen', address: '200 Baseline Rd Apt 7' },
+    'unit'
+  );
+
+  // A missing value on one side is NOT a conflict — fill-only merge still
+  // applies to it.
+  const oneSidedPhone = evaluateCustomerMatch(
+    { name: 'Ray Castillo', address: '1519 W Juniper', phone: '480-555-1111' },
+    { name: 'Ray Castillo', address: '1519 W Juniper' }
+  );
+  check('phone present on only one side is NOT a conflict', oneSidedPhone.evidence.conflicts.length === 0, JSON.stringify(oneSidedPhone));
+
+  // Suffix/city/state/zip differences on the street line are not a conflict
+  // — normalizeAddressKey already collapses them to the same key.
+  const suffixOnly = evaluateCustomerMatch(
+    { name: 'Ray Castillo', address: '1519 W Juniper' },
+    { name: 'Ray Castillo', address: '1519 W Juniper Ave, Mesa AZ 85202' }
+  );
+  check('"1519 W Juniper" vs "...Ave, Mesa AZ 85202": street equal, no conflict', suffixOnly.evidence.conflicts.length === 0, JSON.stringify(suffixOnly));
+}
+
+// --- name relation: surname alone (different first names) must never score
+// as high as an equal/subset match, and is suggest-only (item 2).
+{
+  const diffFirstNames = evaluateCustomerMatch(
+    { name: 'John Smith', address: '10 Elm St' },
+    { name: 'Jane Smith', address: '10 Elm St' }
+  );
+  check('different first names, same surname, same address -> score <= 0.6', diffFirstNames.score <= 0.6, JSON.stringify(diffFirstNames));
+  check('...and never tier auto', diffFirstNames.tier !== 'auto', JSON.stringify(diffFirstNames));
+
+  const subset = evaluateCustomerMatch({ name: 'Castillo', address: '1519 W Juniper' }, { name: 'Ray & Linda Castillo', address: '1519 W Juniper' });
+  check('subset name ("Castillo" ⊂ "Ray & Linda Castillo") scores high', subset.score >= 0.95, JSON.stringify(subset));
+}
+
+// --- tiers (item 3): auto ONLY when name + street + no conflicts + phone/email
+// confirm (or both sides have neither on file).
+{
+  const bothNoContact = evaluateCustomerMatch(
+    { name: 'Castillo', address: '1519 W Juniper' },
+    { name: 'Ray & Linda Castillo', address: '1519 W Juniper' }
+  );
+  eq('subset name + same street + no contact info anywhere -> tier auto', bothNoContact.tier, 'auto');
+
+  const phoneOnOneSide = evaluateCustomerMatch(
+    { name: 'Castillo', address: '1519 W Juniper' },
+    { name: 'Ray & Linda Castillo', address: '1519 W Juniper', phone: '480-555-1111' }
+  );
+  eq('subset name + same street, phone on ONE side only -> tier suggest', phoneOnOneSide.tier, 'suggest');
+  check('...evidence lists phone as missing (present on only one side)', phoneOnOneSide.evidence.missing.includes('phone'), JSON.stringify(phoneOnOneSide.evidence));
+
+  const samePhone = evaluateCustomerMatch(
+    { name: 'Castillo', address: '1519 W Juniper', phone: '480-555-1111' },
+    { name: 'Ray & Linda Castillo', address: '1519 W Juniper', phone: '(480) 555-1111' }
+  );
+  eq('subset name + same street + matching phone (punctuation aside) -> tier auto', samePhone.tier, 'auto');
+  check('...evidence lists phone as a match', samePhone.evidence.matches.includes('phone'), JSON.stringify(samePhone.evidence));
+
+  const surnameOnlyDiffFirst = evaluateCustomerMatch(
+    { name: 'John Smith', address: '10 Elm St', phone: '480-555-1111' },
+    { name: 'Jane Smith', address: '10 Elm St', phone: '480-555-1111' }
+  );
+  eq('same surname, different first names, even with matching phone -> never auto (name is not equal/subset)', surnameOnlyDiffFirst.tier, 'suggest');
+}
+
+// --- findDuplicateCustomerPairs surfaces suggest-tier pairs too (lower than
+// CUSTOMER_MATCH_THRESHOLD, at/above CUSTOMER_SUGGEST_THRESHOLD) so a human
+// can still see and decide on them; mergeDuplicates (routes/integrity.js)
+// is what actually restricts itself to tier 'auto'.
+{
+  const pairs = findDuplicateCustomerPairs([
+    { id: 's1', customerNumber: 'C-00010', name: 'John Smith', address: '10 Elm St' },
+    { id: 's2', customerNumber: 'C-00011', name: 'Jane Smith', address: '10 Elm St' },
+  ]);
+  eq('a surname-only match still shows up as a suggestion', pairs.length, 1);
+  eq('...tagged tier suggest', pairs[0]?.tier, 'suggest');
+  check('...with evidence attached', Array.isArray(pairs[0]?.evidence?.matches), JSON.stringify(pairs[0]));
+}
+{
+  // Hard veto: score 0 is below even the default (lowest) suggestion bar,
+  // so a vetoed pair never appears at all, at any normal threshold.
+  const pairs = findDuplicateCustomerPairs([
+    { id: 'p1', name: 'Ray Castillo', address: '1519 W Juniper', phone: '480-555-1111' },
+    { id: 'p2', name: 'Ray Castillo', address: '1519 W Juniper', phone: '480-555-2222' },
+  ]);
+  eq('a phone conflict never becomes a suggestion', pairs.length, 0);
+}
+
+check('CUSTOMER_SUGGEST_THRESHOLD stays below CUSTOMER_MATCH_THRESHOLD', CUSTOMER_SUGGEST_THRESHOLD < CUSTOMER_MATCH_THRESHOLD);
+
+// --- buildMatchEvidence directly: a field absent on BOTH sides is not
+// mentioned at all (nothing to say about it either way).
+eq('buildMatchEvidence: phone absent on both sides is omitted entirely', buildMatchEvidence({ name: 'A' }, { name: 'B' }).missing.includes('phone'), false);
+eq('buildMatchEvidence: phone absent on both sides is omitted entirely (conflicts too)', buildMatchEvidence({ name: 'A' }, { name: 'B' }).conflicts.includes('phone'), false);
 
 /* --------------------------------------------------- document/equipment rules */
 
@@ -270,6 +412,59 @@ eq(
   { phone: 'keep-phone', fax: 'drop-fax' }
 );
 eq('null keep and null drop -> empty object, never throws', coalesceEntityData(null, null), {});
+
+/* --------------------------------------------------------- preferFullerName
+ * Owner request 2026-09-20 follow-up: keep "Ray & Linda Castillo", not just
+ * "Castillo". */
+
+eq('nameTokenCount: counts people, "&" is a separator, not a token', nameTokenCount('Ray & Linda Castillo'), 3);
+eq('nameTokenCount: surname alone is one token', nameTokenCount('Castillo'), 1);
+
+eq('both-names beats surname-only (same family)', preferFullerName('Castillo', 'Ray & Linda Castillo'), 'Ray & Linda Castillo');
+eq('surname-only offered as drop does not replace an already-fuller keep', preferFullerName('Ray & Linda Castillo', 'Castillo'), 'Ray & Linda Castillo');
+eq('equally-full names are left as keep, not reordered', preferFullerName('Castillo, Ray', 'Ray Castillo'), 'Castillo, Ray');
+eq('identical names -> keep, trivially', preferFullerName('Ray Castillo', 'Ray Castillo'), 'Ray Castillo');
+eq('company names untouched — different "surname" (last word), not a subset', preferFullerName('Plaza Dental', 'Plaza Dental Group'), 'Plaza Dental');
+eq('blank keep takes drop outright', preferFullerName('', 'Castillo'), 'Castillo');
+eq('blank drop leaves keep alone', preferFullerName('Castillo', ''), 'Castillo');
+
+eq(
+  'coalesceEntityData adopts the fuller name from drop and aliases the shorter keep name',
+  coalesceEntityData({ customer_name: 'Castillo' }, { customer_name: 'Ray & Linda Castillo' }),
+  { customer_name: 'Ray & Linda Castillo', aliases: ['Castillo'] }
+);
+eq(
+  'coalesceEntityData keeps an already-fuller keep name, aliasing the surname-only drop',
+  coalesceEntityData({ customer_name: 'Ray & Linda Castillo' }, { customer_name: 'Castillo' }),
+  { customer_name: 'Ray & Linda Castillo', aliases: ['Castillo'] }
+);
+
+/* ------------------------------- findDuplicateCustomerPairs keep/drop order
+ * Nightly auto-merge and "Fix everything" run with no human in the loop, so
+ * keep/drop must default to the same fuller-name rule the Customers-tab
+ * chooser uses, not just customer_number order. */
+{
+  const fuller = { id: 'full', name: 'Ray & Linda Castillo', address: '1519 W Juniper', customerNumber: 'C-00004' };
+  const surnameOnly = { id: 'surname', name: 'Castillo', address: '1519 W Juniper', customerNumber: 'C-00003' };
+  const [pair] = findDuplicateCustomerPairs([fuller, surnameOnly]);
+  check(
+    'findDuplicateCustomerPairs: fuller name wins keepId even with the HIGHER customer_number',
+    pair && pair.keepId === 'full' && pair.dropId === 'surname',
+    JSON.stringify(pair)
+  );
+}
+{
+  // Same name fullness on both sides -> falls back to the lower customer_number,
+  // same as before this change.
+  const lower = { id: 'lower', name: 'Ray Castillo', address: '1519 W Juniper', customerNumber: 'C-00002' };
+  const higher = { id: 'higher', name: 'Ray Castillo', address: '1519 W Juniper', customerNumber: 'C-00009' };
+  const [pair] = findDuplicateCustomerPairs([higher, lower]);
+  check(
+    'findDuplicateCustomerPairs: equal name fullness falls back to the lower customer_number',
+    pair && pair.keepId === 'lower' && pair.dropId === 'higher',
+    JSON.stringify(pair)
+  );
+}
 
 /* --------------------------------------------------------------------- csv */
 
