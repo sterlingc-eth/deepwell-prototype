@@ -34,28 +34,45 @@ export const MAX_CACHE_BREAKPOINTS = 4;
  * Anthropic will not cache the block at all — attaching cache_control to a
  * too-short block wastes a breakpoint (the 4-per-request budget) for zero
  * benefit, so callers must not do it.
+ *
+ * CORRECTED 2026-09-20 (late): haiku was 2048. Per the current Anthropic docs
+ * (platform.claude.com/docs/en/build-with-claude/prompt-caching, fetched
+ * 2026-09-20), the real minimum for claude-haiku-4-5 is **4096** tokens —
+ * double what this file assumed. Sonnet's 1024 was already correct. This is
+ * the actual reason prompt caching never fired for Haiku in production: every
+ * "cacheable" stable prefix cleared the wrong (too-low) bar, so cache_control
+ * was attached to blocks Anthropic itself still refused to cache — see
+ * handoffs/COST_REPORT_2026-09-20.md's "Correction" section.
  */
 export const CACHE_MIN_TOKENS = {
   sonnet: 1024,
-  haiku: 2048,
+  haiku: 4096,
 };
 
 /**
- * ~4 characters per token. This is the rough heuristic the task calls for,
- * not a real tokenizer — a real count would need to either call the API's
+ * CORRECTED 2026-09-20 (late): the old comment here claimed chars/4
+ * under-estimates real BPE token counts for English prose. That was
+ * backwards. For ordinary English prose, real tokenizers land closer to
+ * chars/4.3-4.6 (common words and whitespace batch into fewer, longer
+ * tokens); chars/4 OVERESTIMATES a token count for prose, which is exactly
+ * backwards for a "don't claim cacheable when it isn't" estimate — a
+ * 9,377-char prompt that this used to report as ~2,345 tokens is really
+ * closer to 2,050-2,150.
+ *
+ * Not a real tokenizer — a real count would need to either call the API's
  * token-counting endpoint (a network call this file deliberately avoids) or
  * vendor a tokenizer, either of which is more machinery than a
- * fail-safe-toward-"don't cache" estimate justifies. Because the real
- * (BPE) token count for English prose is normally BELOW chars/4 (short
- * common words often are a single token even at 5-6 characters), this
- * heuristic is if anything pessimistic — it under-estimates tokens less
- * often than it over-estimates them — so it defaults toward skipping a cache
- * breakpoint on a block that would have just barely qualified, never toward
- * claiming a too-short block is cacheable.
+ * fail-safe-toward-"don't cache" estimate justifies. Using chars/4.6,
+ * FLOORED (never rounded up), keeps the bias in the safe direction: this
+ * estimate is now, if anything, LOWER than the real token count, so it can
+ * under-claim a block is long enough to cache but never over-claim it —
+ * exactly the direction that wastes nothing (worst case: a cacheable block
+ * misses a breakpoint) rather than the direction that silently attaches
+ * cache_control to something Anthropic will refuse to cache anyway.
  */
 export function estimateTokens(text) {
   const s = typeof text === "string" ? text : text == null ? "" : JSON.stringify(text);
-  return Math.ceil(s.length / 4);
+  return Math.floor(s.length / 4.6);
 }
 
 /** "claude-sonnet-4-5" / "claude-haiku-4-5" (or any string containing one of
@@ -103,6 +120,71 @@ export function withCache(block, model, opts = {}) {
 }
 
 /**
+ * Pure: decide cache breakpoints the way Anthropic actually bills them —
+ * off the CUMULATIVE estimated prefix up to and including each block, in the
+ * exact order Anthropic bills a request (tools, then system, then message
+ * content) — not off each block measured in isolation the way `cacheable()`/
+ * `withCache()` do.
+ *
+ * CORRECTED 2026-09-20 (late): a per-block check under-attaches breakpoints.
+ * Once one earlier block (say, `system`) has already pushed the cumulative
+ * prefix past the model's minimum, EVERY later block in the same request is
+ * already past it too (the cumulative sum only grows) — so a later block
+ * that is individually too short to cache on its own (a small context block
+ * behind an already-large system prompt) is still a perfectly valid
+ * breakpoint. `withCache()` measuring each block alone can never see that.
+ *
+ * @param {{tools?: {block:object, breakpoint?: boolean}[],
+ *           system?: {block:object, breakpoint?: boolean}[],
+ *           messageBlocks?: {block:object, breakpoint?: boolean}[]}} parts
+ *   Each entry pairs a real tool/content block with whether the CALLER wants
+ *   a breakpoint there if it turns out eligible (e.g. never true for a
+ *   question block that changes every call). Arrays are concatenated in
+ *   Anthropic's own billed order: tools -> system -> messageBlocks.
+ * @param {string} model
+ * @param {{ttl?: '1h'}} [opts] see withCache's opts.
+ * @returns {{tools: object[], system: object[], messageBlocks: object[]}}
+ *   the same blocks (new objects where a breakpoint was added; the original
+ *   object where it wasn't), grouped back the way they came in.
+ */
+export function planCacheBreakpoints({ tools = [], system = [], messageBlocks = [] } = {}, model, opts = {}) {
+  const min = minTokensFor(model);
+  const ttl = opts?.ttl === "1h" ? CACHE_CONTROL_1H : CACHE_CONTROL;
+  const groups = { tools, system, messageBlocks };
+  const out = { tools: [], system: [], messageBlocks: [] };
+
+  let cumulative = 0;
+  let breakpointsUsed = 0;
+  for (const groupName of ["tools", "system", "messageBlocks"]) {
+    for (const entry of groups[groupName] ?? []) {
+      const block = entry?.block;
+      const measured =
+        block && typeof block === "object"
+          ? typeof block.text === "string"
+            ? block.text
+            : { ...block, cache_control: undefined }
+          : block;
+      cumulative += estimateTokens(measured);
+
+      const eligible =
+        entry?.breakpoint &&
+        block &&
+        typeof block === "object" &&
+        breakpointsUsed < MAX_CACHE_BREAKPOINTS &&
+        cumulative >= min;
+
+      if (eligible) {
+        out[groupName].push({ ...block, cache_control: ttl });
+        breakpointsUsed++;
+      } else {
+        out[groupName].push(block);
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Pure: shape the one structured log line each Anthropic call site emits
  * (via `console.log(JSON.stringify(...))`) so Vercel logs show cache hit
  * rates. Deliberately just {route, model, input_tokens, cache_read,
@@ -128,6 +210,18 @@ export function modelCallLogLine({
   // caller (extractDocument.js) that never passes it gets the exact same
   // line as before.
   timingsMs,
+  // Diagnostics added 2026-09-20 (late), /api/ask only for now — counts and a
+  // short enum, never content: `stopReason` is the Anthropic response's own
+  // `stop_reason` ("tool_use", "max_tokens", ...) so a Vercel-log reader can
+  // tell a genuine no-answer apart from a truncated one; `factsRaw` is how
+  // many facts the model's tool_use returned before grounding, `factsKept` is
+  // how many survived shapeAnswer's citation check — the gap between them is
+  // exactly how often the model cites something retrieval never returned.
+  // Each is folded in only when actually given, same as timingsMs above, so
+  // no other caller's line shape changes.
+  stopReason,
+  factsRaw,
+  factsKept,
 } = {}) {
   const n = (v) => Math.max(0, Math.trunc(v) || 0);
   const line = {
@@ -146,5 +240,8 @@ export function modelCallLogLine({
     }
     line.timings_ms = timings_ms;
   }
+  if (typeof stopReason === "string" && stopReason) line.stop_reason = stopReason;
+  if (Number.isFinite(factsRaw)) line.facts_raw = n(factsRaw);
+  if (Number.isFinite(factsKept)) line.facts_kept = n(factsKept);
   return line;
 }

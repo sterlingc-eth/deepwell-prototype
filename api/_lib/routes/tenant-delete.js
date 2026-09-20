@@ -17,8 +17,8 @@ import { captureException } from "../telemetry.js";
  * — see auth.js — so there's no way to pass someone else's tenant id here and
  * have it accepted).
  *
- * NOT YET ADMIN-GATED — same limitation, same reason, as tenant-export.js.
- * See HANDOFF.md.
+ * ADMIN-GATED: inside a shop only the admin role may delete (requireRole below), same as tenant-export.js.
+ * (Comment was stale — the guard has been in place since the keys.js pattern landed.)
  *
  * Order of operations, and why: (1) delete every Postgres row for the tenant,
  * in FK-safe order, inside one transaction — see opsStore.deleteTenantData

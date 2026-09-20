@@ -21,6 +21,7 @@ export function LoginScreen() {
       >
         <SignIn
           fallbackRedirectUrl="/app/"
+          signUpFallbackRedirectUrl="/app/"
           routing="hash"
           appearance={{
             elements: {

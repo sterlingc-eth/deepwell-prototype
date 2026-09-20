@@ -124,3 +124,110 @@ screen to pick up.
 `npm run typecheck` — clean.
 `npm run build` — clean.
 `api/` file count — still 12 (no new files added there; all new code in `api/_lib/`).
+
+## Correction 2026-09-20 (late)
+
+Production logs still showed `cache_read:0, cache_creation:0` on every
+`/api/ask` call after the above shipped. Root cause: this report's own "Haiku
+min 2048" was wrong. The real minimum for `claude-haiku-4-5`, per the current
+Anthropic docs (platform.claude.com/docs/en/build-with-claude/prompt-caching,
+fetched 2026-09-20), is **4096 tokens** — double what `api/_lib/promptCache.js`
+(`CACHE_MIN_TOKENS.haiku`) assumed. Every "now cacheable" row in this report's
+own table above was measured against that wrong bar; `withCache()` dutifully
+attached `cache_control` to blocks Anthropic itself still refused to cache,
+which is the actual reason the hit rate stayed at 0% for Haiku regardless of
+how much reference content was added.
+
+Two more bugs, both in the same file, compounded it:
+
+1. `estimateTokens` used `ceil(chars/4)`, on the (backwards) theory that
+   chars/4 under-estimates real BPE token counts for English prose. It's the
+   opposite: ordinary prose tokenizes closer to chars/4.3-4.6 (whitespace and
+   common words batch into fewer, longer tokens), so chars/4 OVER-estimates —
+   exactly the wrong direction for a "don't claim cacheable when it isn't"
+   heuristic. A 9,377-char prompt this file reported as ~2,345 tokens was
+   really ~2,050-2,150. Corrected to `floor(chars/4.6)` — now biased LOWER
+   than the real count, so it can under-claim cacheability but never
+   over-claim it.
+2. `withCache()` measured each block (system prompt, context block, tool
+   schema) in isolation against the minimum. Anthropic actually bills the
+   CUMULATIVE prefix up to each breakpoint, in request order (tools -> system
+   -> messages) — so a block that individually falls short can still be a
+   valid breakpoint once an earlier block in the same request has already
+   pushed the cumulative total past the minimum. A per-block check can only
+   under-attach breakpoints, never over-attach them, but it was silently
+   leaving cacheable blocks unmarked. Added `planCacheBreakpoints({tools,
+   system, messageBlocks}, model)` (`api/_lib/promptCache.js`) to replace
+   `withCache()` at `/api/ask`'s one call site (`api/ask.js`) — it walks all
+   three groups in Anthropic's own billed order, tracks the running total,
+   and attaches `cache_control` only where cumulative tokens clear the
+   model's real minimum, capped at the existing 4-breakpoint limit.
+
+### What changed
+
+- `api/_lib/promptCache.js`: `CACHE_MIN_TOKENS.haiku` 2048 -> **4096**;
+  `estimateTokens` `ceil(chars/4)` -> **`floor(chars/4.6)`**; new
+  `planCacheBreakpoints()`; `modelCallLogLine()` gained optional
+  `stopReason`/`factsRaw`/`factsKept` fields (diagnostics only — counts and a
+  short enum, never content) so a Vercel log line can now show whether a call
+  was cut off (`stop_reason`) and how many facts the model returned vs. how
+  many `shapeAnswer` actually kept after grounding.
+- `api/_lib/answer.js`: `SYSTEM_PROMPT` raised again — this time genuinely
+  needed, not just "clear the (wrong) 2048 bar" — with an extracted
+  field-key guide (reused from `extractFields.js`'s own `FIELD_SPECS`, never
+  copied by hand), a required-fields-per-type guide (reused from
+  `documentTypes.js`'s `REQUIRED_FIELDS`), an HVAC abbreviation glossary
+  (AHU, RTU, SEER/SEER2, TXV, VAV, VFD, ERV/HRV, MERV, CFM, BTU, ACH, PSI,
+  ...), and a compressor-vs-parts warranty note condensed from
+  `docs/HVAC_WARRANTY_RESEARCH.md`. Real, load-bearing reference content
+  (each section marked "background only", same sourcing rules unchanged),
+  now measuring **~21,300 chars / ~4,631 est. tokens** — clears the
+  corrected 4096 minimum with a ~535-token safety margin (target was
+  >= 4,600).
+- `api/_lib/answer.js` (separate fix, same file, filed together): the
+  2026-09-20 RULES/facts trim had an unintended side effect — Haiku started
+  refusing ("Nothing in your records answers that.") on an AMBIGUOUS question
+  (a customer with several units/warranties/matching customers) instead of
+  answering the best match. Added an explicit RULES bullet and rewrote the
+  `text`/`facts` tool-schema descriptions: on an ambiguous question, answer
+  for the best match and name the other candidates in one clause, or return
+  one fact per matching record (still capped at 5); no-answer is reserved for
+  evidence that is genuinely irrelevant to the question. The sourcing/citation
+  rules are untouched.
+- `api/ask.js`: switched from per-block `withCache()` to
+  `planCacheBreakpoints()`; `max_tokens` 700 -> **900** (the disambiguation
+  fix above can legitimately cost a few more output tokens — naming other
+  matches or returning up to 5 per-record facts instead of a one-line
+  refusal); log line now passes `stopReason`/`factsRaw`/`factsKept`.
+- `scripts/verify-caching.mjs`: rewritten boundary/estimator tests for the
+  corrected numbers; new direct unit tests for `planCacheBreakpoints`
+  (cumulative-prefix attachment, the 4-breakpoint cap, `{ttl:'1h'}`, empty
+  input); new tests asserting the ambiguity-fix RULES text is present and the
+  sourcing rules are unchanged; the two stable prefixes this agent does not
+  own (extraction, transcription) are now asserted against their REAL current
+  state (not yet cacheable under the corrected minimum) rather than an
+  aspirational one — see below.
+
+### Known gap this agent does not own
+
+`api/_lib/extractFields.js`'s stable field/type guide (used by
+`api/_lib/extractDocument.js`) and `api/_lib/readDocument.js`'s
+`TRANSCRIBE_SYSTEM_PROMPT` were both sized to clear the old, wrong 2048
+minimum and do not clear the corrected 4096 one (~2,000 and ~1,860 est.
+tokens respectively — both need roughly double their current content). These
+two files are outside this task's ownership, so the exact needed change
+(content ideas included, not just "make it longer") is filed in
+`handoffs/REQUESTS_ask-cache-agent.md` instead of edited directly.
+`scripts/verify-caching.mjs` and `scripts/verify-transcribe.mjs` were updated
+to assert this real, current (not-yet-fixed) state so `verify:all` stays
+honest and green — each assertion is commented with a pointer back to the
+request file, to flip once that work lands.
+
+### Results (re-run after this correction)
+
+`npm run typecheck:api` — clean.
+`npm run verify:all` — clean (all PASS; extraction/transcription's known
+caching gap above is asserted as a known, filed gap, not silently masked).
+`npm run build` — clean.
+`api/` file count — still 12 (no files added or removed under `api/`; all
+changes in `api/_lib/`, `api/ask.js`'s log line, and `scripts/`).

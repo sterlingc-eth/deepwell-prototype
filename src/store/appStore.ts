@@ -14,7 +14,8 @@ export type Screen =
   | 'customer'
   | 'warranty-export'
   | 'billing'
-  | 'team';
+  | 'team'
+  | 'outreach';
 
 /** `?plan=&interval=` deep link, held until Billing opens and preselects it. */
 export interface PendingPlan {
@@ -195,6 +196,14 @@ interface AppState {
   customerRef: string | null;
   openCustomer: (ref: string) => void;
 
+  // Outreach screen — an equipment id to preselect/highlight, carried from
+  // the Dashboard's "Open in Outreach" button or a `?screen=outreach&equipment=`
+  // deep link. Consumed once by OutreachScreen, same one-shot pattern as
+  // pendingReviewFilter above.
+  pendingOutreachEquipmentId: string | null;
+  openOutreach: (equipmentId?: string) => void;
+  clearPendingOutreachEquipment: () => void;
+
   // Browse (secondary list view)
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -314,6 +323,10 @@ export const useAppStore = create<AppState>((set) => ({
   openEntity: (id) => set({ selectedEntityId: id, currentScreen: 'entity' }),
   customerRef: null,
   openCustomer: (ref) => set({ customerRef: ref, currentScreen: 'customer' }),
+
+  pendingOutreachEquipmentId: null,
+  openOutreach: (equipmentId) => set({ currentScreen: 'outreach', pendingOutreachEquipmentId: equipmentId ?? null }),
+  clearPendingOutreachEquipment: () => set({ pendingOutreachEquipmentId: null }),
 
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),

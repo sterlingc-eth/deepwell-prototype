@@ -14,6 +14,8 @@ import './index.css';
 
 // The claim-packet export pulls in jspdf + html2canvas (~60 KB gzipped); only load it when opened.
 const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen').then((m) => ({ default: m.WarrantyExportScreen })));
+// Reached from the Dashboard or a deep link only (not primary nav) — lazy same as WarrantyExportScreen.
+const OutreachScreen = lazy(() => import('./screens/OutreachScreen').then((m) => ({ default: m.OutreachScreen })));
 
 // Same flag main.tsx reads to decide whether to bootstrap the HVAC fixture.
 // In demo mode the fixture IS the data — real sync stays off so it can never
@@ -290,6 +292,12 @@ function App() {
         return (
           <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
             <WarrantyExportScreen />
+          </Suspense>
+        );
+      case 'outreach':
+        return (
+          <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
+            <OutreachScreen />
           </Suspense>
         );
       default:

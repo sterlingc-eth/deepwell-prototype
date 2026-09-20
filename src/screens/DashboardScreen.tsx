@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, ShieldCheck, Upload, User } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
@@ -8,6 +8,7 @@ import { dateOf, formatYmd, normalize, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { deepLinkFor } from '../hooks/useDeepLink';
 import { customerClient } from '../services/customerClient';
+import { fetchOutreachSettings, generateOutreachDrafts, listOutreachMessages, sentThisMonth, type OutreachSettings } from '../services/outreachClient';
 import { useAppStore } from '../store/appStore';
 import { authHeader } from '../services/authToken';
 
@@ -72,29 +73,6 @@ function itemsForCard(items: AttentionItem[], key: AlertCardKey): AttentionItem[
   return key === 'upsell' ? items.filter((i) => i.upsell.eligible) : items.filter((i) => i.tier === key);
 }
 
-/** Plain-text extended-warranty / maintenance-agreement pitch. Template only —
- *  no model call, per the brief. Copied to the clipboard for the rep to paste. */
-function outreachDraft(item: AttentionItem): string {
-  const name = item.customerName || 'there';
-  const unit = [item.manufacturer, item.model].filter(Boolean).join(' ') || 'HVAC unit';
-  const where = item.serviceAddress ? ` at ${item.serviceAddress}` : '';
-  const status =
-    item.tier === 'expired'
-      ? `is no longer covered by ${item.manufacturer ?? 'the manufacturer'}'s parts warranty${item.expires ? ` (expired ${item.expires})` : ''}`
-      : item.tier === 'unregistered-window-closing'
-        ? `still needs to be registered with ${item.manufacturer ?? 'the manufacturer'} — the window to lock in the full parts term closes ${item.registrationDeadline ?? 'soon'}`
-        : item.expires
-          ? `is nearing the end of its ${item.manufacturer ?? 'manufacturer'} parts warranty (expires ${item.expires})`
-          : `may not be fully covered for labor even while parts are still under warranty`;
-  return (
-    `Hi ${name},\n\n` +
-    `Our records show your ${unit}${where} ${status}.\n\n` +
-    `We offer an extended warranty / maintenance agreement that covers parts and labor beyond the manufacturer's ` +
-    `terms, so a future repair doesn't come as a surprise bill. Want me to send over the options?\n\n` +
-    `Thanks`
-  );
-}
-
 /**
  * The office view. Every row is a question — click it and the Ask screen
  * answers it with sources. Warranty expiry and at-risk sections read the
@@ -105,6 +83,7 @@ export function DashboardScreen() {
   const askQuestion = useAppStore((s) => s.askQuestion);
   const openEntity = useAppStore((s) => s.openEntity);
   const openCustomer = useAppStore((s) => s.openCustomer);
+  const openOutreach = useAppStore((s) => s.openOutreach);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const setInboxTab = useAppStore((s) => s.setInboxTab);
   const toggleSelectForExport = useAppStore((s) => s.toggleSelectForExport);
@@ -158,19 +137,38 @@ export function DashboardScreen() {
     };
   }, []);
 
+  // Customer outreach card (handoffs/OUTREACH_2026-09-20.md): a cheap
+  // settings check always runs; the actual counts (which need a `generate`
+  // pass to refresh drafts) only run once the feature is turned on, so a
+  // tenant who hasn't opted in costs nothing extra on every Dashboard visit.
+  const [outreachSettings, setOutreachSettings] = useState<OutreachSettings | null>(null);
+  const [outreachStats, setOutreachStats] = useState({ drafts: 0, sentThisMonth: 0, needsEmail: 0 });
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const s = await fetchOutreachSettings();
+        if (cancelled) return;
+        setOutreachSettings(s);
+        if (!s.enabled || s.migrationPending) return;
+        const [gen, list] = await Promise.all([generateOutreachDrafts(), listOutreachMessages('all', 200)]);
+        if (cancelled) return;
+        setOutreachStats({
+          drafts: list.items.filter((i) => i.status === 'draft').length,
+          sentThisMonth: sentThisMonth(list.items),
+          needsEmail: gen.needsEmail,
+        });
+      } catch {
+        /* bonus card, fail quiet — same as the attention fetch above */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [draftedId, setDraftedId] = useState<string | null>(null);
-  const draftOutreach = (item: AttentionItem) => {
-    void navigator.clipboard
-      .writeText(outreachDraft(item))
-      .then(() => {
-        setDraftedId(item.entityId);
-        window.setTimeout(() => setDraftedId((id) => (id === item.entityId ? null : id)), 1500);
-      })
-      .catch(() => {
-        /* clipboard unavailable — nothing to fall back to here */
-      });
-  };
   // "View customer": /api/warranty-attention (agent-backend's file, out of
   // scope here) carries a unit's customerName as free text, not a customer
   // id, so this looks the name up against GET /api/v1/customers on demand —
@@ -355,9 +353,8 @@ export function DashboardScreen() {
                         >
                           Ask about this unit
                         </button>
-                        <button type="button" onClick={() => draftOutreach(item)} className="dw-btn-secondary !min-h-[36px] !py-1">
-                          {draftedId === item.entityId ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : null}
-                          {draftedId === item.entityId ? 'Copied' : 'Draft outreach'}
+                        <button type="button" onClick={() => openOutreach(item.entityId)} className="dw-btn-secondary !min-h-[36px] !py-1">
+                          <Mail className="w-3.5 h-3.5" aria-hidden="true" /> Open in Outreach
                         </button>
                       </div>
                       {customerLookup[item.entityId] === 'notfound' && (
@@ -405,6 +402,44 @@ export function DashboardScreen() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+          </section>
+        )}
+
+        {!DEMO_MODE && (
+          <section aria-labelledby="outreach-heading" className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="outreach-heading" className="dw-label">Customer outreach</h2>
+              <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" onClick={() => openOutreach()}>
+                Open Outreach <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </div>
+            {outreachSettings?.migrationPending ? (
+              <div className="dw-card p-4 text-body text-ink-2">Needs a database update before this is available.</div>
+            ) : !outreachSettings?.enabled ? (
+              <div className="dw-card p-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-body text-ink-2">
+                  Off. Turn it on to automatically email customers close to — or past — their warranty end.
+                </p>
+                <button type="button" className="dw-btn-primary shrink-0" onClick={() => openOutreach()}>
+                  Set up outreach
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="dw-card p-4">
+                  <p className="text-caption text-ink-3">Drafts ready</p>
+                  <p className="font-display text-h1 mt-1">{outreachStats.drafts}</p>
+                </div>
+                <div className="dw-card p-4">
+                  <p className="text-caption text-ink-3">Sent this month</p>
+                  <p className="font-display text-h1 mt-1">{outreachStats.sentThisMonth}</p>
+                </div>
+                <div className="dw-card p-4">
+                  <p className="text-caption text-ink-3">Needs an email</p>
+                  <p className="font-display text-h1 mt-1">{outreachStats.needsEmail}</p>
+                </div>
               </div>
             )}
           </section>

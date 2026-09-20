@@ -12,7 +12,7 @@ import { useAppStore, type Screen } from '../store/appStore';
 import { useGraph } from '../core/entityGraph';
 import { isValidPlanId, type BillingInterval } from '../services/billingClient';
 
-const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team'];
+const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team', 'outreach'];
 
 function isScreen(value: string): value is Screen {
   return (SCREENS as readonly string[]).includes(value);
@@ -37,6 +37,10 @@ export interface DeepLinkParams {
    *  itself, same "let the screen own its own lookup" split as `question`);
    *  only trimmed and capped so a malformed or huge value can't wedge. */
   customerRef?: string;
+  /** `?equipment=<uuid>` — an equipment entity to preselect on the Outreach
+   *  screen (Dashboard's "Open in Outreach" button). Only meaningful
+   *  alongside `?screen=outreach`; ignored otherwise. */
+  outreachEquipmentId?: string;
 }
 
 /**
@@ -61,6 +65,8 @@ export function parseDeepLink(search: string): DeepLinkParams {
   }
   const customer = params.get('customer')?.trim();
   if (customer) out.customerRef = customer.slice(0, 64);
+  const equipment = params.get('equipment')?.trim();
+  if (equipment) out.outreachEquipmentId = equipment.slice(0, 64);
   return out;
 }
 
@@ -77,6 +83,7 @@ export function deepLinkFor(params: DeepLinkParams): string {
   if (params.docId) url.searchParams.set('doc', params.docId);
   if (params.screen) url.searchParams.set('screen', params.screen);
   if (params.customerRef) url.searchParams.set('customer', params.customerRef);
+  if (params.outreachEquipmentId) url.searchParams.set('equipment', params.outreachEquipmentId);
   return url.toString();
 }
 
@@ -89,6 +96,7 @@ function cleanUrl(): void {
   url.searchParams.delete('plan');
   url.searchParams.delete('interval');
   url.searchParams.delete('customer');
+  url.searchParams.delete('equipment');
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -116,6 +124,7 @@ export function useDeepLink(): void {
   const askQuestion = useAppStore((s) => s.askQuestion);
   const setPendingPlan = useAppStore((s) => s.setPendingPlan);
   const openCustomer = useAppStore((s) => s.openCustomer);
+  const openOutreach = useAppStore((s) => s.openOutreach);
   const handledRef = useRef(false);
 
   useEffect(() => {
@@ -145,6 +154,14 @@ export function useDeepLink(): void {
     // immediately, same as a bare ?screen=.
     if (params.customerRef) {
       openCustomer(params.customerRef);
+      cleanUrl();
+      return;
+    }
+
+    // ?screen=outreach[&equipment=] — needs nothing from the graph
+    // (OutreachScreen fetches its own data), same as ?customer= above.
+    if (params.screen === 'outreach') {
+      openOutreach(params.outreachEquipmentId);
       cleanUrl();
       return;
     }

@@ -348,8 +348,21 @@ async function withFakeClient(handler, fn) {
   );
   check('every transcription call carries the shared system prompt',
     calls[0].system?.[0]?.text === TRANSCRIBE_SYSTEM_PROMPT);
-  check('the system prompt is long enough to get a cache breakpoint (see verify-caching.mjs for the threshold check)',
-    'cache_control' in (calls[0].system?.[0] ?? {}));
+  // CORRECTED 2026-09-20 (late, out-of-scope collateral fix — see
+  // handoffs/COST_REPORT_2026-09-20.md "Correction" and
+  // handoffs/REQUESTS_ask-cache-agent.md): api/_lib/promptCache.js's Haiku
+  // minimum was wrong (2048, corrected to the real 4096) and its
+  // estimateTokens formula was backwards for English prose (corrected
+  // ceil(chars/4) -> floor(chars/4.6)). Under the CORRECT minimum,
+  // TRANSCRIBE_SYSTEM_PROMPT (a Haiku-model call here, by default) no longer
+  // clears it — this was never really cacheable in production, the old test
+  // just encoded the same wrong minimum the production bug did. Raising
+  // TRANSCRIBE_SYSTEM_PROMPT's content is readDocument.js's call, not this
+  // agent's (see the request filed above) — this assertion now checks the
+  // real, current state instead of the stale expectation, so it can't mask
+  // the gap or silently regress further before that request is picked up.
+  check('the system prompt does NOT yet clear Haiku\'s corrected 4096-token cache minimum (known gap, filed in handoffs/REQUESTS_ask-cache-agent.md)',
+    !('cache_control' in (calls[0].system?.[0] ?? {})));
 }
 
 delete process.env.TRANSCRIBE_MODEL_FAST;

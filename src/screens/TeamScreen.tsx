@@ -126,7 +126,7 @@ export function TeamScreen() {
       <AppShell>
         <div className="max-w-md mx-auto dw-card p-6 space-y-4">
           <p className="text-body text-ink-2">Create your shop to invite your team.</p>
-          <CreateOrganization hideSlug appearance={clerkAppearance} />
+          <CreateOrganization hideSlug afterCreateOrganizationUrl="/app/" appearance={clerkAppearance} />
         </div>
       </AppShell>
     );

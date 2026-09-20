@@ -270,7 +270,11 @@ async function runWarrantyNotificationSweepForTenantInner(pool, tenant, today) {
   return { ...result, emailed: sendResult.sent, channel: sendResult.channel, recipients: recipients.length };
 }
 
-function withTimeout(promise, ms) {
+/** Exported so api/_lib/routes/outreach.js's cron sweep can bound its own
+ *  per-tenant work the same way this file does — one tenant's slow query (or,
+ *  for outreach, a big auto-mode send batch) must never eat the shared 45s
+ *  cron deadline outright. */
+export function withTimeout(promise, ms) {
   return Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)),

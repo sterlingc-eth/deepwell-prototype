@@ -15,7 +15,7 @@ import {
   buildQuestionBlock,
   selectPassagesForContext,
 } from "./_lib/answer.js";
-import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
+import { planCacheBreakpoints, modelCallLogLine } from "./_lib/promptCache.js";
 import { recordModelCall } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
@@ -649,22 +649,36 @@ export default async function handler(req, res) {
     //              every call for every tenant.
     //   tools   -> ANSWER_TOOL: fixed schema.
     //   content -> [context block (passages+extractions), question block],
-    //              IN THAT ORDER, with cache_control only on the context
-    //              block: a follow-up question that retrieves the same top
-    //              passages reuses the cache through the end of that block
-    //              and pays full price for only the (always-different)
-    //              question after it.
+    //              IN THAT ORDER — the question block never gets a breakpoint
+    //              (it's different on every single call, cached or not) so a
+    //              follow-up question that retrieves the same top passages
+    //              reuses the cache through the end of the context block and
+    //              pays full price for only the question after it.
     //
-    // withCache() (api/_lib/promptCache.js) only attaches cache_control when
-    // a block is actually long enough for Anthropic to cache (Sonnet: 1024
-    // tokens, ~4096 chars) — a too-short SYSTEM_PROMPT or ANSWER_TOOL is left
-    // alone rather than wasting one of the 4-per-request breakpoints. See
-    // handoffs/HANDOFF-B.md for current measured sizes.
+    // planCacheBreakpoints() (api/_lib/promptCache.js, corrected 2026-09-20
+    // late) decides breakpoints off the CUMULATIVE estimated prefix in
+    // Anthropic's own billed order (tools -> system -> content), not each
+    // block measured alone — so a context block that's individually short
+    // still gets cached once the (now-large) system prompt ahead of it has
+    // already cleared the model's minimum. See handoffs/COST_REPORT_2026-09-20.md's
+    // "Correction" section for current measured sizes.
     const contextText = buildContextBlock({ passages: contextPassages, extractions: mappedExtractions });
     const questionText = buildQuestionBlock({
       question,
       today: todayResolved,
     });
+
+    const { tools: cachedTools, system: cachedSystem, messageBlocks: cachedContent } = planCacheBreakpoints(
+      {
+        tools: [{ block: ANSWER_TOOL, breakpoint: true }],
+        system: [{ block: { type: "text", text: SYSTEM_PROMPT }, breakpoint: true }],
+        messageBlocks: [
+          { block: { type: "text", text: contextText }, breakpoint: true },
+          { block: { type: "text", text: questionText }, breakpoint: false }, // never cached — always different
+        ],
+      },
+      ASK_MODEL
+    );
 
     const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
     const startedAt = Date.now();
@@ -674,28 +688,24 @@ export default async function handler(req, res) {
     const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
     const response = await withBackoff(() => client.messages.create({
       model: ASK_MODEL,
-      // 700, not 1500 (owner cost cut, 2026-09-20): a real answer here is
-      // 1-3 sentences plus a handful of {label, value, sources} facts — the
-      // ANSWER_TOOL schema, not free prose. 1500 was headroom nothing here
-      // ever used; every token of it was paid for on every single call.
-      max_tokens: 700,
+      // 900, not 700 (2026-09-20 late correction): the disambiguation fix
+      // below (RULES + the text/facts descriptions in answer.js) means an
+      // ambiguous question's answer now legitimately names other candidate
+      // records or returns up to 5 per-record facts instead of refusing —
+      // both cost a few more output tokens than a single-match answer. 700
+      // was sized for the single-match case only; 900 keeps headroom for
+      // 5 facts + a text clause naming the other matches without reintroducing
+      // the unused 1500 headroom this was cut from in the first place.
+      max_tokens: 900,
       // Deterministic on purpose: identical question, identical retrieved
       // evidence -> identical answer. The 2026-09-19 walkthrough saw the
       // SAME question return different dollar figures on two runs; that
       // can't happen at temperature 0.
       temperature: 0,
-      system: [withCache({ type: "text", text: SYSTEM_PROMPT }, ASK_MODEL)],
-      tools: [withCache(ANSWER_TOOL, ASK_MODEL)],
+      system: cachedSystem,
+      tools: cachedTools,
       tool_choice: { type: "tool", name: "answer" },
-      messages: [
-        {
-          role: "user",
-          content: [
-            withCache({ type: "text", text: contextText }, ASK_MODEL),
-            { type: "text", text: questionText }, // never cached — see above
-          ],
-        },
-      ],
+      messages: [{ role: "user", content: cachedContent }],
     }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
     const latencyMs = Date.now() - startedAt;
     timer.add("model", latencyMs);
@@ -722,6 +732,13 @@ export default async function handler(req, res) {
     // (and the response sent) BEFORE the bookkeeping below runs — neither
     // needs the customer to wait on it. `timingsMs` is the same snapshot the
     // Server-Timing header below carries; see handoffs/ASK_LATENCY_2026-09-20.md.
+    //
+    // stop_reason/facts_raw/facts_kept (2026-09-20 late): counts only, no
+    // content — stop_reason tells "genuine no-answer" apart from "the model
+    // got cut off"; facts_raw vs. facts_kept is how many facts the model
+    // actually cited that shapeAnswer's grounding check then dropped, which
+    // is exactly the signal for whether the disambiguation-vs-no-answer
+    // regression fix above is doing its job in production.
     console.log(
       JSON.stringify(
         modelCallLogLine({
@@ -733,6 +750,9 @@ export default async function handler(req, res) {
           outputTokens: response.usage?.output_tokens,
           latencyMs,
           timingsMs: timer.snapshot(),
+          stopReason: response.stop_reason,
+          factsRaw: Array.isArray(toolUse?.input?.facts) ? toolUse.input.facts.length : 0,
+          factsKept: data.facts.length,
         })
       )
     );

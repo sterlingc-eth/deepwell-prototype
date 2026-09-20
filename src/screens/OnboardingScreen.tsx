@@ -106,6 +106,10 @@ export function OnboardingScreen() {
             <CreateOrganization
               hideSlug
               skipInvitationScreen={false}
+              // Without this Clerk falls back to the dashboard "home URL" —
+              // the marketing site — so a new shop landed on the website
+              // instead of the app (owner report, 2026-09-20).
+              afterCreateOrganizationUrl="/app/"
               appearance={clerkAppearance}
             />
           </>

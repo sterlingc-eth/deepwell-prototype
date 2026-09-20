@@ -31,7 +31,8 @@
  * nicely: it drops any source that doesn't check out and then drops facts
  * left with no source at all.
  */
-import { DOCUMENT_TYPES, DOCUMENT_TYPE_DEFINITIONS } from './documentTypes.js';
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_DEFINITIONS, REQUIRED_FIELDS, fieldLabel } from './documentTypes.js';
+import { FIELD_SPECS } from './extractFields.js';
 import { BRAND_RULES } from './warrantyRules.js';
 import { estimateTokens } from './promptCache.js';
 
@@ -44,7 +45,7 @@ export const ANSWER_TOOL = {
       text: {
         type: "string",
         description:
-          "1–2 plain-English sentences answering the question. If the evidence doesn't support an answer, say so plainly and do not guess.",
+          "1–2 plain-English sentences answering the question. If MORE THAN ONE record could answer it (the customer has several units, warranties, or matching customers), do not refuse — answer for the single best match and name the others in one clause, e.g. \"the Desert Peak condenser's model is GSX140361K (there's also a Desert Peak furnace on file).\" Only say the evidence doesn't support an answer, plainly and without guessing, when nothing in the evidence is relevant to the question at all.",
       },
       facts: {
         type: "array",
@@ -109,6 +110,7 @@ const RULES = `Rules:
 - For a passage, location must be { "page": <the page number shown for that passage> } — the exact number, never a guess or a nearby page.
 - For an already-extracted field, location must be { "field": "<field name exactly as shown>" } — those aren't tied to a single page here, so do not invent a page number for one.
 - Never invent a document, a page, a date, a serial, a model number, or a price. If the evidence does not answer the question, set text to "Nothing in your records answers that." and return no facts.
+- AMBIGUOUS QUESTIONS ARE NOT NO-ANSWERS. When several records could match — the customer has more than one unit, more than one warranty, more than one matching customer — do NOT return no-answer just because the question didn't say which one. Either (a) answer for the single best match (the one the evidence most directly supports) and name the other candidates in one clause of text, or (b) return one fact per matching record (up to the 5-fact cap below), each with its own sources. Reserve "Nothing in your records answers that." for when the evidence has nothing relevant to the question at all, not for "more than one thing could be relevant."
 - If two passages disagree, say so in text and cite both rather than picking one.
 - Return at most 5 facts — only the ones that answer the question, never an exhaustive dump of everything retrieved.
 - Facts are a key/value grid: keep labels short ("Warranty", "Installed by", "Cost"). Use status "ok" for an active warranty, "warn" for one expiring within 90 days, "bad" for expired.
@@ -193,10 +195,59 @@ const HVAC_GLOSSARY = `HVAC GLOSSARY (background only — never state a fact fro
 const DOCUMENT_TYPE_GUIDE = `DOCUMENT TYPES you may see named next to a passage (the "documentType" field):
 ${DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYPE_DEFINITIONS[t.id] ?? ''}`).join('\n')}`;
 
+/** Rendered once at module load from documentTypes.js's own REQUIRED_FIELDS —
+ * never copied by hand. Background only: this is what "Blocked at Classified"
+ * means for a given type, so a dispatcher asking "why isn't this verified"
+ * gets a real answer instead of a guess, and it is genuinely a different fact
+ * from DOCUMENT_TYPE_GUIDE above (what a type IS vs. what it NEEDS). `a|b`
+ * means either field satisfies the requirement — kept exactly as
+ * documentTypes.js declares it, not paraphrased. */
+const REQUIRED_FIELDS_GUIDE = `REQUIRED FIELDS per document type (background only — for explaining pipeline state, e.g. why a document is "Blocked at Classified"; never a source for an answer itself):
+${DOCUMENT_TYPES.map((t) => {
+    const req = REQUIRED_FIELDS[t.id] ?? [];
+    const labels = req.map((r) => r.split('|').map(fieldLabel).join(' or ')).join(', ');
+    return `- ${t.id}: ${labels || '(none required)'}`;
+  }).join('\n')}`;
+
+/** Rendered once at module load from extractFields.js's own FIELD_SPECS —
+ * never copied by hand, so this can never drift from the actual extraction
+ * vocabulary. This is what the "field" in a source citation ({"field":
+ * "warranty_term"}) actually means — needed to tell warranty_term (the
+ * printed MANUFACTURER term) apart from agreement_term (a service contract
+ * period), or equipment_id (an internal "Unit 3" label) from serial_number
+ * (the manufacturer's own serial), when phrasing an answer that cites one. */
+const FIELD_KEY_GUIDE = `EXTRACTED FIELD KEYS you may see in "ALREADY-EXTRACTED FIELDS" (the "field" in a source citation):
+${FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}${s.example ? ` (${s.example})` : ''}`).join('\n')}`;
+
+const ABBREVIATIONS = `HVAC ABBREVIATIONS (background only — expand these when a dispatcher's question or the evidence uses them, never state a fact from this list alone):
+- AHU: Air Handler Unit — the indoor unit that moves air across a coil; see "Air handler" above.
+- RTU: Rooftop Unit — a packaged heating/cooling unit mounted on a roof, common on commercial buildings.
+- SEER / SEER2: Seasonal Energy Efficiency Ratio — a unit's rated cooling efficiency; SEER2 is the current (2023+) test standard and is not numerically the same scale as older SEER figures.
+- EER: Energy Efficiency Ratio — a single fixed-condition efficiency rating, distinct from SEER's seasonal average.
+- HSPF / HSPF2: Heating Seasonal Performance Factor — the heat-pump equivalent of SEER, rating heating-mode efficiency.
+- TXV: Thermostatic Expansion Valve — meters refrigerant into the evaporator coil; a common failed/replaced part on a service ticket.
+- VAV: Variable Air Volume — a commercial system that varies airflow (rather than temperature) to condition a zone.
+- VFD: Variable Frequency Drive — an electronic control that varies a motor's speed, used on fans or compressors for efficiency.
+- ERV / HRV: Energy/Heat Recovery Ventilator — brings in fresh outdoor air while recovering energy from the air being exhausted.
+- IAQ: Indoor Air Quality.
+- MERV: Minimum Efficiency Reporting Value — a filter's particle-capture rating; a higher number traps smaller particles.
+- CFM: Cubic Feet per Minute — a measure of airflow.
+- BTU / BTU/hr: British Thermal Unit — a unit of heat energy; capacity is quoted in BTU/hr or tons (1 ton = 12,000 BTU/hr, see "Tonnage" above).
+- ACH: Air Changes per Hour — how many times a space's air volume is replaced per hour.
+- PSI / PSIG: Pounds per Square Inch (Gauge) — a refrigerant charge or static-pressure reading.
+- OEM: Original Equipment Manufacturer.
+- S/N, M/N: Serial Number, Model Number — shorthand commonly printed on nameplates and service paperwork.
+- RH: Relative Humidity.
+- ACCA: Air Conditioning Contractors of America — publishes the Manual J/S load-calculation standards a proposal or install record may reference.`;
+
 /** Rendered once at module load from warrantyRules.js's BRAND_RULES — never
  * copied by hand, so this can never drift from the actual derivation logic.
  * Only verified brands (a real `rule`) are listed; an unverified brand
- * computes nothing there either, so it has nothing useful to summarize here. */
+ * computes nothing there either, so it has nothing useful to summarize here.
+ * Per-brand `caveats` (jurisdiction overrides, conditional/gated registered
+ * terms, shared-certificate provenance) are included — they're exactly the
+ * kind of thing that changes what a dispatcher should actually do with the
+ * number, not just decoration. */
 function renderBrandWarrantyTable() {
   return Object.values(BRAND_RULES)
     .filter((v) => v.rule)
@@ -206,14 +257,29 @@ function renderBrandWarrantyTable() {
         ? `${r.registeredPartsYears}-year parts if registered in time`
         : `up to ${Math.max(r.unregisteredPartsYears, ...(r.conditionalRegisteredTerms ?? []).map((o) => o.years))}` +
           `-year parts if registered in time, depending on conditions not always on file`;
+      const caveats = v.caveats?.length ? ` ${v.caveats.join(' ')}` : '';
       return `- ${v.label}: register within ${r.registrationWindowDays} days of install for ${registered}; ` +
-        `${r.unregisteredPartsYears}-year parts if never registered.`;
+        `${r.unregisteredPartsYears}-year parts if never registered.${caveats}`;
     })
     .join('\n');
 }
 
 const WARRANTY_BRAND_TABLE = `MANUFACTURER WARRANTY BACKGROUND (background only — a specific unit's actual term/expiry always comes from its extracted warranty fields or an already-computed warranty shown in the evidence, never computed here from this table alone):
-${renderBrandWarrantyTable()}`;
+${renderBrandWarrantyTable()}
+
+Recognized but NOT verified — no deadline can be computed for these regardless of what the evidence shows about registration timing (only a PRINTED expiry/term in the evidence itself is usable), each for a different reason: York/Coleman/Luxaire (manufacturer warranty pages redirect to a parent site with no terms reachable), Fujitsu (states terms but never a registration deadline in days), Bosch (its own FAQ says registration does not change parts coverage at all, so this app's "register for a longer term" shape does not apply), Maytag (states a registered figure but not the unregistered floor this app needs as a guaranteed minimum), Nordyne (an umbrella/OEM name, not itself a warranted product line).`;
+
+/** Condensed from docs/HVAC_WARRANTY_RESEARCH.md. Background only: this app's
+ * warrantyRules.js models one PARTS term per brand and nothing else — a
+ * compressor term (often longer than parts) is never computed, only ever
+ * read off a document that states one directly. This exists so the model
+ * doesn't confuse a printed compressor date with the parts figure above, or
+ * assume they're always the same number. */
+const BRAND_COMPRESSOR_NOTE = `COMPRESSOR VS. PARTS WARRANTY (background only — this app computes a PARTS term only; any compressor-specific date must come from the evidence itself, never inferred from the parts table above):
+- Napoleon: unregistered compressor and parts both run 5 years (bundled, per its own certificate).
+- Mitsubishi Electric: compressor coverage runs LONGER than parts (7-year unregistered vs. 5-year parts; 10-12 years once registered) — a document may state a compressor date well past what the parts table above implies.
+- Most Goodman/Amana/Daikin-family, Trane/American Standard, and Lennox-family units: compressor terms are usually printed close to or bundled with the parts term on the unit's own certificate — never assume a match to the table above; read whatever the specific document states.
+- ICP-family brands (Heil, Tempstar, Comfortmaker, Day & Night, KeepRite, Arcoaire) do not publish a compressor figure separate from parts in what's on file for this app — treat any compressor date only as printed on the document itself.`;
 
 const ANSWER_STYLE_RULES = `ANSWER STYLE:
 - Write like a dispatcher talking to another dispatcher: short, plain, no hedging filler ("it appears that...", "based on the provided information...").
@@ -224,7 +290,7 @@ const ANSWER_STYLE_RULES = `ANSWER STYLE:
 - Never fill in a customer's phone number, address, or unit location that isn't itself in the evidence, even to make a sentence read more naturally.`;
 
 export const SYSTEM_PROMPT =
-  `${PREAMBLE}\n\n${HVAC_GLOSSARY}\n\n${DOCUMENT_TYPE_GUIDE}\n\n${WARRANTY_BRAND_TABLE}\n\n${ANSWER_STYLE_RULES}\n\n${RULES}`;
+  `${PREAMBLE}\n\n${HVAC_GLOSSARY}\n\n${ABBREVIATIONS}\n\n${DOCUMENT_TYPE_GUIDE}\n\n${REQUIRED_FIELDS_GUIDE}\n\n${FIELD_KEY_GUIDE}\n\n${WARRANTY_BRAND_TABLE}\n\n${BRAND_COMPRESSOR_NOTE}\n\n${ANSWER_STYLE_RULES}\n\n${RULES}`;
 
 export function buildContextBlock({ passages, extractions } = {}) {
   const ev =

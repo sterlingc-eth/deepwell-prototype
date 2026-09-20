@@ -3,6 +3,7 @@ import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeys } from 
 import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { captureMessage, captureException } from "../telemetry.js";
 import { runWarrantyNotificationSweep } from "../notify.js";
+import { runOutreachSweep } from "./outreach.js";
 
 /**
  * GET /api/cron-sweep
@@ -180,6 +181,16 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "notifications" });
   }
 
+  // Customer outreach (handoffs/OUTREACH_2026-09-20.md): same shared deadline,
+  // own cross-tenant listing (opt-in tenants only — list_outreach_enabled_tenants,
+  // M3-config/18-outreach.sql), never allowed to fail the rest of this sweep.
+  try {
+    summary.outreach = await runOutreachSweep({ deadlineAt });
+  } catch (err) {
+    summary.outreach = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "outreach" });
+  }
+
   await captureMessage(
     `cron-sweep: ${summary.tenantsChecked} tenant(s) checked, ${summary.stuckFound} stuck document(s) found, ` +
       `${summary.recovered} recovered, ${summary.stillFailing} still failing; ` +
@@ -187,7 +198,9 @@ export default async function handler(req, res) {
       `${summary.budgetDeferredRecovered} recovered, ${summary.budgetDeferredStillFailing} still failing; ` +
       `notifications: ${summary.notifications?.tenantsChecked ?? 0} tenant(s), ` +
       `${summary.notifications?.notified ?? 0} notified, ${summary.notifications?.emailsSent ?? 0} digest(s) sent, ` +
-      `${summary.notifications?.skipped ?? 0} tenant(s) skipped (deadline).`,
+      `${summary.notifications?.skipped ?? 0} tenant(s) skipped (deadline); ` +
+      `outreach: ${summary.outreach?.tenantsChecked ?? 0} tenant(s), ${summary.outreach?.drafted ?? 0} drafted, ` +
+      `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed.`,
     { route: "/api/cron-sweep" }
   );
 

@@ -37,6 +37,7 @@ import { PIPELINE_STAGES } from '../src/core/types';
 import { NAV } from '../src/components/AppShell';
 import { isAdminRole, seatStatus } from '../src/services/teamClient';
 import { unreadBadgeLabel, parseNotificationLink } from '../src/services/notifyClient';
+import { sentThisMonth, type OutreachMessage } from '../src/services/outreachClient';
 import { docsMatchingFilter } from '../src/screens/ReviewScreen';
 import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
@@ -146,6 +147,16 @@ const eq = (name: string, got: unknown, want: unknown): void =>
     const got = parseDeepLink(`?customer=${longRef}`).customerRef;
     check('customer ref is capped at 64 chars', got?.length === 64, `got length ${got?.length}`);
   }
+
+  // ?screen=outreach&equipment= — Dashboard's "Open in Outreach" button and
+  // handoffs/OUTREACH_2026-09-20.md's deep link.
+  eq('outreach is a valid screen', parseDeepLink('?screen=outreach'), { screen: 'outreach' });
+  eq(
+    'outreach screen with an equipment id to preselect',
+    parseDeepLink('?screen=outreach&equipment=eq-9'),
+    { screen: 'outreach', outreachEquipmentId: 'eq-9' },
+  );
+  eq('an empty equipment value is treated as absent', parseDeepLink('?screen=outreach&equipment='), { screen: 'outreach' });
 }
 
 /* ---------------------------------------------------------------- formatYmd */
@@ -777,6 +788,27 @@ function listFilesRecursive(dir: string): string[] {
   eq('parseNotificationLink: extracts the entity id', parseNotificationLink('/app/?entity=abc-123'), { entityId: 'abc-123' });
   eq('parseNotificationLink: null link -> no entity', parseNotificationLink(null), { entityId: null });
   eq('parseNotificationLink: a link with no entity param -> no entity', parseNotificationLink('/app/?screen=dashboard'), { entityId: null });
+}
+
+/* ----------------------------------------------------------------- outreach */
+//
+// handoffs/OUTREACH_2026-09-20.md: the Dashboard card's "sent this month"
+// count. api/_lib/outreach.js's own pure logic (template rendering, tier
+// mapping, dedupe, opt-out, batching) is checked in scripts/verify-outreach.mjs
+// instead — this file only covers the one bit of outreach logic that lives
+// in src/.
+{
+  const msg = (over: Partial<OutreachMessage>): OutreachMessage => ({
+    id: 'm1', tier: 'expiring-90', equipmentId: 'eq-1', toEmail: 'a@example.com', subject: 's', preview: 'p',
+    status: 'sent', customerNumber: null, customerName: null, unit: null, serialLast4: null,
+    createdAt: '2026-09-01T00:00:00Z', approvedAt: null, sentAt: '2026-09-05T00:00:00Z', error: null, ...over,
+  });
+  const now = new Date('2026-09-20T12:00:00Z');
+  eq('sentThisMonth: counts a sent message from this month', sentThisMonth([msg({})], now), 1);
+  eq('sentThisMonth: ignores a draft (not sent)', sentThisMonth([msg({ status: 'draft', sentAt: null })], now), 0);
+  eq('sentThisMonth: ignores a message sent last month', sentThisMonth([msg({ sentAt: '2026-08-30T00:00:00Z' })], now), 0);
+  eq('sentThisMonth: ignores a failed send even if sentAt is set', sentThisMonth([msg({ status: 'failed' })], now), 0);
+  eq('sentThisMonth: sums multiple sent messages this month', sentThisMonth([msg({ id: 'a' }), msg({ id: 'b' })], now), 2);
 }
 
 /* ------------------------------------------------------------------ done */
