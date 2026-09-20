@@ -777,43 +777,59 @@ export default async function handler(req, res) {
     // hashQuestion's doc comment — only its hash, which documents were cited,
     // and how many passages were considered.
     const citedDocumentIds = [...new Set((data.sources ?? []).map((s) => s.documentId))];
-    await Promise.allSettled([
-      timer.time("bookkeeping", () =>
-        recordModelCall(ctxArg, {
+    // ONE connection, sequential (2026-09-20 fix): running the three writes
+    // as parallel withTenant calls exhausted the 5-client pool under Fluid
+    // compute — production logged "Failed to upsert ask cache row: timeout
+    // exceeded when trying to connect", so answers were never cached. The
+    // response is already sent; nothing here is on the customer's clock.
+    await timer.time("bookkeeping", async () => {
+      try {
+        await withTenant(ctxArg, async (db) => {
+          try {
+            await db.logAction({
+              action: "document.queried",
+              resource_type: "question",
+              clerk_user_id: auth.userId,
+              changes: {
+                question_hash: hashQuestion(question),
+                documents: citedDocumentIds,
+                passages: passages.length,
+              },
+            });
+          } catch (err) {
+            console.error("Failed to write document.queried audit row:", err?.message);
+          }
+          // Cache write (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): a cache
+          // miss above means `corpusStamp` came from the SAME transaction that
+          // just ran retrieval, so it is still the stamp this answer was built
+          // against.
+          if (ASK_CACHE_ENABLED && corpusStamp && shouldCache(data.kind, passages.length, extractions.length)) {
+            // SAVEPOINT: a failed upsert must not abort the transaction and
+            // silently roll back the audit row written just above.
+            await db.raw("SAVEPOINT ask_cache_upsert", []);
+            try {
+              await upsertCacheEntry(db, { questionHash, corpusStamp, today: todayResolved, answer: data });
+              await db.raw("RELEASE SAVEPOINT ask_cache_upsert", []);
+            } catch (err) {
+              console.error("Failed to upsert ask cache row:", err?.message);
+              await db.raw("ROLLBACK TO SAVEPOINT ask_cache_upsert", []).catch(() => {});
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Ask bookkeeping transaction failed:", err?.message);
+      }
+      try {
+        await recordModelCall(ctxArg, {
           inputTokens: response.usage?.input_tokens,
           outputTokens: response.usage?.output_tokens,
           cacheReadInputTokens: response.usage?.cache_read_input_tokens,
           cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-        }).catch((err) => console.error("Failed to record ask usage:", err?.message))
-      ),
-      timer.time("bookkeeping", () =>
-        withTenant(ctxArg, (db) =>
-          db.logAction({
-            action: "document.queried",
-            resource_type: "question",
-            clerk_user_id: auth.userId,
-            changes: {
-              question_hash: hashQuestion(question),
-              documents: citedDocumentIds,
-              passages: passages.length,
-            },
-          })
-        ).catch((err) => console.error("Failed to write document.queried audit row:", err?.message))
-      ),
-      // Cache write (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): a cache
-      // miss above means `corpusStamp` came from the SAME transaction that
-      // just ran retrieval, so it is still the stamp this answer was built
-      // against — safe to store alongside it even though this write lands in
-      // a brand-new transaction after the retrieval one already committed.
-      timer.time("bookkeeping", () => {
-        if (!ASK_CACHE_ENABLED || !corpusStamp || !shouldCache(data.kind, passages.length, extractions.length)) {
-          return Promise.resolve();
-        }
-        return withTenant(ctxArg, (db) =>
-          upsertCacheEntry(db, { questionHash, corpusStamp, today: todayResolved, answer: data })
-        ).catch((err) => console.error("Failed to upsert ask cache row:", err?.message));
-      }),
-    ]);
+        });
+      } catch (err) {
+        console.error("Failed to record ask usage:", err?.message);
+      }
+    });
   } catch (error) {
     try {
       const header = formatServerTiming(timer.snapshot());

@@ -51,7 +51,13 @@ export function getPool() {
     if (!connectionString) throw new Error('NEON_CONNECTION_STRING is not set');
     pool = new pg.Pool({
       connectionString,
-      max: 5,                       // serverless: keep well under Neon's pooler limits
+      // 10 (was 5) — Fluid compute funnels many concurrent requests through
+      // one instance; 5 exhausted under a single user's UI polling + one Ask
+      // (2026-09-20: "timeout exceeded when trying to connect"). Neon's
+      // pooled endpoint (-pooler host) multiplexes thousands of clients, and
+      // even the direct endpoint at 0.25 CU allows ~100. Override with
+      // PG_POOL_MAX if a bigger instance needs it.
+      max: Number(process.env.PG_POOL_MAX) || 10,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 8_000,
     });

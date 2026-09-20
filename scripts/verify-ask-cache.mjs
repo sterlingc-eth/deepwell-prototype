@@ -19,6 +19,7 @@ import {
   getCacheEntry,
   upsertCacheEntry,
   _resetTableExistsForTests,
+  PROMPT_VERSION,
 } from '../api/_lib/askCache.js';
 
 let failures = 0;
@@ -68,8 +69,8 @@ const eq = (name, got, want) =>
 {
   check('kind=no-answer with zero passages and zero extractions is NOT cacheable',
     !shouldCache('no-answer', 0, 0));
-  check('kind=no-answer WITH real evidence (model just couldn\'t answer) IS cacheable',
-    shouldCache('no-answer', 3, 0) && shouldCache('no-answer', 0, 2));
+  check('kind=no-answer WITH real evidence is NOT cacheable either (2026-09-20: a model no-answer outlived the prompt fix)',
+    !shouldCache('no-answer', 3, 0) && !shouldCache('no-answer', 0, 2));
   check('kind=answer is always cacheable, evidence or not', shouldCache('answer', 5, 5) && shouldCache('answer', 0, 0));
 }
 
@@ -135,12 +136,12 @@ const eq = (name, got, want) =>
 
   const first = await getCacheEntry(mockDb, { questionHash: 'h1', today: '2026-09-20' });
   eq('first lookup with a missing table returns the stamp and no row (not a thrown error)',
-    first, { corpusStamp: 'STAMP-A', row: null });
+    first, { corpusStamp: `STAMP-A:${PROMPT_VERSION}`, row: null });
   check('first lookup used a SAVEPOINT to probe safely', calls.includes('SAVEPOINT ask_cache_probe'));
 
   const callsBeforeSecond = calls.length;
   const second = await getCacheEntry(mockDb, { questionHash: 'h2', today: '2026-09-20' });
-  eq('second lookup (table known missing) still returns the stamp', second, { corpusStamp: 'STAMP-A', row: null });
+  eq('second lookup (table known missing) still returns the stamp', second, { corpusStamp: `STAMP-A:${PROMPT_VERSION}`, row: null });
   check('second lookup skipped the SAVEPOINT entirely (memoized "known missing")',
     !calls.slice(callsBeforeSecond).some((c) => c.includes('SAVEPOINT')));
 
@@ -163,14 +164,14 @@ const eq = (name, got, want) =>
       if (/ask_answer_cache/.test(sql)) {
         const [questionHash] = params;
         const hit = questionHash === 'known-question';
-        return { rows: [{ corpus_stamp: 'STAMP-B', cached_stamp: hit ? 'STAMP-B' : null, answer: hit ? { kind: 'answer', text: 'cached' } : null, created_at: hit ? new Date().toISOString() : null }] };
+        return { rows: [{ corpus_stamp: 'STAMP-B', cached_stamp: hit ? `STAMP-B:${PROMPT_VERSION}` : null, answer: hit ? { kind: 'answer', text: 'cached' } : null, created_at: hit ? new Date().toISOString() : null }] };
       }
       throw new Error(`unexpected SQL in test mock: ${sql}`);
     },
   };
 
   const miss = await getCacheEntry(mockDb, { questionHash: 'new-question', today: '2026-09-20' });
-  check('a genuine miss returns the stamp with no usable row', miss.corpusStamp === 'STAMP-B' && miss.row?.cached_stamp == null);
+  check('a genuine miss returns the stamp with no usable row', miss.corpusStamp === `STAMP-B:${PROMPT_VERSION}` && miss.row?.cached_stamp == null);
 
   const hit = await getCacheEntry(mockDb, { questionHash: 'known-question', today: '2026-09-20' });
   check('isCacheHit accepts the row getCacheEntry returns for a real match',

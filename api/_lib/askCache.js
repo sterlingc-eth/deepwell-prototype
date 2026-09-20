@@ -36,6 +36,23 @@
  * gone, which count() already reflects.
  */
 import { logOnce } from "./rateLimit.js";
+import { createHash } from "node:crypto";
+import { SYSTEM_PROMPT, ANSWER_TOOL } from "./answer.js";
+
+/** Any change to the prompt, the tool schema, or the model invalidates every
+ *  cached answer: a cached "no-answer" from an older prompt outlived the fix
+ *  that would have answered it (2026-09-20). Mixed into corpus_stamp. */
+export const PROMPT_VERSION = createHash("sha256")
+  .update(String(process.env.ASK_MODEL || "claude-haiku-4-5"))
+  .update(SYSTEM_PROMPT)
+  .update(JSON.stringify(ANSWER_TOOL))
+  .digest("hex")
+  .slice(0, 12);
+
+/** Pure: the stamp compared/stored is the DB stamp plus the prompt version. */
+export function withPromptVersion(dbStamp, promptVersion = PROMPT_VERSION) {
+  return dbStamp == null ? null : `${dbStamp}:${promptVersion}`;
+}
 
 export const ASK_CACHE_ENABLED = process.env.ASK_CACHE !== "0";
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -86,13 +103,13 @@ export async function getCacheEntry(db, { questionHash, today }) {
 
   if (tableExists === false) {
     const { rows } = await db.raw(STAMP_ONLY_SQL, []);
-    return { corpusStamp: rows[0].corpus_stamp, row: null };
+    return { corpusStamp: withPromptVersion(rows[0].corpus_stamp), row: null };
   }
 
   const run = async () => {
     const { rows } = await db.raw(COMBINED_SQL, [questionHash, today]);
     const row = rows[0];
-    return { corpusStamp: row.corpus_stamp, row: row.cached_stamp != null ? row : null };
+    return { corpusStamp: withPromptVersion(row.corpus_stamp), row: row.cached_stamp != null ? row : null };
   };
 
   if (tableExists === true) return run();
@@ -112,7 +129,7 @@ export async function getCacheEntry(db, { questionHash, today }) {
       tableExists = false;
       logOnce("ask_answer_cache", err);
       const { rows } = await db.raw(STAMP_ONLY_SQL, []);
-      return { corpusStamp: rows[0].corpus_stamp, row: null };
+      return { corpusStamp: withPromptVersion(rows[0].corpus_stamp), row: null };
     }
     throw err;
   }
@@ -141,7 +158,11 @@ export function isCacheHit(row, corpusStamp, nowMs = Date.now()) {
  * real evidence in hand) is cacheable.
  */
 export function shouldCache(kind, passageCount, extractionCount) {
-  if (kind === "no-answer" && !passageCount && !extractionCount) return false;
+  // Never pin a no-answer (2026-09-20): whether from zero evidence or from a
+  // model that declined, it is the answer most likely to be wrong or
+  // transient, and a wrong "nothing found" is worse than one more model call.
+  if (kind === "no-answer") return false;
+  void passageCount; void extractionCount;
   return true;
 }
 
