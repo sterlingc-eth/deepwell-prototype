@@ -7,8 +7,9 @@ import { billingClient } from './services/billingClient';
 import { useAppStore } from './store/appStore';
 import { usePostgresSync } from './hooks/usePostgresSync';
 import { useDeepLink } from './hooks/useDeepLink';
-import { AskScreen, BillingScreen, BrowseScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen } from './screens';
+import { AskScreen, BillingScreen, BrowseScreen, CustomerProfileScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen, TeamScreen } from './screens';
 import { OnboardingScreen } from './screens/OnboardingScreen';
+import { isAdminRole } from './services/teamClient';
 import './index.css';
 
 // The claim-packet export pulls in jspdf + html2canvas (~60 KB gzipped); only load it when opened.
@@ -21,7 +22,7 @@ const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen')
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 function App() {
-  const { isSignedIn, isLoaded, getToken, userId, orgId } = useAuth();
+  const { isSignedIn, isLoaded, getToken, userId, orgId, orgRole } = useAuth();
   const { organization } = useOrganization();
 
   // Hand Clerk's token getter to the service layer so api/ calls are authenticated.
@@ -50,12 +51,22 @@ function App() {
   // to move and the call is a harmless no-op; if the endpoint doesn't exist
   // yet, or the request fails outright, the notice still says what SHOULD
   // happen and nothing about the app breaks either way.
+  //
+  // Admin-only (handoffs/ORG_INVITES_AUDIT.md): merge_tenant() folds THIS
+  // browser's own solo tenant (`user_<callerId>`) into the shop, so a plain
+  // invited member running it only ever touches their own prior solo work —
+  // never another technician's or the shop's. It's still gated to admins
+  // because for an invited member that "solo work" is almost always just
+  // pre-invite testing/scratch uploads, not anything that belongs mixed into
+  // the shop's shared records without anyone deciding that on purpose, and
+  // because a member who just joined has no reason to spend a serverless
+  // invocation checking for something an owner-created shop already covers.
   const prevOrgId = useRef(orgId);
   const [mergeNotice, setMergeNotice] = useState(false);
   useEffect(() => {
     const had = prevOrgId.current;
     prevOrgId.current = orgId;
-    if (!isSignedIn || had || !orgId) return;
+    if (!isSignedIn || had || !orgId || !isAdminRole(orgRole ?? null)) return;
 
     // Once this browser has already run (or tried) the merge for this org, it
     // must never ask again — without this, `had` is `null` on every fresh
@@ -101,7 +112,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [isSignedIn, orgId]);
+  }, [isSignedIn, orgId, orgRole]);
 
   // Only fetches while signed in, and never in demo mode. Runs unconditionally
   // (rules of hooks) — the `enabled` flag is what actually gates the fetch, so
@@ -256,6 +267,8 @@ function App() {
         return <AskScreen />;
       case 'entity':
         return <EntityScreen />;
+      case 'customer':
+        return <CustomerProfileScreen />;
       // 'ingest' and 'review' both render the merged Inbox screen — which
       // tab is active lives in the store's `inboxTab`, not in this switch
       // (see store/appStore.ts's setCurrentScreen aliasing).
@@ -271,6 +284,8 @@ function App() {
         return <BrowseScreen />;
       case 'billing':
         return <BillingScreen />;
+      case 'team':
+        return <TeamScreen />;
       case 'warranty-export':
         return (
           <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>

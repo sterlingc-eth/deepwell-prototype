@@ -119,11 +119,12 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // See splitExtractPrompt()'s doc comment above for why this is split
   // rather than sent as the one flat string it used to be. withCache()
   // (api/_lib/promptCache.js) only attaches cache_control when `stable` is
-  // actually long enough to be cached (Haiku: 2048 tokens, ~8192 chars) — as
-  // measured, today's field guide + rules text is well under that (~600
-  // tokens), so in practice this does NOT get a cache breakpoint yet. See
-  // handoffs/HANDOFF-B.md; this is the documented, intentional "skip rather
-  // than pad" case the task called for, not a bug.
+  // actually long enough to be cached (Haiku: 2048 tokens, ~8192 chars) —
+  // extractFields.js's FIELD_GUIDE now carries a worked example per field
+  // specifically so this clears that bar (see handoffs/COST_REPORT_2026-09-20.md
+  // for the measured before/after). 1h TTL: a bulk import runs this same
+  // stable prefix across hundreds of documents over hours, well past the
+  // default 5-minute cache window.
   const fullPrompt = buildExtractPrompt(selected, documentType || doc.document_type);
   const { dynamic: dynamicPrompt, stable: stablePrompt } = splitExtractPrompt(fullPrompt);
 
@@ -132,7 +133,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const response = await withBackoff(() => client.messages.create({
     model: EXTRACT_MODEL,
     max_tokens: 4000,
-    ...(stablePrompt ? { system: [withCache({ type: "text", text: stablePrompt }, EXTRACT_MODEL)] } : {}),
+    ...(stablePrompt ? { system: [withCache({ type: "text", text: stablePrompt }, EXTRACT_MODEL, { ttl: "1h" })] } : {}),
     tools: [withCache(EXTRACT_TOOL, EXTRACT_MODEL)],
     tool_choice: { type: "tool", name: EXTRACT_TOOL.name },
     messages: [{ role: "user", content: dynamicPrompt }],

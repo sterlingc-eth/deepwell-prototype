@@ -47,6 +47,8 @@ const POSITIVE_META = [
   ['list all customers', 'list'],
   ['who are our customers', 'list'],
   ['what document types do we have', 'list'],
+  ['show everything for C-00012', 'customer'],
+  ['show me everything about c-00099', 'customer'],
   ['delete this document', 'imperative'],
   ['please remove the old invoice', 'imperative'],
   ['upload the new warranty card', 'imperative'],

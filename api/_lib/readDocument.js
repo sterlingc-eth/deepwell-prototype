@@ -4,6 +4,8 @@ import { getObject } from "./r2.js";
 import { getApiKey, MODEL_TIMEOUT_MS } from "./claude.js";
 import { captureException } from "./telemetry.js";
 import { recordModelCall } from "./usage.js";
+import { withCache } from "./promptCache.js";
+import { FIELD_SPECS } from "./extractFields.js";
 
 /**
  * The ingestion pipeline itself, with no HTTP in it.
@@ -20,6 +22,10 @@ import { recordModelCall } from "./usage.js";
  */
 
 export const MAX_PDF_BYTES = 24 * 1024 * 1024;
+// See callTranscribe's comment: a PDF page count varies, an image call is
+// always exactly one page.
+export const PDF_MAX_TOKENS = 8000;
+export const IMAGE_MAX_TOKENS = 3000;
 const TEXT_TYPES = /^(text\/|application\/(json|csv|xml))/;
 const PAGE_CHARS = 6000;
 
@@ -102,6 +108,59 @@ export class IngestError extends Error {
     this.status = status;
   }
 }
+
+/**
+ * Static system prompt for every transcription call (fast and strong pass
+ * alike) — identical for every document, forever, which is exactly what a
+ * cache breakpoint needs. Before this change, callTranscribe sent NO system
+ * block at all, so nothing about transcription was ever cacheable, even
+ * during a bulk import where the same instructions apply to hundreds of
+ * documents in a row. Genuinely useful content (layout conventions,
+ * handwriting shorthand), not padding — see handoffs/COST_REPORT_2026-09-20.md
+ * for the measured token count against Haiku's 2048-token minimum (the fast
+ * pass's model). 1h cache TTL (see promptCache.js) because a bulk import runs
+ * this same prefix for hours, well past the default 5-minute window.
+ */
+export // Reused, not restated by hand: the exact fields extraction will look for
+// downstream (extractFields.js), so transcription knows which values are
+// worth extra care and this can never drift out of sync with the real list.
+const TRANSCRIBE_FIELD_FOCUS = FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}`).join('\n');
+
+export const TRANSCRIBE_SYSTEM_PROMPT = `You transcribe scanned or photographed HVAC business documents into plain text, one page at a time, using the pages tool. This company's paperwork is one of: work orders, service tickets, invoices, warranty registrations, startup/commissioning sheets, permits, nameplate photos, maintenance agreements, dispatch notes, proposals/quotes, inspection reports, purchase orders, or correspondence — but transcribe whatever is actually on the page even if it does not match any of those.
+
+GENERAL RULES
+- Copy serial numbers, model numbers, part numbers, dates, and dollar amounts character for character, including punctuation and leading zeros — they are what this document will be searched by later. Never "clean up" a number.
+- Render a table, form, or checklist as lines of "label: value", one pair per line, in the order printed. A checked box reads as "checked"; an empty one reads as "unchecked" — do not omit unchecked boxes if that omission would lose information (e.g. a checklist of tasks performed).
+- Preserve line breaks and reading order (left-to-right, top-to-bottom, following columns as a person would read them). Do not summarize, paraphrase, reorder, or omit anything the page states.
+- An empty string is the CORRECT output for a genuinely blank page — never invent text that is not there, and never pad a thin page with a description of what the page looks like.
+- If a stamp, signature block, or logo carries printed text (a company name, a license number, a date stamped over other text), transcribe that text too.
+
+HVAC DOCUMENT LAYOUT CONVENTIONS
+- A nameplate / data plate is a small dense grid, often on a curved or reflective metal surface: MODEL, SERIAL/S-N/SER, and sometimes MFG DATE, VOLTS, HZ, PH, REFRIGERANT, and CHARGE OZ are packed close together in a small font. Read every legible field even when only a few characters resolve.
+- A work order / dispatch ticket header carries customer name, service address, and date near the top; the body is either a checklist of tasks or a technician's free-text narrative. Transcribe checklist items as separate "label: value" lines and narrative text as continuous prose, in order.
+- A service ticket usually separates what was found from what was performed — keep those as clearly labeled sections rather than merging them into one paragraph, even if the printed labels are informal ("Problem:" / "Fix:").
+- An invoice's TOTAL is usually the largest or bottom-most dollar figure and is often preceded by a subtotal, tax, and/or discount line above it. Transcribe every dollar figure on the page, in order, with whatever label is printed next to it — deciding which one is "the" total is extraction's job, not transcription's.
+- A warranty registration, startup sheet, or maintenance agreement often states a coverage/term as printed wording ("10 YEAR PARTS", "60 DAYS FROM INSTALL", "01/01/2025-12/31/2025") — copy that wording exactly. Never convert a term into a computed expiration date yourself.
+- A permit carries a permit or case number, often stamped or handwritten into a pre-printed form — these numbers mix letters and digits and are easy to misread; transcribe them character for character.
+
+HANDWRITING
+- Technicians write directly on paper forms in the field, often quickly and in pencil. Common shorthand: "PM" = preventive maintenance, "svc" = service, "cap" = capacitor, "comp" = compressor, "cont" = contactor, "TXV" = thermostatic expansion valve, "N/C" = no charge, "chk" = check/checked, "rplc"/"rep" = replace/replaced, and refrigerant codes ("R-410A", "R-22", "R-454B") written as-is.
+- If a handwritten word is only partly legible, transcribe the legible part and lower your confidence for that page rather than guessing the rest from context — a plausible but wrong guess is worse than an honest gap.
+- Cursive or hurried dollar amounts and dates are the single most consequential kind of handwriting on these forms, because they become billing and warranty facts downstream. Score confidence down for any you are not fully certain of, even when the rest of the page is otherwise clean.
+- A character that could be a 0 or O, a 1, l, or I, or a 5 or S is common in handwritten serials and model numbers. When context (a known manufacturer serial format, the same digit repeated elsewhere on the page) makes one reading clearly right, use it — but still lower confidence rather than presenting a guess as certain.
+
+MULTI-UNIT DOCUMENTS
+- A maintenance agreement or service report can cover more than one piece of equipment (e.g. "RTU-1" and "RTU-2" on the same rooftop, or a furnace and a separate condenser). Keep each unit's own serial, model, and readings grouped under whatever label the document uses for that unit ("Unit 1:", "RTU-2 -", a table column) rather than interleaving them — the next step depends on being able to tell which value belongs to which unit from your transcription's own structure.
+- If two units legitimately share an identical printed value (the same model number, most often), transcribe it for both occurrences — do not assume the repeat is a transcription error and drop the second one.
+
+FIELDS THE NEXT STEP WILL LOOK FOR — you are not extracting these yourself, only transcribing the page text, but a value you drop, paraphrase, or garble here can never be recovered downstream. Give these extra care wherever they appear:
+${TRANSCRIBE_FIELD_FOCUS}
+
+CONFIDENCE
+- Give an honest confidence score from 0 (mostly guessing) to 1 (certain) for each page, reflecting the LEAST certain thing on that page, not the average or the easiest field.
+- When confidence is below 0.9, give a short reason: "handwritten", "faded thermal receipt", "skewed scan", "blurry photo", "low contrast", "small dense nameplate text", or similar. Leave the reason empty when confidence is high.
+- A page can be confidently blank — a real blank cover sheet, or the back of a one-sided form. Report that with an empty string and a HIGH confidence; do not lower confidence just because there was nothing to transcribe.
+- Confidence drives real behavior downstream: a low-confidence page gets re-read by a stronger model, and a low-confidence field never gets auto-verified without a person looking at it. An honest 0.5 costs one extra read; a dishonest 0.95 on a page you were actually guessing at can ship a wrong warranty date or dollar amount straight to a customer with nothing flagging it for review.`;
 
 const PAGES_TOOL = {
   name: "pages",
@@ -293,10 +352,16 @@ function hasRepeatedRun(text) {
  * Four independent signals, ANY of which is enough to escalate a page:
  *   1. Self-reported confidence below `threshold`. Trusts the model when it
  *      says it struggled.
- *   2. Near-empty text. The prompt tells the model an empty string is fine
- *      for a genuinely blank page, so this does re-confirm some real blank
- *      pages at the cost of one extra call — cheap insurance against a page
- *      the model gave up on and returned nothing for instead.
+ *   2. Near-empty text, UNLESS the model is itself confident (self-reported
+ *      confidence >= `threshold`) that the page really is blank. Cost cut,
+ *      2026-09-20 ("stop early on blank pages" — see
+ *      handoffs/COST_REPORT_2026-09-20.md): re-running a genuinely blank page
+ *      through the strong model essentially never turns up text that isn't
+ *      there — it was "cheap insurance" against a page the model GAVE UP on,
+ *      but a model that confidently reports empty didn't give up, it read the
+ *      page. A near-empty page the model was NOT confident about (low or
+ *      missing confidence) still escalates — that's the real "gave up" case,
+ *      and missing confidence is treated as no signal, not as confident.
  *   3. A high ratio of non-alphanumeric "garbage" characters, which is what
  *      OCR looks like when the model is pattern-matching shapes it can't
  *      actually read.
@@ -312,7 +377,8 @@ export function shouldEscalate(pages, threshold = 0.75) {
     if (Number.isFinite(confidence) && confidence < threshold) {
       reasons.push(`self-reported confidence ${confidence.toFixed(2)} below ${threshold}`);
     }
-    if (text.trim().length <= EMPTY_TEXT_THRESHOLD) {
+    const confidentlyBlank = Number.isFinite(confidence) && confidence >= threshold;
+    if (text.trim().length <= EMPTY_TEXT_THRESHOLD && !confidentlyBlank) {
       reasons.push("page produced almost no text");
     }
     const ratio = garbageRatio(text);
@@ -554,9 +620,15 @@ async function callTranscribe({ model, bytes, contentType, timeoutMs, pageFilter
 
   const response = await client.messages.create({
     model,
-    max_tokens: 8000,
+    // Cost cut (2026-09-20): a PDF call can legitimately return many pages of
+    // text in one response, so it keeps the full 8000. A single image is
+    // always exactly one page — a nameplate photo, a one-page work order —
+    // and 3000 tokens is generous headroom for that; PDF_MAX_TOKENS' extra
+    // room was never used by an image call and only raised its worst-case cost.
+    max_tokens: contentType === "application/pdf" ? PDF_MAX_TOKENS : IMAGE_MAX_TOKENS,
     tools: [PAGES_TOOL],
     tool_choice: { type: "tool", name: "pages" },
+    system: [withCache({ type: "text", text: TRANSCRIBE_SYSTEM_PROMPT }, model, { ttl: "1h" })],
     messages: [
       {
         role: "user",

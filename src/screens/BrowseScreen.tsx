@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronDown, ChevronUp, FolderOpen, Loader2, Search, Trash2 } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, FolderOpen, Loader2, Search, Trash2, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StagePill } from '../components/StagePill';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
@@ -8,6 +8,7 @@ import { dateOf, fmtDate, formatYmd, fmtMoney, normalize, numOf, str } from '../
 import type { Doc, Entity } from '../core/types';
 import { DOCUMENT_TYPES } from '../domains/hvac/documentTypes';
 import { deleteDocuments } from '../services/documentClient';
+import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
@@ -35,19 +36,32 @@ function haystack(e: Entity, g: ReturnType<typeof useGraph.getState>): string {
   return normalize(parts.join(' '));
 }
 
-/** Best available "who/what this is about" label for a linked document. */
+/** Best available "who/what this is about" label for a linked document,
+ *  excluding the customer entity — that gets its own clickable column now
+ *  (see `customerFor` below) rather than being buried in this generic one. */
 function linkedLabel(doc: Doc, entities: Record<string, Entity>): string {
   for (const id of doc.linkedEntityIds) {
     const e = entities[id];
-    if (!e) continue;
+    if (!e || e.type === 'customer') continue;
     switch (e.type) {
-      case 'customer': return str(e, 'name');
       case 'property': return str(e, 'address');
       case 'equipment': return str(e, 'serial') || str(e, 'model');
       default: return str(e, 'name') || e.type;
     }
   }
   return '';
+}
+
+/** The customer entity (if any) this document is linked to — via a direct
+ *  document_entity_links row, the same source `linkedEntityIds` already
+ *  reads (see usePostgresSync.ts's `toDoc`/`toEntity`; entity_type survives
+ *  regardless of which fields that sync maps for a given type). */
+function customerFor(doc: Doc, entities: Record<string, Entity>): Entity | null {
+  for (const id of doc.linkedEntityIds) {
+    const e = entities[id];
+    if (e?.type === 'customer') return e;
+  }
+  return null;
 }
 
 type DocSort = 'date' | 'name' | 'type';
@@ -65,6 +79,7 @@ function DocumentsTab() {
   const removeDoc = useGraph((s) => s.removeDoc);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  const openCustomer = useAppStore((s) => s.openCustomer);
 
   const [filter, setFilter] = useState('');
   const [sort, setSort] = useState<DocSort>('date');
@@ -78,14 +93,19 @@ function DocumentsTab() {
 
   const rows = useMemo(() => {
     const q = normalize(filter);
-    let list = Object.values(docs).map((doc) => ({
-      doc,
-      typeLabel: (doc.typeId && DOCUMENT_TYPE_LABEL.get(doc.typeId)) || 'Unclassified',
-      linked: linkedLabel(doc, entities),
-    }));
+    let list = Object.values(docs).map((doc) => {
+      const customer = customerFor(doc, entities);
+      return {
+        doc,
+        typeLabel: (doc.typeId && DOCUMENT_TYPE_LABEL.get(doc.typeId)) || 'Unclassified',
+        linked: linkedLabel(doc, entities),
+        customer,
+        customerName: customer ? str(customer, 'customer_name') || str(customer, 'name') : '',
+      };
+    });
     if (q) {
-      list = list.filter(({ doc, typeLabel, linked }) =>
-        normalize(`${doc.filename} ${typeLabel} ${linked}`).includes(q)
+      list = list.filter(({ doc, typeLabel, linked, customerName }) =>
+        normalize(`${doc.filename} ${typeLabel} ${linked} ${customerName}`).includes(q)
       );
     }
     list.sort((a, b) => {
@@ -218,7 +238,8 @@ function DocumentsTab() {
                 <button type="button" className="flex items-center gap-1" onClick={() => toggleSort('type')}>Type {sortIcon('type')}</button>
               </th>
               <th className="px-3 py-2">Stage</th>
-              <th className="px-3 py-2">Customer / equipment</th>
+              <th className="px-3 py-2">Customer</th>
+              <th className="px-3 py-2">Linked to</th>
               <th className="px-3 py-2">
                 <button type="button" className="flex items-center gap-1" onClick={() => toggleSort('date')}>Received {sortIcon('date')}</button>
               </th>
@@ -226,7 +247,7 @@ function DocumentsTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {rows.map(({ doc, typeLabel, linked }) => (
+            {rows.map(({ doc, typeLabel, linked, customer, customerName }) => (
               <tr key={doc.id} className="hover:bg-surface-2">
                 <td className="px-3 py-2 align-top">
                   <input type="checkbox" aria-label={`Select ${doc.filename}`} checked={selected.has(doc.id)} onChange={() => toggleOne(doc.id)} />
@@ -234,6 +255,15 @@ function DocumentsTab() {
                 <td className="px-3 py-2 align-top max-w-[16rem] truncate" title={doc.filename}>{doc.filename}</td>
                 <td className="px-3 py-2 align-top">{typeLabel}</td>
                 <td className="px-3 py-2 align-top"><StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} compact /></td>
+                <td className="px-3 py-2 align-top">
+                  {customer ? (
+                    <button type="button" className="text-ink-2 underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 hover:text-ink" onClick={() => openCustomer(customer.id)}>
+                      {customerName || 'Unnamed'}
+                    </button>
+                  ) : (
+                    <span className="text-ink-3">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 align-top text-ink-2">{linked || '—'}</td>
                 <td className="px-3 py-2 align-top text-ink-2 whitespace-nowrap">{fmtDate(doc.receivedAt)}</td>
                 <td className="px-3 py-2 align-top">
@@ -249,7 +279,7 @@ function DocumentsTab() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-ink-3">
+                <td colSpan={8} className="px-4 py-8 text-center text-ink-3">
                   {totalCount === 0 ? 'No documents yet.' : 'No documents match this filter.'}
                 </td>
               </tr>
@@ -302,7 +332,7 @@ export function BrowseScreen() {
   const setQuery = useAppStore((s) => s.setSearchQuery);
   const openEntity = useAppStore((s) => s.openEntity);
   const askQuestion = useAppStore((s) => s.askQuestion);
-  const [mainTab, setMainTab] = useState<'documents' | 'search'>('documents');
+  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search'>('documents');
   const [kind, setKind] = useState<Kind>('all');
   const [debounced, setDebounced] = useState(query);
   useEffect(() => {
@@ -369,6 +399,7 @@ export function BrowseScreen() {
         <div role="tablist" aria-label="Records view" className="flex flex-wrap gap-1.5">
           {([
             { id: 'documents' as const, label: 'Documents', Icon: FolderOpen },
+            { id: 'customers' as const, label: 'Customers', Icon: Users },
             { id: 'search' as const, label: 'Search', Icon: Search },
           ]).map((t) => (
             <button
@@ -385,6 +416,8 @@ export function BrowseScreen() {
 
         {mainTab === 'documents' ? (
           <DocumentsTab />
+        ) : mainTab === 'customers' ? (
+          <CustomersScreen />
         ) : (
           <div className="space-y-6">
             <div className="relative">

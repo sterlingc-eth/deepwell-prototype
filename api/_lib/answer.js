@@ -31,6 +31,9 @@
  * nicely: it drops any source that doesn't check out and then drops facts
  * left with no source at all.
  */
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_DEFINITIONS } from './documentTypes.js';
+import { BRAND_RULES } from './warrantyRules.js';
+import { estimateTokens } from './promptCache.js';
 
 export const ANSWER_TOOL = {
   name: "answer",
@@ -141,7 +144,73 @@ const PREAMBLE =
   'company. You will be given retrieved passages from the customer\'s own ' +
   'documents, then a question. Answer using only the "answer" tool.';
 
-export const SYSTEM_PROMPT = `${PREAMBLE}\n\n${RULES}`;
+/**
+ * Reference material below (glossary, document-type guide, warranty-brand
+ * table, style rules) is what pushes SYSTEM_PROMPT above Haiku's 2048-token
+ * prompt-caching minimum (api/_lib/promptCache.js) so ASK_MODEL=claude-haiku-4-5
+ * (the 2026-09-20 owner default) actually gets a cache hit on it, instead of
+ * cache_control being attached to a block too short for Anthropic to ever
+ * cache. It is genuinely load-bearing content, not padding: every section is
+ * something the model needs to interpret an HVAC dispatcher's question and
+ * the passages it's shown, none of it is a substitute for evidence — see the
+ * "background only" guard on each section, and the RULES below still forbid
+ * stating anything not also in the evidence.
+ */
+const HVAC_GLOSSARY = `HVAC GLOSSARY (background only — never state a fact from here unless the evidence above also states it; this is for understanding the question and the passages, not for answering from):
+- RTU (rooftop unit): a packaged heating/cooling unit mounted on a roof, common on commercial buildings.
+- Condenser: the outdoor half of a split system; rejects heat to outside air in cooling mode.
+- Evaporator coil: the indoor coil, usually above or beside a furnace/air handler, where refrigerant absorbs heat from indoor air.
+- Air handler: the indoor unit that moves air across the evaporator coil; paired with a heat pump or as the indoor half of a split system with no gas furnace.
+- Heat pump: a unit that both heats and cools by reversing refrigerant flow.
+- Furnace: a gas-, oil-, or electric-fired indoor unit that heats air directly.
+- Mini-split / ductless: one outdoor condenser feeding one or more small indoor units with no ductwork.
+- Compressor: the pump inside a condenser that pressurizes refrigerant; the single most expensive part to replace.
+- Capacitor / contactor: small electrical parts that start a compressor/fan motor or switch power to it; common, inexpensive service items.
+- Refrigerant: the working fluid (R-410A, R-22 [phased out], R-454B); "a charge" means adding refrigerant.
+- Tonnage: cooling capacity, in tons of refrigeration (1 ton = 12,000 BTU/hr); residential units are usually 1.5-5 tons.
+- SEER / SEER2: a unit's rated cooling efficiency; higher is more efficient, and is NOT the same measurement as tonnage.
+- Plenum: the sheet-metal box atop a furnace/air handler that ductwork connects to.
+- PM (preventive maintenance): a routine scheduled visit, as opposed to a repair or emergency call.
+- Startup / commissioning: the initial readings recorded when newly installed equipment is first run.
+- Registration window: the number of days after install a manufacturer allows for registering equipment to unlock its full parts warranty (see the brand table below).
+- Document pipeline stages you may see on a passage/extraction: received (uploaded, not yet read) -> read (text transcribed) -> classified (document type set) -> extracted (fields pulled) -> linked (attached to a customer/equipment record) -> verified (confirmed complete and correct, by the AI or a person). "AI verified" and "human verified" both mean stage verified, distinguished only by who confirmed it.
+- Registration window closing / expiring / expired describe a warranty's urgency, computed from the install date and, if on file, the registration date — never guessed from a document that doesn't state one.`;
+
+const DOCUMENT_TYPE_GUIDE = `DOCUMENT TYPES you may see named next to a passage (the "documentType" field):
+${DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYPE_DEFINITIONS[t.id] ?? ''}`).join('\n')}`;
+
+/** Rendered once at module load from warrantyRules.js's BRAND_RULES — never
+ * copied by hand, so this can never drift from the actual derivation logic.
+ * Only verified brands (a real `rule`) are listed; an unverified brand
+ * computes nothing there either, so it has nothing useful to summarize here. */
+function renderBrandWarrantyTable() {
+  return Object.values(BRAND_RULES)
+    .filter((v) => v.rule)
+    .map((v) => {
+      const r = v.rule;
+      const registered = r.registeredPartsYears != null
+        ? `${r.registeredPartsYears}-year parts if registered in time`
+        : `up to ${Math.max(r.unregisteredPartsYears, ...(r.conditionalRegisteredTerms ?? []).map((o) => o.years))}` +
+          `-year parts if registered in time, depending on conditions not always on file`;
+      return `- ${v.label}: register within ${r.registrationWindowDays} days of install for ${registered}; ` +
+        `${r.unregisteredPartsYears}-year parts if never registered.`;
+    })
+    .join('\n');
+}
+
+const WARRANTY_BRAND_TABLE = `MANUFACTURER WARRANTY BACKGROUND (background only — a specific unit's actual term/expiry always comes from its extracted warranty fields or an already-computed warranty shown in the evidence, never computed here from this table alone):
+${renderBrandWarrantyTable()}`;
+
+const ANSWER_STYLE_RULES = `ANSWER STYLE:
+- Write like a dispatcher talking to another dispatcher: short, plain, no hedging filler ("it appears that...", "based on the provided information...").
+- Money: "$1,234.56" — two decimals, comma-separated thousands.
+- Dates: say them the way a person would ("expires March 10, 2034"), not the raw YYYY-MM-DD, even though sources cite the raw value.
+- A serial or model number is always copied exactly as shown in the evidence — never reformatted, abbreviated, or "corrected".
+- If two documents disagree, name both (filename or date) in text so the dispatcher knows which is which, rather than silently picking one.
+- Never fill in a customer's phone number, address, or unit location that isn't itself in the evidence, even to make a sentence read more naturally.`;
+
+export const SYSTEM_PROMPT =
+  `${PREAMBLE}\n\n${HVAC_GLOSSARY}\n\n${DOCUMENT_TYPE_GUIDE}\n\n${WARRANTY_BRAND_TABLE}\n\n${ANSWER_STYLE_RULES}\n\n${RULES}`;
 
 export function buildContextBlock({ passages, extractions } = {}) {
   const ev =
@@ -165,6 +234,55 @@ export function buildContextBlock({ passages, extractions } = {}) {
 
 PASSAGES:
 ${ev}${factsBlock}`;
+}
+
+/**
+ * Token budget for the context block api/ask.js sends (passages +
+ * already-extracted fields), independent of MAX_PASSAGES/MAX_EXCERPT's own
+ * per-passage caps — those bound a single passage's size and count; this
+ * bounds the whole block's cost regardless of how many passages retrieval
+ * returned. ~6K tokens keeps a worst-case (12 full-length passages) call well
+ * under half its context window while leaving room for the (uncapped)
+ * extracted-fields block and the question.
+ */
+export const CONTEXT_TOKEN_BUDGET = 6000;
+
+/**
+ * Pure: what actually gets shown to the model for one question, chosen from
+ * what retrieval returned.
+ *
+ * Two things happen, in order:
+ *   1. Dedupe by (documentId, page) — retrieval can return the same page
+ *      more than once (e.g. it matched on more than one search term), and a
+ *      repeated passage is pure waste: same tokens, no new evidence.
+ *   2. Keep passages, IN THE ORDER GIVEN (assumed already rank-sorted by the
+ *      caller — see db.searchPassages), until the next one would push the
+ *      cumulative excerpt text over `maxTokens`. Always keeps at least the
+ *      first passage even if it alone exceeds the budget, so a single large
+ *      match is never dropped to zero context.
+ *
+ * @param {{documentId: string, page?: number, excerpt?: string}[]} passages
+ */
+export function selectPassagesForContext(passages, maxTokens = CONTEXT_TOKEN_BUDGET) {
+  const seen = new Set();
+  const deduped = [];
+  for (const p of passages ?? []) {
+    if (!p || typeof p.documentId !== 'string') continue;
+    const key = `${p.documentId}\u0000${p.page ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(p);
+  }
+
+  const kept = [];
+  let used = 0;
+  for (const p of deduped) {
+    const cost = estimateTokens(p.excerpt ?? '');
+    if (kept.length && used + cost > maxTokens) break;
+    kept.push(p);
+    used += cost;
+  }
+  return kept;
 }
 
 export function buildQuestionBlock({ question, today }) {

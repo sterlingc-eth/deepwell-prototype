@@ -11,8 +11,10 @@ export type Screen =
   | 'dashboard'
   | 'browse'
   | 'entity'
+  | 'customer'
   | 'warranty-export'
-  | 'billing';
+  | 'billing'
+  | 'team';
 
 /** `?plan=&interval=` deep link, held until Billing opens and preselects it. */
 export interface PendingPlan {
@@ -163,6 +165,12 @@ interface AppState {
   pendingQuestion: string | null; // deep-link prefill (dashboard rows, entity links)
   askQuestion: (question: string) => void; // navigate to Ask with this question
   clearPendingQuestion: () => void;
+  // Unlike pendingQuestion (navigates to Ask AND submits immediately),
+  // pendingPrefill only fills the question box and lets the person finish
+  // typing — used by "Ask about this customer" (prefills "C-00012: ").
+  pendingPrefill: string | null;
+  prefillQuestion: (text: string) => void;
+  clearPendingPrefill: () => void;
   recentQuestions: string[];
   pushRecentQuestion: (q: string) => void;
   includeUnverified: boolean;
@@ -177,6 +185,12 @@ interface AppState {
   openDocument: (id: string) => void;
   selectedEntityId: string | null;
   openEntity: (id: string) => void;
+  // The customer-profile screen's ref — whatever the caller had in hand (a
+  // uuid or a 'C-00012' display number); CustomerProfileScreen itself
+  // resolves which one it is (customerClient.getByRef) rather than the store
+  // doing that classification.
+  customerRef: string | null;
+  openCustomer: (ref: string) => void;
 
   // Browse (secondary list view)
   searchQuery: string;
@@ -274,6 +288,9 @@ export const useAppStore = create<AppState>((set) => ({
   pendingQuestion: null,
   askQuestion: (question) => set({ pendingQuestion: question, currentScreen: 'ask' }),
   clearPendingQuestion: () => set({ pendingQuestion: null }),
+  pendingPrefill: null,
+  prefillQuestion: (text) => set({ pendingPrefill: text, currentScreen: 'ask' }),
+  clearPendingPrefill: () => set({ pendingPrefill: null }),
   recentQuestions: [],
   pushRecentQuestion: (q) =>
     set((s) => ({
@@ -292,6 +309,8 @@ export const useAppStore = create<AppState>((set) => ({
   openDocument: (id) => set({ selectedDocumentId: id }),
   selectedEntityId: null,
   openEntity: (id) => set({ selectedEntityId: id, currentScreen: 'entity' }),
+  customerRef: null,
+  openCustomer: (ref) => set({ customerRef: ref, currentScreen: 'customer' }),
 
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),

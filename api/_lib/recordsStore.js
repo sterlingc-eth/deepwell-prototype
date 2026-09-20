@@ -617,10 +617,26 @@ function makeStore(db, tenantId) {
      * 4 KB of text, and shipping 20 of them into a prompt is what made the old
      * client-side "send everything" approach cost what it did.
      */
-    searchPassages: async (question, limit = 12) => {
+    // `documentIds`, when given, restricts every pass below to that set —
+    // used by ask.js to scope a "C-00012: ..." question to one customer's own
+    // documents (see api/ask.js's customer-number resolution). A non-null,
+    // EMPTY array means "restrict to nothing", not "no restriction" — the
+    // caller already knows this customer has zero documents and wants that
+    // reflected, not silently ignored.
+    searchPassages: async (question, limit = 12, { documentIds = null } = {}) => {
       const rows = new Map();
       const push = (list, source) => {
         for (const r of list) if (!rows.has(r.id)) rows.set(r.id, { ...r, matched_by: source });
+      };
+      if (documentIds && documentIds.length === 0) return [];
+      const scopeSql = documentIds ? ' AND p.document_id = ANY($__ids__::uuid[])' : '';
+      const withIds = (params) => documentIds ? [...params, documentIds] : params;
+      // The scoped queries below append documentIds as their LAST bind param;
+      // $__ids__ is replaced with that param's real position so the same
+      // scopeSql string works regardless of how many params precede it.
+      const scoped = (sql, params) => {
+        const withScope = documentIds ? sql.replace('__SCOPE__', scopeSql.replace('$__ids__', `$${params.length + 1}`)) : sql.replace('__SCOPE__', '');
+        return db.query(withScope, withIds(params));
       };
 
       // OR, not AND. websearch_to_tsquery ANDs every term, so a real question
@@ -643,10 +659,10 @@ function makeStore(db, tenantId) {
           FROM document_pages p
           JOIN documents d ON d.id = p.document_id
           CROSS JOIN q
-         WHERE p.${TENANT} AND q.tsq IS NOT NULL AND p.tsv @@ q.tsq
+         WHERE p.${TENANT} AND q.tsq IS NOT NULL AND p.tsv @@ q.tsq __SCOPE__
          ORDER BY rank DESC
          LIMIT $2`;
-      push((await db.query(ftsSql, [question, limit])).rows, 'text');
+      push((await scoped(ftsSql, [question, limit])).rows, 'text');
 
       // Belt and braces: if full-text search found nothing (an empty or
       // stale tsv column did exactly this in production once), fall back to
@@ -659,14 +675,14 @@ function makeStore(db, tenantId) {
             .filter((w) => !STOPWORDS.has(w))
         )].slice(0, 6);
         for (const w of words) {
-          const r = await db.query(
+          const r = await scoped(
             `SELECT p.id, p.document_id, p.page_no,
                     d.original_filename, d.document_type, d.stage,
                     substring(p.text from greatest(1, position(lower($2) in lower(p.text)) - 120) for 320) AS excerpt,
                     0.5 AS rank
                FROM document_pages p
                JOIN documents d ON d.id = p.document_id
-              WHERE p.${TENANT} AND p.text ILIKE $1
+              WHERE p.${TENANT} AND p.text ILIKE $1 __SCOPE__
               LIMIT 4`,
             [`%${w}%`, w]
           );
@@ -683,14 +699,14 @@ function makeStore(db, tenantId) {
 
       for (const token of ids) {
         const like = `%${token}%`;
-        const r = await db.query(
+        const r = await scoped(
           `SELECT p.id, p.document_id, p.page_no,
                   d.original_filename, d.document_type, d.stage,
                   substring(p.text from greatest(1, position($2 in p.text) - 120) for 320) AS excerpt,
                   1.0 AS rank
              FROM document_pages p
              JOIN documents d ON d.id = p.document_id
-            WHERE p.${TENANT} AND p.text ILIKE $1
+            WHERE p.${TENANT} AND p.text ILIKE $1 __SCOPE__
             LIMIT 5`,
           [like, token]
         );
@@ -705,20 +721,25 @@ function makeStore(db, tenantId) {
      * reliable than re-reading a page when the question is about a field the
      * pipeline has already extracted ("what's the model on unit 3").
      */
-    searchExtractions: async (question, limit = 25) => {
+    searchExtractions: async (question, limit = 25, { documentIds = null } = {}) => {
+      if (documentIds && documentIds.length === 0) return [];
       const tokens = [...new Set(
         (question.match(/[A-Za-z0-9][A-Za-z0-9/-]{3,}/g) ?? []).filter((t) => /\d/.test(t))
       )].slice(0, 5);
       if (!tokens.length) return [];
+      const scopeSql = documentIds ? ' AND x.document_id = ANY($3::uuid[])' : '';
+      const params = documentIds
+        ? [tokens.map((t) => `%${t}%`), limit, documentIds]
+        : [tokens.map((t) => `%${t}%`), limit];
       return many(
         `SELECT x.id, x.document_id, x.entity_id, x.field_key, x.value, x.confidence,
                 d.original_filename, d.stage, e.entity_type, e.data
            FROM extractions x
            JOIN documents d ON d.id = x.document_id
       LEFT JOIN entities  e ON e.id = x.entity_id
-          WHERE x.${TENANT} AND x.value ILIKE ANY($1::text[])
+          WHERE x.${TENANT} AND x.value ILIKE ANY($1::text[])${scopeSql}
           LIMIT $2`,
-        [tokens.map((t) => `%${t}%`), limit]
+        params
       );
     },
 
@@ -1052,6 +1073,15 @@ function makeStore(db, tenantId) {
         const v = String(facts?.[k] ?? '').trim();
         if (v) incoming[k] = v;
       }
+      // customer_phone/customer_email (extractFields.js FIELD_SPECS) map onto
+      // the customer's data.phone/data.email — see
+      // handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md section A. Same
+      // fill-once merge as every other field on this row (below): a value
+      // already on file is never overwritten by a later document.
+      const phone = String(facts?.customer_phone ?? '').trim();
+      if (phone) incoming.phone = phone;
+      const email = String(facts?.customer_email ?? '').trim();
+      if (email) incoming.email = email;
 
       // B2, same race as findOrCreateEquipment above, same fix: serialize
       // concurrent creators of the same (tenant, normalized name) before the
@@ -1066,7 +1096,7 @@ function makeStore(db, tenantId) {
       await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:customer:${name.toLowerCase()}`]);
 
       const candidates = await many(
-        `SELECT id, data FROM entities
+        `SELECT id, data, customer_number FROM entities
           WHERE entity_type = 'customer' AND ${TENANT}
             AND merged_into IS NULL
             AND lower(data->>'customer_name') = lower($1)
@@ -1077,12 +1107,19 @@ function makeStore(db, tenantId) {
       const existing = selectCustomerMatch(candidates, address);
 
       if (!existing) {
+        // SECURITY DEFINER, advisory-locked per tenant (M3-config/15-customer-
+        // profiles.sql) — serializes concurrent customer creations for the
+        // SAME tenant the same way the pg_advisory_xact_lock just above
+        // serializes concurrent creations of the same NAME, so two different
+        // brand-new customers created in the same instant never race for the
+        // same next number.
+        const numRow = await one('SELECT next_customer_number($1) AS num', [tenantId]);
         const created = await one(
-          `INSERT INTO entities (tenant_id, entity_type, data, created_at, updated_at)
-           VALUES ($1,'customer',$2,NOW(),NOW()) RETURNING id`,
-          [tenantId, incoming]
+          `INSERT INTO entities (tenant_id, entity_type, data, customer_number, created_at, updated_at)
+           VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING id, customer_number`,
+          [tenantId, incoming, numRow?.num ?? null]
         );
-        return { id: created.id, created: true };
+        return { id: created.id, created: true, customerNumber: created.customer_number };
       }
 
       const data = { ...(existing.data ?? {}) };
@@ -1096,7 +1133,7 @@ function makeStore(db, tenantId) {
           [existing.id, data]
         );
       }
-      return { id: existing.id, created: false };
+      return { id: existing.id, created: false, customerNumber: existing.customer_number };
     },
 
     /**
@@ -1145,18 +1182,200 @@ function makeStore(db, tenantId) {
      */
     listCustomerEquipment: (customerId) => many(
       `SELECT id,
-              data->>'serial_number'   AS serial_number,
-              data->>'model'           AS model,
-              data->>'manufacturer'    AS manufacturer,
-              data->>'equipment_type'  AS equipment_type,
-              data->>'service_address' AS service_address,
-              data->'warranty'         AS warranty,
+              data->>'serial_number'    AS serial_number,
+              data->>'model'            AS model,
+              data->>'manufacturer'     AS manufacturer,
+              data->>'equipment_type'   AS equipment_type,
+              data->>'service_address'  AS service_address,
+              data->>'installation_date' AS installation_date,
+              data->'warranty'          AS warranty,
               updated_at
          FROM entities
-        WHERE entity_type = 'equipment' AND customer_id = $1 AND ${TENANT}
+        WHERE entity_type = 'equipment' AND customer_id = $1 AND merged_into IS NULL AND ${TENANT}
         ORDER BY updated_at DESC`,
       [customerId]
     ),
+
+    // ---- customer profiles (read side) ---------------------------------
+    //
+    // Backs api/_lib/routes/customers.js. `entities.customer_id` already
+    // links an equipment row to its customer (M3-config/05-customer-link.sql);
+    // what's missing for a profile screen is which DOCUMENTS belong to that
+    // customer, and there is no single column for that — a document can name
+    // a customer three different ways (see the module doc comment on
+    // getCustomerDocumentLinks below). These queries return raw rows; the
+    // union/dedupe and warranty-tier math are pure functions in
+    // api/_lib/routes/customers.js so they're testable with no database.
+
+    getCustomerByIdOrNumber: ({ id, number } = {}) => {
+      if (id) return one(`SELECT * FROM entities WHERE id = $1 AND entity_type = 'customer' AND ${TENANT}`, [id]);
+      if (number) return one(`SELECT * FROM entities WHERE customer_number = $1 AND entity_type = 'customer' AND ${TENANT}`, [number]);
+      return Promise.resolve(null);
+    },
+
+    /**
+     * Every (document_id, via) pair a customer's documents can be found
+     * through, EXCEPT the name-match path (see listNameMatchedDocuments) —
+     * kept separate because it takes its own params and is skipped entirely
+     * when the customer has no address on file.
+     *
+     *   'direct'    — document_entity_links straight to this customer entity
+     *                 (a customer-only document, or a human's manual link)
+     *   'equipment' — this customer's equipment, reached either through
+     *                 document_entity_links (secondary units on a multi-unit
+     *                 document, or a manual link) OR extractions.entity_id
+     *                 (the PRIMARY unit link every extracted document gets —
+     *                 see extractDocument.js's markLinked/linkDocumentToEntity)
+     *
+     * UNION ALL, not UNION: a document reachable through more than one path
+     * is intentionally returned more than once here; mergeDocumentVia()
+     * collapses that in JS by priority, so the priority rule lives in one
+     * testable place instead of being encoded twice (once in SQL dedup logic,
+     * once in JS).
+     */
+    listCustomerDocumentLinks: (customerId) => many(
+      `SELECT l.document_id AS document_id, 'direct' AS via, NULL::text AS serial
+         FROM document_entity_links l
+        WHERE l.entity_id = $1 AND ${TENANT.replace('tenant_id', 'l.tenant_id')}
+        UNION ALL
+       SELECT l.document_id, 'equipment' AS via, e.data->>'serial_number' AS serial
+         FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+        WHERE e.customer_id = $1 AND e.entity_type = 'equipment' AND ${TENANT.replace('tenant_id', 'l.tenant_id')}
+        UNION ALL
+       SELECT x.document_id, 'equipment' AS via, e.data->>'serial_number' AS serial
+         FROM extractions x JOIN entities e ON e.id = x.entity_id
+        WHERE e.customer_id = $1 AND e.entity_type = 'equipment' AND ${TENANT.replace('tenant_id', 'x.tenant_id')}`,
+      [customerId]
+    ),
+
+    /**
+     * The one path above that is NOT keyed off any link: a document whose
+     * extracted customer_name and service_address both match this customer's,
+     * but that has never been linked to any entity at all — an unreviewed
+     * document sitting loose in the inbox that nonetheless names this exact
+     * customer. Requires BOTH facts to match (never name alone — see
+     * selectCustomerMatch's reasoning on why an address-free match is unsafe);
+     * skipped by the caller entirely when the customer has no address on file.
+     */
+    listNameMatchedDocuments: (name, address) => {
+      if (!name || !address) return Promise.resolve([]);
+      return many(
+        `SELECT cn.document_id AS document_id, 'name-match' AS via, NULL::text AS serial
+           FROM (SELECT document_id FROM extractions
+                  WHERE field_key = 'customer_name' AND lower(value) = lower($1) AND ${TENANT}) cn
+           JOIN (SELECT document_id FROM extractions
+                  WHERE field_key = 'service_address' AND lower(value) = lower($2) AND ${TENANT}) sa
+             ON sa.document_id = cn.document_id
+          LIMIT 200`,
+        [name, address]
+      );
+    },
+
+    /** Document rows for a customer profile's Documents tab, one query for
+     *  however many ids the union above produced. `service_date` is the
+     *  single highest-confidence reading for that document, same "one extra
+     *  correlated subquery, not a join that fans out" shape as
+     *  getIngestStatus above. */
+    listDocumentDetails: (documentIds) => {
+      const ids = [...new Set((documentIds ?? []).filter((x) => typeof x === 'string'))].slice(0, 500);
+      if (!ids.length) return Promise.resolve([]);
+      return many(
+        `SELECT d.id, d.original_filename, d.document_type, d.stage, d.verified_by, d.created_at,
+                (SELECT x.value FROM extractions x
+                  WHERE x.document_id = d.id AND x.field_key = 'service_date' AND ${TENANT.replace('tenant_id', 'x.tenant_id')}
+                  ORDER BY x.confidence DESC NULLS LAST, x.id LIMIT 1) AS service_date
+           FROM documents d WHERE d.id = ANY($1::uuid[]) AND ${TENANT.replace('tenant_id', 'd.tenant_id')}`,
+        [ids]
+      );
+    },
+
+    /** Other customers sharing this one's normalized name or address —
+     *  merge candidates for the profile screen's "Merge duplicates" panel.
+     *  Capped at 25: this is a hint list for a human, not an exhaustive
+     *  report, and a name/address common enough to exceed 25 hits is not a
+     *  real HVAC customer list. */
+    listDuplicateCustomers: (customerId, name, address) => many(
+      `SELECT id, customer_number, data
+         FROM entities
+        WHERE entity_type = 'customer' AND merged_into IS NULL AND id <> $1 AND ${TENANT}
+          AND ( ($2::text <> '' AND lower(data->>'customer_name') = lower($2))
+             OR ($3::text <> '' AND lower(data->>'service_address') = lower($3)) )
+        LIMIT 25`,
+      [customerId, name ?? '', address ?? '']
+    ),
+
+    /**
+     * The Customers tab's list: one row per customer with the counts and
+     * warranty JSON a profile card needs. `q` (already wrapped in '%...%' by
+     * the caller, or null) matches name, address or customer number.
+     * `warranties` is the raw jsonb array of each owned unit's
+     * data->'warranty' — alertTier() (warrantyRules.js) is applied to it in
+     * JS (see customers.js's countWarrantyAlerts), not here, so this store
+     * never has to duplicate that date math in SQL.
+     */
+    listCustomersSummary: ({ like = null, sort = 'recent', limit = 200 } = {}) => {
+      const lim = Math.min(Math.max(Number(limit) || 200, 1), 200);
+      const orderBy = sort === 'name' ? "c.data->>'customer_name' ASC NULLS LAST, c.id"
+        : sort === 'docs' ? 'doc_count DESC NULLS LAST, c.id'
+        : 'last_activity DESC NULLS LAST, c.id';
+      return many(
+        `WITH c AS (
+           SELECT id, customer_number, data, updated_at
+             FROM entities
+            WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+              AND ($1::text IS NULL OR data->>'customer_name' ILIKE $1
+                                    OR data->>'service_address' ILIKE $1
+                                    OR customer_number ILIKE $1)
+         ),
+         equip AS (
+           SELECT id, customer_id, data->'warranty' AS warranty
+             FROM entities WHERE entity_type = 'equipment' AND customer_id IS NOT NULL AND ${TENANT}
+         ),
+         doc_union AS (
+           SELECT l.document_id, c.id AS customer_id
+             FROM document_entity_links l JOIN c ON c.id = l.entity_id
+            WHERE ${TENANT.replace('tenant_id', 'l.tenant_id')}
+           UNION
+           SELECT l.document_id, eq.customer_id
+             FROM document_entity_links l JOIN equip eq ON eq.id = l.entity_id
+            WHERE ${TENANT.replace('tenant_id', 'l.tenant_id')}
+           UNION
+           SELECT x.document_id, eq.customer_id
+             FROM extractions x JOIN equip eq ON eq.id = x.entity_id
+            WHERE ${TENANT.replace('tenant_id', 'x.tenant_id')}
+         ),
+         doc_agg AS (
+           SELECT du.customer_id, COUNT(DISTINCT du.document_id) AS doc_count, MAX(d.created_at) AS last_doc
+             FROM doc_union du JOIN documents d ON d.id = du.document_id
+            GROUP BY du.customer_id
+         ),
+         service_agg AS (
+           SELECT eq.customer_id, MAX(x.value::date) AS last_service
+             FROM extractions x JOIN equip eq ON eq.id = x.entity_id
+            WHERE x.field_key = 'service_date' AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}$'
+              AND ${TENANT.replace('tenant_id', 'x.tenant_id')}
+            GROUP BY eq.customer_id
+         ),
+         equip_agg AS (
+           SELECT customer_id, COUNT(*) AS n FROM equip GROUP BY customer_id
+         )
+         SELECT c.id, c.customer_number, c.data,
+                COALESCE(da.doc_count, 0)::int AS doc_count,
+                COALESCE(ea.n, 0)::int         AS equipment_count,
+                GREATEST(da.last_doc, sa.last_service::timestamptz) AS last_activity,
+                COALESCE(
+                  (SELECT jsonb_agg(eq.warranty) FROM equip eq WHERE eq.customer_id = c.id AND eq.warranty IS NOT NULL),
+                  '[]'::jsonb
+                ) AS warranties
+           FROM c
+           LEFT JOIN doc_agg da ON da.customer_id = c.id
+           LEFT JOIN service_agg sa ON sa.customer_id = c.id
+           LEFT JOIN equip_agg ea ON ea.customer_id = c.id
+          ORDER BY ${orderBy}
+          LIMIT $2`,
+        [like, lim]
+      );
+    },
 
     // ---- warranty ---------------------------------------------------------
     //

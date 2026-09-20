@@ -31,6 +31,8 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const openDocument = useAppStore((s) => s.openDocument);
   const openEntity = useAppStore((s) => s.openEntity);
+  const openCustomer = useAppStore((s) => s.openCustomer);
+  const entities = useGraph((s) => s.entities);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
 
@@ -192,18 +194,28 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
         </div>
 
         <footer className="px-5 py-3 border-t border-line flex flex-wrap gap-2 justify-end">
-          {doc.linkedEntityIds[0] && (
-            <button
-              type="button"
-              className="dw-btn-secondary"
-              onClick={() => {
-                onClose();
-                openEntity(doc.linkedEntityIds[0] as string);
-              }}
-            >
-              View record
-            </button>
-          )}
+          {(() => {
+            // A linked customer takes priority — that's the record most
+            // often worth opening from a document (invoice, warranty card),
+            // and it's what CUSTOMER_PROFILES_BRIEF_2026-09-20.md section E
+            // asks this link to prefer when one exists.
+            const customerId = doc.linkedEntityIds.find((id) => entities[id]?.type === 'customer');
+            const targetId = customerId ?? doc.linkedEntityIds[0];
+            if (!targetId) return null;
+            return (
+              <button
+                type="button"
+                className="dw-btn-secondary"
+                onClick={() => {
+                  onClose();
+                  if (customerId) openCustomer(customerId);
+                  else openEntity(targetId);
+                }}
+              >
+                View record
+              </button>
+            );
+          })()}
           <button
             type="button"
             className="dw-btn-secondary"

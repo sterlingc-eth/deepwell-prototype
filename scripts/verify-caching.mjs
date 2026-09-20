@@ -9,6 +9,8 @@
  *
  *   node scripts/verify-caching.mjs
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   estimateTokens,
   minTokensFor,
@@ -29,6 +31,10 @@ import { ASK_MODEL } from '../api/ask.js';
 import { splitExtractPrompt, EXTRACT_MODEL } from '../api/_lib/extractDocument.js';
 import { EXTRACT_TOOL, buildExtractPrompt } from '../api/_lib/extractFields.js';
 import { totalInputTokens, recordModelCall } from '../api/_lib/usage.js';
+import {
+  TRANSCRIBE_SYSTEM_PROMPT,
+  resolveTranscribeModels,
+} from '../api/_lib/readDocument.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -139,8 +145,13 @@ const eq = (name, got, want) =>
 
   check('a realistic 12-passage context block clears Sonnet\'s cacheable minimum',
     cacheable(contextText, ASK_MODEL));
-  check('today\'s SYSTEM_PROMPT text does NOT clear Sonnet\'s minimum (documented in HANDOFF-B)',
-    !cacheable(SYSTEM_PROMPT, ASK_MODEL));
+  // 2026-09-20 cost fix: SYSTEM_PROMPT now carries the HVAC glossary,
+  // document-type guide, warranty-brand table and answer-style rules — real
+  // reference content, not padding — specifically so it clears HAIKU's
+  // (higher) 2048-token minimum, since ASK_MODEL defaults to Haiku. It clears
+  // Sonnet's lower minimum too, trivially.
+  check('SYSTEM_PROMPT now clears Haiku\'s (the default ASK_MODEL) cacheable minimum',
+    cacheable(SYSTEM_PROMPT, ASK_MODEL));
 
   const content = body.messages[0].content;
   eq('exactly two content blocks: context, then question', content.length, 2);
@@ -150,9 +161,9 @@ const eq = (name, got, want) =>
     'cache_control' in content[0]);
   check('the question block NEVER gets cache_control, no matter what',
     !('cache_control' in content[1]));
-  check('the system block (too short today) has no cache_control',
-    !('cache_control' in body.system[0]));
-  check('the tools block (too short today) has no cache_control',
+  check('the system block (now long enough) DOES get cache_control',
+    'cache_control' in body.system[0]);
+  check('the tools block (ANSWER_TOOL is small by design — a schema, not reference material) has no cache_control',
     !('cache_control' in body.tools[0]));
 
   const breakpoints =
@@ -161,7 +172,7 @@ const eq = (name, got, want) =>
     content.filter((b) => 'cache_control' in b).length;
   check(`this request never exceeds the ${MAX_CACHE_BREAKPOINTS}-breakpoint limit`, breakpoints <= MAX_CACHE_BREAKPOINTS,
     `got ${breakpoints} breakpoints`);
-  check('this request has exactly one breakpoint today (the context block only)', breakpoints === 1);
+  check('this request has exactly two breakpoints today (system + context block)', breakpoints === 2);
 }
 
 /* ------------------------------------------------------- extraction split */
@@ -196,9 +207,12 @@ const eq = (name, got, want) =>
 
   check('the extraction request carries a system block (the stable text is still sent, just maybe uncached)',
     Array.isArray(extractBody.system) && extractBody.system[0].text === stableA);
-  check('today\'s stable extraction prompt (~600 est. tokens) does NOT clear Haiku\'s 2048 minimum (documented in HANDOFF-B)',
-    !cacheable(stableA, EXTRACT_MODEL) && !('cache_control' in extractBody.system[0]));
-  check('EXTRACT_TOOL in the request also has no cache_control today, same reason',
+  // 2026-09-20 cost fix: extractFields.js's FIELD_GUIDE now carries a worked
+  // example per field (real guidance, not padding) specifically to clear
+  // Haiku's 2048-token minimum, since EXTRACT_MODEL defaults to Haiku.
+  check('today\'s stable extraction prompt now clears Haiku\'s 2048 minimum',
+    cacheable(stableA, EXTRACT_MODEL) && 'cache_control' in extractBody.system[0]);
+  check('EXTRACT_TOOL in the request still has no cache_control (small schema, not reference material)',
     !('cache_control' in extractBody.tools[0]));
   check('the fallback (no marker) shape omits `system` entirely rather than sending an empty one',
     !('system' in buildExtractBody('', 'whole prompt, no split')));
@@ -275,6 +289,57 @@ const eq = (name, got, want) =>
     threw = true;
   }
   check('recordModelCall with no tenantKey is a safe, DB-free no-op (never throws)', !threw);
+}
+
+/* ------------------------------------------------- withCache TTL variants */
+{
+  const longText = 'x'.repeat(9000);
+  const block = { type: 'text', text: longText };
+
+  const default5m = withCache(block, 'claude-sonnet-4-5');
+  eq('withCache with no ttl option uses the 5-minute default', default5m.cache_control, CACHE_CONTROL);
+
+  const oneHour = withCache(block, 'claude-sonnet-4-5', { ttl: '1h' });
+  eq('withCache with {ttl:"1h"} uses the 1-hour cache_control', oneHour.cache_control, { type: 'ephemeral', ttl: '1h' });
+
+  const tooShort = withCache({ type: 'text', text: 'short' }, 'claude-sonnet-4-5', { ttl: '1h' });
+  check('a too-short block gets no cache_control regardless of ttl option', !('cache_control' in tooShort));
+
+  // Source checks: extraction and transcription are the two long-running
+  // bulk paths (an import can run for hours), so their stable prefixes use
+  // the 1h TTL rather than the 5m default. Ask is a one-off question/answer
+  // exchange, so it correctly keeps the 5m default (not asserted 1h here).
+  const extractSrc = readFileSync(fileURLToPath(new URL('../api/_lib/extractDocument.js', import.meta.url)), 'utf8');
+  check('extractDocument.js caches its stable prompt with the 1h TTL', /withCache\([^)]*ttl:\s*["']1h["']/.test(extractSrc));
+  const readDocSrc = readFileSync(fileURLToPath(new URL('../api/_lib/readDocument.js', import.meta.url)), 'utf8');
+  check('readDocument.js caches its transcription system prompt with the 1h TTL', /withCache\([^)]*ttl:\s*["']1h["']/.test(readDocSrc));
+}
+
+/* --------------------------------------- every stable prefix vs. its model's minimum
+ * 2026-09-20 cost fix: the whole point of raising these prefixes was to
+ * clear the CACHING model's minimum (each may run under a different model —
+ * Ask/Extract default to Haiku, transcription's fast pass also defaults to
+ * Haiku but its escalation pass uses Sonnet). Checked here against the real,
+ * exported constants so a future edit that shrinks one of these back below
+ * threshold fails a test instead of silently losing its cache breakpoint.
+ */
+{
+  const { fast: transcribeFast, strong: transcribeStrong } = resolveTranscribeModels({});
+
+  const samplePages = [{ page_no: 1, text: 'sample page text, just for measuring the stable half of the prompt' }];
+  const { stable: extractStable } = splitExtractPrompt(buildExtractPrompt(samplePages, 'invoice'));
+
+  const stablePrefixes = [
+    { label: 'ask SYSTEM_PROMPT', text: SYSTEM_PROMPT, model: ASK_MODEL },
+    { label: 'extract stable field/type guide', text: extractStable, model: EXTRACT_MODEL },
+    { label: 'transcribe TRANSCRIBE_SYSTEM_PROMPT vs. fast model', text: TRANSCRIBE_SYSTEM_PROMPT, model: transcribeFast },
+    { label: 'transcribe TRANSCRIBE_SYSTEM_PROMPT vs. strong model', text: TRANSCRIBE_SYSTEM_PROMPT, model: transcribeStrong },
+  ];
+  for (const { label, text, model } of stablePrefixes) {
+    check(`${label} clears its own call site's model minimum (${minTokensFor(model)} tokens for ${model})`,
+      cacheable(text, model),
+      `est. ${estimateTokens(text)} tokens`);
+  }
 }
 
 /* ------------------------------------------------------------------ done */

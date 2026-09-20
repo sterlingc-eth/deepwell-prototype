@@ -1,10 +1,12 @@
 import type { ComponentType, ReactNode } from 'react';
-import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe } from 'lucide-react';
+import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe, Users } from 'lucide-react';
 import { AskMark } from './AskMark';
-import { OrganizationSwitcher, useClerk } from '@clerk/clerk-react';
+import { OrganizationSwitcher, useAuth, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
 import { useAppStore, selectIngestProgress, type Screen } from '../store/appStore';
 import { billingBannerFor } from '../services/billingClient';
+import { isAdminRole } from '../services/teamClient';
+import { NotificationsPanel } from './NotificationsPanel';
 
 interface NavItem {
   screen: Screen;
@@ -22,7 +24,7 @@ interface NavItem {
 export const NAV: NavItem[] = [
   { screen: 'ask', label: 'Ask', icon: AskMark, matches: ['ask', 'entity'] },
   { screen: 'ingest', label: 'Inbox', icon: Inbox, matches: ['ingest', 'review'] },
-  { screen: 'browse', label: 'Records', icon: Database, matches: ['browse'] },
+  { screen: 'browse', label: 'Records', icon: Database, matches: ['browse', 'customer'] },
   { screen: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, matches: ['dashboard', 'warranty-export', 'records'] },
 ];
 
@@ -41,6 +43,8 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const billingStatus = useAppStore((s) => s.billingStatus);
   const banner = billingBannerFor(billingStatus);
   const { signOut } = useClerk();
+  const { orgRole } = useAuth();
+  const isAdmin = isAdminRole(orgRole ?? null);
 
   // The one-line sub-bar shown below `sm`, so a phone-width session always
   // has a legible label for the active screen instead of relying on the
@@ -105,6 +109,9 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               for a signed-in user, so it lives in the footer, not this row —
               see the footer below. */}
 
+          {/* Bell, next to Billing — see NotificationsPanel.tsx. */}
+          <NotificationsPanel />
+
           {/* Billing lives in the account area, not the primary nav — it's
               not one of the four destinations NAV enumerates above. */}
           <button
@@ -116,6 +123,22 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             <CreditCard className="w-5 h-5" aria-hidden="true" />
             <span className="hidden md:inline text-body">Billing</span>
           </button>
+
+          {/* Team (invite/manage members) — admin-only in the UI. A member
+              still has read-only access if they navigate here directly (see
+              TeamScreen.tsx), but nothing surfaces the destination to them
+              here, same reasoning as Billing living outside the primary nav. */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setCurrentScreen('team')}
+              aria-current={currentScreen === 'team' ? 'page' : undefined}
+              className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
+            >
+              <Users className="w-5 h-5" aria-hidden="true" />
+              <span className="hidden md:inline text-body">Team</span>
+            </button>
+          )}
 
           <button
             type="button"

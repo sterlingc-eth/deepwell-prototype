@@ -3,6 +3,7 @@ import tenantExport from "./_lib/routes/tenant-export.js";
 import tenantDelete from "./_lib/routes/tenant-delete.js";
 import cronSweep from "./_lib/routes/cron-sweep.js";
 import mergeTenant from "./_lib/routes/merge-tenant.js";
+import notifications from "./_lib/routes/notifications.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -12,13 +13,14 @@ import mergeTenant from "./_lib/routes/merge-tenant.js";
  *   POST /api/tenant-delete   -> ?action=delete   (everything, gone; needs confirm)
  *   GET  /api/cron-sweep      -> ?action=sweep    (find stuck documents; cron only)
  *   POST /api/merge-tenant    -> ?action=merge    (fold solo uploads into the shop)
+ *   GET/POST notifications    -> ?action=notifications (bell icon list, mark read, digest toggle)
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 60 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

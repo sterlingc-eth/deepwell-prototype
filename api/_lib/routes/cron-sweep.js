@@ -2,6 +2,7 @@ import { ingestDocument, recordIngestFailure } from "../readDocument.js";
 import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeys } from "../opsStore.js";
 import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { captureMessage, captureException } from "../telemetry.js";
+import { runWarrantyNotificationSweep } from "../notify.js";
 
 /**
  * GET /api/cron-sweep
@@ -69,6 +70,14 @@ export default async function handler(req, res) {
   if (!isValidCronAuth(req.headers?.authorization, process.env.CRON_SECRET)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+
+  // ONE shared deadline for this whole invocation (api/account.js's
+  // maxDuration is 60s for every ?action=, this one included). 45s leaves a
+  // margin for the response itself and whatever the stuck-document phases
+  // below still take. Only the notification step is deadline-aware today
+  // (REVIEW FIX 2026-09-20) — it receives this and stops before crossing it,
+  // logging + reporting how many tenants it had to leave for next run.
+  const deadlineAt = Date.now() + 45_000;
 
   let tenants = await listTenantKeys();
 
@@ -158,11 +167,27 @@ export default async function handler(req, res) {
     summary.budgetDeferredStillFailing += deferredResult.stillFailing;
   }
 
+  // Warranty-expiration notifications (handoffs/NOTIFICATIONS.md). Its own
+  // tenant listing (SECURITY DEFINER, active/trialing plans only — see
+  // M3-config/16-notifications.sql) rather than listTenantKeys() above,
+  // which is scoped to "every tenant" for document recovery, not "tenants
+  // who should get a warranty digest". Never allowed to fail the sweep the
+  // rest of this route exists for.
+  try {
+    summary.notifications = await runWarrantyNotificationSweep({ deadlineAt });
+  } catch (err) {
+    summary.notifications = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "notifications" });
+  }
+
   await captureMessage(
     `cron-sweep: ${summary.tenantsChecked} tenant(s) checked, ${summary.stuckFound} stuck document(s) found, ` +
       `${summary.recovered} recovered, ${summary.stillFailing} still failing; ` +
       `${summary.budgetDeferredFound} budget-deferred document(s) found, ` +
-      `${summary.budgetDeferredRecovered} recovered, ${summary.budgetDeferredStillFailing} still failing.`,
+      `${summary.budgetDeferredRecovered} recovered, ${summary.budgetDeferredStillFailing} still failing; ` +
+      `notifications: ${summary.notifications?.tenantsChecked ?? 0} tenant(s), ` +
+      `${summary.notifications?.notified ?? 0} notified, ${summary.notifications?.emailsSent ?? 0} digest(s) sent, ` +
+      `${summary.notifications?.skipped ?? 0} tenant(s) skipped (deadline).`,
     { route: "/api/cron-sweep" }
   );
 

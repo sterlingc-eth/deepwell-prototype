@@ -4,7 +4,8 @@ import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } fro
 import { denyAuth } from "./_lib/auth.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
-import { withTenant } from "./_lib/recordsStore.js";
+import { withTenant, normalizeMatchText } from "./_lib/recordsStore.js";
+import { mergeDocumentVia, formatVia } from "./_lib/routes/customers.js";
 import {
   ANSWER_TOOL,
   buildAllowed,
@@ -12,6 +13,7 @@ import {
   SYSTEM_PROMPT,
   buildContextBlock,
   buildQuestionBlock,
+  selectPassagesForContext,
 } from "./_lib/answer.js";
 import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 import { recordModelCall } from "./_lib/usage.js";
@@ -170,9 +172,26 @@ const LIST_TYPES = new Set([
   "list document types", "what document types exist",
 ]);
 
+// Customer numbers (M3-config/15-customer-profiles.sql, 'C-00001' style).
+// Matched case-insensitively against the RAW question (never the lowercased
+// `q` normalizeQuestion produces) so the returned id keeps canonical
+// uppercase 'C-' regardless of how the dispatcher typed it.
+const CUSTOMER_NUMBER_RE = /\bC-(\d{5})\b/i;
+
+/** Pure: pull a customer number out of free text, or null. Exported so this
+ *  is testable with no database (scripts/verify-retrieval.mjs). */
+export function extractCustomerNumber(question) {
+  const m = String(question ?? "").match(CUSTOMER_NUMBER_RE);
+  return m ? `C-${m[1]}` : null;
+}
+
+const SHOW_EVERYTHING_RE = /^show (?:me )?everything (?:for|about) (c-\d{5})$/;
+
 export function classifyMetaQuestion(question) {
   const q = normalizeQuestion(question);
   if (!q) return null;
+  const everything = q.match(SHOW_EVERYTHING_RE);
+  if (everything) return { kind: "customer", number: everything[1].toUpperCase() };
   if (COUNT_QUESTIONS[q]) return { kind: "count", target: COUNT_QUESTIONS[q] };
   if (LIST_DOCUMENTS.has(q)) return { kind: "list", target: "documents" };
   if (LIST_UNVERIFIED.has(q)) return { kind: "list", target: "unverified-documents" };
@@ -182,6 +201,62 @@ export function classifyMetaQuestion(question) {
   if (/^(please\s+)?(delete|remove)\b/.test(q)) return { kind: "imperative", action: "delete" };
   if (/^(please\s+)?upload\b/.test(q)) return { kind: "imperative", action: "upload" };
   return null;
+}
+
+/**
+ * Every document id reachable for one customer, via the same three paths as
+ * the customer profile screen (api/_lib/routes/customers.js) — direct
+ * customer link, owned-equipment link/extraction, or a name+address text
+ * match. Returns null (not []) when the number resolves to no customer, so
+ * callers can tell "found the customer, they have zero documents" (a real []
+ * — retrieval should find nothing) apart from "that number doesn't exist"
+ * (null — the meta path answers that directly; the scoping path falls back
+ * to answering unscoped rather than silently returning zero results for a
+ * typo'd number).
+ */
+async function resolveCustomerDocumentIds(db, number) {
+  const row = await db.getCustomerByIdOrNumber({ number });
+  if (!row || row.merged_into) return { row: null, documentIds: null };
+  const name = normalizeMatchText(row.data?.customer_name);
+  const address = normalizeMatchText(row.data?.service_address);
+  const [linkRows, nameMatchRows] = await Promise.all([
+    db.listCustomerDocumentLinks(row.id),
+    db.listNameMatchedDocuments(name, address),
+  ]);
+  const via = mergeDocumentVia([
+    ...linkRows.map((r) => ({ documentId: r.document_id, via: r.via, serial: r.serial })),
+    ...nameMatchRows.map((r) => ({ documentId: r.document_id, via: r.via, serial: r.serial })),
+  ]);
+  return { row, documentIds: via.map((v) => v.documentId).slice(0, 2000), via };
+}
+
+/** "show everything for C-00012" — model-free: lists this customer's
+ *  documents and equipment with sources, same shape as listCustomers/
+ *  listDocuments above. */
+async function showCustomerEverything(db, number) {
+  const { row, documentIds, via } = await resolveCustomerDocumentIds(db, number);
+  if (!row) {
+    return { kind: "no-answer", text: `No customer found for ${number}.`, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+  }
+  const [equipmentRows, documentDetails] = await Promise.all([
+    db.listCustomerEquipment(row.id),
+    db.listDocumentDetails(documentIds),
+  ]);
+  const viaByDoc = new Map(via.map((v) => [v.documentId, v]));
+  const facts = documentDetails.slice(0, META_LIST_LIMIT).map((d) => {
+    const v = viaByDoc.get(d.id);
+    return {
+      label: documentTypeLabel(d.document_type),
+      value: `${d.original_filename ?? d.id} (${formatVia(v?.via, v?.serial)})`,
+      sources: [{ documentId: d.id, location: {} }],
+    };
+  });
+  for (const u of equipmentRows.slice(0, META_LIST_LIMIT)) {
+    facts.push({ label: "Equipment", value: [u.serial_number, u.model].filter(Boolean).join(" — ") || u.id, sources: [] });
+  }
+  const name = row.data?.customer_name ?? "Unnamed customer";
+  const text = `${name} (${row.customer_number}) — ${documentDetails.length} document${documentDetails.length === 1 ? "" : "s"}, ${equipmentRows.length} piece${equipmentRows.length === 1 ? "" : "s"} of equipment.`;
+  return { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] };
 }
 
 const META_LIST_LIMIT = 50;
@@ -280,6 +355,7 @@ async function runMetaQuestion(db, meta) {
       sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
     };
   }
+  if (meta.kind === "customer") return showCustomerEverything(db, meta.number);
   if (meta.target === "unverified-documents") return listDocuments(db, true);
   if (meta.target === "documents") return listDocuments(db, false);
   if (meta.target === "customers") return listCustomers(db);
@@ -350,14 +426,34 @@ export default async function handler(req, res) {
     }
 
     // ---- 1. retrieve -------------------------------------------------------
+    // A question naming a customer number ("C-00012: when's the warranty up")
+    // is restricted to that customer's own documents (section D,
+    // handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md) — resolved BEFORE
+    // retrieval, in its own try/catch so a lookup failure degrades to an
+    // unscoped answer rather than a 500 (this route's existing "fail toward
+    // an honest answer, never a crash" rule — see the retrieval catch below).
+    let documentIdsFilter = null;
+    const customerNumber = extractCustomerNumber(question);
+    if (customerNumber) {
+      try {
+        const resolved = await withTenant(
+          { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
+          (db) => resolveCustomerDocumentIds(db, customerNumber)
+        );
+        documentIdsFilter = resolved.documentIds; // null (unknown number) or a real (possibly empty) list
+      } catch (err) {
+        console.error("Customer-number scoping failed, answering unscoped:", err?.message);
+      }
+    }
+
     let passages = [];
     let extractions = [];
     try {
       const found = await withTenant(
         { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
         async (db) => ({
-          passages: await db.searchPassages(question, MAX_PASSAGES),
-          extractions: await db.searchExtractions(question),
+          passages: await db.searchPassages(question, MAX_PASSAGES, { documentIds: documentIdsFilter }),
+          extractions: await db.searchExtractions(question, 25, { documentIds: documentIdsFilter }),
         })
       );
       passages = found.passages;
@@ -401,9 +497,16 @@ export default async function handler(req, res) {
       stage: x.stage,
     }));
 
+    // Cost cut (2026-09-20, owner decision): dedupe by (documentId, page) and
+    // cap the context block to ~6K tokens — see selectPassagesForContext's
+    // doc comment. `candidates` below (for the no-answer "closest" list)
+    // still uses the FULL retrieved set; only what's actually SHOWN to the
+    // model, and therefore what a citation may point at, is capped.
+    const contextPassages = selectPassagesForContext(mappedPassages);
+
     // What a citation is allowed to point at: exactly the documents (and,
-    // per document, the pages/fields) retrieval returned above.
-    const allowed = buildAllowed({ passages: mappedPassages, extractions: mappedExtractions });
+    // per document, the pages/fields) actually shown to the model above.
+    const allowed = buildAllowed({ passages: contextPassages, extractions: mappedExtractions });
 
     // B1 (2026-09-19 adversarial audit): /api/ask is the single most
     // expensive call site in the codebase (Sonnet, one call per question) and
@@ -435,7 +538,7 @@ export default async function handler(req, res) {
     // tokens, ~4096 chars) — a too-short SYSTEM_PROMPT or ANSWER_TOOL is left
     // alone rather than wasting one of the 4-per-request breakpoints. See
     // handoffs/HANDOFF-B.md for current measured sizes.
-    const contextText = buildContextBlock({ passages: mappedPassages, extractions: mappedExtractions });
+    const contextText = buildContextBlock({ passages: contextPassages, extractions: mappedExtractions });
     const questionText = buildQuestionBlock({
       question,
       today: today ?? new Date().toISOString().slice(0, 10),
@@ -449,7 +552,11 @@ export default async function handler(req, res) {
     const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
     const response = await withBackoff(() => client.messages.create({
       model: ASK_MODEL,
-      max_tokens: 1500,
+      // 700, not 1500 (owner cost cut, 2026-09-20): a real answer here is
+      // 1-3 sentences plus a handful of {label, value, sources} facts — the
+      // ANSWER_TOOL schema, not free prose. 1500 was headroom nothing here
+      // ever used; every token of it was paid for on every single call.
+      max_tokens: 700,
       // Deterministic on purpose: identical question, identical retrieved
       // evidence -> identical answer. The 2026-09-19 walkthrough saw the
       // SAME question return different dollar figures on two runs; that

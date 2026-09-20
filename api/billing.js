@@ -11,6 +11,7 @@ import {
   PLAN_CATALOG,
 } from "./_lib/billing.js";
 import { PLAN_LIMITS, planStateFor } from "./_lib/plan.js";
+import { getUsage, estimateCostUsd } from "./_lib/usage.js";
 
 /**
  * POST /api/billing?action=checkout|portal|webhook, GET/POST ?action=status
@@ -113,6 +114,28 @@ async function handleStatus(req, res, auth) {
     const documentsStored = await store.countDocuments();
     const monthStartIso = new Date(Date.now() - MONTH_MS).toISOString();
     const pagesThisMonth = await store.countPagesSince(monthStartIso);
+
+    // Owner ask (2026-09-20): "make sure we're not wasting money asking
+    // questions" — a per-tenant monthly AI-cost estimate on the Billing
+    // screen, so a tenant asking a lot of questions or bulk-importing a lot
+    // of pages can actually see it, not just Anthropic's own console.
+    // getUsage() reads its own aux-pool connection (see usage.js) — best
+    // effort, never fatal to the rest of this response.
+    let aiCostEstimateUsd = 0;
+    try {
+      const days = await getUsage({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, 30);
+      const totals = days.reduce(
+        (acc, d) => ({
+          inputTokens: acc.inputTokens + (d.modelInputTokens ?? 0),
+          outputTokens: acc.outputTokens + (d.modelOutputTokens ?? 0),
+        }),
+        { inputTokens: 0, outputTokens: 0 }
+      );
+      aiCostEstimateUsd = estimateCostUsd(totals);
+    } catch (err) {
+      console.error("billing status: AI cost estimate failed (non-fatal):", err?.message);
+    }
+
     return {
       plan: tenantRow?.plan ?? null,
       status: planStateFor(tenantRow ?? {}),
@@ -120,7 +143,9 @@ async function handleStatus(req, res, auth) {
       currentPeriodEnd: tenantRow?.current_period_end ?? null,
       cancelAtPeriodEnd: !!tenantRow?.cancel_at_period_end,
       limits: tenantRow?.limits ?? PLAN_LIMITS[tenantRow?.plan] ?? {},
-      usage: { documentsStored, pagesThisMonth },
+      // aiCostEstimateUsd: last-30-days estimate, NOT a bill — see
+      // usage.js's estimateCostUsd doc comment for what it blends and why.
+      usage: { documentsStored, pagesThisMonth, aiCostEstimateUsd },
     };
   });
   return handleCors(res, req).status(200).json(result);

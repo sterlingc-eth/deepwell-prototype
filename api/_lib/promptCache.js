@@ -15,8 +15,16 @@
  * that's only possible if the decision is a pure function of (text, model).
  */
 
-/** The only cache type Anthropic supports today. */
+/** The only cache type Anthropic supports today. Default TTL is 5 minutes. */
 export const CACHE_CONTROL = { type: "ephemeral" };
+
+/** 1-hour TTL variant — for a stable prefix reused across a long bulk run
+ * (extraction, transcription during a multi-hour import) where the default
+ * 5-minute window would expire between documents. Costs more per cache
+ * WRITE (Anthropic bills a 1h write higher than a 5m write) but that is paid
+ * once per hour, not once per document — a clear win once a prefix is reused
+ * more than a couple of times inside that hour, which a bulk import always is. */
+export const CACHE_CONTROL_1H = { type: "ephemeral", ttl: "1h" };
 
 /** At most 4 cache breakpoints per request — an Anthropic API hard limit. */
 export const MAX_CACHE_BREAKPOINTS = 4;
@@ -81,12 +89,17 @@ export function cacheable(text, model) {
  * text billed for a tool is its whole JSON shape, not just `description`, so
  * a tool block is measured by JSON-stringifying it (minus any cache_control
  * that might already be on it) rather than by one field.
+ *
+ * @param {{ttl?: '1h'}} [opts] ttl: '1h' uses CACHE_CONTROL_1H instead of the
+ *   5-minute default — pass this for a prefix reused across a long-running
+ *   bulk operation (extraction, transcription). Anything else (omitted, '5m')
+ *   keeps the default.
  */
-export function withCache(block, model) {
+export function withCache(block, model, opts = {}) {
   if (!block || typeof block !== "object") return block;
   const measured = typeof block.text === "string" ? block.text : { ...block, cache_control: undefined };
   if (!cacheable(measured, model)) return block;
-  return { ...block, cache_control: CACHE_CONTROL };
+  return { ...block, cache_control: opts?.ttl === "1h" ? CACHE_CONTROL_1H : CACHE_CONTROL };
 }
 
 /**

@@ -746,6 +746,274 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
   return { changes, remaining };
 }
 
+// ---------------------------------------------------------------------------
+// Customer profile actions (handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md
+// section C). Written here rather than recordsStore.js for the same reason
+// as every other action in this file: each is a guarded, audited state
+// change (a customer_number assignment, a document's customer link replaced,
+// a merge's number housekeeping), not a generic column update.
+// ---------------------------------------------------------------------------
+
+/** Allowlisted updateCustomer patch keys -> the `data` jsonb key they write.
+ *  Exported so the allowlist itself is testable with no database. */
+export const CUSTOMER_PATCH_KEYS = Object.freeze(['name', 'serviceAddress', 'phone', 'email', 'notes']);
+const PATCH_TO_DATA_KEY = {
+  name: 'customer_name', serviceAddress: 'service_address',
+  phone: 'phone', email: 'email', notes: 'notes',
+};
+
+/** Pure: turn a caller's patch into {data_key: value}, dropping anything not
+ *  in CUSTOMER_PATCH_KEYS and any key whose value is null/undefined (omit a
+ *  field to leave it unchanged; pass '' to explicitly clear it). */
+export function filterCustomerPatch(patch) {
+  const out = {};
+  for (const k of CUSTOMER_PATCH_KEYS) {
+    if (!patch || !Object.prototype.hasOwnProperty.call(patch, k)) continue;
+    const v = patch[k];
+    if (v == null) continue;
+    out[PATCH_TO_DATA_KEY[k]] = String(v).trim();
+  }
+  return out;
+}
+
+/** Pure: which of two customer_number values survives a merge, and which
+ *  retires into the survivor's data.former_numbers. The LOWER number wins —
+ *  it's the older-registered identity — with either input allowed to be
+ *  missing (a pre-migration-15 row that somehow has none). Exported so the
+ *  "keep the lower number" rule is checked with no database. */
+export function chooseSurvivorNumber(keepNumber, dropNumber) {
+  const kn = typeof keepNumber === 'string' ? Number(keepNumber.replace(/^C-/, '')) : NaN;
+  const dn = typeof dropNumber === 'string' ? Number(dropNumber.replace(/^C-/, '')) : NaN;
+  if (!Number.isFinite(kn) && !Number.isFinite(dn)) return { survivorNumber: null, retiredNumber: null };
+  if (!Number.isFinite(kn)) return { survivorNumber: dropNumber, retiredNumber: null };
+  if (!Number.isFinite(dn)) return { survivorNumber: keepNumber, retiredNumber: null };
+  return dn < kn
+    ? { survivorNumber: dropNumber, retiredNumber: keepNumber }
+    : { survivorNumber: keepNumber, retiredNumber: dropNumber };
+}
+
+/** `createCustomer {name, serviceAddress?, phone?, email?, notes?}` — a
+ *  human creating a customer record directly, distinct from
+ *  findOrCreateCustomer's document-driven inference (recordsStore.js): here
+ *  the human IS the source of truth, so there is no name/address matching to
+ *  do, only a fresh row and a fresh number. */
+export async function createCustomer(ctx, { name, serviceAddress, phone, email, notes } = {}, actorClerkId) {
+  assertNonEmptyString('name', name);
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const data = { customer_name: name.trim() };
+    for (const [k, v] of [['service_address', serviceAddress], ['phone', phone], ['email', email], ['notes', notes]]) {
+      if (isNonEmptyString(v)) data[k] = v.trim();
+    }
+
+    const numRow = await client.query('SELECT next_customer_number($1) AS num', [tenantId]);
+    const number = numRow.rows[0]?.num ?? null;
+
+    const created = await client.query(
+      `INSERT INTO entities (tenant_id, entity_type, data, customer_number, created_at, updated_at)
+       VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING *`,
+      [tenantId, data, number]
+    );
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'review.customer_created',
+      resourceType: 'entity',
+      resourceId: created.rows[0].id,
+      changes: { name: name.trim(), customerNumber: number },
+    });
+
+    return { customer: created.rows[0] };
+  });
+}
+
+/** `updateCustomer {customerId, patch:{name?, serviceAddress?, phone?,
+ *  email?, notes?}}` — allowlisted via filterCustomerPatch; never touches
+ *  customer_number (mergeCustomers owns that). */
+export async function updateCustomer(ctx, { customerId, patch } = {}, actorClerkId) {
+  assertUuid('customerId', customerId);
+  const dataPatch = filterCustomerPatch(patch);
+  if (!Object.keys(dataPatch).length) throw new ReviewError('patch has no allowed fields');
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const row = (await client.query(
+      `SELECT id, data FROM entities WHERE id = $1 AND entity_type = 'customer' AND ${TENANT}`,
+      [customerId]
+    )).rows[0];
+    if (!row) throw new ReviewError('Customer not found', 404);
+
+    const data = { ...(row.data ?? {}), ...dataPatch };
+    const updated = await client.query(
+      `UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT} RETURNING *`,
+      [customerId, data]
+    );
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'review.customer_updated',
+      resourceType: 'entity',
+      resourceId: customerId,
+      changes: { patch: dataPatch },
+    });
+
+    return { customer: updated.rows[0] };
+  });
+}
+
+/**
+ * `assignDocumentCustomer {documentId, customerId}` — replaces any existing
+ * CUSTOMER link on the document (a document names exactly one customer;
+ * unlike equipment, there is no legitimate multi-customer case here) and
+ * advances stage forward-only, same idiom as linkDocument above. If the
+ * document is also linked to equipment with no customer yet, backfills that
+ * equipment's customer_id — the same repair aiVerifyDocument's link-recovery
+ * path does, just triggered by a human picking a customer instead of a
+ * name/address match.
+ */
+export async function assignDocumentCustomer(ctx, { documentId, customerId }, actorClerkId) {
+  assertUuid('documentId', documentId);
+  assertUuid('customerId', customerId);
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const doc = (await client.query(`SELECT id, stage FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
+    if (!doc) throw new ReviewError('Document not found', 404);
+    const cust = (await client.query(
+      `SELECT id FROM entities WHERE id = $1 AND entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}`,
+      [customerId]
+    )).rows[0];
+    if (!cust) throw new ReviewError('Customer not found', 404);
+
+    await client.query(
+      `DELETE FROM document_entity_links l
+        USING entities e
+       WHERE l.document_id = $1 AND l.entity_id = e.id AND e.entity_type = 'customer'
+         AND l.tenant_id = (current_setting('app.tenant_id', true))::uuid`,
+      [documentId]
+    );
+    await client.query(
+      `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
+       VALUES ($1,$2,$3,1.0,'human',NOW())
+       ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
+      [tenantId, documentId, customerId]
+    );
+    await client.query(
+      `UPDATE documents SET stage = 'linked'
+        WHERE id = $1 AND ${TENANT} AND stage IN ('received', 'read', 'mapped')`,
+      [documentId]
+    );
+
+    // Backfill: any equipment this document already names (via link or
+    // extraction) that has no customer yet gets this one — fill-only, same
+    // rule as recordsStore.js's setEquipmentCustomer.
+    const equipmentIds = (await client.query(
+      `SELECT DISTINCT e.id FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+        WHERE l.document_id = $1 AND e.entity_type = 'equipment' AND l.tenant_id = (current_setting('app.tenant_id', true))::uuid
+        UNION
+       SELECT DISTINCT e.id FROM extractions x JOIN entities e ON e.id = x.entity_id
+        WHERE x.document_id = $1 AND e.entity_type = 'equipment' AND x.tenant_id = (current_setting('app.tenant_id', true))::uuid`,
+      [documentId]
+    )).rows.map((r) => r.id);
+    for (const equipmentId of equipmentIds) {
+      await client.query(
+        `UPDATE entities SET customer_id = $2, updated_at = NOW()
+          WHERE id = $1 AND entity_type = 'equipment' AND customer_id IS NULL AND ${TENANT}`,
+        [equipmentId, customerId]
+      );
+    }
+
+    const documentRow = (await client.query(`SELECT * FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'review.document_customer_assigned',
+      resourceType: 'document',
+      resourceId: documentId,
+      changes: { customerId, equipmentBackfilled: equipmentIds },
+    });
+
+    return { document: documentRow };
+  });
+}
+
+/**
+ * `mergeCustomers {keepId, dropId}` — wraps mergeEntities (rejecting anything
+ * that isn't two customer rows) and then does the customer_number
+ * housekeeping mergeEntities itself knows nothing about: the survivor keeps
+ * whichever number is numerically lower, and the OTHER number is retired
+ * (cleared to NULL — freeing it under the partial unique index — and
+ * recorded in the survivor's data.former_numbers) rather than left dangling
+ * on a row nothing can find by number anymore.
+ *
+ * Two sequential transactions, not one: mergeEntities is a complete, already
+ * — tested unit of work on its own (repointing extractions/links, setting
+ * merged_into), and the number housekeeping is additive to it, not a rewrite
+ * of it — matching reclassifyDocuments' own "per-unit transaction, then a
+ * small follow-up transaction" shape elsewhere in this file. A failure
+ * between the two leaves both customer_numbers exactly as they were
+ * (unchanged, still valid) with the merge itself already durable — a
+ * survivor keeping its original (higher) number until a retry is a cosmetic
+ * gap, not a data-integrity one.
+ */
+export async function mergeCustomers(ctx, { keepId, dropId }, actorClerkId) {
+  assertUuid('keepId', keepId);
+  assertUuid('dropId', dropId);
+  if (keepId === dropId) throw new ReviewError('keepId and dropId must differ');
+
+  const pre = await withTenant(ctx, async (client) => (await client.query(
+    `SELECT id, entity_type, customer_number FROM entities WHERE id = ANY($1::uuid[]) AND ${TENANT}`,
+    [[keepId, dropId]]
+  )).rows);
+  const keepPre = pre.find((r) => r.id === keepId);
+  const dropPre = pre.find((r) => r.id === dropId);
+  if (!keepPre || !dropPre) throw new ReviewError('Both entities must exist in this tenant', 404);
+  if (keepPre.entity_type !== 'customer' || dropPre.entity_type !== 'customer') {
+    throw new ReviewError('mergeCustomers requires two customer records', 400);
+  }
+
+  const merged = await mergeEntities(ctx, { keepId, dropId }, actorClerkId);
+
+  const { survivorNumber, retiredNumber } = chooseSurvivorNumber(keepPre.customer_number, dropPre.customer_number);
+  if (retiredNumber) {
+    await withTenant(ctx, async (client, tenantId) => {
+      // Clear BOTH rows' numbers first, unconditionally — not just the
+      // retired one. Whichever number survives (it can be EITHER keep's or
+      // drop's own original number, depending on which was lower) is about
+      // to be written onto keepId; if the row that already holds that exact
+      // value were left alone, the very next UPDATE would collide with it
+      // under the partial unique index (tenant_id, customer_number) WHERE
+      // entity_type='customer'. Two NULLs never conflict with each other or
+      // with anything else, so clearing both first makes the reassignment
+      // below unconditionally safe regardless of which number won.
+      await client.query(
+        `UPDATE entities SET customer_number = NULL
+          WHERE id = ANY($1::uuid[]) AND entity_type = 'customer' AND ${TENANT}`,
+        [[keepId, dropId]]
+      );
+      await client.query(
+        `UPDATE entities
+            SET customer_number = $2,
+                data = jsonb_set(COALESCE(data, '{}'::jsonb), '{former_numbers}',
+                         COALESCE(data->'former_numbers', '[]'::jsonb) || to_jsonb($3::text))
+          WHERE id = $1 AND ${TENANT}`,
+        [keepId, survivorNumber, retiredNumber]
+      );
+      await logAction(client, tenantId, {
+        clerkUserId: actorClerkId,
+        action: 'review.customer_number_reassigned',
+        resourceType: 'entity',
+        resourceId: keepId,
+        changes: { survivorNumber, retiredNumber },
+      });
+    });
+  }
+
+  const kept = await withTenant(ctx, async (client) => (await client.query(
+    `SELECT * FROM entities WHERE id = $1 AND ${TENANT}`, [keepId]
+  )).rows[0]);
+
+  return { ...merged, keep: kept };
+}
+
 /** Every corrected field for a set of documents, in one query. Only rows with
  *  a correction on file — a document with none costs one empty array entry
  *  in the caller's map, not a row here. */

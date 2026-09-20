@@ -22,6 +22,8 @@ const EXAMPLE_QUESTIONS = [
 export function AskScreen() {
   const pendingQuestion = useAppStore((s) => s.pendingQuestion);
   const clearPendingQuestion = useAppStore((s) => s.clearPendingQuestion);
+  const pendingPrefill = useAppStore((s) => s.pendingPrefill);
+  const clearPendingPrefill = useAppStore((s) => s.clearPendingPrefill);
   const recentQuestions = useAppStore((s) => s.recentQuestions);
   const pushRecentQuestion = useAppStore((s) => s.pushRecentQuestion);
   const includeUnverified = useAppStore((s) => s.includeUnverified);
@@ -84,6 +86,23 @@ export function AskScreen() {
       void submit(pendingQuestion);
     }
   }, [pendingQuestion, clearPendingQuestion, submit]);
+
+  // "Ask about this customer" only fills the box (e.g. "C-00012: ") — the
+  // person still has to say what they want to know, unlike pendingQuestion
+  // above which asks immediately.
+  useEffect(() => {
+    if (pendingPrefill != null) {
+      setInput(pendingPrefill);
+      clearPendingPrefill();
+      window.setTimeout(() => {
+        const el = inputRef.current;
+        if (el) {
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        }
+      }, 0);
+    }
+  }, [pendingPrefill, clearPendingPrefill]);
 
   // Toggling verified-only, or the records changing, re-asks the same question silently
   useEffect(() => {

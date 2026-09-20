@@ -46,6 +46,10 @@ const ACTIONS = new Set([
   'deleteDocuments',
   'aiVerify',
   'reclassify',
+  'createCustomer',
+  'updateCustomer',
+  'assignDocumentCustomer',
+  'mergeCustomers',
 ]);
 
 export default async (req, res) => {
@@ -112,6 +116,18 @@ export default async (req, res) => {
         break;
       case 'reclassify':
         result = await reviewStore.reclassifyDocuments(ctx, payload, auth.userId);
+        break;
+      case 'createCustomer':
+        result = await reviewStore.createCustomer(ctx, payload, auth.userId);
+        break;
+      case 'updateCustomer':
+        result = await reviewStore.updateCustomer(ctx, payload, auth.userId);
+        break;
+      case 'assignDocumentCustomer':
+        result = await reviewStore.assignDocumentCustomer(ctx, payload, auth.userId);
+        break;
+      case 'mergeCustomers':
+        result = await reviewStore.mergeCustomers(ctx, payload, auth.userId);
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

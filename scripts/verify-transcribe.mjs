@@ -20,6 +20,9 @@ import {
   isTransientError,
   extractWithClaude,
   __setAnthropicClientFactoryForTests,
+  TRANSCRIBE_SYSTEM_PROMPT,
+  PDF_MAX_TOKENS,
+  IMAGE_MAX_TOKENS,
 } from '../api/_lib/readDocument.js';
 
 let failures = 0;
@@ -41,13 +44,33 @@ const eq = (name, got, want) =>
 }
 
 /* -------------------------------------------------- shouldEscalate: empty page */
+// 2026-09-20 cost fix ("stop early on blank pages" — see
+// handoffs/COST_REPORT_2026-09-20.md): a page the model reports empty AND is
+// itself confident about is trusted — re-running a genuinely blank page
+// through the strong model essentially never turns up text that isn't there.
+// A page that came back empty but the model was UNSURE about (low or missing
+// confidence) still gets escalated — that's the real "the model gave up" case
+// this heuristic exists to catch.
 {
-  const decisions = shouldEscalate([{ page_no: 2, text: '', confidence: 0.9 }], 0.75);
-  check('a near-empty page is escalated even with high self-reported confidence', decisions[0].escalate);
-  check('the empty-page reason is reported', decisions[0].reasons.some((r) => /almost no text/.test(r)));
+  const confidentBlank = shouldEscalate([{ page_no: 2, text: '', confidence: 0.9 }], 0.75);
+  check('a confidently-blank page (empty text, confidence above threshold) is NOT escalated',
+    !confidentBlank[0].escalate);
+  eq('a confidently-blank page carries no reasons', confidentBlank[0].reasons, []);
 
-  const whitespaceOnly = shouldEscalate([{ page_no: 3, text: '   \n\t  ', confidence: 0.9 }], 0.75);
-  check('a whitespace-only page counts as near-empty too', whitespaceOnly[0].escalate);
+  const unsureEmpty = shouldEscalate([{ page_no: 2, text: '', confidence: 0.4 }], 0.75);
+  check('an empty page the model was NOT confident about is still escalated', unsureEmpty[0].escalate);
+  check('the empty-page reason is reported for the unsure case',
+    unsureEmpty[0].reasons.some((r) => /almost no text/.test(r)));
+
+  const noConfidence = shouldEscalate([{ page_no: 2, text: '' }], 0.75);
+  check('an empty page with NO self-reported confidence is still escalated (fails safe, missing is not confident)',
+    noConfidence[0].escalate);
+
+  const whitespaceOnlyConfident = shouldEscalate([{ page_no: 3, text: '   \n\t  ', confidence: 0.9 }], 0.75);
+  check('a confidently-blank whitespace-only page is also not escalated', !whitespaceOnlyConfident[0].escalate);
+
+  const whitespaceOnlyUnsure = shouldEscalate([{ page_no: 3, text: '   \n\t  ', confidence: 0.5 }], 0.75);
+  check('a whitespace-only page the model was unsure about is still escalated', whitespaceOnlyUnsure[0].escalate);
 }
 
 /* ------------------------------------------------- shouldEscalate: garbage page */
@@ -97,7 +120,7 @@ const eq = (name, got, want) =>
   const decisions = shouldEscalate(
     [
       { page_no: 1, text: 'A perfectly normal page of transcribed text right here.', confidence: 0.9 },
-      { page_no: 2, text: '', confidence: 0.9 },
+      { page_no: 2, text: '', confidence: 0.4 }, // empty AND unsure -> still escalates
       { page_no: 3, text: 'Another fine page with plenty of legible words in it.', confidence: 0.3 },
     ],
     0.75
@@ -188,7 +211,13 @@ async function withFakeClient(handler, fn) {
   __setAnthropicClientFactoryForTests((timeoutMs) => ({
     messages: {
       create: async (req) => {
-        calls.push({ timeoutMs, model: req.model, text: req.messages[0].content[1].text });
+        calls.push({
+          timeoutMs,
+          model: req.model,
+          text: req.messages[0].content[1].text,
+          maxTokens: req.max_tokens,
+          system: req.system,
+        });
         return handler(req, calls.length);
       },
     },
@@ -210,7 +239,7 @@ async function withFakeClient(handler, fn) {
     if (callNumber === 1) {
       return fakeToolResponse([
         { page_no: 1, text: 'A clean legible page transcribed with no trouble at all.', confidence: 0.95 },
-        { page_no: 2, text: '', confidence: 0.9 },
+        { page_no: 2, text: '', confidence: 0.4 }, // empty AND unsure -> still escalates
       ]);
     }
     return fakeToolResponse([{ page_no: 2, text: 'Recovered text from the strong model pass.', confidence: 0.92 }]);
@@ -248,9 +277,11 @@ async function withFakeClient(handler, fn) {
 }
 
 {
-  // Budget too tight -> escalation is skipped, fast result ships.
+  // Budget too tight -> escalation is skipped, fast result ships. Confidence
+  // 0.4 (not 0.9): this page must actually WANT to escalate so the test
+  // exercises the budget check, not the confidently-blank skip.
   const { result, calls } = await withFakeClient(
-    () => fakeToolResponse([{ page_no: 1, text: '', confidence: 0.9 }]),
+    () => fakeToolResponse([{ page_no: 1, text: '', confidence: 0.4 }]),
     () => extractWithClaude(Buffer.from('%PDF-fake'), 'application/pdf', {}, Date.now() - (INGEST_BUDGET_MS - 1000))
   );
   eq('escalation is skipped when the ingest budget is nearly spent, so only the fast call happens', calls.length, 1);
@@ -259,11 +290,12 @@ async function withFakeClient(handler, fn) {
 
 {
   // Escalation call throws -> degrade to the fast result rather than failing.
+  // Confidence 0.4 so this page actually attempts escalation.
   let n = 0;
   const { result, calls } = await withFakeClient(
     () => {
       n++;
-      if (n === 1) return fakeToolResponse([{ page_no: 1, text: '', confidence: 0.9 }]);
+      if (n === 1) return fakeToolResponse([{ page_no: 1, text: '', confidence: 0.4 }]);
       throw Object.assign(new Error('overloaded'), { status: 529 });
     },
     () => extractWithClaude(Buffer.from('%PDF-fake'), 'application/pdf', {}, Date.now())
@@ -286,6 +318,38 @@ async function withFakeClient(handler, fn) {
   );
   eq('a zero-page model response does not throw, and ships as an empty array', result, []);
   eq('only the one fast call is made for an empty document (nothing to escalate)', calls.length, 1);
+}
+
+/* --------------------------------------------- image vs. PDF max_tokens cap */
+// Cost cut (2026-09-20): a PDF call can legitimately return many pages of
+// text in one response, so it keeps the full ceiling. A single image call is
+// always exactly one page (a nameplate photo, a one-page work order), so it
+// gets a lower one — see readDocument.js's callTranscribe.
+{
+  const { calls: pdfCalls } = await withFakeClient(
+    () => fakeToolResponse([{ page_no: 1, text: 'A clean PDF page.', confidence: 0.98 }]),
+    () => extractWithClaude(Buffer.from('%PDF-fake'), 'application/pdf', {}, Date.now())
+  );
+  eq('a PDF call uses the full PDF max_tokens ceiling', pdfCalls[0].maxTokens, PDF_MAX_TOKENS);
+
+  const { calls: imageCalls } = await withFakeClient(
+    () => fakeToolResponse([{ page_no: 1, text: 'A clean nameplate photo.', confidence: 0.98 }]),
+    () => extractWithClaude(Buffer.from('fake-image-bytes'), 'image/jpeg', {}, Date.now())
+  );
+  eq('a single-image call uses the lower image max_tokens ceiling', imageCalls[0].maxTokens, IMAGE_MAX_TOKENS);
+  check('the PDF ceiling is higher than the image ceiling', PDF_MAX_TOKENS > IMAGE_MAX_TOKENS);
+}
+
+/* ------------------------------------------- transcription system prompt */
+{
+  const { calls } = await withFakeClient(
+    () => fakeToolResponse([{ page_no: 1, text: 'Clean page.', confidence: 0.98 }]),
+    () => extractWithClaude(Buffer.from('%PDF-fake'), 'application/pdf', {}, Date.now())
+  );
+  check('every transcription call carries the shared system prompt',
+    calls[0].system?.[0]?.text === TRANSCRIBE_SYSTEM_PROMPT);
+  check('the system prompt is long enough to get a cache breakpoint (see verify-caching.mjs for the threshold check)',
+    'cache_control' in (calls[0].system?.[0] ?? {}));
 }
 
 delete process.env.TRANSCRIBE_MODEL_FAST;

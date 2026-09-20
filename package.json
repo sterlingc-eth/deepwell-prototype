@@ -19,8 +19,9 @@
     "verify:warranty": "node scripts/verify-warranty.mjs",
     "verify:answer": "node scripts/verify-answer.mjs",
     "verify:customer": "node scripts/verify-customer-link.mjs",
+    "verify:customers": "node scripts/verify-customers.mjs",
     "verify:multiunit": "node scripts/verify-multiunit.mjs",
-    "verify:all": "npm run verify:extract && npm run verify:doctypes && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:multiunit && npm run verify:hardening && npm run verify:auth && npm run verify:review && npm run verify:ops && npm run verify:apikeys && npm run verify:transcribe && npm run verify:caching && npm run verify:bulk && npm run verify:scale && npm run verify:ui && npm run verify:docaccess && npm run verify:billing",
+    "verify:all": "npm run verify:extract && npm run verify:doctypes && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:customers && npm run verify:multiunit && npm run verify:hardening && npm run verify:auth && npm run verify:review && npm run verify:ops && npm run verify:apikeys && npm run verify:transcribe && npm run verify:caching && npm run verify:bulk && npm run verify:scale && npm run verify:ui && npm run verify:docaccess && npm run verify:billing && npm run verify:notify",
     "verify:hardening": "node scripts/verify-hardening.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:review": "node scripts/verify-review.mjs",
@@ -32,7 +33,8 @@
     "verify:bulk": "node scripts/verify-bulk.mjs",
     "verify:scale": "node scripts/verify-scale.mjs",
     "verify:docaccess": "node scripts/verify-docaccess.mjs",
-    "verify:billing": "node scripts/verify-billing.mjs"
+    "verify:billing": "node scripts/verify-billing.mjs",
+    "verify:notify": "node scripts/verify-notify.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",

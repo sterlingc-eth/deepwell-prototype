@@ -22,7 +22,10 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { shapeAnswer, buildAllowed, buildPrompt, ANSWER_TOOL, NO_ANSWER_TEXT } from '../api/_lib/answer.js';
+import {
+  shapeAnswer, buildAllowed, buildPrompt, ANSWER_TOOL, NO_ANSWER_TEXT,
+  selectPassagesForContext, SYSTEM_PROMPT,
+} from '../api/_lib/answer.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -434,6 +437,59 @@ for (const [name, raw] of Object.entries({
   check('ANSWER_TOOL exposes a basis field on each fact (Bug 3 contract)', !!factSchema.basis);
   eq('basis is constrained to printed/computed', factSchema.basis.enum, ['printed', 'computed']);
   check('ANSWER_TOOL still requires a location on every source', ANSWER_TOOL.input_schema.properties.facts.items.properties.sources.items.required.includes('location'));
+}
+
+/* ------------------------------------------ selectPassagesForContext (cost) */
+// 2026-09-20 owner cost cut: cap the context block to ~6K tokens and dedupe
+// repeated (documentId, page) hits before they ever reach buildContextBlock.
+
+{
+  const dupePassages = [
+    { documentId: 'doc-1', page: 1, excerpt: 'first hit' },
+    { documentId: 'doc-1', page: 1, excerpt: 'first hit, duplicate' }, // same doc+page
+    { documentId: 'doc-1', page: 2, excerpt: 'a different page, same doc' },
+    { documentId: 'doc-2', page: 1, excerpt: 'a different doc entirely' },
+  ];
+  const kept = selectPassagesForContext(dupePassages, 10_000);
+  eq('exact (documentId, page) duplicates are dropped, keeping the first (highest-ranked) occurrence',
+    kept.map((p) => p.excerpt), ['first hit', 'a different page, same doc', 'a different doc entirely']);
+}
+
+{
+  // Budget cap: each passage below is ~1000 est. tokens (4000 chars); a
+  // budget of 2500 tokens should keep 2 and stop before a 3rd would push it
+  // over, even though a 4th and 5th passage were retrieved.
+  const bigPassages = Array.from({ length: 5 }, (_, i) => ({
+    documentId: `doc-${i}`, page: 1, excerpt: 'x'.repeat(4000),
+  }));
+  const kept = selectPassagesForContext(bigPassages, 2500);
+  eq('passages are kept in rank order until the next one would exceed the token budget',
+    kept.map((p) => p.documentId), ['doc-0', 'doc-1']);
+}
+
+{
+  // A single passage bigger than the whole budget is still kept — never
+  // zero context just because the first (best) match is large.
+  const huge = [{ documentId: 'doc-huge', page: 1, excerpt: 'x'.repeat(100_000) }];
+  const kept = selectPassagesForContext(huge, 10);
+  eq('a single passage over budget on its own is still kept, not dropped to empty',
+    kept.map((p) => p.documentId), ['doc-huge']);
+}
+
+{
+  eq('garbage input (not an array, junk entries) is handled safely',
+    selectPassagesForContext(null).length, 0);
+  const junk = [null, 42, 'x', {}, { documentId: 42 }, { documentId: 'ok', page: 1, excerpt: 'fine' }];
+  eq('junk entries are skipped, real ones survive', selectPassagesForContext(junk).map((p) => p.documentId), ['ok']);
+}
+
+{
+  // Sanity: SYSTEM_PROMPT's own reference material (glossary, doc-type
+  // guide, warranty-brand table) never overrides the "answer only from the
+  // evidence above" contract stated in RULES.
+  check('SYSTEM_PROMPT still states the evidence-only rule', SYSTEM_PROMPT.includes('Answer only from the evidence above'));
+  check('SYSTEM_PROMPT marks its reference sections as background-only, not answerable-from',
+    (SYSTEM_PROMPT.match(/background only/gi) ?? []).length >= 2);
 }
 
 /* ---------------------------------------------------------------- summary */

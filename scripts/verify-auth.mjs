@@ -59,6 +59,14 @@ const eq = (name, got, want) =>
   eq('v1: "org:" prefix stripped, member', auth.orgRole, 'member');
 }
 {
+  // A shop-defined custom role on the legacy (v1, "org:"-prefixed) token
+  // shape collapses to the least-privileged bucket, same as the v2 case
+  // above — this is the fallback the v2 test already covers, extended to
+  // the other claim shape so both token generations are exercised.
+  const auth = deriveAuth({ sub: 'user_2b', org_id: 'org_2b', org_role: 'org:billing_manager' });
+  eq('v1: unrecognized custom role (with "org:" prefix) -> member (least privilege)', auth.orgRole, 'member');
+}
+{
   // Both shapes present (should never happen for real, but the function must
   // not crash, and it prefers the explicit legacy field when it's there).
   const auth = deriveAuth({ sub: 'user_2', org_id: 'org_legacy', org_role: 'org:admin', o: { id: 'org_v2', rol: 'member' } });

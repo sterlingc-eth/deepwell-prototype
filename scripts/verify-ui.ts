@@ -27,12 +27,16 @@ import { describeFetchFailure, NETWORK_ERROR_MESSAGE, chunkIds, pollDocumentStat
 import { messageFromResponse, parseRetryAfterSeconds, isDailyCap, type ResponseLike } from '../src/services/httpError';
 import { truncateForDisplay, summarizeProgress, type BulkFileState } from '../src/services/bulkImport';
 import { conflictDocs, gapDocs, maxStageFor, recomputeIssues, unlinkedDocs, type GraphSnapshot } from '../src/core/entityGraph';
+import { isValidCustomerNumber, isUuid, refKind } from '../src/services/customerClient';
+import { sortTimelineDesc } from '../src/screens/CustomerProfileScreen';
 import { hvacSchema } from '../src/domains/hvac/schema';
 import * as hvacDocTypes from '../src/domains/hvac/documentTypes';
 import type { Doc, Entity } from '../src/core/types';
 import { STAGE_LABEL } from '../src/components/StagePill';
 import { PIPELINE_STAGES } from '../src/core/types';
 import { NAV } from '../src/components/AppShell';
+import { isAdminRole, seatStatus } from '../src/services/teamClient';
+import { unreadBadgeLabel, parseNotificationLink } from '../src/services/notifyClient';
 import { docsMatchingFilter } from '../src/screens/ReviewScreen';
 import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
@@ -128,6 +132,20 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   eq('an invalid plan id is dropped entirely, including interval', parseDeepLink('?plan=enterprise&interval=year'), {});
   eq('an empty plan is dropped', parseDeepLink('?plan=&interval=year'), {});
   check('isValidPlanId accepts exactly the four catalog ids', ['solo', 'shop', 'crew', 'fleet'].every(isValidPlanId) && !isValidPlanId('enterprise') && !isValidPlanId(null) && !isValidPlanId(undefined));
+
+  // ?customer= — a customer's uuid or its 'C-00012' display number
+  // (handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md section E's deep link).
+  // Parsing itself doesn't classify which one it is (that's customerClient's
+  // job — see refKind below); it just carries the trimmed, capped string.
+  eq('a customer uuid is carried through', parseDeepLink('?customer=3fa85f64-5717-4562-b3fc-2c963f66afa6'), { customerRef: '3fa85f64-5717-4562-b3fc-2c963f66afa6' });
+  eq('a customer number is carried through', parseDeepLink('?customer=C-00012'), { customerRef: 'C-00012' });
+  eq('an empty customer value is treated as absent', parseDeepLink('?customer=&doc=doc-1'), { docId: 'doc-1' });
+  eq('customer is trimmed', parseDeepLink(`?customer=${encodeURIComponent('  C-00012  ')}`), { customerRef: 'C-00012' });
+  {
+    const longRef = 'C-'.repeat(50);
+    const got = parseDeepLink(`?customer=${longRef}`).customerRef;
+    check('customer ref is capped at 64 chars', got?.length === 64, `got length ${got?.length}`);
+  }
 }
 
 /* ---------------------------------------------------------------- formatYmd */
@@ -668,6 +686,97 @@ function listFilesRecursive(dir: string): string[] {
   eq('recordsRescueTotalCents: at the minimum is ~$500 (4,167 * $0.12)', recordsRescueTotalCents(RECORDS_RESCUE_MIN_PAGES), 50_004);
   eq('recordsRescueTotalCents: below the minimum is still priced at the minimum', recordsRescueTotalCents(1), 50_004);
   eq('recordsRescueTotalCents: 10,000 pages at $0.12/page', recordsRescueTotalCents(10_000), 120_000);
+}
+
+/* ------------------------------------------------------ customer profiles */
+//
+// customerClient.ts's number/uuid classification and CustomerProfileScreen's
+// timeline sort — see handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md section
+// E. isValidCustomerNumber mirrors api/_lib/routes/customers.js's
+// CUSTOMER_NUMBER_RE exactly (src/ can't import api/ — see the
+// documentTypes-parity block above for why that's a hand-mirrored copy here
+// too), so this is the check that keeps the two from drifting silently.
+{
+  check('isValidCustomerNumber accepts the canonical C-00001..C-99999 shape', isValidCustomerNumber('C-00001') && isValidCustomerNumber('C-99999'));
+  check(
+    'isValidCustomerNumber rejects anything else',
+    !isValidCustomerNumber('c-00001') && // lowercase
+      !isValidCustomerNumber('C-1') && // too few digits
+      !isValidCustomerNumber('C-000001') && // too many digits
+      !isValidCustomerNumber('C00001') && // missing dash
+      !isValidCustomerNumber('') &&
+      !isValidCustomerNumber(null) &&
+      !isValidCustomerNumber(undefined),
+  );
+
+  check('isUuid accepts a real uuid, case-insensitively', isUuid('3fa85f64-5717-4562-b3fc-2c963f66afa6') && isUuid('3FA85F64-5717-4562-B3FC-2C963F66AFA6'));
+  check('isUuid rejects a customer number and garbage', !isUuid('C-00012') && !isUuid('not-a-uuid') && !isUuid(null));
+
+  eq('refKind: a uuid is classified as "id"', refKind('3fa85f64-5717-4562-b3fc-2c963f66afa6'), 'id');
+  eq('refKind: a C-00012 is classified as "number"', refKind('C-00012'), 'number');
+  eq('refKind: neither shape is null', refKind('bob smith'), null);
+
+  const entry = (date: string, title: string): ReturnType<typeof sortTimelineDesc>[number] => ({ date, kind: 'document', title, documentId: null });
+  eq(
+    'sortTimelineDesc: most recent first',
+    sortTimelineDesc([entry('2025-01-01', 'oldest'), entry('2026-06-01', 'newest'), entry('2025-06-01', 'middle')]).map((e) => e.title),
+    ['newest', 'middle', 'oldest'],
+  );
+  eq(
+    'sortTimelineDesc: a full ISO timestamp and a bare YYYY-MM-DD day sort correctly against each other',
+    sortTimelineDesc([entry('2026-01-01', 'day'), entry('2026-01-01T23:00:00Z', 'timestamp same day')]).map((e) => e.title),
+    ['timestamp same day', 'day'],
+  );
+  eq('sortTimelineDesc: empty input stays empty', sortTimelineDesc([]), []);
+  eq('sortTimelineDesc: does not mutate its input', (() => { const input = [entry('2025-01-01', 'a'), entry('2026-01-01', 'b')]; sortTimelineDesc(input); return input.map((e) => e.title); })(), ['a', 'b']);
+}
+
+/* --------------------------------------------------------- org invites / Team */
+//
+// handoffs/ORG_INVITES_AUDIT.md: TeamScreen.tsx and AppShell.tsx's admin-only
+// "Team" button both gate on teamClient.ts's isAdminRole, and the seat
+// display comes from teamClient.ts's seatStatus. Both are pure — no Clerk
+// SDK, no DOM — so role→UI-visibility and seats math are checked here the
+// same way every other pure function in this file is.
+{
+  check('isAdminRole: bare "admin" is admin', isAdminRole('admin'));
+  check('isAdminRole: v1-shaped "org:admin" is admin', isAdminRole('org:admin'));
+  check('isAdminRole: case-insensitive', isAdminRole('Admin') && isAdminRole('ADMIN'));
+  check('isAdminRole: "member" is not admin', !isAdminRole('member'));
+  check('isAdminRole: "org:member" is not admin', !isAdminRole('org:member'));
+  check('isAdminRole: an unrecognized custom role is not admin (least privilege, same as the server)', !isAdminRole('org:billing_manager'));
+  check('isAdminRole: null/undefined/empty is not admin', !isAdminRole(null) && !isAdminRole(undefined) && !isAdminRole(''));
+
+  eq('seatStatus: under cap is not at cap, "N of M seats" label', seatStatus(3, 4), { count: 3, cap: 4, atCap: false, label: '3 of 4 seats' });
+  eq('seatStatus: exactly at cap IS at cap', seatStatus(4, 4), { count: 4, cap: 4, atCap: true, label: '4 of 4 seats' });
+  eq('seatStatus: over cap (a seat removed on Clerk\'s side after billing downgraded) is still at cap, not negative', seatStatus(5, 4), { count: 5, cap: 4, atCap: true, label: '5 of 4 seats' });
+  eq('seatStatus: null cap (Fleet, uncapped) is never at cap', seatStatus(50, null), { count: 50, cap: null, atCap: false, label: '50 members' });
+  eq('seatStatus: undefined cap (billing status not loaded yet) behaves like null', seatStatus(2, undefined), { count: 2, cap: null, atCap: false, label: '2 members' });
+  eq('seatStatus: singular "1 of 1 seat" / "1 member" wording', [seatStatus(1, 1).label, seatStatus(1, null).label], ['1 of 1 seat', '1 member']);
+  eq('seatStatus: zero members on a solo plan', seatStatus(0, 1), { count: 0, cap: 1, atCap: false, label: '0 of 1 seat' });
+
+  // The primary nav stays exactly 4 items (checked above) — Team is
+  // deliberately NOT one of them; it lives in the account-area row next to
+  // Billing (AppShell.tsx), gated on isAdminRole, same as this check assumes.
+  check('Team is not one of the 4 primary nav destinations', !NAV.some((n) => n.screen === 'team'));
+}
+
+/* ----------------------------------------------------------- notifications */
+//
+// handoffs/NOTIFICATIONS.md: the bell icon's badge math and its in-app-link
+// parsing (NotificationsPanel.tsx), both pure so they're checked here with
+// no DOM.
+{
+  eq('unreadBadgeLabel: zero is blank (no badge rendered)', unreadBadgeLabel(0), '');
+  eq('unreadBadgeLabel: negative (should never happen) is also blank', unreadBadgeLabel(-1), '');
+  eq('unreadBadgeLabel: small counts render exactly', unreadBadgeLabel(1), '1');
+  eq('unreadBadgeLabel: 9 renders exactly', unreadBadgeLabel(9), '9');
+  eq('unreadBadgeLabel: 10+ caps at "9+"', unreadBadgeLabel(10), '9+');
+  eq('unreadBadgeLabel: a large count still caps at "9+"', unreadBadgeLabel(200), '9+');
+
+  eq('parseNotificationLink: extracts the entity id', parseNotificationLink('/app/?entity=abc-123'), { entityId: 'abc-123' });
+  eq('parseNotificationLink: null link -> no entity', parseNotificationLink(null), { entityId: null });
+  eq('parseNotificationLink: a link with no entity param -> no entity', parseNotificationLink('/app/?screen=dashboard'), { entityId: null });
 }
 
 /* ------------------------------------------------------------------ done */

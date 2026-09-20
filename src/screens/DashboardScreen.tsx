@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, ShieldCheck, Upload } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, ShieldCheck, Upload, User } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
 import { docCountsByStage, entitiesOfType, useGraph } from '../core/entityGraph';
-import { dateOf, formatYmd, str } from '../core/answer';
+import { dateOf, formatYmd, normalize, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { deepLinkFor } from '../hooks/useDeepLink';
+import { customerClient } from '../services/customerClient';
 import { useAppStore } from '../store/appStore';
 import { authHeader } from '../services/authToken';
 
@@ -103,6 +104,7 @@ export function DashboardScreen() {
   const graph = useGraph();
   const askQuestion = useAppStore((s) => s.askQuestion);
   const openEntity = useAppStore((s) => s.openEntity);
+  const openCustomer = useAppStore((s) => s.openCustomer);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const setInboxTab = useAppStore((s) => s.setInboxTab);
   const toggleSelectForExport = useAppStore((s) => s.toggleSelectForExport);
@@ -169,6 +171,31 @@ export function DashboardScreen() {
         /* clipboard unavailable — nothing to fall back to here */
       });
   };
+  // "View customer": /api/warranty-attention (agent-backend's file, out of
+  // scope here) carries a unit's customerName as free text, not a customer
+  // id, so this looks the name up against GET /api/v1/customers on demand —
+  // only when clicked, never prefetched for the whole alert list — and only
+  // navigates on an exact (normalized) name match, since a fuzzy hit here
+  // would send someone to the wrong customer's profile.
+  const [customerLookup, setCustomerLookup] = useState<Record<string, 'loading' | 'notfound'>>({});
+  const viewCustomer = async (item: AttentionItem) => {
+    if (!item.customerName) return;
+    setCustomerLookup((m) => ({ ...m, [item.entityId]: 'loading' }));
+    try {
+      const rows = await customerClient.list({ q: item.customerName, sort: 'name', limit: 5 });
+      const match = rows.find((r) => r.name && normalize(r.name) === normalize(item.customerName as string));
+      if (match) {
+        setCustomerLookup((m) => { const n = { ...m }; delete n[item.entityId]; return n; });
+        openCustomer(match.id);
+      } else {
+        setCustomerLookup((m) => ({ ...m, [item.entityId]: 'notfound' }));
+        window.setTimeout(() => setCustomerLookup((m) => { const n = { ...m }; delete n[item.entityId]; return n; }), 2500);
+      }
+    } catch {
+      setCustomerLookup((m) => { const n = { ...m }; delete n[item.entityId]; return n; });
+    }
+  };
+
   const copyLink = (entityId: string) => {
     void navigator.clipboard
       .writeText(deepLinkFor({ entityId }))
@@ -308,18 +335,34 @@ export function DashboardScreen() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => askQuestion(item.serialNumber ? `Is ${item.serialNumber} under warranty?` : 'Which units are out of warranty?')}
-                        className="dw-btn-tertiary !min-h-[36px] !py-1"
-                      >
-                        Ask about this unit
-                      </button>
-                      <button type="button" onClick={() => draftOutreach(item)} className="dw-btn-secondary !min-h-[36px] !py-1">
-                        {draftedId === item.entityId ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : null}
-                        {draftedId === item.entityId ? 'Copied' : 'Draft outreach'}
-                      </button>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex gap-1.5">
+                        {item.customerName && (
+                          <button
+                            type="button"
+                            onClick={() => void viewCustomer(item)}
+                            disabled={customerLookup[item.entityId] === 'loading'}
+                            className="dw-btn-tertiary !min-h-[36px] !py-1"
+                          >
+                            {customerLookup[item.entityId] === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <User className="w-3.5 h-3.5" aria-hidden="true" />}
+                            View customer
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => askQuestion(item.serialNumber ? `Is ${item.serialNumber} under warranty?` : 'Which units are out of warranty?')}
+                          className="dw-btn-tertiary !min-h-[36px] !py-1"
+                        >
+                          Ask about this unit
+                        </button>
+                        <button type="button" onClick={() => draftOutreach(item)} className="dw-btn-secondary !min-h-[36px] !py-1">
+                          {draftedId === item.entityId ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : null}
+                          {draftedId === item.entityId ? 'Copied' : 'Draft outreach'}
+                        </button>
+                      </div>
+                      {customerLookup[item.entityId] === 'notfound' && (
+                        <span className="text-caption text-ink-3">No customer profile found.</span>
+                      )}
                     </div>
                   </li>
                 ))}

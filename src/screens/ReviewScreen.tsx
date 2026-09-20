@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, AlertTriangle, Link2, GitMerge, Copy, Sparkles, Trash2 } from 'lucide-react';
+import { Check, AlertTriangle, Link2, GitMerge, Copy, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { conflictDocs, entitiesOfType, gapDocs, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
@@ -9,6 +9,7 @@ import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
 import { str } from '../core/answer';
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
+import { customerClient, type CustomerSummary } from '../services/customerClient';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
 
 const CURRENT_USER = 'You';
@@ -98,6 +99,136 @@ function entityLabel(e: Entity): string {
     case 'equipment': return `${str(e, 'serial')} · ${str(e, 'manufacturer')} ${str(e, 'model')}`;
     default: return str(e, 'name') || str(e, 'workPerformed') || e.id;
   }
+}
+
+/** The customer entity (if any) this document is linked to — same source as
+ *  BrowseScreen's `customerFor`: `linkedEntityIds` already includes any
+ *  document_entity_links row a customer, not just equipment/property. */
+function customerEntityFor(doc: Doc, entities: Record<string, Entity>): Entity | null {
+  for (const id of doc.linkedEntityIds) {
+    const e = entities[id];
+    if (e?.type === 'customer') return e;
+  }
+  return null;
+}
+
+/**
+ * "Linked to" for a customer replaces the old equipment-only "Record to
+ * link" for serial-less documents (invoices, warranty cards without a
+ * scanned unit) — handoffs/CUSTOMER_PROFILES_BRIEF_2026-09-20.md section E.
+ * Search existing customers or create one inline; either path calls
+ * assignDocumentCustomer, then reloads the graph so `doc.linkedEntityIds`
+ * reflects the new link the same way AI-verify's reload already does.
+ * Disabled in demo mode — there is no backend customer API to call there
+ * (same gate DashboardScreen's warranty-attention fetch uses).
+ */
+function LinkedCustomerSection({ doc, current, isDemo }: { doc: Doc; current: Entity | null; isDemo: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CustomerSummary[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+
+  useEffect(() => {
+    if (!open || isDemo) return;
+    let cancelled = false;
+    setSearching(true);
+    const t = window.setTimeout(() => {
+      void customerClient
+        .list({ q: query.trim() || undefined, sort: 'name', limit: 20 })
+        .then((rows) => { if (!cancelled) setResults(rows); })
+        .catch(() => { if (!cancelled) setResults([]); })
+        .finally(() => { if (!cancelled) setSearching(false); });
+    }, 200);
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [open, query, isDemo]);
+
+  const assign = async (customerId: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await customerClient.assignDocument(doc.id, customerId);
+      await loadGraphFromServer();
+      setOpen(false);
+      setQuery('');
+      setNewName('');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not change the customer.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createAndAssign = async () => {
+    if (!newName.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { customer } = await customerClient.create({ name: newName.trim() });
+      await assign(customer.id as string);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not create that customer.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="p-5 space-y-3">
+      <h3 className="flex items-center gap-2 text-h4"><UserCog className="w-4 h-4" aria-hidden="true" /> Customer</h3>
+      <p className="text-ink-2">
+        {current ? (str(current, 'customer_name') || str(current, 'name') || 'Unnamed') : 'Not linked to a customer yet.'}
+      </p>
+      {isDemo ? (
+        <p className="text-caption text-ink-3">Demo data — customer profiles aren't available here.</p>
+      ) : open ? (
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3" aria-hidden="true" />
+            <label className="sr-only" htmlFor={`change-customer-search-${doc.id}`}>Search customers by name</label>
+            <input
+              id={`change-customer-search-${doc.id}`}
+              className="dw-input !pl-9 !min-h-[40px]"
+              placeholder="Search customers by name…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+          {err && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{err}</p>}
+          <ul className="divide-y divide-line border border-line rounded-lg max-h-48 overflow-y-auto">
+            {results.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                <span className="min-w-0 truncate"><span className="font-mono text-caption text-ink-3 mr-2">{c.customerNumber ?? '—'}</span>{c.name ?? 'Unnamed'}</span>
+                <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 shrink-0" disabled={busy} onClick={() => void assign(c.id)}>Use this</button>
+              </li>
+            ))}
+            {!searching && results.length === 0 && <li className="px-3 py-3 text-center text-ink-3">No matches.</li>}
+          </ul>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <label className="sr-only" htmlFor={`new-customer-name-${doc.id}`}>New customer's name</label>
+            <input
+              id={`new-customer-name-${doc.id}`}
+              className="dw-input !min-h-[40px] flex-1 min-w-[10rem]"
+              placeholder="Or create a new customer…"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <button type="button" className="dw-btn-secondary !min-h-[40px]" disabled={!newName.trim() || busy} onClick={() => void createAndAssign()}>
+              <Plus className="w-4 h-4" aria-hidden="true" /> Create &amp; link
+            </button>
+          </div>
+          <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" onClick={() => setOpen(false)} disabled={busy}>Cancel</button>
+        </div>
+      ) : (
+        <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => setOpen(true)}>
+          <UserCog className="w-4 h-4" aria-hidden="true" /> Change customer…
+        </button>
+      )}
+    </section>
+  );
 }
 
 /**
@@ -506,6 +637,12 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           </section>
         );
       })}
+
+      {/* Customer link — search/create, independent of the equipment/property
+          link below (a document can name a customer with no serial at all). */}
+      {!duplicate && doc.typeId && missing.length === 0 && (
+        <LinkedCustomerSection doc={doc} current={customerEntityFor(doc, graph.entities)} isDemo={REVIEW_IS_DEMO_ONLY} />
+      )}
 
       {/* Link */}
       {!duplicate && doc.typeId && missing.length === 0 && (

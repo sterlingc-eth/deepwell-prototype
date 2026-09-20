@@ -12,7 +12,7 @@ import { useAppStore, type Screen } from '../store/appStore';
 import { useGraph } from '../core/entityGraph';
 import { isValidPlanId, type BillingInterval } from '../services/billingClient';
 
-const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'warranty-export', 'billing'];
+const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team'];
 
 function isScreen(value: string): value is Screen {
   return (SCREENS as readonly string[]).includes(value);
@@ -32,6 +32,11 @@ export interface DeepLinkParams {
   plan?: string;
   /** `?interval=` — 'month' (the default) or 'year', alongside `plan`. */
   interval?: BillingInterval;
+  /** `?customer=<id|C-00012>` — either a customer's uuid or its display
+   *  number. Not validated here (CustomerProfileScreen resolves the ref
+   *  itself, same "let the screen own its own lookup" split as `question`);
+   *  only trimmed and capped so a malformed or huge value can't wedge. */
+  customerRef?: string;
 }
 
 /**
@@ -54,6 +59,8 @@ export function parseDeepLink(search: string): DeepLinkParams {
     out.plan = plan;
     out.interval = params.get('interval') === 'year' ? 'year' : 'month';
   }
+  const customer = params.get('customer')?.trim();
+  if (customer) out.customerRef = customer.slice(0, 64);
   return out;
 }
 
@@ -69,6 +76,7 @@ export function deepLinkFor(params: DeepLinkParams): string {
   if (params.entityId) url.searchParams.set('entity', params.entityId);
   if (params.docId) url.searchParams.set('doc', params.docId);
   if (params.screen) url.searchParams.set('screen', params.screen);
+  if (params.customerRef) url.searchParams.set('customer', params.customerRef);
   return url.toString();
 }
 
@@ -80,6 +88,7 @@ function cleanUrl(): void {
   url.searchParams.delete('q');
   url.searchParams.delete('plan');
   url.searchParams.delete('interval');
+  url.searchParams.delete('customer');
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -106,6 +115,7 @@ export function useDeepLink(): void {
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const askQuestion = useAppStore((s) => s.askQuestion);
   const setPendingPlan = useAppStore((s) => s.setPendingPlan);
+  const openCustomer = useAppStore((s) => s.openCustomer);
   const handledRef = useRef(false);
 
   useEffect(() => {
@@ -125,6 +135,16 @@ export function useDeepLink(): void {
     if (params.plan) {
       setPendingPlan({ plan: params.plan, interval: params.interval ?? 'month' });
       setCurrentScreen('billing');
+      cleanUrl();
+      return;
+    }
+
+    // ?customer= needs nothing from the graph — CustomerProfileScreen fetches
+    // its own data straight from the API (customerClient), unlike ?entity=/
+    // ?doc= which wait on the locally-synced entity graph below. Applied
+    // immediately, same as a bare ?screen=.
+    if (params.customerRef) {
+      openCustomer(params.customerRef);
       cleanUrl();
       return;
     }

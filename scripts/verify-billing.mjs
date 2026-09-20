@@ -10,6 +10,7 @@ delete process.env.STRIPE_SECRET_KEY;
 delete process.env.NEON_CONNECTION_STRING;
 
 import crypto from 'node:crypto';
+import { estimateCostUsd } from '../api/_lib/usage.js';
 import {
   PLAN_CATALOG,
   PLAN_IDS,
@@ -217,6 +218,31 @@ check('past_due past grace: ask STILL allowed (read-only, not blocked)',
   gateAsk({ billing_status: 'past_due', current_period_end: new Date(now.getTime() - 30 * DAY).toISOString() },
     { documentsStored: 50 }, now).allowed);
 check('active: ask allowed', gateAsk({ billing_status: 'active' }, { documentsStored: 999 }, now).allowed);
+
+/* -------------------------------------------------------- aiCostEstimateUsd */
+// GET /api/billing?action=status now exposes usage.aiCostEstimateUsd (owner
+// ask, 2026-09-20: "make sure we're not wasting money asking questions").
+// Pure-function checks on estimateCostUsd itself — the DB round-trip that
+// feeds it (getUsage) is not exercised here, same as everything else in this
+// file.
+
+{
+  const zero = estimateCostUsd({ inputTokens: 0, outputTokens: 0 });
+  eq('zero tokens costs $0', zero, 0);
+
+  const some = estimateCostUsd({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
+  check('a million input + a million output tokens costs a small positive number of dollars, not zero or absurd',
+    some > 0 && some < 20, `got ${some}`);
+
+  check('more tokens never costs less',
+    estimateCostUsd({ inputTokens: 2_000_000, outputTokens: 0 }) > estimateCostUsd({ inputTokens: 1_000_000, outputTokens: 0 }));
+
+  check('garbage input is handled safely (never NaN, never negative)',
+    Number.isFinite(estimateCostUsd({ inputTokens: 'nope', outputTokens: -5 })) &&
+    estimateCostUsd({ inputTokens: 'nope', outputTokens: -5 }) >= 0);
+
+  check('missing args default to zero cost, not a throw', estimateCostUsd() === 0);
+}
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -312,6 +312,60 @@ eq('stripControlChars keeps tab/newline/CR', stripControlChars('a\tb\nc\rd'), 'a
 eq('empty input is safe', selectPages([], 100).pages, []);
 eq('null input is safe', selectPages(null, 100).pages, []);
 
+/* ------------------------------------------------- cover-page skip (cost) */
+// 2026-09-20 owner cost cut: a page that is clearly non-content (near-blank,
+// a cover sheet, a logo-only header) is dropped before it ever reaches the
+// model — unless it carries an identifier/date/dollar-shaped fragment, or the
+// document has nothing else, in which case it is kept.
+
+{
+  const withCover = [
+    { page_no: 1, text: 'Acme HVAC' }, // cover sheet, no identifiers, short
+    { page_no: 2, text: 'Serial: CG-4021-A installed by Dave on 2024-03-04, total $412.50' },
+  ];
+  const { pages } = selectPages(withCover, 1000);
+  eq('a contentless cover page is skipped when the document has real content elsewhere',
+    pages.map((p) => p.page_no), [2]);
+}
+
+{
+  // Never empty out a whole document: an all-short/cover-like document
+  // falls back to keeping every non-blank page it has.
+  const allCoverish = [
+    { page_no: 1, text: 'Acme HVAC' },
+    { page_no: 2, text: 'Thank you' },
+  ];
+  const { pages } = selectPages(allCoverish, 1000);
+  eq('an all-cover-like document falls back to keeping every non-blank page',
+    pages.map((p) => p.page_no), [1, 2]);
+}
+
+{
+  // A short page that IS the point (a nameplate photo) must not be skipped
+  // just because it's short — it carries a serial-shaped identifier.
+  const nameplateOnly = [
+    { page_no: 1, text: 'S/N 4A7B9231' },
+    { page_no: 2, text: 'Warranty terms and conditions apply as stated in the manufacturer documentation provided at time of sale and installation.' },
+  ];
+  const { pages } = selectPages(nameplateOnly, 1000);
+  check('a short but identifier-bearing page survives even alongside a longer page',
+    pages.some((p) => p.page_no === 1));
+}
+
+/* ------------------------------------------------------ FIELD_SPECS examples */
+// 2026-09-20 cost fix: FIELD_GUIDE now includes a worked example per field so
+// the stable extraction prompt clears Haiku's cache minimum — see
+// handoffs/COST_REPORT_2026-09-20.md and verify-caching.mjs's threshold check.
+// This just confirms the examples are actually there, for every field.
+
+{
+  const missing = FIELD_SPECS.filter((s) => !s.example || !s.example.trim());
+  eq('every FIELD_SPECS entry has a worked example', missing.map((s) => s.key), []);
+
+  const guide = buildExtractPrompt([{ page_no: 1, text: 'x' }], 'invoice');
+  check('the extraction prompt includes at least one worked example', guide.includes('e.g.'));
+}
+
 /* ------------------------------------------------------------ tool schema */
 
 {

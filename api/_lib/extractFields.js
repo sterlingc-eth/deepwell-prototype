@@ -31,31 +31,33 @@ import { DOCUMENT_TYPES, DOCUMENT_TYPE_DEFINITIONS } from './documentTypes.js';
 
 /** The canonical vocabulary. `field_key` in `extractions` is always one of these. */
 export const FIELD_SPECS = [
-  { key: 'equipment_id',     kind: 'text', desc: 'Internal unit or asset ID the company uses for this equipment (e.g. "Unit 3", "RTU-2"). NOT the serial number.' },
-  { key: 'serial_number',    kind: 'text', desc: 'Manufacturer serial number, exactly as printed, including dashes.' },
-  { key: 'model',            kind: 'text', desc: 'Model name or number, exactly as printed.' },
-  { key: 'manufacturer',     kind: 'text', desc: 'Manufacturer (Carrier, Trane, Lennox, Goodman, Rheem, York, Daikin, ...).' },
-  { key: 'equipment_type',   kind: 'text', desc: 'What the unit is: condenser, furnace, air handler, rooftop unit, heat pump, mini-split, boiler, water heater.' },
-  { key: 'tonnage',          kind: 'text', desc: 'Nominal cooling capacity as printed, e.g. "3 ton", "36,000 BTU".' },
-  { key: 'refrigerant',      kind: 'text', desc: 'Refrigerant type, e.g. R-410A, R-22, R-454B.' },
-  { key: 'service_address',  kind: 'text', desc: 'Street address where the equipment is installed.' },
-  { key: 'customer_name',    kind: 'text', desc: 'Customer or account name.' },
-  { key: 'installation_date', kind: 'date', desc: 'Date the equipment was installed.' },
-  { key: 'warranty_expires', kind: 'date', desc: 'Date the warranty expires.' },
-  { key: 'warranty_term',    kind: 'text', desc: 'The MANUFACTURER warranty length for the equipment itself, as printed, e.g. "10 year parts limited". NOT the service contract period — see agreement_term.' },
-  { key: 'agreement_term',   kind: 'text', desc: 'The service/maintenance AGREEMENT period between the customer and the HVAC company, e.g. "01/01/2025 - 12/31/2025". This is a contract duration, never the manufacturer equipment warranty — see warranty_term.' },
-  { key: 'warranty_registered_date', kind: 'date', desc: 'Date the warranty was registered with the manufacturer.' },
-  { key: 'service_date',     kind: 'date', desc: 'Date service was performed (service reports and invoices).' },
-  { key: 'service_type',     kind: 'text', desc: 'Preventive Maintenance, Repair, Emergency, Installation, Inspection, Startup.' },
-  { key: 'technician',       kind: 'text', desc: 'Name of the technician who performed the work.' },
-  { key: 'work_performed',   kind: 'text', desc: 'One work item performed. Return one field per item, not a joined list.', repeatable: true },
-  { key: 'part_number',      kind: 'text', desc: 'A part number referenced on the document. One field per part.', repeatable: true },
-  { key: 'cost',             kind: 'money', desc: 'Total amount charged, in dollars.' },
-  { key: 'labor_hours',      kind: 'number', desc: 'Labor hours billed.' },
-  { key: 'invoice_number',   kind: 'text', desc: 'Invoice, ticket, or work-order number.' },
-  { key: 'status',           kind: 'text', desc: 'Completed, Pending, In Progress.' },
-  { key: 'notes',            kind: 'text', desc: 'A short observation the technician recorded that does not fit another field.' },
-  { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.' },
+  { key: 'equipment_id',     kind: 'text', desc: 'Internal unit or asset ID the company uses for this equipment (e.g. "Unit 3", "RTU-2"). NOT the serial number.', example: 'Printed "Unit: RTU-2" -> value "RTU-2".' },
+  { key: 'serial_number',    kind: 'text', desc: 'Manufacturer serial number, exactly as printed, including dashes.', example: 'Printed "S/N: 4A7B9231-XT" -> value "4A7B9231-XT" (copy every character, including the dash).' },
+  { key: 'model',            kind: 'text', desc: 'Model name or number, exactly as printed.', example: 'Printed "MODEL NO. GSX140361K" -> value "GSX140361K".' },
+  { key: 'manufacturer',     kind: 'text', desc: 'Manufacturer (Carrier, Trane, Lennox, Goodman, Rheem, York, Daikin, ...).', example: 'Printed "Mfr: Goodman Mfg. Co." -> value "Goodman Mfg. Co." (leave the legal suffix in; brand matching strips it downstream).' },
+  { key: 'equipment_type',   kind: 'text', desc: 'What the unit is: condenser, furnace, air handler, rooftop unit, heat pump, mini-split, boiler, water heater.', example: 'A nameplate on an outdoor unit with a compressor and no burner -> value "condenser".' },
+  { key: 'tonnage',          kind: 'text', desc: 'Nominal cooling capacity as printed, e.g. "3 ton", "36,000 BTU".', example: 'Printed "CAPACITY: 3 TON" -> value "3 ton".' },
+  { key: 'refrigerant',      kind: 'text', desc: 'Refrigerant type, e.g. R-410A, R-22, R-454B.', example: 'Printed "REFRIG R-410A" -> value "R-410A".' },
+  { key: 'service_address',  kind: 'text', desc: 'Street address where the equipment is installed.', example: 'Printed "Service Location: 412 Elm St, Mesa AZ 85201" -> value "412 Elm St, Mesa AZ 85201".' },
+  { key: 'customer_name',    kind: 'text', desc: 'Customer or account name.', example: 'Printed "Bill To: Plaza Dental Group" -> value "Plaza Dental Group".' },
+  { key: 'customer_phone',   kind: 'text', desc: 'Customer phone number, exactly as printed.', example: 'Printed "Ph: (480) 555-0148" -> value "(480) 555-0148".' },
+  { key: 'customer_email',   kind: 'text', desc: 'Customer email address, exactly as printed.', example: 'Printed "Email: office@plazadental.com" -> value "office@plazadental.com".' },
+  { key: 'installation_date', kind: 'date', desc: 'Date the equipment was installed.', example: 'Printed "Install Date: 03/04/2024" -> value "2024-03-04". Printed "Installed 06/2021" with no day -> value "2021-06".' },
+  { key: 'warranty_expires', kind: 'date', desc: 'Date the warranty expires.', example: 'Printed "Warranty valid through 3/10/2034" -> value "2034-03-10". Only return this when a DATE is actually printed — do not compute one yourself.' },
+  { key: 'warranty_term',    kind: 'text', desc: 'The MANUFACTURER warranty length for the equipment itself, as printed, e.g. "10 year parts limited". NOT the service contract period — see agreement_term.', example: 'Printed "10 YEAR PARTS LIMITED WARRANTY" -> value "10 year parts limited".' },
+  { key: 'agreement_term',   kind: 'text', desc: 'The service/maintenance AGREEMENT period between the customer and the HVAC company, e.g. "01/01/2025 - 12/31/2025". This is a contract duration, never the manufacturer equipment warranty — see warranty_term.', example: 'Printed "Agreement Period: 01/01/2025 - 12/31/2025" -> value "01/01/2025 - 12/31/2025".' },
+  { key: 'warranty_registered_date', kind: 'date', desc: 'Date the warranty was registered with the manufacturer.', example: 'Printed "Registered on file: 05/01/2024" -> value "2024-05-01".' },
+  { key: 'service_date',     kind: 'date', desc: 'Date service was performed (service reports and invoices).', example: 'Printed "Date of Service: 9/12/2025" -> value "2025-09-12".' },
+  { key: 'service_type',     kind: 'text', desc: 'Preventive Maintenance, Repair, Emergency, Installation, Inspection, Startup.', example: 'Printed "Visit Type: PM" -> value "Preventive Maintenance".' },
+  { key: 'technician',       kind: 'text', desc: 'Name of the technician who performed the work.', example: 'Printed "Tech: D. Ramirez" -> value "D. Ramirez".' },
+  { key: 'work_performed',   kind: 'text', desc: 'One work item performed. Return one field per item, not a joined list.', repeatable: true, example: 'A checklist with "[x] Replaced capacitor" and "[x] Cleared drain line" -> two separate fields, "Replaced capacitor" and "Cleared drain line", not one joined string.' },
+  { key: 'part_number',      kind: 'text', desc: 'A part number referenced on the document. One field per part.', repeatable: true, example: 'Printed "Parts used: CAP-4550, FLT-2003" -> two fields, "CAP-4550" and "FLT-2003".' },
+  { key: 'cost',             kind: 'money', desc: 'Total amount charged, in dollars.', example: 'Printed "TOTAL DUE: $412.50" -> value "412.50". A printed credit/discount like "-$25.00" -> value "-25.00" (keep the sign).' },
+  { key: 'labor_hours',      kind: 'number', desc: 'Labor hours billed.', example: 'Printed "Labor: 2.5 hrs" -> value "2.5".' },
+  { key: 'invoice_number',   kind: 'text', desc: 'Invoice, ticket, or work-order number.', example: 'Printed "Invoice #INV-10493" -> value "INV-10493".' },
+  { key: 'status',           kind: 'text', desc: 'Completed, Pending, In Progress.', example: 'A checkbox next to "Completed" is marked -> value "Completed".' },
+  { key: 'notes',            kind: 'text', desc: 'A short observation the technician recorded that does not fit another field.', example: 'Handwritten "customer requested callback next week" -> value "customer requested callback next week".' },
+  { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.', example: 'Printed "Permit No: BP-2024-08841" -> value "BP-2024-08841".' },
 ];
 
 const SPEC_BY_KEY = new Map(FIELD_SPECS.map((s) => [s.key, s]));
@@ -121,7 +123,14 @@ export const EXTRACT_TOOL = {
   },
 };
 
-const FIELD_GUIDE = FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}`).join('\n');
+// Each field's worked example is included below its description — this is
+// the "FIELD_SPECS guide with examples per field" the 2026-09-20 cost work
+// added (see promptCache.js): it is what pushes this stable prompt above
+// Haiku's 2048-token caching minimum, and it is also just a better field
+// guide — a model told the exact input->output shape for "10 year parts
+// limited" vs. a computed "warranty_expires" makes fewer of the mistakes
+// FIELD_SPECS' own descriptions have to warn about in prose alone.
+const FIELD_GUIDE = FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}${s.example ? `\n    e.g. ${s.example}` : ''}`).join('\n');
 const DOCUMENT_TYPE_GUIDE = DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYPE_DEFINITIONS[t.id] ?? ''}`).join('\n');
 
 export function buildExtractPrompt(pages, documentType) {
@@ -147,7 +156,13 @@ Rules:
 - If only the month and year are printed for a date (e.g. "installed 06/2021" with no day), return it as YYYY-MM. Do not guess a day.
 - If this document covers more than one piece of equipment, tag equipment_id, serial_number, model, manufacturer, equipment_type, tonnage, refrigerant and installation_date with unit_index (1, 2, 3, ...) so each unit's facts stay together. Fields that apply to the whole document (customer_name, service_address, warranty_term, agreement_term, cost, ...) do not need unit_index.
 - document_type must be exactly one id from the list above. If none clearly fits, use "other".
-- document_type_confidence: 0 to 1, your confidence in that classification alone (independent of field confidences).`;
+- document_type_confidence: 0 to 1, your confidence in that classification alone (independent of field confidences).
+- OCR commonly confuses 0/O, 1/I/l, and 5/S in serial and model numbers. When the surrounding characters make one reading clearly right (a known manufacturer serial format, the same digit repeated elsewhere on the page), use it — but still lower confidence for that field rather than presenting a guess as certain.
+- A subtotal, a tax line, and a total are different dollar amounts, often all on the same invoice. If only one dollar figure is printed, treat it as cost; if several are printed, prefer the one labeled total/amount due/balance due for cost, but you may still be shown only that one line depending on what the page contains.
+- Do not merge two technicians' names into one field. If a document names more than one, return the one who signed or is listed first as technician and mention the others in notes.
+- A document with more than one dollar figure that are line items, not a total and its components (e.g. several separate service calls listed on one recap sheet), is not this rule's "subtotal vs total" case — return each amount you can attribute to a distinct cost with its own page_no rather than guessing which one is "the" total.
+- work_performed and part_number are repeatable: return one field per distinct item rather than joining them ("replaced capacitor, cleared drain" is two fields, not one). Every other field is single-valued per unit (or per document, for fields that are not unit-scoped) — if the same field appears to have two different values with no unit_index to separate them, return the one you are most confident in and note the conflict.
+- A field's confidence should reflect how legible and unambiguous the specific value was, not the page as a whole — a page that is mostly clean but has one smudged digit in the serial number gets a high-confidence customer_name and a lower-confidence serial_number, not one blended score for both.`;
 }
 
 /* ---------------------------------------------------------------- normalize */
@@ -500,6 +515,23 @@ export function collapseDuplicateValues(fields) {
 /** Hard ceiling on what we will send in one extraction call. */
 export const MAX_PROMPT_CHARS = 60_000;
 
+// Below this many non-whitespace characters, a page is "clearly non-content"
+// (a cover sheet, a logo/header-only page, a mostly-blank divider) UNLESS it
+// still carries an identifier/date/dollar-shaped fragment — a short nameplate
+// photo is exactly that exception, and must not be skipped. Pure cost cut:
+// every page sent to extraction is billed input tokens whether or not it has
+// anything extractable on it.
+const MIN_CONTENT_CHARS = 20;
+
+function looksLikeCoverPage(text) {
+  const t = String(text ?? '').trim();
+  if (t.length >= MIN_CONTENT_CHARS) return false;
+  if (/\b[A-Z0-9]{2,}-?[A-Z0-9]*\d[A-Z0-9-]*\b/i.test(t)) return false; // serial/model-shaped
+  if (/\$\s?\d/.test(t)) return false;
+  if (/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/.test(t)) return false;
+  return true;
+}
+
 /**
  * Choose which pages to send when a document is longer than one prompt.
  *
@@ -508,11 +540,22 @@ export const MAX_PROMPT_CHARS = 60_000;
  * carrying identifier- or date-shaped text are pulled forward ahead of prose
  * pages that would otherwise crowd them out. Page order is restored afterwards
  * so the [page N] markers still read in sequence.
+ *
+ * Before any of that: pages that are "clearly non-content" (looksLikeCoverPage
+ * — a near-blank cover sheet, a page that's just a logo/header) are dropped
+ * outright, regardless of budget, since sending them teaches extraction
+ * nothing and still costs input tokens on every single call. Never lets this
+ * empty out a whole document, though — a real one-page document that happens
+ * to be short (a nameplate photo with only a few printed characters) falls
+ * back to keeping every non-blank page it has.
  */
 export function selectPages(pages, budget = MAX_PROMPT_CHARS) {
-  const usable = (pages ?? [])
+  const nonBlank = (pages ?? [])
     .filter((p) => typeof p?.text === 'string' && p.text.trim())
     .map((p) => ({ page_no: Number(p.page_no), text: p.text }));
+
+  const contentful = nonBlank.filter((p) => !looksLikeCoverPage(p.text));
+  const usable = contentful.length ? contentful : nonBlank;
 
   const total = usable.reduce((n, p) => n + p.text.length, 0);
   if (total <= budget) return { pages: usable, truncated: false };

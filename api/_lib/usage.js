@@ -80,8 +80,60 @@ export async function recordModelCall(
 }
 
 /**
- * Read back `days` of daily counters for a tenant — the data a future usage
- * dashboard would render. Not called from anywhere yet.
+ * List prices, dollars per million tokens, for the two model families this
+ * codebase calls (see claude.js/ask.js/extractDocument.js/readDocument.js).
+ * Override via env if pricing changes rather than editing this file.
+ */
+export const MODEL_PRICE_PER_MTOK = {
+  haiku: {
+    input: Number(process.env.AI_COST_HAIKU_INPUT_PER_MTOK ?? 1),
+    output: Number(process.env.AI_COST_HAIKU_OUTPUT_PER_MTOK ?? 5),
+  },
+  sonnet: {
+    input: Number(process.env.AI_COST_SONNET_INPUT_PER_MTOK ?? 3),
+    output: Number(process.env.AI_COST_SONNET_OUTPUT_PER_MTOK ?? 15),
+  },
+};
+
+/**
+ * What fraction of a tenant's billed tokens are Haiku vs. Sonnet, for
+ * estimateCostUsd below. usage_counters (increment_usage_counters) has no
+ * per-model column — see recordModelCall's own doc comment on why cache
+ * tokens are folded into one input-token number instead of a schema change —
+ * so this file cannot know the REAL split for a given tenant without adding
+ * one. Ask and extraction default to Haiku; transcription's fast pass also
+ * defaults to Haiku, with only its (comparatively rare) Sonnet escalation
+ * pass pulling the mix toward Sonnet. HAIKU_SHARE is a documented estimate of
+ * that mix, not a measurement — override via env if a tenant's real mix is
+ * known to differ (e.g. TRANSCRIBE_MODEL pinned to Sonnet for everything).
+ */
+const HAIKU_SHARE = Math.min(1, Math.max(0, Number(process.env.AI_COST_HAIKU_SHARE ?? 0.85)));
+
+/**
+ * Estimate a dollar cost for a tenant's billed token totals. This is an
+ * ESTIMATE, not a bill: it blends Haiku/Sonnet list prices by HAIKU_SHARE
+ * rather than reading which model each token actually billed to (that split
+ * isn't stored — see HAIKU_SHARE's own comment) and it prices cache-read/
+ * cache-write tokens at the same rate as a full-price input token, when
+ * Anthropic actually bills a cache read cheaper and a cache write more (see
+ * promptCache.js) — both of those tokens are already folded into one number
+ * before they reach here (totalInputTokens), so this can't distinguish them
+ * either. Good enough for a "roughly how much is this tenant costing us"
+ * figure on a billing screen; not good enough for a per-tenant invoice.
+ */
+export function estimateCostUsd({ inputTokens = 0, outputTokens = 0 } = {}) {
+  const inTok = Math.max(0, Number(inputTokens) || 0);
+  const outTok = Math.max(0, Number(outputTokens) || 0);
+  const blendedInputPerMtok = HAIKU_SHARE * MODEL_PRICE_PER_MTOK.haiku.input + (1 - HAIKU_SHARE) * MODEL_PRICE_PER_MTOK.sonnet.input;
+  const blendedOutputPerMtok = HAIKU_SHARE * MODEL_PRICE_PER_MTOK.haiku.output + (1 - HAIKU_SHARE) * MODEL_PRICE_PER_MTOK.sonnet.output;
+  const usd = (inTok * blendedInputPerMtok + outTok * blendedOutputPerMtok) / 1_000_000;
+  return Math.round(usd * 10000) / 10000; // 4 decimal places — this is cents-and-fractions money, not dollars
+}
+
+/**
+ * Read back `days` of daily counters for a tenant. Used by billing.js's
+ * `status` action to fold into `aiCostEstimateUsd` (see estimateCostUsd
+ * above) — and available for a future usage dashboard to render directly.
  *
  * @param {{tenantKey: string}} ctx
  * @param {number} [days]
