@@ -45,16 +45,13 @@
   to grouping by field-key heuristics (one implicit "Unit 1" per document),
   which is correct for single-unit documents but can't split a true
   multi-unit document into separate sections without the real column.
-- `GET /api/v1/customers` rows (`countWarrantyAlerts` in
-  `api/_lib/routes/customers.js`) fold 'expired' and 'expiring-90' into one
-  `warrantyAlerts` count. The Customers tab's new Alerts filter
-  (any/expiring/expired/none) would like a per-row breakdown — optional
-  `expiringCount`/`expiredCount` alongside `warrantyAlerts` — so 'expiring'
-  and 'expired' can be told apart. `CustomerSummary` already declares both
-  as optional (`src/services/customerClient.ts`) and
-  `src/core/customerFilters.ts`'s predicate already reads them when present;
-  until they exist, both options degrade to "has any alert" (documented
-  in-code) rather than a fabricated distinction.
+- RESOLVED 2026-09-20 (owner filter-bar rebuild): `GET /api/v1/customers`
+  rows now send a real `alerts: {expiring, expired}` breakdown (backend's
+  `tallyWarrantyAlerts`); `CustomerSummary.alerts` is no longer optional and
+  the old `expiringCount`/`expiredCount` fallback fields are gone —
+  `core/customerFilters.ts`'s Alerts filter reads `alerts` directly, with a
+  fifth option ("Needs attention" = either > 0) added alongside
+  any/expiring/expired/none.
 
 - New integrityFix apply action `healMergedSurvivors` (2026-09-20 follow-up:
   a merge run before the coalesce fix silently dropped a dropped record's

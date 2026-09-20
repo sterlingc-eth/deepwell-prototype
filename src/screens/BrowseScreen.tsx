@@ -5,6 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { StagePill } from '../components/StagePill';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
 import { entitiesOfType, useGraph } from '../core/entityGraph';
+import { customerForDocument } from '../core/customer';
 import { dateOf, fmtDate, formatYmd, fmtMoney, normalize, numOf, str } from '../core/answer';
 import type { Doc, Entity } from '../core/types';
 import { DOCUMENT_TYPES } from '../domains/hvac/documentTypes';
@@ -54,24 +55,9 @@ function linkedLabel(doc: Doc, entities: Record<string, Entity>): string {
   return '';
 }
 
-/** The customer entity (if any) this document is linked to — via a direct
- *  document_entity_links row, the same source `linkedEntityIds` already
- *  reads (see usePostgresSync.ts's `toDoc`/`toEntity`; entity_type survives
- *  regardless of which fields that sync maps for a given type). */
-function customerFor(doc: Doc, entities: Record<string, Entity>): Entity | null {
-  for (const id of doc.linkedEntityIds) {
-    const e = entities[id];
-    if (e?.type === 'customer') return e;
-  }
-  // Owner (2026-09-20): most rows showed "—" although the document is linked
-  // to a unit that belongs to a customer. Fall back to the unit's customer.
-  for (const id of doc.linkedEntityIds) {
-    const e = entities[id];
-    const cid = e?.fields?.customerId;
-    if (e?.type === 'equipment' && typeof cid === 'string' && entities[cid]?.type === 'customer') return entities[cid];
-  }
-  return null;
-}
+// customerFor moved to src/core/customer.ts (customerForDocument) so
+// ReviewScreen/DocumentPreview share the exact same fallback rule instead of
+// each re-deriving it — see that file's doc comment.
 
 type DocSort = 'date-desc' | 'date-asc' | 'name' | 'type';
 const DOC_SORT_OPTIONS: { id: DocSort; label: string }[] = [
@@ -159,7 +145,7 @@ function DocumentsTab() {
   const allRows = useMemo(
     () =>
       Object.values(docs).map((doc) => {
-        const customer = customerFor(doc, entities);
+        const customer = customerForDocument(doc, entities);
         return {
           doc,
           typeId: doc.typeId ?? 'unclassified',

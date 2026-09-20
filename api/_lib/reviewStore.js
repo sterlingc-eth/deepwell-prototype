@@ -527,12 +527,28 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     const rows = await db.listExtractionsByDocument(documentId); // SELECT * includes corrected_value
     const completenessFields = toCompletenessFields(rows);
 
-    // Repair a document stuck unlinked (no equipment entity, so nothing ever
-    // ran findOrCreateCustomer for it, or it ran before this existed) — same
-    // helper extractDocument.js calls right after extraction, so pressing
+    // Repair a document with no DIRECT customer link — same helper
+    // extractDocument.js calls right after extraction, so pressing
     // "Reclassify & verify all" fixes old documents with no re-extraction.
-    // Skipped once the document already has any link — cheap, no-op writes.
-    if (doc.stage !== 'linked' && doc.stage !== 'verified' && !rows.some((r) => r.entity_id)) {
+    //
+    // ROOT CAUSE FIX (2026-09-20, handoffs/LINKING_ROOT_CAUSE_2026-09-20.md):
+    // this used to gate on `!rows.some((r) => r.entity_id)` — i.e. only ran
+    // when the document had NO equipment link at all. A document already
+    // linked to its equipment (`doc.stage === 'linked'`, the ordinary case)
+    // was assumed to be "already fine" and skipped, even when its equipment
+    // had a customer_id but no document_entity_links row pointed at that
+    // customer directly — the "Margaret Henderson" defect: equipment linked,
+    // customer not, and this repair never even looked because an equipment
+    // link already existed. Gated on the actual thing that matters instead:
+    // does a DIRECT customer link exist yet.
+    const hasDirectCustomerLink = (await db.raw(
+      `SELECT 1 FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+        WHERE l.document_id = $1 AND e.entity_type = 'customer'
+          AND l.tenant_id = (current_setting('app.tenant_id', true))::uuid
+        LIMIT 1`,
+      [documentId]
+    )).rowCount > 0;
+    if (!hasDirectCustomerLink) {
       const facts = Object.fromEntries(completenessFields.map((f) => [f.field_key, f.value]));
       const customer = await db.findOrCreateCustomer(facts);
       if (customer?.id) {

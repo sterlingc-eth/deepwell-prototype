@@ -25,6 +25,16 @@ import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from './_lib/a
 import * as reviewStore from './_lib/reviewStore.js';
 import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
+import { limit } from './_lib/rateLimit.js';
+
+// integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
+// 1000 documents and a fix can loop that same set doing writes — cheap per
+// call, not cheap looped by a stuck client tab or a runaway effect. No
+// bucket named "write" has its own DEFAULT_LIMITS entry; envLimits() falls
+// back to DEFAULT_LIMITS.read (120/min, 5000/day) for an unrecognized
+// bucket, which is what this gets — tracked under its own (tenantId,
+// 'write') counters, not shared with the 'read' bucket's own traffic.
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix']);
 
 // Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
 // renumbers/retires customer or equipment records, so on a Clerk org tenant
@@ -92,6 +102,10 @@ export default async (req, res) => {
   }
 
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+
+  if (INTEGRITY_RATE_LIMIT_ACTIONS.has(action)) {
+    if (!(await limit(req, res, auth, 'write'))) return; // 429 already written
+  }
 
   try {
     let result;

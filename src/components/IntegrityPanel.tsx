@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { AlertTriangle, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import { isAdminRole } from '../services/teamClient';
-import { ALL_INTEGRITY_FIXES, reviewClient, type IntegrityFixResult, type IntegrityScanResult } from '../services/reviewClient';
+import { ALL_INTEGRITY_FIXES, reviewClient, isIntegrityFixDebounced, type IntegrityFixApplied, type IntegrityScanResult } from '../services/reviewClient';
 
 const SUMMARY_ROWS: { key: keyof IntegrityScanResult['counts']; label: string }[] = [
   { key: 'duplicateCustomers', label: 'Duplicate customers' },
@@ -26,7 +26,7 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
   const [result, setResult] = useState<IntegrityScanResult | null>(null);
   const [scanErr, setScanErr] = useState<string | null>(null);
   const [fixing, setFixing] = useState(false);
-  const [fixResult, setFixResult] = useState<IntegrityFixResult | null>(null);
+  const [fixResult, setFixResult] = useState<IntegrityFixApplied | null>(null);
   const [fixErr, setFixErr] = useState<string | null>(null);
 
   const runScan = async () => {
@@ -47,9 +47,17 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
     setFixResult(null);
     try {
       const r = await reviewClient.integrityFix(ALL_INTEGRITY_FIXES, false);
-      setFixResult(r);
-      await runScan();
-      onApplied?.();
+      // The 10-minute server debounce only ever applies to a link-only sweep
+      // (linkDocuments/linkEquipmentCustomers alone, e.g. the Inbox auto-fix)
+      // — this button always sends ALL_INTEGRITY_FIXES, so it never actually
+      // hits it, but the return type is still the shared union.
+      if (isIntegrityFixDebounced(r)) {
+        setFixErr('A fix already ran recently — try again in a few minutes.');
+      } else {
+        setFixResult(r);
+        await runScan();
+        onApplied?.();
+      }
     } catch (e) {
       setFixErr(e instanceof Error ? e.message : 'Could not fix those records.');
     } finally {

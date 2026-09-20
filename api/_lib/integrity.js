@@ -137,6 +137,73 @@ export function nameTokenCount(raw) {
  * entirely, not a fuller version of this one — untouched. Exported for
  * scripts/verify-integrity.mjs.
  */
+// ---------------------------------------------------- address-only customers
+// (2026-09-20 root-cause fix, handoffs/LINKING_ROOT_CAUSE_2026-09-20.md):
+// findOrCreateCustomer used to return null outright when a document named a
+// service_address but no customer_name (a permit, a dispatch note, a
+// nameplate photo) — the document then never linked to an owner at all, for
+// its whole life, since nothing ever revisits a document once extracted.
+// These two are the pure naming/flagging rules; the DB matching/creation
+// itself lives in recordsStore.js's findOrCreateCustomer.
+
+/** Display name for a customer created from an address alone — never
+ *  presented as a real name, always distinguishable at a glance. */
+export function addressOnlyCustomerName(address) {
+  const a = String(address ?? '').trim();
+  return a ? `Customer at ${a}` : 'Customer (address unknown)';
+}
+
+/** True when `data` is a placeholder created by addressOnlyCustomerName —
+ *  the one case a LATER document's real customer_name is allowed to replace
+ *  the name outright (an upgrade, not a fill-only merge) rather than create a
+ *  second customer at the same address. */
+export function isAddressOnlyCustomer(data) {
+  return !!data && data.name_source === 'address';
+}
+
+// ---------------------------------------------------------- shop addresses
+// Reviewer follow-up (2026-09-20, NO-GO on the first pass of the fix above):
+// the address-only path can create a "customer" out of the CONTRACTOR'S OWN
+// letterhead address when a document prints no separate service address —
+// every one of Desert Peak's own invoices would otherwise mint (or keep
+// re-matching) a bogus "Customer at 2210 E Main St" using the shop's own
+// address, and then attribute other customers' documents to it by address
+// coincidence. Two independent signals, either sufficient:
+//   1. it matches the tenant's own configured address, when one is on file.
+//   2. it shows the LETTERHEAD PATTERN: extracted as shop_address on at least
+//      one document (the model was asked to tell the two apart — see
+//      extractFields.js's service_address/shop_address guide), OR extracted
+//      as service_address on >=3 distinct documents naming >=3 distinct
+//      customer_names — a real customer's service address does not repeat
+//      across that many different people; a shop's own address, printed on
+//      every form it produces, does.
+
+/** Minimum evidence for signal 2 above — both floors must be met together
+ *  (3 documents is not evidence by itself if they're all the same customer;
+ *  3 different customer names is not evidence by itself off a single
+ *  document). Exported so scripts/verify-linking.mjs pins the exact bar. */
+export const SHOP_ADDRESS_DOC_FLOOR = 3;
+export const SHOP_ADDRESS_CUSTOMER_FLOOR = 3;
+
+/**
+ * Pure. `addrKey` is an already-normalizeAddressKey'd value. `tenantAddressKey`
+ * is the tenant's own address (also normalizeAddressKey'd), or falsy when none
+ * is on file. `letterheadCounts` is `{[addrKey]: {shopAddressDocs, serviceAddressDocs,
+ * distinctCustomerNames}}` — one pre-aggregated row per address key, built by
+ * routes/integrity.js from a single SQL query per request (see
+ * loadLetterheadCounts) and cached there; this function never touches the
+ * database, so it is directly testable with a plain object.
+ */
+export function isLikelyShopAddress(addrKey, { tenantAddressKey, letterheadCounts } = {}) {
+  if (!addrKey) return false;
+  if (tenantAddressKey && addrKey === tenantAddressKey) return true;
+  const counts = letterheadCounts?.[addrKey];
+  if (!counts) return false;
+  if ((counts.shopAddressDocs ?? 0) >= 1) return true;
+  return (counts.serviceAddressDocs ?? 0) >= SHOP_ADDRESS_DOC_FLOOR
+    && (counts.distinctCustomerNames ?? 0) >= SHOP_ADDRESS_CUSTOMER_FLOOR;
+}
+
 export function preferFullerAddress(keepAddr, dropAddr) {
   const keep = String(keepAddr ?? '').trim();
   const drop = String(dropAddr ?? '').trim();

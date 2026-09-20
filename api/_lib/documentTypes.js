@@ -88,6 +88,7 @@ export const FIELD_LABELS = {
   tonnage: 'Tonnage',
   refrigerant: 'Refrigerant',
   service_address: 'Service address',
+  shop_address: 'Shop address',
   customer_name: 'Customer',
   installation_date: 'Installation date',
   warranty_expires: 'Warranty expires',

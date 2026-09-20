@@ -20,7 +20,10 @@
  *     platform role with BYPASSRLS cannot silently open a cross-tenant read.
  */
 import pg from 'pg';
-import { customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname } from './integrity.js';
+import {
+  customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey,
+  addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress,
+} from './integrity.js';
 
 let pool;
 
@@ -352,6 +355,169 @@ export async function extractionsHaveUnitIndex(db) {
   return extractionsUnitIndex;
 }
 export function _resetExtractionsUnitIndexProbe() { extractionsUnitIndex = null; }
+
+/**
+ * Builds the `{tenantAddressKey, letterheadCounts}` isLikelyShopAddress needs
+ * (reviewer follow-up, 2026-09-20: the address-only path above can otherwise
+ * mint a "customer" out of the CONTRACTOR'S OWN letterhead address).
+ *
+ *   - tenantAddressKey: the tenant's own configured address, from
+ *     tenants.settings->>'address' — that jsonb column has existed since
+ *     M3-config/01-create-schema.sql (no new migration); a tenant that has
+ *     never set one just yields null, and the letterhead-pattern signal below
+ *     still applies on its own.
+ *   - letterheadCounts: one row per normalized address key, counting how
+ *     often it was extracted as shop_address vs. service_address, and how
+ *     many DISTINCT customer_names accompanied it as a service_address.
+ *     Built by scanning `extractions` once and grouping in JS — normalizeAddressKey
+ *     has no SQL equivalent, and a tenant's extraction volume is small enough
+ *     that this is one query, not N.
+ *
+ * Both halves are best-effort: a failure here must never break ordinary
+ * customer resolution, so each degrades to "no signal" rather than throwing.
+ * Callers that run this once per row in a loop (routes/integrity.js's bulk
+ * fixes) should call it ONCE and pass the result back into findOrCreateCustomer
+ * as `shopContext` instead of leaving every call to recompute it.
+ */
+async function computeShopAddressContext(db, tenantId) {
+  let tenantAddressKey = null;
+  try {
+    const r = await db.query(`SELECT settings->>'address' AS address FROM tenants WHERE id = $1`, [tenantId]);
+    tenantAddressKey = normalizeAddressKey(r.rows[0]?.address ?? '') || null;
+  } catch (err) {
+    console.error('computeShopAddressContext: tenant address lookup failed (skipping that signal):', err?.message);
+  }
+
+  const letterheadCounts = {};
+  try {
+    const rows = (await db.query(
+      `SELECT document_id, field_key, value FROM extractions
+        WHERE field_key IN ('shop_address','service_address','customer_name') AND value IS NOT NULL AND ${TENANT}
+        LIMIT 20000`,
+      []
+    )).rows;
+
+    const byDoc = new Map();
+    for (const r of rows) {
+      let d = byDoc.get(r.document_id);
+      if (!d) { d = {}; byDoc.set(r.document_id, d); }
+      if (r.field_key === 'shop_address' && d.shopAddress === undefined) d.shopAddress = r.value;
+      if (r.field_key === 'service_address' && d.serviceAddress === undefined) d.serviceAddress = r.value;
+      if (r.field_key === 'customer_name' && d.customerName === undefined) d.customerName = r.value;
+    }
+
+    const buckets = new Map();
+    const bucketFor = (key) => {
+      let b = buckets.get(key);
+      if (!b) { b = { shopAddressDocs: new Set(), serviceAddressDocs: new Set(), customerNames: new Set() }; buckets.set(key, b); }
+      return b;
+    };
+    for (const [docId, d] of byDoc) {
+      if (d.shopAddress) {
+        const key = normalizeAddressKey(d.shopAddress);
+        if (key) bucketFor(key).shopAddressDocs.add(docId);
+      }
+      if (d.serviceAddress) {
+        const key = normalizeAddressKey(d.serviceAddress);
+        if (key) {
+          const b = bucketFor(key);
+          b.serviceAddressDocs.add(docId);
+          const name = normalizeMatchText(d.customerName).toLowerCase();
+          if (name) b.customerNames.add(name);
+        }
+      }
+    }
+    for (const [key, b] of buckets) {
+      letterheadCounts[key] = {
+        shopAddressDocs: b.shopAddressDocs.size,
+        serviceAddressDocs: b.serviceAddressDocs.size,
+        distinctCustomerNames: b.customerNames.size,
+      };
+    }
+  } catch (err) {
+    console.error('computeShopAddressContext: letterhead aggregate failed (skipping that signal):', err?.message);
+  }
+
+  return { tenantAddressKey, letterheadCounts };
+}
+
+/**
+ * findOrCreateCustomer's address-only path (2026-09-20 root-cause fix,
+ * handoffs/LINKING_ROOT_CAUSE_2026-09-20.md): a document that states a
+ * service_address but no customer_name (a permit, a dispatch note, a
+ * nameplate photo) used to make findOrCreateCustomer return null outright —
+ * the document then never had an owner, for its whole life, since nothing
+ * ever revisits an already-extracted document to try again. The owner's
+ * rule is "never sit unowned silently": match an existing customer at that
+ * exact address (ambiguous — more than one candidate — still refuses to
+ * guess, same philosophy as selectCustomerMatch), or create a placeholder
+ * customer named from the address (data.name_source='address', see
+ * integrity.js's addressOnlyCustomerName) so a LATER document naming the
+ * real occupant upgrades it in place (see the name-path's own placeholder
+ * check below) instead of creating a duplicate.
+ *
+ * Address matching here is EXACT (normalizeAddressKey equality) — no fuzzy
+ * scoring — because there is no name to disambiguate with; two different
+ * candidates at the same normalized address is exactly the "don't know, so
+ * don't guess" case selectCustomerMatch already refuses on the name side.
+ *
+ * Reviewer follow-up (2026-09-20): refuses outright for a likely SHOP address
+ * (isLikelyShopAddress — the tenant's own address, or the letterhead pattern:
+ * extracted as shop_address anywhere, or as service_address on several
+ * documents naming several different customers). `shopContext` is the
+ * `{tenantAddressKey, letterheadCounts}` a bulk caller (routes/integrity.js)
+ * precomputed once for its whole loop; left undefined, it's computed here
+ * (cheap — this only runs once per document at ingest/verify time).
+ */
+async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext) {
+  const addrKey = normalizeAddressKey(address);
+  if (!addrKey) return null; // too sparse (a bare "Suite 4", say) to match safely
+
+  const ctx = shopContext ?? await computeShopAddressContext(db, tenantId);
+  if (isLikelyShopAddress(addrKey, ctx)) {
+    console.log(JSON.stringify({ event: 'integrity.skip_shop_address', tenantId, addrKey }));
+    return null;
+  }
+
+  // Same per-tenant serialization as the name path below, keyed on the
+  // address instead of a name: two documents for a brand-new address
+  // arriving at the same instant must not both decide "create new".
+  await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:customeraddr:${addrKey}`]);
+
+  const candidates = (await db.query(
+    `SELECT id, data, customer_number FROM entities
+      WHERE entity_type = 'customer' AND ${TENANT} AND merged_into IS NULL
+        AND data->>'service_address' IS NOT NULL
+      ORDER BY created_at LIMIT 500`,
+    []
+  )).rows;
+  const matches = candidates.filter((c) => normalizeAddressKey(c.data?.service_address) === addrKey);
+
+  if (matches.length === 1) {
+    const existing = matches[0];
+    const rawAddress = String(facts?.service_address ?? '').trim();
+    const data = { ...(existing.data ?? {}) };
+    let changed = false;
+    if (rawAddress && (data.service_address == null || String(data.service_address).trim() === '')) {
+      data.service_address = rawAddress;
+      changed = true;
+    }
+    if (changed) {
+      await db.query(`UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`, [existing.id, data]);
+    }
+    return { id: existing.id, created: false, customerNumber: existing.customer_number };
+  }
+  if (matches.length > 1) return null; // ambiguous (a landlord/HOA address) — refuse, don't guess
+
+  const rawAddress = String(facts?.service_address ?? '').trim();
+  const numRow = (await db.query('SELECT next_customer_number($1) AS num', [tenantId])).rows[0];
+  const created = (await db.query(
+    `INSERT INTO entities (tenant_id, entity_type, data, customer_number, created_at, updated_at)
+     VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING id, customer_number`,
+    [tenantId, { service_address: rawAddress, customer_name: addressOnlyCustomerName(rawAddress), name_source: 'address' }, numRow?.num ?? null]
+  )).rows[0];
+  return { id: created.id, created: true, customerNumber: created.customer_number };
+}
 
 function makeStore(db, tenantId) {
   const one = async (sql, params) => (await db.query(sql, params)).rows[0] ?? null;
@@ -1159,14 +1325,27 @@ function makeStore(db, tenantId) {
      *     real HVAC office — degrades to "always create new" for that name,
      *     which is the same safe fallback as a genuine ambiguous match.
      *
-     * Returns null, not a fabricated customer, when the document names
-     * nobody — including a name that is only whitespace or punctuation
-     * ("—", "...", "   ").
+     * Returns null only when the document names NOBODY at all — no
+     * customer_name AND no service_address (a name that is only whitespace
+     * or punctuation counts as "no name" — normalizeMatchText). A
+     * service_address with no name still resolves: see
+     * findOrCreateCustomerByAddress above (owner root-cause fix, 2026-09-20)
+     * — "never sit unowned silently" — but never for a likely SHOP address
+     * (that function's own shop-address guard).
+     *
+     * @param {object} facts
+     * @param {{tenantAddressKey: string|null, letterheadCounts: object}} [shopContext]
+     *   optional precomputed shop-address signal (loadShopAddressContext
+     *   below) — pass this from a bulk caller's loop so it isn't recomputed
+     *   on every row; omitted, the address-only path computes it itself.
      */
-    findOrCreateCustomer: async (facts) => {
+    findOrCreateCustomer: async (facts, shopContext) => {
       const name = normalizeMatchText(facts?.customer_name);
-      if (!name) return null;
       const address = normalizeMatchText(facts?.service_address);
+      if (!name) {
+        if (!address) return null;
+        return findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext);
+      }
 
       const incoming = {};
       for (const k of ['customer_name', 'service_address']) {
@@ -1216,6 +1395,42 @@ function makeStore(db, tenantId) {
       const existing = selectCustomerMatch(candidates, { name, address });
 
       if (!existing) {
+        // Upgrade-by-fuller-name (owner root-cause fix, 2026-09-20): before
+        // creating a brand-new customer, check whether an ADDRESS-ONLY
+        // placeholder (findOrCreateCustomerByAddress, above) already sits at
+        // this exact address — an earlier document that named the address
+        // but not the person. If so this document's real name replaces the
+        // placeholder outright (never a fill-only merge: "Customer at 3247
+        // Elm St" is not a name worth keeping once the real one is known),
+        // so the same person never ends up as two customer rows.
+        if (address) {
+          const addrKey = normalizeAddressKey(address);
+          if (addrKey) {
+            const placeholders = await many(
+              `SELECT id, data, customer_number FROM entities
+                WHERE entity_type = 'customer' AND ${TENANT} AND merged_into IS NULL
+                  AND data->>'name_source' = 'address'
+                  AND data->>'service_address' IS NOT NULL
+                ORDER BY created_at LIMIT 200`,
+              []
+            );
+            const placeholder = placeholders.find((c) => isAddressOnlyCustomer(c.data) && normalizeAddressKey(c.data?.service_address) === addrKey);
+            if (placeholder) {
+              const data = { ...(placeholder.data ?? {}) };
+              delete data.name_source;
+              data.customer_name = incoming.customer_name;
+              for (const [k, v] of Object.entries(incoming)) {
+                if (k === 'customer_name') continue;
+                if (data[k] == null || String(data[k]).trim() === '') data[k] = v;
+              }
+              await db.query(
+                `UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
+                [placeholder.id, data]
+              );
+              return { id: placeholder.id, created: false, customerNumber: placeholder.customer_number };
+            }
+          }
+        }
         // SECURITY DEFINER, advisory-locked per tenant (M3-config/15-customer-
         // profiles.sql) — serializes concurrent customer creations for the
         // SAME tenant the same way the pg_advisory_xact_lock just above
@@ -1268,6 +1483,13 @@ function makeStore(db, tenantId) {
       const match = selectCustomerMatch(candidates, { name, address });
       return match?.id ?? null;
     },
+
+    /** Precompute the shop-address signal ONCE for a whole bulk loop (see
+     *  computeShopAddressContext above) and pass the result into
+     *  findOrCreateCustomer's `shopContext` param on every row, instead of
+     *  each row recomputing it. Used by routes/integrity.js's linkDocuments/
+     *  linkEquipmentCustomers fixes and its integrityScan report. */
+    loadShopAddressContext: () => computeShopAddressContext(db, tenantId),
 
     /**
      * Link equipment to the customer a document said it belongs to.

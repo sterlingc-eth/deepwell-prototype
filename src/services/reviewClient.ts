@@ -106,6 +106,19 @@ export interface IntegrityUnlinkedDocument { documentId: string; hasCustomerName
 export interface IntegrityEquipmentWithoutCustomer { equipmentId: string; suggestedCustomerId: string | null }
 export interface IntegrityMultiUnitUnderLinked { documentId: string; unitsExtracted: number; unitsLinked: number }
 export interface IntegrityOrphanEquipment { equipmentId: string }
+/** A normalized address the shop-address guard flagged as the contractor's
+ *  own letterhead (or the tenant's address on file) rather than a customer's
+ *  — see api/_lib/integrity.js's isLikelyShopAddress. `placeholderCustomerId`
+ *  is set when an address-only "Customer at ..." placeholder already exists
+ *  at that address (a candidate for the `retireShopCustomers` fix below). */
+export interface IntegritySuspectedShopAddress {
+  addressKey: string;
+  shopAddressDocs: number;
+  serviceAddressDocs: number;
+  distinctCustomerNames: number;
+  viaTenantAddress?: boolean;
+  placeholderCustomerId?: string | null;
+}
 
 export interface IntegrityScanResult {
   duplicateCustomers: IntegrityDuplicateCustomer[];
@@ -113,26 +126,54 @@ export interface IntegrityScanResult {
   equipmentWithoutCustomer: IntegrityEquipmentWithoutCustomer[];
   multiUnitDocsUnderLinked: IntegrityMultiUnitUnderLinked[];
   orphanEquipment: IntegrityOrphanEquipment[];
+  suspectedShopAddresses: IntegritySuspectedShopAddress[];
   counts: {
     duplicateCustomers: number;
     unlinkedDocuments: number;
     equipmentWithoutCustomer: number;
     multiUnitDocsUnderLinked: number;
     orphanEquipment: number;
+    suspectedShopAddresses: number;
   };
 }
 
-export type IntegrityApplyAction = 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits' | 'healMergedSurvivors';
+export type IntegrityApplyAction =
+  | 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits'
+  | 'healMergedSurvivors' | 'retireShopCustomers';
 
 export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = ['mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors'];
 
-export interface IntegrityFixResult {
+/** The ordinary result of an integrityFix call. */
+export interface IntegrityFixApplied {
   dryRun: boolean;
   merged: { keepId: string; dropId: string; score: number }[];
-  documentsLinked: { documentId: string; customerId: string }[];
+  documentsLinked: { documentId: string; customerId: string; alreadyLinked?: boolean }[];
   equipmentLinked: { equipmentId: string; customerId: string }[];
   unitsCreated: { documentId: string; equipmentId: string; serial: string }[];
-  skipped: { documentId: string; reason: string }[];
+  survivorsHealed: { survivorId: string }[];
+  shopCustomersRetired: { customerId: string; addressKey: string; documentIds: string[] }[];
+  skipped: { documentId: string | null; reason: string }[];
+}
+
+/** Returned instead of IntegrityFixApplied when a link-only sweep
+ *  (linkDocuments/linkEquipmentCustomers, e.g. the Inbox auto-fix in
+ *  usePostgresSync.ts) is server-side debounced: one already ran for this
+ *  tenant within the last 10 minutes. `skipped` is a literal `true` here —
+ *  deliberately not the `skipped` ARRAY field name IntegrityFixApplied uses,
+ *  so callers must check which shape they got before touching either. */
+export interface IntegrityFixDebounced {
+  skipped: true;
+  reason: 'recent';
+}
+
+export type IntegrityFixResult = IntegrityFixApplied | IntegrityFixDebounced;
+
+/** True when `result` is the debounced ("skipped, ran recently") shape
+ *  rather than an ordinary applied-fix result. Narrows the union — prefer
+ *  this over inspecting `result.skipped` directly, since that field means
+ *  two different things in the two branches. */
+export function isIntegrityFixDebounced(result: IntegrityFixResult): result is IntegrityFixDebounced {
+  return result.skipped === true;
 }
 
 export const reviewClient = {

@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { recordsStore } from '../services/recordsStoreClient';
-import { reviewClient, type DocumentLink, type Correction } from '../services/reviewClient';
+import { reviewClient, isIntegrityFixDebounced, type DocumentLink, type Correction } from '../services/reviewClient';
 import { authHeader } from '../services/authToken';
 import { maxStageFor, recomputeIssues, useGraph } from '../core/entityGraph';
 import { hvacSchema } from '../domains/hvac';
@@ -401,6 +401,37 @@ export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: bo
   return { isEmpty: docs.length === 0 && entities.length === 0 };
 }
 
+// Inbox-load auto-fix (owner request 2026-09-20, item 4,
+// handoffs/LINKING_ROOT_CAUSE_2026-09-20.md): a document can sit
+// unlinked-but-linkable in Postgres for reasons that have nothing to do with
+// THIS browser tab (extracted before a fix landed, a repair that only ever
+// runs post-extraction) — waiting for the nightly cron sweep means the owner
+// sees "Needs a person" for something the pipeline already knows how to fix.
+// One cheap, debounced (module-level, once per tenant per page load — not
+// re-run on every `refresh()`) call to the same linkDocuments/
+// linkEquipmentCustomers fix "Fix everything" already runs, scoped to just
+// those two non-destructive actions so no admin role is required (server-side
+// gate: api/_lib/routes/integrity.js's integrityFix). Best-effort: a failure
+// here must never surface as a sync error, since the initial load already
+// succeeded without it.
+let linkSweepRanForTenant: string | null = null;
+async function runInboxLinkSweep(tenantKey: string): Promise<void> {
+  if (linkSweepRanForTenant === tenantKey) return;
+  linkSweepRanForTenant = tenantKey;
+  try {
+    const result = await reviewClient.integrityFix(['linkDocuments', 'linkEquipmentCustomers']);
+    // Server-side debounce (routes/integrity.js): another tab/request already
+    // ran this sweep for the tenant in the last 10 minutes. Nothing to do —
+    // this is not a failure, just this call's guard losing to that one's.
+    if (isIntegrityFixDebounced(result)) return;
+    if (result.documentsLinked.length > 0 || result.equipmentLinked.length > 0) {
+      await loadGraphFromServer(tenantKey);
+    }
+  } catch {
+    /* best-effort — the nightly cron sweep still covers this tenant */
+  }
+}
+
 /**
  * @param enabled Only fetches while true — pass `isLoaded && isSignedIn`
  *   (and `false` outright in demo mode) so this never fires while signed out
@@ -430,6 +461,7 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
         const { isEmpty } = await loadGraphFromServer(tenantKey ?? '');
         if (cancelled || requestId.current !== id) return;
         setState({ status: 'ready', error: null, isEmpty, refresh: run });
+        if (!isEmpty) void runInboxLinkSweep(tenantKey ?? '');
       } catch (err) {
         if (cancelled || requestId.current !== id) return;
         // A 401 (session resolved by Clerk client-side but rejected by the

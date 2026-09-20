@@ -8,6 +8,7 @@ import { targetFor } from '../domains/hvac/intake';
 import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
 import { groupExtractionsByUnit } from '../domains/hvac/units';
 import { normalize, str } from '../core/answer';
+import { customerForDocument } from '../core/customer';
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
 import { customerClient, type CustomerSummary } from '../services/customerClient';
@@ -105,16 +106,12 @@ function entityLabel(e: Entity): string {
   }
 }
 
-/** The customer entity (if any) this document is linked to — same source as
- *  BrowseScreen's `customerFor`: `linkedEntityIds` already includes any
- *  document_entity_links row a customer, not just equipment/property. */
-function customerEntityFor(doc: Doc, entities: Record<string, Entity>): Entity | null {
-  for (const id of doc.linkedEntityIds) {
-    const e = entities[id];
-    if (e?.type === 'customer') return e;
-  }
-  return null;
-}
+// customerEntityFor moved to src/core/customer.ts (customerForDocument):
+// this used to check only a direct link, missing the linked-unit fallback
+// BrowseScreen's customerFor already had — a document linked to its
+// equipment but not (yet) directly to the customer showed "Not linked to a
+// customer yet" here while Browse showed the right name for the same row
+// (handoffs/LINKING_ROOT_CAUSE_2026-09-20.md).
 
 /**
  * "Linked to" for a customer replaces the old equipment-only "Record to
@@ -127,6 +124,9 @@ function customerEntityFor(doc: Doc, entities: Record<string, Entity>): Entity |
  * (same gate DashboardScreen's warranty-attention fetch uses).
  */
 function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: Doc; current: Entity | null; isDemo: boolean; suggestedName: string | null }) {
+  const hasCustomerFacts = doc.extracted.some(
+    (f) => (f.name === 'customer_name' || f.name === 'service_address') && (f.correctedValue ?? f.value).trim()
+  );
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CustomerSummary[]>([]);
@@ -208,7 +208,14 @@ function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: D
     <section className="p-5 space-y-3">
       <h3 className="flex items-center gap-2 text-h4"><UserCog className="w-4 h-4" aria-hidden="true" /> Customer</h3>
       <p className="text-ink-2">
-        {current ? (str(current, 'customer_name') || str(current, 'name') || 'Unnamed') : 'Not linked to a customer yet.'}
+        {current
+          ? (str(current, 'customer_name') || str(current, 'name') || 'Unnamed')
+          : hasCustomerFacts
+            // A real bug (should have auto-linked — see integrityFixDocument),
+            // not a task the document itself is missing: say so plainly and
+            // point at the one-click fix rather than a bare "not linked".
+            ? 'Names a customer but hasn’t linked yet — use the suggestion below or search.'
+            : 'This document doesn’t state a customer or service address.'}
       </p>
       {!isDemo && !open && !current && suggestedName && (
         <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" disabled={suggestBusy} onClick={() => void linkToSuggested()}>
@@ -553,7 +560,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const suggestedCustomerName = customerNameField ? (customerNameField.correctedValue ?? customerNameField.value).trim() || null : null;
 
   const grouped = useMemo(() => groupExtractionsByUnit(doc.extracted), [doc.extracted]);
-  const currentCustomer = customerEntityFor(doc, graph.entities);
+  const currentCustomer = customerForDocument(doc, graph.entities);
   const customerStatusLine = currentCustomer
     ? `Customer: ${str(currentCustomer, 'customer_name') || str(currentCustomer, 'name') || 'Unnamed'}`
     : 'Customer: not linked yet';

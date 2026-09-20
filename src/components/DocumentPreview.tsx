@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, AlertTriangle, Download, Loader2 } from 'lucide-react';
 import type { SourceLocation } from '../core/types';
 import { useGraph } from '../core/entityGraph';
+import { customerForDocument } from '../core/customer';
 import { useAppStore } from '../store/appStore';
 import { StagePill } from './StagePill';
 import { locationLabel } from './SourceList';
@@ -208,11 +209,15 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
             // back to a customer matched by name when no link exists.
             const onEntity = currentScreen === 'entity' ? selectedEntityId : null;
             const onCustomer = currentScreen === 'customer' ? customerRef : null;
-            const linkedCustomer = doc.linkedEntityIds.find((id) => entities[id]?.type === 'customer');
+            // customerForDocument (src/core/customer.ts): direct link, then
+            // the linked unit's customer — same rule Browse/Review use, so
+            // this button and those screens never disagree about who a
+            // document belongs to (handoffs/LINKING_ROOT_CAUSE_2026-09-20.md).
+            const linkedCustomer = customerForDocument(doc, entities)?.id;
             const extractedName = doc.extracted.find((f) => f.name === 'customer_name')?.value;
             const byName = !linkedCustomer && extractedName
               ? Object.values(entities).find(
-                  (e) => e.type === 'customer' && String(e.fields.name ?? '').trim().toLowerCase() === String(extractedName).trim().toLowerCase()
+                  (e) => e.type === 'customer' && String(e.fields.customer_name ?? '').trim().toLowerCase() === String(extractedName).trim().toLowerCase()
                 )?.id
               : undefined;
             const customerId = linkedCustomer ?? byName;
