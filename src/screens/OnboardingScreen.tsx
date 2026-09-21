@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CreateOrganization, OrganizationList, useClerk } from '@clerk/clerk-react';
 import { ArrowLeft, Building2, LogOut, Users } from 'lucide-react';
 import { Wordmark } from '../components/Wordmark';
+import { deepLinkRedirectTarget } from '../hooks/useDeepLink';
 
 /** Matches LoginScreen's plate so the two screens read as one flow. */
 const PLATE = '#F6F8F6';
@@ -39,6 +40,11 @@ const clerkAppearance = {
 export function OnboardingScreen() {
   const [mode, setMode] = useState<Mode>('choose');
   const { signOut } = useClerk();
+  // Carries a `?plan=`/`?screen=` deep link through org creation/selection —
+  // both do a real page navigation, which loses the plan pick that had
+  // already been applied to the (now-discarded) in-memory store. See
+  // useDeepLink.ts's DEEP_LINK_STORAGE_KEY comment.
+  const redirectTarget = deepLinkRedirectTarget();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#163C2C] to-[#0F2818] flex flex-col items-center justify-center gap-8 p-4">
@@ -109,7 +115,7 @@ export function OnboardingScreen() {
               // Without this Clerk falls back to the dashboard "home URL" —
               // the marketing site — so a new shop landed on the website
               // instead of the app (owner report, 2026-09-20).
-              afterCreateOrganizationUrl="/app/"
+              afterCreateOrganizationUrl={redirectTarget}
               appearance={clerkAppearance}
             />
           </>
@@ -132,8 +138,8 @@ export function OnboardingScreen() {
             </p>
             <OrganizationList
               hidePersonal
-              afterSelectOrganizationUrl="/app/"
-              afterCreateOrganizationUrl="/app/"
+              afterSelectOrganizationUrl={redirectTarget}
+              afterCreateOrganizationUrl={redirectTarget}
               appearance={clerkAppearance}
             />
           </>

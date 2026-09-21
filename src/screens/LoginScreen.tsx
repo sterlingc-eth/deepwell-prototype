@@ -1,11 +1,17 @@
 import { SignIn } from '@clerk/clerk-react';
 import { ArrowLeft } from 'lucide-react';
 import { Wordmark } from '../components/Wordmark';
+import { deepLinkRedirectTarget } from '../hooks/useDeepLink';
 
 /** The plate behind the lockup; the sign-in card matches it. */
 const PLATE = '#F6F8F6';
 
 export function LoginScreen() {
+  // Carries a `?plan=`/`?screen=` deep link through Clerk's OAuth round trip
+  // (a real page navigation, unlike the embedded email/password form) —
+  // see useDeepLink.ts's DEEP_LINK_STORAGE_KEY comment for why this can't
+  // just be the static "/app/" it used to be.
+  const redirectTarget = deepLinkRedirectTarget();
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#163C2C] to-[#0F2818] flex flex-col items-center justify-center gap-8 p-4">
       <div className="dw-rise flex flex-col items-center text-center">
@@ -20,8 +26,8 @@ export function LoginScreen() {
         style={{ background: PLATE }}
       >
         <SignIn
-          fallbackRedirectUrl="/app/"
-          signUpFallbackRedirectUrl="/app/"
+          fallbackRedirectUrl={redirectTarget}
+          signUpFallbackRedirectUrl={redirectTarget}
           routing="hash"
           appearance={{
             elements: {

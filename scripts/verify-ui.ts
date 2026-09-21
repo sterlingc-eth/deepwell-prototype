@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_DIR = fileURLToPath(new URL('.', import.meta.url));
 import { buildSuggestions } from '../src/core/suggestions';
 import { formatYmd } from '../src/core/answer';
-import { parseDeepLink } from '../src/hooks/useDeepLink';
+import { parseDeepLink, resolveDeepLinkRedirectPath, freshPersistedDeepLinkSearch, DEEP_LINK_TTL_MS } from '../src/hooks/useDeepLink';
 import {
   annualPrice,
   billingBannerFor,
@@ -176,6 +176,82 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   eq('work=mine is carried through alongside screen=inbox', parseDeepLink('?screen=inbox&work=mine'), { screen: 'review', workFilter: 'mine' });
   eq('an unrecognized work value is dropped', parseDeepLink('?screen=inbox&work=everyone'), { screen: 'review' });
   eq('work with no screen is still carried through', parseDeepLink('?work=mine'), { workFilter: 'mine' });
+}
+
+/* ------------------------------------------------- resolveDeepLinkRedirectPath */
+
+{
+  // A Clerk OAuth sign-in or CreateOrganization submit does a real page
+  // navigation to this URL — the fix for the "pricing CTA loses ?plan=
+  // before Clerk loads" bug (handoffs/QA_APP_API_2026-09-21.md).
+  eq('no live and no persisted params → bare app root', resolveDeepLinkRedirectPath('', ''), '/app/');
+  eq('bare "?" on both sides → bare app root', resolveDeepLinkRedirectPath('?', '?'), '/app/');
+  eq(
+    'live params are used as-is',
+    resolveDeepLinkRedirectPath('?plan=solo&interval=month', ''),
+    '/app/?plan=solo&interval=month',
+  );
+  eq(
+    'falls back to the persisted copy when the live URL is bare (the address bar was already scrubbed)',
+    resolveDeepLinkRedirectPath('', '?plan=solo&interval=month'),
+    '/app/?plan=solo&interval=month',
+  );
+  eq(
+    'live params win over a stale persisted copy',
+    resolveDeepLinkRedirectPath('?screen=dashboard', '?plan=solo'),
+    '/app/?screen=dashboard',
+  );
+  eq(
+    'a persisted value missing its leading "?" still gets one',
+    resolveDeepLinkRedirectPath('', 'plan=solo'),
+    '/app/?plan=solo',
+  );
+}
+
+/* ------------------------------------------------- freshPersistedDeepLinkSearch */
+
+{
+  // Reviewer NO-GO (2026-09-21): a persisted deep link must not resurrect on
+  // a later, UNRELATED bare `/app/` visit in the same tab (e.g. someone
+  // abandons signup, comes back an hour later via a bookmark). Fixed with a
+  // timestamp + TTL on the persisted entry — these cases cover that
+  // boundary directly, with a fixed clock so nothing here depends on
+  // wall-clock time.
+  const now = 1_700_000_000_000;
+  const entry = (search: string, ageMs: number) => JSON.stringify({ search, ts: now - ageMs });
+
+  eq(
+    'within TTL — a bare reload mid-redirect (OAuth/org-creation round trip) still gets the pending plan',
+    freshPersistedDeepLinkSearch(entry('?plan=solo&interval=month', 5 * 60 * 1000), now),
+    '?plan=solo&interval=month',
+  );
+  eq(
+    'past TTL — an abandoned signup never resurrects its plan on a later bare visit',
+    freshPersistedDeepLinkSearch(entry('?plan=solo', 20 * 60 * 1000), now),
+    '',
+  );
+  eq('exactly at the TTL boundary is still honored (inclusive)', freshPersistedDeepLinkSearch(entry('?plan=solo', DEEP_LINK_TTL_MS), now), '?plan=solo');
+  eq('one ms past the TTL boundary is not', freshPersistedDeepLinkSearch(entry('?plan=solo', DEEP_LINK_TTL_MS + 1), now), '');
+  eq('nothing persisted -> nothing', freshPersistedDeepLinkSearch(null, now), '');
+  eq('corrupt JSON never throws, just reads as nothing persisted', freshPersistedDeepLinkSearch('not json', now), '');
+  eq('a timestamp in the future (clock skew) is treated as stale, not honored', freshPersistedDeepLinkSearch(entry('?plan=solo', -1000), now), '');
+  eq(
+    'the pre-TTL plain-string format (no {search,ts} wrapper) is dropped rather than honored forever',
+    freshPersistedDeepLinkSearch('?plan=solo', now),
+    '',
+  );
+
+  // "Consumed once -> a second render gets nothing": useDeepLink's
+  // ready-gated effect (and App.tsx's billing-active effect) both call
+  // clearPersistedDeepLinkSearch() the moment the link is actually
+  // consumed — simulated here by reading again with the entry gone.
+  {
+    const raw = entry('?plan=solo&interval=month', 1000);
+    const first = freshPersistedDeepLinkSearch(raw, now);
+    check('consumed once: the first read applies the pending plan', first === '?plan=solo&interval=month');
+    const second = freshPersistedDeepLinkSearch(null, now);
+    check('consumed once: a second read after clearing gets nothing', second === '');
+  }
 }
 
 /* ---------------------------------------------------------------- formatYmd */
@@ -805,8 +881,18 @@ function listFilesRecursive(dir: string): string[] {
   eq('unreadBadgeLabel: a large count still caps at "9+"', unreadBadgeLabel(200), '9+');
 
   eq('parseNotificationLink: extracts the entity id', parseNotificationLink('/app/?entity=abc-123'), { entityId: 'abc-123' });
-  eq('parseNotificationLink: null link -> no entity', parseNotificationLink(null), { entityId: null });
-  eq('parseNotificationLink: a link with no entity param -> no entity', parseNotificationLink('/app/?screen=dashboard'), { entityId: null });
+  eq('parseNotificationLink: null link -> nothing', parseNotificationLink(null), {});
+  eq('parseNotificationLink: a link with no recognized params -> nothing', parseNotificationLink('/app/?bogus=1'), {});
+  // Regression: these two used to fall through to "-> nothing" (and
+  // NotificationsPanel then sent the click to the Dashboard) because the old
+  // parser only ever looked for `?entity=`. outreach.js and followups.js
+  // both write real notification rows with exactly these link shapes.
+  eq('parseNotificationLink: the outreach route\'s link carries its screen', parseNotificationLink('/app/?screen=outreach'), { screen: 'outreach' });
+  eq(
+    'parseNotificationLink: a follow-up\'s absolute link carries screen + work filter',
+    parseNotificationLink('https://deepwelltechnology.com/app/?screen=inbox&work=mine'),
+    { screen: 'review', workFilter: 'mine' },
+  );
 }
 
 /* ----------------------------------------------------------------- outreach */

@@ -7,7 +7,7 @@ import { billingClient } from './services/billingClient';
 import { useAppStore } from './store/appStore';
 import { DEFAULT_CUSTOMER_FILTERS } from './core/customerFilters';
 import { usePostgresSync } from './hooks/usePostgresSync';
-import { useDeepLink } from './hooks/useDeepLink';
+import { useDeepLink, clearPersistedDeepLinkSearch } from './hooks/useDeepLink';
 import { AskScreen, BillingScreen, BrowseScreen, CustomerProfileScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen, TeamScreen } from './screens';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { isAdminRole } from './services/teamClient';
@@ -156,7 +156,10 @@ function App() {
   // ?entity= / ?doc= / ?screen= / ?plan= in the URL open the right record (or
   // Billing) once the graph is loaded. Unconditional for the rules of hooks;
   // it waits for the graph internally and is a no-op without a query string.
-  useDeepLink();
+  // `ready` (signed in with an active org) tells it when it's safe to drop
+  // the sessionStorage copy it keeps around to survive a Clerk auth/org
+  // redirect — see useDeepLink.ts's DEEP_LINK_STORAGE_KEY comment.
+  useDeepLink(!!isSignedIn && !!orgId);
 
   // Billing status backs AppShell's global banner, BillingScreen's own
   // display, and — HARD GATE (owner decision, 2026-09-21) — whether this
@@ -190,6 +193,17 @@ function App() {
       cancelled = true;
     };
   }, [isSignedIn, orgId, setBillingStatus]);
+
+  // Reviewer NO-GO (2026-09-21), belt-and-suspenders alongside useDeepLink's
+  // TTL and its own ready-gated clear: once billing status itself confirms
+  // the plan pick is fulfilled (or was never needed — an existing
+  // subscriber), any leftover persisted `?plan=` must not outlive that,
+  // even if it's still inside its TTL window.
+  useEffect(() => {
+    if (billingStatus?.status === 'active' || billingStatus?.status === 'trialing') {
+      clearPersistedDeepLinkSearch();
+    }
+  }, [billingStatus?.status]);
 
   // `?billing=success|cancel` — Stripe Checkout's return trip. A toast plus a
   // fresh status fetch (the webhook that actually updates billing_status can

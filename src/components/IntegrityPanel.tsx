@@ -4,11 +4,18 @@ import { AlertTriangle, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import { isAdminRole } from '../services/teamClient';
 import { ALL_INTEGRITY_FIXES, reviewClient, isIntegrityFixDebounced, type IntegrityFixApplied, type IntegrityScanResult } from '../services/reviewClient';
 
+// All ten `counts` keys — `total` below sums every one of them, so any key
+// missing from this list was invisible in the grid while still counting
+// toward "Found N things worth a look" (a defect QA_APP_API_2026-09-21.md
+// found: orphanEquipment and suspectedShopAddresses were summed but never
+// shown, and suspectedShopAddresses had no fix button reachable at all).
 const SUMMARY_ROWS: { key: keyof IntegrityScanResult['counts']; label: string }[] = [
   { key: 'duplicateCustomers', label: 'Duplicate customers' },
   { key: 'unlinkedDocuments', label: 'Unlinked documents' },
   { key: 'equipmentWithoutCustomer', label: 'Units without a customer' },
   { key: 'multiUnitDocsUnderLinked', label: 'Multi-unit docs under-linked' },
+  { key: 'orphanEquipment', label: 'Orphaned units' },
+  { key: 'suspectedShopAddresses', label: 'Shop-address placeholder customers' },
   { key: 'shopContactLeaks', label: 'Shop phone/email on a customer' },
   { key: 'mismatchedNameLinks', label: 'Wrong-name links' },
   { key: 'splitLinkDocuments', label: 'Split customer links' },
@@ -40,6 +47,16 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
   const [relinking, setRelinking] = useState(false);
   const [relinkResult, setRelinkResult] = useState<IntegrityFixApplied | null>(null);
   const [relinkErr, setRelinkErr] = useState<string | null>(null);
+
+  // retireShopCustomers is admin-gated and "ask twice" (dryRun:false
+  // required) the same way relinkMismatchedNames is, for the same reason —
+  // it unlinks documents from a customer record, which isn't something to
+  // eyeball-undo. It was in the server's APPLY_ACTIONS with no UI ever
+  // reachable to trigger it (QA_APP_API_2026-09-21.md) — this mirrors the
+  // relink block above rather than adding it to "Fix everything".
+  const [retiring, setRetiring] = useState(false);
+  const [retireResult, setRetireResult] = useState<IntegrityFixApplied | null>(null);
+  const [retireErr, setRetireErr] = useState<string | null>(null);
 
   const runScan = async () => {
     setScanning(true);
@@ -99,8 +116,35 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
     }
   };
 
+  const runRetire = async () => {
+    setRetiring(true);
+    setRetireErr(null);
+    setRetireResult(null);
+    try {
+      // Explicit dryRun:false — retireShopCustomers treats anything else
+      // (including simply omitting it) as preview-only.
+      const r = await reviewClient.integrityFix(['retireShopCustomers'], false);
+      if (isIntegrityFixDebounced(r)) {
+        setRetireErr('A fix already ran recently — try again in a few minutes.');
+      } else {
+        setRetireResult(r);
+        await runScan();
+        onApplied?.();
+      }
+    } catch (e) {
+      setRetireErr(e instanceof Error ? e.message : 'Could not retire those records.');
+    } finally {
+      setRetiring(false);
+    }
+  };
+
   const total = result ? Object.values(result.counts).reduce((a, b) => a + b, 0) : null;
   const mismatchedCount = result?.mismatchedNameLinks.length ?? 0;
+  // Only the addresses the fix would actually act on — `placeholderCustomerId`
+  // set means a "Customer at <address>" placeholder already exists there
+  // (loadShopCustomersToRetire's own target list, api/_lib/routes/integrity.js).
+  const shopCustomerCandidates = result?.suspectedShopAddresses.filter((a) => a.placeholderCustomerId) ?? [];
+  const retireCount = shopCustomerCandidates.length;
 
   return (
     <div className="space-y-3">
@@ -161,6 +205,25 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                           const units = relinkResult.unitsMovedByGroup.reduce((n, g) => n + g.unitsMoved, 0);
                           return units > 0 ? ` · moved ${units} equipment unit${units === 1 ? '' : 's'} along with them` : '';
                         })()}.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {retireCount > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-line">
+                    <p className="text-body text-ink-2">
+                      {retireCount} customer record{retireCount === 1 ? ' is' : 's are'} just a placeholder for your
+                      own shop's address — retiring {retireCount === 1 ? 'it unlinks its documents' : 'them unlinks their documents'} so they can be relinked to the real customer instead.
+                    </p>
+                    <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1.5" disabled={retiring} onClick={() => void runRetire()}>
+                      {retiring ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Sparkles className="w-4 h-4" aria-hidden="true" />} {retiring ? 'Retiring…' : `Retire ${retireCount} shop-address record${retireCount === 1 ? '' : 's'}`}
+                    </button>
+                    {retireErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{retireErr}</p>}
+                    {retireResult && (
+                      <p className="text-caption text-ink-3">
+                        Retired {retireResult.shopCustomersRetired.length} record{retireResult.shopCustomersRetired.length === 1 ? '' : 's'} and unlinked{' '}
+                        {retireResult.shopCustomersRetired.reduce((n, r) => n + r.documentIds.length, 0)} document{retireResult.shopCustomersRetired.reduce((n, r) => n + r.documentIds.length, 0) === 1 ? '' : 's'} from{' '}
+                        {retireResult.shopCustomersRetired.length === 1 ? 'it' : 'them'} — re-run "Check records" and "Fix everything" to relink them to the right customer.
                       </p>
                     )}
                   </div>

@@ -1,6 +1,7 @@
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
 import { handleCors, handleError } from "../claude.js";
 import { getPool } from "../recordsStore.js";
+import { limit as rateLimit } from "../rateLimit.js";
 
 /**
  * GET  /api/account?action=notifications  -> { items: [...unread first, <=50], unreadCount }
@@ -78,6 +79,14 @@ export default async function handler(req, res) {
   } catch (err) {
     return denyAuth(res, err);
   }
+
+  // QA_APP_API_2026-09-21: every other write/scan route in this codebase
+  // rate-limits itself; this one didn't, despite being reachable by any
+  // signed-in member (not just admins) and polled automatically every 5
+  // minutes by NotificationsPanel.tsx. 'read' bucket, same fallback bucket
+  // envLimits() already gives an unrecognized name — cheap enough traffic
+  // that it doesn't deserve its own dedicated bucket.
+  if (!(await rateLimit(req, res, auth, "read"))) return; // 429 already written
 
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
 

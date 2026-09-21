@@ -5,6 +5,7 @@
  */
 import { authHeader } from './authToken';
 import { messageFromResponse } from './httpError';
+import { parseDeepLink, type DeepLinkParams } from '../hooks/useDeepLink';
 
 const API_URL = '/api/account?action=notifications';
 
@@ -78,16 +79,22 @@ export function setEmailDigestPreference(emailDigest: boolean): Promise<{ settin
   return post({ settings: { emailDigest } });
 }
 
-/** Pure — turns a stored `link` (e.g. "/app/?entity=<uuid>") into what
- *  NotificationsPanel needs to navigate in-app via appStore's `openEntity`,
- *  instead of a full page reload. Falls back to the Dashboard for a link
- *  shape this client doesn't recognize (e.g. one added later, or none). */
-export function parseNotificationLink(link: string | null | undefined): { entityId: string | null } {
-  if (!link) return { entityId: null };
+/**
+ * Pure — turns a stored `link` (e.g. "/app/?entity=<uuid>", the outreach
+ * route's "/app/?screen=outreach", or a follow-up's absolute
+ * "https://…/app/?screen=inbox&work=mine") into the same DeepLinkParams
+ * shape useDeepLink.ts parses from the address bar, so NotificationsPanel
+ * can navigate in-app with the exact same store actions a real deep link
+ * uses — instead of only ever recognizing `?entity=` and silently sending
+ * every other notification kind (outreach, follow-ups) to the Dashboard.
+ * `link` may be absolute (a full https://… URL) or relative (just the path
+ * + query) — only the query string after the first "?" matters here.
+ */
+export function parseNotificationLink(link: string | null | undefined): DeepLinkParams {
+  if (!link) return {};
   const queryStart = link.indexOf('?');
-  if (queryStart < 0) return { entityId: null };
-  const params = new URLSearchParams(link.slice(queryStart + 1));
-  return { entityId: params.get('entity') };
+  if (queryStart < 0) return {};
+  return parseDeepLink(link.slice(queryStart));
 }
 
 /** Pure — how the bell badge renders a count. Exported so verify-ui.ts can

@@ -103,6 +103,180 @@ export function deepLinkFor(params: DeepLinkParams): string {
   return url.toString();
 }
 
+/**
+ * Where a deep link survives an auth/org-creation round trip.
+ *
+ * The bug this exists to fix: a pricing CTA lands on `/app/?plan=solo&
+ * interval=month`. `useDeepLink`'s effect below fires on mount — before
+ * Clerk even finishes loading — applies the plan to the (in-memory) store,
+ * and scrubs the address bar back to a bare `/app/`. That's fine as long as
+ * nothing reloads the page. But a brand-new user's flow does reload it:
+ * Clerk's OAuth sign-in and `CreateOrganization` both do a real top-level
+ * navigation, away from this page and back, landing on whatever static URL
+ * `signUpFallbackRedirectUrl`/`afterCreateOrganizationUrl` name — which was
+ * always the bare string `"/app/"`. That reload throws away the in-memory
+ * zustand store (a fresh page = a fresh JS heap) AND lands on a URL with no
+ * `?plan=` to re-parse, so the chosen plan never reaches Billing.
+ *
+ * Fix: persist the raw query string to sessionStorage the moment the page
+ * first loads (module scope below, before React even renders), and have
+ * LoginScreen/OnboardingScreen read it back out to build the Clerk redirect
+ * URLs so the round trip lands back on the SAME `?plan=...` URL — a fresh
+ * page load that `useDeepLink` parses normally, same as the first one.
+ *
+ * Reviewer NO-GO (2026-09-21): an unbounded persisted copy can resurrect on
+ * a completely UNRELATED later bare `/app/` visit in the same tab/session —
+ * e.g. someone abandons signup, comes back an hour later via a bookmark,
+ * and gets the stale plan silently re-applied to Billing. Two independent
+ * guards fix that:
+ *   1. Every persisted entry carries a timestamp and is only ever honored
+ *      within DEEP_LINK_TTL_MS of it (`freshPersistedDeepLinkSearch` below)
+ *      — long enough for the slowest realistic redirect chain, short enough
+ *      to expire well within one sitting. A stale or corrupt entry is
+ *      dropped outright the moment a bare load finds nothing fresh to use.
+ *   2. The entry is cleared as soon as it's actually consumed — the first
+ *      time `ready` (signed in with an org) goes true, see the effect in
+ *      `useDeepLink` — and again from App.tsx once billing status itself
+ *      confirms the plan pick is fulfilled (active/trialing), so it can't
+ *      outlive its own purpose even within the TTL window.
+ */
+const DEEP_LINK_STORAGE_KEY = 'deepwell.pendingDeepLink';
+
+/** A persisted deep link is only ever honored for this long after it was
+ *  last seen live (module load, or a redirect landing back on the same
+ *  `?plan=...` URL both refresh this clock — see the module-load persist
+ *  below and `useDeepLink`'s own effect). */
+export const DEEP_LINK_TTL_MS = 15 * 60 * 1000;
+
+interface PersistedDeepLink {
+  search: string;
+  /** `Date.now()` when this was last (re-)persisted. */
+  ts: number;
+}
+
+function hasDeepLinkParams(search: string): boolean {
+  try {
+    return new URLSearchParams(search).toString().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function parsePersistedDeepLink(raw: string | null): PersistedDeepLink | null {
+  if (!raw) return null;
+  try {
+    const obj: unknown = JSON.parse(raw);
+    if (
+      obj &&
+      typeof obj === 'object' &&
+      typeof (obj as PersistedDeepLink).search === 'string' &&
+      typeof (obj as PersistedDeepLink).ts === 'number'
+    ) {
+      return obj as PersistedDeepLink;
+    }
+  } catch {
+    /* corrupt JSON, or the pre-TTL plain-string format this replaced —
+     * either way, treat as nothing persisted rather than throwing. */
+  }
+  return null;
+}
+
+/**
+ * Pure: the persisted entry's search string, but ONLY while it's within
+ * DEEP_LINK_TTL_MS of its own timestamp — otherwise `''`, exactly as if
+ * nothing were persisted at all. This is the guard the 2026-09-21 reviewer
+ * NO-GO asked for: without it, a signup abandoned minutes ago would
+ * resurrect its `?plan=` on a later, unrelated bare `/app/` visit in the
+ * same tab. Exported so scripts/verify-ui.ts can cover the TTL boundary
+ * directly, with no sessionStorage/Date mocking needed.
+ */
+export function freshPersistedDeepLinkSearch(persistedRaw: string | null, now: number): string {
+  const persisted = parsePersistedDeepLink(persistedRaw);
+  if (!persisted || !hasDeepLinkParams(persisted.search)) return '';
+  const age = now - persisted.ts;
+  return age >= 0 && age <= DEEP_LINK_TTL_MS ? persisted.search : '';
+}
+
+function readPersistedDeepLinkRaw(): string | null {
+  try {
+    return window.sessionStorage.getItem(DEEP_LINK_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedDeepLink(search: string, now: number): void {
+  try {
+    window.sessionStorage.setItem(DEEP_LINK_STORAGE_KEY, JSON.stringify({ search, ts: now } satisfies PersistedDeepLink));
+  } catch {
+    /* no sessionStorage (private mode, locked-down profile) — the link just won't survive a redirect */
+  }
+}
+
+/** Exported so App.tsx can drop it the moment billing status itself confirms
+ *  the plan pick is fulfilled (active/trialing) — belt and suspenders
+ *  alongside the TTL above and the `ready`-gated clear in `useDeepLink`. */
+export function clearPersistedDeepLinkSearch(): void {
+  try {
+    window.sessionStorage.removeItem(DEEP_LINK_STORAGE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+/**
+ * Impure: this read's effective persisted search, TTL-filtered — and, as a
+ * side effect, drops a stale or corrupt entry outright. A bare `/app/` load
+ * with nothing fresh pending must never leave a corpse around for a LATER
+ * unrelated visit to trip over (the exact scenario the reviewer flagged).
+ */
+function readAndPruneStalePersistedSearch(now = Date.now()): string {
+  const raw = readPersistedDeepLinkRaw();
+  const fresh = freshPersistedDeepLinkSearch(raw, now);
+  if (!fresh && raw) clearPersistedDeepLinkSearch();
+  return fresh;
+}
+
+// Runs once, at module load — i.e. the moment the page first loads, well
+// before React renders anything or Clerk resolves auth. Wrapped in
+// try/catch: this file is also imported by scripts/verify-ui.ts under
+// plain Node, where `window` doesn't exist at all.
+try {
+  const initialSearch = window.location.search;
+  if (hasDeepLinkParams(initialSearch)) {
+    writePersistedDeepLink(initialSearch, Date.now());
+  }
+} catch {
+  /* no window/sessionStorage — the link just won't survive a redirect */
+}
+
+/**
+ * Pure: what a Clerk redirect URL (`signUpFallbackRedirectUrl`,
+ * `afterCreateOrganizationUrl`, ...) should point at so a deep link survives
+ * the round trip. Prefers whatever's live in the address bar right now (a
+ * link opened straight at the sign-in screen still has it); falls back to
+ * whatever `persistedSearch` the caller resolved (already TTL-filtered —
+ * see `freshPersistedDeepLinkSearch`), since `useDeepLink`'s own effect
+ * scrubs the address bar immediately on mount — by the time LoginScreen/
+ * OnboardingScreen render, the live URL is usually already bare.
+ */
+export function resolveDeepLinkRedirectPath(liveSearch: string, persistedSearch: string): string {
+  const search = hasDeepLinkParams(liveSearch) ? liveSearch : persistedSearch;
+  if (!hasDeepLinkParams(search)) return '/app/';
+  return `/app/${search.startsWith('?') ? search : `?${search}`}`;
+}
+
+/** Impure wrapper — call directly as a Clerk redirect-url prop value. */
+export function deepLinkRedirectTarget(): string {
+  let live = '';
+  try {
+    live = window.location.search;
+  } catch {
+    /* ignore */
+  }
+  return resolveDeepLinkRedirectPath(live, readAndPruneStalePersistedSearch());
+}
+
 function cleanUrl(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete('entity');
@@ -133,8 +307,14 @@ const RETRY_BUDGET_MS = 8000;
  *
  * Call this once, high in the tree (App.tsx), after sync is wired up — not
  * from individual screens.
+ *
+ * `ready` (signed in AND an org is active) gates only ONE thing: clearing
+ * the sessionStorage copy `resolveDeepLinkRedirectPath` above reads from.
+ * Everything else below still applies as soon as the page loads, same as
+ * before — that was never the bug; losing the persisted copy to an
+ * in-between redirect was.
  */
-export function useDeepLink(): void {
+export function useDeepLink(ready: boolean): void {
   const openEntity = useAppStore((s) => s.openEntity);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
@@ -145,11 +325,29 @@ export function useDeepLink(): void {
   const setPendingWorkFilter = useAppStore((s) => s.setPendingWorkFilter);
   const handledRef = useRef(false);
 
+  // Only once the app is actually ready to render the target screen (no more
+  // redirects expected) do we drop the persisted copy — until then it needs
+  // to survive however many sign-in/org-creation round trips happen first.
+  useEffect(() => {
+    if (ready) clearPersistedDeepLinkSearch();
+  }, [ready]);
+
   useEffect(() => {
     if (handledRef.current) return;
     handledRef.current = true;
 
-    const params = parseDeepLink(window.location.search);
+    const liveSearch = window.location.search;
+    let search: string;
+    if (hasDeepLinkParams(liveSearch)) {
+      search = liveSearch;
+      // Refresh the TTL clock on every real sighting, not just the very
+      // first click — a redirect landing back on this same `?plan=...` URL
+      // means the flow is still actively in progress.
+      writePersistedDeepLink(liveSearch, Date.now());
+    } else {
+      search = readAndPruneStalePersistedSearch();
+    }
+    const params = parseDeepLink(search);
 
     // `?work=mine` (a follow-up message's deep link) applies independently of
     // which screen branch below ends up handling the rest — src/hooks/

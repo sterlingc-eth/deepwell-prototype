@@ -39,6 +39,9 @@ export function NotificationsPanel() {
   const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const openEntity = useAppStore((s) => s.openEntity);
+  const openCustomer = useAppStore((s) => s.openCustomer);
+  const openOutreach = useAppStore((s) => s.openOutreach);
+  const setPendingWorkFilter = useAppStore((s) => s.setPendingWorkFilter);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
 
   const refresh = useCallback(() => {
@@ -83,9 +86,18 @@ export function NotificationsPanel() {
       setUnreadCount((n) => Math.max(0, n - 1));
       markNotificationsRead([item.id]).catch(() => {});
     }
-    const { entityId } = parseNotificationLink(item.link);
-    if (entityId) openEntity(entityId);
-    else setCurrentScreen('dashboard');
+    // Mirrors useDeepLink.ts's own branching so every notification kind
+    // (outreach, follow-ups, an entity mention, ...) lands where its link
+    // actually points, not just the ?entity= case — see notifyClient.ts's
+    // parseNotificationLink doc comment for the bug this replaced.
+    const target = parseNotificationLink(item.link);
+    if (target.entityId) openEntity(target.entityId);
+    else if (target.customerRef) openCustomer(target.customerRef);
+    else if (target.screen === 'outreach') openOutreach(target.outreachEquipmentId);
+    else if (target.screen) {
+      if (target.workFilter) setPendingWorkFilter(target.workFilter);
+      setCurrentScreen(target.screen);
+    } else setCurrentScreen('dashboard');
     setOpen(false);
   };
 
