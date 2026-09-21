@@ -226,7 +226,7 @@ const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+(?!we\b|you\b|they\b|the company\b|
  * an address or identifier is a stronger, unambiguous signal than any
  * quantifier/aggregate-noun match could ever override.
  */
-const STREET_ADDRESS_RE =
+export const STREET_ADDRESS_RE =
   /\b\d{2,6}\s+[NSEW]?\.?\s*[A-Za-z0-9.' ]+\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|way|ct|court|cir|circle|hwy|pkwy|pl|ter)\b/i;
 /**
  * Reviewer NO-GO (2026-09-21, round 3, item 3): round 2's WHO_HAS_RE bypass
@@ -243,7 +243,7 @@ const STREET_ADDRESS_RE =
  * tokens, and false negatives here cost nothing (the question still reaches
  * retrieval, same as any other fast-path/analytics miss).
  */
-const AT_ADDRESS_RE = /\bat\s+\d{1,6}\s+\w/i;
+export const AT_ADDRESS_RE = /\bat\s+\d{1,6}\s+\w/i;
 /**
  * Reviewer NO-GO (2026-09-21, round 4, item 1): dropping CONTEXT as a
  * required gate (preClassifyAnalytics, below) opened one real regression —
@@ -364,13 +364,84 @@ const KNOWN_COUNTY_NAMES = [
   ),
 ];
 
+/**
+ * Live miss cluster 2 (2026-09-21 270-question sample): "What's the total
+ * dollar amount of our open invoices?" / "how much did we invoice last
+ * month" and friends returned a fabricated "$0.00 across N documents." —
+ * there is no financials layer yet (handoffs/FINANCIALS_DESIGN_2026-09-21.md,
+ * not built), so the `sum` op silently summed a non-numeric column (a
+ * filename, a document id) down to 0 and printed it as though it were a real
+ * total. Any question this matches must get the honest fallback below
+ * instead of ever reaching the planner/executor — see api/ask.js's money
+ * gate (checked BEFORE the Haiku planner call, so a money question never
+ * spends a model call at all) and executeAnalyticsPlan's own sum-op guard
+ * (routes/analytics.js) for the second line of defense. Deliberately broad
+ * (a false positive here just means an honest "can't do that yet" where a
+ * real analytics answer might have worked, never a wrong dollar figure).
+ */
+// Stemmed rather than a fixed "invoice"/"invoiced" pair — reviewer NO-GO
+// (2026-09-21): "total invoiced this year" missed because the outer \b
+// forced a word-boundary right after literal "invoice", which "invoiced"
+// (word char 'd' next) never has. INVOICE_STEM covers invoice/invoiced/
+// invoices/invoicing wherever this regex used to spell out only one form.
+const INVOICE_STEM = 'invoic(?:e|ed|es|ing)';
+const MONEY_RE = new RegExp(
+  '\\b(revenue|' + INVOICE_STEM + '\\s+(?:total|amount)|' +
+    'total\\s+(?:' + INVOICE_STEM + '|billed|dollar)|' +
+    'how much (?:did we|have we|do we)\\s+(?:bill|' + INVOICE_STEM + '|charge|make|earn|spend)|' +
+    'dollar amount|\\$\\s?\\d|billed|owed|outstanding balance|by revenue|by sales|spend(?:ing)?)\\b',
+  'i'
+);
+
+export function isMoneyQuestion(question) {
+  return MONEY_RE.test(String(question ?? ''));
+}
+
+/** The one honest answer every money question gets until the financials
+ *  layer ships — no facts (there is no real number to show), not cached, no
+ *  model call. Text is fixed on purpose so every money phrasing reads
+ *  identically rather than each falling back through a different path with
+ *  its own wording. */
+export const MONEY_FALLBACK_TEXT =
+  "I can't total invoice amounts yet — that's coming with the Financials update. I can count invoices and find a specific one if that helps.";
+
+export function moneyFallbackAnswer() {
+  return {
+    kind: 'answer', text: MONEY_FALLBACK_TEXT,
+    facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+}
+
+/**
+ * Live miss cluster 3 (2026-09-21 270-question sample): "Which customers are
+ * overdue for maintenance?" / "List customers due for a tune-up" matched the
+ * classifier (WHICH_CUSTOMERS_RE / QUANTIFIER+AGGREGATE_NOUN) but named a
+ * condition — "no service since" — that has no filter field anywhere in the
+ * closed vocabulary (FILTER_FIELDS, analytics.js), so the model's plan came
+ * back with zero filters and executed as a confident, unfiltered "49
+ * customers." "Which customers have not had service in 12 months?" reads the
+ * same way but happened to already fall through to retrieval honestly,
+ * purely as a side effect of naming a 2+ digit number ("12") that trips
+ * suspiciousUnfilteredCustomerPlan (below) — a coincidence, not a real fix.
+ * This condition makes every phrasing of the same question honest the same
+ * way: CONDITION_PLAN_FIELD has no entry for 'maintenance' (there is no such
+ * plan field to ever satisfy it), so missingConditions() below always finds
+ * it missing and runAnalyticsQuestion (routes/analytics.js) always returns
+ * unsupportedConditionAnswer('maintenance', ...) instead of executing an
+ * unfiltered query.
+ */
+const MAINTENANCE_DUE_RE =
+  /\b(overdue for (?:a )?(?:maintenance|service)|due for (?:a )?(?:tune-?up|maintenance|service|checkup)|haven'?t been serviced|not had service|no (?:maintenance|service) in \d+\s*months?|needs?\s+(?:a )?service)\b/i;
+
 /** A dumb, self-contained scan of the question TEXT for a handful of
  *  conditions a plan might drop: 'email'/'phone' (the hasEmail/hasPhone
  *  shape), 'brand' (a known manufacturer name), 'county' (the word "county"
  *  or a known AZ county name), 'month' (anything resolveQuestionTimeRange
- *  recognizes). Returns a Set; order is insertion order (email, phone,
- *  brand, county, month) so a caller picking "the" missing condition when
- *  several are detected gets a stable, deterministic choice. */
+ *  recognizes), 'money' (a dollar-total question with no financials layer to
+ *  back it — see MONEY_RE), 'maintenance' (a "no service since" question with
+ *  no such filter field — see MAINTENANCE_DUE_RE). Returns a Set; order is
+ *  insertion order so a caller picking "the" missing condition when several
+ *  are detected gets a stable, deterministic choice. */
 export function detectedConditions(question) {
   const q = String(question ?? '').toLowerCase();
   const found = new Set();
@@ -379,6 +450,8 @@ export function detectedConditions(question) {
   if (BRAND_WORDS.some((b) => new RegExp(`\\b${b}\\b`).test(q))) found.add('brand');
   if (/\bcounty\b/.test(q) || KNOWN_COUNTY_NAMES.some((c) => new RegExp(`\\b${c}\\b`).test(q))) found.add('county');
   if (/\bthis month\b|\blast month\b/.test(q) || resolveQuestionTimeRange(question) != null) found.add('month');
+  if (MONEY_RE.test(q)) found.add('money');
+  if (MAINTENANCE_DUE_RE.test(q)) found.add('maintenance');
   return found;
 }
 

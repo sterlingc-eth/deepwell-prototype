@@ -32,6 +32,7 @@ import {
   resolveQuestionTimeRange,
   detectedConditions,
 } from '../api/_lib/analytics.js';
+import { parseContactLookupQuestion } from '../api/_lib/contactLookup.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BANK_PATH = join(__dirname, '..', 'test-docs', 'question-bank', 'bank.json');
@@ -44,10 +45,25 @@ const bank = JSON.parse(readFileSync(BANK_PATH, 'utf8'));
 /** Mirrors api/ask.js's analytics gate exactly (see that file's
  *  `analyticsCandidate`) — the single-record guard runs against the RAW
  *  text (capitalization is the only signal SINGULAR_NAMED_RECORD_RE has),
- *  the vocabulary classifier runs against the NORMALIZED text. */
+ *  the vocabulary classifier runs against the NORMALIZED text.
+ *
+ * Live miss cluster 1 (2026-09-21) added a contact-lookup gate AHEAD of
+ * preClassifyAnalytics in the real ask.js: a contact-lookup shape never
+ * reaches the analytics gate at all, regardless of what preClassifyAnalytics
+ * alone would say (e.g. "on file" contains the word "file", one of
+ * AGGREGATE_NOUN's own document synonyms, so "show me what's the phone
+ * number on file for X" matches QUANTIFIER+AGGREGATE_NOUN on its own —
+ * harmless in production only because contactLookupIntent is checked first
+ * there). Mirrored here too. The money gate is NOT mirrored the same way:
+ * every 'money' bank entry that expects route 'analytics' documents "this
+ * phrasing matches preClassifyAnalytics's own vocabulary", which is still
+ * true even though api/ask.js's money gate now answers it first — see the
+ * 'money' category's own entries (gen-question-bank.mjs). */
 function classify(rawText) {
   const { normalized } = normalizeQuestion(rawText);
-  const isAnalytics = !looksLikeSingleRecordReference(rawText) && preClassifyAnalytics(normalized);
+  const isContactLookup = Boolean(parseContactLookupQuestion(rawText));
+  const isAnalytics =
+    !isContactLookup && !looksLikeSingleRecordReference(rawText) && preClassifyAnalytics(normalized);
   return { normalized, isAnalytics };
 }
 

@@ -420,7 +420,17 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
 
   let sum = null;
   if (plan.op === 'sum') {
-    sum = filtered.reduce((acc, r) => acc + (Number(r.tonnage ?? r.value) || 0), 0);
+    // Live miss cluster 2 (2026-09-21): tonnage is the ONLY numeric field
+    // this codebase can honestly total today — there is no financials layer
+    // (handoffs/FINANCIALS_DESIGN_2026-09-21.md, not built), so summing
+    // anything else (r.value ends up being a filename/document id for a
+    // `documents` plan) silently reduced to 0 and printed as a confident
+    // "$0.00 across N documents." api/ask.js's money gate already intercepts
+    // most money phrasings before a plan is ever made; this is the second
+    // line of defense — refuse rather than guess, same as every other
+    // "can't answer this confidently" path in this file.
+    if (plan.entity !== 'equipment' && plan.entity !== 'warranties') return null;
+    sum = filtered.reduce((acc, r) => acc + (Number(r.tonnage) || 0), 0);
   }
 
   // Ambiguity rule (design point 5): 0 results from a named filter — show

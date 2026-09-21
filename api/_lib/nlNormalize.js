@@ -66,6 +66,13 @@ const EXTRA_DOMAIN_WORDS = [
   // preClassifyAnalytics but weren't anywhere in the vocabulary a typo could
   // land back on ("xhich customers have Lennox units" never recovered).
   'which', 'count', 'total',
+  // Live miss clusters 2+3 (2026-09-21): 'money'/'maintenance' detection
+  // (analytics.js's MONEY_RE/MAINTENANCE_DUE_RE) keys off exact words —
+  // "billed"/"revenue"/"overdue" — that are just as load-bearing as the
+  // contact/time words above and just as absent from every other list this
+  // vocabulary is built from, so a typo'd "reevnue" or "overde" had nothing
+  // to fuzzy-correct back to.
+  'billed', 'revenue', 'overdue', 'maintenance',
 ];
 
 function buildVocab() {

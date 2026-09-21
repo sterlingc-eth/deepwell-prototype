@@ -68,9 +68,14 @@ import {
   detectedConditions,
   missingConditions,
   unsupportedConditionAnswer,
+  isMoneyQuestion,
+  moneyFallbackAnswer,
+  MONEY_FALLBACK_TEXT,
 } from '../api/_lib/analytics.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
+import { parseContactLookupQuestion, fuzzyNameMatches, nameTokens, buildContactAnswer, buildAmbiguousContactAnswer } from '../api/_lib/contactLookup.js';
+import { extractStreetTokens, correctStreetTypos } from '../api/_lib/streetVocab.js';
 
 let failures = 0;
 let count = 0;
@@ -968,6 +973,196 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
   const plan = { entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] };
   const missing = missingConditions(plan, 'how many customers have an email on file');
   eq('round 5 item 3: email condition present in the plan -> nothing missing', missing.size, 0);
+}
+
+/* ======================================================================
+ * 15. Live miss cluster 2 (2026-09-21) — money questions must always get the
+ * fixed honest fallback, never reach the planner, and detectedConditions
+ * must flag 'money' for every phrasing from the live sample.
+ * ====================================================================== */
+{
+  const MONEY_QUESTIONS = [
+    "What's the total dollar amount of our open invoices?",
+    "What's the total we billed in invoices this year?",
+    "Who's our biggest customer by revenue?",
+    'how much did we invoice last month',
+    'How much have we billed year to date?',
+    'Are we owed any money?',
+    // Reviewer NO-GO (round 5, item 1): "invoiced" was missed because the
+    // regex only spelled out literal "invoice" — now stemmed.
+    "what's the total dollar amount of our open invoices",
+    'how much did we bill last month',
+    'biggest customer by revenue',
+    'total invoiced this year',
+  ];
+  for (const q of MONEY_QUESTIONS) {
+    check(`money: detectedConditions flags "${q}"`, detectedConditions(q).has('money'));
+    check(`money: isMoneyQuestion flags "${q}"`, isMoneyQuestion(q));
+  }
+  const NON_MONEY = [
+    'how many customers do we have',
+    'which customers have Trane units',
+    'when was the unit at 3247 Elm St installed',
+    // Reviewer NO-GO (round 5, item 1): stemming "invoice" must not turn
+    // ordinary invoice-count/lookup questions into money questions.
+    'how many invoices this year',
+    'list invoices for Ramirez',
+    'show me the invoice from March',
+    'how many customers in Mesa',
+  ];
+  for (const q of NON_MONEY) {
+    check(`money: does not fire on "${q}"`, !isMoneyQuestion(q));
+  }
+  const answer = moneyFallbackAnswer();
+  eq('money: fallback text is the fixed, exact copy', answer.text, MONEY_FALLBACK_TEXT);
+  eq('money: fallback carries no facts', answer.facts.length, 0);
+  eq('money: fallback kind is "answer" (not an error)', answer.kind, 'answer');
+}
+
+/* ======================================================================
+ * 16. Live miss cluster 3 (2026-09-21) — maintenance-due synonyms must all
+ * be detected and, since no last-service-date filter field exists, always
+ * fall to the honest "can't filter by maintenance yet" answer rather than
+ * an unfiltered count.
+ * ====================================================================== */
+{
+  const MAINTENANCE_QUESTIONS = [
+    'Which customers are overdue for maintenance?',
+    'List customers due for a tune-up',
+    'Which customers have not had service in 12 months?',
+    "Customers who haven't been serviced",
+    'customers who need service',
+  ];
+  for (const q of MAINTENANCE_QUESTIONS) {
+    check(`maintenance: detectedConditions flags "${q}"`, detectedConditions(q).has('maintenance'));
+    const missing = missingConditions({ entity: 'customers', op: 'list', filters: [] }, q);
+    check(`maintenance: always missing (no such plan field exists)`, missing.has('maintenance'));
+  }
+  const answer = unsupportedConditionAnswer('maintenance', 'customers');
+  eq('maintenance: fallback text names the condition', answer.text, "I can count customers, but I can't filter by maintenance yet.");
+  eq('maintenance: fallback carries no facts', answer.facts.length, 0);
+  check('maintenance: does not fire on an unrelated customer count', !detectedConditions('how many customers do we have').has('maintenance'));
+}
+
+/* ======================================================================
+ * 17. Live miss cluster 1 (2026-09-21) — contact-lookup-by-name shape
+ * detection, including the negative cases it must never hijack (an
+ * address-based lookup, an analytics question, or a bare mention of the
+ * field word with no name attached).
+ * ====================================================================== */
+{
+  const POSITIVES = [
+    ["what's the phone number on file for donna thornton", 'phone', 'donna thornton'],
+    ["what's the email for sandra wyckoff", 'email', 'sandra wyckoff'],
+    ["what's the ph# on file for brian chavez", 'phone', 'brian chavez'],
+    ['whats the phone numbr for thomas mercer', 'phone', 'thomas mercer'],
+    ["what's the service address for james patterson", 'address', 'james patterson'],
+    // Reviewer NO-GO (round 5, item 2): possessive/name-before-field phrasing.
+    ["whats thomas mercer's phone number", 'phone', 'thomas mercer'],
+    ["donna thornton's email", 'email', 'donna thornton'],
+    ['brian chavez address?', 'address', 'brian chavez'],
+  ];
+  for (const [q, field, name] of POSITIVES) {
+    const parsed = parseContactLookupQuestion(q);
+    check(`contact-lookup: detects shape for "${q}"`, parsed !== null);
+    if (parsed) {
+      eq(`contact-lookup: field for "${q}"`, parsed.field, field);
+      eq(`contact-lookup: name phrase for "${q}"`, parsed.namePhrase.toLowerCase(), name);
+    }
+  }
+
+  const NEGATIVES = [
+    'who is at 1234 Main St',
+    'serial for 123 W Ray Rd',
+    'how many customers have a phone',
+    "what's the address for 1234 Main St, Mesa",
+    'does the customer have a warranty',
+  ];
+  for (const q of NEGATIVES) {
+    check(`contact-lookup: never hijacks "${q}"`, parseContactLookupQuestion(q) === null);
+  }
+
+  check('contact-lookup: surname fuzzy match (typo)', fuzzyNameMatches('Thomas Mercer', nameTokens('thomas mercer')));
+  check('contact-lookup: surname-only search matches', fuzzyNameMatches('Donna Thornton', nameTokens('thornton')));
+  check(
+    'contact-lookup: disagreeing first name never matches',
+    !fuzzyNameMatches('Diane Chavez', nameTokens('brian chavez'))
+  );
+
+  const row = { id: 'c1', customer_number: 'C-00001', customer_name: 'Donna Thornton', phone: '(480) 555-0112', email: 'donna.thornton2@outlook.com', service_address: '123 X St, Mesa, AZ' };
+  const found = buildContactAnswer('phone', row);
+  check('contact-lookup: full-record answer names the customer and every field on file', found.text.includes('Donna Thornton') && found.text.includes('555-0112') && found.text.includes('outlook.com'));
+  eq('contact-lookup: facts link back to the customer entity', found.facts[0].entityId, 'c1');
+
+  const missingRow = { id: 'c2', customer_number: 'C-00002', customer_name: 'No Phone Customer', phone: null, email: 'x@y.com', service_address: '1 Main St' };
+  const missingAnswer = buildContactAnswer('phone', missingRow);
+  eq('contact-lookup: missing requested field is answered honestly', missingAnswer.text, 'No phone on file for No Phone Customer.');
+  eq('contact-lookup: honest miss carries no facts', missingAnswer.facts.length, 0);
+
+  const ambiguous = buildAmbiguousContactAnswer('smith', [
+    { id: 'c3', customer_number: 'C-00003', customer_name: 'John Smith' },
+    { id: 'c4', customer_number: 'C-00004', customer_name: 'Jane Smith' },
+  ]);
+  check('contact-lookup: ambiguous match names both candidates', ambiguous.text.includes('John Smith') && ambiguous.text.includes('Jane Smith'));
+  eq('contact-lookup: ambiguous match returns one fact per candidate', ambiguous.facts.length, 2);
+}
+
+/* ======================================================================
+ * 18. Live miss cluster 4 (2026-09-21) — street-name typo correction is a
+ * pure function of (question, tenant street vocabulary): it only fixes a
+ * token within edit distance 1 of a real word in THAT vocabulary, never a
+ * word already recognized generally, and never a short/digit token.
+ * ====================================================================== */
+{
+  const vocab = extractStreetTokens([
+    '766 N Vista Dr, Tucson, AZ 85704',
+    '248 W Huard Rd, Tucson, AZ 85705',
+    '174 N College Ave, Tucson, AZ 85719',
+  ]);
+  check('street-typo: extracts real street tokens from addresses', vocab.has('vista') && vocab.has('huard') && vocab.has('college'));
+
+  {
+    const { corrected, corrections } = correctStreetTypos('when was the unit at 766 n val ivsta dr, tucson installed', vocab);
+    eq('street-typo: corrects "ivsta" -> "vista"', corrected, 'when was the unit at 766 n val vista dr, tucson installed');
+    eq('street-typo: reports the correction it made', corrections[0]?.from, 'ivsta');
+  }
+  {
+    const { corrected } = correctStreetTypos('model number of the unit at 174 n collehe av', vocab);
+    check('street-typo: corrects "collehe" -> "college"', corrected.includes('college'));
+  }
+  {
+    const { corrected, corrections } = correctStreetTypos("what's the serial number of the unit at 248 w huard rd", vocab);
+    eq('street-typo: an already-correct street name is left untouched', corrected, "what's the serial number of the unit at 248 w huard rd");
+    eq('street-typo: no correction reported when nothing needed fixing', corrections.length, 0);
+  }
+  {
+    // A word the GLOBAL vocabulary already recognizes must never be
+    // "corrected" against a tenant's street list, even if it happens to be
+    // one edit away from a street token — nlNormalize's VOCAB always wins.
+    const { corrected } = correctStreetTypos('how many customers do we have', vocab);
+    eq('street-typo: leaves an ordinary sentence alone', corrected, 'how many customers do we have');
+  }
+  check(
+    'street-typo: common street-suffix abbreviations survive untouched (too short to ever be "corrected")',
+    ['rd', 'st', 'dr', 'ave', 'blvd', 'ln', 'ct'].every((w) => correctStreetTypos(`unit on ${w} street`, vocab).corrected === `unit on ${w} street`)
+  );
+  {
+    // Reviewer NO-GO (round 5, item 3): correction must be restricted to the
+    // address span itself — a trailing, unrelated word one edit away from a
+    // tenant street token must never be rewritten just because it happens to
+    // sit later in the same question.
+    const nameVocab = new Set(['chandler']);
+    const { corrected, corrections } = correctStreetTypos(
+      'who is at 1234 Elm St, ask for Chander in accounting',
+      nameVocab
+    );
+    eq(
+      'street-typo: a name outside the address span is never "corrected" against street vocab',
+      corrected,
+      'who is at 1234 Elm St, ask for Chander in accounting'
+    );
+    eq('street-typo: no correction reported for the out-of-span name', corrections.length, 0);
+  }
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

@@ -507,6 +507,11 @@ const eq = (name, got, want) =>
   check('the fast path does not count', !isCountableAskSource('fast-path'));
   check('"no evidence, no model call" does not count', !isCountableAskSource('no-evidence'));
   check('an unrecognized source defaults to not counting (fail closed on cost, not open)', !isCountableAskSource('bogus'));
+  // Live miss clusters 1+2 (2026-09-21): contactLookup.js and the money gate
+  // (api/ask.js) both answer without ever calling the model — neither name
+  // should ever be added to COUNTABLE_ASK_SOURCES.
+  check('contact lookup (no model call) does not count', !isCountableAskSource('contact-lookup'));
+  check('the money gate (no model call) does not count', !isCountableAskSource('money'));
 }
 
 /* ------------------------------------------------------------------ gateAsk at 0/79/80/99/100% */

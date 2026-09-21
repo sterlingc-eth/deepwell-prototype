@@ -101,3 +101,32 @@ AI is named Donovan. Haiku everywhere. Be efficient — cheapest model, no waste
 ## Cost notes
 Anthropic spend for the whole limit test ≈ $1–2 (Haiku). Agents: use sonnet;
 one implementation agent + one reviewer per round; avoid re-reading big files.
+
+## Late 2026-09-21 — Donovan accuracy program (all committed; deploy-0921n..q)
+- Monthly Donovan usage allowance (ASK_ALLOWANCE): Solo 3,000 / Shop 9,000 /
+  Crew 22,500 / Fleet 60,000 model-calling asks per month, UI shows "% used ·
+  resets <Month 1>" only (never "questions"). Daily safety cap 900, 20/min.
+- Analytics fixes: month resolution in code (service_date), hasEmail/hasPhone
+  filters, brand-aware labels, honest fallback ("I can count X, but I can't
+  filter by Y yet") whenever the plan dropped a condition the question named.
+- Question bank: `npm run gen:bank` → test-docs/question-bank/bank.json
+  (3,224 entries, $0), `node scripts/verify-question-bank.mjs` (99.4% routing).
+  Normalizer api/_lib/nlNormalize.js runs before classifier + planner (typos,
+  abbreviations, filler); cache keys use normalized text.
+- Live 270-question sample on the founder account: $0.95, 25/26 dup cache hits,
+  ~89% correct after removing scorer artifacts. Misses fixed in deploy-0921q:
+  contact lookup by customer name (api/_lib/contactLookup.js, no model call),
+  money questions → honest fallback (never "$0.00 across N documents"),
+  maintenance-due synonyms → fallback, street-name typo correction from the
+  tenant's own addresses (api/_lib/streetVocab.js). Re-run the 20 misses live
+  after push (~$0.05). Oracle recipe: export?kind=customers|equipment CSV in
+  the browser, compute expected counts, compare to /api/ask.
+- Training plan: handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md (≈$4 total).
+  Day 2 still open: few-shot examples in the planner prompt, miss-loop logging
+  (log fallthrough + "can't filter by" answers, weekly review).
+- Financials layer DESIGN only: handoffs/FINANCIALS_DESIGN_2026-09-21.md
+  (document_financials tables = M3-config/22, extraction extension ~$0.001/doc,
+  backfill <$0.30, invoices/bills entities, AR aging, trust UI; 3 phases
+  ~3.5 days). Owner has not yet said go.
+- Do NOT claim an accuracy % for business questions on the website until the
+  bank is measured live at ≥97%; document lookup keeps its measured claim.

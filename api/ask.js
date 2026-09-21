@@ -23,8 +23,10 @@ import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
-import { preClassifyAnalytics, looksLikeSingleRecordReference } from "./_lib/analytics.js";
+import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer } from "./_lib/analytics.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
+import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
+import { getStreetVocab, correctStreetTypos } from "./_lib/streetVocab.js";
 // Day 1 training-plan normalization layer (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
 // aliased because this file already has its own `normalizeQuestion` (the
 // retrieval-cache one, below) — the analytics pre-classifier gate needs the
@@ -501,7 +503,7 @@ export default async function handler(req, res) {
   if (!(await timer.time("limit", () => limit(req, res, auth, "ask")))) return;
 
   try {
-    const { question, today } = req.body ?? {};
+    let { question, today } = req.body ?? {};
     if (typeof question !== "string" || !question.trim()) {
       return res.status(400).json({ error: "Missing question" });
     }
@@ -511,6 +513,39 @@ export default async function handler(req, res) {
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
     const meta = classifyMetaQuestion(question);
+
+    // ---- street-name typo correction (live miss cluster 4, 2026-09-21) ----
+    // "when was the unit at 766 n val ivsta dr, tucson installed" — the
+    // ADDRESS SHAPE is fine (fastPath's own ADDRESS_RE needs only a number +
+    // words + a street-suffix word), but the typo'd street NAME never
+    // matches a real address token during DB resolution, so both fastPath
+    // and the retrieval fallback come up empty. nlNormalize's own fuzzy
+    // correction deliberately skips every word of a single-record question
+    // (a general word list has no business rewriting an address) — this
+    // corrects against the TENANT'S OWN street vocabulary instead (see
+    // streetVocab.js), cached 10 minutes per tenant so this costs a real DB
+    // round trip only on a cache miss, and only for a question that already
+    // looks like a single-record reference (never for an aggregate/analytics
+    // question — no address to correct there). Runs before fastPathIntent/
+    // customerNumber/retrieval are computed so all three see the corrected
+    // text; `question` is reassigned in place (let, not const) rather than
+    // threading a second "effective question" variable through every
+    // downstream call site.
+    if (!meta && looksLikeSingleRecordReference(question)) {
+      try {
+        const streetVocab = await timer.time("streetvocab", () =>
+          withTenant(ctxArg, (db) => getStreetVocab(db, auth.tenantId))
+        );
+        const { corrected, corrections } = correctStreetTypos(question, streetVocab);
+        if (corrections.length) {
+          console.log(JSON.stringify({ route: "ask", street_typo_corrections: corrections }));
+          question = corrected;
+        }
+      } catch (err) {
+        console.error("Street vocab correction failed, using original question:", err?.message);
+      }
+    }
+
     // Fast path (handoffs/FAST_PATH_2026-09-20.md): a model-free field lookup
     // straight from `extractions`, tried after the meta-router and before
     // retrieval/the answer cache — see the block below. Never attempted for a
@@ -518,12 +553,30 @@ export default async function handler(req, res) {
     // ASK_FAST_PATH=0. classifyFastPath is pure (no DB) so this costs nothing
     // when it returns null, which most non-meta questions still will.
     const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
+    // Contact-lookup-by-name pre-router (live miss cluster 1, 2026-09-21):
+    // "what's the phone number on file for donna thornton" — a lowercase
+    // name with no HVAC anchor satisfies neither of fastPath's own gates
+    // (extractSubject's name regexes require capitalization; hasAnchor needs
+    // an HVAC-specific word) so fastPath itself never claims these. Pure
+    // shape detection only here (no DB) — see contactLookup.js.
+    const contactLookupIntent = !meta ? parseContactLookupQuestion(question) : null;
+    const normalizedForAnalytics = normalizeQuestionForAnalytics(question).normalized;
+    // Money gate (live miss cluster 2, 2026-09-21): "what's the total dollar
+    // amount of our open invoices" style questions have no honest answer yet
+    // — there is no financials layer (handoffs/FINANCIALS_DESIGN_2026-09-21.md,
+    // not built) and the analytics `sum` op has no real currency support, so
+    // answering anyway produces a confident, fabricated "$0.00 across N
+    // documents." Checked here, before the analytics pre-router, so a money
+    // question NEVER reaches the Haiku planner at all — see
+    // isMoneyQuestion/moneyFallbackAnswer (analytics.js).
+    const moneyQuestion = !meta && isMoneyQuestion(normalizedForAnalytics);
     // Analytics pre-router (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md): a
     // cheap deterministic regex gate (preClassifyAnalytics, no DB/model cost)
     // decides whether this question is even WORTH the one Haiku planner call
     // below — most questions still won't match and pay nothing extra. Tried
-    // after meta and fast path (both already own their own question shapes)
-    // and, like fast path, never fired for a meta question.
+    // after meta, fast path, contact lookup and the money gate (all of which
+    // already own their own question shapes) and, like fast path, never
+    // fired for a meta question.
     // looksLikeSingleRecordReference is checked against the RAW question, not
     // the normalized one: SINGULAR_NAMED_RECORD_RE (analytics.js) keys off a
     // capitalized proper noun ("the Whitmore unit") to catch a named-record
@@ -533,9 +586,9 @@ export default async function handler(req, res) {
     // capitalized, on top of whatever preClassifyAnalytics(normalized) itself
     // already re-checks (redundant on lowercased text, never wrong).
     const analyticsCandidate =
-      !meta && !fastPathIntent && isAnalyticsEnabled() &&
+      !meta && !fastPathIntent && !contactLookupIntent && !moneyQuestion && isAnalyticsEnabled() &&
       !looksLikeSingleRecordReference(question) &&
-      preClassifyAnalytics(normalizeQuestionForAnalytics(question).normalized);
+      preClassifyAnalytics(normalizedForAnalytics);
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
@@ -574,7 +627,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || fastPathIntent || analyticsCandidate
+    const retrievalPromise = meta || fastPathIntent || contactLookupIntent || moneyQuestion || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
 
@@ -661,6 +714,74 @@ export default async function handler(req, res) {
       // fastData is null: DB found nothing certain enough. Retrieval was never
       // started above (retrievalPromise is null for a fast-path candidate), so
       // run it now, inline — identical fallback shape to the meta-router's own.
+    }
+
+    // ---- 0.6 contact-lookup pre-router (no model, DB only) -----------------
+    // "what's the phone number on file for donna thornton" — answered
+    // straight from the customer's own entity row (data->>'phone' etc.), no
+    // document to cite, no model call — see contactLookup.js's own doc
+    // comment. Never a model call: 'contact-lookup' is not in
+    // usage.js's COUNTABLE_ASK_SOURCES, so nothing here ever touches
+    // incrementAsksThisMonth.
+    if (contactLookupIntent) {
+      let contactData = null;
+      try {
+        contactData = await timer.time("contact", () =>
+          withTenant(ctxArg, (db) => runContactLookup(db, question))
+        );
+      } catch (err) {
+        console.error("Contact lookup failed, falling through to retrieval+model:", err?.message);
+      }
+      console.log(JSON.stringify({
+        route: "ask",
+        contact_lookup_field: contactLookupIntent.field,
+        contact_lookup_hit: Boolean(contactData),
+      }));
+      if (contactData) {
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, (db) => db.logAction({
+              action: "document.queried",
+              resource_type: "question",
+              clerk_user_id: auth.userId,
+              changes: {
+                question_hash: hashQuestion(question),
+                documents: [],
+                passages: 0,
+                contactLookup: true,
+              },
+            }));
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (contact lookup):", err?.message);
+          }
+        });
+        return send(200, { success: true, data: contactData });
+      }
+      // contactData is null: no customer matched the name. Retrieval was
+      // never started above (retrievalPromise is null for a contact-lookup
+      // candidate), so run it now, inline — identical fallback shape to the
+      // fast-path miss above.
+    }
+
+    // ---- 0.65 money gate (no model, no DB, no cache) -----------------------
+    // "What's the total dollar amount of our open invoices?" — the honest
+    // "not built yet" answer, always, never a fabricated dollar figure. See
+    // isMoneyQuestion/moneyFallbackAnswer (analytics.js) for why this can
+    // never produce "$0.00 across N documents." again. Not cached (nothing
+    // here should ever be served back stale once financials ships) and not
+    // counted against the monthly model allowance (no model call was made).
+    if (moneyQuestion) {
+      const data = moneyFallbackAnswer();
+      send(200, { success: true, data });
+      await timer.time("bookkeeping", () =>
+        withTenant(ctxArg, (db) => db.logAction({
+          action: "document.queried",
+          resource_type: "question",
+          clerk_user_id: auth.userId,
+          changes: { question_hash: hashQuestion(question), documents: [], passages: 0, money: true },
+        })).catch((err) => console.error("Failed to write document.queried audit row (money):", err?.message))
+      );
+      return;
     }
 
     // ---- 0.7 analytics pre-router (ONE Haiku tool-use call, before retrieval) --

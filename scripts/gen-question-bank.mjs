@@ -436,6 +436,65 @@ add('time', 'How many invoices did we complete in August 2024?', { route: 'analy
 add('time', 'How many visits did we have this week?', { route: 'analytics', entity: 'serviceVisits', answerValue: null });
 add('time', 'How many documents did we add this year?', { route: 'analytics', entity: 'documents', answerValue: key.totalDocuments });
 
+/* ---- 14. live misses (2026-09-21 270-question production sample) -------
+ * Regression pins for the four real miss clusters fixed this session:
+ *   1. contact lookup by (often lowercase) customer name -> contactLookup.js
+ *   2. money/dollar-total questions -> honest fallback, never "$0.00"
+ *   3. maintenance-due synonyms -> honest fallback, never an unfiltered count
+ *   4. street-name typos in a single-record address -> streetVocab.js
+ * These are literal phrasings from the live sample, not templated over the
+ * synthetic corpus's own customers/addresses, so `route`/`conditionsOnly`/
+ * `singleRecord` are the only expectations verify-question-bank.mjs can
+ * check with no database (see that script's own doc comment) — the DB-
+ * backed behavior itself (contactLookup.js, the money/maintenance honest
+ * fallbacks, streetVocab.js's correction) is unit-tested directly in
+ * scripts/verify-analytics.mjs.
+ */
+const LIVE_MISSES_2026_09_21 = [
+  // 1. contact lookup by name — must NOT route to analytics; a lowercase
+  // name with no HVAC anchor also never matches fastPath's own gates, so
+  // 'lookup' here means "contactLookup.js or plain retrieval", never analytics.
+  { q: "what's the phone number on file for donna thornton", expect: { route: 'lookup' } },
+  { q: "what's the email for sandra wyckoff", expect: { route: 'lookup' } },
+  { q: "what's the ph# on file for brian chavez", expect: { route: 'lookup' } },
+  { q: 'whats the phone numbr for thomas mercer', expect: { route: 'lookup' } },
+  { q: "what's the email on file for linda alvarez", expect: { route: 'lookup' } },
+  { q: "what's the service address for james patterson", expect: { route: 'lookup' } },
+  { q: 'phone number for maria gutierrez', expect: { route: 'lookup' } },
+  { q: 'email on file for robert kim', expect: { route: 'lookup' } },
+
+  // 2. money questions — the honest fallback, never a fabricated dollar
+  // figure. conditionsOnly is documentation here (verified directly against
+  // detectedConditions/isMoneyQuestion in verify-analytics.mjs); this script
+  // only checks it when expect.route is 'analytics'.
+  { q: "What's the total dollar amount of our open invoices?", expect: { route: 'analytics', entity: 'documents', unsupported: true, conditionsOnly: ['money'] } },
+  { q: "What's the total we billed in invoices this year?", expect: { route: 'analytics', entity: 'documents', unsupported: true, conditionsOnly: ['money'] } },
+  { q: "Who's our biggest customer by revenue?", expect: { route: 'analytics', entity: 'customers', unsupported: true, conditionsOnly: ['money'] } },
+  { q: 'how much did we invoice last month', expect: { route: 'lookup', conditionsOnly: ['money'] } },
+  { q: 'Are we owed any money?', expect: { route: 'lookup', conditionsOnly: ['money'] } },
+  { q: 'How much have we billed year to date?', expect: { route: 'lookup', conditionsOnly: ['money'] } },
+
+  // 3. maintenance-due synonyms — the honest fallback, never an unfiltered
+  // "49 customers." "not had service in 12 months" already fell through to
+  // retrieval before this fix (a 2+ digit number trips
+  // suspiciousUnfilteredCustomerPlan); it's included here so detectedConditions
+  // stays correct for it too.
+  { q: 'Which customers are overdue for maintenance?', expect: { route: 'analytics', entity: 'customers', unsupported: true, conditionsOnly: ['maintenance'] } },
+  { q: 'List customers due for a tune-up', expect: { route: 'analytics', entity: 'customers', unsupported: true, conditionsOnly: ['maintenance'] } },
+  { q: 'Which customers have not had service in 12 months?', expect: { route: 'analytics', entity: 'customers', unsupported: true, conditionsOnly: ['maintenance'] } },
+
+  // 4. street-name typos in a single-record address — corrected against the
+  // tenant's own street vocabulary (streetVocab.js), never against a general
+  // word list. singleRecord: true pins that these keep being recognized as
+  // one-record lookups (never analytics) despite the typo.
+  { q: 'when was the unit at 766 n val ivsta dr, tucson installed', expect: { route: 'lookup', singleRecord: true } },
+  { q: "what's the serial number of the unit at 248 w huard rd", expect: { route: 'lookup', singleRecord: true } },
+  { q: 'model number of the unit at 174 n collehe av', expect: { route: 'lookup', singleRecord: true } },
+];
+for (const { q, expect } of LIVE_MISSES_2026_09_21) {
+  add('live-misses-2026-09-21', q, expect);
+}
+
 /* ============================================================ expand into the bank */
 
 const catSlug = (c) => c.replace(/[^a-z0-9]+/gi, '-').toLowerCase();

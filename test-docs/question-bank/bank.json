@@ -24832,6 +24832,1942 @@
     }
   },
   {
+    "id": "live-misses-2026-09-21-0001-abbreviated",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "what's the ph# on file for donna thornton",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-canonical",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "what's the phone number on file for donna thornton",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-filler-prefix",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "quick question, what's the phone number on file for donna thornton",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-lowercase-no-punct",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "what's the phone number on file for donna thornton",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-statement-form",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "pull up what's the phone number on file for donna thornton",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-trailing-context",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "what's the phone number on file for donna thornton so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-typo",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "what's the phone number on file for donna thorntoon",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0001-voice-style",
+    "base": "what's the phone number on file for donna thornton",
+    "text": "whats the phone number on file for donna thornton",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-abbreviated",
+    "base": "what's the email for sandra wyckoff",
+    "text": "what's the e-mail for sandra wyckoff",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-canonical",
+    "base": "what's the email for sandra wyckoff",
+    "text": "what's the email for sandra wyckoff",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-filler-prefix",
+    "base": "what's the email for sandra wyckoff",
+    "text": "hey what's the email for sandra wyckoff",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-lowercase-no-punct",
+    "base": "what's the email for sandra wyckoff",
+    "text": "what's the email for sandra wyckoff",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-statement-form",
+    "base": "what's the email for sandra wyckoff",
+    "text": "list what's the email for sandra wyckoff",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-trailing-context",
+    "base": "what's the email for sandra wyckoff",
+    "text": "what's the email for sandra wyckoff for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-typo",
+    "base": "what's the email for sandra wyckoff",
+    "text": "what's the email for sanrda wyckoff",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0002-voice-style",
+    "base": "what's the email for sandra wyckoff",
+    "text": "whats the email for sandra wyckoff",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-abbreviated",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "what's the ph# on file for brian chavez",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-canonical",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "what's the ph# on file for brian chavez",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-filler-prefix",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "could you what's the ph# on file for brian chavez",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-lowercase-no-punct",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "what's the ph# on file for brian chavez",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-statement-form",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "need the what's the ph# on file for brian chavez",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-trailing-context",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "what's the ph# on file for brian chavez for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-typo",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "what's the ph# on file for brian chaavez",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0003-voice-style",
+    "base": "what's the ph# on file for brian chavez",
+    "text": "whats the ph# on file for brian chavez",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-abbreviated",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "whats the phone numbr for thomas mercer",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-canonical",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "whats the phone numbr for thomas mercer",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-filler-prefix",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "i need to know whats the phone numbr for thomas mercer",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-lowercase-no-punct",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "whats the phone numbr for thomas mercer",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-statement-form",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "show me whats the phone numbr for thomas mercer",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-trailing-context",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "whats the phone numbr for thomas mercer before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-typo",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "whats the phone nmbr for thomas mercer",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0004-voice-style",
+    "base": "whats the phone numbr for thomas mercer",
+    "text": "whats the phone numbr for thomas mercer",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-abbreviated",
+    "base": "what's the email on file for linda alvarez",
+    "text": "what's the e-mail on file for linda alvarez",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-canonical",
+    "base": "what's the email on file for linda alvarez",
+    "text": "what's the email on file for linda alvarez",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-filler-prefix",
+    "base": "what's the email on file for linda alvarez",
+    "text": "quick question, what's the email on file for linda alvarez",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-lowercase-no-punct",
+    "base": "what's the email on file for linda alvarez",
+    "text": "what's the email on file for linda alvarez",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-statement-form",
+    "base": "what's the email on file for linda alvarez",
+    "text": "pull up what's the email on file for linda alvarez",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-trailing-context",
+    "base": "what's the email on file for linda alvarez",
+    "text": "what's the email on file for linda alvarez before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-typo",
+    "base": "what's the email on file for linda alvarez",
+    "text": "what's the email on file for linda alvarz",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0005-voice-style",
+    "base": "what's the email on file for linda alvarez",
+    "text": "whats the email on file for linda alvarez",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-abbreviated",
+    "base": "what's the service address for james patterson",
+    "text": "what's the service addy for james patterson",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-canonical",
+    "base": "what's the service address for james patterson",
+    "text": "what's the service address for james patterson",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-filler-prefix",
+    "base": "what's the service address for james patterson",
+    "text": "i need to know what's the service address for james patterson",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-lowercase-no-punct",
+    "base": "what's the service address for james patterson",
+    "text": "what's the service address for james patterson",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-statement-form",
+    "base": "what's the service address for james patterson",
+    "text": "list what's the service address for james patterson",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-trailing-context",
+    "base": "what's the service address for james patterson",
+    "text": "what's the service address for james patterson so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-typo",
+    "base": "what's the service address for james patterson",
+    "text": "what's the service addess for james patterson",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0006-voice-style",
+    "base": "what's the service address for james patterson",
+    "text": "whats the service address for james patterson",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-abbreviated",
+    "base": "phone number for maria gutierrez",
+    "text": "ph# for maria gutierrez",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-canonical",
+    "base": "phone number for maria gutierrez",
+    "text": "phone number for maria gutierrez",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-filler-prefix",
+    "base": "phone number for maria gutierrez",
+    "text": "quick question, phone number for maria gutierrez",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-lowercase-no-punct",
+    "base": "phone number for maria gutierrez",
+    "text": "phone number for maria gutierrez",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-statement-form",
+    "base": "phone number for maria gutierrez",
+    "text": "need the phone number for maria gutierrez",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-trailing-context",
+    "base": "phone number for maria gutierrez",
+    "text": "phone number for maria gutierrez so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-typo",
+    "base": "phone number for maria gutierrez",
+    "text": "phhone number for maria gutierrez",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0007-voice-style",
+    "base": "phone number for maria gutierrez",
+    "text": "phone number for maria gutierrez",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-abbreviated",
+    "base": "email on file for robert kim",
+    "text": "e-mail on file for robert kim",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-canonical",
+    "base": "email on file for robert kim",
+    "text": "email on file for robert kim",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-filler-prefix",
+    "base": "email on file for robert kim",
+    "text": "i need to know email on file for robert kim",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-lowercase-no-punct",
+    "base": "email on file for robert kim",
+    "text": "email on file for robert kim",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-statement-form",
+    "base": "email on file for robert kim",
+    "text": "show me email on file for robert kim",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-trailing-context",
+    "base": "email on file for robert kim",
+    "text": "email on file for robert kim before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-typo",
+    "base": "email on file for robert kim",
+    "text": "mail on file for robert kim",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0008-voice-style",
+    "base": "email on file for robert kim",
+    "text": "email on file for robert kim",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-abbreviated",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "what's the total dollar amount of our open invoices",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-canonical",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "What's the total dollar amount of our open invoices?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-filler-prefix",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "quick question, what's the total dollar amount of our open invoices",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-lowercase-no-punct",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "what's the total dollar amount of our open invoices",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-statement-form",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "pull up what's the total dollar amount of our open invoices",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-trailing-context",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "What's the total dollar amount of our open invoices before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-typo",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "what's the total dollar amount of our open invoiices",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0009-voice-style",
+    "base": "What's the total dollar amount of our open invoices?",
+    "text": "whats the total dollar amount of our open invoices",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-abbreviated",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "what's the total we billed in invoices this yr",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-canonical",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "What's the total we billed in invoices this year?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-filler-prefix",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "quick question, what's the total we billed in invoices this year",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-lowercase-no-punct",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "what's the total we billed in invoices this year",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-statement-form",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "need the what's the total we billed in invoices this year",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-trailing-context",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "What's the total we billed in invoices this year for the newsletter",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-typo",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "what's the total we bbilled in invoices this year",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0010-voice-style",
+    "base": "What's the total we billed in invoices this year?",
+    "text": "whats the total we billed in invoices this year",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "documents",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-abbreviated",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "who's our biggest cust by revenue",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-canonical",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "Who's our biggest customer by revenue?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-filler-prefix",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "hey who's our biggest customer by revenue",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-lowercase-no-punct",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "who's our biggest customer by revenue",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-statement-form",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "list who's our biggest customer by revenue",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-trailing-context",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "Who's our biggest customer by revenue for the newsletter",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-typo",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "who's our biggest customer by reevnue",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0011-voice-style",
+    "base": "Who's our biggest customer by revenue?",
+    "text": "whos our biggest customer by revenue",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-abbreviated",
+    "base": "how much did we invoice last month",
+    "text": "how much did we invoice last mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-canonical",
+    "base": "how much did we invoice last month",
+    "text": "how much did we invoice last month",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-filler-prefix",
+    "base": "how much did we invoice last month",
+    "text": "can you tell me how much did we invoice last month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-lowercase-no-punct",
+    "base": "how much did we invoice last month",
+    "text": "how much did we invoice last month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-statement-form",
+    "base": "how much did we invoice last month",
+    "text": "pull up how much did we invoice last month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-trailing-context",
+    "base": "how much did we invoice last month",
+    "text": "how much did we invoice last month so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-typo",
+    "base": "how much did we invoice last month",
+    "text": "how much did we invojce last month",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0012-voice-style",
+    "base": "how much did we invoice last month",
+    "text": "how much did we invoice last month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-abbreviated",
+    "base": "Are we owed any money?",
+    "text": "are we owed any money",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-canonical",
+    "base": "Are we owed any money?",
+    "text": "Are we owed any money?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-filler-prefix",
+    "base": "Are we owed any money?",
+    "text": "i need to know are we owed any money",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-lowercase-no-punct",
+    "base": "Are we owed any money?",
+    "text": "are we owed any money",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-statement-form",
+    "base": "Are we owed any money?",
+    "text": "show me are we owed any money",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-trailing-context",
+    "base": "Are we owed any money?",
+    "text": "Are we owed any money before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-typo",
+    "base": "Are we owed any money?",
+    "text": "are we owed any oney",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0013-voice-style",
+    "base": "Are we owed any money?",
+    "text": "are we owed any money",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-abbreviated",
+    "base": "How much have we billed year to date?",
+    "text": "how much have we billed yr to date",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-canonical",
+    "base": "How much have we billed year to date?",
+    "text": "How much have we billed year to date?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-filler-prefix",
+    "base": "How much have we billed year to date?",
+    "text": "could you how much have we billed year to date",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-lowercase-no-punct",
+    "base": "How much have we billed year to date?",
+    "text": "how much have we billed year to date",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-statement-form",
+    "base": "How much have we billed year to date?",
+    "text": "need the how much have we billed year to date",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-trailing-context",
+    "base": "How much have we billed year to date?",
+    "text": "How much have we billed year to date so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-typo",
+    "base": "How much have we billed year to date?",
+    "text": "how much have we billled year to date",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0014-voice-style",
+    "base": "How much have we billed year to date?",
+    "text": "how much have we billed year to date",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "conditionsOnly": [
+        "money"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-abbreviated",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "which custs are overdue for maintenance",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-canonical",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "Which customers are overdue for maintenance?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-filler-prefix",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "real quick, which customers are overdue for maintenance",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-lowercase-no-punct",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "which customers are overdue for maintenance",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-statement-form",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "list which customers are overdue for maintenance",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-trailing-context",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "Which customers are overdue for maintenance so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-typo",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "which customers are overde for maintenance",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0015-voice-style",
+    "base": "Which customers are overdue for maintenance?",
+    "text": "which customers are overdue for maintenance",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-abbreviated",
+    "base": "List customers due for a tune-up",
+    "text": "list custs due for a tune-up",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-canonical",
+    "base": "List customers due for a tune-up",
+    "text": "List customers due for a tune-up",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-filler-prefix",
+    "base": "List customers due for a tune-up",
+    "text": "can you tell me list customers due for a tune-up",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-lowercase-no-punct",
+    "base": "List customers due for a tune-up",
+    "text": "list customers due for a tune-up",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-statement-form",
+    "base": "List customers due for a tune-up",
+    "text": "pull up list customers due for a tune-up",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-trailing-context",
+    "base": "List customers due for a tune-up",
+    "text": "List customers due for a tune-up for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-typo",
+    "base": "List customers due for a tune-up",
+    "text": "list customesr due for a tune-up",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0016-voice-style",
+    "base": "List customers due for a tune-up",
+    "text": "list customers due for a tune-up",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-abbreviated",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "which custs have not had service in 12 months",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-canonical",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "Which customers have not had service in 12 months?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-filler-prefix",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "real quick, which customers have not had service in 12 months",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-lowercase-no-punct",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "which customers have not had service in 12 months",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-statement-form",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "show me which customers have not had service in 12 months",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-trailing-context",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "Which customers have not had service in 12 months before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-typo",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "which customers have not had service in 12 moths",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0017-voice-style",
+    "base": "Which customers have not had service in 12 months?",
+    "text": "which customers have not had service in 12 months",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "analytics",
+      "entity": "customers",
+      "unsupported": true,
+      "conditionsOnly": [
+        "maintenance"
+      ]
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-abbreviated",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-canonical",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-filler-prefix",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "quick question, when was the unit at 766 n val ivsta dr, tucson installed",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-lowercase-no-punct",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "when was the unit at 766 n val ivsta dr tucson installed",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-statement-form",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "need the when was the unit at 766 n val ivsta dr, tucson installed",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-trailing-context",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "when was the unit at 766 n val ivsta dr, tucson installed so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-typo",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "when was the unit at 766 n val ivsta dr, tucsn installed",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0018-voice-style",
+    "base": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "text": "when was the unit at 766 n val ivsta dr, tucson installed",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-abbreviated",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "what's the serial number of the unit at 248 w huard rd",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-canonical",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "what's the serial number of the unit at 248 w huard rd",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-filler-prefix",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "real quick, what's the serial number of the unit at 248 w huard rd",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-lowercase-no-punct",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "what's the serial number of the unit at 248 w huard rd",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-statement-form",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "list what's the serial number of the unit at 248 w huard rd",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-trailing-context",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "what's the serial number of the unit at 248 w huard rd for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-typo",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "what's the serial number of the unit at 248 w hurd rd",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0019-voice-style",
+    "base": "what's the serial number of the unit at 248 w huard rd",
+    "text": "whats the serial number of the unit at 248 w huard rd",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-abbreviated",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "model number of the unit at 174 n collehe av",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-canonical",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "model number of the unit at 174 n collehe av",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-filler-prefix",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "i need to know model number of the unit at 174 n collehe av",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-lowercase-no-punct",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "model number of the unit at 174 n collehe av",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-statement-form",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "list model number of the unit at 174 n collehe av",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-trailing-context",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "model number of the unit at 174 n collehe av so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-typo",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "model nvmber of the unit at 174 n collehe av",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21-0020-voice-style",
+    "base": "model number of the unit at 174 n collehe av",
+    "text": "model number of the unit at 174 n collehe av",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
     "id": "lookups-0001-abbreviated",
     "base": "What's the serial number of the unit at 100 E Main St, Mesa, AZ 85201?",
     "text": "what's the serial number of the unit at 100 e main st, mesa, az 85201",
