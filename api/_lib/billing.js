@@ -40,6 +40,20 @@ export function lookupKeyFor(plan, interval) {
   return `${plan}_${suffix}`;
 }
 
+/**
+ * REQUEST 2b (2026-09-21, owner brief): "Maybe they can add the automated
+ * portion that auto-sends if they pay extra." The Stripe price lookup_key
+ * for that add-on, added to a tenant's subscription as its own line item
+ * alongside their base plan — the single named place this codebase needs
+ * to know it exists. No product/price is created here or by
+ * scripts/stripe-setup.mjs: the owner creates it in the Stripe dashboard
+ * (or CLI) with exactly this lookup_key, whenever they're ready to sell it.
+ * Until then patchForEvent() below simply never sees it on a subscription's
+ * items and `limits.outreachAuto` stays unset (see plan.js's
+ * hasOutreachAutoEntitlement).
+ */
+export const OUTREACH_AUTO_ADDON_LOOKUP_KEY = 'outreach_auto_addon_monthly';
+
 export const RECORDS_RESCUE = Object.freeze({
   lookupKey: 'records_rescue_page',
   productName: 'Records Rescue scanning',
@@ -282,6 +296,12 @@ export function patchForEvent(event) {
       if (!customerId) return null;
       const plan = planFromSubscriptionItem(obj);
       const billing_status = billingStatusFromStripeStatus(obj.status);
+      // REQUEST 2b: the auto-send add-on rides as its own line item on the
+      // same subscription. Detected by lookup_key so this needs no Stripe
+      // product id, same idiom as priceIdFor()'s plan lookups.
+      const hasOutreachAutoAddOn = (obj.items?.data ?? []).some(
+        (item) => item?.price?.lookup_key === OUTREACH_AUTO_ADDON_LOOKUP_KEY
+      );
       const patch = {
         stripe_customer_id: customerId,
         stripe_subscription_id: obj.id,
@@ -292,7 +312,21 @@ export function patchForEvent(event) {
       };
       if (plan) {
         patch.plan = plan;
-        patch.limits = PLAN_LIMITS[plan] ?? null;
+        // `limits` is replaced wholesale by billing_apply() (see its own
+        // comment), so the add-on flag is folded in here rather than
+        // written separately — a subscription event that resolves a plan
+        // is the only place this app currently learns the add-on's state.
+        // No add-on item present -> patch.limits is BYTE-IDENTICAL to
+        // PLAN_LIMITS[plan] (scripts/verify-billing.mjs asserts this) —
+        // both "never had it" and "just removed it" correctly end up with
+        // no `outreachAuto` key at all once this replaces tenants.limits.
+        // OPEN (out of scope for this pass, see the handoff): a Stripe
+        // event for the add-on item alone, with no plan-carrying item
+        // present, is not handled — rare in practice since Stripe reports
+        // the whole subscription's items on every update.
+        patch.limits = hasOutreachAutoAddOn
+          ? { ...(PLAN_LIMITS[plan] ?? {}), outreachAuto: true }
+          : (PLAN_LIMITS[plan] ?? null);
       }
       // Once a subscription has ever reached 'trialing', that trial is spent —
       // even if the customer later cancels, they don't get a second free trial.

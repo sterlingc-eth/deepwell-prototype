@@ -13,6 +13,8 @@ import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
 import { customerClient, type CustomerSummary } from '../services/customerClient';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
+import { useWorkFilter } from '../hooks/useWorkFilter';
+import { WorkFilterControl } from '../components/WorkFilterControl';
 
 const CURRENT_USER = 'You';
 
@@ -324,11 +326,23 @@ export function ReviewBody() {
     [graph],
   );
 
+  // "My work / Everyone" (owner brief 2026-09-21) — allDocs (not the queue
+  // itself) so the default-choice rule and per-user persistence stay stable
+  // no matter which FILTERS tab is active.
+  const allDocsList = useMemo(() => Object.values(graph.docs), [graph.docs]);
+  const work = useWorkFilter(allDocsList);
+  const inWorkScope = (d: Doc) => work.choice === 'everyone' || work.isMine(d);
+
   const queue = useMemo(
-    () => Object.values(graph.docs).filter((d) => matches(d, filter, sets)).sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime()),
-    [graph.docs, filter, sets],
+    () => Object.values(graph.docs).filter((d) => matches(d, filter, sets) && inWorkScope(d)).sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [graph.docs, filter, sets, work.choice, work.isMine],
   );
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, Object.values(graph.docs).filter((d) => matches(d, f.id, sets)).length])) as Record<Filter, number>, [graph.docs, sets]);
+  const counts = useMemo(
+    () => Object.fromEntries(FILTERS.map((f) => [f.id, Object.values(graph.docs).filter((d) => matches(d, f.id, sets) && inWorkScope(d)).length])) as Record<Filter, number>,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [graph.docs, sets, work.choice, work.isMine],
+  );
 
   const doc = selectedDocumentId ? graph.docs[selectedDocumentId] : undefined;
   useEffect(() => {
@@ -374,6 +388,8 @@ export function ReviewBody() {
           </div>
         )}
 
+        {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
+
         <div role="tablist" aria-label="Queue filters" className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
             <button
@@ -401,6 +417,11 @@ export function ReviewBody() {
                       <span className="block font-mono text-data text-ink truncate">{d.filename}</span>
                       <span className="block text-body text-ink-3">{typeLabel}</span>
                     </span>
+                    {work.choice === 'everyone' && work.hasShop && (
+                      <span className="dw-pill-muted shrink-0 text-caption">
+                        {(d.uploadedBy && work.nameByUserId.get(d.uploadedBy)) || 'Teammate'}
+                      </span>
+                    )}
                     {d.issues.length > 0 && <span className="dw-pill-warn shrink-0">{d.issues.length}</span>}
                   </button>
                 </li>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, Loader2, Mail, RefreshCw, Send, X } from 'lucide-react';
+import { useAuth, useOrganization } from '@clerk/clerk-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, Clipboard, Loader2, Mail, RefreshCw, Send, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole } from '../services/teamClient';
@@ -37,6 +37,7 @@ const TIER_LABEL: Record<OutreachMessage['tier'], string> = {
 export function OutreachScreen() {
   const { orgRole } = useAuth();
   const admin = isAdminRole(orgRole ?? null);
+  const { organization } = useOrganization();
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const pendingEquipmentId = useAppStore((s) => s.pendingOutreachEquipmentId);
   const clearPendingOutreachEquipment = useAppStore((s) => s.clearPendingOutreachEquipment);
@@ -55,6 +56,7 @@ export function OutreachScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedBody, setExpandedBody] = useState<Record<string, string>>({});
   const [notFoundNote, setNotFoundNote] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = async () => {
     setLoadError(null);
@@ -151,6 +153,38 @@ export function OutreachScreen() {
     }
   };
 
+  // REQUEST 2a (draft-to-copy, 2026-09-21): the base flow needs no email
+  // provider at all — "Copy email" and "Open in your mail app" work off the
+  // exact same deterministic draft the review queue already shows.
+  const fullBodyFor = async (msg: OutreachMessage): Promise<string> => {
+    const cached = expandedBody[msg.id];
+    if (cached) return cached;
+    try {
+      const full = await previewOutreach(msg.id);
+      setExpandedBody((s) => ({ ...s, [msg.id]: full.bodyText }));
+      return full.bodyText;
+    } catch {
+      return msg.preview; // short preview beats nothing if the fetch fails
+    }
+  };
+
+  const copyMessage = async (msg: OutreachMessage) => {
+    const body = await fullBodyFor(msg);
+    try {
+      await navigator.clipboard.writeText(`Subject: ${msg.subject}\n\n${body}`);
+      setCopiedId(msg.id);
+      setTimeout(() => setCopiedId((c) => (c === msg.id ? null : c)), 2000);
+    } catch {
+      setLoadError('Could not copy to your clipboard — your browser may be blocking it.');
+    }
+  };
+
+  const openInMail = async (msg: OutreachMessage) => {
+    const body = await fullBodyFor(msg);
+    const url = `mailto:${encodeURIComponent(msg.toEmail)}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = url;
+  };
+
   const saveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -170,6 +204,10 @@ export function OutreachScreen() {
   const fromName = settingsDraft.fromName ?? settings?.fromName ?? '';
   const replyTo = settingsDraft.replyTo ?? settings?.replyTo ?? '';
   const offerText = settingsDraft.offerText ?? settings?.offerText ?? '';
+  const shopName = settingsDraft.shopName ?? settings?.shopName ?? '';
+  const shopPhone = settingsDraft.shopPhone ?? settings?.shopPhone ?? '';
+  const signature = settingsDraft.signature ?? settings?.signature ?? '';
+  const outreachAutoEntitled = settings?.outreachAutoEntitled ?? false;
   const hasSettingsChanges = Object.keys(settingsDraft).length > 0;
 
   return (
@@ -184,8 +222,9 @@ export function OutreachScreen() {
               <Mail className="w-5 h-5" aria-hidden="true" /> Customer outreach
             </h1>
             <p className="text-ink-2 mt-1">
-              Plain-English emails to customers whose equipment is close to — or past — the end of its warranty,
-              offering an extended warranty or maintenance agreement.
+              Donovan drafts a plain-English email for every customer whose equipment is close to — or past — the
+              end of its warranty. Copy it or open it in your own mail app to send it — no email account needed.
+              Want Donovan to send it for you automatically? That's an optional add-on.
             </p>
           </div>
         </header>
@@ -246,20 +285,35 @@ export function OutreachScreen() {
                 >
                   <p className="text-body font-medium text-ink">Review first</p>
                   <p className="text-caption text-ink-3 mt-1">
-                    Drafts are created for you to check. Nothing sends until you click Approve, then Send.
+                    Donovan drafts each one for you to check — copy it or open it in your mail app whenever you're
+                    ready. No email account needed.
                   </p>
                 </button>
-                <button
-                  type="button"
-                  disabled={!admin}
-                  onClick={() => setSettingsDraft((d) => ({ ...d, mode: 'auto' }))}
-                  className={['dw-card p-3 text-left disabled:opacity-50', mode === 'auto' ? 'ring-2 ring-accent' : ''].join(' ')}
-                >
-                  <p className="text-body font-medium text-ink">Automatic</p>
-                  <p className="text-caption text-ink-3 mt-1">
-                    Every night, new drafts are approved and emailed automatically — no review step.
-                  </p>
-                </button>
+                {outreachAutoEntitled ? (
+                  <button
+                    type="button"
+                    disabled={!admin}
+                    onClick={() => setSettingsDraft((d) => ({ ...d, mode: 'auto' }))}
+                    className={['dw-card p-3 text-left disabled:opacity-50', mode === 'auto' ? 'ring-2 ring-accent' : ''].join(' ')}
+                  >
+                    <p className="text-body font-medium text-ink">Automatic</p>
+                    <p className="text-caption text-ink-3 mt-1">
+                      Every night, new drafts are approved and emailed automatically — no review step.
+                    </p>
+                  </button>
+                ) : (
+                  <div className="dw-card p-3 text-left opacity-90">
+                    <p className="text-body font-medium text-ink flex items-center gap-1.5">
+                      Automatic <span className="dw-pill-muted">Add-on</span>
+                    </p>
+                    <p className="text-caption text-ink-3 mt-1">
+                      Auto-send is an add-on — Donovan sends approved drafts for you, no clicking required.{' '}
+                      <button type="button" className="underline font-medium" onClick={() => setCurrentScreen('billing')}>
+                        See plans
+                      </button>
+                    </p>
+                  </div>
+                )}
               </div>
 
               <label className="block">
@@ -276,13 +330,49 @@ export function OutreachScreen() {
               </label>
 
               <label className="block">
-                <span className="text-caption text-ink-3">From name (shown in the email)</span>
+                <span className="text-caption text-ink-3">Shop name (shown in the email)</span>
+                <input
+                  type="text"
+                  disabled={!admin}
+                  value={shopName}
+                  placeholder={organization?.name || "Your shop's name"}
+                  onChange={(e) => setSettingsDraft((d) => ({ ...d, shopName: e.target.value }))}
+                  className="dw-input mt-1 w-full"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-caption text-ink-3">Shop phone (optional — offered as a way to reply)</span>
+                <input
+                  type="tel"
+                  disabled={!admin}
+                  value={shopPhone}
+                  placeholder="(555) 555-0100"
+                  onChange={(e) => setSettingsDraft((d) => ({ ...d, shopPhone: e.target.value }))}
+                  className="dw-input mt-1 w-full"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-caption text-ink-3">From name (the person signing — optional)</span>
                 <input
                   type="text"
                   disabled={!admin}
                   value={fromName}
-                  placeholder="Your shop's name"
+                  placeholder="e.g. Dana"
                   onChange={(e) => setSettingsDraft((d) => ({ ...d, fromName: e.target.value }))}
+                  className="dw-input mt-1 w-full"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-caption text-ink-3">Signature line (optional — overrides the sign-off above)</span>
+                <input
+                  type="text"
+                  disabled={!admin}
+                  value={signature}
+                  placeholder="e.g. Dana, Acme HVAC"
+                  onChange={(e) => setSettingsDraft((d) => ({ ...d, signature: e.target.value }))}
                   className="dw-input mt-1 w-full"
                 />
               </label>
@@ -407,7 +497,22 @@ export function OutreachScreen() {
                   </button>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <span className={msg.status === 'approved' ? 'dw-pill-info' : 'dw-pill-muted'}>{TIER_LABEL[msg.tier]}</span>
-                    <div className="flex gap-1.5">
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void copyMessage(msg)}
+                        className="dw-btn-tertiary !min-h-[32px] !py-0.5"
+                      >
+                        {copiedId === msg.id ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Clipboard className="w-3.5 h-3.5" aria-hidden="true" />}
+                        {copiedId === msg.id ? 'Copied' : 'Copy email'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void openInMail(msg)}
+                        className="dw-btn-tertiary !min-h-[32px] !py-0.5"
+                      >
+                        <Mail className="w-3.5 h-3.5" aria-hidden="true" /> Open in mail
+                      </button>
                       {msg.status === 'draft' && (
                         <button
                           type="button"

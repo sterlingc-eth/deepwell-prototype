@@ -5,6 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus } from '../services/teamClient';
 import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
+import { memberDisplayName } from '../core/memberNames';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -99,13 +100,6 @@ function NotificationsCard() {
       </p>
     </div>
   );
-}
-
-function memberDisplayName(m: { publicUserData?: { firstName?: string | null; lastName?: string | null; identifier?: string } | null }): string {
-  const first = m.publicUserData?.firstName ?? '';
-  const last = m.publicUserData?.lastName ?? '';
-  const name = `${first} ${last}`.trim();
-  return name || m.publicUserData?.identifier || 'Team member';
 }
 
 export function TeamScreen() {

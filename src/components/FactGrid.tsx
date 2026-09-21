@@ -1,5 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { Fact, FactStatus, SourceRef } from '../core/types';
+import { useGraph } from '../core/entityGraph';
 
 const PILL: Record<FactStatus, string> = {
   ok: 'dw-pill-ok',
@@ -26,7 +27,18 @@ interface FactGridProps {
  * citation numbers; tapping one opens that document at the cited field.
  */
 export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLabel }: FactGridProps) {
+  const docs = useGraph((s) => s.docs);
+  const schema = useGraph((s) => s.schema);
   if (!facts.length) return null;
+  // Owner follow-up (2026-09-21): "signify the citations better". A bare
+  // [2] is a footnote; "2 · Invoice" says what kind of page backs the fact
+  // before you tap. Type label from the graph; filename in the tooltip.
+  const typeOf = (ref: SourceRef): string | undefined => {
+    const doc = docs[ref.documentId];
+    if (!doc) return undefined;
+    return schema.documentTypes.find((t) => t.id === doc.typeId)?.label ?? 'Document';
+  };
+  const nameOf = (ref: SourceRef): string | undefined => sourceLabel?.(ref) ?? docs[ref.documentId]?.filename;
   return (
     <section aria-labelledby="facts-heading">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -37,7 +49,7 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLa
             — they are the source documents, numbered to match the list
             further down the page. Say so where the eye lands. */}
         <p className="text-caption text-ink-3">
-          [1] [2] [3] = which document says so · tap to open it
+          Numbered chips = the document each fact came from · tap to open the page
         </p>
       </div>
       <dl className="border border-line rounded-lg bg-surface divide-y divide-line">
@@ -66,19 +78,27 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLa
                   <span className={f.kind === 'serial' || f.kind === 'money' ? 'font-mono' : ''}>{f.value}</span>
                 )}
               </dd>
-              <dd className="flex gap-1 justify-end">
-                {refs.slice(0, 3).map((r, j) => (
-                  <button
-                    key={`${r.documentId}-${j}`}
-                    type="button"
-                    onClick={() => onOpenSource(r)}
-                    aria-label={`Open source ${citation(r)} for ${f.label}${sourceLabel?.(r) ? ` (${sourceLabel(r)})` : ''}`}
-                    title={sourceLabel?.(r) ? `Source ${citation(r)}: ${sourceLabel(r)}` : `Source ${citation(r)}`}
-                    className="font-mono text-caption text-ink-3 hover:text-ink border border-line hover:border-line-2 rounded-sm min-w-[28px] h-7 px-1.5 grid place-items-center transition-colors duration-quick"
-                  >
-                    [{citation(r)}]
-                  </button>
-                ))}
+              <dd className="flex gap-1.5 justify-end flex-wrap">
+                {refs.slice(0, 3).map((r, j) => {
+                  const n = citation(r);
+                  const kind = typeOf(r);
+                  const name = nameOf(r);
+                  return (
+                    <button
+                      key={`${r.documentId}-${j}`}
+                      type="button"
+                      onClick={() => onOpenSource(r)}
+                      aria-label={`Open source ${n}${kind ? ` (${kind})` : ''} for ${f.label}${name ? ` — ${name}` : ''}`}
+                      title={name ? `Source ${n}${kind ? ` · ${kind}` : ''}: ${name}` : `Source ${n}`}
+                      className="inline-flex items-center gap-1.5 h-7 pl-1 pr-2 rounded-full border border-brass-300/70 dark:border-brass-300/40 bg-brass-50 dark:bg-forest-800 text-ink-2 hover:text-ink hover:border-brass-500 dark:hover:border-brass-200 transition-colors duration-quick text-caption"
+                    >
+                      <span className="font-mono grid place-items-center w-5 h-5 rounded-full bg-brass-500 text-white dark:bg-brass-300 dark:text-forest-900 text-[11px] leading-none">
+                        {n}
+                      </span>
+                      {kind && <span className="hidden sm:inline whitespace-nowrap">{kind}</span>}
+                    </button>
+                  );
+                })}
               </dd>
             </div>
           );

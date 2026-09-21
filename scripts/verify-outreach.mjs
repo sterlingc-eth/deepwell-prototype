@@ -16,9 +16,11 @@ import {
   classifyCandidates,
   DEFAULT_OFFER_TEXT,
   assertEnabledForOp,
+  assertModeAllowed,
   sendCapFor,
   SEND_BATCH_CAP,
 } from '../api/_lib/outreach.js';
+import { hasOutreachAutoEntitlement } from '../api/_lib/plan.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -92,6 +94,34 @@ check('maskSerial never returns the full serial for a long value', !maskSerial('
 }
 
 check('renderOutreachEmail: missing customer name falls back to "there", never blank', renderOutreachEmail({ tier: 'expired', customerName: null }).bodyText.includes('Hi there,'));
+
+/* --------------------------------------------- renderOutreachEmail: shop fields (REQUEST 2a) */
+// "Donovan uses their information to draft the emails" — shop phone, sender
+// name and a signature line distinct from just the shop name.
+
+{
+  const { bodyText } = renderOutreachEmail({
+    tier: 'expiring-30',
+    shopName: 'Acme HVAC',
+    shopPhone: '555-0100',
+    senderName: 'Dana',
+    signature: 'Dana, Acme HVAC',
+    customerName: 'Jane Doe',
+    replyTo: 'help@acme.test',
+  });
+  check('renderOutreachEmail: body offers the shop phone as a way to reply', bodyText.includes('call us at 555-0100'));
+  check('renderOutreachEmail: body still offers the reply-to email too', bodyText.includes('reach us at help@acme.test'));
+  check('renderOutreachEmail: signs off with the signature line, not just the shop name', bodyText.includes('— Dana, Acme HVAC'));
+}
+{
+  const { bodyText } = renderOutreachEmail({ tier: 'expiring-30', shopName: 'Acme HVAC', senderName: 'Dana', customerName: 'Jane' });
+  check('renderOutreachEmail: falls back to the sender name when no signature line is set', bodyText.includes('— Dana') && !bodyText.includes('— Acme HVAC'));
+}
+{
+  const { bodyText } = renderOutreachEmail({ tier: 'expired', shopName: 'Acme HVAC', customerName: 'Jane' });
+  check('renderOutreachEmail: falls back to the shop name when neither sender name nor signature is set (unchanged default)', bodyText.includes('— Acme HVAC'));
+  check('renderOutreachEmail: no shop phone set means no phone line is fabricated', !bodyText.includes('call us at'));
+}
 
 /* ------------------------------------------------------------- dedupeKey */
 
@@ -191,6 +221,26 @@ eq("assertEnabledForOp: 'settings'/'list'/'preview'/'optOut' are never gated", [
   assertEnabledForOp('preview', { enabled: false }),
   assertEnabledForOp('optOut', { enabled: false }),
 ], [null, null, null, null]);
+
+/* --------------------------------------------- assertModeAllowed (REQUEST 2b) */
+// mode='review' (Donovan drafts, a human copies/opens in mail) never needs
+// the add-on or RESEND_API_KEY; mode='auto' (unattended nightly sending) is
+// gated behind the outreachAuto entitlement.
+
+eq("assertModeAllowed: 'review' mode is always allowed, entitlement or not", assertModeAllowed('review', false), null);
+eq("assertModeAllowed: 'review' mode allowed even when entitled (no reason to differ)", assertModeAllowed('review', true), null);
+eq("assertModeAllowed: undefined mode (unchanged on this save) is allowed", assertModeAllowed(undefined, false), null);
+eq("assertModeAllowed: 'auto' mode allowed once entitled", assertModeAllowed('auto', true), null);
+check("assertModeAllowed: 'auto' mode refused (402) without the entitlement", assertModeAllowed('auto', false)?.status === 402);
+check('assertModeAllowed: the refusal names it as an add-on, not a generic error', assertModeAllowed('auto', false)?.error.toLowerCase().includes('add-on'));
+
+/* --------------------------------------------- hasOutreachAutoEntitlement (REQUEST 2b) */
+
+check('hasOutreachAutoEntitlement: true only when tenants.limits.outreachAuto is literally true', hasOutreachAutoEntitlement({ limits: { outreachAuto: true } }));
+check('hasOutreachAutoEntitlement: false when unset', !hasOutreachAutoEntitlement({ limits: {} }));
+check('hasOutreachAutoEntitlement: false when limits itself is missing', !hasOutreachAutoEntitlement({}));
+check('hasOutreachAutoEntitlement: false for a null tenant row', !hasOutreachAutoEntitlement(null));
+check('hasOutreachAutoEntitlement: a truthy-but-not-true value does not count (jsonb round-trip safety)', !hasOutreachAutoEntitlement({ limits: { outreachAuto: 'true' } }));
 
 /* ------------------------------------------------------- sendCapFor (item 4) */
 // REVIEW FIX 2026-09-20: the nightly auto-sweep is capped tighter than an

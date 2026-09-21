@@ -81,6 +81,13 @@ export function renderOutreachEmail({
   offerText = null,
   replyTo = null,
   address = null,
+  // REQUEST 2 (draft-to-copy, 2026-09-21): the shop's own contact details,
+  // beyond just its name — "Donovan uses their information to draft the
+  // emails." All optional and additive; every existing caller/test that
+  // omits them gets byte-identical output to before.
+  shopPhone = null,
+  senderName = null,
+  signature = null,
 }) {
   const shop = shopName?.trim() || "your HVAC service team";
   const name = customerName?.trim() || "there";
@@ -88,8 +95,14 @@ export function renderOutreachEmail({
   const masked = maskSerial(serial);
   const statusLine = (STATUS_LINE[tier] ?? STATUS_LINE["expiring-90"])(unit, masked, expiryDate);
   const offer = offerText?.trim() || DEFAULT_OFFER_TEXT;
-  const replyLine = replyTo?.trim()
-    ? `Reply to this email or reach us at ${replyTo.trim()} to get started.`
+  // Sign-off: an explicit signature line wins, then the sender's own name,
+  // then just the shop name — exactly today's behavior when neither is set.
+  const signOff = signature?.trim() || senderName?.trim() || shop;
+  const contactBits = [];
+  if (replyTo?.trim()) contactBits.push(`reach us at ${replyTo.trim()}`);
+  if (shopPhone?.trim()) contactBits.push(`call us at ${shopPhone.trim()}`);
+  const replyLine = contactBits.length
+    ? `Reply to this email or ${contactBits.join(" or ")} to get started.`
     : "Reply to this email to get started.";
 
   // Mandatory: every outreach email says why the recipient is getting it and
@@ -111,7 +124,7 @@ export function renderOutreachEmail({
     "",
     replyLine,
     "",
-    `— ${shop}`,
+    `— ${signOff}`,
     "",
     footer,
   ];
@@ -168,6 +181,28 @@ export function assertEnabledForOp(op, settings) {
   if (op !== "approve" && op !== "sendApproved") return null;
   if (settings?.enabled) return null;
   return { status: 409, error: "Turn on Customer outreach in settings first" };
+}
+
+/**
+ * REQUEST 2b (2026-09-21): mode='review' (Donovan drafts, a human copies or
+ * opens in their own mail app) never needs anything beyond the base
+ * product — no RESEND_API_KEY, no add-on. mode='auto' (unattended nightly
+ * sending) is a paid add-on: refused with 402 unless the tenant holds the
+ * `outreachAuto` entitlement (api/_lib/plan.js's hasOutreachAutoEntitlement).
+ * Pure so scripts/verify-outreach.mjs can assert both branches with no
+ * database.
+ * @param {string|undefined} mode 'review' | 'auto' | undefined
+ * @param {boolean} hasOutreachAutoEntitlement
+ * @returns {{status: number, error: string}|null} null means "allowed"
+ */
+export function assertModeAllowed(mode, hasOutreachAutoEntitlement) {
+  if (mode !== "auto") return null;
+  if (hasOutreachAutoEntitlement) return null;
+  return {
+    status: 402,
+    error:
+      "Auto-send is an add-on. Upgrade your plan to turn it on — Donovan will keep drafting for you to copy and send in the meantime.",
+  };
 }
 
 /**

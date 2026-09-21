@@ -30,6 +30,7 @@ import { getWarrantyAttention } from "../../warranty-attention.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { sendEmail } from "../email.js";
 import { sweepWithDeadline, withTimeout } from "../notify.js";
+import { hasOutreachAutoEntitlement } from "../plan.js";
 import {
   OUTREACH_TIERS,
   renderOutreachEmail,
@@ -40,6 +41,7 @@ import {
   sweepAction,
   classifyCandidates,
   assertEnabledForOp,
+  assertModeAllowed,
   sendCapFor,
 } from "../outreach.js";
 
@@ -59,7 +61,38 @@ export const config = { api: { bodyParser: { sizeLimit: "32kb" } } };
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const MAX_SEND_BATCH = 50;
 const MAX_IDS = 100;
-const DEFAULT_SETTINGS = Object.freeze({ enabled: false, mode: "review", leadDays: 90, fromName: null, replyTo: null, offerText: null });
+const DEFAULT_SETTINGS = Object.freeze({
+  enabled: false,
+  mode: "review",
+  leadDays: 90,
+  fromName: null,
+  replyTo: null,
+  offerText: null,
+  // REQUEST 2a (draft-to-copy, 2026-09-21): the shop's own details Donovan's
+  // template uses (M3-config/21-outreach-shop-fields.sql).
+  shopName: null,
+  shopPhone: null,
+  signature: null,
+});
+
+/** Same memoized information_schema-probe idiom as recordsStore.js's
+ *  documentsHaveUpdatedAt — guards upsertSettings' INSERT column list so a
+ *  deploy that lands before M3-config/21 is pasted just can't persist these
+ *  three fields yet, instead of a 42703 undefined_column error. Reads are
+ *  already tolerant for free: `SELECT *` + shapeSettings()'s `?? null`. */
+let outreachHasShopFields = null;
+async function outreachSettingsHaveShopFields(client) {
+  if (outreachHasShopFields !== null) return outreachHasShopFields;
+  try {
+    const r = await client.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenant_outreach_settings' AND column_name = 'shop_name'`
+    );
+    outreachHasShopFields = r.rowCount > 0;
+  } catch {
+    return false;
+  }
+  return outreachHasShopFields;
+}
 
 async function withTenantTx(ctx, fn) {
   const client = await getPool().connect();
@@ -103,6 +136,12 @@ function shapeSettings(row) {
     fromName: row.from_name,
     replyTo: row.reply_to,
     offerText: row.offer_text,
+    // `?? null`: undefined (column doesn't exist yet, M3-config/21 not
+    // applied) reads the same as an explicit NULL — never throws, never
+    // shows "undefined" in the UI.
+    shopName: row.shop_name ?? null,
+    shopPhone: row.shop_phone ?? null,
+    signature: row.signature ?? null,
   };
 }
 
@@ -126,7 +165,24 @@ async function upsertSettings(client, tenantId, patch) {
     fromName: typeof patch.fromName === "string" ? patch.fromName.trim().slice(0, 200) || null : current.fromName,
     replyTo: typeof patch.replyTo === "string" ? patch.replyTo.trim().slice(0, 200) || null : current.replyTo,
     offerText: typeof patch.offerText === "string" ? patch.offerText.trim().slice(0, 2000) || null : current.offerText,
+    shopName: typeof patch.shopName === "string" ? patch.shopName.trim().slice(0, 200) || null : current.shopName,
+    shopPhone: typeof patch.shopPhone === "string" ? patch.shopPhone.trim().slice(0, 40) || null : current.shopPhone,
+    signature: typeof patch.signature === "string" ? patch.signature.trim().slice(0, 200) || null : current.signature,
   };
+
+  if (await outreachSettingsHaveShopFields(client)) {
+    const { rows } = await client.query(
+      `INSERT INTO tenant_outreach_settings (tenant_id, enabled, mode, lead_days, from_name, reply_to, offer_text, shop_name, shop_phone, signature, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+       ON CONFLICT (tenant_id) DO UPDATE
+         SET enabled = $2, mode = $3, lead_days = $4, from_name = $5, reply_to = $6, offer_text = $7,
+             shop_name = $8, shop_phone = $9, signature = $10, updated_at = NOW()
+       RETURNING *`,
+      [tenantId, merged.enabled, merged.mode, merged.leadDays, merged.fromName, merged.replyTo, merged.offerText,
+       merged.shopName, merged.shopPhone, merged.signature]
+    );
+    return shapeSettings(rows[0]);
+  }
   const { rows } = await client.query(
     `INSERT INTO tenant_outreach_settings (tenant_id, enabled, mode, lead_days, from_name, reply_to, offer_text, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
@@ -204,7 +260,10 @@ async function generateDraftsFromItems(client, tenantId, { shopName, settings },
   for (const { item, contact } of eligible) {
     const { subject, bodyText } = renderOutreachEmail({
       tier: item.tier,
-      shopName: settings.fromName || shopName,
+      shopName: settings.shopName || settings.fromName || shopName,
+      senderName: settings.fromName,
+      signature: settings.signature,
+      shopPhone: settings.shopPhone,
       customerName: item.customerName,
       manufacturer: item.manufacturer,
       model: item.model,
@@ -383,10 +442,13 @@ export default async function handler(req, res) {
   try {
     if (op === "settings") {
       try {
-        const settings = await withTenantTx(ctx, (client, tenantId) => getSettings(client, tenantId));
-        return handleCors(res, req).status(200).json({ ...settings, migrationPending: false });
+        const { settings, outreachAutoEntitled } = await withTenantTx(ctx, async (client, tenantId) => {
+          const { rows } = await client.query(`SELECT limits FROM tenants WHERE id = $1`, [tenantId]);
+          return { settings: await getSettings(client, tenantId), outreachAutoEntitled: hasOutreachAutoEntitlement(rows[0]) };
+        });
+        return handleCors(res, req).status(200).json({ ...settings, outreachAutoEntitled, migrationPending: false });
       } catch (err) {
-        if (err?.code === "42P01") return handleCors(res, req).status(200).json({ ...DEFAULT_SETTINGS, migrationPending: true });
+        if (err?.code === "42P01") return handleCors(res, req).status(200).json({ ...DEFAULT_SETTINGS, outreachAutoEntitled: false, migrationPending: true });
         throw err;
       }
     }
@@ -394,12 +456,19 @@ export default async function handler(req, res) {
     if (op === "saveSettings") {
       if (hasShop(auth)) requireRole(auth, "admin");
       const patch = body.settings && typeof body.settings === "object" ? body.settings : {};
-      const settings = await withTenantTx(ctx, async (client, tenantId) => {
+      const { settings, outreachAutoEntitled } = await withTenantTx(ctx, async (client, tenantId) => {
+        const { rows } = await client.query(`SELECT limits FROM tenants WHERE id = $1`, [tenantId]);
+        const entitled = hasOutreachAutoEntitlement(rows[0]);
+        // REQUEST 2b: mode='auto' is a paid add-on; mode='review' never
+        // needs this check (assertModeAllowed returns null immediately).
+        const gate = assertModeAllowed(patch.mode, entitled);
+        if (gate) throw new OutreachError(gate.error, gate.status);
+
         const s = await upsertSettings(client, tenantId, patch);
         await logAudit(client, tenantId, { clerkUserId: auth.userId, action: "outreach.settings_saved", changes: patch });
-        return s;
+        return { settings: s, outreachAutoEntitled: entitled };
       });
-      return handleCors(res, req).status(200).json({ ...settings, migrationPending: false });
+      return handleCors(res, req).status(200).json({ ...settings, outreachAutoEntitled, migrationPending: false });
     }
 
     if (op === "list") {
@@ -412,7 +481,9 @@ export default async function handler(req, res) {
       const attention = await getWarrantyAttention({ tenantId: ctx.tenantKey, orgId: ctx.tenantName }, {});
       const result = await withTenantTx(ctx, async (client, tenantId) => {
         const settings = await getSettings(client, tenantId);
-        const shopName = settings.fromName || (await getTenantName(client, tenantId)) || null;
+        // REQUEST 2a: prefill from the org/tenant name only when the shop
+        // hasn't set anything more specific of its own.
+        const shopName = settings.shopName || settings.fromName || (await getTenantName(client, tenantId)) || null;
         return generateDraftsFromItems(client, tenantId, { shopName, settings }, attention.items);
       });
       return handleCors(res, req).status(200).json(result);
@@ -533,7 +604,18 @@ async function runOutreachSweepForTenant(tenant, settings, result) {
     const gen = await generateDraftsFromItems(client, tenantId, { shopName: tenant.tenant_name, settings }, attention.items);
     result.drafted = gen.created;
 
-    if (sweepAction(settings) === "auto") {
+    let action = sweepAction(settings);
+    if (action === "auto") {
+      // REQUEST 2b, defense in depth: saveSettings already refuses to turn
+      // mode='auto' on without the entitlement, but this cron path reads
+      // `tenant_outreach_settings.mode` directly — if the entitlement was
+      // later revoked (a downgrade, a canceled add-on) with nobody visiting
+      // Settings again to notice, degrade to 'review' rather than send.
+      const { rows } = await client.query(`SELECT limits FROM tenants WHERE id = $1`, [tenantId]);
+      if (!hasOutreachAutoEntitlement(rows[0])) action = "review";
+    }
+
+    if (action === "auto") {
       if (gen.created > 0) await approveDrafts(client, tenantId, null, "system:auto");
       // Capped tighter than an interactive click (sendCapFor("auto") = 20):
       // one tenant's backlog must not eat the whole shared cron budget. The
@@ -581,6 +663,11 @@ export async function runOutreachSweep({ deadlineAt, maxTenants = 8, perTenantMs
         fromName: tenant.from_name,
         replyTo: tenant.reply_to,
         offerText: tenant.offer_text,
+        // `?? null`: list_outreach_enabled_tenants() only returns these
+        // columns once M3-config/21 is applied — undefined until then.
+        shopName: tenant.shop_name ?? null,
+        shopPhone: tenant.shop_phone ?? null,
+        signature: tenant.signature ?? null,
       };
       const result = { drafted: 0, sent: 0, failed: 0 };
       try {

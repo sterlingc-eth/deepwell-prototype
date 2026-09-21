@@ -65,6 +65,9 @@ interface DocumentRow {
   /** Written by api/_lib/reviewStore.js's verifyDocument (M3-config/08-review.sql). */
   verified_by?: string | null;
   verified_at?: unknown;
+  /** Clerk user id of whoever uploaded this document (M3-config/20) —
+   *  undefined on a database that hasn't applied that migration yet. */
+  uploaded_by?: string | null;
 }
 
 /** Parses whatever JSON actually sent back (a string, or nothing) into a Date. */
@@ -177,6 +180,7 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
     // as "already digital" and is the least misleading of the four options.
     source: 'drive',
     receivedAt,
+    uploadedBy: row.uploaded_by ?? undefined,
     typeId,
     stage: 'received', // placeholder — deriveStage below sets the real one
     extracted: extractions.map((x) => {

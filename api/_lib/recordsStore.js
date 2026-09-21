@@ -385,6 +385,25 @@ export async function extractionsHaveUnitIndex(db) {
 }
 export function _resetExtractionsUnitIndexProbe() { extractionsUnitIndex = null; }
 
+/** Same contract as documentsHaveUpdatedAt, for documents.uploaded_by
+ *  (M3-config/20). Guards createDocument's INSERT so a deploy that lands
+ *  before that migration is pasted just writes nothing for uploaded_by,
+ *  instead of a 42703 undefined_column error. */
+let documentsUploadedBy = null;
+export async function documentsHaveUploadedBy(db) {
+  if (documentsUploadedBy !== null) return documentsUploadedBy;
+  try {
+    const r = await db.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'documents' AND column_name = 'uploaded_by'`
+    );
+    documentsUploadedBy = r.rowCount > 0;
+  } catch {
+    return false;
+  }
+  return documentsUploadedBy;
+}
+export function _resetDocumentsUploadedByProbe() { documentsUploadedBy = null; }
+
 /**
  * Builds the `{tenantAddressKey, letterheadCounts}` isLikelyShopAddress needs
  * (reviewer follow-up, 2026-09-20: the address-only path above can otherwise
@@ -734,18 +753,39 @@ function makeStore(db, tenantId) {
     tenantId,
 
     // ---- documents ----
-    createDocument: (d) => one(
-      `INSERT INTO documents (tenant_id, batch_id, original_filename, document_type,
-                              sha256_hash, file_size_bytes, stage, storage_key,
-                              content_type, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'received'),$8,$9,NOW())
-       ON CONFLICT (tenant_id, sha256_hash) DO UPDATE
-         SET storage_key = COALESCE(EXCLUDED.storage_key, documents.storage_key)
-       RETURNING id`,
-      [tenantId, d.batch_id ?? null, d.original_filename, d.document_type ?? null,
-       d.sha256_hash, d.file_size_bytes ?? null, d.stage,
-       d.storage_key ?? null, d.content_type ?? null]
-    ),
+    // uploaded_by (M3-config/20): the Clerk user id that requested this
+    // upload (api/upload-url.js), guarded by documentsHaveUploadedBy() —
+    // see that probe's own comment. Left NULL/never overwritten on a repeat
+    // upload of the same bytes (COALESCE keeps whoever uploaded it first).
+    createDocument: async (d) => {
+      if (await documentsHaveUploadedBy(db)) {
+        return one(
+          `INSERT INTO documents (tenant_id, batch_id, original_filename, document_type,
+                                  sha256_hash, file_size_bytes, stage, storage_key,
+                                  content_type, uploaded_by, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'received'),$8,$9,$10,NOW())
+           ON CONFLICT (tenant_id, sha256_hash) DO UPDATE
+             SET storage_key = COALESCE(EXCLUDED.storage_key, documents.storage_key),
+                 uploaded_by = COALESCE(documents.uploaded_by, EXCLUDED.uploaded_by)
+           RETURNING id`,
+          [tenantId, d.batch_id ?? null, d.original_filename, d.document_type ?? null,
+           d.sha256_hash, d.file_size_bytes ?? null, d.stage,
+           d.storage_key ?? null, d.content_type ?? null, d.uploaded_by ?? null]
+        );
+      }
+      return one(
+        `INSERT INTO documents (tenant_id, batch_id, original_filename, document_type,
+                                sha256_hash, file_size_bytes, stage, storage_key,
+                                content_type, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'received'),$8,$9,NOW())
+         ON CONFLICT (tenant_id, sha256_hash) DO UPDATE
+           SET storage_key = COALESCE(EXCLUDED.storage_key, documents.storage_key)
+         RETURNING id`,
+        [tenantId, d.batch_id ?? null, d.original_filename, d.document_type ?? null,
+         d.sha256_hash, d.file_size_bytes ?? null, d.stage,
+         d.storage_key ?? null, d.content_type ?? null]
+      );
+    },
     getDocument: (id) => one(`SELECT * FROM documents WHERE id = $1 AND ${TENANT}`, [id]),
     // Cascades to document_pages, facets and extractions through their FKs.
     // The tenant predicate is belt-and-braces next to RLS: a delete that

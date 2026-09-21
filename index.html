@@ -133,8 +133,19 @@ a{color:inherit}
 .fact{display:flex;flex-direction:column;gap:2px}
 .fact b{font-family:"Newsreader",serif;font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
 .fact span{font-size:.78rem;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-family:"IBM Plex Mono",monospace}
-.well{position:relative;aspect-ratio:1;max-width:380px;width:100%;margin-left:auto}
-.well canvas{width:100%;height:100%;display:block}
+.well{position:relative;max-width:380px;width:100%;margin-left:auto;display:flex;flex-direction:column;gap:14px}
+.well canvas{width:100%;aspect-ratio:1;display:block}
+/* Donovan: the well is his mark. A lit sphere with brass rings that breathe;
+   under it, a question becoming an answer — the thing the product does. */
+.donovan-chat{display:flex;flex-direction:column;gap:8px;min-height:84px;font-size:.92rem;line-height:1.35}
+.donovan-q,.donovan-a{display:flex;gap:10px;align-items:flex-start}
+.donovan-who{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding-top:3px;width:64px}
+.donovan-who-d{color:var(--brass)}
+.donovan-a{color:var(--text)}
+.donovan-q{color:var(--muted)}
+#donovan-a::after{content:"";display:inline-block;width:2px;height:1em;background:var(--brass);margin-left:2px;vertical-align:-2px;animation:donovan-caret 1s steps(2) infinite}
+@keyframes donovan-caret{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#donovan-a::after{animation:none}}
 @media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.well{max-width:360px;margin:0 auto;order:-1}}
 
 /* hero micro-loop: a document quietly becoming an answer, next to the headline */
@@ -482,7 +493,13 @@ footer a{color:var(--muted);text-decoration:none}
         <div class="fact"><b>100%</b><span>Answers cite the source</span></div>
       </div>
     </div>
-    <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
+    <div class="well" aria-hidden="true">
+      <canvas id="well"></canvas>
+      <div class="donovan-chat">
+        <div class="donovan-q"><span class="donovan-who">You</span><span id="donovan-q"></span></div>
+        <div class="donovan-a"><span class="donovan-who donovan-who-d">Donovan</span><span id="donovan-a"></span></div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -1200,7 +1217,7 @@ footer a{color:var(--muted);text-decoration:none}
 </footer>
 
 <script>
-/* ---- ambient well rings ---- */
+/* ---- Donovan's mark: a lit well with breathing rings + a reading sweep ---- */
 (function(){
   const c=document.getElementById('well');if(!c)return;
   const ctx=c.getContext('2d');
@@ -1208,27 +1225,68 @@ footer a{color:var(--muted);text-decoration:none}
   let w,h,dpr,t0=performance.now();
   function size(){dpr=Math.min(devicePixelRatio||1,2);const r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
   size();addEventListener('resize',size);
-  function ringColor(){return getComputedStyle(document.documentElement).getPropertyValue('--ring').trim()||'rgba(22,60,44,.5)'}
+  function cssv(n,f){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||f}
+  window.__donovanReading=false;
   function frame(now){
     const t=reduce?0:(now-t0)/1000;
     ctx.clearRect(0,0,w,h);
-    const cx=w/2,cy=h/2,R=Math.min(w,h)/2-6;
-    const N=9,base=ringColor();
+    const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;
+    const brass=cssv('--brass','#B98A4E');
+    // halo
+    const halo=ctx.createRadialGradient(cx,cy,R*0.9,cx,cy,R*1.08);
+    halo.addColorStop(0,'rgba(185,138,78,0)');halo.addColorStop(1,'rgba(185,138,78,'+(window.__donovanReading?0.35:0.18)+')');
+    ctx.beginPath();ctx.arc(cx,cy,R*1.08,0,Math.PI*2);ctx.fillStyle=halo;ctx.fill();
+    // sphere
+    const g=ctx.createRadialGradient(cx-R*0.3,cy-R*0.38,R*0.05,cx,cy,R*1.05);
+    g.addColorStop(0,'#5A8C6C');g.addColorStop(0.55,'#245239');g.addColorStop(1,'#07140E');
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+    // rings breathe in sequence; faster while "reading"
+    const N=4,speed=window.__donovanReading?1.2:0.28;
     for(let i=0;i<N;i++){
-      // rings drift outward slowly, like a ripple; opacity fades at the edge
-      const phase=((i/N)+t*0.035)%1;
-      const r=R*(0.08+0.92*phase);
-      const a=Math.sin(phase*Math.PI);
-      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-      ctx.lineWidth=2.2;
-      ctx.strokeStyle=base.replace(/[\d.]+\)$/,(0.15+0.85*a)+')');
-      ctx.stroke();
+      const r=R*(0.2+0.68*(i/(N-1)));
+      const a=0.35+0.65*Math.max(0,Math.sin((t*speed-i*0.45)*Math.PI/1.8));
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.lineWidth=i===0?2.4:1.6;
+      ctx.strokeStyle='rgba(232,209,168,'+a.toFixed(3)+')';ctx.stroke();
     }
-    // static center + hairline crosshair
-    ctx.beginPath();ctx.arc(cx,cy,R*0.06,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=base;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,R*0.06,0,Math.PI*2);ctx.fillStyle='#E8D1A8';ctx.fill();
+    // reading sweep
+    if(window.__donovanReading&&!reduce){
+      const th=(t*2.2)%(Math.PI*2);
+      ctx.beginPath();ctx.arc(cx,cy,R*0.88,th,th+0.9);ctx.lineWidth=3;ctx.lineCap='round';ctx.strokeStyle=brass;ctx.stroke();
+    }
+    // specular highlight — makes it a sphere, not a disc
+    ctx.save();ctx.translate(cx-R*0.3,cy-R*0.42);ctx.rotate(-0.5);ctx.scale(1,0.6);
+    const hl=ctx.createRadialGradient(0,0,0,0,0,R*0.3);hl.addColorStop(0,'rgba(134,174,147,.7)');hl.addColorStop(1,'rgba(134,174,147,0)');
+    ctx.beginPath();ctx.arc(0,0,R*0.3,0,Math.PI*2);ctx.fillStyle=hl;ctx.fill();ctx.restore();
     if(!reduce)requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  /* a question becoming an answer, on loop — every one a real thing Donovan does */
+  const qa=[
+    ['What\'s the serial at 215 N College Ave?','F2006123 — Trane 4TTR4036. From the startup sheet, p. 1.'],
+    ['Is the Whitmore unit still under warranty?','Parts warranty ends Nov 20, 2026 — 60 days out. Invoice + nameplate photo.'],
+    ['Who was last out to the Castillo house?','Denise Ford, 11/06/2025 — weak airflow after a filter change. Service ticket.'],
+    ['What refrigerant is in RTU-3 at Desert Ridge Dental?','R-454B. Lennox ML14XC1-048. Maintenance agreement, p. 2.'],
+  ];
+  const qEl=document.getElementById('donovan-q'),aEl=document.getElementById('donovan-a');
+  if(!qEl||!aEl)return;
+  if(reduce){qEl.textContent=qa[0][0];aEl.textContent=qa[0][1];return;}
+  let k=0,stop=false;
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  async function type(el,text,ms){el.textContent='';for(const ch of text){el.textContent+=ch;await wait(ms);}}
+  async function untilVisible(){while(document.hidden)await wait(500);}
+  (async function loop(){
+    while(!stop){
+      await untilVisible();
+      const [q,a]=qa[k%qa.length];k++;
+      aEl.textContent='';
+      await type(qEl,q,34);
+      window.__donovanReading=true;await wait(900);window.__donovanReading=false;
+      await type(aEl,a,16);
+      await wait(4200);
+    }
+  })();
 })();
 
 /* ---- pause/resume decorative animations off-screen ---- */

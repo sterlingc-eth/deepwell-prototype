@@ -13,6 +13,8 @@ import { deleteDocuments } from '../services/documentClient';
 import { isAttention } from './ReviewScreen';
 import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
+import { useWorkFilter } from '../hooks/useWorkFilter';
+import { WorkFilterControl } from '../components/WorkFilterControl';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -128,6 +130,11 @@ function DocumentsTab() {
   const [emptying, setEmptying] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
+  // "My work / Everyone" (owner brief 2026-09-21) — the full doc set, not
+  // `rows`, so the default-choice rule stays stable across the other filters
+  // on this screen.
+  const allDocsList = useMemo(() => Object.values(docs), [docs]);
+  const work = useWorkFilter(allDocsList);
   const runExport = async () => {
     setExporting(true);
     setExportErr(null);
@@ -177,6 +184,7 @@ function DocumentsTab() {
     if (stageFilter !== 'any') list = list.filter((r) => r.stageBucket === stageFilter);
     if (customerFilter === 'none') list = list.filter((r) => !r.customer);
     else if (customerFilter !== 'any') list = list.filter((r) => r.customer?.id === customerFilter);
+    if (work.choice === 'mine') list = list.filter((r) => work.isMine(r.doc));
 
     return [...list].sort((a, b) => {
       switch (sort) {
@@ -187,10 +195,11 @@ function DocumentsTab() {
         default: return b.doc.receivedAt.getTime() - a.doc.receivedAt.getTime();
       }
     });
-  }, [allRows, filter, typeFilter, stageFilter, customerFilter, sort]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, filter, typeFilter, stageFilter, customerFilter, sort, work.choice, work.isMine]);
 
   const filtersActive = typeFilter !== 'any' || stageFilter !== 'any' || customerFilter !== 'any';
-  const anyActive = filtersActive || filter.trim().length > 0;
+  const anyActive = filtersActive || filter.trim().length > 0 || work.choice === 'mine';
   const clearAll = () => { setFilter(''); setTypeFilter('any'); setStageFilter('any'); setCustomerFilter('any'); };
 
   // Selection can only ever hold ids currently in view; a doc removed out
@@ -260,6 +269,8 @@ function DocumentsTab() {
           autoComplete="off"
         />
       </div>
+
+      {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
 
       <div className="dw-card p-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -376,7 +387,14 @@ function DocumentsTab() {
                 <td className="px-3 py-2 align-top">
                   <input type="checkbox" aria-label={`Select ${doc.filename}`} checked={selected.has(doc.id)} onChange={() => toggleOne(doc.id)} />
                 </td>
-                <td className="px-3 py-2 align-top max-w-[16rem] truncate" title={doc.filename}>{doc.filename}</td>
+                <td className="px-3 py-2 align-top max-w-[16rem]" title={doc.filename}>
+                  <span className="block truncate">{doc.filename}</span>
+                  {work.choice === 'everyone' && work.hasShop && (
+                    <span className="dw-pill-muted mt-1 inline-block text-caption">
+                      {(doc.uploadedBy && work.nameByUserId.get(doc.uploadedBy)) || 'Teammate'}
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2 align-top">{typeLabel}</td>
                 <td className="px-3 py-2 align-top"><StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} compact /></td>
                 <td className="px-3 py-2 align-top">

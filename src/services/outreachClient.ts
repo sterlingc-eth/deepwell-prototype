@@ -24,6 +24,17 @@ export interface OutreachSettings {
   fromName: string | null;
   replyTo: string | null;
   offerText: string | null;
+  /** The shop's own name, phone and sign-off line — Donovan's draft template
+   *  uses these (api/_lib/outreach.js's renderOutreachEmail). Null until an
+   *  admin sets them, or on a database that hasn't applied
+   *  M3-config/21-outreach-shop-fields.sql yet. */
+  shopName: string | null;
+  shopPhone: string | null;
+  signature: string | null;
+  /** True once this tenant holds the `outreachAuto` add-on entitlement
+   *  (api/_lib/plan.js's hasOutreachAutoEntitlement) — mode: 'auto' is only
+   *  selectable when this is true; mode: 'review' never needs it. */
+  outreachAutoEntitled: boolean;
   /** true when M3-config/18-outreach.sql hasn't been applied to this database yet. */
   migrationPending: boolean;
 }
@@ -95,7 +106,7 @@ export function fetchOutreachSettings(): Promise<OutreachSettings> {
   return call({ op: 'settings' });
 }
 
-export function saveOutreachSettings(patch: Partial<Omit<OutreachSettings, 'migrationPending'>>): Promise<OutreachSettings> {
+export function saveOutreachSettings(patch: Partial<Omit<OutreachSettings, 'migrationPending' | 'outreachAutoEntitled'>>): Promise<OutreachSettings> {
   return call({ op: 'saveSettings', settings: patch });
 }
 

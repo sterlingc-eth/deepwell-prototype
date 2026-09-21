@@ -19,6 +19,27 @@ export const PLAN_LIMITS = Object.freeze({
   fleet: Object.freeze({ technicians: null, documentsStored: null,    pagesPerMonth: 10_000 }),
 });
 
+/**
+ * Add-on entitlements a tenant may hold independently of their plan tier
+ * (PLAN_LIMITS, above, caps USAGE per plan; this is a separate yes/no a
+ * tenant buys on top). Stored under tenants.limits — the same jsonb column
+ * billing_apply() already writes PLAN_LIMITS into on every subscription
+ * webhook (M3-config/14-billing.sql) — so no new column/migration is
+ * needed: a tenant granted an add-on gets `limits.<key> = true` merged in
+ * from its own Stripe subscription item, independent of which base plan
+ * they're on. See api/_lib/billing.js's OUTREACH_AUTO_ADDON_LOOKUP_KEY for
+ * where that Stripe item is recognized.
+ *
+ * REQUEST 2b (2026-09-21, owner brief): "Maybe they can add the automated
+ * portion that auto-sends if they pay extra." `outreachAuto` gates
+ * api/_lib/routes/outreach.js's mode='auto' (unattended nightly sending);
+ * mode='review' (Donovan drafts, a human copies/sends) needs no entitlement
+ * at all.
+ */
+export function hasOutreachAutoEntitlement(tenantRow) {
+  return tenantRow?.limits?.outreachAuto === true;
+}
+
 /** Documents a never-subscribed tenant may ingest and ask about before a
  * trial or subscription is required. */
 export const FREE_PREVIEW_DOCUMENTS = 3;

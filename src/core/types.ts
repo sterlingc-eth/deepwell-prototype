@@ -142,6 +142,11 @@ export interface Doc {
   batchId: BatchId;
   source: IntakeSource;
   receivedAt: Date;
+  /** Clerk user id of whoever uploaded this document (documents.uploaded_by,
+   *  M3-config/20), undefined for a document uploaded before that column
+   *  existed or via an API key. Drives the "My work · Everyone" filter
+   *  (src/core/workFilter.ts) and the uploader chip shown in Everyone view. */
+  uploadedBy?: string;
   /** Domain document type id, null until classified */
   typeId: string | null;
   stage: PipelineStage;

@@ -204,6 +204,11 @@ async function createUploadUrlTx(db, validated, auth) {
     file_size_bytes: sizeBytes,
     content_type: contentType,
     storage_key: key,
+    // Per-technician work attribution (M3-config/20): the Clerk user id of
+    // whoever requested this upload. `auth.userId` is `key:<id>` for an API
+    // key caller, not a real Clerk user — harmless here, it just never
+    // matches anyone's "My work" filter, same as any other non-human upload.
+    uploaded_by: auth.userId ?? null,
   });
   // Was this row already here (same tenant, same bytes)? If the document
   // already has pages, the client can skip the upload entirely.
