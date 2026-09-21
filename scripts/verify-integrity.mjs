@@ -15,7 +15,7 @@ import {
   buildContactAddressCounts, isLikelyShopPhone, isLikelyShopEmail, SHOP_CONTACT_ADDRESS_FLOOR,
   chooseUpgradedCustomerName,
 } from '../api/_lib/integrity.js';
-import { isEligibleForRelink, planSerialMovesByGroup } from '../api/_lib/routes/integrity.js';
+import { isEligibleForRelink, planSerialMovesByGroup, planSplitUnitMoves } from '../api/_lib/routes/integrity.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -616,6 +616,33 @@ eq('damerauLevenshteinDistance: adjacent transposition -> 1', damerauLevenshtein
     '480-555-9999'
   );
 
+  // Round 4 item 3 (2026-09-21): buildContactAddressCounts's `extra` param —
+  // evidence from customer_phone/shop_phone/shop_email EXTRACTIONS, not just
+  // each customer's own consolidated phone/email field. Live case: after a
+  // strip, only ONE customer still carries the number in its own `phone`
+  // field, so the floor can never clear from customer rows alone again.
+  const noCustomerEvidence = buildContactAddressCounts(
+    [{ address: '1 Elm St', phone: '' }], // one customer, no phone of its own on file
+    [
+      { address: '1 Elm St', phone: '480-555-0199' },
+      { address: '2 Oak St', phone: '480-555-0199' },
+      { address: '3 Pine St', phone: '480-555-0199' },
+    ]
+  );
+  eq('extraction-only evidence across 3 addresses still clears the floor', noCustomerEvidence.phoneAddressCounts['4805550199'], 3);
+  check('...and isLikelyShopPhone sees it', isLikelyShopPhone('480-555-0199', { phoneAddressCounts: noCustomerEvidence.phoneAddressCounts }) === true);
+
+  const mixedEvidence = buildContactAddressCounts(
+    [{ address: '1 Elm St', phone: '480-555-0199' }], // one address from the customer's OWN field
+    [
+      { address: '2 Oak St', phone: '480-555-0199' }, // + two more from extraction evidence
+      { address: '3 Pine St', phone: '480-555-0199' },
+    ]
+  );
+  eq('customer-row evidence and extraction evidence union onto the SAME address set', mixedEvidence.phoneAddressCounts['4805550199'], 3);
+
+  eq('extra defaults to nothing extra when omitted (back-compatible)', buildContactAddressCounts([{ address: '1 Elm St', phone: '480-555-0199' }]).phoneAddressCounts['4805550199'], 1);
+
   // Per buildMatchEvidence's own doc comment: before this fix, every
   // customer carrying the same leaked shop phone "matched" on phone, and
   // the auto-tier logic (contactConfirmed) treated that coincidence as
@@ -759,6 +786,53 @@ check(
   'a document with no toCustomerId (relink failed to resolve) forms no group',
   planSerialMovesByGroup([{ documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: null, serials: ['SN-X'] }], new Map()).length === 0
 );
+
+/* --------------------------- Round 4 item 1: healSplitUnits unanimity check */
+// Live case: Desert Ridge Dental's 3 RTUs are still on Plaza Dental Group
+// because the relink that moved their documents ran on the build before
+// planSerialMovesByGroup existed — healSplitUnits repairs that ALREADY-
+// DAMAGED state by re-checking, for each unit, whether every document naming
+// its serial now unanimously agrees on a different customer.
+
+{
+  // Every document naming the serial agrees on customer X, which differs
+  // from the unit's current (wrong) customer -> moves.
+  const rows = [
+    { equipmentId: 'eq-1', unitCustomerId: 'plaza', serial: 'sn-rtu-1', documentId: 'doc-1', directCustomerId: 'desert-ridge' },
+    { equipmentId: 'eq-1', unitCustomerId: 'plaza', serial: 'sn-rtu-1', documentId: 'doc-2', directCustomerId: 'desert-ridge' },
+  ];
+  const moves = planSplitUnitMoves(rows);
+  eq('unanimous documents naming the serial move the unit to the agreed customer', moves, [
+    { equipmentId: 'eq-1', unitCustomerId: 'plaza', serial: 'sn-rtu-1', targetCustomerId: 'desert-ridge' },
+  ]);
+}
+
+{
+  // Paterson/Patterson case: documents disagree (1 says Paterson, 3 say
+  // Patterson) -> do nothing, stays for a human in splitLinkDocuments.
+  const rows = [
+    { equipmentId: 'eq-2', unitCustomerId: 'paterson-cust', serial: 'sn-9', documentId: 'doc-1', directCustomerId: 'paterson-cust' },
+    { equipmentId: 'eq-2', unitCustomerId: 'paterson-cust', serial: 'sn-9', documentId: 'doc-2', directCustomerId: 'patterson-cust' },
+    { equipmentId: 'eq-2', unitCustomerId: 'paterson-cust', serial: 'sn-9', documentId: 'doc-3', directCustomerId: 'patterson-cust' },
+    { equipmentId: 'eq-2', unitCustomerId: 'paterson-cust', serial: 'sn-9', documentId: 'doc-4', directCustomerId: 'patterson-cust' },
+  ];
+  eq('documents disagreeing on the customer -> no move', planSplitUnitMoves(rows), []);
+}
+
+check(
+  'a document with NO direct customer link at all blocks the move (not unanimous agreement, just missing evidence)',
+  planSplitUnitMoves([
+    { equipmentId: 'eq-3', unitCustomerId: 'plaza', serial: 'sn-3', documentId: 'doc-1', directCustomerId: 'desert-ridge' },
+    { equipmentId: 'eq-3', unitCustomerId: 'plaza', serial: 'sn-3', documentId: 'doc-2', directCustomerId: null },
+  ]).length === 0
+);
+check(
+  'every document already agreeing with the unit\'s OWN customer -> no move (nothing to fix)',
+  planSplitUnitMoves([
+    { equipmentId: 'eq-4', unitCustomerId: 'plaza', serial: 'sn-4', documentId: 'doc-1', directCustomerId: 'plaza' },
+  ]).length === 0
+);
+check('a unit with no documents naming its serial at all forms no candidate', planSplitUnitMoves([]).length === 0);
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

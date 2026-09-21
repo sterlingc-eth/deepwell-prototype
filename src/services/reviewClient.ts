@@ -169,7 +169,8 @@ export interface IntegrityScanResult {
 
 export type IntegrityApplyAction =
   | 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits'
-  | 'healMergedSurvivors' | 'retireShopCustomers' | 'stripShopContact' | 'relinkMismatchedNames';
+  | 'healMergedSurvivors' | 'retireShopCustomers' | 'stripShopContact' | 'relinkMismatchedNames'
+  | 'healSplitUnits' | 'refillCustomerContacts';
 
 // Review fix (2026-09-20, reviewer NO-GO item 2): relinkMismatchedNames is
 // deliberately NOT in this list. It repoints a document from one customer to
@@ -183,6 +184,11 @@ export type IntegrityApplyAction =
 export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = [
   'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
   'stripShopContact',
+  // Round 4 (2026-09-21): both safe/additive like healMergedSurvivors above —
+  // healSplitUnits only moves a unit when every document naming its serial
+  // unanimously agrees on a different customer; refillCustomerContacts only
+  // ever fills an EMPTY phone/email, never overwrites one.
+  'healSplitUnits', 'refillCustomerContacts',
 ];
 
 /** The ordinary result of an integrityFix call. */
@@ -201,6 +207,12 @@ export interface IntegrityFixApplied {
    *  customer got relinked into the same new one. One entry per
    *  (fromCustomerId -> toCustomerId) pair actually relinked this run. */
   unitsMovedByGroup: { fromCustomerId: string; toCustomerId: string; documentIds: string[]; unitsMoved: number }[];
+  /** Round 4 (2026-09-21): healSplitUnits — a unit whose serial's documents
+   *  unanimously point at a different customer than the unit currently has. */
+  splitUnitsHealed: { equipmentId: string; from: string; to: string }[];
+  /** Round 4 (2026-09-21): refillCustomerContacts — a customer whose phone/
+   *  email was empty, filled from that customer's own documents. */
+  customerContactsFilled: { customerId: string; field: 'phone' | 'email'; value: string }[];
   skipped: { documentId: string | null; reason: string }[];
 }
 

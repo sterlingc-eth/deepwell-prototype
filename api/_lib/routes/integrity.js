@@ -29,6 +29,12 @@ import {
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const CUSTOMER_SCAN_LIMIT = 500;
 const DOCUMENT_SCAN_LIMIT = 1000;
+// Round 4 (2026-09-21) caps: both new evidence queries below join extractions
+// across the whole tenant, so each gets its own row cap independent of the
+// per-document/per-customer scan limits above.
+const CONTACT_EXTRACTION_EVIDENCE_LIMIT = 5000;
+const SPLIT_UNIT_EQUIPMENT_LIMIT = 2000;
+const SPLIT_UNIT_ROW_LIMIT = 5000;
 // Destructive/irreversible-feeling actions, admin-gated (integrityFix below)
 // regardless of what else is in `apply`. stripShopContact and
 // relinkMismatchedNames (limit-test defects A/C, 2026-09-20) join this list:
@@ -38,6 +44,11 @@ const ADMIN_ONLY_ACTIONS = new Set(['mergeDuplicates', 'retireShopCustomers', 's
 const APPLY_ACTIONS = new Set([
   'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
   'retireShopCustomers', 'stripShopContact', 'relinkMismatchedNames',
+  // Round 4 (2026-09-21): both additive/fill-only, like healMergedSurvivors —
+  // never repoint a document or remove data, so they get the plain
+  // effectiveDryRun gate and a place in ALL_INTEGRITY_FIXES/cron, not the
+  // admin-only "ask twice" gate above.
+  'healSplitUnits', 'refillCustomerContacts',
 ]);
 
 // ------------------------------------------------------------------ reads --
@@ -246,13 +257,47 @@ async function loadShopCustomersToRetire(db) {
   return targets;
 }
 
+/**
+ * Round 4 (2026-09-21): evidence for the shop-contact-address-count
+ * heuristic that a customer's OWN `data.phone`/`data.email` field can't see
+ * — a document naming the shop's number as `customer_phone` (fill-once
+ * wrote it there once, correctly recognized as shop-owned then, but never
+ * re-checked once the ONLY customer that still carried it after a strip was
+ * a fresh one with no address history) or `shop_phone`/`shop_email` still
+ * proves the number/email is the shop's, on that document's customer's
+ * address, whether or not it ever made it into that customer's own contact
+ * field. Returns `[{address, phone?, email?}]`, straight into
+ * buildContactAddressCounts's `extra` param — one row per (customer,
+ * matching extraction), `phone` and `email` mutually exclusive per row (SQL
+ * CASE, not a JS mapping step). Capped at CONTACT_EXTRACTION_EVIDENCE_LIMIT
+ * rows — a heuristic input, not a report; missing a few rows past the cap
+ * only makes the floor slightly harder to clear, never wrong.
+ */
+async function loadContactExtractionEvidence(db) {
+  const rows = await db.raw(
+    `SELECT ce.data->>'service_address' AS address,
+            CASE WHEN x.field_key IN ('customer_phone','shop_phone') THEN COALESCE(x.corrected_value, x.value) END AS phone,
+            CASE WHEN x.field_key IN ('customer_email','shop_email') THEN COALESCE(x.corrected_value, x.value) END AS email
+       FROM document_entity_links l
+       JOIN entities ce ON ce.id = l.entity_id AND ce.entity_type = 'customer' AND ce.merged_into IS NULL AND l.${TENANT}
+       JOIN extractions x ON x.document_id = l.document_id AND x.${TENANT}
+        AND x.field_key IN ('customer_phone','customer_email','shop_phone','shop_email') AND x.value IS NOT NULL
+      LIMIT ${CONTACT_EXTRACTION_EVIDENCE_LIMIT}`,
+    []
+  );
+  return rows.rows;
+}
+
 /** Builds isLikelyShopPhone/isLikelyShopEmail's ctx from a scan's already-
  *  loaded `customers` rows plus the tenant's own configured phone/email
  *  (carried on `shopContext` — see recordsStore.js's computeShopAddressContext,
- *  extended for this). Pure once `customers`/`shopContext` are in hand — no
- *  extra query beyond what integrityScan/applyIntegrityFix already run. */
-function buildContactCtx(customers, shopContext) {
-  const { phoneAddressCounts, emailAddressCounts } = buildContactAddressCounts(customers);
+ *  extended for this). `extraContactRows` (round 4, 2026-09-21, optional):
+ *  loadContactExtractionEvidence's rows, widening the address-count evidence
+ *  beyond each customer's own consolidated phone/email field — see that
+ *  function's doc comment. Pure once all three are in hand — no extra query
+ *  beyond what the caller already ran. */
+function buildContactCtx(customers, shopContext, extraContactRows) {
+  const { phoneAddressCounts, emailAddressCounts } = buildContactAddressCounts(customers, extraContactRows);
   return {
     tenantPhoneKey: shopContext?.tenantPhoneKey ?? null,
     tenantEmailKey: shopContext?.tenantEmailKey ?? null,
@@ -419,6 +464,93 @@ async function loadSplitLinkDocuments(db) {
 }
 
 /**
+ * Round 4 item 1 (2026-09-21): raw material for healSplitUnits — one row per
+ * (equipment unit with a serial, document naming that serial). `directCustomerId`
+ * is the document's DIRECT customer link (null when it has none). Grouped and
+ * decided by the pure planSplitUnitMoves below. Live case this repairs:
+ * Desert Ridge Dental's 3 RTUs are still on Plaza Dental Group because the
+ * relink that moved their documents ran on the build before
+ * planSerialMovesByGroup existed — this heals already-damaged state, not
+ * just fresh ingests. Equipment scan capped at SPLIT_UNIT_EQUIPMENT_LIMIT,
+ * total joined rows at SPLIT_UNIT_ROW_LIMIT.
+ */
+async function loadSplitUnitCandidateRows(db) {
+  const rows = await db.raw(
+    `WITH units AS (
+       SELECT id, customer_id, lower(data->>'serial_number') AS serial
+         FROM entities
+        WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT}
+          AND data->>'serial_number' IS NOT NULL AND data->>'serial_number' <> ''
+        LIMIT ${SPLIT_UNIT_EQUIPMENT_LIMIT}
+     )
+     SELECT u.id AS equipment_id, u.customer_id AS unit_customer_id, u.serial,
+            x.document_id, ce.id AS direct_customer_id
+       FROM units u
+       JOIN extractions x ON x.field_key = 'serial_number' AND x.value IS NOT NULL AND x.${TENANT}
+        AND lower(COALESCE(x.corrected_value, x.value)) = u.serial
+       LEFT JOIN document_entity_links l ON l.document_id = x.document_id AND l.${TENANT}
+       LEFT JOIN entities ce ON ce.id = l.entity_id AND ce.entity_type = 'customer' AND ce.merged_into IS NULL
+      LIMIT ${SPLIT_UNIT_ROW_LIMIT}`,
+    []
+  );
+  return rows.rows.map((r) => ({
+    equipmentId: r.equipment_id, unitCustomerId: r.unit_customer_id, serial: r.serial,
+    documentId: r.document_id, directCustomerId: r.direct_customer_id,
+  }));
+}
+
+/**
+ * Pure: Round 4 item 1 (2026-09-21) — the decision at the heart of
+ * healSplitUnits, pinned as a plain function (same isEligibleForRelink/
+ * planSerialMovesByGroup pattern) so it is unit-testable without a database.
+ * See scripts/verify-integrity.mjs.
+ *
+ * `rows`: loadSplitUnitCandidateRows' shape — one entry per (equipment,
+ * document) pair where that document names the equipment's serial,
+ * `{equipmentId, unitCustomerId, serial, documentId, directCustomerId}`
+ * (`directCustomerId` null when that document has no direct customer link).
+ *
+ * A unit moves to `targetCustomerId` only when EVERY document naming its
+ * serial has EXACTLY ONE direct customer link, and it's the SAME one across
+ * all of them, and that customer differs from the unit's own — i.e. the
+ * documents unanimously agree on a different owner. A document with no
+ * direct link at all, or documents that disagree (the Paterson/Patterson
+ * case: one doc says Paterson, three say Patterson), leaves the unit
+ * untouched — it stays in splitLinkDocuments for a human. Returns
+ * `[{equipmentId, unitCustomerId, serial, targetCustomerId}]`.
+ */
+export function planSplitUnitMoves(rows) {
+  const byEquip = new Map();
+  for (const r of rows || []) {
+    if (!r || !r.equipmentId || !r.documentId) continue;
+    let g = byEquip.get(r.equipmentId);
+    if (!g) {
+      g = { equipmentId: r.equipmentId, unitCustomerId: r.unitCustomerId, serial: r.serial, docs: new Map() };
+      byEquip.set(r.equipmentId, g);
+    }
+    if (!g.docs.has(r.documentId)) g.docs.set(r.documentId, new Set());
+    if (r.directCustomerId) g.docs.get(r.documentId).add(r.directCustomerId);
+  }
+
+  const moves = [];
+  for (const g of byEquip.values()) {
+    if (!g.docs.size) continue;
+    let target;
+    let unanimous = true;
+    for (const custSet of g.docs.values()) {
+      if (custSet.size !== 1) { unanimous = false; break; } // no direct link, or more than one
+      const [only] = custSet;
+      if (target === undefined) target = only;
+      else if (target !== only) { unanimous = false; break; }
+    }
+    if (unanimous && target && target !== g.unitCustomerId) {
+      moves.push({ equipmentId: g.equipmentId, unitCustomerId: g.unitCustomerId, serial: g.serial, targetCustomerId: target });
+    }
+  }
+  return moves;
+}
+
+/**
  * Limit-test defect D (2026-09-20): a document linked to its customer purely
  * by name (`linked_by = 'ai:name-only'` — see recordsStore.js's
  * findOrCreateCustomer/selectCustomerMatch matchBasis, and
@@ -463,7 +595,7 @@ async function loadAmbiguousNameOnlyLinks(db, customers) {
 
 export async function integrityScan(ctx) {
   return withRecordsTenant(ctx, async (db) => {
-    const [customers, docCandidates, equipCandidates, multiUnitCandidates, orphanEquipment, shopContext, mismatchedNameLinks, splitLinkDocuments] = await Promise.all([
+    const [customers, docCandidates, equipCandidates, multiUnitCandidates, orphanEquipment, shopContext, mismatchedNameLinks, splitLinkDocuments, extraContactRows] = await Promise.all([
       loadCustomersForScan(db),
       loadUnlinkedCandidates(db),
       loadEquipmentMissingCustomer(db),
@@ -472,6 +604,7 @@ export async function integrityScan(ctx) {
       db.loadShopAddressContext(),
       loadMismatchedDirectLinks(db),
       loadSplitLinkDocuments(db),
+      loadContactExtractionEvidence(db),
     ]);
     const suspectedShopAddresses = await loadSuspectedShopAddresses(db, shopContext);
 
@@ -479,9 +612,21 @@ export async function integrityScan(ctx) {
     // value is excluded from evaluateCustomerMatch's identity check entirely
     // (see integrity.js's buildMatchEvidence) — otherwise every customer that
     // still carries the leaked shop number "matches" every other on phone.
-    const contactCtx = buildContactCtx(customers, shopContext);
+    // Round 4 (2026-09-21): extraContactRows widens the address-count
+    // evidence to documents' own customer_phone/shop_phone/shop_email
+    // extractions, not just each customer's consolidated phone/email field —
+    // see loadContactExtractionEvidence's doc comment.
+    const contactCtx = buildContactCtx(customers, shopContext, extraContactRows);
     const duplicateCustomers = findDuplicateCustomerPairs(customers, { ctx: contactCtx });
     const shopContactLeaks = findShopContactLeaks(customers, contactCtx);
+    // Round 4: a value only findable via the extraction-evidence signal above
+    // was never learned into known_shop_contacts either (that only happens
+    // inside stripShopContact's fix loop) — best-effort persist here too so a
+    // read-only scan still makes the finding durable, same as isLikelyShopPhone/
+    // Email's own doc comment describes. Never throws, never blocks the scan.
+    for (const leak of shopContactLeaks) {
+      await db.recordKnownShopContact(leak.field === 'phone' ? { phone: leak.value } : { email: leak.value });
+    }
     const ambiguousNameOnlyLinks = await loadAmbiguousNameOnlyLinks(db, customers);
 
     const unlinkedRows = docCandidates.filter(isUnlinkedDocument);
@@ -872,7 +1017,7 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
   const result = {
     dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [],
     survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [],
-    unitsMovedByGroup: [], skipped: [],
+    unitsMovedByGroup: [], splitUnitsHealed: [], customerContactsFilled: [], skipped: [],
   };
 
   if (applySet.has('mergeDuplicates')) {
@@ -1008,6 +1153,79 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     }
   }
 
+  if (applySet.has('healSplitUnits')) {
+    // Round 4 item 1 (2026-09-21), safe/additive like healMergedSurvivors
+    // above: only moves a unit when every document naming its serial
+    // unanimously points at one other customer (planSplitUnitMoves) — never
+    // a judgement call, so it gets the plain effectiveDryRun gate. This is a
+    // direct UPDATE (not the fill-only setEquipmentCustomer helper other
+    // fixes use) because the live case is a unit that already has a WRONG
+    // customer_id set (Desert Ridge Dental's RTUs still on Plaza Dental
+    // Group from a relink that ran before planSerialMovesByGroup existed) —
+    // a fill-only helper would never touch it.
+    const rows = await withRecordsTenant(ctx, loadSplitUnitCandidateRows);
+    const moves = planSplitUnitMoves(rows);
+    for (const m of moves) {
+      if (effectiveDryRun) {
+        result.splitUnitsHealed.push({ equipmentId: m.equipmentId, from: m.unitCustomerId, to: m.targetCustomerId });
+        continue;
+      }
+      const r = await withRecordsTenant(ctx, (db) => db.raw(
+        `UPDATE entities SET customer_id = $2, updated_at = NOW()
+           WHERE id = $1 AND entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT}`,
+        [m.equipmentId, m.targetCustomerId]
+      ));
+      if (r.rowCount) result.splitUnitsHealed.push({ equipmentId: m.equipmentId, from: m.unitCustomerId, to: m.targetCustomerId });
+    }
+    if (result.splitUnitsHealed.length && !effectiveDryRun) {
+      await withRecordsTenant(ctx, (db) => db.logAction({
+        clerk_user_id: actorClerkId, action: 'integrity.heal_split_units', resource_type: 'tenant',
+        changes: { count: result.splitUnitsHealed.length },
+      }));
+    }
+  }
+
+  if (applySet.has('refillCustomerContacts')) {
+    // Round 4 item 2 (2026-09-21), fill-only like every other additive fix
+    // here: runs the SAME rederiveCustomerContact logic stripShopContact
+    // already uses, but for a customer whose phone/email was left empty
+    // rather than one that needs a leaked value replaced — currently that
+    // logic only ever runs INSIDE a strip, so a customer stripped on an
+    // earlier build (before rederiveCustomerContact existed) stayed empty
+    // forever. Live case: Ortiz's own invoice prints (480) 555-0176, sitting
+    // unused because fill-once locked the shop number in first.
+    const customers = await withRecordsTenant(ctx, loadCustomersForScan);
+    const emptyCustomers = customers.filter((c) => !c.phone || !c.email);
+    if (emptyCustomers.length) {
+      const shopContext = await withRecordsTenant(ctx, (db) => db.loadShopAddressContext());
+      const extraContactRows = await withRecordsTenant(ctx, loadContactExtractionEvidence);
+      const contactCtx = buildContactCtx(customers, shopContext, extraContactRows);
+      for (const c of emptyCustomers) {
+        for (const field of ['phone', 'email']) {
+          if (c[field]) continue;
+          const value = await withRecordsTenant(ctx, (db) => rederiveCustomerContact(db, { customerId: c.id, field, contactCtx }));
+          if (!value) continue;
+          if (effectiveDryRun) { result.customerContactsFilled.push({ customerId: c.id, field, value }); continue; }
+          // Fill-only: the WHERE guard re-checks the field is still empty at
+          // write time, in case something else filled it between the read
+          // above and here.
+          const r = await withRecordsTenant(ctx, (db) => db.raw(
+            `UPDATE entities SET data = jsonb_set(COALESCE(data, '{}'::jsonb), $2::text[], to_jsonb($3::text)), updated_at = NOW()
+               WHERE id = $1 AND ${TENANT} AND (data->>$4 IS NULL OR data->>$4 = '')`,
+            [c.id, [field], value, field]
+          ));
+          if (r.rowCount) result.customerContactsFilled.push({ customerId: c.id, field, value });
+        }
+      }
+    }
+    if (result.customerContactsFilled.length && !effectiveDryRun) {
+      await withRecordsTenant(ctx, (db) => db.logAction({
+        clerk_user_id: actorClerkId, action: 'integrity.refill_customer_contacts', resource_type: 'tenant',
+        changes: { count: result.customerContactsFilled.length },
+      }));
+    }
+  }
+
   if (applySet.has('retireShopCustomers')) {
     // Stricter default than every other action here: anything other than
     // the EXPLICIT boolean `dryRun: false` previews only. An admin who wants
@@ -1060,7 +1278,12 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     // customer list read plus the tenant-context lookup.
     const customers = await withRecordsTenant(ctx, loadCustomersForScan);
     const shopContext = await withRecordsTenant(ctx, (db) => db.loadShopAddressContext());
-    const contactCtx = buildContactCtx(customers, shopContext);
+    // Round 4 (2026-09-21): same widened evidence integrityScan now uses —
+    // otherwise a value only findable via an extraction (never written to a
+    // customer's own phone/email field once only one customer is left
+    // carrying it) never reaches the floor here either.
+    const extraContactRows = await withRecordsTenant(ctx, loadContactExtractionEvidence);
+    const contactCtx = buildContactCtx(customers, shopContext, extraContactRows);
     const leaks = findShopContactLeaks(customers, contactCtx);
     for (const leak of leaks) {
       if (stripDryRun) { result.shopContactStripped.push(leak); continue; }
@@ -1143,11 +1366,17 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
  * customer record (same gate as deleteDocuments/mergeCustomers), and
  * retiring unlinks documents from a placeholder a person would otherwise
  * have to notice went missing. The other actions (linkDocuments,
- * linkEquipmentCustomers, createMissingUnits, healMergedSurvivors) only ADD
- * links or fill blanks — never destructive, ON CONFLICT DO NOTHING/fill-only
- * throughout — so the owner's 2026-09-20 request explicitly does not gate
- * those on admin: any signed-in user (and the Inbox-load auto-fix,
- * usePostgresSync.ts) can run them. A solo tenant is its own admin either way.
+ * linkEquipmentCustomers, createMissingUnits, healMergedSurvivors,
+ * healSplitUnits, refillCustomerContacts) only ADD links or fill blanks —
+ * never destructive, ON CONFLICT DO NOTHING/fill-only throughout — so the
+ * owner's 2026-09-20 request explicitly does not gate those on admin: any
+ * signed-in user (and the Inbox-load auto-fix, usePostgresSync.ts) can run
+ * them. A solo tenant is its own admin either way. healSplitUnits (round 4,
+ * 2026-09-21) is the one exception to "fill blanks only" — it can overwrite
+ * an already-set (wrong) equipment customer_id — but it's still a judgement-
+ * free correction: planSplitUnitMoves only ever fires when every document
+ * naming the unit's serial unanimously names one other customer, so it's
+ * grouped here with the additive fixes rather than the admin-gated ones.
  */
 export async function integrityFix(ctx, opts, auth) {
   const apply = Array.isArray(opts?.apply) ? opts.apply : [];

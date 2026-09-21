@@ -141,7 +141,8 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                     {(() => {
                       const recovered = fixResult.shopContactStripped.filter((l) => l.rederivedTo).length;
                       return recovered > 0 ? `, recovering the customer's real number/email for ${recovered} of them` : '';
-                    })()}.
+                    })()} · healed {fixResult.splitUnitsHealed.length} split unit{fixResult.splitUnitsHealed.length === 1 ? '' : 's'} ·
+                    filled {fixResult.customerContactsFilled.length} customer contact field{fixResult.customerContactsFilled.length === 1 ? '' : 's'}.
                   </p>
                 )}
                 {mismatchedCount > 0 && (

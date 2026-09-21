@@ -434,30 +434,40 @@ export const SHOP_CONTACT_ADDRESS_FLOOR = 3;
 
 /**
  * Pure. `customers`: [{address, phone?, email?}] (a tenant's customer list,
- * e.g. routes/integrity.js's loadCustomersForScan). Returns
- * `{phoneAddressCounts, emailAddressCounts}` — one count per normalized
- * phone/email key, of how many DISTINCT normalized street addresses it
- * appears on. A customer with no address on file contributes nothing (there
- * is no address to count), same "nothing to say either way" treatment as
- * buildMatchEvidence's `missing`.
+ * e.g. routes/integrity.js's loadCustomersForScan). `extra` (round 4,
+ * 2026-09-21): additional [{address, phone?, email?}]-shaped evidence from
+ * somewhere OTHER than a customer's own consolidated phone/email field — the
+ * live-retest gap this closes is a number that only ever shows up in
+ * customer_phone/shop_phone/shop_email EXTRACTIONS on a customer's linked
+ * documents, never written to that customer's own `data.phone`. Each entry
+ * (real customer row or `extra` row) contributes its address to the SAME
+ * per-value address set, so a value spread across, say, two customers' own
+ * `phone` fields plus one more customer's document extraction still clears
+ * the floor. Returns `{phoneAddressCounts, emailAddressCounts}` — one count
+ * per normalized phone/email key, of how many DISTINCT normalized street
+ * addresses it appears on. An entry with no address on file contributes
+ * nothing (there is no address to count), same "nothing to say either way"
+ * treatment as buildMatchEvidence's `missing`.
  */
-export function buildContactAddressCounts(customers) {
+export function buildContactAddressCounts(customers, extra) {
   const phoneBuckets = new Map();
   const emailBuckets = new Map();
-  for (const c of Array.isArray(customers) ? customers : []) {
-    const streetKey = normalizeAddressKey(c?.address);
-    if (!streetKey) continue;
-    const phoneKey = normalizePhoneKey(c?.phone);
+  const addEntry = (address, phone, email) => {
+    const streetKey = normalizeAddressKey(address);
+    if (!streetKey) return;
+    const phoneKey = normalizePhoneKey(phone);
     if (phoneKey) {
       if (!phoneBuckets.has(phoneKey)) phoneBuckets.set(phoneKey, new Set());
       phoneBuckets.get(phoneKey).add(streetKey);
     }
-    const emailKey = normalizeEmailKey(c?.email);
+    const emailKey = normalizeEmailKey(email);
     if (emailKey) {
       if (!emailBuckets.has(emailKey)) emailBuckets.set(emailKey, new Set());
       emailBuckets.get(emailKey).add(streetKey);
     }
-  }
+  };
+  for (const c of Array.isArray(customers) ? customers : []) addEntry(c?.address, c?.phone, c?.email);
+  for (const e of Array.isArray(extra) ? extra : []) addEntry(e?.address, e?.phone, e?.email);
   const toCounts = (buckets) => Object.fromEntries([...buckets].map(([k, set]) => [k, set.size]));
   return { phoneAddressCounts: toCounts(phoneBuckets), emailAddressCounts: toCounts(emailBuckets) };
 }

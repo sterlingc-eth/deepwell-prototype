@@ -217,3 +217,90 @@ New cases added to `scripts/verify-integrity.mjs`:
 **Result**: `npm run typecheck && npm run typecheck:api && npm run lint &&
 npm run verify:all` all green — 2643 checks passed, 0 failures. `api/` still
 exactly 12 files (`_lib/` plus 12 route files). No git used.
+
+## Round 4 (2026-09-21) — repairing already-damaged state
+
+Round 3's fixes were correct going forward but only apply going forward —
+data damaged by earlier builds (before those fixes existed) needed its own
+repair, not just a guard against new damage. No DDL, no new migration, `api/`
+still exactly 12 files, no git used.
+
+1. **New heal step `healSplitUnits`** (safe/additive, in `ALL_INTEGRITY_FIXES`
+   and cron, plain `effectiveDryRun` gate like `healMergedSurvivors`). Live
+   case: Desert Ridge Dental's 3 RTUs are still on Plaza Dental Group because
+   the relink that moved their documents ran on the build before
+   `planSerialMovesByGroup` existed.
+   - `api/_lib/routes/integrity.js` — new `loadSplitUnitCandidateRows` (one
+     row per equipment-unit/document pair where the document names that
+     unit's serial, with the document's direct customer link if any; capped
+     at `SPLIT_UNIT_EQUIPMENT_LIMIT`/`SPLIT_UNIT_ROW_LIMIT`) and new exported
+     pure `planSplitUnitMoves` (same `isEligibleForRelink`-style extraction):
+     a unit moves only when EVERY document naming its serial has exactly one,
+     and the SAME, direct customer link, differing from the unit's own —
+     Paterson/Patterson-style disagreement, or any document with no direct
+     link at all, leaves it untouched for a human in `splitLinkDocuments`.
+     The actual move is a direct `UPDATE` (not the fill-only
+     `setEquipmentCustomer` helper), since the live case is a unit that
+     already has a WRONG `customer_id` set — a fill-only helper would never
+     touch it; `healSplitUnits`' own doc comment explains why this is still
+     grouped with the additive/non-admin-gated fixes despite overwriting
+     existing data. Reports `{equipmentId, from, to}`.
+2. **New fill step `refillCustomerContacts`** (safe/additive, in
+   `ALL_INTEGRITY_FIXES` and cron, fill-only). The existing
+   `rederiveCustomerContact` logic (a customer's own documents'
+   `customer_phone`/`customer_email` extractions, skipping likely-shop
+   values) previously only ran INSIDE `stripShopContact`'s fix loop, so a
+   customer stripped on an earlier build (before `rederiveCustomerContact`
+   existed) stayed empty forever — live case: Ortiz's own invoice prints
+   `(480) 555-0176`, unused because fill-once locked the shop number in
+   first. `api/_lib/routes/integrity.js` now runs the same logic standalone
+   for every customer with an empty phone and/or email, guarding the actual
+   `UPDATE` with a re-check that the field is still empty at write time.
+   Reports `{customerId, field, value}`.
+3. **Shop-contact evidence from EXTRACTIONS, not just customer rows.** After
+   a strip, only one customer is left carrying a leaked number, so the ≥3-
+   address heuristic can never re-fire from customer rows alone — and this
+   tenant's `known_shop_contacts` was never learned in the first place
+   because the original strip ran on the pre-round-3 build. Live case: Desert
+   Ridge Dental C-00016 still showed `(480) 555-0199` and the scan reported
+   `shopContactLeaks: 0`.
+   - `api/_lib/integrity.js` — `buildContactAddressCounts` takes an optional
+     second `extra` param, `[{address, phone?, email?}]`, unioned into the
+     SAME per-value address sets as the real customer rows (not a separate
+     count to merge — one value spread across 2 customer-row addresses plus 1
+     extraction-derived address still clears the floor).
+   - `api/_lib/routes/integrity.js` — new `loadContactExtractionEvidence`:
+     one row per (customer, document) pair where that document has a
+     `customer_phone`/`customer_email`/`shop_phone`/`shop_email` extraction,
+     using SQL `CASE` to shape each row as `{address, phone}` or `{address,
+     email}` directly (no separate JS mapping step), capped at
+     `CONTACT_EXTRACTION_EVIDENCE_LIMIT` (5000) rows. `buildContactCtx` takes
+     this as an optional third param and threads it into
+     `buildContactAddressCounts`; both `integrityScan` and `stripShopContact`
+     (and the new `refillCustomerContacts`) now fetch and pass it. `integrityScan`
+     — otherwise strictly read-only — best-effort persists every leak it
+     finds into `known_shop_contacts` (same call `stripShopContact`'s fix
+     loop already made), so a value only findable via this wider evidence
+     still becomes durable the moment the scan sees it, not only on a fix.
+
+### Files changed (Round 4)
+
+`api/_lib/integrity.js`, `api/_lib/routes/integrity.js`,
+`api/_lib/routes/cron-sweep.js`, `src/services/reviewClient.ts`,
+`src/components/IntegrityPanel.tsx`, `scripts/verify-integrity.mjs`.
+
+### Verify (Round 4)
+
+New cases added to `scripts/verify-integrity.mjs`:
+- `buildContactAddressCounts`'s `extra` param: extraction-only evidence
+  across 3 addresses clears the floor with zero customer-row evidence;
+  customer-row and extraction evidence union onto the same address set;
+  `extra` omitted is back-compatible.
+- `planSplitUnitMoves`: documents unanimously naming a different customer ->
+  moves; Paterson/Patterson-style disagreement -> no move; a document with no
+  direct customer link at all blocks the move; already-correct customer ->
+  no-op; no candidate rows -> nothing.
+
+**Result**: `npm run typecheck && npm run typecheck:api && npm run lint &&
+npm run verify:all` all green — 2652 checks passed, 0 failures. `api/` still
+exactly 12 files. No git used.

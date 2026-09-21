@@ -102,6 +102,12 @@ export default async function handler(req, res) {
     integrityLinked: 0,
     integrityHealed: 0,
     integrityContactStripped: 0,
+    // Round 4 (2026-09-21): healSplitUnits/refillCustomerContacts, both safe
+    // to auto-apply (see integrityFixTenant's own doc comments) — repair
+    // already-damaged state from before those fixes existed, not just fresh
+    // ingests.
+    integritySplitUnitsHealed: 0,
+    integrityContactsFilled: 0,
     // Review fix (2026-09-20): relinkMismatchedNames runs dry-run only from
     // cron (see below) — this is how many documents it WOULD relink, not how
     // many it did. An admin applies them from the Customers-tab panel.
@@ -199,7 +205,7 @@ export default async function handler(req, res) {
         const fixed = await integrityFixTenant(ctx, {
           apply: [
             'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
-            'stripShopContact',
+            'stripShopContact', 'healSplitUnits', 'refillCustomerContacts',
           ],
           minMergeScore: 0.95,
           dryRun: false,
@@ -208,6 +214,8 @@ export default async function handler(req, res) {
         summary.integrityLinked += fixed.documentsLinked.length + fixed.equipmentLinked.length + fixed.unitsCreated.length;
         summary.integrityHealed += fixed.survivorsHealed.length;
         summary.integrityContactStripped += fixed.shopContactStripped?.length ?? 0;
+        summary.integritySplitUnitsHealed += fixed.splitUnitsHealed?.length ?? 0;
+        summary.integrityContactsFilled += fixed.customerContactsFilled?.length ?? 0;
 
         const relinkPreview = await integrityFixTenant(ctx, { apply: ['relinkMismatchedNames'], dryRun: true });
         summary.integrityNamesRelinkable += relinkPreview.mismatchedNamesRelinked?.length ?? 0;
@@ -255,6 +263,7 @@ export default async function handler(req, res) {
       `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed; ` +
       `integrity: ${summary.integrityMerged} merged, ${summary.integrityLinked} linked, ` +
       `${summary.integrityHealed} survivor(s) healed, ${summary.integrityContactStripped} shop contact field(s) stripped, ` +
+      `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
     { route: "/api/cron-sweep" }
