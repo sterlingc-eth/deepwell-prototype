@@ -13,8 +13,9 @@ import {
   normalizeUnitKey, normalizeCityKey, normalizeZipKey, normalizePhoneKey, normalizeEmailKey,
   compareNamesStrict, damerauLevenshteinDistance, SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
   buildContactAddressCounts, isLikelyShopPhone, isLikelyShopEmail, SHOP_CONTACT_ADDRESS_FLOOR,
+  chooseUpgradedCustomerName,
 } from '../api/_lib/integrity.js';
-import { isEligibleForRelink } from '../api/_lib/routes/integrity.js';
+import { isEligibleForRelink, planSerialMovesByGroup } from '../api/_lib/routes/integrity.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -431,6 +432,20 @@ eq('company names untouched — different "surname" (last word), not a subset', 
 eq('blank keep takes drop outright', preferFullerName('', 'Castillo'), 'Castillo');
 eq('blank drop leaves keep alone', preferFullerName('Castillo', ''), 'Castillo');
 
+/* -------------------------------------------- chooseUpgradedCustomerName
+ * Round 3 (2026-09-21): findOrCreateCustomer's existing-match branch used to
+ * freeze the survivor's name at whatever the first document spelled
+ * ("Nguyen, T."), even once a fuller name for the same family showed up
+ * ("Tom & Mai Nguyen"). */
+
+eq('a fuller same-family name upgrades the stored one', chooseUpgradedCustomerName('Nguyen, T.', 'Tom & Mai Nguyen'), 'Tom & Mai Nguyen');
+eq('surname-only incoming never downgrades an already-fuller stored name', chooseUpgradedCustomerName('Tom & Mai Nguyen', 'Nguyen'), 'Tom & Mai Nguyen');
+eq('equally-full names are left as stored, not reordered', chooseUpgradedCustomerName('Castillo, Ray', 'Ray Castillo'), 'Castillo, Ray');
+eq('a different family (no-match) never overwrites the stored name', chooseUpgradedCustomerName('Castillo', 'Ray & Linda Smith'), 'Castillo');
+eq('identical names -> stored, trivially (no-op, not just no-downgrade)', chooseUpgradedCustomerName('Ray Castillo', 'Ray Castillo'), 'Ray Castillo');
+eq('blank stored name is left alone here — findOrCreateCustomer\'s fill-only loop already handles a blank field', chooseUpgradedCustomerName('', 'Tom & Mai Nguyen'), '');
+eq('blank incoming name never clears an existing stored name', chooseUpgradedCustomerName('Nguyen, T.', ''), 'Nguyen, T.');
+
 eq(
   'coalesceEntityData adopts the fuller name from drop and aliases the shorter keep name',
   coalesceEntityData({ customer_name: 'Castillo' }, { customer_name: 'Ray & Linda Castillo' }),
@@ -575,6 +590,32 @@ eq('damerauLevenshteinDistance: adjacent transposition -> 1', damerauLevenshtein
   check('tenant\'s own configured phone is always a shop phone, however few addresses', isLikelyShopPhone('480-555-9999', { tenantPhoneKey: '4805559999' }) === true);
   check('a phone/email with no ctx at all is never flagged', isLikelyShopPhone('480-555-9999') === false && isLikelyShopEmail('shop@acmehvac.com') === false);
 
+  // Round 3 (2026-09-21): a previously-learned known_shop_contacts entry
+  // must flag a number/email on its own, with no address-count evidence at
+  // all — this is what lets a number that only ever appears on ONE customer
+  // (because it just got stripped everywhere else) still be recognized as
+  // shop-owned and kept off the newly-relinked customer.
+  const knownCtx = { knownShopPhoneKeys: ['4805559999'], knownShopEmailKeys: ['shop@acmehvac.com'] };
+  check('a phone in knownShopPhoneKeys is flagged with zero address evidence', isLikelyShopPhone('480-555-9999', knownCtx) === true);
+  check('an email in knownShopEmailKeys is flagged with zero address evidence', isLikelyShopEmail('shop@acmehvac.com', knownCtx) === true);
+  check('a phone NOT in knownShopPhoneKeys and below the address floor is not flagged', isLikelyShopPhone('480-555-1234', knownCtx) === false);
+
+  eq(
+    'coalesceEntityData skips filling a known-shop phone from drop, even though keep is blank',
+    coalesceEntityData({ phone: '' }, { phone: '480-555-9999' }, knownCtx).phone,
+    ''
+  );
+  eq(
+    'coalesceEntityData still fills an ordinary (non-shop) phone from drop when ctx is given',
+    coalesceEntityData({ phone: '' }, { phone: '480-555-1234' }, knownCtx).phone,
+    '480-555-1234'
+  );
+  eq(
+    'coalesceEntityData with no ctx at all still fills (ctx is optional, back-compatible)',
+    coalesceEntityData({ phone: '' }, { phone: '480-555-9999' }).phone,
+    '480-555-9999'
+  );
+
   // Per buildMatchEvidence's own doc comment: before this fix, every
   // customer carrying the same leaked shop phone "matched" on phone, and
   // the auto-tier logic (contactConfirmed) treated that coincidence as
@@ -646,6 +687,78 @@ check('an ai link on a document with verified_by set to a human name is NOT elig
 check('an ai link on a HUMAN-verified document (stage verified, verified_by a person) is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'user_2abc123', stage: 'verified' }));
 check('a missing linkedBy is NOT eligible (fails closed)', !isEligibleForRelink({ linkedBy: null, verifiedBy: null, stage: 'linked' }));
 check('a missing linkedBy is NOT eligible (undefined too)', !isEligibleForRelink({}));
+
+/* --------------------- Round 3 item 2: relinkMismatchedNames unit-move grouping */
+// Live-retest gap (2026-09-21): the old rule moved a unit only when THIS
+// document was the sole one naming its serial — three RTUs each named on
+// several relinked docs moved 0 units. New rule: group by (fromCustomerId ->
+// toCustomerId); a unit moves only when EVERY document that named its
+// serial under the old customer ended up in that same group.
+
+{
+  // Exact case named in the request: two docs both name serial X and both
+  // get relinked -> X moves.
+  const perDoc = [
+    { documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: 'cust-new', serials: ['SN-X'] },
+    { documentId: 'doc-2', fromCustomerId: 'cust-old', toCustomerId: 'cust-new', serials: ['sn-x'] },
+  ];
+  const serialOwners = new Map([
+    ['cust-old::sn-x', ['doc-1', 'doc-2']],
+  ]);
+  const plan = planSerialMovesByGroup(perDoc, serialOwners);
+  eq('two docs naming the same serial, both relinked -> exactly one group', plan.length, 1);
+  eq('...serial moves (case-insensitive match against the snapshot too)', plan[0].serialsToMove, ['sn-x']);
+  eq('...group documentIds is both relinked documents', [...plan[0].documentIds].sort(), ['doc-1', 'doc-2']);
+}
+
+{
+  // A third document naming the same serial stays behind (not relinked) ->
+  // the serial must NOT move, even though two of its three documents did.
+  const perDoc = [
+    { documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: 'cust-new', serials: ['SN-X'] },
+    { documentId: 'doc-2', fromCustomerId: 'cust-old', toCustomerId: 'cust-new', serials: ['SN-X'] },
+    // doc-3 is NOT in perDoc at all (it was never relinked this run), but the
+    // pre-relink snapshot still lists it as one of SN-X's owning documents.
+  ];
+  const serialOwners = new Map([
+    ['cust-old::sn-x', ['doc-1', 'doc-2', 'doc-3']],
+  ]);
+  const plan = planSerialMovesByGroup(perDoc, serialOwners);
+  eq('a serial with a document left behind never moves', plan[0].serialsToMove, []);
+}
+
+{
+  // A serial's documents split across TWO different destination customers in
+  // the same run -> neither group sees "everything", so it stays put in both.
+  const perDoc = [
+    { documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: 'cust-a', serials: ['SN-Y'] },
+    { documentId: 'doc-2', fromCustomerId: 'cust-old', toCustomerId: 'cust-b', serials: ['SN-Y'] },
+  ];
+  const serialOwners = new Map([
+    ['cust-old::sn-y', ['doc-1', 'doc-2']],
+  ]);
+  const plan = planSerialMovesByGroup(perDoc, serialOwners);
+  eq('split across two destination customers -> two groups', plan.length, 2);
+  check('...neither group moves the serial', plan.every((g) => g.serialsToMove.length === 0), JSON.stringify(plan));
+}
+
+{
+  // A serial with no snapshot entry at all (e.g. it was only ever on
+  // documents outside this batch's visibility) never moves — no evidence of
+  // "everything" is not evidence that everything moved.
+  const perDoc = [{ documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: 'cust-new', serials: ['SN-Z'] }];
+  const plan = planSerialMovesByGroup(perDoc, new Map());
+  eq('no snapshot entry for the serial -> does not move', plan[0].serialsToMove, []);
+}
+
+check(
+  'a document whose findOrCreateCustomer resolved back to the SAME customer forms no group',
+  planSerialMovesByGroup([{ documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: 'cust-old', serials: ['SN-X'] }], new Map()).length === 0
+);
+check(
+  'a document with no toCustomerId (relink failed to resolve) forms no group',
+  planSerialMovesByGroup([{ documentId: 'doc-1', fromCustomerId: 'cust-old', toCustomerId: null, serials: ['SN-X'] }], new Map()).length === 0
+);
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -23,7 +23,7 @@ import pg from 'pg';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress,
-  normalizePhoneKey, normalizeEmailKey, compareNamesStrict,
+  normalizePhoneKey, normalizeEmailKey, compareNamesStrict, chooseUpgradedCustomerName,
 } from './integrity.js';
 
 let pool;
@@ -412,16 +412,27 @@ async function computeShopAddressContext(db, tenantId) {
   let tenantAddressKey = null;
   let tenantPhoneKey = null;
   let tenantEmailKey = null;
+  let knownShopPhoneKeys = [];
+  let knownShopEmailKeys = [];
   try {
     // Same row, same query, as the phone/email tenant lookup below
     // (loadTenantContactKeys) — folded in here too so a caller that already
     // has a `shopContext` (routes/integrity.js's bulk loops) gets the
     // contact-leak signal (limit-test defect A) for free, with no second
-    // round trip.
-    const r = await db.query(`SELECT settings->>'address' AS address, settings->>'phone' AS phone, settings->>'email' AS email FROM tenants WHERE id = $1`, [tenantId]);
+    // round trip. `known_shop_contacts` (round-3 fix, 2026-09-21) is the
+    // same tenant row too — see recordKnownShopContact's doc comment.
+    const r = await db.query(
+      `SELECT settings->>'address' AS address, settings->>'phone' AS phone, settings->>'email' AS email,
+              settings->'known_shop_contacts' AS known_shop_contacts
+         FROM tenants WHERE id = $1`,
+      [tenantId]
+    );
     tenantAddressKey = normalizeAddressKey(r.rows[0]?.address ?? '') || null;
     tenantPhoneKey = normalizePhoneKey(r.rows[0]?.phone ?? '') || null;
     tenantEmailKey = normalizeEmailKey(r.rows[0]?.email ?? '') || null;
+    const known = r.rows[0]?.known_shop_contacts ?? {};
+    knownShopPhoneKeys = Array.isArray(known?.phones) ? known.phones.filter((v) => typeof v === 'string') : [];
+    knownShopEmailKeys = Array.isArray(known?.emails) ? known.emails.filter((v) => typeof v === 'string') : [];
   } catch (err) {
     console.error('computeShopAddressContext: tenant address lookup failed (skipping that signal):', err?.message);
   }
@@ -476,7 +487,7 @@ async function computeShopAddressContext(db, tenantId) {
     console.error('computeShopAddressContext: letterhead aggregate failed (skipping that signal):', err?.message);
   }
 
-  return { tenantAddressKey, tenantPhoneKey, tenantEmailKey, letterheadCounts };
+  return { tenantAddressKey, tenantPhoneKey, tenantEmailKey, knownShopPhoneKeys, knownShopEmailKeys, letterheadCounts };
 }
 
 /**
@@ -485,21 +496,123 @@ async function computeShopAddressContext(db, tenantId) {
  * (limit-test defect A) — that path runs on every single extraction, so it
  * does NOT pay for the full letterheadCounts extraction scan the way the
  * address-only path's shopContext does; it only needs the tenant's own
- * configured phone/email. A caller that already has a full shopContext
+ * configured phone/email plus the learned `known_shop_contacts` list (same
+ * row, no extra round trip). A caller that already has a full shopContext
  * (routes/integrity.js's bulk loops, or a repeat call within one document)
- * should pass that instead — it carries the same two keys for free.
+ * should pass that instead — it carries the same keys for free.
  */
 async function loadTenantContactKeys(db, tenantId) {
   try {
-    const r = await db.query(`SELECT settings->>'phone' AS phone, settings->>'email' AS email FROM tenants WHERE id = $1`, [tenantId]);
+    const r = await db.query(
+      `SELECT settings->>'phone' AS phone, settings->>'email' AS email, settings->'known_shop_contacts' AS known_shop_contacts
+         FROM tenants WHERE id = $1`,
+      [tenantId]
+    );
+    const known = r.rows[0]?.known_shop_contacts ?? {};
     return {
       tenantPhoneKey: normalizePhoneKey(r.rows[0]?.phone ?? '') || null,
       tenantEmailKey: normalizeEmailKey(r.rows[0]?.email ?? '') || null,
+      knownShopPhoneKeys: Array.isArray(known?.phones) ? known.phones.filter((v) => typeof v === 'string') : [],
+      knownShopEmailKeys: Array.isArray(known?.emails) ? known.emails.filter((v) => typeof v === 'string') : [],
     };
   } catch (err) {
     console.error('loadTenantContactKeys: tenant contact lookup failed (skipping that signal):', err?.message);
-    return { tenantPhoneKey: null, tenantEmailKey: null };
+    return { tenantPhoneKey: null, tenantEmailKey: null, knownShopPhoneKeys: [], knownShopEmailKeys: [] };
   }
+}
+
+/** Cap on each of `known_shop_contacts.phones`/`.emails` — round-3 fix
+ *  (2026-09-21). FIFO: the oldest learned value is dropped first once the cap
+ *  is hit, same tradeoff as everywhere else in this file that bounds an
+ *  unbounded list (a stale shop number aging out is cheap; an unbounded
+ *  tenant-settings blob is not). */
+export const KNOWN_SHOP_CONTACTS_CAP = 50;
+
+/**
+ * Persists a newly-seen shop phone/email into `tenants.settings.
+ * known_shop_contacts` (`{phones: [...], emails: [...]}`, normalized keys) —
+ * the fix for the round-3 live-retest gap: `isLikelyShopPhone`'s
+ * distinct-address-count heuristic only sees a shop number WHILE it is
+ * spread across >= SHOP_CONTACT_ADDRESS_FLOOR customers. The moment
+ * `stripShopContact` cleans those customers up, only whichever customer is
+ * created/relinked NEXT still carries it — never enough addresses for the
+ * heuristic to fire again, so the same leaked number comes right back. This
+ * makes "we've seen this number before" a durable fact instead of a
+ * recomputed-every-time inference. Two write triggers use this (both
+ * best-effort — a failure here must never break extraction or the fix that
+ * calls it): (1) findOrCreateCustomer/findOrCreateCustomerByAddress, every
+ * time a document's own `shop_phone`/`shop_email` extraction is non-empty;
+ * (2) routes/integrity.js's `stripShopContact`, for the exact value it just
+ * removed from a customer.
+ *
+ * A no-op (no write at all) when both values are blank or already known —
+ * this runs on the ingest hot path, so it must not turn into a write on
+ * every single document once a tenant's shop numbers are already learned.
+ */
+export async function recordKnownShopContact(db, tenantId, { phone, email } = {}) {
+  const phoneKey = normalizePhoneKey(phone ?? '');
+  const emailKey = normalizeEmailKey(email ?? '');
+  if (!phoneKey && !emailKey) return;
+  try {
+    const { knownShopPhoneKeys, knownShopEmailKeys } = await loadTenantContactKeys(db, tenantId);
+    let phones = knownShopPhoneKeys;
+    let emails = knownShopEmailKeys;
+    let changed = false;
+    if (phoneKey && !phones.includes(phoneKey)) {
+      phones = [...phones, phoneKey].slice(-KNOWN_SHOP_CONTACTS_CAP);
+      changed = true;
+    }
+    if (emailKey && !emails.includes(emailKey)) {
+      emails = [...emails, emailKey].slice(-KNOWN_SHOP_CONTACTS_CAP);
+      changed = true;
+    }
+    if (!changed) return;
+    await db.query(
+      `UPDATE tenants SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('known_shop_contacts', $2::jsonb) WHERE id = $1`,
+      [tenantId, { phones, emails }]
+    );
+  } catch (err) {
+    console.error('recordKnownShopContact: write failed (best-effort, skipping):', err?.message);
+  }
+}
+
+/**
+ * Shared by findOrCreateCustomer and findOrCreateCustomerByAddress
+ * (round-3 fix, 2026-09-21 — "findOrCreateCustomerByAddress... consult it"):
+ * filters a document's customer_phone/customer_email against every shop
+ * signal this tenant has — the document's OWN shop_phone/shop_email
+ * extraction, the tenant's configured contact, and every previously-learned
+ * `known_shop_contacts` value — and, whenever THIS document itself names a
+ * shop_phone/shop_email, learns it (recordKnownShopContact) so a LATER
+ * document with no shop_phone extraction of its own (an old-prompt document,
+ * or one where the customer's own row simply carries no name at all) still
+ * gets it filtered. Returns `{phone, email}`, each `''` when filtered out or
+ * absent. `shopContext`, optional, is the same precomputed context
+ * findOrCreateCustomer/findOrCreateCustomerByAddress already accept.
+ */
+async function resolveCustomerContact(db, tenantId, facts, shopContext) {
+  const docShopPhoneKey = normalizePhoneKey(facts?.shop_phone ?? '');
+  const docShopEmailKey = normalizeEmailKey(facts?.shop_email ?? '');
+  if (docShopPhoneKey || docShopEmailKey) {
+    await recordKnownShopContact(db, tenantId, { phone: facts?.shop_phone, email: facts?.shop_email });
+  }
+
+  let phone = String(facts?.customer_phone ?? '').trim();
+  let email = String(facts?.customer_email ?? '').trim();
+  if (!phone && !email) return { phone, email };
+
+  const phoneKey = normalizePhoneKey(phone);
+  const emailKey = normalizeEmailKey(email);
+  if (phone && docShopPhoneKey && phoneKey === docShopPhoneKey) phone = '';
+  if (email && docShopEmailKey && emailKey === docShopEmailKey) email = '';
+  if (phone || email) {
+    const tenantKeys = shopContext ?? await loadTenantContactKeys(db, tenantId);
+    if (phone && tenantKeys.tenantPhoneKey && phoneKey === tenantKeys.tenantPhoneKey) phone = '';
+    if (email && tenantKeys.tenantEmailKey && emailKey === tenantKeys.tenantEmailKey) email = '';
+    if (phone && tenantKeys.knownShopPhoneKeys?.includes(phoneKey)) phone = '';
+    if (email && tenantKeys.knownShopEmailKeys?.includes(emailKey)) email = '';
+  }
+  return { phone, email };
 }
 
 /**
@@ -554,6 +667,12 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
   )).rows;
   const matches = candidates.filter((c) => normalizeAddressKey(c.data?.service_address) === addrKey);
 
+  // Round-3 fix (2026-09-21): the address-only path can carry a
+  // customer_phone/customer_email too (a permit with a phone number but no
+  // name field) — filtered against the same shop signals as the name path,
+  // and it learns from this document's own shop_phone/shop_email either way.
+  const { phone, email } = await resolveCustomerContact(db, tenantId, facts, ctx);
+
   if (matches.length === 1) {
     const existing = matches[0];
     const rawAddress = String(facts?.service_address ?? '').trim();
@@ -563,6 +682,8 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
       data.service_address = rawAddress;
       changed = true;
     }
+    if (phone && (data.phone == null || String(data.phone).trim() === '')) { data.phone = phone; changed = true; }
+    if (email && (data.email == null || String(data.email).trim() === '')) { data.email = email; changed = true; }
     if (changed) {
       await db.query(`UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`, [existing.id, data]);
     }
@@ -572,10 +693,13 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
 
   const rawAddress = String(facts?.service_address ?? '').trim();
   const numRow = (await db.query('SELECT next_customer_number($1) AS num', [tenantId])).rows[0];
+  const initialData = { service_address: rawAddress, customer_name: addressOnlyCustomerName(rawAddress), name_source: 'address' };
+  if (phone) initialData.phone = phone;
+  if (email) initialData.email = email;
   const created = (await db.query(
     `INSERT INTO entities (tenant_id, entity_type, data, customer_number, created_at, updated_at)
      VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING id, customer_number`,
-    [tenantId, { service_address: rawAddress, customer_name: addressOnlyCustomerName(rawAddress), name_source: 'address' }, numRow?.num ?? null]
+    [tenantId, initialData, numRow?.num ?? null]
   )).rows[0];
   return { id: created.id, created: true, customerNumber: created.customer_number, matchBasis: 'created' };
 }
@@ -1419,29 +1543,18 @@ function makeStore(db, tenantId) {
       // fill-once merge as every other field on this row (below): a value
       // already on file is never overwritten by a later document.
       //
-      // Limit-test defect A (2026-09-20): a value equal to THIS document's
-      // own shop_phone/shop_email extraction, or to the tenant's own
-      // configured phone/email, is never written as a customer's contact
+      // Limit-test defect A (2026-09-20), round-3 fix (2026-09-21): a value
+      // equal to THIS document's own shop_phone/shop_email extraction, the
+      // tenant's configured phone/email, OR a previously-learned
+      // known_shop_contacts value is never written as a customer's contact
       // info — that is the contractor's own letterhead number, not the
       // customer's, and writing it here is exactly how every customer ended
-      // up sharing the shop's phone. Checked before the fill-once merge
-      // below, so a customer can never acquire it even on an otherwise-blank
-      // phone/email field.
-      let phone = String(facts?.customer_phone ?? '').trim();
-      let email = String(facts?.customer_email ?? '').trim();
-      if (phone || email) {
-        const phoneKey = normalizePhoneKey(phone);
-        const emailKey = normalizeEmailKey(email);
-        const docShopPhoneKey = normalizePhoneKey(facts?.shop_phone ?? '');
-        const docShopEmailKey = normalizeEmailKey(facts?.shop_email ?? '');
-        if (phone && docShopPhoneKey && phoneKey === docShopPhoneKey) phone = '';
-        if (email && docShopEmailKey && emailKey === docShopEmailKey) email = '';
-        if (phone || email) {
-          const tenantKeys = shopContext ?? await loadTenantContactKeys(db, tenantId);
-          if (phone && tenantKeys.tenantPhoneKey && phoneKey === tenantKeys.tenantPhoneKey) phone = '';
-          if (email && tenantKeys.tenantEmailKey && emailKey === tenantKeys.tenantEmailKey) email = '';
-        }
-      }
+      // up sharing the shop's phone. resolveCustomerContact also LEARNS this
+      // document's own shop_phone/shop_email (if any) into known_shop_contacts,
+      // so a LATER document extracted with no shop_phone field of its own —
+      // an old-prompt document, or a relink that never re-reads the page —
+      // still gets the number filtered.
+      const { phone, email } = await resolveCustomerContact(db, tenantId, facts, shopContext);
       if (phone) incoming.phone = phone;
       if (email) incoming.email = email;
 
@@ -1567,6 +1680,16 @@ function makeStore(db, tenantId) {
       for (const [k, v] of Object.entries(incoming)) {
         if (data[k] == null || String(data[k]).trim() === '') { data[k] = v; changed = true; }
       }
+      // Round-3 fix (2026-09-21): the survivor's name used to be frozen at
+      // whatever the FIRST document happened to spell it as ("Nguyen, T.")
+      // even once a fuller name showed up later ("Tom & Mai Nguyen") — the
+      // fill-only loop above only ever fills a BLANK customer_name, never
+      // upgrades a non-blank one. chooseUpgradedCustomerName pins the exact
+      // upgrade rule as a plain function (see scripts/verify-integrity.mjs).
+      const storedName = String(existing.data?.customer_name ?? '').trim();
+      const incomingName = String(incoming.customer_name ?? '').trim();
+      const upgradedName = chooseUpgradedCustomerName(storedName, incomingName);
+      if (upgradedName !== storedName) { data.customer_name = upgradedName; changed = true; }
       if (changed) {
         await db.query(
           `UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
@@ -1615,6 +1738,11 @@ function makeStore(db, tenantId) {
      *  each row recomputing it. Used by routes/integrity.js's linkDocuments/
      *  linkEquipmentCustomers fixes and its integrityScan report. */
     loadShopAddressContext: () => computeShopAddressContext(db, tenantId),
+
+    /** Learn a newly-seen shop phone/email (see recordKnownShopContact's own
+     *  doc comment) — exposed for routes/integrity.js's stripShopContact,
+     *  which calls this for the exact value it just removed. */
+    recordKnownShopContact: (args) => recordKnownShopContact(db, tenantId, args),
 
     /**
      * Link equipment to the customer a document said it belongs to.

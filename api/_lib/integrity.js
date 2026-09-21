@@ -227,6 +227,35 @@ export function preferFullerName(keepName, dropName) {
 }
 
 /**
+ * Pure: Round-3 live-retest fix (2026-09-21) — recordsStore.js's
+ * findOrCreateCustomer used to freeze the survivor's customer_name at
+ * whatever the FIRST document happened to spell it ("Nguyen, T."), because
+ * its existing-match branch only ever fills a BLANK field, never upgrades a
+ * non-blank one. This decides whether an incoming name should REPLACE an
+ * already-stored one: only ever upgrades to something FULLER of the same
+ * person/family — compareNamesStrict must say the two names are the same at
+ * some level (equal/subset/surname; never a bare surname-fuzzy near-miss or
+ * no-match) AND the incoming name must have MORE tokens than the stored one
+ * — then defers to preferFullerName (the same fuller-wins rule
+ * coalesceEntityData and the Customers-tab duplicates chooser already use)
+ * for the actual pick, so a name can never get shorter through this path.
+ * Returns the name that should be stored (`storedName` itself, unchanged,
+ * when no upgrade applies). Pinned as a plain function, same pattern as
+ * isEligibleForRelink, so it is unit-testable without a database — see
+ * scripts/verify-integrity.mjs.
+ */
+export function chooseUpgradedCustomerName(storedName, incomingName) {
+  const stored = String(storedName ?? '').trim();
+  const incoming = String(incomingName ?? '').trim();
+  if (!stored || !incoming || stored.toLowerCase() === incoming.toLowerCase()) return stored;
+  const rel = compareNamesStrict(incoming, stored);
+  if ((rel === 'equal' || rel === 'subset' || rel === 'surname') && nameTokenCount(incoming) > nameTokenCount(stored)) {
+    return preferFullerName(stored, incoming);
+  }
+  return stored;
+}
+
+/**
  * Damerau-Levenshtein distance (insertions, deletions, substitutions and
  * adjacent transpositions each cost 1) between two strings. No dependency —
  * this is the only place that needs it (compareNamesStrict's 'surname-fuzzy'
@@ -446,6 +475,14 @@ export function isLikelyShopPhone(phone, ctx = {}) {
   const key = normalizePhoneKey(phone);
   if (!key) return false;
   if (ctx.tenantPhoneKey && key === ctx.tenantPhoneKey) return true;
+  // Round-3 fix (2026-09-21): a value recorded in tenants.settings.
+  // known_shop_contacts (recordsStore.js's recordKnownShopContact) is a shop
+  // number REGARDLESS of how many customer addresses it currently sits on —
+  // this is what keeps a once-leaked number recognized even after
+  // stripShopContact has cleaned every customer up and the address-count
+  // signal below can no longer see it (only one customer left carrying it,
+  // never enough to clear the floor again).
+  if (Array.isArray(ctx.knownShopPhoneKeys) && ctx.knownShopPhoneKeys.includes(key)) return true;
   return (ctx.phoneAddressCounts?.[key] ?? 0) >= SHOP_CONTACT_ADDRESS_FLOOR;
 }
 
@@ -454,6 +491,7 @@ export function isLikelyShopEmail(email, ctx = {}) {
   const key = normalizeEmailKey(email);
   if (!key) return false;
   if (ctx.tenantEmailKey && key === ctx.tenantEmailKey) return true;
+  if (Array.isArray(ctx.knownShopEmailKeys) && ctx.knownShopEmailKeys.includes(key)) return true;
   return (ctx.emailAddressCounts?.[key] ?? 0) >= SHOP_CONTACT_ADDRESS_FLOOR;
 }
 
@@ -741,16 +779,25 @@ const isBlank = (v) => v == null || String(v).trim() === '';
  *     when BOTH name the same building (preferFullerAddress), the fuller
  *     string is adopted even though `keep`'s wasn't blank — a terse address
  *     is never allowed to shadow a fuller one for the same place.
- * Pure — no db, no mutation of the inputs.
+ * Pure — no db, no mutation of the inputs. `ctx`, optional (round-3 fix,
+ * 2026-09-21): the same shop-contact context isLikelyShopPhone/isLikelyShopEmail
+ * take — when passed, a `phone`/`email` on `drop` that looks like a shop
+ * value is never filled into a blank `keep.phone`/`keep.email`. Without this,
+ * merging a duplicate customer that still carries the leaked shop number
+ * back INTO one that had already been cleaned up (stripShopContact) would
+ * silently reintroduce it. Left undefined, every existing caller keeps its
+ * old behavior.
  */
 const ADDRESS_KEYS = ['service_address', 'billing_address'];
 
-export function coalesceEntityData(keep, drop) {
+export function coalesceEntityData(keep, drop, ctx) {
   const k = { ...(keep ?? {}) };
   const d = drop ?? {};
 
   for (const [key, value] of Object.entries(d)) {
     if (key === 'notes' || key === 'customer_name' || ARRAY_UNION_KEYS.includes(key) || ADDRESS_KEYS.includes(key)) continue;
+    if (ctx && key === 'phone' && isLikelyShopPhone(value, ctx)) continue;
+    if (ctx && key === 'email' && isLikelyShopEmail(value, ctx)) continue;
     if (isBlank(k[key]) && !isBlank(value)) k[key] = value;
   }
 

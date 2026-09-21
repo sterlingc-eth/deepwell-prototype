@@ -123,7 +123,12 @@ export interface IntegritySuspectedShopAddress {
 /** Limit-test defect A (2026-09-20): a customer whose phone/email is a
  *  likely shop (contractor letterhead) value — see api/_lib/integrity.js's
  *  isLikelyShopPhone/isLikelyShopEmail. stripShopContact's target list. */
-export interface IntegrityShopContactLeak { customerId: string; field: 'phone' | 'email'; value: string }
+/** `rederivedTo` (round-3 fix, 2026-09-21) is set only on a `stripShopContact`
+ *  fix result, never on the scan's own `shopContactLeaks` list: the real
+ *  value stripShopContact found on the customer's own documents once the
+ *  shop leak was removed, if any (see api/_lib/routes/integrity.js's
+ *  rederiveCustomerContact). */
+export interface IntegrityShopContactLeak { customerId: string; field: 'phone' | 'email'; value: string; rederivedTo?: string }
 /** Limit-test defect C (2026-09-20): a document whose direct customer link
  *  disagrees at the name level with its own extracted customer_name —
  *  relinkMismatchedNames' target list. */
@@ -190,7 +195,12 @@ export interface IntegrityFixApplied {
   survivorsHealed: { survivorId: string }[];
   shopCustomersRetired: { customerId: string; addressKey: string; documentIds: string[] }[];
   shopContactStripped: IntegrityShopContactLeak[];
-  mismatchedNamesRelinked: { documentId: string; fromCustomerId: string; toCustomerId: string | null; unitsMoved: number }[];
+  mismatchedNamesRelinked: { documentId: string; fromCustomerId: string; toCustomerId: string | null }[];
+  /** Round 3 (2026-09-21): units move as a GROUP, not per document — a unit
+   *  only moves once every document that named its serial under the old
+   *  customer got relinked into the same new one. One entry per
+   *  (fromCustomerId -> toCustomerId) pair actually relinked this run. */
+  unitsMovedByGroup: { fromCustomerId: string; toCustomerId: string; documentIds: string[]; unitsMoved: number }[];
   skipped: { documentId: string | null; reason: string }[];
 }
 

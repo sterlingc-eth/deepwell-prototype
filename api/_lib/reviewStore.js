@@ -83,7 +83,7 @@ import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, docum
 import { getApiKey, withBackoff } from './claude.js';
 import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
-import { coalesceEntityData } from './integrity.js';
+import { coalesceEntityData, normalizePhoneKey, normalizeEmailKey } from './integrity.js';
 import {
   normalizeDocumentType,
   inferDocumentType,
@@ -452,7 +452,27 @@ export async function mergeEntities(ctx, { keepId, dropId }, actorClerkId) {
 
     // Fill-only: the survivor never loses a value the dropped row had
     // (phone/email/notes/aliases) — see integrity.js's coalesceEntityData.
-    const coalescedData = coalesceEntityData(keep.data, drop.data);
+    // Round-3 fix (2026-09-21): for a customer merge, also pass the tenant's
+    // shop-contact signal, so a dropped row's leaked shop phone/email never
+    // fills a blank field on the survivor. Queried directly on this same
+    // client/transaction (not recordsStore.js's withTenant, which would open
+    // a second pool connection mid-transaction) — cheap, one tenant row.
+    let contactCtx;
+    if (keep.entity_type === 'customer') {
+      const t = (await client.query(
+        `SELECT settings->>'phone' AS phone, settings->>'email' AS email, settings->'known_shop_contacts' AS known_shop_contacts
+           FROM tenants WHERE id = $1`,
+        [tenantId]
+      )).rows[0];
+      const known = t?.known_shop_contacts ?? {};
+      contactCtx = {
+        tenantPhoneKey: normalizePhoneKey(t?.phone ?? '') || null,
+        tenantEmailKey: normalizeEmailKey(t?.email ?? '') || null,
+        knownShopPhoneKeys: Array.isArray(known?.phones) ? known.phones : [],
+        knownShopEmailKeys: Array.isArray(known?.emails) ? known.emails : [],
+      };
+    }
+    const coalescedData = coalesceEntityData(keep.data, drop.data, contactCtx);
     await client.query(`UPDATE entities SET data = $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`, [keepId, coalescedData]);
 
     await client.query(`UPDATE extractions SET entity_id = $2 WHERE entity_id = $1 AND ${TENANT}`, [dropId, keepId]);

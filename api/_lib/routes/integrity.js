@@ -23,6 +23,7 @@ import {
   unitIndexBackfillPlan, groupExtractionRowsByUnit, coalesceEntityData,
   isLikelyShopAddress, normalizeAddressKey, normalizeSurname, compareNamesStrict,
   isAddressOnlyCustomer, isLikelyShopPhone, isLikelyShopEmail, buildContactAddressCounts,
+  normalizePhoneKey, normalizeEmailKey,
 } from '../integrity.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -255,6 +256,12 @@ function buildContactCtx(customers, shopContext) {
   return {
     tenantPhoneKey: shopContext?.tenantPhoneKey ?? null,
     tenantEmailKey: shopContext?.tenantEmailKey ?? null,
+    // Round-3 fix (2026-09-21): a value learned into tenants.settings.
+    // known_shop_contacts is a shop signal on its own, independent of how
+    // many customer addresses it currently sits on — see isLikelyShopPhone's
+    // own doc comment for why the address-count signal alone isn't durable.
+    knownShopPhoneKeys: shopContext?.knownShopPhoneKeys ?? [],
+    knownShopEmailKeys: shopContext?.knownShopEmailKeys ?? [],
     phoneAddressCounts,
     emailAddressCounts,
   };
@@ -270,6 +277,38 @@ function findShopContactLeaks(customers, contactCtx) {
     if (c.email && isLikelyShopEmail(c.email, contactCtx)) leaks.push({ customerId: c.id, field: 'email', value: c.email });
   }
   return leaks;
+}
+
+/**
+ * Round-3 fix (2026-09-21): after stripping a leaked shop value, look for
+ * the REAL value fill-once should have captured — this customer's OWN
+ * documents' customer_phone/customer_email extractions, skipping any that
+ * are themselves a likely shop value under `contactCtx` (kept current by the
+ * caller as it strips each leak — see the stripShopContact loop below).
+ * Fill-once had already locked the shop number in on the FIRST document a
+ * customer appeared on, so a later document's real number (an invoice
+ * printing the customer's own (480) 555-0176) was silently discarded —
+ * stripping the leak alone would leave the customer with no phone on file at
+ * all when a good one was sitting right there. Returns the first non-shop,
+ * non-empty value found (any deterministic order), or null. Read-only.
+ */
+async function rederiveCustomerContact(db, { customerId, field, contactCtx }) {
+  const extractionKey = field === 'phone' ? 'customer_phone' : 'customer_email';
+  const isLikelyShop = field === 'phone' ? isLikelyShopPhone : isLikelyShopEmail;
+  const rows = await db.raw(
+    `SELECT DISTINCT COALESCE(x.corrected_value, x.value) AS value
+       FROM document_entity_links l
+       JOIN extractions x ON x.document_id = l.document_id AND x.${TENANT}
+      WHERE l.entity_id = $1 AND l.${TENANT} AND x.field_key = $2 AND x.value IS NOT NULL
+      LIMIT 200`,
+    [customerId, extractionKey]
+  );
+  for (const r of rows.rows) {
+    const value = String(r.value ?? '').trim();
+    if (!value || isLikelyShop(value, contactCtx)) continue;
+    return value;
+  }
+  return null;
 }
 
 /**
@@ -567,80 +606,174 @@ async function createMissingUnitsForDocument(ctx, { documentId }, { dryRun }) {
 }
 
 /**
- * Limit-test defect C repair (2026-09-20): a document flagged by
- * loadMismatchedDirectLinks — its DIRECT customer link disagrees at the name
- * level with what it actually extracted. Unlinks it from the wrong customer,
- * re-resolves via the (now name-checked) findOrCreateCustomer, links to the
- * result, and moves any equipment unit THIS document introduced (its serial
- * appears on no other document already tied to the old customer) over to the
- * new one — reusing linkDocumentToCustomer/findOrCreateCustomer rather than
- * reimplementing linking. Returns `{documentId, fromCustomerId, toCustomerId,
- * unitsMoved}`.
+ * Limit-test defect C repair (2026-09-20), revised for Round 3 item 2
+ * (2026-09-21, live-retest gap): loadMismatchedDirectLinks' whole batch of
+ * flagged documents is processed together instead of one at a time, because
+ * a unit's serial is often named on SEVERAL of the old customer's documents
+ * at once (three RTUs each on multiple relinked tickets) — "did THIS
+ * document introduce the serial" was never true for any of them, so the old
+ * per-document rule moved 0 units. The rule is now per (fromCustomerId ->
+ * toCustomerId) GROUP: a unit moves only when EVERY document that mentioned
+ * its serial while linked to the old customer — per a snapshot taken before
+ * any relinking starts — ended up relinked into that same group. A document
+ * left behind (not a candidate, or ineligible), or relinked to a DIFFERENT
+ * new customer, blocks that serial from moving at all (no partial/ambiguous
+ * moves). Reuses linkDocumentToCustomer/findOrCreateCustomer rather than
+ * reimplementing linking. Returns `{ perDoc: [{documentId, fromCustomerId,
+ * toCustomerId}], groups: [{fromCustomerId, toCustomerId, documentIds,
+ * unitsMoved}] }`.
  */
-async function relinkMismatchedNameDocument(ctx, { documentId, customerId: oldCustomerId }) {
+/**
+ * Pure: Round 3 item 2 (2026-09-21) — the grouping/subset decision at the
+ * heart of relinkMismatchedNamesBatch, pinned as a plain function (same
+ * pattern as isEligibleForRelink) so it is unit-testable without a database.
+ * See scripts/verify-integrity.mjs.
+ *
+ * `perDocEntries`: one entry per document actually relinked this run —
+ * `{documentId, fromCustomerId, toCustomerId, serials}` (serials: any
+ * iterable of serial strings; case/whitespace are normalized here). Entries
+ * with no toCustomerId, or toCustomerId === fromCustomerId, are ignored.
+ *
+ * `serialOwners`: the FULL pre-relink ownership snapshot — a Map (or plain
+ * object) keyed `${fromCustomerId}::${serial}` -> an iterable of every
+ * document id that mentioned that serial while linked to that customer,
+ * before this run touched anything. A serial with no key (or an empty
+ * owner set) never moves — nothing to confirm "everything left".
+ *
+ * Returns one entry per (fromCustomerId -> toCustomerId) group that had at
+ * least one relinked document: `{fromCustomerId, toCustomerId, documentIds,
+ * serialsToMove}`. A serial appears in `serialsToMove` only when EVERY
+ * document `serialOwners` lists for it is also in that group's
+ * `documentIds` — i.e. nothing that named this serial was left behind
+ * (unrelinked) or sent to a different customer.
+ */
+export function planSerialMovesByGroup(perDocEntries, serialOwners) {
+  const groups = new Map();
+  for (const d of perDocEntries || []) {
+    if (!d || !d.toCustomerId || d.toCustomerId === d.fromCustomerId) continue;
+    const key = `${d.fromCustomerId}=>${d.toCustomerId}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { fromCustomerId: d.fromCustomerId, toCustomerId: d.toCustomerId, documentIds: new Set(), serials: new Set() };
+      groups.set(key, g);
+    }
+    g.documentIds.add(d.documentId);
+    for (const s of d.serials || []) {
+      const serial = String(s ?? '').trim().toLowerCase();
+      if (serial) g.serials.add(serial);
+    }
+  }
+
+  const getOwners = (key) => {
+    const raw = serialOwners instanceof Map ? serialOwners.get(key) : serialOwners?.[key];
+    return raw ? [...raw] : undefined;
+  };
+
+  const results = [];
+  for (const g of groups.values()) {
+    const serialsToMove = [];
+    for (const serial of g.serials) {
+      const owners = getOwners(`${g.fromCustomerId}::${serial}`);
+      if (!owners || !owners.length) continue;
+      if (owners.every((docId) => g.documentIds.has(docId))) serialsToMove.push(serial);
+    }
+    results.push({
+      fromCustomerId: g.fromCustomerId, toCustomerId: g.toCustomerId,
+      documentIds: [...g.documentIds], serialsToMove,
+    });
+  }
+  return results;
+}
+
+async function relinkMismatchedNamesBatch(ctx, candidates) {
   return withRecordsTenant(ctx, async (db) => {
-    const rows = await db.listExtractionsByDocument(documentId);
-    const facts = {};
-    for (const r of rows) {
-      const v = r.corrected_value ?? r.value;
-      if (v != null && String(v).trim() !== '' && facts[r.field_key] == null) facts[r.field_key] = v;
+    if (!candidates.length) return { perDoc: [], groups: [] };
+
+    // Snapshot, BEFORE any unlinking: for each old customer in this batch,
+    // every serial its currently-linked documents mention, and the full set
+    // of document ids mentioning each one. This is the "everything about
+    // this unit moved" baseline the group check below is measured against.
+    const fromCustomerIds = [...new Set(candidates.map((c) => c.customerId))];
+    const serialDocs = new Map(); // `${customerId}::${serial}` -> Set(documentId)
+    const snapshot = await db.raw(
+      `SELECT l.entity_id AS customer_id, l.document_id,
+              lower(COALESCE(x.corrected_value, x.value)) AS serial
+         FROM document_entity_links l
+         JOIN extractions x ON x.document_id = l.document_id AND x.field_key = 'serial_number' AND x.${TENANT}
+        WHERE l.entity_id = ANY($1::uuid[]) AND l.${TENANT}`,
+      [fromCustomerIds]
+    );
+    for (const r of snapshot.rows) {
+      const serial = (r.serial || '').trim();
+      if (!serial) continue;
+      const key = `${r.customer_id}::${serial}`;
+      if (!serialDocs.has(key)) serialDocs.set(key, new Set());
+      serialDocs.get(key).add(r.document_id);
     }
-    const docSerials = new Set(
-      rows
-        .filter((r) => r.field_key === 'serial_number')
-        .map((r) => String(r.corrected_value ?? r.value ?? '').trim().toLowerCase())
-        .filter(Boolean)
-    );
 
-    await db.raw(
-      `DELETE FROM document_entity_links WHERE document_id = $1 AND entity_id = $2 AND ${TENANT}`,
-      [documentId, oldCustomerId]
-    );
-
-    const newCustomer = await db.findOrCreateCustomer(facts);
-    let unitsMoved = 0;
-    if (newCustomer?.id && newCustomer.id !== oldCustomerId) {
-      await linkDocumentToCustomer(db, {
-        documentId, customerId: newCustomer.id, confidence: 0.75,
-        linkedBy: newCustomer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
-      });
-
-      if (docSerials.size) {
-        // Every serial this document shares with some OTHER document already
-        // tied to the old customer stays put — this document didn't
-        // introduce it. Only a serial appearing on no document but this one
-        // moves with it.
-        const otherDocs = await db.raw(
-          `SELECT DISTINCT l.document_id FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
-             WHERE e.customer_id = $1 AND e.entity_type = 'equipment' AND l.${TENANT} AND l.document_id <> $2
-            UNION
-           SELECT DISTINCT x.document_id FROM extractions x JOIN entities e ON e.id = x.entity_id
-             WHERE e.customer_id = $1 AND e.entity_type = 'equipment' AND x.${TENANT} AND x.document_id <> $2`,
-          [oldCustomerId, documentId]
-        );
-        const otherDocIds = otherDocs.rows.map((r) => r.document_id);
-        let otherSerials = new Set();
-        if (otherDocIds.length) {
-          const otherRows = await db.raw(
-            `SELECT DISTINCT lower(COALESCE(corrected_value, value)) AS serial FROM extractions
-              WHERE field_key = 'serial_number' AND document_id = ANY($1::uuid[]) AND ${TENANT}`,
-            [otherDocIds]
-          );
-          otherSerials = new Set(otherRows.rows.map((r) => r.serial).filter(Boolean));
-        }
-        for (const serial of docSerials) {
-          if (otherSerials.has(serial)) continue;
-          const r = await db.raw(
-            `UPDATE entities SET customer_id = $3, updated_at = NOW()
-               WHERE entity_type = 'equipment' AND customer_id = $1 AND merged_into IS NULL
-                 AND lower(data->>'serial_number') = $2 AND ${TENANT}`,
-            [oldCustomerId, serial, newCustomer.id]
-          );
-          unitsMoved += r.rowCount;
-        }
+    // Phase A: relink each candidate document (unlink from old, resolve via
+    // the name-checked findOrCreateCustomer, link to the result).
+    const perDoc = [];
+    for (const c of candidates) {
+      const rows = await db.listExtractionsByDocument(c.documentId);
+      const facts = {};
+      for (const r of rows) {
+        const v = r.corrected_value ?? r.value;
+        if (v != null && String(v).trim() !== '' && facts[r.field_key] == null) facts[r.field_key] = v;
       }
+      const docSerials = new Set(
+        rows
+          .filter((r) => r.field_key === 'serial_number')
+          .map((r) => String(r.corrected_value ?? r.value ?? '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      await db.raw(
+        `DELETE FROM document_entity_links WHERE document_id = $1 AND entity_id = $2 AND ${TENANT}`,
+        [c.documentId, c.customerId]
+      );
+
+      const newCustomer = await db.findOrCreateCustomer(facts);
+      const toCustomerId = newCustomer?.id && newCustomer.id !== c.customerId ? newCustomer.id : null;
+      if (toCustomerId) {
+        await linkDocumentToCustomer(db, {
+          documentId: c.documentId, customerId: toCustomerId, confidence: 0.75,
+          linkedBy: newCustomer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+        });
+      }
+      perDoc.push({ documentId: c.documentId, fromCustomerId: c.customerId, toCustomerId, docSerials });
     }
-    return { documentId, fromCustomerId: oldCustomerId, toCustomerId: newCustomer?.id ?? null, unitsMoved };
+
+    // Phase B: group the now-relinked documents by (fromCustomerId ->
+    // toCustomerId) and decide, per group, which serials move — pure
+    // decision, see planSerialMovesByGroup — then execute the moves.
+    const plan = planSerialMovesByGroup(
+      perDoc.map((d) => ({ documentId: d.documentId, fromCustomerId: d.fromCustomerId, toCustomerId: d.toCustomerId, serials: d.docSerials })),
+      serialDocs
+    );
+
+    const groupResults = [];
+    for (const g of plan) {
+      let unitsMoved = 0;
+      for (const serial of g.serialsToMove) {
+        const r = await db.raw(
+          `UPDATE entities SET customer_id = $2, updated_at = NOW()
+             WHERE entity_type = 'equipment' AND customer_id = $1 AND merged_into IS NULL
+               AND lower(data->>'serial_number') = $3 AND ${TENANT}`,
+          [g.fromCustomerId, g.toCustomerId, serial]
+        );
+        unitsMoved += r.rowCount;
+      }
+      groupResults.push({
+        fromCustomerId: g.fromCustomerId, toCustomerId: g.toCustomerId,
+        documentIds: g.documentIds, unitsMoved,
+      });
+    }
+
+    return {
+      perDoc: perDoc.map((d) => ({ documentId: d.documentId, fromCustomerId: d.fromCustomerId, toCustomerId: d.toCustomerId })),
+      groups: groupResults,
+    };
   });
 }
 
@@ -738,7 +871,8 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
 
   const result = {
     dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [],
-    survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [], skipped: [],
+    survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [],
+    unitsMovedByGroup: [], skipped: [],
   };
 
   if (applySet.has('mergeDuplicates')) {
@@ -847,13 +981,17 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     // One survivor can have more than one dropped row pointing at it; fold
     // them in one at a time. coalesceEntityData is fill-only/prefer-fuller,
     // so folding an already-healed pair again changes nothing — idempotent.
+    // Round-3 fix (2026-09-21): pass the tenant's shop-contact signal too
+    // (a no-op for a non-customer entity, which has no phone/email field to
+    // begin with) — only fetched when there's actually something to heal.
+    const shopContext = rows.length ? await withRecordsTenant(ctx, (db) => db.loadShopAddressContext()) : null;
     const bySurvivor = new Map();
     for (const r of rows) {
       if (!bySurvivor.has(r.survivorId)) bySurvivor.set(r.survivorId, { data: r.survivorData ?? {}, dropped: [] });
       bySurvivor.get(r.survivorId).dropped.push(r.droppedData ?? {});
     }
     for (const [survivorId, { data, dropped }] of bySurvivor) {
-      const healed = dropped.reduce((acc, d) => coalesceEntityData(acc, d), data);
+      const healed = dropped.reduce((acc, d) => coalesceEntityData(acc, d, shopContext), data);
       if (JSON.stringify(healed) === JSON.stringify(data)) continue; // already healed, nothing changed
       if (effectiveDryRun) { result.survivorsHealed.push({ survivorId }); continue; }
       await withRecordsTenant(ctx, (db) => db.raw(
@@ -926,11 +1064,40 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     const leaks = findShopContactLeaks(customers, contactCtx);
     for (const leak of leaks) {
       if (stripDryRun) { result.shopContactStripped.push(leak); continue; }
+
+      // Round-3 fix (2026-09-21): persist this value into known_shop_contacts
+      // BEFORE stripping — durable even once every customer that carried it
+      // has been cleaned up and the address-count heuristic can no longer see
+      // it (only one customer left, never enough to clear the floor again).
+      // Also folded into THIS loop's in-memory contactCtx right away, so a
+      // later leak in the SAME run (a different customer sharing the number)
+      // and this leak's own re-derivation step both see it immediately,
+      // without waiting for a fresh scan.
+      await withRecordsTenant(ctx, (db) => db.recordKnownShopContact(
+        leak.field === 'phone' ? { phone: leak.value } : { email: leak.value }
+      ));
+      const learnedKey = leak.field === 'phone' ? normalizePhoneKey(leak.value) : normalizeEmailKey(leak.value);
+      if (learnedKey) {
+        const listKey = leak.field === 'phone' ? 'knownShopPhoneKeys' : 'knownShopEmailKeys';
+        if (!contactCtx[listKey].includes(learnedKey)) contactCtx[listKey] = [...contactCtx[listKey], learnedKey];
+      }
+
       await withRecordsTenant(ctx, (db) => db.raw(
         `UPDATE entities SET data = data - $2, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
         [leak.customerId, leak.field]
       ));
-      result.shopContactStripped.push(leak);
+
+      // Re-derive: this customer's own documents may have printed the real
+      // value all along — fill-once just never got to see it because the
+      // shop number was written first. One extra step, same fix.
+      const rederivedTo = await withRecordsTenant(ctx, (db) => rederiveCustomerContact(db, { customerId: leak.customerId, field: leak.field, contactCtx }));
+      if (rederivedTo) {
+        await withRecordsTenant(ctx, (db) => db.raw(
+          `UPDATE entities SET data = jsonb_set(data, $2::text[], to_jsonb($3::text)), updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
+          [leak.customerId, [leak.field], rederivedTo]
+        ));
+      }
+      result.shopContactStripped.push(rederivedTo ? { ...leak, rederivedTo } : leak);
     }
     if (result.shopContactStripped.length && !stripDryRun) {
       await withRecordsTenant(ctx, (db) => db.logAction({
@@ -949,13 +1116,14 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     // previews only.
     const relinkDryRun = dryRun !== false;
     const candidates = await withRecordsTenant(ctx, loadMismatchedDirectLinks);
-    for (const c of candidates) {
-      if (relinkDryRun) {
-        result.mismatchedNamesRelinked.push({ documentId: c.documentId, fromCustomerId: c.customerId, toCustomerId: null, unitsMoved: 0 });
-        continue;
+    if (relinkDryRun) {
+      for (const c of candidates) {
+        result.mismatchedNamesRelinked.push({ documentId: c.documentId, fromCustomerId: c.customerId, toCustomerId: null });
       }
-      const r = await relinkMismatchedNameDocument(ctx, { documentId: c.documentId, customerId: c.customerId });
-      result.mismatchedNamesRelinked.push(r);
+    } else if (candidates.length) {
+      const batch = await relinkMismatchedNamesBatch(ctx, candidates);
+      result.mismatchedNamesRelinked.push(...batch.perDoc);
+      result.unitsMovedByGroup.push(...batch.groups);
     }
     if (result.mismatchedNamesRelinked.length && !relinkDryRun) {
       await withRecordsTenant(ctx, (db) => db.logAction({

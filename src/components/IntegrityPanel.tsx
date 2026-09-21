@@ -137,7 +137,11 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                   <p className="text-caption text-ink-3">
                     Merged {fixResult.merged.length} duplicate{fixResult.merged.length === 1 ? '' : 's'} · linked {fixResult.documentsLinked.length} document{fixResult.documentsLinked.length === 1 ? '' : 's'} to a customer ·
                     linked {fixResult.equipmentLinked.length} unit{fixResult.equipmentLinked.length === 1 ? '' : 's'} to a customer · created {fixResult.unitsCreated.length} missing unit{fixResult.unitsCreated.length === 1 ? '' : 's'} ·
-                    stripped {fixResult.shopContactStripped.length} shop contact field{fixResult.shopContactStripped.length === 1 ? '' : 's'}.
+                    stripped {fixResult.shopContactStripped.length} shop contact field{fixResult.shopContactStripped.length === 1 ? '' : 's'}
+                    {(() => {
+                      const recovered = fixResult.shopContactStripped.filter((l) => l.rederivedTo).length;
+                      return recovered > 0 ? `, recovering the customer's real number/email for ${recovered} of them` : '';
+                    })()}.
                   </p>
                 )}
                 {mismatchedCount > 0 && (
@@ -151,7 +155,11 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                     {relinkErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{relinkErr}</p>}
                     {relinkResult && (
                       <p className="text-caption text-ink-3">
-                        Relinked {relinkResult.mismatchedNamesRelinked.length} document{relinkResult.mismatchedNamesRelinked.length === 1 ? '' : 's'} to the right customer.
+                        Relinked {relinkResult.mismatchedNamesRelinked.length} document{relinkResult.mismatchedNamesRelinked.length === 1 ? '' : 's'} to the right customer
+                        {(() => {
+                          const units = relinkResult.unitsMovedByGroup.reduce((n, g) => n + g.unitsMoved, 0);
+                          return units > 0 ? ` · moved ${units} equipment unit${units === 1 ? '' : 's'} along with them` : '';
+                        })()}.
                       </p>
                     )}
                   </div>

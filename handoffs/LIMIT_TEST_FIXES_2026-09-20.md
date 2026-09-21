@@ -113,3 +113,107 @@ Additional changed paths: `api/_lib/routes/integrity.js`,
 
 **Result**: `npm run typecheck && npm run typecheck:api && npm run lint &&
 npm run verify:all` all green again; `npm run build` re-run — succeeded.
+
+## Round 3 (2026-09-21) — live-retest gaps after deploy
+
+Deploy confirmed the fixes above work in production (shop phones stripped,
+Paterson/Patterson surfaced as a suggest-tier duplicate, Desert Ridge Dental
+docs relinked into a new customer) but surfaced three follow-on gaps. No DDL,
+no new migration, `api/` still has exactly 12 files, no git used.
+
+1. **The shop phone came right back on the relinked customer.**
+   `relinkMismatchedNames` re-runs `findOrCreateCustomer`, and a freshly
+   created customer has no address history for the ≥3-address shop-number
+   heuristic to catch — and after stripping, only 1 customer carries the
+   number, so the heuristic can never fire again on it. Fixed by persisting
+   learned shop contacts in `tenants.settings.known_shop_contacts:
+   {phones:[...], emails:[...]}` (capped at 50 each, FIFO):
+   - `api/_lib/recordsStore.js` — `computeShopAddressContext`/
+     `loadTenantContactKeys` also return `knownShopPhoneKeys`/
+     `knownShopEmailKeys`; new exported `recordKnownShopContact` (best-effort,
+     never throws, no-op if already known); new private `resolveCustomerContact`
+     shared by `findOrCreateCustomer` and `findOrCreateCustomerByAddress`
+     (which previously dropped phone/email entirely) — learns this document's
+     own shop_phone/shop_email, then filters `customer_phone`/`customer_email`
+     against the doc's own shop contact, the tenant's configured contact, and
+     `known_shop_contacts`.
+   - `api/_lib/integrity.js` — `isLikelyShopPhone`/`isLikelyShopEmail` also
+     check `ctx.knownShopPhoneKeys`/`knownShopEmailKeys`; `coalesceEntityData`
+     takes an optional third `ctx` param and skips filling a likely-shop
+     phone/email from the dropped record.
+   - `api/_lib/routes/integrity.js` — `buildContactCtx` carries the known-
+     contact arrays through; `stripShopContact`'s fix loop now (a) records the
+     leaked value into `known_shop_contacts` before stripping, (b) updates its
+     in-memory ctx so a later leak/re-derivation in the same run sees it, (c)
+     strips the field, (d) re-derives a replacement via new
+     `rederiveCustomerContact` (the customer's own linked documents'
+     `customer_phone`/`customer_email` extractions, skipping shop values) and
+     writes it back when found, reporting `rederivedTo` on the result;
+     `healMergedSurvivors` now also passes `shopContext` into
+     `coalesceEntityData`.
+   - `api/_lib/reviewStore.js` — `mergeEntities` builds a `contactCtx` (tenant
+     contact + `known_shop_contacts`, queried on its own transaction's client,
+     not a second pool checkout) and passes it into `coalesceEntityData` when
+     merging customers.
+   - `src/services/reviewClient.ts` — `IntegrityShopContactLeak.rederivedTo?`.
+   - `src/components/IntegrityPanel.tsx` — "Fix everything" summary now notes
+     how many stripped contacts were recovered from the customer's own docs.
+
+2. **`relinkMismatchedNames` moved 0 units.** The old rule moved a unit only
+   when the ONE document being relinked was the sole document naming its
+   serial — but the flagged units were each named on several of the relinked
+   documents at once, so that was never true. Rule is now per
+   `(fromCustomerId -> toCustomerId)` group: a unit moves only when EVERY
+   document that named its serial under the old customer (per a snapshot
+   taken before any relinking starts) ended up relinked into that same group
+   — a document left behind, or sent to a different customer, blocks the
+   move entirely (no partial/ambiguous moves).
+   - `api/_lib/routes/integrity.js` — `relinkMismatchedNameDocument` (per
+     document) replaced by `relinkMismatchedNamesBatch` (processes the whole
+     candidate batch: snapshots serial ownership, relinks every document,
+     then decides moves per group); new exported pure `planSerialMovesByGroup`
+     (the group/subset decision, pinned as a plain function per the
+     `isEligibleForRelink` pattern so it's unit-testable without a database).
+     `applyIntegrityFix`'s result gains `unitsMovedByGroup` (one entry per
+     relinked group, replacing the old meaningless per-document `unitsMoved`).
+   - `src/services/reviewClient.ts` — `mismatchedNamesRelinked` entries drop
+     `unitsMoved`; new `unitsMovedByGroup: [{fromCustomerId, toCustomerId,
+     documentIds, unitsMoved}]`.
+   - `src/components/IntegrityPanel.tsx` — relink summary now also reports
+     total units moved.
+3. **Survivor name frozen at the first-seen spelling.** `findOrCreateCustomer`'s
+   existing-match branch only ever filled a *blank* `customer_name`, never
+   upgraded a non-blank one, so "Nguyen, T." never became "Tom & Mai Nguyen"
+   once the fuller name showed up. New exported pure `chooseUpgradedCustomerName`
+   in `api/_lib/integrity.js` (same `isEligibleForRelink`-style extraction):
+   upgrades only when `compareNamesStrict` says the two names are the same
+   person/family (`equal`/`subset`/`surname`) and the incoming name has MORE
+   tokens, deferring to the existing `preferFullerName` for the pick — never a
+   downgrade. `api/_lib/recordsStore.js`'s `findOrCreateCustomer` now calls it
+   instead of inlining the same comparison.
+
+### Files changed (Round 3)
+
+`api/_lib/recordsStore.js`, `api/_lib/integrity.js`,
+`api/_lib/routes/integrity.js`, `api/_lib/reviewStore.js`,
+`src/services/reviewClient.ts`, `src/components/IntegrityPanel.tsx`,
+`scripts/verify-integrity.mjs`.
+
+### Verify (Round 3)
+
+New cases added to `scripts/verify-integrity.mjs`:
+- `known_shop_contacts` ctx flags a phone/email with zero address evidence;
+  `coalesceEntityData` skips a known-shop value even filling into a blank
+  field, still fills an ordinary value, and is back-compatible with no `ctx`.
+- `chooseUpgradedCustomerName`: fuller same-family name upgrades; surname-only
+  incoming never downgrades; equally-full names left alone; different family
+  never overwrites; identical names no-op; blank stored/incoming each leave
+  the other side untouched.
+- `planSerialMovesByGroup`: two documents naming the same serial, both
+  relinked -> moves; a third document naming it left behind -> stays; split
+  across two destination customers -> stays in both; no snapshot evidence for
+  a serial -> stays; same-customer or unresolved relink forms no group.
+
+**Result**: `npm run typecheck && npm run typecheck:api && npm run lint &&
+npm run verify:all` all green — 2643 checks passed, 0 failures. `api/` still
+exactly 12 files (`_lib/` plus 12 route files). No git used.
