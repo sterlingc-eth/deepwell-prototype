@@ -1354,7 +1354,14 @@ export function buildAnalyticsSQL(plan) {
   // the document's own 'model' extraction for the unit. Most-recent-row-wins
   // (ORDER BY ... DESC LIMIT 1) on both, same idiom as service_date itself.
   return {
-    sql: `SELECT x.document_id, x.value, x.confidence, x.stage,
+    // ROOT CAUSE of every live service-visit miss up to 2026-09-21: this
+    // SELECT used to read `x.stage`, but `stage` is a documents column —
+    // extractions has none (M3-config/01) — so Postgres rejected the query
+    // and runAnalyticsQuestion's catch fell through to retrieval for EVERY
+    // serviceVisits plan. Mock-db tests never executed real SQL, so it was
+    // invisible offline. Columns here are checked against the schema file by
+    // scripts/verify-analytics.mjs now.
+    sql: `SELECT x.document_id, x.value, x.confidence,
                  (SELECT c.data->>'customer_name'
                     FROM document_entity_links l
                     JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer'

@@ -1427,6 +1427,19 @@ for (const q of ['what units did we service this month', 'what customers did we 
   check(`WHAT_DID_WE_RE positive :: "${q}" is analytics`, preClassifyAnalytics(q));
 }
 
+// Schema guard: every `x.<col>` the serviceVisits SELECT reads must be a real
+// extractions column in M3-config/01-create-schema.sql (the x.stage bug).
+{
+  const fs = await import('node:fs');
+  const schema = fs.readFileSync(new URL('../M3-config/01-create-schema.sql', import.meta.url), 'utf8');
+  const block = schema.slice(schema.indexOf('CREATE TABLE IF NOT EXISTS extractions'));
+  const cols = new Set([...block.slice(0, block.indexOf(');')).matchAll(/^\s+([a-z_]+)\s+[A-Z]/gm)].map((m) => m[1]));
+  const { sql } = buildAnalyticsSQL({ entity: 'serviceVisits', op: 'list', filters: [], timeRange: null });
+  const used = [...sql.matchAll(/\bx\.([a-z_]+)/g)].map((m) => m[1]);
+  for (const c of new Set(used)) check(`serviceVisits SQL column x.${c} exists on extractions`, cols.has(c));
+  check('serviceVisits SQL reads at least document_id and value', used.includes('document_id') && used.includes('value'));
+}
+
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {
   console.error(`${failures} FAILURE(S)`);
