@@ -14,6 +14,7 @@ import {
   compareNamesStrict, damerauLevenshteinDistance, SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
   buildContactAddressCounts, isLikelyShopPhone, isLikelyShopEmail, SHOP_CONTACT_ADDRESS_FLOOR,
   chooseUpgradedCustomerName, planAddressPlaceholderAbsorptions, houseNumberOf,
+  extractNameMention, matchNameMention,
 } from '../api/_lib/integrity.js';
 import { isEligibleForRelink, planSerialMovesByGroup, planSplitUnitMoves } from '../api/_lib/routes/integrity.js';
 
@@ -707,6 +708,8 @@ check(`SURNAME_FUZZY_MIN_LENGTH is ${SURNAME_FUZZY_MIN_LENGTH}, MAX_DISTANCE is 
 
 check('an ai link on an unverified document is eligible', isEligibleForRelink({ linkedBy: 'ai', verifiedBy: null, stage: 'linked' }));
 check('an ai:name-only link on an unverified document is eligible', isEligibleForRelink({ linkedBy: 'ai:name-only', verifiedBy: null, stage: 'linked' }));
+check('an ai:name-mention link on an unverified document is eligible (Round 4 item 4)', isEligibleForRelink({ linkedBy: 'ai:name-mention', verifiedBy: null, stage: 'linked' }));
+check('an ai:name-mention link on a HUMAN-verified document is NOT eligible', !isEligibleForRelink({ linkedBy: 'ai:name-mention', verifiedBy: 'Dana', stage: 'verified' }));
 check('a human-chosen link ("human") is NEVER eligible, whatever the stage', !isEligibleForRelink({ linkedBy: 'human', verifiedBy: null, stage: 'linked' }));
 check('a link attributed to a Clerk user id is NEVER eligible (fails closed on an unrecognized value)', !isEligibleForRelink({ linkedBy: 'user_2abc123', verifiedBy: null, stage: 'linked' }));
 check('an ai link on an AUTO-verified document (verified_by = ai, the pipeline stamp) IS eligible — auto-verify is not a human review', isEligibleForRelink({ linkedBy: 'ai', verifiedBy: 'ai', stage: 'verified' }));
@@ -952,6 +955,47 @@ eq('houseNumberOf: null input -> null', houseNumberOf(null), null);
     [{ keepId: 'named-ortega', dropId: 'placeholder-ray-rd' }]
   );
 }
+
+/* --------------------------------------------------- extractNameMention */
+// Round 4 item 4 (2026-09-21): a document with no customer_name fact can
+// still name its customer by mentioning them in notes/status text.
+
+eq('possessive "account" mention extracted', extractNameMention("Left a note on Sarah Chen's account to call back Monday"), 'Sarah Chen');
+eq('possessive "home" mention extracted', extractNameMention("Serviced the unit at Mike Torres's home"), 'Mike Torres');
+eq('possessive "unit" mention extracted', extractNameMention("Replaced the capacitor on Dana Ramirez's unit"), 'Dana Ramirez');
+eq('possessive "system" mention extracted', extractNameMention("Flushed the drain line on Jane Whitmore's system"), 'Jane Whitmore');
+eq('possessive "property" mention extracted', extractNameMention("Inspected Bob Nguyen's property"), 'Bob Nguyen');
+eq('possessive "house" mention extracted', extractNameMention("Dropped parts at Linda Ortega's house"), 'Linda Ortega');
+eq('"for <name>" mention extracted', extractNameMention('Picked up the filter for Tom Castillo'), 'Tom Castillo');
+eq('no mention pattern present -> null', extractNameMention('Counted 40 capacitors in stock'), null);
+eq('empty/null input is safe', extractNameMention(''), null);
+check('null input is safe', extractNameMention(null) === null);
+check('undefined input is safe', extractNameMention(undefined) === null);
+eq('lowercase name is not a mention (not a proper noun)', extractNameMention("left a note on sarah chen's account"), null);
+eq('first mention wins when the text has more than one', extractNameMention("Note for Tom Castillo about Jane Whitmore's system"), 'Tom Castillo');
+
+/* ----------------------------------------------------- matchNameMention */
+
+{
+  const customers = [{ id: 'c1', name: 'Sarah Chen' }, { id: 'c2', name: 'Mike Torres' }];
+  eq('exact single match links to that customer', matchNameMention('Sarah Chen', customers), { id: 'c1' });
+  eq('subset match (mention names fewer tokens than stored) still links',
+    matchNameMention('Chen', [{ id: 'c1', name: 'Sarah & David Chen' }]), { id: 'c1' });
+}
+{
+  // Two customers with the same/overlapping name -> ambiguous, no link.
+  const customers = [{ id: 'c1', name: 'Sarah Chen' }, { id: 'c2', name: 'Sarah Chen' }];
+  eq('two equal-name matches -> null (left for a person)', matchNameMention('Sarah Chen', customers), null);
+}
+{
+  // Same surname, different first name -> compareNamesStrict says 'surname',
+  // not 'equal'/'subset' -> not a match at all (never linked on surname alone).
+  const customers = [{ id: 'c1', name: 'John Smith' }];
+  eq('surname-only relation does not count as a match', matchNameMention('Jane Smith', customers), null);
+}
+eq('no candidates at all -> null', matchNameMention('Sarah Chen', []), null);
+eq('null candidate name -> null', matchNameMention(null, [{ id: 'c1', name: 'Sarah Chen' }]), null);
+eq('null customers list is safe', matchNameMention('Sarah Chen', null), null);
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

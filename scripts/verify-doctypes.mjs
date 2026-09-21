@@ -18,6 +18,7 @@ import {
   resolveDocumentType,
   completenessFor,
   toCompletenessFields,
+  isShopInternalDocument,
 } from '../api/_lib/documentTypes.js';
 
 let failures = 0;
@@ -273,6 +274,46 @@ eq('non-array fields is safe', completenessFor('invoice', 'nope').complete, fals
 }
 eq('toCompletenessFields is safe on null', toCompletenessFields(null), []);
 eq('toCompletenessFields is safe on undefined', toCompletenessFields(undefined), []);
+
+/* --------------------------------------------------- isShopInternalDocument */
+// Round 4 (2026-09-21): a document whose only facts are its own shop_*
+// letterhead fields plus notes/status names no customer at all and must be
+// routed to the 'internal' type (Shop record), not left waiting in the human
+// review queue for a link that will never come.
+
+{
+  const f = (key, value) => ({ field_key: key, value });
+
+  // The three examples from the live corpus.
+  check('a bare parts count (shop letterhead + a note) is shop-internal',
+    isShopInternalDocument([f('shop_address', '2210 E Main St, Mesa AZ'), f('notes', 'Counted 40 capacitors in stock')]));
+  check('a truck dispatch note (shop phone + status) is shop-internal',
+    isShopInternalDocument([f('shop_phone', '(480) 555-0199'), f('status', 'Dispatched')]));
+  check('an internal memo to all techs (shop email + note) is shop-internal',
+    isShopInternalDocument([f('shop_email', 'dispatch@desertpeakhvac.com'), f('notes', 'All techs: new PPE policy effective Monday')]));
+
+  // Any customer/job/unit signal disqualifies it, even alongside shop facts.
+  check('customer_name disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('customer_name', 'Plaza Dental')]));
+  check('service_address disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('service_address', '412 Elm St')]));
+  check('serial_number disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('serial_number', 'SN1')]));
+  check('model disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('model', 'GSX140361K')]));
+  check('invoice_number disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('invoice_number', 'INV-1')]));
+  check('permit_number disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('permit_number', 'BP-1')]));
+  check('a technician name disqualifies it (not "shop_* + notes/status only")',
+    !isShopInternalDocument([f('shop_address', 'x'), f('technician', 'D. Ramirez')]));
+  check('a cost figure disqualifies it', !isShopInternalDocument([f('shop_address', 'x'), f('cost', '412.50')]));
+
+  // Edge cases.
+  check('no facts at all is not shop-internal (just unclassified)', !isShopInternalDocument([]));
+  check('notes/status alone with no shop_* fact is not shop-internal', !isShopInternalDocument([f('notes', 'reminder')]));
+  check('an empty-string shop_address does not count as a shop fact', !isShopInternalDocument([f('shop_address', '  '), f('notes', 'x')]));
+  check('null/undefined input is safe', !isShopInternalDocument(null) && !isShopInternalDocument(undefined));
+  check('a normal invoice (customer + cost, no shop facts) is not shop-internal',
+    !isShopInternalDocument([f('customer_name', 'Plaza Dental'), f('cost', '412.50')]));
+
+  check('"internal" is a canonical document type', DOCUMENT_TYPE_IDS.has('internal'));
+  eq('the "internal" type has no required fields (always AI-verifiable)', REQUIRED_FIELDS.internal, []);
+}
 
 /* -------------------------------------------------------------- FIELD_LABELS */
 

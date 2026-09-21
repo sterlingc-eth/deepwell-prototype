@@ -28,6 +28,10 @@
  *       customers->equipment join, end to end against a mock db.
  *   13. Reviewer round 3 (2026-09-21) item 3 — WHO_HAS_RE over an "at
  *       <number> <word>" single-record reference with no street suffix.
+ *   14. Reviewer round 4 (2026-09-21) item 1 — plain-English entity synonyms
+ *       ("how many clients do we have", "how many rooftop units", "who's
+ *       our biggest customer") shared between the classifier and the
+ *       planner's system prompt.
  *
  *   node scripts/verify-analytics.mjs
  */
@@ -55,6 +59,9 @@ import {
   ANALYTICS_PROMPT_VERSION,
   analyticsQuestionHash,
   analyticsPlanHash,
+  ENTITY_SYNONYMS,
+  ANALYTICS_SYSTEM_PROMPT,
+  TOP_CUSTOMERS_LIMIT,
 } from '../api/_lib/analytics.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
@@ -617,6 +624,115 @@ for (const [q, why] of ROUND3_ITEM3_EXCLUDED) {
 // still classify, unaffected by this narrower exclusion.
 for (const q of ['who has Trane units', 'which customers have Goodman units?', 'customers with expired warranties']) {
   check(`round 3 item 3 pre-classify (still analytics) :: "${q}"`, preClassifyAnalytics(q) === true);
+}
+
+/* ======================================================================
+ * 14. Reviewer round 4 (2026-09-21) item 1 — plain-English synonyms.
+ * "how many clients do we have" answered "Nothing in your records answers
+ * that" on live use: "clients" was recognized but a bare "do we have"
+ * question with no location/time/brand word failed the old CONTEXT gate.
+ * ====================================================================== */
+
+const ROUND4_ITEM1_POSITIVE = [
+  'how many clients do we have',
+  'how many accounts do we have',
+  'how many homeowners do we service',
+  'how many households are on file',
+  'how many properties do we have',
+  'how many sites do we service',
+  'how many houses do we service',
+  'how many businesses do we have',
+  'how many jobs did we do in August',
+  'how many visits did we have this week',
+  'how many service calls did we make',
+  'how many rooftop units do we have',
+  'how many ACs do we have',
+  'how many heat pumps are on file',
+  'how many files did we upload this week',
+  'how many docs did we get this month',
+  'how many work orders do we have',
+  "who's our biggest customer",
+  'who is our biggest client',
+  'top 10 customers',
+  'our largest accounts',
+];
+check('round 4 item 1 corpus has >= 15 exact live-reported phrasings', ROUND4_ITEM1_POSITIVE.length >= 15, String(ROUND4_ITEM1_POSITIVE.length));
+for (const q of ROUND4_ITEM1_POSITIVE) {
+  check(`round 4 item 1 pre-classify (positive) :: "${q}"`, preClassifyAnalytics(q) === true);
+}
+
+const ROUND4_ITEM1_NEGATIVE = [
+  ['how many tons is the Whitmore unit', 'named singular record, not an aggregate'],
+  ['who has the unit at 1234 Main', 'single-record "at <number> <word>" reference'],
+  ['does Henderson have a maintenance agreement', 'possessive single-record question'],
+  ['which customer owns serial 4N2119-08772', 'serial-shaped identifier token'],
+  ['thanks', 'not a question at all'],
+];
+check('round 4 item 1 negatives has >= 5 cases', ROUND4_ITEM1_NEGATIVE.length >= 5, String(ROUND4_ITEM1_NEGATIVE.length));
+for (const [q, why] of ROUND4_ITEM1_NEGATIVE) {
+  check(`round 4 item 1 pre-classify (negative) :: "${q}" (${why})`, preClassifyAnalytics(q) === false);
+}
+
+// One synonym table, two consumers: the planner's system prompt must mention
+// every synonym the classifier's own AGGREGATE_NOUN recognizes, so the model
+// can map "clients"/"accounts"/... back to the canonical entity name.
+check('ENTITY_SYNONYMS: customers synonyms all appear in the system prompt', ENTITY_SYNONYMS.customers.every((w) => ANALYTICS_SYSTEM_PROMPT.includes(w)));
+check('ENTITY_SYNONYMS: equipment synonyms all appear in the system prompt', ENTITY_SYNONYMS.equipment.every((w) => ANALYTICS_SYSTEM_PROMPT.includes(w)));
+check('ENTITY_SYNONYMS: documents synonyms all appear in the system prompt', ENTITY_SYNONYMS.documents.every((w) => ANALYTICS_SYSTEM_PROMPT.includes(w)));
+check('ENTITY_SYNONYMS: serviceVisits synonyms all appear in the system prompt', ENTITY_SYNONYMS.serviceVisits.every((w) => ANALYTICS_SYSTEM_PROMPT.includes(w)));
+check('ANALYTICS_SYSTEM_PROMPT: mentions sortBy for "biggest customer"', ANALYTICS_SYSTEM_PROMPT.includes('sortBy') && ANALYTICS_SYSTEM_PROMPT.toLowerCase().includes('biggest'));
+
+// validatePlan: sortBy vocabulary.
+check('validatePlan: sortBy equipmentCount on customers/list is valid', validatePlan({ entity: 'customers', op: 'list', sortBy: 'equipmentCount' }) !== null);
+check('validatePlan: sortBy documentCount on customers/list is valid', validatePlan({ entity: 'customers', op: 'list', sortBy: 'documentCount' }) !== null);
+check('validatePlan: unknown sortBy value -> null (whole plan rejected)', validatePlan({ entity: 'customers', op: 'list', sortBy: 'revenue' }) === null);
+check('validatePlan: sortBy on a non-customers entity -> null', validatePlan({ entity: 'equipment', op: 'list', sortBy: 'equipmentCount' }) === null);
+check('validatePlan: sortBy on op "count" -> null (only "list" supports ranking)', validatePlan({ entity: 'customers', op: 'count', sortBy: 'equipmentCount' }) === null);
+eq('validatePlan: sortBy caps the limit to TOP_CUSTOMERS_LIMIT even if a larger limit was set', validatePlan({ entity: 'customers', op: 'list', sortBy: 'equipmentCount', limit: 500 }).limit, TOP_CUSTOMERS_LIMIT);
+
+// End to end against a mock db: "who's our biggest customer" ranks by
+// equipment count, formats as a ranking (not a bare count), and caps at 10.
+{
+  const custRows = Array.from({ length: 12 }, (_, i) => ({
+    id: `c${i}`, customer_name: `Customer ${i}`, service_address: '1 Main St', metric: 20 - i,
+  }));
+  const mockDb = {
+    raw: async (sql, params) => {
+      if (sql.includes('entities e ON e.customer_id')) {
+        check('gap: biggest-customer query passes the plan-validated limit as $1', params[0] === TOP_CUSTOMERS_LIMIT);
+        return { rows: custRows.slice(0, params[0]) };
+      }
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({ entity: 'customers', op: 'list', sortBy: 'equipmentCount' });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('round 4 item 1: biggest-customer answer is capped at TOP_CUSTOMERS_LIMIT rows', answer.facts.length, TOP_CUSTOMERS_LIMIT);
+  eq('round 4 item 1: top row is the highest equipment count', answer.facts[0].label, 'Customer 0');
+  eq('round 4 item 1: row detail reads "N units"', answer.facts[0].value, '20 units');
+  check('round 4 item 1: text reads as a ranking, not a bare count', answer.text.startsWith('Your top 10 customers by equipment count'));
+}
+{
+  // documentCount variant uses the document_entity_links join and says "N documents".
+  const mockDb = {
+    raw: async (sql, params) => {
+      if (sql.includes('document_entity_links')) {
+        return { rows: [{ id: 'c1', customer_name: 'Plaza Dental', service_address: '1 Main St', metric: 7 }] };
+      }
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({ entity: 'customers', op: 'list', sortBy: 'documentCount' });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('round 4 item 1: documentCount row detail reads "N documents"', answer.facts[0].value, '7 documents');
+  check('round 4 item 1: documentCount text names the right measure', answer.text.includes('document count'));
+}
+{
+  // No customers on file at all -> a real, honest answer, not a crash.
+  const mockDb = { raw: async () => ({ rows: [] }) };
+  const plan = validatePlan({ entity: 'customers', op: 'list', sortBy: 'equipmentCount' });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('round 4 item 1: zero customers -> honest empty answer', answer.text, 'No customers on file yet.');
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

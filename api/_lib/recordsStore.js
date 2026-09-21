@@ -24,6 +24,7 @@ import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress, houseNumberOf,
   normalizePhoneKey, normalizeEmailKey, compareNamesStrict, chooseUpgradedCustomerName,
+  extractNameMention, matchNameMention,
 } from './integrity.js';
 
 let pool;
@@ -152,6 +153,22 @@ export function normalizeMatchText(raw) {
   // to them. Not an edge case: an ordinary customer list in most American
   // cities contains names this rejected, and it failed quietly every time.
   return /[\p{L}\p{N}]/u.test(s) ? s : '';
+}
+
+/**
+ * findOrCreateCustomer's `matchBasis` -> the `linked_by` value every caller
+ * (extractDocument.js, reviewStore.js, routes/integrity.js) should stamp on
+ * the resulting document_entity_links row. Both 'name-only' and, since Round
+ * 4 item 4 (2026-09-21), 'name-mention' are weaker-than-address matches that
+ * a later same-surname customer can make ambiguous — routes/integrity.js's
+ * isEligibleForRelink/ambiguousNameOnlyLinks treat 'ai:name-mention' exactly
+ * like 'ai:name-only' (eligible for relink, ambiguity flag applies). One
+ * function so every call site stays in sync instead of five copies of the
+ * same ternary.
+ */
+export function linkedByForMatchBasis(matchBasis) {
+  if (matchBasis === 'name-only' || matchBasis === 'name-mention') return `ai:${matchBasis}`;
+  return 'ai';
 }
 
 /**
@@ -1624,8 +1641,39 @@ function makeStore(db, tenantId) {
       const name = normalizeMatchText(facts?.customer_name);
       const address = normalizeMatchText(facts?.service_address);
       if (!name) {
-        if (!address) return null;
-        return findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext);
+        if (address) return findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext);
+
+        // Round 4 item 4 (2026-09-21): no customer_name, no service_address —
+        // but notes/status text sometimes still names someone ("Sarah Chen's
+        // account", "for Mike Torres") without the model ever extracting a
+        // customer_name fact. Narrow SQL only, same surname-LIKE shape as the
+        // exact-name lookup below — never a full-tenant customer load (round-3
+        // NO-GO on exactly that pattern). Only ever LINKS to an existing
+        // customer, never creates one: a bare mention is not enough evidence
+        // to mint a new customer record.
+        const mention = extractNameMention(`${facts?.notes ?? ''} ${facts?.status ?? ''}`);
+        if (mention) {
+          const mentionSurname = normalizeSurname(mention).replace(/[%_]/g, '\\$&');
+          const mentionCandidates = mentionSurname
+            ? await many(
+                `SELECT id, data, customer_number FROM entities
+                  WHERE entity_type = 'customer' AND ${TENANT}
+                    AND merged_into IS NULL
+                    AND lower(data->>'customer_name') LIKE '%' || $1 || '%' ESCAPE '\\'
+                  ORDER BY created_at LIMIT 200`,
+                [mentionSurname]
+              )
+            : [];
+          const match = matchNameMention(
+            mention,
+            mentionCandidates.map((c) => ({ id: c.id, name: c.data?.customer_name }))
+          );
+          if (match) {
+            const row = mentionCandidates.find((c) => c.id === match.id);
+            return { id: row.id, created: false, customerNumber: row.customer_number, matchBasis: 'name-mention' };
+          }
+        }
+        return null;
       }
 
       const incoming = {};

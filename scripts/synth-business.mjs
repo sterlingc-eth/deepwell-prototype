@@ -44,12 +44,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const TODAY = '2026-09-21';
 
+// Bumped whenever a change deliberately alters what the DEFAULT (120-customer)
+// output contains -- e.g. the 2026-09-21 fix that (a) caps every printed
+// document date at TODAY and (b) starts printing customer phone/email. Stored
+// in ANSWER_KEY.json so a stale key is easy to spot.
+const CORPUS_VERSION = 2;
+
 /* ------------------------------------------------------------------ CLI -- */
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a.startsWith('--')) { out[a.slice(2)] = argv[i + 1]; i++; }
+    if (!a.startsWith('--')) continue;
+    const key = a.slice(2);
+    const next = argv[i + 1];
+    // A boolean flag (e.g. --contacts-topup) has no value of its own -- only
+    // consume the next token as this flag's value when it isn't itself
+    // another --flag (or absent, at the end of argv).
+    if (next !== undefined && !next.startsWith('--')) { out[key] = next; i++; }
+    else out[key] = true;
   }
   return out;
 }
@@ -62,18 +75,39 @@ const IS_DEFAULT_SCALE = CUSTOMER_COUNT === 120 && !cliArgs.out;
 const CHEAP_FORMS = !IS_DEFAULT_SCALE;
 const OUT_DIR = cliArgs.out ? path.resolve(ROOT, cliArgs.out) : path.join(ROOT, 'test-docs', 'business');
 
+// --contacts-topup: writes ONLY new contact-proving invoices into
+// `${OUT_DIR}-topup/`. It never touches OUT_DIR at all (no mkdir, no cleanup,
+// no ANSWER_KEY.json write, and every writePdf/writeTxt call below becomes a
+// no-op on disk) -- the whole generator still runs normally IN MEMORY so the
+// exact same deterministic customer/unit/contact facts are available to build
+// the topup invoices from. See the TOPUP_MODE block at the end of this file.
+const TOPUP_MODE = Boolean(cliArgs['contacts-topup']);
+
+// The already-uploaded 30-customer/144-file corpus at test-docs/business-small
+// must not change text on disk except where the 2026-09-21 date fix (a)
+// forces it -- printing customer phone/email into those same 144 files would
+// mean re-ingesting them at cost for no reason (the --contacts-topup mode
+// exists specifically so contact extraction can be proven via NEW documents
+// instead). So contact info is always COMPUTED and stored in the answer key
+// (both corpora), but only PRINTED into documents when this is not that
+// exact, already-shipped combination.
+const IS_FROZEN_SMALL_BASE = CUSTOMER_COUNT === 30 && OUT_DIR === path.join(ROOT, 'test-docs', 'business-small') && !TOPUP_MODE;
+const PRINT_CONTACTS = !IS_FROZEN_SMALL_BASE;
+
 if (CUSTOMER_COUNT < 15) {
   console.warn(`--customers ${CUSTOMER_COUNT} is small enough that full document-type/brand coverage cannot be guaranteed (need at least ~15). Proceeding anyway.`);
 }
 
-fs.mkdirSync(OUT_DIR, { recursive: true });
-// Clean any previous run's generated docs + answer key, but leave a built
-// bundle.json/bundle-manifest.json (scripts/build-bundle.mjs's output) alone
-// -- re-running this generator (e.g. from verify-business-corpus.mjs) should
-// not silently delete a bundle someone already built from the prior run.
-for (const f of fs.readdirSync(OUT_DIR)) {
-  if (/^bundle(\.\d+)?\.json$/.test(f) || f === 'bundle-manifest.json') continue;
-  fs.rmSync(path.join(OUT_DIR, f), { force: true });
+if (!TOPUP_MODE) {
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  // Clean any previous run's generated docs + answer key, but leave a built
+  // bundle.json/bundle-manifest.json (scripts/build-bundle.mjs's output) alone
+  // -- re-running this generator (e.g. from verify-business-corpus.mjs) should
+  // not silently delete a bundle someone already built from the prior run.
+  for (const f of fs.readdirSync(OUT_DIR)) {
+    if (/^bundle(\.\d+)?\.json$/.test(f) || f === 'bundle-manifest.json') continue;
+    fs.rmSync(path.join(OUT_DIR, f), { force: true });
+  }
 }
 
 /* --------------------------------------------------------------- seeded rng */
@@ -112,6 +146,14 @@ function addDaysIso(iso, days) {
 }
 function ymd(y, m, d) {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+// ISO YYYY-MM-DD strings compare correctly with plain `>` (zero-padded, fixed
+// width), so this is a real "is this in the future" clamp, not a string hack.
+// Applied to every date that ends up PRINTED on a document (service/invoice/
+// work-order/memo/dispatch dates); install dates go through this too since a
+// unit cannot have been installed after today.
+function capToday(iso) {
+  return iso > TODAY ? TODAY : iso;
 }
 
 /* --------------------------------------------------------------- pdf writer
@@ -201,13 +243,16 @@ function nextName(type, slug, ext) {
 }
 function writePdf(type, slug, lines) {
   const name = nextName(type, slug, 'pdf');
-  fs.writeFileSync(path.join(OUT_DIR, name), buildPdf(lines));
+  // TOPUP_MODE runs this whole generator only to recompute the same
+  // deterministic customer/unit facts in memory -- it must never write (or
+  // overwrite) anything under OUT_DIR itself.
+  if (!TOPUP_MODE) fs.writeFileSync(path.join(OUT_DIR, name), buildPdf(lines));
   filesWritten.push(name);
   return name;
 }
 function writeTxt(type, slug, lines) {
   const name = nextName(type, slug, 'txt');
-  fs.writeFileSync(path.join(OUT_DIR, name), lines.join('\n') + '\n', 'utf8');
+  if (!TOPUP_MODE) fs.writeFileSync(path.join(OUT_DIR, name), lines.join('\n') + '\n', 'utf8');
   filesWritten.push(name);
   return name;
 }
@@ -228,12 +273,14 @@ function invoiceDoc({ nameVariant, address, phone, email, invoiceNo, date, cost,
     `Technician: ${tech}`, 'Status: Completed');
   return lines;
 }
-function warrantyRegDoc({ nameVariant, address, unit, registeredDate, term, expires }) {
-  return [...LETTERHEAD, '', 'WARRANTY REGISTRATION', `Customer: ${nameVariant}`, `Service Address: ${address}`, '',
-    `Manufacturer: ${unit.manufacturer}`, `Model: ${unit.model}`, `Serial: ${unit.serial}`,
+function warrantyRegDoc({ nameVariant, address, email, unit, registeredDate, term, expires }) {
+  const lines = [...LETTERHEAD, '', 'WARRANTY REGISTRATION', `Customer: ${nameVariant}`, `Service Address: ${address}`];
+  if (email) lines.push(`Homeowner email: ${email}`);
+  lines.push('', `Manufacturer: ${unit.manufacturer}`, `Model: ${unit.model}`, `Serial: ${unit.serial}`,
     `Tonnage: ${unit.tonnage}`, `Refrigerant: ${unit.refrigerant}`, '',
     `Installation Date: ${mdY(unit.installDate)}`, `Registered on file: ${mdY(registeredDate)}`,
-    `Warranty Term: ${term}`, expires ? `Valid through: ${mdY(expires)}` : 'Valid through: per manufacturer terms'];
+    `Warranty Term: ${term}`, expires ? `Valid through: ${mdY(expires)}` : 'Valid through: per manufacturer terms');
+  return lines;
 }
 function startupSheetDoc({ nameVariant, address, unit, tech }) {
   return [...LETTERHEAD, '', 'STARTUP / COMMISSIONING SHEET', `Customer: ${nameVariant}`, `Service Address: ${address}`, '',
@@ -242,17 +289,22 @@ function startupSheetDoc({ nameVariant, address, unit, tech }) {
     'Startup readings recorded, system operating normally.',
     `Technician: ${tech}`, `Service Date: ${mdY(unit.installDate)}`];
 }
-function serviceTicketDoc({ nameVariant, address, date, tech, unit, items, notes, serviceType = 'Repair' }) {
+function serviceTicketDoc({ nameVariant, address, phone, date, tech, unit, items, notes, serviceType = 'Repair' }) {
   const lines = [...LETTERHEAD, '', 'SERVICE TICKET', `Date of Service: ${mdY(date)}`, `Customer: ${nameVariant}`,
-    `Service Address: ${address}`, '', `Equipment: ${unit.manufacturer} ${unit.model}  Serial: ${unit.serial}`,
-    `Visit Type: ${serviceType}`, '', 'Work Performed:'];
+    `Service Address: ${address}`];
+  if (phone) lines.push(`Customer phone: ${phone}`);
+  lines.push('', `Equipment: ${unit.manufacturer} ${unit.model}  Serial: ${unit.serial}`,
+    `Visit Type: ${serviceType}`, '', 'Work Performed:');
   for (const it of items) lines.push(`- ${it}`);
   lines.push('', `Notes: ${notes}`, `Technician: ${tech}`, 'Status: Completed');
   return lines;
 }
-function workOrderDoc({ nameVariant, address, date, task, tech, status = 'Completed', woNo }) {
-  return [...LETTERHEAD, '', 'WORK ORDER', `Work Order #: ${woNo}`, `Date: ${mdY(date)}`, `Customer: ${nameVariant}`,
-    `Service Address: ${address}`, '', `Task: ${task}`, `Assigned Technician: ${tech}`, `Status: ${status}`];
+function workOrderDoc({ nameVariant, address, phone, date, task, tech, status = 'Completed', woNo }) {
+  const lines = [...LETTERHEAD, '', 'WORK ORDER', `Work Order #: ${woNo}`, `Date: ${mdY(date)}`, `Customer: ${nameVariant}`,
+    `Service Address: ${address}`];
+  if (phone) lines.push(`Customer phone: ${phone}`);
+  lines.push('', `Task: ${task}`, `Assigned Technician: ${tech}`, `Status: ${status}`);
+  return lines;
 }
 function maintenanceAgreementDoc({ nameVariant, address, contact, term, cost, units }) {
   const lines = [...LETTERHEAD, '', 'MAINTENANCE AGREEMENT', `Customer: ${nameVariant}`, `Service Address: ${address}`];
@@ -293,8 +345,9 @@ function equipmentRecordDoc({ nameVariant, address, unit }) {
   lines.push(`Equipment Type: ${unit.equipmentType || 'condenser'}`);
   return lines;
 }
-function correspondenceDoc({ nameVariant, address, phone, date, body }) {
+function correspondenceDoc({ nameVariant, address, phone, email, date, body }) {
   const lines = [...LETTERHEAD, '', mdY(date), '', `Dear ${nameVariant},`, '', body, '', 'Sincerely,', 'Sonoran Comfort Air'];
+  if (email) lines.splice(4, 0, `Email on file: ${email}`);
   if (phone) lines.splice(4, 0, `Re: service at ${address} - ${phone}`);
   return lines;
 }
@@ -431,7 +484,43 @@ function installDateFor(i) {
   const year = 2009 + ((i * 7) % 18); // 2009..2026
   const month = 1 + ((i * 5) % 12);
   const day = 1 + ((i * 9) % 28);
-  return ymd(year, month, day);
+  // 2026 x (month, day) can land after TODAY (2026-09-21) -- a unit cannot
+  // have been installed in the future, so clamp it (per the brief: "install
+  // dates unchanged unless > today").
+  return capToday(ymd(year, month, day));
+}
+
+/* -------------------------------------------------------------- contacts
+ * ~80% of customers get a phone on file, ~50% an email -- independently, and
+ * never printed for the frozen small-corpus base (see PRINT_CONTACTS above).
+ * Deterministic off the same `i` used for everything else about that
+ * customer, so a re-run is byte-identical.
+ */
+const AREA_BY_STATE = { AZ: '480', NV: '702', NM: '505', CA: '213' };
+const EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com', 'icloud.com', 'aol.com', 'hotmail.com', 'comcast.net'];
+function phoneVariant(i, area, last4) {
+  const forms = [
+    `(${area}) 555-${last4}`,
+    `${area}-555-${last4}`,
+    `Ph: ${area}.555.${last4}`,
+    `Cell: ${area}-555-${last4}`,
+  ];
+  return forms[i % forms.length];
+}
+function contactFor(i, city, name) {
+  const hasPhone = (i * 37) % 100 < 80;
+  const hasEmail = (i * 53) % 100 < 50;
+  const area = AREA_BY_STATE[city.state] || '480';
+  // Always "01xx" so it can never collide with the shop's own "555-0199".
+  const last4 = `01${String(10 + (i % 88)).padStart(2, '0')}`;
+  const phone = hasPhone ? phoneVariant(i, area, last4) : null;
+  let email = null;
+  if (hasEmail) {
+    const domain = EMAIL_DOMAINS[i % EMAIL_DOMAINS.length];
+    const sep = i % 2 === 0 ? '.' : '';
+    email = `${name.first.toLowerCase()}${sep}${name.last.toLowerCase()}${i % 5}@${domain}`.toLowerCase();
+  }
+  return { phone, email };
 }
 
 /* ------------------------------------------------------------- customers */
@@ -508,49 +597,53 @@ function buildResidential({ i, city }) {
   const unit = makeUnit({ i, brand, installDate, equipmentId: 'Unit 1' });
 
   const registered = i % 2 === 0;
-  if (registered) unit.registeredDate = addDaysIso(installDate, 15 + (i % 20));
+  if (registered) unit.registeredDate = capToday(addDaysIso(installDate, 15 + (i % 20)));
+
+  const { phone, email } = contactFor(i, city, name);
+  const printPhone = PRINT_CONTACTS ? phone : null;
+  const printEmail = PRINT_CONTACTS ? email : null;
 
   const docs = [];
   docs.push(writePdf('invoice', `c${i}`, invoiceDoc({
-    nameVariant: name.full, address, invoiceNo, date: installDate,
+    nameVariant: name.full, address, phone: printPhone, email: printEmail, invoiceNo, date: installDate,
     cost: (2800 + (i * 137) % 5200).toFixed(2), workDesc: `Install ${unit.tonnage} ${brand} system, ${unit.refrigerant} charge`,
     tech, unit,
   })));
 
   if (registered) {
     docs.push(writePdf('warranty-registration', `c${i}`, warrantyRegDoc({
-      nameVariant: name.full, address, unit, registeredDate: unit.registeredDate,
+      nameVariant: name.full, address, email: printEmail, unit, registeredDate: unit.registeredDate,
       term: normalizeBrand(brand) ? '5-10 year parts (per manufacturer terms)' : 'not verified',
       expires: null,
     })));
   } else {
     docs.push(writePdf('proposal-quote', `c${i}`, proposalQuoteDoc({
-      nameVariant: name.full, address, date: addDaysIso(installDate, 400 + (i % 300)),
+      nameVariant: name.full, address, date: capToday(addDaysIso(installDate, 400 + (i % 300))),
       desc: 'Annual maintenance agreement enrollment', cost: (280 + (i % 6) * 25).toFixed(2),
     })));
   }
 
-  const serviceDate = addDaysIso(installDate, 500 + ((i * 13) % 1600));
+  const serviceDate = capToday(addDaysIso(installDate, 500 + ((i * 13) % 1600)));
   docs.push(writePdf('service-ticket', `c${i}`, serviceTicketDoc({
-    nameVariant: name.full, address, date: serviceDate, tech: TECHS[(i + 2) % TECHS.length], unit,
+    nameVariant: name.full, address, phone: printPhone, date: serviceDate, tech: TECHS[(i + 2) % TECHS.length], unit,
     serviceType: i % 3 === 0 ? 'Preventive Maintenance' : 'Repair',
     items: i % 3 === 0 ? ['Annual PM: cleaned coil, checked charge'] : ['Checked refrigerant charge', 'Replaced air filter'],
     notes: 'System operating normally after visit',
   })));
 
   const extraType1 = EXTRA_TYPE_POOL[i % EXTRA_TYPE_POOL.length];
-  docs.push(buildExtraDoc(extraType1, { i, name, address, city, unit, tech }));
+  docs.push(buildExtraDoc(extraType1, { i, name, address, city, unit, tech, phone: printPhone, email: printEmail }));
   const extraType2 = EXTRA_TYPE_POOL[(i + 5) % EXTRA_TYPE_POOL.length];
-  docs.push(buildExtraDoc(extraType2, { i, name, address, city, unit, tech }));
+  docs.push(buildExtraDoc(extraType2, { i, name, address, city, unit, tech, phone: printPhone, email: printEmail }));
 
-  addCustomer({ key: `res_${i}`, canonicalName: name.full, address, units: [unit], docFilenames: docs });
+  addCustomer({ key: `res_${i}`, canonicalName: name.full, address, phone, email, units: [unit], docFilenames: docs });
 }
 
-function buildExtraDoc(type, { i, name, address, city, unit, tech }) {
+function buildExtraDoc(type, { i, name, address, city, unit, tech, phone = null, email = null }) {
   switch (type) {
     case 'work-order':
       return writePdf('work-order', `c${i}`, workOrderDoc({
-        nameVariant: name.full, address, date: addDaysIso(unit.installDate, 600 + (i % 400)),
+        nameVariant: name.full, address, phone, date: capToday(addDaysIso(unit.installDate, 600 + (i % 400))),
         woNo: `WO-${40000 + i}`, task: 'No cooling, dispatch for diagnosis', tech,
       }));
     case 'permit':
@@ -560,7 +653,7 @@ function buildExtraDoc(type, { i, name, address, city, unit, tech }) {
       }));
     case 'inspection-report':
       return writePdf('inspection-report', `c${i}`, inspectionReportDoc({
-        nameVariant: name.full, address, date: addDaysIso(unit.installDate, 900 + (i % 500)), tech,
+        nameVariant: name.full, address, date: capToday(addDaysIso(unit.installDate, 900 + (i % 500))), tech,
         findings: ['Coil clean, no leaks found', 'Refrigerant charge within spec'],
       }));
     case 'correspondence': {
@@ -569,13 +662,13 @@ function buildExtraDoc(type, { i, name, address, city, unit, tech }) {
       // default 120-customer run is untouched (CHEAP_FORMS is false there).
       const writer = CHEAP_FORMS ? writeTxt : writePdf;
       return writer('correspondence', `c${i}`, correspondenceDoc({
-        nameVariant: name.full, address, date: addDaysIso(unit.installDate, 700 + (i % 300)),
+        nameVariant: name.full, address, phone, email, date: capToday(addDaysIso(unit.installDate, 700 + (i % 300))),
         body: 'Thank you for your business. Let us know if the system needs anything further.',
       }));
     }
     case 'purchase-order':
       return writePdf('purchase-order', `c${i}`, purchaseOrderDoc({
-        poNumber: `PO-${9000 + i}`, date: addDaysIso(unit.installDate, 650 + (i % 300)),
+        poNumber: `PO-${9000 + i}`, date: capToday(addDaysIso(unit.installDate, 650 + (i % 300))),
         vendor: i % 2 === 0 ? 'Baker Distributing' : 'Watsco Supply', address, nameVariant: name.full,
         parts: ['Capacitor', 'Filter drier'], cost: (60 + (i % 10) * 8).toFixed(2),
       }));
@@ -583,7 +676,7 @@ function buildExtraDoc(type, { i, name, address, city, unit, tech }) {
       return writePdf('startup-sheet', `c${i}`, startupSheetDoc({ nameVariant: name.full, address, unit, tech }));
     case 'dispatch-note':
       return writeTxt('dispatch-note', `c${i}`, dispatchNoteDoc({
-        nameVariant: name.full, address, date: addDaysIso(unit.installDate, 550 + (i % 300)),
+        nameVariant: name.full, address, date: capToday(addDaysIso(unit.installDate, 550 + (i % 300))),
         note: 'Customer reports weak airflow, tech dispatched today.', tech,
       }));
     case 'equipment-record':
@@ -597,7 +690,7 @@ function buildExtraDoc(type, { i, name, address, city, unit, tech }) {
       return writeTxt('nameplate-photo', `c${i}`, nameplatePhotoDoc({ unit }));
     default:
       return writePdf('other', `c${i}`, shopMemoDoc({
-        date: addDaysIso(unit.installDate, 800), subject: 'Filter stock check',
+        date: capToday(addDaysIso(unit.installDate, 800)), subject: 'Filter stock check',
         body: `Reminder logged for ${name.full}'s account: confirm filter size on next visit.`,
       }));
   }
@@ -625,13 +718,17 @@ function buildCommercial({ type, city }) {
   const street = STREET_NAMES[(i * 3) % STREET_NAMES.length];
   const suite = 100 + (commercialSeq % 20) * 5;
   const address = `${streetNo} ${street}, Suite ${suite}, ${city.name}, ${city.state} ${city.zip}`;
-  const contact = `${nameFor(i).full}`;
+  const contactName = nameFor(i);
+  const contact = contactName.full;
+  const { phone, email } = contactFor(i, city, contactName);
+  const printPhone = PRINT_CONTACTS ? phone : null;
+  const printEmail = PRINT_CONTACTS ? email : null;
   const unitCount = COMMERCIAL_UNITS[type];
   const installDate = installDateFor(i);
   const units = [];
   for (let u = 0; u < unitCount; u++) {
     const brand = BRANDS[(i + u) % BRANDS.length];
-    units.push(makeUnit({ i: i + u, brand, installDate: addDaysIso(installDate, u * 3), equipmentId: `RTU-${u + 1}` }));
+    units.push(makeUnit({ i: i + u, brand, installDate: capToday(addDaysIso(installDate, u * 3)), equipmentId: `RTU-${u + 1}` }));
   }
 
   const docs = [];
@@ -639,23 +736,23 @@ function buildCommercial({ type, city }) {
     nameVariant: label, address, contact, term: '01/01/2025 - 12/31/2027', cost: (1200 + unitCount * 250).toFixed(2), units,
   })));
   docs.push(writePdf('invoice', `${type}${commercialSeq}`, invoiceDoc({
-    nameVariant: label, address, invoiceNo: `INV-${30000 + i}`, date: addDaysIso(installDate, 400),
+    nameVariant: label, address, phone: printPhone, email: printEmail, invoiceNo: `INV-${30000 + i}`, date: capToday(addDaysIso(installDate, 400)),
     cost: (600 + unitCount * 120).toFixed(2),
     workDesc: `${units[0].equipmentId} (Serial ${units[0].serial}) filter change and capacitor check`,
     tech: TECHS[commercialSeq % TECHS.length], unit: units[0],
   })));
   docs.push(writePdf('service-ticket', `${type}${commercialSeq}`, serviceTicketDoc({
-    nameVariant: label, address, date: addDaysIso(installDate, 900), tech: TECHS[(commercialSeq + 1) % TECHS.length],
+    nameVariant: label, address, phone: printPhone, date: capToday(addDaysIso(installDate, 900)), tech: TECHS[(commercialSeq + 1) % TECHS.length],
     unit: units[units.length - 1], serviceType: 'Repair',
     items: [`Diagnosed ${units[units.length - 1].equipmentId} compressor issue, recommended service`],
     notes: 'Customer approved follow-up repair',
   })));
   docs.push(writePdf('work-order', `${type}${commercialSeq}`, workOrderDoc({
-    nameVariant: label, address, date: addDaysIso(installDate, 905), woNo: `WO-${50000 + i}`,
+    nameVariant: label, address, phone: printPhone, date: capToday(addDaysIso(installDate, 905)), woNo: `WO-${50000 + i}`,
     task: `Service ${units[units.length - 1].equipmentId}`, tech: TECHS[(commercialSeq + 1) % TECHS.length],
   })));
   docs.push(writePdf('proposal-quote', `${type}${commercialSeq}`, proposalQuoteDoc({
-    nameVariant: label, address, date: addDaysIso(installDate, 890),
+    nameVariant: label, address, date: capToday(addDaysIso(installDate, 890)),
     desc: `Replace aging rooftop unit (${units[units.length - 1].equipmentId})`, cost: (7500 + unitCount * 400).toFixed(2),
   })));
   docs.push(writePdf('permit', `${type}${commercialSeq}`, permitDoc({
@@ -666,7 +763,7 @@ function buildCommercial({ type, city }) {
     nameVariant: label, address, unit: units[0], tech: TECHS[commercialSeq % TECHS.length],
   })));
 
-  addCustomer({ key: `${type}_${commercialSeq}`, canonicalName: label, address, units, docFilenames: docs });
+  addCustomer({ key: `${type}_${commercialSeq}`, canonicalName: label, address, phone, email, units, docFilenames: docs });
   return label;
 }
 
@@ -682,29 +779,32 @@ function buildApartmentComplex(city, unitCount = 8) {
     const brand = BRANDS[u % BRANDS.length];
     const installDate = installDateFor(i);
     const unit = makeUnit({ i, brand, installDate, equipmentId: 'Unit 1' });
-    if (u % 2 === 0) unit.registeredDate = addDaysIso(installDate, 18);
+    if (u % 2 === 0) unit.registeredDate = capToday(addDaysIso(installDate, 18));
     const tech = TECHS[u % TECHS.length];
+    const { phone, email } = contactFor(i, city, name);
+    const printPhone = PRINT_CONTACTS ? phone : null;
     const docs = [];
     docs.push(writePdf('invoice', `apt${u}`, invoiceDoc({
-      nameVariant: name.full, address, invoiceNo: `INV-${60000 + u}`, date: installDate,
+      nameVariant: name.full, address, phone: printPhone, email: PRINT_CONTACTS ? email : null,
+      invoiceNo: `INV-${60000 + u}`, date: installDate,
       cost: (3200 + u * 90).toFixed(2), workDesc: `Install ${unit.tonnage} ${brand} condenser`, tech, unit,
     })));
     docs.push(writePdf('service-ticket', `apt${u}`, serviceTicketDoc({
-      nameVariant: name.full, address, date: addDaysIso(installDate, 700 + u * 20), tech,
+      nameVariant: name.full, address, phone: printPhone, date: capToday(addDaysIso(installDate, 700 + u * 20)), tech,
       unit, items: ['Checked refrigerant charge', 'Replaced air filter'], notes: 'Airflow restored',
     })));
     if (u % 2 === 0) {
       docs.push(writeTxt('dispatch-note', `apt${u}`, dispatchNoteDoc({
-        nameVariant: name.full, address, date: addDaysIso(installDate, 750 + u * 20),
+        nameVariant: name.full, address, date: capToday(addDaysIso(installDate, 750 + u * 20)),
         note: 'Tenant reports no cold air, unit running constantly. Send tech today.', tech,
       })));
     } else {
       docs.push(writePdf('work-order', `apt${u}`, workOrderDoc({
-        nameVariant: name.full, address, date: addDaysIso(installDate, 750 + u * 20),
+        nameVariant: name.full, address, phone: printPhone, date: capToday(addDaysIso(installDate, 750 + u * 20)),
         woNo: `WO-${60000 + u}`, task: 'No cooling, dispatch for diagnosis', tech,
       })));
     }
-    addCustomer({ key: `apt_${u}`, canonicalName: name.full, address, units: [unit], docFilenames: docs });
+    addCustomer({ key: `apt_${u}`, canonicalName: name.full, address, phone, email, units: [unit], docFilenames: docs });
     created.push(`apt_${u}`);
   }
   return created;
@@ -802,7 +902,7 @@ const nameVariantCustomers = [...new Set([5, 40, 55].slice(0, WANT_NAME_VARIANTS
       'New dispatch radios arrived at the shop, hand out at Monday morning meeting.', '', 'Tech: Ray Sutton',
     ]),
     () => writePdf('other', 'holiday-schedule', shopMemoDoc({
-      date: '2026-11-01', subject: 'Holiday on-call schedule', body: 'On-call rotation for the holiday week posted on the shop board.',
+      date: '2026-09-10', subject: 'Holiday on-call schedule', body: 'On-call rotation for the holiday week posted on the shop board.',
     })),
   ];
   for (const write of shopOnlyWriters.slice(0, WANT_SHOP_ONLY_DOCS)) docsWithoutCustomer.push(write());
@@ -928,13 +1028,32 @@ while (lookupQuestions.length < WANT_QUESTIONS_PER_TYPE && li < answerCustomers.
 }
 lookupQuestions.length = Math.min(lookupQuestions.length, WANT_QUESTIONS_PER_TYPE);
 
+// ---- contact questions (2026-09-21 fix): 3 phone + 3 email lookups (6 total,
+// per key) plus 1 analytics question, appended AFTER the normal slice above so
+// they add to the question count rather than displacing an existing question.
+// Recorded on both corpora's keys regardless of PRINT_CONTACTS -- the small
+// corpus's base documents don't print these values, but the --contacts-topup
+// invoices do, so these become answerable once the topup is ingested too.
+const customersWithPhone = answerCustomers.filter((c) => c.phone);
+const customersWithEmail = answerCustomers.filter((c) => c.email);
+const contactLookups = [
+  ...customersWithPhone.slice(0, 3).map((c) => ({ q: `What's the phone number on file for ${c.canonicalName}?`, expectedContains: [c.phone] })),
+  ...customersWithEmail.slice(0, 3).map((c) => ({ q: `What's the email for ${c.canonicalName}?`, expectedContains: [c.email] })),
+];
+const contactAnalytics = [
+  { q: 'How many customers have an email on file?', expectedContains: [String(customersWithEmail.length)] },
+];
+
 const questions = [
   ...analyticsQuestions.slice(0, WANT_QUESTIONS_PER_TYPE).map((q) => ({ ...q, type: 'analytics' })),
+  ...contactAnalytics.map((q) => ({ ...q, type: 'analytics' })),
   ...lookupQuestions.slice(0, WANT_QUESTIONS_PER_TYPE).map((q) => ({ ...q, type: 'lookup' })),
+  ...contactLookups.map((q) => ({ ...q, type: 'lookup' })),
 ];
 
 /* ------------------------------------------------------------ answer key */
 const answerKey = {
+  corpusVersion: CORPUS_VERSION,
   shopAddress: SHOP.address,
   shopPhone: SHOP.phone,
   shopEmail: SHOP.email,
@@ -956,6 +1075,49 @@ const answerKey = {
   totalUnits,
   questions,
 };
+
+/* ============================================================ TOPUP MODE ==
+ * --contacts-topup: everything above ran purely in memory (writePdf/writeTxt
+ * were no-ops on disk, OUT_DIR was never created/cleaned/written). Now write
+ * ONLY new, distinctly-numbered invoices -- one per customer who has a phone
+ * or email on file -- into `${OUT_DIR}-topup/`, plus a TOPUP_KEY.json. This
+ * never touches OUT_DIR itself.
+ * ========================================================================= */
+if (TOPUP_MODE) {
+  const TOPUP_DIR = `${OUT_DIR}-topup`;
+  fs.mkdirSync(TOPUP_DIR, { recursive: true });
+  for (const f of fs.readdirSync(TOPUP_DIR)) fs.rmSync(path.join(TOPUP_DIR, f), { force: true });
+
+  const topupCustomers = answerCustomers.filter((c) => c.phone || c.email);
+  const topupEntries = [];
+  let topupSeq = 200; // filenames start at 201, per the brief's own example
+  for (const c of topupCustomers) {
+    topupSeq += 1;
+    const u = c.units[0];
+    const slug = c.key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const name = `${topupSeq}-invoice-topup-${slug}.pdf`;
+    const date = capToday(addDaysIso(TODAY, -(topupSeq % 30)));
+    const lines = invoiceDoc({
+      nameVariant: c.canonicalName, address: c.address, phone: c.phone, email: c.email,
+      invoiceNo: `INV-T${topupSeq}`, date,
+      cost: (200 + (topupSeq % 12) * 15).toFixed(2),
+      workDesc: 'Seasonal maintenance check; confirmed customer contact info on file',
+      tech: TECHS[topupSeq % TECHS.length], unit: u,
+    });
+    fs.writeFileSync(path.join(TOPUP_DIR, name), buildPdf(lines));
+    topupEntries.push({ key: c.key, canonicalName: c.canonicalName, address: c.address, phone: c.phone, email: c.email, filename: name });
+  }
+  fs.writeFileSync(path.join(TOPUP_DIR, 'TOPUP_KEY.json'), JSON.stringify({
+    generatedAt: TODAY,
+    baseDir: path.relative(ROOT, OUT_DIR),
+    customers: topupEntries,
+  }, null, 2));
+
+  console.log(`Wrote ${topupEntries.length} contact-topup invoices to ${path.relative(ROOT, TOPUP_DIR)}/ (base dir ${path.relative(ROOT, OUT_DIR)}/ untouched)`);
+  console.log('Wrote', path.join(path.relative(ROOT, TOPUP_DIR), 'TOPUP_KEY.json'));
+  process.exit(0);
+}
+
 fs.writeFileSync(path.join(OUT_DIR, 'ANSWER_KEY.json'), JSON.stringify(answerKey, null, 2));
 
 /* ----------------------------------------------------------------- report */
@@ -971,6 +1133,7 @@ console.log(`Equipment by brand: ${JSON.stringify(equipmentByBrand)} (total unit
 console.log(`Warranty status counts: ${JSON.stringify(warrantyStatusCounts)}`);
 console.log(`mustNotMerge pairs: ${mustNotMerge.length}; nameVariant customers: ${nameVariantCustomers.length}; docsWithoutCustomer: ${docsWithoutCustomer.length}`);
 console.log(`Questions: ${questions.length} (${questions.filter((q) => q.type === 'analytics').length} analytics, ${questions.filter((q) => q.type === 'lookup').length} lookup)`);
+console.log(`Contacts: ${customersWithPhone.length} customers with phone, ${customersWithEmail.length} with email (printed in documents: ${PRINT_CONTACTS})`);
 const pdfCount = filesWritten.filter((f) => f.endsWith('.pdf')).length;
 const txtCount = filesWritten.filter((f) => f.endsWith('.txt')).length;
 const estCost = pdfCount * 0.012 + txtCount * 0.006;

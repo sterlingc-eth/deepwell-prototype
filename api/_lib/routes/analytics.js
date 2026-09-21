@@ -32,6 +32,7 @@ import {
   installYearOf,
   warrantyStatusOf,
   UNKNOWN_BUCKET,
+  TOP_CUSTOMERS_LIMIT,
 } from '../analytics.js';
 
 export const ANALYTICS_MODEL = process.env.ANALYTICS_MODEL || process.env.ASK_MODEL || 'claude-haiku-4-5';
@@ -246,6 +247,46 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
   return { rows };
 }
 
+/**
+ * Round 4 item 1 (2026-09-21): "who's our biggest customer" — customers
+ * RANKED by a size measure (equipmentCount or documentCount), not filtered.
+ * A LEFT JOIN + COUNT + ORDER BY DESC + LIMIT — the join/columns are fixed,
+ * whitelisted SQL text (never model input), and `limit` is a plan-validated
+ * number, never a raw string. Deliberately ignores plan.filters for v1 (a
+ * "biggest customer in Arizona" county/state filter combined with a sort) —
+ * an honest, documented limitation (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md),
+ * not a silent one: the brief's own examples never combine the two.
+ */
+async function queryTopCustomers(db, sortBy, limit) {
+  const sql =
+    sortBy === 'documentCount'
+      ? `SELECT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address,
+                COUNT(DISTINCT l.document_id) AS metric
+           FROM entities c
+           LEFT JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
+          WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+          GROUP BY c.id
+          ORDER BY metric DESC, c.updated_at DESC
+          LIMIT $1`
+      : `SELECT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address,
+                COUNT(DISTINCT e.id) AS metric
+           FROM entities c
+           LEFT JOIN entities e ON e.customer_id = c.id AND e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+          WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+          GROUP BY c.id
+          ORDER BY metric DESC, c.updated_at DESC
+          LIMIT $1`;
+  const { rows } = await db.raw(sql, [limit]);
+  const noun = sortBy === 'documentCount' ? 'document' : 'unit';
+  return rows.map((r) => {
+    const n = Number(r.metric) || 0;
+    return {
+      id: r.id, label: r.customer_name || 'Unnamed customer',
+      value: `${n} ${noun}${n === 1 ? '' : 's'}`, entityId: r.id,
+    };
+  });
+}
+
 function keyOf(groupBy) {
   return (row) => {
     if (groupBy === 'warrantyStatus') return row.warrantyStatus ?? UNKNOWN_BUCKET;
@@ -260,6 +301,14 @@ function keyOf(groupBy) {
  * transaction — same calling convention as fastPathQuery.js.
  */
 export async function executeAnalyticsPlan(db, plan, { today } = {}) {
+  // "who's our biggest customer" (round 4, item 1) — a distinct shape from
+  // every other op: ranked, not filtered/counted. validatePlan already
+  // guarantees sortBy only ever appears with entity 'customers' + op 'list'.
+  if (plan.sortBy) {
+    const rows = await queryTopCustomers(db, plan.sortBy, plan.limit ?? TOP_CUSTOMERS_LIMIT);
+    return formatAnalyticsAnswer(plan, { total: rows.length, rows });
+  }
+
   if (!filtersSupported(plan.entity, plan.filters)) return null;
 
   const hasEquipmentJoinFilter =

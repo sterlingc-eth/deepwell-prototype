@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { deriveCity } from './routes/customers.js';
-import { alertTier, normalizeBrand, BRAND_RULES } from './warrantyRules.js';
+import { alertTier, normalizeBrand } from './warrantyRules.js';
 
 // Plain readFileSync + JSON.parse rather than an import attribute (`with {
 // type: 'json' }`) — same idiom claude.js already uses for .env.local, and it
@@ -48,6 +48,11 @@ export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'i
 export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown'];
 export const MAX_LIMIT = 500;
 export const DEFAULT_LIMIT = 500;
+/** "who's our biggest customer" (round 4, item 1) — customers RANKED by a
+ *  size measure, not filtered/counted. Only meaningful for entity
+ *  'customers' + op 'list'; see queryTopCustomers, routes/analytics.js. */
+export const SORT_FIELDS = ['equipmentCount', 'documentCount'];
+export const TOP_CUSTOMERS_LIMIT = 10;
 
 /* ================================================================ classifier
  *
@@ -61,16 +66,91 @@ export const DEFAULT_LIMIT = 500;
  * EXCLUDE below, which mirrors ask.js's own comment about "how many documents
  * does Plaza Dental have" needing retrieval, not a meta/aggregate answer.
  */
-const AGGREGATE_NOUN = /\b(customers?|clients?|units?|equipment|pieces? of equipment|documents?|invoices?|warrant(?:y|ies)|records?)\b/i;
+/**
+ * Reviewer NO-GO (2026-09-21, round 4, item 1): "how many clients do we
+ * have" answered "Nothing in your records answers that" — a plain-English
+ * owner phrasing that never reaches a document at all, so retrieval had
+ * nothing to cite. Two separate gaps caused it: (1) "clients" WAS already
+ * accepted, but a bare "do we have" question names no location/time/brand
+ * word, and CONTEXT (below, since removed as a gate — see
+ * preClassifyAnalytics's own doc comment) required one; (2) most of the
+ * plain-English synonyms an owner actually says out loud ("accounts",
+ * "homeowners", "properties", "jobs", "rooftop units", "paperwork", ...)
+ * were never in the noun list at all.
+ *
+ * ONE table, used by BOTH consumers: this classifier's AGGREGATE_NOUN regex,
+ * and the planner's ANALYTICS_SYSTEM_PROMPT (buildEntitySynonymPromptLine,
+ * below) — so a synonym added here is recognized by both without hand-
+ * duplicating the list into the prompt text. Keys are the canonical
+ * ENTITIES/groupBy-dimension names; `technicians` is not itself a plan
+ * entity (there's no "how many technicians" op) but feeds GROUP_SHAPE_RE's
+ * "by tech/by crew" dimension-word recognition below.
+ */
+export const ENTITY_SYNONYMS = {
+  customers: [
+    'customer', 'customers', 'client', 'clients', 'account', 'accounts',
+    'homeowner', 'homeowners', 'household', 'households', 'property', 'properties',
+    'site', 'sites', 'house', 'houses', 'business', 'businesses', 'people we service',
+  ],
+  equipment: [
+    'equipment', 'unit', 'units', 'system', 'systems', 'ac', 'acs', 'air conditioner', 'air conditioners',
+    'furnace', 'furnaces', 'heat pump', 'heat pumps', 'condenser', 'condensers', 'rtu', 'rtus',
+    'rooftop unit', 'rooftop units', 'piece of equipment', 'pieces of equipment',
+  ],
+  documents: [
+    'document', 'documents', 'doc', 'docs', 'file', 'files', 'paperwork', 'record', 'records',
+    'invoice', 'invoices', 'ticket', 'tickets', 'work order', 'work orders',
+  ],
+  serviceVisits: [
+    'service visit', 'service visits', 'job', 'jobs', 'visit', 'visits', 'call', 'calls',
+    'service call', 'service calls', 'ticket', 'tickets',
+  ],
+  warranties: ['warranty', 'warranties'],
+  technicians: ['technician', 'technicians', 'tech', 'techs', 'guy', 'guys', 'crew'],
+};
+
+/** Longest phrase first, so a multi-word synonym ("rooftop units") matches
+ *  before a shorter one that happens to be its own suffix ("units") could —
+ *  harmless for `test()` (order never changes whether SOME alternative
+ *  matches) but keeps the built pattern readable/debuggable in that order. */
+function synonymAlternation(words) {
+  return [...new Set(words)]
+    .sort((a, b) => b.length - a.length)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+}
+
+const AGGREGATE_NOUN = new RegExp(
+  `\\b(${synonymAlternation([
+    ...ENTITY_SYNONYMS.customers,
+    ...ENTITY_SYNONYMS.equipment,
+    ...ENTITY_SYNONYMS.documents,
+    ...ENTITY_SYNONYMS.serviceVisits,
+    ...ENTITY_SYNONYMS.warranties,
+  ])})\\b`,
+  'i'
+);
 const QUANTIFIER = /\b(how many|count|list|which|show me|total)\b/i;
-const CONTEXT = /\b(in|from|by|of|older than|newer than|out of warranty|under warranty|expiring|expired|active|unknown|warranty status|this month|last month|this year|county|arizona|\baz\b|city|state|zip|brand|technician)\b/i;
 /** "group X by Y" / "breakdown by Y" / "grouped by Y" — an aggregate-request
  *  shape regardless of which noun is being broken down, so a groupBy
  *  dimension word alone (technician, brand, month) is enough even without one
  *  of AGGREGATE_NOUN's fixed nouns ("show me a breakdown by technician"). */
-const GROUP_SHAPE_RE = /\b(group(?:ed)?\b[\s\S]*\bby\b|breakdown\b[\s\S]*\bby\b|\bby\b\s+(city|county|state|zip|brand|month|technician|warranty status)\b)/i;
+const GROUP_SHAPE_RE = new RegExp(
+  `\\b(group(?:ed)?\\b[\\s\\S]*\\bby\\b|breakdown\\b[\\s\\S]*\\bby\\b|\\bby\\b\\s+(city|county|state|zip|brand|month|warranty status|${synonymAlternation(ENTITY_SYNONYMS.technicians)})\\b)`,
+  'i'
+);
 const WHO_SERVICED_RE = /\bwho did we (service|work for)\b/i;
 const WHICH_CUSTOMERS_RE = /\bwhich customers\b/i;
+/** "who's/who is our biggest client" / "top 10 customers" / "our largest
+ *  accounts" — asks for customers RANKED by some size measure (equipment or
+ *  document count), not filtered/counted — a distinct op from every other
+ *  bypass trigger (see routes/analytics.js's queryTopCustomers). Built from
+ *  the SAME customer synonym list, so "biggest account"/"largest client"
+ *  match exactly as readily as "biggest customer". */
+const BIGGEST_CUSTOMER_RE = new RegExp(
+  `\\b(biggest|largest|top)\\s+(\\d+\\s+)?(${synonymAlternation(ENTITY_SYNONYMS.customers)})\\b`,
+  'i'
+);
 /**
  * Reviewer NO-GO (2026-09-21, round 2, gap 1): "who has Trane units" and
  * "customers with expired warranties" / "units older than 10 years" named a
@@ -91,25 +171,20 @@ const NOUN_WITH_RE = /\b(customers?|clients?|units?|equipment)\s+(with|that have
 /** "units older than N years" / "installed before/after 2020" — an age/date
  *  filter shape on its own aggregate noun, with no quantifier word needed. */
 const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b/i;
-/**
- * Every accepted brand spelling (BRAND_RULES' labels + aliases,
- * warrantyRules.js — the SAME list normalizeBrand/brandMatches already
- * recognize, so the classifier never knows a brand name the planner
- * couldn't also resolve), so "how many Trane units" / "how many Goodman
- * units" pass CONTEXT even though neither names any of CONTEXT's other
- * generic words (a county, "brand", a time range, ...). Built once at module
- * load, not hand-duplicated, so a brand added to warrantyRules.js is
- * recognized here for free.
- */
-const BRAND_NAME_RE = new RegExp(
-  `\\b(${[...new Set(Object.values(BRAND_RULES).flatMap((v) => [v.label, ...(v.aliases ?? [])]))]
-    .map((s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('|')})\\b`,
-  'i'
-);
 /** "how many documents does Plaza Dental have" / "does X have a warranty" —
  *  a single, named record's own attribute, not an aggregate across many. */
-const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+[\s\S]+\b(have|has|need)\b/i;
+/**
+ * Reviewer NO-GO (2026-09-21, round 4, item 1): "how many visits did we have
+ * this week" (a real aggregate question, "we" as subject) matched this
+ * regex's "did ... have" shape exactly like "does Henderson have a
+ * warranty" (a real single-record one, a NAMED subject) and was wrongly
+ * excluded. The negative lookahead excludes the common generic-subject
+ * pronouns ("we"/"you"/"they"/"the company"/"the shop") right after
+ * does/did — those are never a single customer RECORD, so "does/did <pronoun>
+ * have" is never this pattern's intended shape; a genuinely named subject
+ * ("Henderson", "the unit at 3247 Elm", "Plaza Dental") still matches.
+ */
+const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+(?!we\b|you\b|they\b|the company\b|the shop\b)[\s\S]+\b(have|has|need)\b/i;
 
 /**
  * Reviewer NO-GO (2026-09-21, A1): WHICH_CUSTOMERS_RE / WHO_SERVICED_RE /
@@ -144,6 +219,20 @@ const STREET_ADDRESS_RE =
  * retrieval, same as any other fast-path/analytics miss).
  */
 const AT_ADDRESS_RE = /\bat\s+\d{1,6}\s+\w/i;
+/**
+ * Reviewer NO-GO (2026-09-21, round 4, item 1): dropping CONTEXT as a
+ * required gate (preClassifyAnalytics, below) opened one real regression —
+ * "how many tons is the Whitmore unit" (an existing adversarial check, no
+ * address, no digit token) would now pass QUANTIFIER + AGGREGATE_NOUN with
+ * nothing left to exclude it. The one thing that DOES distinguish it from a
+ * real aggregate question like "how many rooftop units" is the definite
+ * article + capitalized proper noun: "the <Name> unit/system/..." names ONE
+ * specific, already-identified record, the same shape fastPath itself
+ * resolves ("the Whitmore unit", "the Ortega account"). Case-SENSITIVE on
+ * purpose — a capital letter is the signal; "the rooftop units" (lowercase,
+ * plural) never matches this.
+ */
+const SINGULAR_NAMED_RECORD_RE = /\bthe\s+[A-Z][A-Za-z]*\s+(unit|system|account|job|customer|client|property)\b/;
 /** An alnum token >= 8 chars with at least one digit — the same serial/model
  *  shape fastPath.js's own IDENTIFIER_RE looks for (see its file for why:
  *  that's the printed shape of a real HVAC serial/model number, and a bare
@@ -162,9 +251,28 @@ function looksLikeIdentifierToken(question) {
  *  scripts/verify-analytics.mjs can both exercise it directly. */
 export function looksLikeSingleRecordReference(question) {
   const q = String(question ?? '');
-  return STREET_ADDRESS_RE.test(q) || AT_ADDRESS_RE.test(q) || looksLikeIdentifierToken(q);
+  return STREET_ADDRESS_RE.test(q) || AT_ADDRESS_RE.test(q) || SINGULAR_NAMED_RECORD_RE.test(q) || looksLikeIdentifierToken(q);
 }
 
+/**
+ * Reviewer NO-GO (2026-09-21, round 4, item 1): the generic path used to
+ * require QUANTIFIER && AGGREGATE_NOUN && CONTEXT, where CONTEXT was a
+ * location/time/brand word (a county, "this month", "brand", ...). That
+ * gate is why "how many clients do we have" — the live owner question —
+ * fell through to retrieval: it names no location/time/brand at all, only
+ * the aggregate noun and the quantifier. Checked against every existing
+ * verify case (adversarial included), the ONLY negative that actually
+ * depended on CONTEXT for its exclusion was "how many tons is the Whitmore
+ * unit", now independently caught by SINGULAR_NAMED_RECORD_RE above — every
+ * other single-record negative was already excluded up front by
+ * looksLikeSingleRecordReference or POSSESSIVE_SINGLE_RE. So CONTEXT is no
+ * longer a required gate: QUANTIFIER + AGGREGATE_NOUN alone is enough once
+ * the exclusions above have already run. A true false positive here (a
+ * genuinely ambiguous "which one do you like" that happens to also contain
+ * an aggregate noun) still costs nothing but one wasted, cheap planner call
+ * that validatePlan/the executor then reject — the same trade-off this
+ * file's own header comment has always accepted.
+ */
 export function preClassifyAnalytics(question) {
   const q = String(question ?? '').trim();
   if (!q) return false;
@@ -176,11 +284,12 @@ export function preClassifyAnalytics(question) {
     GROUP_SHAPE_RE.test(q) ||
     WHO_HAS_RE.test(q) ||
     NOUN_WITH_RE.test(q) ||
+    BIGGEST_CUSTOMER_RE.test(q) ||
     (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q))
   ) {
     return true;
   }
-  return QUANTIFIER.test(q) && AGGREGATE_NOUN.test(q) && (CONTEXT.test(q) || BRAND_NAME_RE.test(q));
+  return QUANTIFIER.test(q) && AGGREGATE_NOUN.test(q);
 }
 
 /**
@@ -262,20 +371,41 @@ export const ANALYTICS_TOOL = {
         description: 'YYYY-MM-DD or YYYY-MM, for "this month"/"in August"/"since 2024" style questions.',
       },
       limit: { type: 'number', description: `Row cap for "list". Defaults to ${DEFAULT_LIMIT}.` },
+      sortBy: {
+        type: 'string',
+        enum: SORT_FIELDS,
+        description:
+          'Only for entity "customers" + op "list": rank customers by size instead of filtering them. ' +
+          '"who\'s our biggest/largest/top customer(s)" -> "equipmentCount" unless the question names ' +
+          'documents/invoices/paperwork specifically, in which case "documentCount". Omit for every other question.',
+      },
     },
     required: ['entity', 'op'],
   },
 };
 
+/** One line per canonical entity, its plain-English synonyms, built from
+ *  ENTITY_SYNONYMS (above) so the prompt can never drift from the
+ *  classifier's own noun list — see that table's own doc comment. */
+function synonymPromptLine() {
+  return Object.entries(ENTITY_SYNONYMS)
+    .filter(([entity]) => entity !== 'technicians')
+    .map(([entity, words]) => `${entity} = ${[...new Set(words)].join('/')}`)
+    .join('; ');
+}
+
 export const ANALYTICS_SYSTEM_PROMPT =
   'You turn an HVAC dispatch company\'s counting/listing/grouping question into a query plan ' +
   'using the "analytics_plan" tool. You never see or write SQL, and you never answer the question ' +
   'yourself — you only choose entity/op/groupBy/filters from the closed vocabulary the tool schema ' +
-  'declares. "Arizona"/"AZ"/"arizona" always means the state filter value "AZ". A bare county name ' +
-  '("Maricopa", "Pima") means the county filter with that name, no "County" suffix. A brand name ' +
-  '(Trane, Carrier, Goodman, Lennox, Rheem, York, Daikin, Mitsubishi, ...) means the brand filter. ' +
-  '"this month"/"last month"/a named month means timeRange. If the question names no entity, assume ' +
-  '"customers". Always call the tool exactly once.';
+  'declares. The owner uses plain English, not database terms — map every synonym to its canonical ' +
+  `entity before filling the schema: ${synonymPromptLine()}. "Arizona"/"AZ"/"arizona" always means ` +
+  'the state filter value "AZ". A bare county name ("Maricopa", "Pima") means the county filter with ' +
+  'that name, no "County" suffix. A brand name (Trane, Carrier, Goodman, Lennox, Rheem, York, Daikin, ' +
+  'Mitsubishi, ...) means the brand filter. "this month"/"last month"/"this week"/a named month means ' +
+  'timeRange. "who\'s our biggest/largest/top customer(s)" means entity "customers", op "list", and ' +
+  'sortBy "equipmentCount" (or "documentCount" if the question specifically names documents/invoices) ' +
+  '— never a filter. If the question names no entity, assume "customers". Always call the tool exactly once.';
 
 /* ============================================================ cache namespace
  *
@@ -352,6 +482,9 @@ function canonicalPlanString(plan) {
     filters,
     timeRange: plan?.timeRange ?? null,
     limit: plan?.limit ?? null,
+    // round 4 item 1: a plain "list customers" and a "biggest customer"
+    // sortBy plan must never share a cache row — they run different SQL.
+    sortBy: plan?.sortBy ?? null,
   });
 }
 
@@ -406,7 +539,18 @@ export function validatePlan(raw) {
     limit = Math.min(Math.trunc(n), MAX_LIMIT);
   }
 
-  return { entity: p.entity, op: p.op, groupBy, filters, timeRange, limit };
+  // "who's our biggest customer" (round 4, item 1) — only meaningful for
+  // customers/list; an out-of-vocabulary value rejects the WHOLE plan, same
+  // as any other field. Always caps to TOP_CUSTOMERS_LIMIT regardless of any
+  // `limit` the model also set — "top 10" is what was asked, not "top 500".
+  let sortBy;
+  if (p.sortBy != null) {
+    if (!SORT_FIELDS.includes(p.sortBy) || p.entity !== 'customers' || p.op !== 'list') return null;
+    sortBy = p.sortBy;
+    limit = Math.min(limit, TOP_CUSTOMERS_LIMIT);
+  }
+
+  return { entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy };
 }
 
 /* =================================================================== geo */
@@ -712,6 +856,21 @@ export const MAX_FACT_ROWS = 50;
 export function formatAnalyticsAnswer(plan, opts) {
   const { total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null } = opts ?? {};
   const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
+
+  // "who's our biggest customer" (round 4, item 1) — a ranked list, not a
+  // filtered/counted one; its own wording so the answer reads as a ranking
+  // ("Your top 3 customers by equipment count:") rather than a bare count.
+  if (plan.sortBy) {
+    const measure = plan.sortBy === 'documentCount' ? 'document count' : 'equipment count';
+    const text = total === 0
+      ? 'No customers on file yet.'
+      : `Your top ${total} customer${total === 1 ? '' : 's'} by ${measure}: ${rows.map((r) => `${r.label} (${r.value})`).join(', ')}.`;
+    return {
+      kind: 'answer', text,
+      facts: rows.map((r) => ({ label: r.label, value: r.value ?? '—', entityId: r.entityId, sources: [] })),
+      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
 
   // ---- ambiguity rule (design point 5): a named filter matched zero rows,
   // but the tenant does have data for this entity elsewhere -> say so instead

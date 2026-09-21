@@ -28,6 +28,7 @@ export const DOCUMENT_TYPES: DocumentTypeDef[] = [
   { id: 'purchase-order', label: 'Purchase order' },
   { id: 'equipment-record', label: 'Equipment record' },
   { id: 'correspondence', label: 'Correspondence' },
+  { id: 'internal', label: 'Shop record' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -53,6 +54,7 @@ export const REQUIRED_FIELDS: Record<string, string[]> = {
   'purchase-order': ['vendor|customer_name', 'cost'],
   'equipment-record': ['serial_number|model'],
   correspondence: ['customer_name'],
+  internal: [],
   other: [],
 };
 

@@ -266,6 +266,136 @@ cases). Full `verify:all` chain: **3110 PASS / 0 FAIL, exit 0**. Standing
 constraints still hold: exactly 12 files directly under `api/`, no DDL, no
 new dependencies, Haiku only.
 
+## Reviewer round 4 — live owner miss + three ingestion findings fixed (2026-09-21)
+
+Trigger: the owner asked "how many clients do we have" and got "Nothing in
+your records answers that," plus three findings from the live 600-document
+corpus. All four fixed under the same standing constraints.
+
+**Item 1 — plain-English vocabulary gap.** The pre-classifier's noun list and
+the planner's system prompt each separately spelled out only a handful of
+words per entity ("customers", "units", ...), so "clients", "accounts",
+"homeowners", "jobs", "docs", and a dozen other everyday synonyms simply
+never matched either one — "how many clients do we have" fell all the way
+through to retrieval, which correctly has no single record that answers a
+count question. Fixed with one synonym table, `ENTITY_SYNONYMS`
+(`api/_lib/analytics.js`) — canonical entity -> its synonym list — consumed
+by BOTH sides so a synonym added once is recognized everywhere:
+- `synonymAlternation()` builds the classifier's `AGGREGATE_NOUN` regex
+  alternation straight from `ENTITY_SYNONYMS` (customers/equipment/documents/
+  serviceVisits/warranties combined).
+- `synonymPromptLine()` renders the same table as `"customers =
+  clients/accounts/homeowners/..."` lines embedded in
+  `ANALYTICS_SYSTEM_PROMPT`, so the Haiku planner is told the identical
+  vocabulary the classifier already gates on.
+- Also fixed the classifier's own false negative on bare "do we have"/"did we
+  have" phrasing: dropped the old `CONTEXT` gate (audited every existing
+  negative test first — only one, "how many tons is the Whitmore unit," relied
+  on it, covered instead by a new case-sensitive `SINGULAR_NAMED_RECORD_RE`,
+  `/\bthe\s+[A-Z][A-Za-z]*\s+(unit|system|account|job|customer|client|property)\b/`)
+  and fixed `POSSESSIVE_SINGLE_RE`'s over-broad "does/did ... have" match with
+  a negative lookahead excluding generic subjects (`we`/`you`/`they`/`the
+  company`/`the shop`) so "how many visits did we have this week" is no
+  longer wrongly excluded as a single-record question.
+- New: "who's our biggest customer" is a distinct RANKED shape, not a filter —
+  a new `sortBy` plan field (`SORT_FIELDS = ['equipmentCount',
+  'documentCount']`, valid only for `entity: 'customers'` + `op: 'list'`,
+  always capped to `TOP_CUSTOMERS_LIMIT = 10`), executed by a dedicated
+  `queryTopCustomers` (`api/_lib/routes/analytics.js`, LEFT JOIN + COUNT +
+  ORDER BY DESC + LIMIT — documented v1 limitation: ignores `plan.filters`),
+  included in `canonicalPlanString`'s cache key, with its own answer format.
+- 46 new verify cases in `scripts/verify-analytics.mjs`: 21 exact positive
+  phrasings (including every exact string the coordinator listed) + 5
+  negatives + synonym-prompt-coverage checks + `validatePlan`/cache-key
+  `sortBy` checks + 3 mock-db `executeAnalyticsPlan` end-to-end checks
+  (including the zero-customers edge case).
+
+**Item 2 — future service/install dates were silently dropped.** "Date of
+Service: 11/27/2026" and "03/07/2028" both failed the old universal
+`FUTURE_GRACE_DAYS = 2` check in `extractFields.js` and were thrown away
+entirely, so the document then showed "service date missing" for a date it
+had actually stated. Fixed with a per-field extended future window
+(`EXTENDED_FUTURE_MONTHS = { service_date: 18, installation_date: 3 }`,
+`isBeyondFutureWindow`) — `warranty_registered_date` keeps the original tight
+2-day grace (a warranty cannot be registered before it's registered, so it
+never got a wider window). A date within its field's window is now KEPT, not
+dropped, and marked `flags: ['future']` on the returned fact — visible to
+every caller of `normalizeFields`, and recorded into
+`extractDocument.js`'s `db.logAction` audit entry (`future_dated_fields`,
+reusing the existing `audit_log.changes` JSONB — no DDL) so it's on file
+wherever that action is audited, distinct from "missing." A date beyond even
+the extended window is still dropped, exactly as before. 7 new verify cases
+in `scripts/verify-extract.mjs`: the two exact live-reported dates (kept +
+flagged), the tighter 3-month installation_date window (both an in-window and
+a beyond-window case), a beyond-window service_date, `warranty_registered_date`
+unaffected, and an ordinary past date carrying no `flags` property at all.
+
+**Item 3 — shop-internal documents sat in the human queue with no path out.**
+A parts count, a truck dispatch note, or a memo to all techs has no customer,
+no unit, and no job on it — it can never be linked to anything, so it was
+stuck waiting for a link that would never come. New pure classifier
+`isShopInternalDocument` (`api/_lib/documentTypes.js`): true when a
+document's only non-empty facts are its own `shop_address`/`shop_phone`/
+`shop_email` plus `notes`/`status` (at least one shop_* fact required, so an
+empty document doesn't count). New canonical type `'internal'` ("Shop
+record") added to both `api/_lib/documentTypes.js` and
+`src/domains/hvac/documentTypes.ts` (kept in sync — `scripts/verify-ui.ts`'s
+16-type parity check updated) with `REQUIRED_FIELDS.internal = []`, so
+`completenessFor` calls it complete at full confidence and the EXISTING
+`verifyByAi` auto-verification path (unchanged) stamps `stage: 'verified'`,
+`verified_by: 'ai'` the moment extraction finishes — no new DB write needed.
+`extractDocument.js` checks `isShopInternalDocument` ahead of the model's own
+guess (stronger factual signal, still below an explicit/human override) and
+records `no_customer: true` in the same `audit_log.changes` JSON as item 2's
+`future_dated_fields` (no DDL). The integrity scan's `unlinkedDocuments`
+exclusion needed NO new code: `isUnlinkedDocument` already requires
+`hasCustomerName || hasAddress`, both structurally false for a document with
+no customer_name/service_address fact — the exact "already excluded for
+letterhead-only" mechanism the brief said to reuse. New "Shop records" filter
+chip in `src/screens/ReviewScreen.tsx` (`doc.typeId === 'internal'`), inside
+the same Inbox tab the "Needs a person" chip lives in. 19 new verify cases in
+`scripts/verify-doctypes.mjs` for the pure classifier (the three example
+document kinds, one case per disqualifying field, edge cases, and the new
+type's registry entries).
+
+**Item 4 — no name-mention fallback linking.** A document with notes reading
+"Sarah Chen's account" or "for Mike Torres" but no extracted `customer_name`
+fact was left unlinked even when exactly one customer obviously matched. New
+pure `extractNameMention`/`matchNameMention` (`api/_lib/integrity.js`):
+`extractNameMention` matches `"<First Last>'s
+account|home|house|unit|system|property"` or `"for <First Last>"` (fixed at
+exactly two capitalized tokens — a wider version swallowed a
+sentence-initial capitalized verb, e.g. read "Inspected Bob Nguyen's
+property" as candidate "Inspected Bob Nguyen"); `matchNameMention` requires
+`compareNamesStrict` to say `'equal'`/`'subset'` against the candidate set,
+returning a match only when exactly one customer qualifies (0 or 2+ ->
+`null`, left for review). Wired into `findOrCreateCustomer`
+(`api/_lib/recordsStore.js`)'s existing "names nobody at all" branch, narrowed
+in SQL the same way the exact-name lookup above it already is (surname-ILIKE
+candidate query, never a full-tenant load — the exact pattern round 3 item 1
+required); only ever LINKS to an existing customer, never creates one. New
+shared `linkedByForMatchBasis` (`api/_lib/recordsStore.js`) replaces five
+separate copies of the `matchBasis === 'name-only' ? 'ai:name-only' : 'ai'`
+ternary (`extractDocument.js`, `reviewStore.js`, `routes/integrity.js` x3) and
+adds `'name-mention' -> 'ai:name-mention'` to all of them at once.
+`'ai:name-mention'` was added everywhere `'ai:name-only'` is treated
+specially: `isEligibleForRelink`'s allow-list, both raw-SQL `linked_by IN
+(...)` filters, `loadAmbiguousNameOnlyLinks`'s ambiguity scan (backend), and
+its client-side mirror in `src/hooks/usePostgresSync.ts` — eligible for
+relink, ambiguity flag applies, exactly like `'ai:name-only'`. 22 new verify
+cases in `scripts/verify-integrity.mjs` (13 `extractNameMention` cases, 7
+`matchNameMention` cases including the ambiguous/surname-only-no-match
+cases, 2 `isEligibleForRelink` cases for the new `linked_by` value).
+
+Verified: `npm run typecheck && npm run typecheck:api && npm run lint &&
+npm run verify:all` all green. `verify-analytics.mjs` alone: **280/280** (was
+233; +47). `verify-integrity.mjs` alone: **238/238** (was 216; +22).
+`verify-doctypes.mjs` alone: **127/127** (+18 for `isShopInternalDocument`
+and the registry). `verify-extract.mjs` alone: **162/162** (+7 for the
+future-date window). Full `verify:all` chain: **3224 PASS / 0 FAIL, exit 0**.
+Standing constraints still hold: exactly 12 files directly under `api/`, no
+DDL, no new dependencies, Haiku only.
+
 ## What changed
 
 Today `/api/ask` had: meta-router (exact-phrase inventory questions) → fast
@@ -497,6 +627,47 @@ answer.
   - `scripts/verify-integrity.mjs` — 5 `houseNumberOf` cases + 3 `isLocked`
     cases.
   - `scripts/verify-analytics.mjs` — 9 new cases for `AT_ADDRESS_RE`.
+- Round 4 (2026-09-21) additional files touched, items 1–4:
+  - `api/_lib/analytics.js` — new `ENTITY_SYNONYMS`/`synonymAlternation`/
+    `synonymPromptLine`, `BIGGEST_CUSTOMER_RE`, `SINGULAR_NAMED_RECORD_RE`,
+    `sortBy`/`SORT_FIELDS`/`TOP_CUSTOMERS_LIMIT`, `POSSESSIVE_SINGLE_RE` fix,
+    dropped `CONTEXT`/`BRAND_NAME_RE` (item 1).
+  - `api/_lib/routes/analytics.js` — new `queryTopCustomers`, `sortBy`
+    special-case branch in `executeAnalyticsPlan` (item 1).
+  - `api/_lib/extractFields.js` — `EXTENDED_FUTURE_MONTHS`/
+    `isBeyondFutureWindow`, per-field future window replaces the flat drop,
+    `flags: ['future']` on the kept fact (item 2).
+  - `api/_lib/extractDocument.js` — `future_dated_fields`/`no_customer`
+    recorded in `db.logAction`'s `changes` JSON (items 2+3); `documentType`
+    classification checks `isShopInternalDocument` ahead of the model's guess
+    (item 3); `linkedByForMatchBasis` replaces its inline ternary (item 4).
+  - `api/_lib/documentTypes.js` — new `'internal'` type + definition +
+    `REQUIRED_FIELDS.internal = []`, new pure `isShopInternalDocument` (item 3).
+  - `src/domains/hvac/documentTypes.ts` — mirrored the `'internal'` type +
+    `REQUIRED_FIELDS` entry (item 3).
+  - `src/screens/ReviewScreen.tsx` — new `'shop-records'` filter chip (item 3).
+  - `scripts/verify-ui.ts` — DOCUMENT_TYPES parity count 15 -> 16 (item 3).
+  - `api/_lib/integrity.js` — new pure `extractNameMention`/`matchNameMention`
+    (item 4).
+  - `api/_lib/recordsStore.js` — `findOrCreateCustomer`'s "names nobody"
+    branch tries a narrowed name-mention lookup before giving up; new shared
+    `linkedByForMatchBasis` (item 4).
+  - `api/_lib/reviewStore.js` — its `matchBasis` ternary replaced with
+    `linkedByForMatchBasis` (item 4).
+  - `api/_lib/routes/integrity.js` — `isEligibleForRelink`'s allow-list, both
+    raw-SQL `linked_by IN (...)` filters, and `loadAmbiguousNameOnlyLinks` all
+    add `'ai:name-mention'`; its 3 `matchBasis` ternaries replaced with
+    `linkedByForMatchBasis` (item 4).
+  - `src/hooks/usePostgresSync.ts` — client-side ambiguity mirror also matches
+    `'ai:name-mention'` (item 4).
+  - `scripts/verify-extract.mjs` — 7 new cases for the future-date window.
+  - `scripts/verify-doctypes.mjs` — 19 new cases for `isShopInternalDocument`
+    and the `'internal'` type registry.
+  - `scripts/verify-integrity.mjs` — 22 new cases (`extractNameMention` x13,
+    `matchNameMention` x7, `isEligibleForRelink` x2 for the new `linked_by`
+    value).
+  - `scripts/verify-analytics.mjs` — 46 new cases for items 1's vocabulary/
+    sortBy work (§14).
 
 ## Question types now supported end to end
 
@@ -578,6 +749,18 @@ verify:all` — all green. `scripts/verify-analytics.mjs` alone: **233/233**
 lint`: exit 0 (pre-existing warnings only, none in a file this workstream
 touched). Standing constraints still hold: exactly 12 files directly under
 `api/`, no DDL, no new dependencies, Haiku only.
+
+After the reviewer round 4 fixes (vocabulary + future dates + shop-internal
+docs + name-mention linking, this update): reran `npm run typecheck`, `npm
+run typecheck:api`, `npm run lint`, and `npm run verify:all` — all green.
+`scripts/verify-analytics.mjs` alone: **280/280** (was 233; +47).
+`scripts/verify-integrity.mjs` alone: **238/238** (was 216; +22).
+`scripts/verify-doctypes.mjs` alone: **127/127** (+18).
+`scripts/verify-extract.mjs` alone: **162/162** (+7). Full `verify:all`
+chain: **3224 PASS / 0 FAIL, exit 0**. `npm run lint`: exit 0 (pre-existing
+warnings only, none in a file this workstream touched). Standing constraints
+still hold: exactly 12 files directly under `api/`, no DDL, no new
+dependencies, Haiku only.
 
 ---
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>

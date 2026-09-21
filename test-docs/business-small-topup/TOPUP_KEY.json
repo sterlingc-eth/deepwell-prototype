@@ -1,0 +1,222 @@
+{
+  "generatedAt": "2026-09-21",
+  "baseDir": "test-docs/business-small",
+  "customers": [
+    {
+      "key": "res_0",
+      "canonicalName": "Linda Fitzgerald",
+      "address": "100 E Main St, Mesa, AZ 85201",
+      "phone": "(480) 555-0110",
+      "email": "linda.fitzgerald0@gmail.com",
+      "filename": "201-invoice-topup-res0.pdf"
+    },
+    {
+      "key": "res_1",
+      "canonicalName": "Thomas Mercer",
+      "address": "137 W Southern Ave, Mesa, AZ 85201",
+      "phone": "480-555-0111",
+      "email": null,
+      "filename": "202-invoice-topup-res1.pdf"
+    },
+    {
+      "key": "res_2",
+      "canonicalName": "Sorensen",
+      "address": "174 N College Ave, Mesa, AZ 85201",
+      "phone": "Ph: 480.555.0112",
+      "email": "donna.thornton2@outlook.com",
+      "filename": "203-invoice-topup-res2.pdf"
+    },
+    {
+      "key": "res_3",
+      "canonicalName": "Ronald Bracken",
+      "address": "211 E University Dr, Mesa, AZ 85201",
+      "phone": "Cell: 480-555-0113",
+      "email": null,
+      "filename": "204-invoice-topup-res3.pdf"
+    },
+    {
+      "key": "res_4",
+      "canonicalName": "Amy Isaacson",
+      "address": "248 W Guadalupe Rd, Mesa, AZ 85201",
+      "phone": "(480) 555-0114",
+      "email": "amy.isaacson4@aol.com",
+      "filename": "205-invoice-topup-res4.pdf"
+    },
+    {
+      "key": "res_6",
+      "canonicalName": "Sandra Wyckoff",
+      "address": "322 N Greenfield Rd, Mesa, AZ 85201",
+      "phone": "Ph: 480.555.0116",
+      "email": "sandra.wyckoff1@comcast.net",
+      "filename": "206-invoice-topup-res6.pdf"
+    },
+    {
+      "key": "res_7",
+      "canonicalName": "Steven Ellison",
+      "address": "359 E Broadway Rd, Mesa, AZ 85201",
+      "phone": "Cell: 480-555-0117",
+      "email": null,
+      "filename": "207-invoice-topup-res7.pdf"
+    },
+    {
+      "key": "res_8",
+      "canonicalName": "Laura Lombardi",
+      "address": "396 W Baseline Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": "laura.lombardi3@yahoo.com",
+      "filename": "208-invoice-topup-res8.pdf"
+    },
+    {
+      "key": "res_9",
+      "canonicalName": "Robert Salazar",
+      "address": "433 S Alma School Rd, Casa Grande, AZ 85122",
+      "phone": "480-555-0119",
+      "email": null,
+      "filename": "209-invoice-topup-res9.pdf"
+    },
+    {
+      "key": "res_10",
+      "canonicalName": "Karen Abernathy",
+      "address": "470 E Chandler Blvd, Casa Grande, AZ 85122",
+      "phone": "Ph: 480.555.0120",
+      "email": "karen.abernathy0@icloud.com",
+      "filename": "210-invoice-topup-res10.pdf"
+    },
+    {
+      "key": "res_11",
+      "canonicalName": "Sorenson",
+      "address": "507 N Dobson Rd, Casa Grande, AZ 85122",
+      "phone": "Cell: 480-555-0121",
+      "email": null,
+      "filename": "211-invoice-topup-res11.pdf"
+    },
+    {
+      "key": "res_12",
+      "canonicalName": "Deborah Ortega",
+      "address": "544 E Ray Rd, Casa Grande, AZ 85122",
+      "phone": "(480) 555-0122",
+      "email": "deborah.ortega2@hotmail.com",
+      "filename": "212-invoice-topup-res12.pdf"
+    },
+    {
+      "key": "res_14",
+      "canonicalName": "Barbara Delgado",
+      "address": "618 N Power Rd, Casa Grande, AZ 85122",
+      "phone": "Ph: 480.555.0124",
+      "email": "barbara.delgado4@gmail.com",
+      "filename": "213-invoice-topup-res14.pdf"
+    },
+    {
+      "key": "res_15",
+      "canonicalName": "Daniel Keller",
+      "address": "655 E McKellips Rd, Casa Grande, AZ 85122",
+      "phone": "Cell: 480-555-0125",
+      "email": null,
+      "filename": "214-invoice-topup-res15.pdf"
+    },
+    {
+      "key": "res_16",
+      "canonicalName": "Carol Rios",
+      "address": "692 S Higley Rd, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": "carol.rios1@outlook.com",
+      "filename": "215-invoice-topup-res16.pdf"
+    },
+    {
+      "key": "res_17",
+      "canonicalName": "Kevin Zimmerman",
+      "address": "729 W Camelback Rd, Tucson, AZ 85701",
+      "phone": "480-555-0127",
+      "email": "kevinzimmerman2@icloud.com",
+      "filename": "216-invoice-topup-res17.pdf"
+    },
+    {
+      "key": "res_18",
+      "canonicalName": "Maria Gallardo",
+      "address": "766 N Val Vista Dr, Tucson, AZ 85701",
+      "phone": "Ph: 480.555.0128",
+      "email": null,
+      "filename": "217-invoice-topup-res18.pdf"
+    },
+    {
+      "key": "res_19",
+      "canonicalName": "Joseph Norwood",
+      "address": "803 E Pecos Rd, Tucson, AZ 85701",
+      "phone": "Cell: 480-555-0129",
+      "email": "josephnorwood4@hotmail.com",
+      "filename": "218-invoice-topup-res19.pdf"
+    },
+    {
+      "key": "res_20",
+      "canonicalName": "Emily Underhill",
+      "address": "840 S Ellsworth Rd, Tucson, AZ 85701",
+      "phone": "(480) 555-0130",
+      "email": null,
+      "filename": "219-invoice-topup-res20.pdf"
+    },
+    {
+      "key": "res_21",
+      "canonicalName": "Brian Chavez",
+      "address": "877 W Ocotillo Rd, Tucson, AZ 85701",
+      "phone": "480-555-0131",
+      "email": "brianchavez1@gmail.com",
+      "filename": "220-invoice-topup-res21.pdf"
+    },
+    {
+      "key": "res_22",
+      "canonicalName": "Kathleen Jennings",
+      "address": "914 N Recker Rd, Tucson, AZ 85701",
+      "phone": "Ph: 480.555.0132",
+      "email": null,
+      "filename": "221-invoice-topup-res22.pdf"
+    },
+    {
+      "key": "res_23",
+      "canonicalName": "William Quintana",
+      "address": "951 E Main St, Tucson, AZ 85701",
+      "phone": "Cell: 480-555-0133",
+      "email": "williamquintana3@outlook.com",
+      "filename": "222-invoice-topup-res23.pdf"
+    },
+    {
+      "key": "res_25",
+      "canonicalName": "Kenneth Fenwick",
+      "address": "1025 N College Ave, Las Vegas, NV 89101",
+      "phone": "702-555-0135",
+      "email": "kennethfenwick0@aol.com",
+      "filename": "223-invoice-topup-res25.pdf"
+    },
+    {
+      "key": "apt_1",
+      "canonicalName": "Thomas Nakamura",
+      "address": "3300 S Alma School Rd, Apt 101, Mesa, AZ 85201",
+      "phone": "480-555-0127",
+      "email": null,
+      "filename": "224-invoice-topup-apt1.pdf"
+    },
+    {
+      "key": "apt_2",
+      "canonicalName": "Donna Ulloa",
+      "address": "3300 S Alma School Rd, Apt 102, Mesa, AZ 85201",
+      "phone": "Ph: 480.555.0128",
+      "email": "donna.ulloa2@icloud.com",
+      "filename": "225-invoice-topup-apt2.pdf"
+    },
+    {
+      "key": "apt_3",
+      "canonicalName": "Ronald Calloway",
+      "address": "3300 S Alma School Rd, Apt 103, Mesa, AZ 85201",
+      "phone": "Cell: 480-555-0129",
+      "email": null,
+      "filename": "226-invoice-topup-apt3.pdf"
+    },
+    {
+      "key": "apt_4",
+      "canonicalName": "Amy Jarvis",
+      "address": "3300 S Alma School Rd, Apt 104, Mesa, AZ 85201",
+      "phone": "(480) 555-0130",
+      "email": "amy.jarvis4@hotmail.com",
+      "filename": "227-invoice-topup-apt4.pdf"
+    }
+  ]
+}

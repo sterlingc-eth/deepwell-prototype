@@ -424,7 +424,7 @@ const eq = (name: string, got: unknown, want: unknown): void =>
 {
   eq('DOCUMENT_TYPES ids match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.id), backendDocTypes.DOCUMENT_TYPES.map((t: { id: string }) => t.id));
   eq('DOCUMENT_TYPES labels match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.label), backendDocTypes.DOCUMENT_TYPES.map((t: { label: string }) => t.label));
-  eq('there are exactly the 15 canonical types the brief lists', hvacDocTypes.DOCUMENT_TYPES.length, 15);
+  eq('there are exactly the 16 canonical types (15 the brief lists + Round 4\'s "internal")', hvacDocTypes.DOCUMENT_TYPES.length, 16);
   eq('REQUIRED_FIELDS matches the backend exactly, including a|b alternatives', hvacDocTypes.REQUIRED_FIELDS, backendDocTypes.REQUIRED_FIELDS);
   eq('FIELD_LABELS matches the backend exactly', hvacDocTypes.FIELD_LABELS, backendDocTypes.FIELD_LABELS);
   eq('AI_VERIFY_MIN_CONFIDENCE matches the backend', hvacDocTypes.AI_VERIFY_MIN_CONFIDENCE, backendDocTypes.AI_VERIFY_MIN_CONFIDENCE);

@@ -203,10 +203,38 @@ const BACKWARD_LOOKING_FIELDS = new Set([
 ]);
 const FUTURE_GRACE_DAYS = 2;
 
+// Round 4 (2026-09-21) live finding: "Date of Service: 11/27/2026" and a
+// 2028 install date were silently dropped by the tight universal grace above,
+// and the document then showed "service date missing" for a date it had
+// actually stated. Scheduled work is a real, plausible future date — a
+// dispatch note or signed proposal routinely names a job date months out.
+// Only the two fields that legitimately record scheduled/future work get a
+// wider window; warranty_registered_date has no such reading (a warranty is
+// registered on the day it's registered, never before) and keeps the tight
+// FUTURE_GRACE_DAYS grace only.
+const EXTENDED_FUTURE_MONTHS = {
+  service_date: 18,
+  installation_date: 3,
+};
+
 export function isFutureDate(ymd, today = new Date().toISOString().slice(0, 10)) {
   if (typeof ymd !== 'string' || typeof today !== 'string') return false;
   const limit = new Date(`${today}T00:00:00Z`);
   limit.setUTCDate(limit.getUTCDate() + FUTURE_GRACE_DAYS);
+  return ymd > limit.toISOString().slice(0, 10);
+}
+
+/**
+ * True when `ymd` is further out than `key`'s allowed future window — still
+ * implausible even after EXTENDED_FUTURE_MONTHS, so the fact must be dropped
+ * rather than kept-and-flagged. Fields with no extended window fall back to
+ * the tight universal grace (same as isFutureDate).
+ */
+function isBeyondFutureWindow(key, ymd, today = new Date().toISOString().slice(0, 10)) {
+  const months = EXTENDED_FUTURE_MONTHS[key];
+  if (!months) return isFutureDate(ymd, today);
+  const limit = new Date(`${today}T00:00:00Z`);
+  limit.setUTCMonth(limit.getUTCMonth() + months);
   return ymd > limit.toISOString().slice(0, 10);
 }
 
@@ -358,15 +386,21 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
     let value = stripControlChars(String(rawValue)).trim().slice(0, MAX_VALUE_CHARS);
     if (!value) { dropped.push({ key, reason: 'empty' }); continue; }
 
+    let dateFlags;
     if (spec.kind === 'date') {
       const d = normalizeDate(value);
       if (!d) { dropped.push({ key, reason: `unparseable date "${value}"` }); continue; }
-      // A record of something that already happened cannot be dated in the
-      // future. Dropped rather than clamped: we do not know what the real date
-      // was, and a guess here becomes a warranty deadline downstream.
+      // A record of something that already happened cannot be dated far in
+      // the future. Dropped rather than clamped: we do not know what the real
+      // date was, and a guess here becomes a warranty deadline downstream.
+      // Within the field's own extended window, though, a future date is a
+      // real fact (scheduled work) — kept and flagged rather than discarded.
       if (BACKWARD_LOOKING_FIELDS.has(key) && isFutureDate(d, today)) {
-        dropped.push({ key, reason: `date is in the future ("${d}")` });
-        continue;
+        if (isBeyondFutureWindow(key, d, today)) {
+          dropped.push({ key, reason: `date is in the future ("${d}")` });
+          continue;
+        }
+        dateFlags = ['future'];
       }
       value = d;
     } else if (spec.kind === 'money' || spec.kind === 'number') {
@@ -400,6 +434,10 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
       page_no: pageNo,
       verbatim: stripControlChars(String(f?.verbatim ?? '')).trim().slice(0, MAX_VALUE_CHARS) || null,
       unit_index: unitIndex,
+      // Round 4: present only when set, so every existing caller/test that
+      // builds a plain {field_key,value,...} object to compare against a kept
+      // fact (no `flags` key at all) still matches one with no future date.
+      ...(dateFlags ? { flags: dateFlags } : {}),
     });
   }
 

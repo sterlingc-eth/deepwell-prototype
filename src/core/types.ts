@@ -130,7 +130,7 @@ export type DocumentIssue =
   // now matches 2+ other non-merged customers — order-dependent at the time
   // it was linked, invisible after. `candidateIds` includes the currently-
   // linked customer. Computed client-side in usePostgresSync.ts from each
-  // link's `linked_by` (server value 'ai:name-only') plus the already-synced
+  // link's `linked_by` (server value 'ai:name-only' or 'ai:name-mention') plus the already-synced
   // customer entities — no extra round trip.
   | { kind: 'ambiguous-name-link'; surname: string; candidateIds: EntityId[] };
 

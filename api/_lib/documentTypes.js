@@ -25,6 +25,7 @@ export const DOCUMENT_TYPES = [
   { id: 'purchase-order', label: 'Purchase order' },
   { id: 'equipment-record', label: 'Equipment record' },
   { id: 'correspondence', label: 'Correspondence' },
+  { id: 'internal', label: 'Shop record' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -52,6 +53,7 @@ export const DOCUMENT_TYPE_DEFINITIONS = {
   'purchase-order': 'An order placed with a vendor for parts or equipment.',
   'equipment-record': 'Identifies a piece of equipment with no service or billing context.',
   'correspondence': 'A letter or email about a customer or job, not a paperwork form.',
+  'internal': 'Shop-only record with no customer on it at all — a parts count, a truck dispatch note, an internal memo to all techs.',
   'other': 'Does not clearly fit any type above.',
 };
 
@@ -75,8 +77,37 @@ export const REQUIRED_FIELDS = {
   'purchase-order': ['vendor|customer_name', 'cost'],
   'equipment-record': ['serial_number|model'],
   'correspondence': ['customer_name'],
+  'internal': [],
   'other': [],
 };
+
+/** Facts a shop-internal document is allowed to carry (see
+ *  isShopInternalDocument below) — its own letterhead facts plus a free-text
+ *  note or status, and nothing that ties it to any customer, unit or job. */
+const SHOP_INTERNAL_ALLOWED_FIELDS = new Set(['shop_address', 'shop_phone', 'shop_email', 'notes', 'status']);
+
+/**
+ * True when a document's only non-empty extracted facts are its own shop_*
+ * fields plus notes/status — e.g. a parts count, a truck dispatch note, an
+ * internal memo to all techs. Such a document names no customer, unit or job
+ * and can never be linked to one, so it must not sit in the human review
+ * queue waiting for a link that will never come (Round 4, 2026-09-21).
+ *
+ * Pure: takes the same `{field_key, value}[]` shape extractFields.js's
+ * normalizeFields() returns. Requires at least one non-empty shop_* fact —
+ * a document with nothing extracted at all, or only a bare "notes"/"status"
+ * value, is not this; it's simply unclassified.
+ */
+export function isShopInternalDocument(fields) {
+  let hasShopFact = false;
+  for (const f of Array.isArray(fields) ? fields : []) {
+    if (!f || typeof f.field_key !== 'string') continue;
+    if (f.value == null || String(f.value).trim() === '') continue;
+    if (!SHOP_INTERNAL_ALLOWED_FIELDS.has(f.field_key)) return false;
+    if (f.field_key.startsWith('shop_')) hasShopFact = true;
+  }
+  return hasShopFact;
+}
 
 /** Display labels for field_keys, used wherever "missing" fields are shown. */
 export const FIELD_LABELS = {

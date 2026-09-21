@@ -79,7 +79,7 @@
  *                       already-canonical value.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, documentsHaveUpdatedAt } from './recordsStore.js';
+import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, documentsHaveUpdatedAt, linkedByForMatchBasis } from './recordsStore.js';
 import { getApiKey, withBackoff } from './claude.js';
 import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
@@ -576,7 +576,7 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
         const confidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
         await linkDocumentToCustomer(db, {
           documentId, customerId: customer.id, confidence,
-          linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+          linkedBy: linkedByForMatchBasis(customer.matchBasis),
         });
       }
     }

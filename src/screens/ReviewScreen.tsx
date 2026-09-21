@@ -32,7 +32,7 @@ const CURRENT_USER = 'You';
 // reasoning).
 const REVIEW_IS_DEMO_ONLY = import.meta.env?.VITE_DEMO_MODE === 'true';
 
-type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'all';
+type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'shop-records' | 'all';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'attention', label: 'Needs a person' },
   { id: 'gaps', label: 'Missing info' },
@@ -40,6 +40,12 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'duplicates', label: 'Duplicates' },
   { id: 'ready', label: 'Ready to verify' },
+  // Round 4 (2026-09-21): shop-internal documents (parts counts, dispatch
+  // notes, memos to all techs — api/_lib/documentTypes.js's 'internal' type)
+  // are AI-verified on extraction (isShopInternalDocument) and so never show
+  // under "Needs a person" (isAttention requires stage !== 'verified'). This
+  // chip is the only place left to find them, rather than nowhere at all.
+  { id: 'shop-records', label: 'Shop records' },
   { id: 'all', label: 'All' },
 ];
 const FILTER_IDS = FILTERS.map((f) => f.id);
@@ -72,6 +78,7 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
     case 'conflicts': return sets.conflicts.has(doc.id);
     case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate');
     case 'ready': return doc.stage === 'linked' && doc.issues.length === 0;
+    case 'shop-records': return doc.typeId === 'internal';
     case 'all': return true;
   }
 }

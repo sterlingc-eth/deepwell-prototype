@@ -240,21 +240,115 @@ Steps are identical either way, just point at the other directory.
    `analytics`/`lookups` accuracy split (analytics questions score their
    numbers exactly; lookups score by substring, same as before).
 
+## Update (2026-09-21, later same day): dates capped at today, customer contacts, `--contacts-topup`
+
+Two live findings from the owner's own testing, fixed in `scripts/synth-business.mjs`
+(`CORPUS_VERSION` bumped to `2`, stored in `ANSWER_KEY.json`, so a stale key is
+visible):
+
+1. **No document printed a customer phone/email** (0/144). Real invoices/work
+   orders/tickets do. Fixed: ~80% of customers now get a phone on file, ~50%
+   an email (independent, deterministic per customer — varied formats: `(480)
+   555-01xx`, `480-555-01xx`, `Ph: 480.555.01xx`, `Cell: 480-555-01xx`; varied
+   lowercase email domains; area code follows the customer's state; never the
+   shop's own `(480) 555-0199`/`info@sonorancomfortair.com`). Printed on
+   invoices (`Bill To:` block), service tickets and work orders (`Customer
+   phone:`), warranty registrations (`Homeowner email:`), and correspondence
+   (`Re: ... - <phone>` / `Email on file:`).
+2. **Some documents were dated after 2026-09-21** (up to 2031 in a few cases)
+   — `installDateFor()`'s formula could itself land past today, and every
+   `addDaysIso(installDate, N)`-derived service/invoice/work-order/proposal/
+   inspection/purchase-order/dispatch-note/memo date could overshoot today for
+   a recent install. Fixed with a `capToday()` clamp applied at both. The one
+   deliberate exception: a maintenance agreement's `Agreement Period` (e.g.
+   `01/01/2025 - 12/31/2026`) is a contract term, not an event date — like a
+   warranty's "Valid through," its end date is *supposed* to be in the
+   future, so it's left alone (`verify-business-corpus.mjs`'s date check
+   excludes `maintenance-agreement` filenames for the same reason).
+
+**The already-uploaded `test-docs/business-small/` (144 files) was changed as
+little as possible.** Contact info is computed for every customer and
+recorded in *both* corpora's `ANSWER_KEY.json`, but is only **printed** into
+documents when the run is not that exact, already-shipped combination
+(`--customers 30 --out test-docs/business-small`, no `--contacts-topup`) — a
+`PRINT_CONTACTS` flag gates it. So re-running the small corpus's generator
+changed **11 of its 144 files**, solely from the date-cap fix (a — nothing
+from contacts, since printing was suppressed there):
+
+```
+027-proposal-quote-c5.pdf   028-service-ticket-c5.pdf   030-other-c5.pdf
+053-service-ticket-c10.pdf  054-other-c10.pdf           055-purchase-order-c10.pdf
+117-proposal-quote-c23.pdf  118-service-ticket-c23.pdf  120-dispatch-note-c23.txt
+141-service-ticket-apt4.pdf 142-dispatch-note-apt4.txt
+```
+The other 133 files are byte-identical to what's already ingested (verified
+by SHA-256 diff against the pre-fix corpus). Only those 11 need re-uploading
+if the account already has the old versions; skip the rest.
+
+### `--contacts-topup`: proving contact extraction without re-ingesting the 144
+
+```
+node scripts/synth-business.mjs --customers 30 --out test-docs/business-small --contacts-topup
+node scripts/build-bundle.mjs test-docs/business-small-topup
+```
+Runs the whole small-corpus generator in memory (same deterministic facts,
+same seed) but **writes nothing into `test-docs/business-small/`** — no
+mkdir, no cleanup, no `ANSWER_KEY.json` overwrite, every `writePdf`/`writeTxt`
+call is a no-op on disk for the base dir. Instead it writes **one new invoice
+per customer who has a phone or email on file** into
+`test-docs/business-small-topup/` (27 documents from the current seed —
+`201-invoice-topup-res0.pdf`, `202-invoice-topup-res1.pdf`, ...), each with a
+new invoice number, a date ≤ today, and content guaranteed distinct from
+every other generated document (verified sha256-clean against both corpora),
+plus `test-docs/business-small-topup/TOPUP_KEY.json` (customer → expected
+phone/email/filename). Upload just this ~27-document, ~$0.32 batch onto the
+already-ingested account to prove phone/email extraction without touching
+anything already there.
+
+### Contact + date numbers
+
+- **Full corpus** (regenerated, free to change): 97/120 customers have a
+  phone, 60/120 have an email — printed directly into its 604 documents.
+  67 questions now (was 60): 31 analytics (+1: "How many customers have an
+  email on file?") and 36 lookup (+6: 3 phone + 3 email fact lookups).
+- **Small corpus key** (documents unchanged except the 11 above): 25/30
+  customers have a phone, 16/30 have an email — recorded in the key and
+  provable via the 27-document topup, not printed in the base 144. 47
+  questions now (was 40): 21 analytics, 26 lookup, same +1/+6 shape.
+- No document in either corpus (or the topup) prints a date after
+  2026-09-21, other than a maintenance agreement's forward-looking contract
+  period — checked by two new `verify-business-corpus.mjs` assertions plus a
+  `[small-topup]` block (10 more checks: base dir untouched, topup count
+  matches contacts-in-key, no future dates, every topup invoice actually
+  prints its promised phone/email, no sha256 collision with either corpus,
+  and `--contacts-topup` itself is deterministic across two runs). Verify
+  suite is now 79 checks total (37 full + 32 small + 10 small-topup),
+  `npm run verify:all` green.
+- `bundle.json` rebuilt for `test-docs/business` (870.2 KB) and
+  `test-docs/business-small` (196.5 KB, reflects the 11 changed files); new
+  `test-docs/business-small-topup/bundle.json` (46.1 KB).
+
 ## Files touched
 
 - `scripts/synth-business.mjs` — new (generator); extended with
   `--customers N` / `--out <dir>` for a cheaper subset (default-run output
-  unchanged, hash-verified).
+  unchanged, hash-verified); later extended again with `capToday()` (dates),
+  `contactFor()`/`PRINT_CONTACTS` (customer phone/email), `CORPUS_VERSION`,
+  and `--contacts-topup`.
 - `test-docs/business/` — new (604 generated docs + `ANSWER_KEY.json` +
-  `bundle.json`).
+  `bundle.json`); regenerated for the date/contact fix (free to change).
 - `test-docs/business-small/` — new (144 generated docs + `ANSWER_KEY.json`
-  + `bundle.json`, from `--customers 30`).
+  + `bundle.json`, from `--customers 30`); 11 of the 144 files changed for
+  the date-cap fix only (listed above), the other 133 are byte-identical.
+- `test-docs/business-small-topup/` — new (27 contact-proving invoices +
+  `TOPUP_KEY.json` + `bundle.json`, from `--contacts-topup`).
 - `scripts/score-corpus.mjs` — extended (`containsAnalyticsMatch`,
   `--key` flag, `analytics`/`lookups` breakdown in the scorecard).
 - `scripts/build-bundle.mjs` — new (generalized, chunking).
 - `scripts/browser-ingest.js` — new (paste-in console script).
 - `scripts/verify-business-corpus.mjs` — new; runs its full check suite
-  against both `test-docs/business/` and `test-docs/business-small/`.
+  (79 checks) against `test-docs/business/`, `test-docs/business-small/`,
+  and a `[small-topup]` block for `--contacts-topup`.
 - `package.json` — added `verify:business-corpus`, wired into `verify:all`.
 
 ---

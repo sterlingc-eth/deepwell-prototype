@@ -14,7 +14,7 @@
  * already-merged row. Running the same `apply` list twice changes nothing
  * the second time.
  */
-import { withTenant as withRecordsTenant, linkDocumentToCustomer, linkDocumentToEntity, extractionsHaveUnitIndex } from '../recordsStore.js';
+import { withTenant as withRecordsTenant, linkDocumentToCustomer, linkDocumentToEntity, extractionsHaveUnitIndex, linkedByForMatchBasis } from '../recordsStore.js';
 import { mergeCustomers, ReviewError, isUuid } from '../reviewStore.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
 import {
@@ -503,7 +503,10 @@ async function rederiveCustomerContact(db, { customerId, field, contactCtx }) {
  * must never be a relinkMismatchedNames candidate, however the row got here.
  */
 export function isEligibleForRelink({ linkedBy, verifiedBy, stage }) {
-  if (linkedBy !== 'ai' && linkedBy !== 'ai:name-only') return false;
+  // Round 4 item 4 (2026-09-21): 'ai:name-mention' (recordsStore.js's
+  // findOrCreateCustomer, matchBasis 'name-mention') is treated exactly like
+  // 'ai:name-only' everywhere — same weak-match provenance, same eligibility.
+  if (linkedBy !== 'ai' && linkedBy !== 'ai:name-only' && linkedBy !== 'ai:name-mention') return false;
   // A human verification (any verified_by other than the pipeline's own
   // 'ai' stamp) locks the link. stage alone says nothing about who did it.
   if (verifiedBy && verifiedBy !== 'ai') return false;
@@ -523,7 +526,7 @@ async function loadMismatchedDirectLinks(db) {
        JOIN entities e ON e.id = l.entity_id
        JOIN documents d ON d.id = l.document_id
       WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND l.${TENANT}
-        AND l.linked_by IN ('ai', 'ai:name-only')
+        AND l.linked_by IN ('ai', 'ai:name-only', 'ai:name-mention')
         AND (d.verified_by IS NULL OR d.verified_by = 'ai')
       LIMIT ${DOCUMENT_SCAN_LIMIT}`,
     []
@@ -665,12 +668,16 @@ export function planSplitUnitMoves(rows) {
  * (25-correspondence-castillo.pdf's case), and invisible after. Needs-
  * attention only; no auto-fix (deciding which customer is right needs a
  * person). `customers` is the scan's already-loaded list — no extra query.
+ * Round 4 item 4 (2026-09-21): `linked_by = 'ai:name-mention'` (a document
+ * that only MENTIONED its customer in notes/status text) is exactly the same
+ * kind of weak, name-only-derived link and gets the same ambiguity check.
  */
 async function loadAmbiguousNameOnlyLinks(db, customers) {
   const rows = await db.raw(
     `SELECT l.document_id, l.entity_id AS customer_id
        FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
-      WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND l.linked_by = 'ai:name-only'
+      WHERE e.entity_type = 'customer' AND e.merged_into IS NULL
+        AND l.linked_by IN ('ai:name-only', 'ai:name-mention')
         AND l.${TENANT}
       LIMIT ${DOCUMENT_SCAN_LIMIT}`,
     []
@@ -989,7 +996,7 @@ async function relinkMismatchedNamesBatch(ctx, candidates) {
       if (toCustomerId) {
         await linkDocumentToCustomer(db, {
           documentId: c.documentId, customerId: toCustomerId, confidence: 0.75,
-          linkedBy: newCustomer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+          linkedBy: linkedByForMatchBasis(newCustomer.matchBasis),
         });
       }
       perDoc.push({ documentId: c.documentId, fromCustomerId: c.customerId, toCustomerId, docSerials });
@@ -1178,7 +1185,7 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
       if (!customer?.id) { result.skipped.push({ documentId: r.documentId, reason: 'no customer name or address to resolve (or a likely shop address)' }); continue; }
       const didLink = await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, {
         documentId: r.documentId, customerId: customer.id, confidence: 0.75,
-        linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+        linkedBy: linkedByForMatchBasis(customer.matchBasis),
       }));
       result.documentsLinked.push({ documentId: r.documentId, customerId: customer.id, alreadyLinked: !didLink });
     }
@@ -1558,7 +1565,7 @@ export async function integrityFixDocument(ctx, documentId) {
       if (customer?.id) {
         await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, {
           documentId, customerId: customer.id, confidence: 0.75,
-          linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+          linkedBy: linkedByForMatchBasis(customer.matchBasis),
         }));
         documentsLinked.push({ documentId, customerId: customer.id });
       }

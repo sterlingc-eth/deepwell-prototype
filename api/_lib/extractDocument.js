@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { withTenant, linkDocumentToCustomer, linkDocumentToEntity } from "./recordsStore.js";
+import { withTenant, linkDocumentToCustomer, linkDocumentToEntity, linkedByForMatchBasis } from "./recordsStore.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import {
   EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages,
@@ -15,6 +15,7 @@ import {
   resolveDocumentType,
   isLegacyOrUnknownType,
   completenessFor,
+  isShopInternalDocument,
   AI_VERIFY_MIN_CONFIDENCE,
 } from "./documentTypes.js";
 import { integrityFixDocument } from "./routes/integrity.js";
@@ -190,9 +191,20 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // lands, findOrCreateEquipment silently drops this key from `incoming` the
   // same way it already drops any key not on its list, so passing it early
   // is inert rather than wrong, and starts working the moment that list grows.
+  // Round 4 (2026-09-21): a document whose only facts are its own shop_*
+  // letterhead fields plus notes/status names no customer, unit or job — it
+  // can never be linked to one, so it must not be left waiting in the human
+  // queue for a link that will never come. Checked ahead of the model's own
+  // guess (like the `documentType` explicit-override case above it) because
+  // this is a stronger, purely factual signal than anything the model can
+  // infer from prose alone, but still below an explicit override — a human
+  // or a prior AI pass that already decided this document's type still wins,
+  // via `existingIsDecided` below.
   const classification = documentType
     ? { documentType: normalizeDocumentType(documentType, facts), confidence: 1, source: 'explicit' }
-    : resolveDocumentType(toolUse?.input, facts, doc.original_filename);
+    : isShopInternalDocument(fields)
+      ? { documentType: 'internal', confidence: 1, source: 'shop-internal' }
+      : resolveDocumentType(toolUse?.input, facts, doc.original_filename);
 
   // A human (via review.classifyDocument) or an earlier pass already decided
   // this document's type; a routine re-extraction must not quietly relabel
@@ -374,7 +386,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       const customerConfidence = customerFields.length ? Math.max(...customerFields.map((f) => f.confidence)) : 0.6;
       documentCustomerLinked = await linkDocumentToCustomer(db, {
         documentId, customerId: customer.id, confidence: customerConfidence,
-        linkedBy: customer.matchBasis === 'name-only' ? 'ai:name-only' : 'ai',
+        linkedBy: linkedByForMatchBasis(customer.matchBasis),
       });
     }
 
@@ -420,6 +432,18 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         document_type_source: classification.source,
         completeness_missing: completeness.missing,
         ai_verified: aiVerified,
+        // Round 4 (2026-09-21): fields kept despite a future date (scheduled
+        // work, within extractFields.js's per-field window) — stored here,
+        // the existing document-action JSON, so Review can read "dated in
+        // the future" for these keys instead of inferring "missing" just
+        // because completenessFor doesn't know the difference. No DDL: reuses
+        // audit_log.changes, already written on every extraction.
+        future_dated_fields: fields.filter((f) => f.flags?.includes('future')).map((f) => f.field_key),
+        // Round 4: shop-internal documents (see isShopInternalDocument) carry
+        // no customer at all, by design — recorded here (again, no DDL) so
+        // that fact is on file wherever this action is audited, distinct from
+        // "a customer should be here but resolution failed".
+        ...(classification.source === 'shop-internal' ? { no_customer: true } : {}),
       },
     });
     return {

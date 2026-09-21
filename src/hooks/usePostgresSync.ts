@@ -349,6 +349,12 @@ function clientNormalizeSurname(raw: unknown): string {
  * plus the customer entities already in `entityRows`) rather than a new
  * round trip or threading a server-side scan through the whole issues
  * pipeline. Mutates each affected `doc.issues` in place.
+ *
+ * Round 4 item 4 (2026-09-21): `linked_by: 'ai:name-mention'` (a document
+ * that only mentioned its customer in notes/status text, never a
+ * customer_name fact) is the exact same weak-match provenance and gets the
+ * same ambiguity check — see api/_lib/routes/integrity.js's
+ * loadAmbiguousNameOnlyLinks, kept in sync with this client-side mirror.
  */
 function addAmbiguousNameLinkIssues(docs: Doc[], entityRows: ApiEntity[], linksByDoc: Map<string, DocumentLink[]>): void {
   const customers = entityRows.filter(
@@ -366,7 +372,7 @@ function addAmbiguousNameLinkIssues(docs: Doc[], entityRows: ApiEntity[], linksB
   }
 
   for (const doc of docs) {
-    const nameOnlyLink = (linksByDoc.get(doc.id) ?? []).find((l) => l.linked_by === 'ai:name-only');
+    const nameOnlyLink = (linksByDoc.get(doc.id) ?? []).find((l) => l.linked_by === 'ai:name-only' || l.linked_by === 'ai:name-mention');
     if (!nameOnlyLink) continue;
     const customer = customers.find((c) => c.id === nameOnlyLink.entity_id);
     if (!customer) continue;

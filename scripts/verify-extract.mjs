@@ -190,6 +190,79 @@ eq('array input rejected', normalizeNumber(['4280'], { money: true }), null);
 }
 
 {
+  // Round 4 (2026-09-21) live finding: "Date of Service: 11/27/2026" from a
+  // document extracted on 2026-09-21 used to be silently dropped (>2 days out)
+  // and the document then showed "service date missing" for a date it had
+  // actually stated. service_date gets an 18-month window for scheduled work;
+  // the date must be KEPT (not dropped) and flagged 'future'.
+  const { fields, dropped } = normalizeFields(
+    [{ key: 'service_date', value: '11/27/2026', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1, today: '2026-09-21' }
+  );
+  eq('scheduled service_date within 18mo is kept, not dropped', fields[0]?.value, '2026-11-27');
+  eq('nothing dropped for an in-window future service_date', dropped.length, 0);
+  eq('kept fact is flagged future', fields[0]?.flags, ['future']);
+}
+
+{
+  // installation_date gets a narrower 3-month window (an install a year out
+  // is not "scheduled work", it's implausible) — still flagged, not dropped,
+  // when within window.
+  const { fields, dropped } = normalizeFields(
+    [{ key: 'installation_date', value: '11/01/2026', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1, today: '2026-09-21' }
+  );
+  eq('install date ~6 weeks out is kept and flagged', fields[0]?.value, '2026-11-01');
+  eq('nothing dropped', dropped.length, 0);
+  eq('flagged future', fields[0]?.flags, ['future']);
+}
+
+{
+  // 03/07/2028 from a document extracted 2026-09-21 is ~18 months out for
+  // installation_date (3-month window) — beyond even service_date's 18-month
+  // window it would also be dropped, but this specifically checks
+  // installation_date's tighter window still rejects an implausible date
+  // rather than flagging it as merely "scheduled".
+  const { fields, dropped } = normalizeFields(
+    [{ key: 'installation_date', value: '03/07/2028', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1, today: '2026-09-21' }
+  );
+  check('install date ~18mo out is still dropped (beyond the 3mo window)', !fields.length);
+  eq('drop recorded with a future-date reason', dropped[0]?.reason, 'date is in the future ("2028-03-07")');
+}
+
+{
+  // service_date beyond even its 18-month window is still dropped, not kept
+  // forever into the future.
+  const { fields } = normalizeFields(
+    [{ key: 'service_date', value: '01/01/2030', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1, today: '2026-09-21' }
+  );
+  check('service_date far beyond the 18mo window is still dropped', !fields.length);
+}
+
+{
+  // warranty_registered_date keeps the original tight grace — no extended
+  // window was requested for it, and a warranty cannot be registered before
+  // it's registered.
+  const { fields } = normalizeFields(
+    [{ key: 'warranty_registered_date', value: '11/27/2026', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1, today: '2026-09-21' }
+  );
+  check('warranty_registered_date has no extended future window', !fields.length);
+}
+
+{
+  // An ordinary past service_date must never be flagged — `flags` should be
+  // entirely absent from the fact, not present-but-empty.
+  const { fields } = normalizeFields(
+    [{ key: 'service_date', value: '09/12/2025', page_no: 1, confidence: 0.9 }],
+    { pageCount: 1, today: '2026-09-21' }
+  );
+  check('an ordinary past service_date carries no flags property at all', !('flags' in fields[0]));
+}
+
+{
   // Trane/Plaza Dental fixture: installation_date printed only as "06/2021".
   // Must survive normalizeFields at month precision, not be dropped.
   const { fields, dropped } = normalizeFields(

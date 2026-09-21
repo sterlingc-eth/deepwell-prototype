@@ -30,12 +30,14 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const GEN = path.join(ROOT, 'scripts', 'synth-business.mjs');
+const TODAY = '2026-09-21';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -83,6 +85,17 @@ function extractPdfText(buf) {
 function docText(outDir, filename) {
   const buf = fs.readFileSync(path.join(outDir, filename));
   return filename.endsWith('.pdf') ? extractPdfText(buf) : buf.toString('utf8');
+}
+
+/** Every MM/DD/YYYY and YYYY-MM-DD date printed in a piece of document text,
+ *  as an ISO string (comparable with plain `>` since it's zero-padded). Used
+ *  to catch a document dated after TODAY -- a unit's install date is allowed
+ *  to be old, never in the future. */
+function datesInText(text) {
+  const found = [];
+  for (const m of text.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g)) found.push(`${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`);
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) found.push(m[0]);
+  return found;
 }
 
 /**
@@ -182,6 +195,49 @@ function runChecks(label, genArgs, outDirRel, expect) {
   }
   p('every document that prints a unit\'s serial also prints the key\'s brand for that unit', brandMismatches === 0);
 
+  // -- no printed document date is after TODAY. maintenance-agreement is the
+  // one exception: its "Agreement Period" is a contract term (e.g.
+  // "01/01/2025 - 12/31/2026"), not an event date, and a contract's end date
+  // is expected to be in the future -- exactly like a warranty's "Valid
+  // through" date, which this generator also never treats as implausible.
+  let futureDateFiles = 0;
+  for (const f of actualFiles) {
+    if (typeFromFilename(f) === 'maintenance-agreement') continue;
+    const text = docText(outDir, f);
+    const future = datesInText(text).filter((d) => d > TODAY);
+    if (future.length) {
+      futureDateFiles++;
+      console.log(`FAIL  ${label} ${f} prints a date after today (${TODAY}): ${[...new Set(future)].join(', ')}`);
+    }
+  }
+  p('no generated document (other than a maintenance-agreement\'s contract period) prints a date after today', futureDateFiles === 0);
+
+  // -- every customer with a phone/email recorded in the key actually has it
+  // printed on at least one of their documents -- EXCEPT the frozen small
+  // corpus base (test-docs/business-small with no --contacts-topup), where
+  // contact info is deliberately recorded in the key but not printed into any
+  // of the 144 already-uploaded files; there, the check instead looks at the
+  // sibling `${outDir}-topup/` directory the brief's --contacts-topup mode
+  // writes, since that's where those same phone/email values actually get
+  // printed for that corpus.
+  const topupDir = `${outDir}-topup`;
+  const topupDocsExist = fs.existsSync(topupDir);
+  let contactPrintMisses = 0;
+  for (const c of customers) {
+    if (!c.phone && !c.email) continue;
+    const ownDocsText = c.docs.map((f) => docText(outDir, f)).join('\n');
+    let found = (c.phone && ownDocsText.includes(c.phone)) || (c.email && ownDocsText.includes(c.email));
+    if (!found && topupDocsExist) {
+      for (const f of fs.readdirSync(topupDir)) {
+        if (!f.endsWith('.pdf') && !f.endsWith('.txt')) continue;
+        const text = docText(topupDir, f);
+        if ((c.phone && text.includes(c.phone)) || (c.email && text.includes(c.email))) { found = true; break; }
+      }
+    }
+    if (!found) { contactPrintMisses++; console.log(`FAIL  ${label} ${c.key} has a phone/email in the key but it is not printed on any of its documents (or the topup dir)`); }
+  }
+  p('every customer with a key phone/email has it printed on at least one document (base or topup)', contactPrintMisses === 0);
+
   const allUnits = customers.flatMap((c) => c.units);
   pEq('totalUnits matches the sum of every customer\'s units', totalUnits, allUnits.length);
   const recomputedBrand = {};
@@ -277,14 +333,95 @@ function runChecks(label, genArgs, outDirRel, expect) {
 }
 
 runChecks('[full]', [], 'test-docs/business', {
-  minCustomers: 100, minDocuments: 500, questionTotal: 60, analyticsCount: 30, lookupCount: 30,
+  minCustomers: 100, minDocuments: 500, questionTotal: 67, analyticsCount: 31, lookupCount: 36,
   requireAllCounties: true, requireOutOfState: true, requireAllBrands: true, requireAllDocTypes: true, requireMixedWarranty: true,
 });
 
 runChecks('[small]', ['--customers', '30', '--out', 'test-docs/business-small'], 'test-docs/business-small', {
-  minCustomers: 25, minDocuments: 100, questionTotal: 40, analyticsCount: 20, lookupCount: 20,
+  minCustomers: 25, minDocuments: 100, questionTotal: 47, analyticsCount: 21, lookupCount: 26,
   requireAllCounties: true, requireOutOfState: true, requireAllBrands: true, requireAllDocTypes: true, requireMixedWarranty: true,
 });
+
+/**
+ * --contacts-topup: the small corpus's 144 already-uploaded files must be
+ * left exactly as `[small]` above just produced them, and the topup dir must
+ * contain new, distinctly-numbered, non-colliding invoices for every
+ * customer who has a phone/email on file.
+ */
+{
+  const label = '[small-topup]';
+  const p = (name, ok, detail) => check(`${label} ${name}`, ok, detail);
+  const smallDir = path.join(ROOT, 'test-docs', 'business-small');
+  const topupDir = `${smallDir}-topup`;
+
+  const beforeFiles = fs.readdirSync(smallDir).sort();
+  const beforeHashes = new Map(beforeFiles.map((f) => [f, fs.readFileSync(path.join(smallDir, f))]));
+
+  execFileSync('node', [GEN, '--customers', '30', '--out', 'test-docs/business-small', '--contacts-topup'], { cwd: ROOT, stdio: 'ignore' });
+
+  const afterFiles = fs.readdirSync(smallDir).sort();
+  p('base dir file list is unchanged by --contacts-topup', JSON.stringify(afterFiles) === JSON.stringify(beforeFiles));
+  let baseMutated = 0;
+  for (const f of afterFiles) {
+    const before = beforeHashes.get(f);
+    const after = fs.readFileSync(path.join(smallDir, f));
+    if (!before || Buffer.compare(before, after) !== 0) { baseMutated++; console.log(`FAIL  ${label} ${f} changed on disk after running --contacts-topup`); }
+  }
+  p('no base-dir file content changed after running --contacts-topup', baseMutated === 0);
+
+  p('topup dir exists', fs.existsSync(topupDir));
+  const topupKey = JSON.parse(fs.readFileSync(path.join(topupDir, 'TOPUP_KEY.json'), 'utf8'));
+  p('TOPUP_KEY.json lists at least 1 customer', topupKey.customers.length > 0, `got ${topupKey.customers.length}`);
+
+  const smallKey = JSON.parse(fs.readFileSync(path.join(smallDir, 'ANSWER_KEY.json'), 'utf8'));
+  const withContact = smallKey.customers.filter((c) => c.phone || c.email).length;
+  p('TOPUP_KEY.json has exactly one entry per customer with a phone or email in the small corpus key',
+    topupKey.customers.length === withContact, `got ${topupKey.customers.length}, want ${withContact}`);
+
+  const topupFiles = fs.readdirSync(topupDir).filter((f) => f.endsWith('.pdf') || f.endsWith('.txt'));
+  p(`topup dir has ${withContact} new invoice documents`, topupFiles.length === withContact, `got ${topupFiles.length}`);
+
+  let futureInTopup = 0;
+  for (const f of topupFiles) {
+    const future = datesInText(docText(topupDir, f)).filter((d) => d > TODAY);
+    if (future.length) { futureInTopup++; console.log(`FAIL  ${label} ${f} prints a date after today: ${future.join(', ')}`); }
+  }
+  p('no topup document prints a date after today', futureInTopup === 0);
+
+  let contactMisses = 0;
+  for (const entry of topupKey.customers) {
+    const text = docText(topupDir, entry.filename);
+    const ok = (entry.phone && text.includes(entry.phone)) || (entry.email && text.includes(entry.email));
+    if (!ok) { contactMisses++; console.log(`FAIL  ${label} ${entry.filename} does not print ${entry.key}'s phone/email`); }
+  }
+  p('every topup invoice prints the phone/email TOPUP_KEY.json says it should', contactMisses === 0);
+
+  // sha256 of every topup file must not collide with anything already
+  // generated (the base small corpus, nor the full corpus).
+  const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
+  const existingHashes = new Set();
+  for (const dir of [smallDir, path.join(ROOT, 'test-docs', 'business')]) {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.pdf') || f.endsWith('.txt')) existingHashes.add(sha256(fs.readFileSync(path.join(dir, f))));
+    }
+  }
+  let collisions = 0;
+  for (const f of topupFiles) {
+    const h = sha256(fs.readFileSync(path.join(topupDir, f)));
+    if (existingHashes.has(h)) { collisions++; console.log(`FAIL  ${label} ${f}'s sha256 collides with an already-generated document`); }
+  }
+  p('no topup document\'s sha256 collides with the base or full corpus', collisions === 0);
+
+  // determinism: running --contacts-topup twice produces byte-identical topup output.
+  const topupHashesA = new Map(topupFiles.map((f) => [f, sha256(fs.readFileSync(path.join(topupDir, f)))]));
+  execFileSync('node', [GEN, '--customers', '30', '--out', 'test-docs/business-small', '--contacts-topup'], { cwd: ROOT, stdio: 'ignore' });
+  let topupDrift = 0;
+  for (const [f, h] of topupHashesA) {
+    const h2 = sha256(fs.readFileSync(path.join(topupDir, f)));
+    if (h2 !== h) { topupDrift++; console.log(`FAIL  ${label} ${f} is not byte-identical on a second --contacts-topup run`); }
+  }
+  p('--contacts-topup is deterministic across two runs', topupDrift === 0);
+}
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

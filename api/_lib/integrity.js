@@ -406,6 +406,50 @@ export function compareNamesStrict(a, b) {
   return 'no-match';
 }
 
+/**
+ * Round 4 item 4 (2026-09-21): a document sometimes names its customer only
+ * by MENTIONING them in free text — "Sarah Chen's account", "for Mike
+ * Torres" — rather than the model extracting a customer_name fact. Matches
+ * "<First Last[ Last2]>'s account|home|house|unit|system|property" or
+ * "for <First Last[ Last2]>". First match wins; pure, no I/O.
+ * See recordsStore.js's findOrCreateCustomer for where this feeds in, and
+ * scripts/verify-integrity.mjs for coverage.
+ */
+// Exactly "First Last" (two tokens), per the brief's literal pattern. A wider
+// {1,2}-extra-word version also swallowed a capitalized sentence-initial verb
+// with nothing but a name between it and "'s" ("Inspected Bob Nguyen's
+// property" read as candidate "Inspected Bob Nguyen") — fixed-width avoids
+// that ambiguity entirely: the regex engine simply slides its start position
+// forward until "'s"/"for" lines up immediately before a two-token name.
+const NAME_MENTION_RE =
+  /\b([A-Z][a-z]+\s+[A-Z][a-z]+)'s\s+(?:account|home|house|unit|system|property)\b|\bfor\s+([A-Z][a-z]+\s+[A-Z][a-z]+)\b/;
+
+export function extractNameMention(text) {
+  const m = String(text ?? '').match(NAME_MENTION_RE);
+  if (!m) return null;
+  return (m[1] || m[2] || '').trim() || null;
+}
+
+/**
+ * Given a name mentioned in a document's free text (extractNameMention) and
+ * a narrow set of same-surname customer candidates, returns the single
+ * customer it unambiguously names — compareNamesStrict must say 'equal' or
+ * 'subset', the same strict bar 'ai:name-only' already applies — or null when
+ * zero or two-or-more match (left for a person, never guessed). Pure.
+ *
+ * @param {string|null} candidateName
+ * @param {{id: string, name: string}[]} customers
+ * @returns {{id: string}|null}
+ */
+export function matchNameMention(candidateName, customers) {
+  if (!candidateName) return null;
+  const matches = (customers ?? []).filter((c) => {
+    const rel = compareNamesStrict(candidateName, c?.name);
+    return rel === 'equal' || rel === 'subset';
+  });
+  return matches.length === 1 ? { id: matches[0].id } : null;
+}
+
 // ------------------------------------------------------------------- score
 
 // The 6 identity fields a hard veto is checked against (owner "strict
