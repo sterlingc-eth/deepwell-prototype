@@ -1,0 +1,51 @@
+1
+00:00:00,500 --> 00:00:03,200
+Where's the serial for the Elm Street unit?
+
+2
+00:00:03,400 --> 00:00:05,800
+Filing cabinet · shared drive · tech's phone — three places, one question.
+
+3
+00:00:07,000 --> 00:00:13,600
+DeepWell Technology — records that answer back.
+
+4
+00:00:14,300 --> 00:00:18,800
+Drop in a folder of documents...
+
+5
+00:00:19,000 --> 00:00:23,300
+...and Donovan sorts, reads, and extracts every one.
+
+6
+00:00:23,500 --> 00:00:29,700
+Facts come out with the page they came from — a customer record assembles itself.
+
+7
+00:00:30,200 --> 00:00:32,300
+"Is the furnace at 2847 N 24th St still under warranty?"
+
+8
+00:00:34,500 --> 00:00:37,500
+Yes — installed March 2019. 10-year parts warranty. Expires March 2029.
+
+9
+00:00:38,300 --> 00:00:40,500
+"Which warranties expire in the next 90 days?"
+
+10
+00:00:42,700 --> 00:00:43,800
+6 units expiring — 2 on an agreement, 4 are not.
+
+11
+00:00:43,900 --> 00:00:47,700
+A draft outreach email is ready to send.
+
+12
+00:00:48,000 --> 00:00:51,800
+The same answer, on the job site.
+
+13
+00:00:52,600 --> 00:00:59,500
+Knowledge builds business. Plans from $99/mo — deepwelltechnology.com

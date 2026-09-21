@@ -170,6 +170,12 @@ const eq = (name: string, got: unknown, want: unknown): void =>
     { screen: 'outreach', outreachEquipmentId: 'eq-9' },
   );
   eq('an empty equipment value is treated as absent', parseDeepLink('?screen=outreach&equipment='), { screen: 'outreach' });
+
+  // Follow-up messages' own deep link (api/_lib/followups.js's FOLLOWUP_INBOX_LINK).
+  eq('screen=inbox is an alias for the review (Needs a person) screen', parseDeepLink('?screen=inbox'), { screen: 'review' });
+  eq('work=mine is carried through alongside screen=inbox', parseDeepLink('?screen=inbox&work=mine'), { screen: 'review', workFilter: 'mine' });
+  eq('an unrecognized work value is dropped', parseDeepLink('?screen=inbox&work=everyone'), { screen: 'review' });
+  eq('work with no screen is still carried through', parseDeepLink('?work=mine'), { workFilter: 'mine' });
 }
 
 /* ---------------------------------------------------------------- formatYmd */

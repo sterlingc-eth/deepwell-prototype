@@ -3,6 +3,7 @@ import type { IngestProgress } from '../services/ingestClient';
 import { summarizeProgress, type BulkFileState } from '../services/bulkImport';
 import type { BillingInterval, BillingStatus } from '../services/billingClient';
 import { DEFAULT_CUSTOMER_FILTERS, type CustomerFilters } from '../core/customerFilters';
+import type { WorkFilterChoice } from '../core/workFilter';
 
 export type Screen =
   | 'ask'
@@ -120,6 +121,16 @@ interface AppState {
   /** Jump straight to Inbox's "Needs a person" tab, optionally pre-selecting
    *  one of its queue filters (e.g. "unlinked", "gaps", "conflicts"). */
   openInboxNeedsPerson: (filter?: PendingReviewFilter) => void;
+
+  // `?screen=inbox&work=mine` deep link (a Follow-up message's own link,
+  // api/_lib/followups.js's FOLLOWUP_INBOX_LINK) — which "My work / Everyone"
+  // choice src/hooks/useWorkFilter.ts should apply the next time it resolves
+  // a signed-in user, overriding whatever this browser has stored for them.
+  // One-shot, consumed and cleared by useWorkFilter itself, same pattern as
+  // pendingReviewFilter above.
+  pendingWorkFilter: WorkFilterChoice | null;
+  setPendingWorkFilter: (choice: WorkFilterChoice) => void;
+  clearPendingWorkFilter: () => void;
 
   // Inbox "Add files" tab state — lifted out of the component (rather than
   // component-local useState/useRef) so switching Inbox tabs or navigating
@@ -255,6 +266,10 @@ export const useAppStore = create<AppState>((set) => ({
   pendingReviewFilter: null,
   clearPendingReviewFilter: () => set({ pendingReviewFilter: null }),
   openInboxNeedsPerson: (filter) => set({ currentScreen: 'ingest', inboxTab: 'needs-person', pendingReviewFilter: filter ?? null }),
+
+  pendingWorkFilter: null,
+  setPendingWorkFilter: (choice) => set({ pendingWorkFilter: choice }),
+  clearPendingWorkFilter: () => set({ pendingWorkFilter: null }),
 
   uploads: {},
   setUpload: (filename, progress) => set((s) => ({ uploads: { ...s.uploads, [filename]: progress } })),

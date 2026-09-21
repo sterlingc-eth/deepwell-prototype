@@ -4,6 +4,7 @@ import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { captureMessage, captureException } from "../telemetry.js";
 import { runWarrantyNotificationSweep } from "../notify.js";
 import { runOutreachSweep } from "./outreach.js";
+import { runFollowupsSweep } from "./followups.js";
 import { integrityFixTenant } from "./integrity.js";
 
 /**
@@ -251,6 +252,18 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "outreach" });
   }
 
+  // Missing-info follow-ups (owner brief, item 3: handoffs/START_HERE_NEXT_CHAT.md;
+  // design in handoffs/TECH_FOLLOWUPS_2026-09-21.md): same shared deadline, own
+  // cross-tenant listing (reused from notify.js's own — see followups.js's
+  // module comment), off by default per tenant, never allowed to fail the
+  // rest of this sweep.
+  try {
+    summary.followups = await runFollowupsSweep({ deadlineAt });
+  } catch (err) {
+    summary.followups = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "followups" });
+  }
+
   await captureMessage(
     `cron-sweep: ${summary.tenantsChecked} tenant(s) checked, ${summary.stuckFound} stuck document(s) found, ` +
       `${summary.recovered} recovered, ${summary.stillFailing} still failing; ` +
@@ -261,6 +274,8 @@ export default async function handler(req, res) {
       `${summary.notifications?.skipped ?? 0} tenant(s) skipped (deadline); ` +
       `outreach: ${summary.outreach?.tenantsChecked ?? 0} tenant(s), ${summary.outreach?.drafted ?? 0} drafted, ` +
       `${summary.outreach?.sent ?? 0} sent, ${summary.outreach?.failed ?? 0} failed; ` +
+      `followups: ${summary.followups?.tenantsEnabled ?? 0}/${summary.followups?.tenantsChecked ?? 0} tenant(s) enabled, ` +
+      `${summary.followups?.messagesSent ?? 0} message(s) sent, ${summary.followups?.emailsSent ?? 0} emailed; ` +
       `integrity: ${summary.integrityMerged} merged, ${summary.integrityLinked} linked, ` +
       `${summary.integrityHealed} survivor(s) healed, ${summary.integrityContactStripped} shop contact field(s) stripped, ` +
       `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Doc } from '../core/types';
 import { useMemberDirectory } from './useMemberDirectory';
+import { useAppStore } from '../store/appStore';
 import { defaultWorkFilterChoice, isMineDoc, type WorkFilterChoice } from '../core/workFilter';
 
 const HINT_SEEN_KEY = 'deepwell.workFilterHintSeen';
@@ -53,13 +54,24 @@ export function useWorkFilter(allDocs: Doc[]): UseWorkFilter {
 
   const [choice, setChoiceState] = useState<WorkFilterChoice>('everyone');
 
-  // Runs once per userId becoming known (Clerk hydrates async): pick up a
-  // stored per-user choice, or compute the default rule. Deliberately does
-  // NOT re-run every time attributedCount changes afterward — once a user
-  // (or the default) has picked, a later upload should not silently flip
-  // the control out from under them.
+  // Runs once per userId becoming known (Clerk hydrates async): a pending
+  // `?work=mine` deep link (a follow-up message's own link — see
+  // store/appStore.ts's pendingWorkFilter) wins outright, then a stored
+  // per-user choice, then the default rule. Deliberately does NOT re-run
+  // every time attributedCount changes afterward — once a user (or the
+  // default) has picked, a later upload should not silently flip the
+  // control out from under them. Reads the store directly (getState())
+  // rather than subscribing, so consuming the one-shot deep link doesn't
+  // widen this effect's own dependency list.
   useEffect(() => {
     if (!userId) return;
+    const pending = useAppStore.getState().pendingWorkFilter;
+    if (pending) {
+      setChoiceState(pending);
+      safeSet(`deepwell.workFilter.${userId}`, pending);
+      useAppStore.getState().clearPendingWorkFilter();
+      return;
+    }
     const stored = safeGet(`deepwell.workFilter.${userId}`);
     if (stored === 'mine' || stored === 'everyone') {
       setChoiceState(stored);

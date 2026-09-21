@@ -51,6 +51,14 @@
   --dv-rgb-rim:157,196,178;     /* Donovan well: rim / light accent */
   --dv-rgb-brass:185,138,78;    /* Donovan well: brass, rgb of --brass */
   --dv-rgb-ink:79,98,89;        /* Donovan well: particle ink, rgb of --muted */
+  --dv-bronze:#8C6B3E;          /* Donovan well v3: the answer — bronze, not brass */
+  --dv-bronze-mid:#A67C52;
+  --dv-bronze-hi:#C8A67A;
+  --dv-rgb-bronze:140,107,62;
+  --dv-rgb-bronze-mid:166,124,82;
+  --dv-rgb-bronze-hi:200,166,122;
+  --dv-rgb-navy:18,61,107;      /* Donovan well v3: faint surface caustics */
+  --dv-rgb-cream:244,235,221;   /* Donovan well v3: meniscus highlight */
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -141,39 +149,8 @@ a{color:inherit}
 .fact{display:flex;flex-direction:column;gap:2px}
 .fact b{font-family:"Newsreader",serif;font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
 .fact span{font-size:.78rem;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-family:"IBM Plex Mono",monospace}
-.well{position:relative;max-width:380px;width:100%;margin-left:auto;display:flex;flex-direction:column;gap:14px}
-.well canvas{width:100%;aspect-ratio:1;display:block;touch-action:none}
-/* Donovan: a well of concentric light seen from above, with real depth —
-   rings recede and dim toward the centre, document fragments drift at the
-   edges and are drawn in while he reads, a single brass line rises back out
-   with the answer. Under it, the question becoming an answer in text. */
-.donovan-chat{display:flex;flex-direction:column;gap:9px;min-height:92px;font-size:.92rem;line-height:1.35}
-.donovan-q,.donovan-a{display:flex;gap:10px;align-items:flex-start}
-.donovan-who{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding-top:2px;width:20px;display:flex;align-items:center;justify-content:flex-start}
-.donovan-q .donovan-who{width:64px;padding-top:3px;font-size:.7rem}
-.donovan-who-d{color:var(--brass)}
-.donovan-avatar{width:18px;height:18px;display:block;overflow:visible}
-.donovan-avatar circle{fill:none;stroke:currentColor;stroke-width:7}
-.donovan-avatar circle:last-child{fill:currentColor;stroke:none}
-.donovan-a{color:var(--text)}
-.donovan-q{color:var(--muted)}
-.donovan-a-wrap{display:inline}
-#donovan-a::after{content:"";display:inline-block;width:2px;height:1em;background:var(--brass);margin-left:2px;vertical-align:-2px;animation:donovan-caret 1s steps(2) infinite}
-@keyframes donovan-caret{50%{opacity:0}}
-.donovan-src{display:inline-flex;align-items:center;gap:4px;margin-left:9px;padding:2px 8px 2px 6px;border-radius:999px;border:1px solid var(--line-strong);color:var(--faint);
-  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.03em;white-space:nowrap;vertical-align:middle;
-  opacity:0;transform:translateY(3px) scale(.94);
-  transition:opacity .4s cubic-bezier(.16,1,.3,1),transform .4s cubic-bezier(.16,1,.3,1)}
-.donovan-src.show{opacity:1;transform:translateY(0) scale(1)}
-.donovan-src-ic{width:10px;height:10px;flex:none}
-.donovan-src-ic path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.dv-msg.dv-in{animation:dv-rise .5s cubic-bezier(.16,1,.3,1)}
-@keyframes dv-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@media (prefers-reduced-motion:reduce){
-  #donovan-a::after{animation:none}
-  .dv-msg.dv-in{animation:none}
-  .donovan-src{transition:none}
-}
+.well{position:relative;aspect-ratio:1;max-width:380px;width:100%;margin-left:auto}
+.well canvas{width:100%;height:100%;display:block}
 @media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.well{max-width:360px;margin:0 auto;order:-1}}
 
 /* hero micro-loop: a document quietly becoming an answer, next to the headline */
@@ -444,6 +421,127 @@ footer a{color:var(--muted);text-decoration:none}
   .hero-micro .hm-arrow{stroke-dashoffset:0!important}
 }
 </style>
+
+<style>
+/* ======================================================================
+   MICRO-ANIMATIONS — ENGINEER B (2026-09-21), reactbits.dev/c/micro-style
+   Vanilla CSS + JS, no dependencies. New selectors are prefixed `mm-`.
+   Does NOT modify: the Donovan canvas IIFE, .well/.donovan-* rules,
+   --dv-* tokens, or the nav <svg class="mark">.
+   Reduced motion: the sitewide reset above (animation/transition:none)
+   handles every CSS-only effect here; JS-driven effects (headline split,
+   count-up, magnetic buttons, spotlight follow, cursor glow) are also
+   explicitly skipped in JS when prefers-reduced-motion matches.
+   ====================================================================== */
+
+/* 1) scroll reveal — extends the site's existing .dw-observe/.in-view
+   fade+12px-rise idiom (already used by .cost-card) to every remaining
+   section header and card. Classes added in the HTML below; the existing
+   IntersectionObserver near the end of the page (unmodified) drives it. */
+.sec-head,.person,.vert,.founder,.plan,.principle{
+  opacity:0;transform:translateY(12px);
+  transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1);
+}
+.sec-head.in-view,.person.in-view,.vert.in-view,.founder.in-view,.plan.in-view,.principle.in-view{
+  opacity:1;transform:translateY(0);
+}
+.people .person:nth-child(2){transition-delay:.08s}
+.people .person:nth-child(3){transition-delay:.16s}
+.verts .vert:nth-child(2){transition-delay:.08s}
+.verts .vert:nth-child(3){transition-delay:.16s}
+.founders .founder:nth-child(2){transition-delay:.1s}
+.plans .plan:nth-child(2){transition-delay:.06s}
+.plans .plan:nth-child(3){transition-delay:.12s}
+.plans .plan:nth-child(4){transition-delay:.18s}
+.principles .principle:nth-child(2){transition-delay:.06s}
+.principles .principle:nth-child(3){transition-delay:.12s}
+.principles .principle:nth-child(4){transition-delay:.18s}
+
+/* 2) headline split-text reveal — JS wraps each word of the hero h1 in
+   a .mm-word span with --mm-i as its index; this animates it in. */
+.mm-headline .mm-word{display:inline-block;opacity:0;transform:translateY(14px);
+  animation:mm-word-rise .55s cubic-bezier(.16,1,.3,1) forwards;
+  animation-delay:calc(var(--mm-i,0) * 30ms)}
+@keyframes mm-word-rise{to{opacity:1;transform:translateY(0)}}
+
+/* 3) spotlight hover + lift — platform / who-it's-for / pricing cards.
+   --mm-x/--mm-y (set by JS on pointer-fine devices) default to center,
+   so touch/keyboard/reduced-motion still get a plain centered highlight
+   on hover/focus, just without the pointer-follow motion. */
+.step,.person,.plan{position:relative;overflow:hidden}
+.step::before,.person::before,.plan::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:radial-gradient(220px circle at var(--mm-x,50%) var(--mm-y,50%),color-mix(in srgb,var(--brass) 16%,transparent),transparent 70%);
+  transition:opacity .3s ease;
+}
+.step:hover::before,.person:hover::before,.plan:hover::before,
+.step:focus-within::before,.person:focus-within::before,.plan:focus-within::before{opacity:1}
+.step.in-view:hover,.person.in-view:hover,.plan.in-view:hover{transform:translateY(-2px)}
+
+/* 4) magnetic primary buttons (translate toward pointer, JS sets the
+   --mm-tx/--mm-ty vars, ≤6px) + press scale (pure CSS, no JS needed);
+   secondary buttons get an underline that grows from the left. */
+.btn-primary{transform:translate(var(--mm-tx,0px),var(--mm-ty,0px));
+  transition:transform .18s cubic-bezier(.16,1,.3,1),background .2s ease}
+.btn-primary:active{transform:translate(var(--mm-tx,0px),var(--mm-ty,0px)) scale(.96)}
+.btn-ghost{position:relative}
+.btn-ghost::after{content:"";position:absolute;left:20px;right:20px;bottom:7px;height:1px;
+  background:currentColor;opacity:.6;transform:scaleX(0);transform-origin:left;
+  transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.btn-ghost:hover::after,.btn-ghost:focus-visible::after{transform:scaleX(1)}
+
+/* 5) count-up numbers — tabular figures keep digit width steady while
+   the value climbs; JS also locks min-width for the duration (no shift). */
+.hero-facts .fact b,.cost-total b{font-variant-numeric:tabular-nums}
+
+/* 6) document-type marquee, under "Ingest everything". Pure CSS scroll;
+   paused by default and only runs once revealed + resumes/pauses with
+   scroll position via the existing .dw-observe/.in-view mechanism. */
+.mm-marquee{margin:18px 0 4px;overflow:hidden;padding:10px 0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);}
+.mm-marquee-track{display:flex;width:max-content;animation:none}
+.dw-observe.in-view .mm-marquee-track{animation:mm-marquee-scroll 34s linear infinite}
+.mm-marquee-track span{font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.05em;
+  color:var(--faint);white-space:nowrap;padding:0 22px;border-right:1px solid var(--line)}
+@keyframes mm-marquee-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* 7) cursor glow — dark theme only, confined to the hero copy column so
+   it never sits over the Donovan well/canvas. JS-created element. */
+.mm-glow{position:absolute;width:280px;height:280px;left:0;top:0;border-radius:50%;
+  pointer-events:none;transform:translate(-50%,-50%);opacity:0;transition:opacity .3s ease;z-index:-1;
+  background:radial-gradient(circle,color-mix(in srgb,var(--brass) 22%,transparent),transparent 72%);}
+.mm-glow.mm-show{opacity:1}
+
+/* 8) nav active-section indicator — a thin bar that slides between
+   links as you scroll. JS-created element + width/position. */
+.navlinks{position:relative}
+.mm-nav-ind{position:absolute;bottom:-9px;height:2px;left:0;width:0;background:var(--brass);
+  opacity:0;transform:translateX(0);
+  transition:transform .35s cubic-bezier(.16,1,.3,1),width .35s cubic-bezier(.16,1,.3,1),opacity .3s ease}
+.mm-nav-ind.mm-show{opacity:1}
+
+/* 9) "Included with every plan" — ticks draw on (stroke-dashoffset) once
+   revealed, same trigger as the reveal system above. */
+.mm-ticks{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mm-ticks li{display:flex;align-items:center;gap:8px;font-size:.86rem;color:var(--muted)}
+.mm-ticks svg{width:15px;height:15px;flex:none;stroke:var(--brass-text);fill:none;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.mm-ticks path{stroke-dasharray:20;stroke-dashoffset:20;transition:stroke-dashoffset .5s cubic-bezier(.16,1,.3,1)}
+.mm-ticks.in-view path{stroke-dashoffset:0}
+.mm-ticks li:nth-child(2) path{transition-delay:.1s}
+.mm-ticks li:nth-child(3) path{transition-delay:.2s}
+.mm-ticks li:nth-child(4) path{transition-delay:.3s}
+</style>
+
+<noscript><style>
+/* JS-off fallback for engineer B's reveal-on-scroll additions above (and
+   the pre-existing .cost-card, which uses the same JS-only mechanism):
+   without JS these would otherwise stay invisible forever. */
+.sec-head,.person,.vert,.founder,.plan,.principle,.cost-card,.mm-ticks{opacity:1!important;transform:none!important}
+.mm-ticks path{stroke-dashoffset:0!important}
+</style></noscript>
 </head>
 <body>
 
@@ -524,7 +622,7 @@ footer a{color:var(--muted);text-decoration:none}
         </g>
       </svg>
       </div>
-      <h1>One question answered right. <em>For example, a $300 callback avoided.</em></h1>
+      <h1 class="mm-headline">One question answered right. <em>For example, a $300 callback avoided.</em></h1>
       <p class="lede">DeepWell finds the answer in your own work orders, warranty sheets, invoices and nameplate photos — so your techs stop calling the office. We set it up for you; day one is already useful.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#plans">See pricing</a>
@@ -537,24 +635,14 @@ footer a{color:var(--muted);text-decoration:none}
         <div class="fact"><b>100%</b><span>Answers cite the source</span></div>
       </div>
     </div>
-    <div class="well" aria-hidden="true">
-      <canvas id="well"></canvas>
-      <div class="donovan-chat">
-        <div class="donovan-q dv-msg"><span class="donovan-who">You</span><span id="donovan-q"></span></div>
-        <div class="donovan-a dv-msg">
-          <span class="donovan-who donovan-who-d">
-            <svg class="donovan-avatar" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="16"/><circle cx="50" cy="50" r="5"/></svg>
-          </span>
-          <span class="donovan-a-wrap"><span id="donovan-a"></span><span id="donovan-src" class="donovan-src"><svg class="donovan-src-ic" viewBox="0 0 24 24"><path d="M5 3h10l5 5v13H5z"/><path d="M15 3v6h5"/></svg><span id="donovan-src-t"></span></span></span>
-        </div>
-      </div>
+    <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
     </div>
   </div>
 </header>
 
 <section id="problem">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">The problem</div>
         <h2>The knowledge exists. It's just in the wrong place.</h2>
@@ -601,7 +689,7 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="team">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">The Founders</div>
         <h2>Two brothers, and a phone that gets answered.</h2>
@@ -611,7 +699,7 @@ footer a{color:var(--muted);text-decoration:none}
 
     <div class="founders">
       <!-- PLACEHOLDER COPY — replace both bios before launch. -->
-      <div class="founder">
+      <div class="founder dw-observe dw-once">
         <div class="founder-ph" aria-hidden="true"><span>S</span></div>
         <div>
           <h3>Sterling Chapman</h3>
@@ -620,7 +708,7 @@ footer a{color:var(--muted);text-decoration:none}
         </div>
       </div>
 
-      <div class="founder">
+      <div class="founder dw-observe dw-once">
         <div class="founder-ph" aria-hidden="true"><span>H</span></div>
         <div>
           <h3>Hilton Chapman</h3>
@@ -634,12 +722,18 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="platform">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">The platform</div>
         <h2>Ingest everything. Link what belongs together. Ask anything.</h2>
       </div>
       <p class="lede">DeepWell is one hosted system that does three things to your records, continuously — from the first box of paper to this morning's job sheet. It runs under your company's name and we keep it running.</p>
+    </div>
+    <div class="mm-marquee dw-observe" aria-hidden="true">
+      <div class="mm-marquee-track">
+        <span>Invoices</span><span>Warranty cards</span><span>Nameplate photos</span><span>Startup sheets</span><span>Permits</span><span>Dispatch notes</span><span>Work orders</span><span>Service tickets</span>
+        <span>Invoices</span><span>Warranty cards</span><span>Nameplate photos</span><span>Startup sheets</span><span>Permits</span><span>Dispatch notes</span><span>Work orders</span><span>Service tickets</span>
+      </div>
     </div>
     <div class="steps">
       <div class="step dw-observe dw-once">
@@ -823,7 +917,7 @@ footer a{color:var(--muted);text-decoration:none}
 <section id="how-it-works">
   <div class="wrap">
 
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">How it works</div>
         <h2>Every record goes two places at once.</h2>
@@ -1002,7 +1096,7 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="demo">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">What it feels like</div>
         <h2>Ask Donovan.</h2>
@@ -1032,7 +1126,7 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="who">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">Who it's for</div>
         <h2>One system. Three people who use it differently.</h2>
@@ -1040,17 +1134,17 @@ footer a{color:var(--muted);text-decoration:none}
       <p class="lede">The same records, seen from the desk, the truck, and the owner's office. Nobody gets a dumbed-down version; everybody gets the view that matches their day.</p>
     </div>
     <div class="people">
-      <div class="person">
+      <div class="person dw-observe dw-once">
         <div class="role">Office manager · dispatch</div>
         <blockquote>"The customer's on hold. I need the install date and who was out there last."</blockquote>
         <p>Answer the call without putting it down. Equipment, warranty status and last three visits on one screen, with the signed work order behind it.</p>
       </div>
-      <div class="person">
+      <div class="person dw-observe dw-once">
         <div class="role">Field technician · on site</div>
         <blockquote>"I'm in the attic on my phone. What's this unit's history?"</blockquote>
         <p>Type the serial off the nameplate — or photograph it — and read the last tech's notes before you touch anything. Big type, high contrast, works in sun.</p>
       </div>
-      <div class="person">
+      <div class="person dw-observe dw-once">
         <div class="role">Owner · operations</div>
         <blockquote>"How much warranty money did we leave on the table last year?"</blockquote>
         <p>See expiring coverage across every unit installed, and where maintenance agreements are due — plus, <span class="pill-soon">Coming soon</span>, which techs generate callbacks.</p>
@@ -1061,22 +1155,22 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="where">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">Where it works</div>
         <h2>Built for your company. Built to go further.</h2>
       </div>
     </div>
     <div class="verts verts-3">
-      <div class="vert now">
+      <div class="vert now dw-observe dw-once">
         <div class="st">Trade businesses · live today</div>
         <h3>HVAC, plumbing, electrical &amp; more</h3>
       </div>
-      <div class="vert">
+      <div class="vert dw-observe dw-once">
         <div class="st">Roadmap</div>
         <h3>Property management <span class="pill-soon">Next</span></h3>
       </div>
-      <div class="vert">
+      <div class="vert dw-observe dw-once">
         <div class="st">Roadmap</div>
         <h3>Fleet &amp; equipment rental <span class="pill-soon">Next</span></h3>
       </div>
@@ -1086,7 +1180,7 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="plans">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">Pricing</div>
         <h2>Pick your plan by team size. Everything else is unlimited.</h2>
@@ -1094,7 +1188,7 @@ footer a{color:var(--muted);text-decoration:none}
       <p class="lede">Every plan includes unlimited logins, unlimited questions, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 30-day free trial on Solo — card required, you won't be charged until the trial ends.</p>
     </div>
     <div class="plans plans-4">
-      <div class="plan">
+      <div class="plan dw-observe dw-once">
         <div class="tier">Solo</div>
         <span class="trial-badge">30-day free trial</span>
         <h3>$99<span class="per">/mo</span></h3>
@@ -1128,7 +1222,7 @@ footer a{color:var(--muted);text-decoration:none}
         <p class="math">Three techs preventing one callback a month each: $3,600–7,200 saved. You pay $199.</p>
         <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Get started</a>
       </div>
-      <div class="plan">
+      <div class="plan dw-observe dw-once">
         <div class="tier">Crew</div>
         <h3>$399<span class="per">/mo</span></h3>
         <p class="for">For 5–10 technicians. Multiple locations, phone support.</p>
@@ -1145,7 +1239,7 @@ footer a{color:var(--muted);text-decoration:none}
         <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
         <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Get started</a>
       </div>
-      <div class="plan">
+      <div class="plan dw-observe dw-once">
         <div class="tier">Fleet</div>
         <h3>$899<span class="per">+/mo</span></h3>
         <p class="for">For 11+ technicians or multi-location. Custom fit.</p>
@@ -1169,6 +1263,12 @@ footer a{color:var(--muted);text-decoration:none}
         <h3>White-glove setup by the DeepWell Technology team</h3>
       </div>
       <p>Our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon.</p>
+      <ul class="mm-ticks">
+        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Inventories your records</li>
+        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Runs the first bulk ingest</li>
+        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Checks links against real questions</li>
+        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Trains your crew in an afternoon</li>
+      </ul>
     </div>
     <p class="annual"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price.</p>
     <div class="rescue">
@@ -1187,7 +1287,7 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="cost">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">The cost of missing this</div>
         <h2>What a missed follow-up costs a shop like yours, per year</h2>
@@ -1216,7 +1316,7 @@ footer a{color:var(--muted);text-decoration:none}
 
 <section id="principles">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">How we build</div>
         <h2>Rules we don't bend.</h2>
@@ -1224,19 +1324,19 @@ footer a{color:var(--muted);text-decoration:none}
       <p class="lede">These are commitments in every DeepWell Technology agreement, not a values page. If a feature can't meet them, it doesn't ship.</p>
     </div>
     <div class="principles">
-      <div class="principle">
+      <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><rect x="8" y="6" width="28" height="32" rx="2"/><path d="M14 16h16M14 22h16M14 28h9"/></svg>
         <div><h3>Every answer shows its source.</h3><p>If the system isn't sure, it says so and shows you the document instead of guessing.</p></div>
       </div>
-      <div class="principle">
+      <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 6l14 6v10c0 8-6 13-14 16C14 35 8 30 8 22V12z"/><path d="M16 22l4 4 8-8"/></svg>
         <div><h3>Your records stay yours.</h3><p>Data is stored under your company's own account, never pooled with another contractor's, never used to build anything for anyone else. It stays your data, and you can ask us for a full copy at any time.</p></div>
       </div>
-      <div class="principle">
+      <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15"/><path d="M22 12v10l7 4"/></svg>
         <div><h3>Built for the job, not the demo.</h3><p>Readable in an attic on a cracked phone. Built for the field: fast on a weak connection. Nothing that flashes or slows a tech down. Office gets the full desk view.</p></div>
       </div>
-      <div class="principle">
+      <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
         <div><h3>Measured before you rely on it.</h3><p>During setup we score your account against the questions your team actually asks and show you the number. Under 95% on your own set, we keep working before go-live.</p></div>
       </div>
@@ -1266,244 +1366,35 @@ footer a{color:var(--muted);text-decoration:none}
 </footer>
 
 <script>
-/* ---- Donovan's mark: a well of light seen from above — depth, drift, a reading
-   presence and an answer that surfaces. States: idle / reading / answered. ---- */
+/* ---- ambient well rings ---- */
 (function(){
   const c=document.getElementById('well');if(!c)return;
   const ctx=c.getContext('2d');
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let w,h,dpr,t0=performance.now();
-  function size(){dpr=Math.min(devicePixelRatio||1,2);const r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=Math.max(1,w*dpr);c.height=Math.max(1,h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
-  size();
-  window.__donovanReading=false;
-
-  // theme palette, read from CSS custom properties, cached and refreshed only
-  // when the theme actually changes (not every frame)
-  function readPalette(){
-    const cs=getComputedStyle(document.documentElement);
-    const g=n=>cs.getPropertyValue(n).trim();
-    return{
-      brass:g('--brass')||'#B98A4E',
-      brassRgb:g('--dv-rgb-brass')||'185,138,78',
-      wellRgb:g('--dv-rgb-well')||'22,60,44',
-      midRgb:g('--dv-rgb-mid')||'36,82,57',
-      shallowRgb:g('--dv-rgb-shallow')||'90,140,108',
-      rimRgb:g('--dv-rgb-rim')||'157,196,178',
-      inkRgb:g('--dv-rgb-ink')||'122,146,134'
-    };
-  }
-  let pal=readPalette();
-  if('MutationObserver' in window){
-    new MutationObserver(()=>pal=readPalette()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-  }
-  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>pal=readPalette());
-
-  function lerp(a,b,t){return a+(b-a)*t}
-  function lerpRgb(a,b,t){
-    const pa=a.split(',').map(Number),pb=b.split(',').map(Number);
-    return Math.round(lerp(pa[0],pb[0],t))+','+Math.round(lerp(pa[1],pb[1],t))+','+Math.round(lerp(pa[2],pb[2],t));
-  }
-  function easeOutCubic(x){return 1-Math.pow(1-x,3)}
-  function easeInCubic(x){return x*x*x}
-
-  // pointer: smoothed toward a target, gives gentle magnetism + per-ring parallax
-  let tnx=0,tny=0,pnx=0,pny=0;
-  const host=c.closest('.well')||c;
-  function onPointerMove(e){
-    if(e.pointerType==='touch')return;
-    const r=c.getBoundingClientRect();
-    tnx=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width/2)));
-    tny=Math.max(-1,Math.min(1,(e.clientY-(r.top+r.height/2))/(r.height/2)));
-  }
-  function onPointerLeave(){tnx=0;tny=0}
-  if(!reduce){
-    host.addEventListener('pointermove',onPointerMove,{passive:true});
-    host.addEventListener('pointerleave',onPointerLeave,{passive:true});
-  }
-
-  // a faint field of document fragments drifting at the edges; drawn into the
-  // well while Donovan reads, replaced by fresh ones after
-  const PN=14;
-  function makeParticle(){
-    return{ang:Math.random()*Math.PI*2,fac:1.14+Math.random()*0.32,spin:(Math.random()<.5?-1:1)*(0.04+Math.random()*0.07),
-      w:5+Math.random()*4,h:7+Math.random()*5,rot:Math.random()*Math.PI,op:0.14+Math.random()*0.2,
-      pulled:false,pull:0,elapsed:0,delay:Math.random()*0.5,seed:Math.random()*10};
-  }
-  const particles=Array.from({length:PN},makeParticle);
-  const ripples=[]; // brass answer-lines rising back out
-  let wasReading=false;
-
-  function drawParticle(p,t,R){
-    // called inside the well's own translated+squashed coordinate space
-    // (origin = well centre); position in that space, but drawn back at
-    // 1:1 aspect so the little document rectangles stay upright, not squashed
-    let fac=p.fac,op=p.op;
-    if(p.pulled){
-      const d=Math.max(0,Math.min(1,p.pull));
-      fac=lerp(p.fac,0.08,easeInCubic(d));
-      op=p.op*(1-Math.pow(d,2));
-    }else{
-      fac+=Math.sin(t*0.35+p.seed)*0.015;
-      op=p.op*(0.82+0.18*Math.sin(t*0.5+p.seed));
-    }
-    if(op<=0.004)return;
-    const ang=p.ang+p.spin*t*(p.pulled?2.2:1);
-    const x=Math.cos(ang)*R*fac,y=Math.sin(ang)*R*fac;
-    ctx.save();
-    ctx.translate(x,y);ctx.scale(1,1/SQUASH);ctx.rotate(p.rot+ang*0.15);
-    ctx.fillStyle='rgba('+pal.inkRgb+','+op.toFixed(3)+')';
-    ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
-    ctx.fillStyle='rgba('+pal.inkRgb+','+(op*1.4).toFixed(3)+')';
-    ctx.fillRect(-p.w/2+1,-p.h/2+2,p.w-2,0.9);
-    ctx.fillRect(-p.w/2+1,-p.h/2+4,p.w-3,0.9);
-    ctx.restore();
-  }
-
-  const SQUASH=0.72; // vertical compression — reads as a shaft seen from above, not a ball
-
-  function render(now,reading){
-    const t=(now-t0)/1000;
-    ctx.clearRect(0,0,w,h);
-    const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;
-    const breath=reduce?0:Math.sin(t*0.5)*0.014;
-    const Rb=R*(1+breath);
-    const ox=reduce?0:pnx*2.4,oy=reduce?0:pny*1.6; // gentle whole-object magnetism
-
-    ctx.save();
-    ctx.translate(cx+ox,cy+oy);
-    ctx.scale(1,SQUASH); // everything below is drawn in a circular local space
-
-    // halo — brighter while reading
-    const halo=ctx.createRadialGradient(0,0,Rb*0.86,0,0,Rb*1.14);
-    halo.addColorStop(0,'rgba('+pal.brassRgb+',0)');
-    halo.addColorStop(1,'rgba('+pal.brassRgb+','+(reading?0.32:0.15)+')');
-    ctx.beginPath();ctx.arc(0,0,Rb*1.14,0,Math.PI*2);ctx.fillStyle=halo;ctx.fill();
-
-    // the well floor — a point of light at the centre, dark toward the rim
-    const g=ctx.createRadialGradient(0,0,Rb*0.02,0,0,Rb*1.02);
-    g.addColorStop(0,'rgb('+pal.shallowRgb+')');
-    g.addColorStop(0.42,'rgb('+pal.midRgb+')');
-    g.addColorStop(1,'rgb('+pal.wellRgb+')');
-    ctx.beginPath();ctx.arc(0,0,Rb,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
-
-    // document fragments drifting at the edges, drawn into the well while reading
-    particles.forEach(p=>drawParticle(p,t,Rb));
-
-    // concentric rings: rim closest + brightest, centre farthest + dimmest —
-    // each lags the pointer by how deep it sits (real parallax), each with a
-    // faint, slow caustic glint travelling its circumference
-    const N=5,speed=reading?1.1:0.24;
-    for(let i=0;i<N;i++){
-      const depth=i/(N-1); // 0 = deep/centre, 1 = rim
-      const r=Rb*(0.15+0.82*depth);
-      const lagX=reduce?0:-(1-depth)*2.1*pnx,lagY=reduce?0:-(1-depth)*1.4*pny;
-      const rgb=lerpRgb(pal.wellRgb,pal.rimRgb,depth*0.85);
-      const a=0.42+0.4*Math.max(0,Math.sin((t*speed-i*0.42)*Math.PI/1.8));
-      ctx.save();ctx.translate(lagX,lagY);
-      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);
-      ctx.lineWidth=0.9+0.9*depth;ctx.strokeStyle='rgba('+rgb+','+a.toFixed(3)+')';ctx.stroke();
-      if(!reduce){
-        const dir=i%2?1:-1,gspeed=(reading?1.7:0.32)*(0.55+0.45*depth)*dir;
-        const gang=(t*gspeed+i*2.1)%(Math.PI*2),gwidth=0.3+0.14*(1-depth);
-        ctx.save();ctx.globalCompositeOperation='lighter';
-        ctx.beginPath();ctx.arc(0,0,r,gang,gang+gwidth);
-        ctx.lineWidth=0.9+0.9*depth;ctx.strokeStyle='rgba('+pal.rimRgb+','+(reading?0.34:0.18)+')';ctx.stroke();
-        ctx.restore();
-      }
-      ctx.restore();
-    }
-
-    // a soft wash of light spilling over the top of the rim
-    const rim=ctx.createLinearGradient(0,-Rb,0,-Rb*0.35);
-    rim.addColorStop(0,'rgba('+pal.rimRgb+',.28)');rim.addColorStop(1,'rgba('+pal.rimRgb+',0)');
-    ctx.beginPath();ctx.arc(0,0,Rb*0.99,Math.PI*1.12,Math.PI*1.88);ctx.lineWidth=Rb*0.16;ctx.strokeStyle=rim;ctx.stroke();
-
-    // ripples: a single brass line rising back out with each answer
-    for(let i=ripples.length-1;i>=0;i--){
-      const age=(now-ripples[i])/1000,dur=1.15;
-      if(age>dur){ripples.splice(i,1);continue}
-      const e=easeOutCubic(age/dur);
-      ctx.beginPath();ctx.arc(0,0,Rb*(0.07+0.96*e),0,Math.PI*2);
-      ctx.lineWidth=2.4*(1-e)+0.4;ctx.strokeStyle='rgba('+pal.brassRgb+','+((1-e)*0.85).toFixed(3)+')';ctx.stroke();
-    }
-
-    // the centre: where an answer surfaces
-    const pulse=reading?1+0.14*Math.sin(t*7):1;
-    ctx.beginPath();ctx.arc(0,0,Rb*0.052*pulse,0,Math.PI*2);
-    ctx.fillStyle=pal.brass;ctx.fill();
-
-    ctx.restore();
-  }
-
-  // run loop: paused off-screen and when the tab is hidden
-  let running=false,onscreen=true,lastNow=performance.now();
+  function size(){dpr=Math.min(devicePixelRatio||1,2);const r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+  size();addEventListener('resize',size);
+  function ringColor(){return getComputedStyle(document.documentElement).getPropertyValue('--ring').trim()||'rgba(22,60,44,.5)'}
   function frame(now){
-    if(!running)return;
-    const dt=Math.min(0.05,Math.max(0,(now-lastNow)/1000));lastNow=now;
-    pnx+=(tnx-pnx)*0.08;pny+=(tny-pny)*0.08;
-    const reading=!!window.__donovanReading;
-    if(reading&&!wasReading){
-      particles.forEach(p=>{if(!p.pulled)Object.assign(p,{pulled:true,pull:0,elapsed:0,delay:p.delay})});
+    const t=reduce?0:(now-t0)/1000;
+    ctx.clearRect(0,0,w,h);
+    const cx=w/2,cy=h/2,R=Math.min(w,h)/2-6;
+    const N=9,base=ringColor();
+    for(let i=0;i<N;i++){
+      // rings drift outward slowly, like a ripple; opacity fades at the edge
+      const phase=((i/N)+t*0.035)%1;
+      const r=R*(0.08+0.92*phase);
+      const a=Math.sin(phase*Math.PI);
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.lineWidth=2.2;
+      ctx.strokeStyle=base.replace(/[\d.]+\)$/,(0.15+0.85*a)+')');
+      ctx.stroke();
     }
-    if(!reading&&wasReading)ripples.push(now);
-    particles.forEach(p=>{
-      if(!p.pulled)return;
-      p.elapsed+=dt;
-      if(p.elapsed>p.delay)p.pull=Math.min(1,p.pull+dt*(reading?1.3:3.2));
-      if(p.pull>=1)Object.assign(p,makeParticle());
-    });
-    wasReading=reading;
-    render(now,reading);
-    requestAnimationFrame(frame);
+    // static center + hairline crosshair
+    ctx.beginPath();ctx.arc(cx,cy,R*0.06,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=base;ctx.stroke();
+    if(!reduce)requestAnimationFrame(frame);
   }
-  function loopStart(){if(running||reduce)return;running=true;lastNow=performance.now();requestAnimationFrame(frame)}
-  function loopStop(){running=false}
-  function sync(){(onscreen&&!document.hidden)?loopStart():loopStop()}
-  function onResize(){size();if(!running)render(performance.now(),!!window.__donovanReading)}
-  addEventListener('resize',onResize);
-  if(reduce){
-    render(performance.now(),false);
-  }else{
-    if('IntersectionObserver' in window){
-      new IntersectionObserver(es=>{es.forEach(e=>{onscreen=e.isIntersecting;sync()})},{threshold:0}).observe(c);
-    }
-    document.addEventListener('visibilitychange',sync);
-    sync();
-  }
-
-  /* a question becoming an answer, on loop — every one a real thing Donovan does,
-     each answer citing exactly where it came from */
-  const qa=[
-    ['What\'s the serial at 215 N College Ave?','F2006123 — Trane 4TTR4036.','Startup sheet · p.1'],
-    ['Is the Whitmore unit still under warranty?','Parts warranty ends Nov 20, 2026 — 60 days out.','Invoice + nameplate photo'],
-    ['Who was last out to the Castillo house?','Denise Ford, 11/06/2025 — weak airflow after a filter change.','Service ticket'],
-    ['What refrigerant is in RTU-3 at Desert Ridge Dental?','R-454B. Lennox ML14XC1-048.','Maintenance agreement · p.2'],
-  ];
-  const qRow=document.querySelector('.donovan-q'),aRow=document.querySelector('.donovan-a');
-  const qEl=document.getElementById('donovan-q'),aEl=document.getElementById('donovan-a');
-  const srcEl=document.getElementById('donovan-src'),srcT=document.getElementById('donovan-src-t');
-  if(!qEl||!aEl)return;
-  if(reduce){qEl.textContent=qa[0][0];aEl.textContent=qa[0][1];if(srcT){srcT.textContent=qa[0][2];srcEl.classList.add('show')}return;}
-  function riseIn(el){if(!el)return;el.classList.remove('dv-in');void el.offsetWidth;el.classList.add('dv-in')}
-  let k=0,stop=false;
-  const wait=ms=>new Promise(r=>setTimeout(r,ms));
-  async function type(el,text,ms){el.textContent='';for(const ch of text){el.textContent+=ch;await wait(ms);}}
-  async function untilVisible(){while(document.hidden)await wait(500);}
-  (async function loop(){
-    while(!stop){
-      await untilVisible();
-      const [q,a,src]=qa[k%qa.length];k++;
-      aEl.textContent='';srcT.textContent='';srcEl.classList.remove('show');
-      riseIn(qRow);
-      await type(qEl,q,34);
-      window.__donovanReading=true;await wait(900);window.__donovanReading=false;
-      riseIn(aRow);
-      await type(aEl,a,16);
-      srcT.textContent=src;
-      requestAnimationFrame(()=>srcEl.classList.add('show'));
-      await wait(4200);
-    }
-  })();
+  requestAnimationFrame(frame);
 })();
 
 /* ---- pause/resume decorative animations off-screen ---- */
@@ -1595,6 +1486,205 @@ const DEMO=[
       <div class="demo-note">This preview holds a handful of example records. Your account answers from your files.</div>`;
   });
   render(0);
+})();
+</script>
+
+<script>
+/* ======================================================================
+   MICRO-ANIMATIONS — ENGINEER B (2026-09-21)
+   Vanilla JS, no dependencies (~3KB unminified). Every block below is
+   additive and self-guarding: with JS disabled, or under
+   prefers-reduced-motion, or without IntersectionObserver, the page
+   renders as the current static page (see the <noscript> fallback and
+   the reduced-motion checks in each block). Does NOT touch the Donovan
+   canvas IIFE above, .well/.donovan-* elements, --dv-* tokens, or the
+   nav <svg class="mark"> — see the CSS block in <head> for the styles
+   these hooks drive.
+   ====================================================================== */
+(function(){
+  'use strict';
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
+  var hasIO = 'IntersectionObserver' in window;
+
+  /* 1) sec-head/person/vert/founder/plan/principle reveal: no code here —
+     they carry the site's existing .dw-observe.dw-once classes and are
+     driven by the pre-existing IntersectionObserver further up this file. */
+
+  /* 2) headline split-text reveal (first paint, once, skipped under
+     reduced motion so the plain heading just shows immediately). */
+  (function(){
+    var h1 = document.querySelector('.hero h1.mm-headline');
+    if(!h1 || reduce) return;
+    var i = 0;
+    function wrap(node){
+      if(node.nodeType===3){
+        var parts = node.textContent.split(/(\s+)/);
+        var frag = document.createDocumentFragment();
+        parts.forEach(function(w){
+          if(w===''){ return; }
+          if(/^\s+$/.test(w)){ frag.appendChild(document.createTextNode(w)); return; }
+          var span = document.createElement('span');
+          span.className = 'mm-word';
+          span.style.setProperty('--mm-i', i++);
+          span.textContent = w;
+          frag.appendChild(span);
+        });
+        node.parentNode.replaceChild(frag, node);
+      } else if(node.nodeType===1){
+        Array.prototype.slice.call(node.childNodes).forEach(wrap);
+      }
+    }
+    Array.prototype.slice.call(h1.childNodes).forEach(wrap);
+  })();
+
+  /* 3) stat count-up on scroll into view — keeps the exact final string
+     (hero "< 3 s" / "< 5 min" / "100%" facts, and the cost-section total). */
+  (function(){
+    if(reduce || !hasIO) return;
+    var els = Array.prototype.slice.call(document.querySelectorAll('.hero-facts .fact b, .cost-total b'));
+    if(!els.length) return;
+    function animate(el){
+      var text = el.textContent;
+      var m = text.match(/[\d,]+(?:\.\d+)?/);
+      if(!m) return;
+      var raw = m[0], target = parseFloat(raw.replace(/,/g,''));
+      var hasComma = raw.indexOf(',') > -1;
+      var prefix = text.slice(0, m.index), suffix = text.slice(m.index + raw.length);
+      el.style.minWidth = el.getBoundingClientRect().width + 'px';
+      var start = performance.now(), dur = 900;
+      function frame(now){
+        var p = Math.min(1, (now - start) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);
+        var val = Math.round(target * eased);
+        el.textContent = prefix + (hasComma ? val.toLocaleString('en-US') : String(val)) + suffix;
+        if(p < 1){ requestAnimationFrame(frame); }
+        else { el.textContent = text; el.style.minWidth = ''; }
+      }
+      requestAnimationFrame(frame);
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ animate(e.target); io.unobserve(e.target); }
+      });
+    }, {threshold:.4});
+    els.forEach(function(el){ io.observe(el); });
+  })();
+
+  /* 4) magnetic primary buttons — translate toward the pointer, ≤6px.
+     Press-scale is pure CSS (:active), so it works even here disabled. */
+  (function(){
+    if(reduce || !fine) return;
+    var MAX = 6;
+    Array.prototype.slice.call(document.querySelectorAll('.btn-primary')).forEach(function(btn){
+      btn.addEventListener('mousemove', function(e){
+        var r = btn.getBoundingClientRect();
+        var x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
+        var y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+        btn.style.setProperty('--mm-tx', (x * MAX).toFixed(1) + 'px');
+        btn.style.setProperty('--mm-ty', (y * MAX).toFixed(1) + 'px');
+      });
+      btn.addEventListener('mouseleave', function(){
+        btn.style.setProperty('--mm-tx', '0px');
+        btn.style.setProperty('--mm-ty', '0px');
+      });
+    });
+  })();
+
+  /* 5) spotlight cards — pointer-follow highlight position for the
+     platform / who-it's-for / pricing cards (CSS draws the gradient). */
+  (function(){
+    if(reduce || !fine) return;
+    Array.prototype.slice.call(document.querySelectorAll('.step, .person, .plan')).forEach(function(card){
+      card.addEventListener('mousemove', function(e){
+        var r = card.getBoundingClientRect();
+        card.style.setProperty('--mm-x', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+        card.style.setProperty('--mm-y', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+      });
+    });
+  })();
+
+  /* 6) document-type marquee — purely CSS-driven (see .mm-marquee* rules);
+     nothing to wire up here. */
+
+  /* 7) cursor glow — dark theme only, confined to the hero copy column
+     (never overlaps the Donovan well/canvas), off on touch. */
+  (function(){
+    if(reduce || !fine) return;
+    var copy = document.querySelector('.hero-copy');
+    if(!copy) return;
+    var glow = document.createElement('div');
+    glow.className = 'mm-glow';
+    glow.setAttribute('aria-hidden', 'true');
+    copy.appendChild(glow);
+    function isDark(){
+      var t = document.documentElement.getAttribute('data-theme');
+      if(t === 'dark') return true;
+      if(t === 'light') return false;
+      return matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    var tx = 0, ty = 0, gx = 0, gy = 0, raf = null;
+    function loop(){
+      gx += (tx - gx) * 0.18; gy += (ty - gy) * 0.18;
+      glow.style.transform = 'translate(' + gx.toFixed(1) + 'px,' + gy.toFixed(1) + 'px)';
+      if(Math.abs(tx - gx) > 0.3 || Math.abs(ty - gy) > 0.3){ raf = requestAnimationFrame(loop); }
+      else { raf = null; }
+    }
+    copy.addEventListener('mousemove', function(e){
+      if(!isDark()){ glow.classList.remove('mm-show'); return; }
+      var r = copy.getBoundingClientRect();
+      tx = e.clientX - r.left; ty = e.clientY - r.top;
+      glow.classList.add('mm-show');
+      if(!raf){ raf = requestAnimationFrame(loop); }
+    });
+    copy.addEventListener('mouseleave', function(){ glow.classList.remove('mm-show'); });
+  })();
+
+  /* 8) nav active-section sliding indicator. */
+  (function(){
+    if(!hasIO) return;
+    var nav = document.querySelector('.navlinks');
+    if(!nav) return;
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
+    if(!links.length) return;
+    var ind = document.createElement('span');
+    ind.className = 'mm-nav-ind';
+    ind.setAttribute('aria-hidden', 'true');
+    nav.appendChild(ind);
+    function place(a){
+      ind.style.width = a.offsetWidth + 'px';
+      ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
+      ind.classList.add('mm-show');
+    }
+    var map = {};
+    links.forEach(function(a){
+      var id = a.getAttribute('href').slice(1);
+      var sec = document.getElementById(id);
+      if(sec){ map[id] = a; }
+    });
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var a = map[e.target.id];
+          if(a){ place(a); }
+        }
+      });
+    }, {rootMargin:'-45% 0px -50% 0px', threshold:0});
+    Object.keys(map).forEach(function(id){ io.observe(document.getElementById(id)); });
+  })();
+
+  /* 9) "Included with every plan" ticks draw on when revealed. */
+  (function(){
+    var ticks = document.querySelector('.mm-ticks');
+    if(!ticks) return;
+    if(reduce || !hasIO){ ticks.classList.add('in-view'); return; }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('in-view'); io.unobserve(e.target); }
+      });
+    }, {threshold:.4});
+    io.observe(ticks);
+  })();
 })();
 </script>
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>

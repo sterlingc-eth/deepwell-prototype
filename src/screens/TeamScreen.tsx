@@ -6,6 +6,7 @@ import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus } from '../services/teamClient';
 import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
 import { memberDisplayName } from '../core/memberNames';
+import { FollowupsCard } from '../components/FollowupsCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -145,6 +146,7 @@ export function TeamScreen() {
         </div>
 
         {admin && <NotificationsCard />}
+        {admin && <FollowupsCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

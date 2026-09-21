@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useAppStore, type Screen } from '../store/appStore';
 import { useGraph } from '../core/entityGraph';
 import { isValidPlanId, type BillingInterval } from '../services/billingClient';
+import type { WorkFilterChoice } from '../core/workFilter';
 
 const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team', 'outreach'];
 
@@ -41,6 +42,13 @@ export interface DeepLinkParams {
    *  screen (Dashboard's "Open in Outreach" button). Only meaningful
    *  alongside `?screen=outreach`; ignored otherwise. */
   outreachEquipmentId?: string;
+  /** `?work=mine` — preselect the "My work" choice on the Inbox's work
+   *  filter (src/hooks/useWorkFilter.ts), overriding whatever this browser
+   *  has stored for the signed-in user. Only 'mine' is recognized; any other
+   *  value (or its absence) is dropped, same as an unknown `screen`. Used by
+   *  a follow-up message's deep link (api/_lib/followups.js's
+   *  FOLLOWUP_INBOX_LINK: `?screen=inbox&work=mine`). */
+  workFilter?: WorkFilterChoice;
 }
 
 /**
@@ -55,7 +63,14 @@ export function parseDeepLink(search: string): DeepLinkParams {
   const doc = params.get('doc');
   if (doc) out.docId = doc;
   const screen = params.get('screen');
-  if (screen && isScreen(screen)) out.screen = screen;
+  // 'inbox' isn't a Screen id of its own — 'review' already is the Inbox's
+  // "Needs a person" tab (setCurrentScreen in store/appStore.ts maps it to
+  // {currentScreen: 'ingest', inboxTab: 'needs-person'}), so a follow-up
+  // message's `?screen=inbox` link is just a friendlier spelling of it.
+  if (screen === 'inbox') out.screen = 'review';
+  else if (screen && isScreen(screen)) out.screen = screen;
+  const work = params.get('work');
+  if (work === 'mine') out.workFilter = 'mine';
   const q = params.get('q')?.trim();
   if (q) out.question = q.slice(0, 2000);
   const plan = params.get('plan');
@@ -84,6 +99,7 @@ export function deepLinkFor(params: DeepLinkParams): string {
   if (params.screen) url.searchParams.set('screen', params.screen);
   if (params.customerRef) url.searchParams.set('customer', params.customerRef);
   if (params.outreachEquipmentId) url.searchParams.set('equipment', params.outreachEquipmentId);
+  if (params.workFilter === 'mine') url.searchParams.set('work', 'mine');
   return url.toString();
 }
 
@@ -97,6 +113,7 @@ function cleanUrl(): void {
   url.searchParams.delete('interval');
   url.searchParams.delete('customer');
   url.searchParams.delete('equipment');
+  url.searchParams.delete('work');
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -125,6 +142,7 @@ export function useDeepLink(): void {
   const setPendingPlan = useAppStore((s) => s.setPendingPlan);
   const openCustomer = useAppStore((s) => s.openCustomer);
   const openOutreach = useAppStore((s) => s.openOutreach);
+  const setPendingWorkFilter = useAppStore((s) => s.setPendingWorkFilter);
   const handledRef = useRef(false);
 
   useEffect(() => {
@@ -132,6 +150,12 @@ export function useDeepLink(): void {
     handledRef.current = true;
 
     const params = parseDeepLink(window.location.search);
+
+    // `?work=mine` (a follow-up message's deep link) applies independently of
+    // which screen branch below ends up handling the rest — src/hooks/
+    // useWorkFilter.ts picks this up the moment the signed-in user's id is
+    // known, whichever screen mounts it.
+    if (params.workFilter) setPendingWorkFilter(params.workFilter);
 
     // `?plan=&interval=` (a marketing-site pricing button, or the Records
     // Rescue CTA carrying just `?screen=billing`) — store the pick and land

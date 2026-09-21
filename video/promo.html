@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DeepWell — promo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ==================================================================
+   DeepWell promo video — deterministic scene timeline. v2 refinement
+   pass (2026-09-21): every scene now carries a cream headline beat,
+   a slow camera push, and (on the app scenes) two-layer parallax
+   between the background and the app window — nothing on screen
+   sits idle. The Ask sequence's centerpiece is the site's own bronze
+   "answer rising" canvas scene (index.html's Donovan v3 IIFE),
+   ported here at a large size and driven by this timeline instead of
+   window.__donovanReading/__donovanAnswered.
+   Content uses the real synthetic test corpus
+   (test-docs/synthetic/ANSWER_KEY.json) and the site's own Donovan
+   Q&A copy (index.html's `qa` array) — Nguyen, Whitmore, Castillo,
+   Desert Ridge Dental — instead of invented names.
+   Authored at a fixed 1920x1080 stage; render.mjs sets the real
+   viewport and ?w=/?h= scale the stage to fill it.
+   ================================================================== */
+:root{
+  --forest-950:#05100b; --forest-900:#0a1b14; --forest-800:#10291f;
+  --forest-700:#163C2C; --forest-600:#245239; --forest-500:#3A6B4D;
+  --forest-400:#5A8C6C; --forest-300:#86AE93; --forest-100:#c9dccf;
+  --stone-0:#ffffff; --stone-50:#f6f8f6; --stone-100:#ecf0ed;
+  --stone-200:#dce3de; --stone-300:#c2ccc5; --stone-500:#6e7c72; --stone-700:#3c463f; --stone-950:#0d110e;
+  --brass-500:#B98A4E; --brass-300:#D9B57A; --brass-200:#E8D1A8; --brass-50:#f7ecd9;
+  --bronze:#8C6B3E; --bronze-mid:#A67C52; --bronze-hi:#C8A67A; --cream:#F4EBDD;
+  --navy:#123D6B;
+  --ok:#3f8f5c; --ok-bg:#16432a; --ok-ink:#b9e6c9;
+  --warn:#c9932e; --warn-bg:#4d3300; --warn-ink:#ffd98a;
+  --info-bg:#0e3057; --info-ink:#c3d8ef;
+  font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#000;overflow:hidden;width:100%;height:100%}
+.serif{font-family:"Newsreader",Georgia,serif}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+#viewport{position:relative;width:100vw;height:100vh;overflow:hidden;background:#000}
+#stage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left;overflow:hidden}
+.scene{position:absolute;inset:0;opacity:0;will-change:opacity}
+.cam-bg,.cam-fg{position:absolute;inset:0;transform-origin:50% 50%;will-change:transform}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+
+/* shared dot texture — the promo's version of the site's .dw-topo pattern */
+.dot-tex{position:absolute;inset:-15%;width:130%;height:130%;opacity:.05;
+  background-image:radial-gradient(circle,var(--stone-0) 1px,transparent 1.4px);background-size:26px 26px}
+
+/* shared cream headline: word-split, staggered rise-in, holds */
+.headline{position:absolute;color:var(--cream);font-family:"Newsreader",serif;font-weight:500;margin:0}
+.headline .hw{display:inline-block;opacity:0;transform:translateY(16px);will-change:opacity,transform;white-space:pre}
+
+/* ---------- Scene 1: cold open ---------- */
+#s1{background:radial-gradient(1200px 800px at 50% 30%,#0b1a13 0%,var(--forest-950) 55%,#020805 100%)}
+.phone-ic{position:absolute;left:180px;top:90px;width:56px;height:56px;color:var(--brass-300);opacity:.85}
+#s1-headline{left:180px;top:170px;font-size:40px}
+.quote{position:absolute;left:180px;top:430px;max-width:1180px;font-size:60px;line-height:1.18;color:var(--stone-0);font-weight:500}
+.caption-small{position:absolute;left:180px;top:350px;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--forest-300)}
+.places{position:absolute;left:180px;top:700px;display:flex;gap:24px}
+.place-chip{display:flex;align-items:center;gap:12px;padding:16px 22px;border-radius:999px;border:1px solid rgba(217,181,122,.35);background:rgba(16,41,31,.7);color:var(--stone-100);font-size:24px}
+.place-chip .dot{width:10px;height:10px;border-radius:50%;background:var(--brass-300)}
+
+/* ---------- Scene 2: logo reveal ---------- */
+#s2{background:radial-gradient(1400px 900px at 50% 40%,#0e2a1e 0%,var(--forest-950) 60%,#020805 100%)}
+.logo-wrap{position:absolute;left:50%;top:400px;transform:translate(-50%,-50%)}
+#s2-tagline{left:50%;top:730px;transform:translateX(-50%);font-size:56px;white-space:nowrap;text-align:center}
+.logo-word{position:absolute;left:50%;top:640px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+.logo-word b{font-family:"Newsreader",serif;font-weight:600;font-size:44px;color:var(--stone-0);letter-spacing:-.01em}
+.logo-word span{font-size:16px;letter-spacing:.34em;text-transform:uppercase;color:var(--forest-300)}
+
+/* ---------- App chrome shared by scenes 3 & 4 (Office / dark) ---------- */
+#s3,#s4{background:radial-gradient(1500px 950px at 50% 20%,#0e2015 0%,#05100b 62%,#020805 100%)}
+#s3-headline,#s4-headline{left:160px;top:26px;font-size:36px}
+.app{position:absolute;left:160px;top:70px;width:1600px;height:940px;background:var(--forest-950);border-radius:14px;overflow:hidden;box-shadow:0 60px 120px -40px rgba(0,0,0,.7);border:1px solid var(--forest-800)}
+.app-nav{height:76px;background:var(--forest-700);display:flex;align-items:center;gap:36px;padding:0 32px;border-bottom:1px solid var(--forest-800)}
+.app-nav .brand{display:flex;align-items:center;gap:12px;color:var(--stone-0);font-family:"Newsreader",serif;font-weight:600;font-size:24px}
+.app-nav .brand svg{width:26px;height:26px}
+.app-navitems{display:flex;gap:6px;margin-left:24px}
+.app-navitem{padding:10px 18px;border-radius:8px;color:var(--forest-100);font-size:19px;font-weight:500}
+.app-navitem.active{color:var(--stone-0);box-shadow:inset 0 -3px 0 0 var(--brass-300)}
+.app-body{position:relative;width:100%;height:864px;padding:36px 56px;color:var(--stone-0)}
+.app-h1{font-family:"Newsreader",serif;font-weight:500;font-size:36px;color:var(--stone-0);margin:0 0 4px}
+.app-sub{color:var(--forest-100);font-size:17px;margin:0 0 22px}
+
+/* ---------- Scene 3: ingestion ---------- */
+.dropzone{position:absolute;left:56px;top:130px;width:1488px;height:190px;border:2px dashed var(--forest-500);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(16,41,31,.4)}
+.dropzone .dz-label{font-size:21px;color:var(--forest-100)}
+.file-chip{position:absolute;width:58px;height:70px;border-radius:6px;background:var(--stone-0);box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.file-chip::before{content:"";position:absolute;left:9px;right:9px;top:13px;height:5px;background:var(--stone-300);border-radius:2px;box-shadow:0 11px 0 var(--stone-300),0 22px 0 var(--stone-300),0 33px 0 var(--stone-300)}
+.pipeline{position:absolute;left:56px;top:352px;display:flex;gap:20px}
+.pipe-tile{width:280px;padding:16px 20px;border-radius:12px;background:var(--forest-900);border:1px solid var(--forest-700)}
+.pipe-tile .pt-label{font-size:15px;color:var(--forest-100);letter-spacing:.04em;text-transform:uppercase}
+.pipe-tile .pt-num{font-family:"Newsreader",serif;font-size:40px;color:var(--stone-0);margin-top:4px}
+.doc-panel{position:absolute;left:56px;top:490px;width:700px;height:288px;border-radius:12px;background:var(--forest-900);border:1px solid var(--forest-700);padding:20px 26px;overflow:hidden}
+.doc-panel h3{font-family:"Newsreader",serif;font-size:22px;margin:0 0 12px;color:var(--stone-0)}
+.fact-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--forest-800);font-size:18px}
+.fact-row:first-of-type{border-top:none}
+.fact-row .fk{color:var(--forest-100)}
+.fact-row .fv{color:var(--stone-0);font-family:"IBM Plex Mono",monospace}
+.batch-panel{position:absolute;left:800px;top:490px;width:744px;height:288px;border-radius:12px;background:var(--forest-900);border:1px solid var(--forest-700);padding:20px 26px;overflow:hidden}
+.batch-panel h3{font-family:"Newsreader",serif;font-size:22px;margin:0 0 10px;color:var(--stone-0)}
+.batch-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-top:1px solid var(--forest-800)}
+.batch-row:first-of-type{border-top:none}
+.batch-row .br-file{font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--stone-100);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-row .br-cust{font-size:15px;color:var(--forest-100);flex:none;width:210px}
+.stage-pill{flex:none;padding:4px 11px;border-radius:999px;font-size:13px;font-weight:600}
+.stage-pill.ok{background:var(--ok-bg);color:var(--ok-ink)}
+.stage-pill.info{background:var(--info-bg);color:var(--info-ink)}
+.stage-pill.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.stage-pill.muted{background:var(--forest-800);color:var(--forest-100)}
+.verified-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok-ink);font-size:14px;font-weight:600;letter-spacing:.03em}
+
+/* citation pill — numbered bronze/brass chip, matches FactGrid.tsx */
+.cite{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 3px;border-radius:999px;border:1px solid rgba(200,166,122,.45);background:rgba(140,107,62,.22)}
+.cite .cnum{width:24px;height:24px;border-radius:999px;background:var(--brass-300);color:var(--forest-950);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600}
+.cite .clabel{font-size:14px;color:var(--brass-200)}
+
+/* ---------- Scene 4: Ask Donovan ---------- */
+.ask-wrap{position:absolute;left:56px;top:0;width:1488px;text-align:center}
+.ask-h1{font-family:"Newsreader",serif;font-weight:500;font-size:38px;color:var(--stone-0);margin:0 0 6px}
+#donovan-canvas{display:block;margin:0 auto}
+.ask-typed{margin:6px auto 0;max-width:1100px;min-height:54px;font-size:25px;color:var(--stone-0);display:flex;align-items:center;justify-content:center}
+.ask-typed .caret{display:inline-block;width:3px;height:26px;background:var(--bronze-hi);margin-left:3px;vertical-align:-5px}
+.answer-card{margin:14px auto 0;max-width:1180px;border-radius:14px;background:var(--forest-900);border:1px solid var(--forest-700);overflow:hidden;text-align:left}
+.answer-card .ac-head{padding:18px 30px 14px;border-bottom:1px solid var(--forest-800)}
+.answer-card .ac-eyebrow{font-size:16px;color:var(--forest-100);margin:0 0 6px}
+.answer-card .ac-text{font-family:"Newsreader",serif;font-size:28px;color:var(--stone-0);margin:0;line-height:1.28}
+.answer-card .ac-body{padding:14px 30px 18px;display:flex;flex-direction:column;gap:2px}
+.arow{display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:18px;padding:7px 0;border-bottom:1px solid var(--forest-800)}
+.arow:last-child{border-bottom:none}
+.arow .ak{color:var(--forest-100)}
+.arow .av{color:var(--stone-0);font-family:"IBM Plex Mono",monospace}
+.outreach-card{margin:14px auto 0;max-width:1180px;border-radius:14px;background:var(--forest-900);border:1px solid var(--brass-300);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:24px;text-align:left}
+.outreach-card .oc-text{font-size:17px;color:var(--stone-0);max-width:900px;line-height:1.45}
+.oc-btn{flex:none;display:flex;align-items:center;gap:10px;padding:12px 24px;border-radius:8px;background:var(--brass-300);color:var(--forest-950);font-weight:600;font-size:16px}
+
+/* ---------- Scene 5: field view (light, phone frame) ---------- */
+#s5{background:linear-gradient(180deg,#eef2ee 0%,#e2e9e4 100%)}
+#s5-headline{left:50%;top:120px;transform:translateX(-50%);font-size:44px;color:#0F1F19;text-align:center;white-space:nowrap}
+.phone{position:absolute;left:50%;top:650px;transform:translate(-50%,-50%);width:520px;height:760px;background:#fff;border:14px solid #0F1F19;border-radius:56px;box-shadow:0 50px 100px -30px rgba(0,0,0,.35);overflow:hidden}
+.phone .p-notch{position:absolute;left:50%;top:0;transform:translateX(-50%);width:150px;height:24px;background:#0F1F19;border-radius:0 0 14px 14px}
+.phone .p-body{position:absolute;inset:0;padding:56px 26px 26px;color:#0F1F19}
+.phone .p-eyebrow{font-size:15px;color:#576A62;margin:0 0 10px}
+.phone .p-answer{font-family:"Newsreader",serif;font-size:26px;line-height:1.32;margin:0 0 18px;color:#0B1613}
+.phone .p-fact{display:flex;justify-content:space-between;font-size:16px;padding:10px 0;border-top:1px solid #dce3de}
+.phone .p-fact:first-of-type{border-top:none}
+.phone .p-cite{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 3px;border-radius:999px;border:1px solid rgba(185,138,78,.5);background:#f7ecd9}
+.phone .p-cite b{width:18px;height:18px;border-radius:999px;background:#B98A4E;color:#fff;display:grid;place-items:center;font-size:11px}
+
+/* ---------- Scene 6: closing ---------- */
+#s6{background:radial-gradient(1400px 900px at 50% 35%,#0e2a1e 0%,var(--forest-950) 60%,#020805 100%)}
+#s6-tagline{left:50%;top:560px;transform:translateX(-50%);font-size:62px;white-space:nowrap;text-align:center}
+.close-price{position:absolute;left:50%;top:658px;transform:translateX(-50%);font-size:24px;color:var(--forest-100);font-family:"IBM Plex Mono",monospace;letter-spacing:.02em}
+.close-url{position:absolute;left:50%;top:716px;transform:translateX(-50%);font-size:24px;color:var(--brass-300);font-family:"IBM Plex Mono",monospace;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+
+  <!-- SCENE 1 — cold open -->
+  <section class="scene" id="s1">
+    <div class="cam-bg"><div class="dot-tex" id="s1-dots"></div></div>
+    <div class="cam-fg">
+      <svg class="phone-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 3a2 2 0 012 2v14a2 2 0 01-2 2H9a2 2 0 01-2-2V5a2 2 0 012-2h6z"/><path d="M11 18h2"/></svg>
+      <h2 class="headline" id="s1-headline">One question. No answer.</h2>
+      <div class="caption-small mono" id="s1-time">8:52 AM · SERVICE CALL</div>
+      <div class="quote serif" id="s1-quote"></div>
+      <div class="places" id="s1-places">
+        <div class="place-chip"><span class="dot"></span>Filing cabinet</div>
+        <div class="place-chip"><span class="dot"></span>Shared drive</div>
+        <div class="place-chip"><span class="dot"></span>Tech's phone</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCENE 2 — logo reveal -->
+  <section class="scene" id="s2">
+    <div class="cam-fg">
+      <div class="logo-wrap">
+        <svg width="220" height="220" viewBox="0 0 100 100" id="s2-mark">
+          <circle cx="50" cy="50" r="8" fill="var(--brass-300)"/>
+          <circle class="ring" data-r="18" cx="50" cy="50" r="18" fill="none" stroke="var(--forest-300)" stroke-width="2.2"/>
+          <circle class="ring" data-r="30" cx="50" cy="50" r="30" fill="none" stroke="var(--forest-400)" stroke-width="2"/>
+          <circle class="ring" data-r="42" cx="50" cy="50" r="42" fill="none" stroke="var(--forest-500)" stroke-width="1.6"/>
+        </svg>
+      </div>
+      <div class="logo-word" id="s2-word">
+        <b>DeepWell</b>
+        <span>Technology</span>
+      </div>
+      <h2 class="headline serif" id="s2-tagline">Records that answer back.</h2>
+    </div>
+  </section>
+
+  <!-- SCENE 3 — ingestion / inbox -->
+  <section class="scene" id="s3">
+    <div class="cam-bg"><div class="dot-tex"></div></div>
+    <h2 class="headline" id="s3-headline">Nothing falls through.</h2>
+    <div class="cam-fg" id="s3-app-wrap">
+      <div class="app">
+        <div class="app-nav">
+          <div class="brand"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="6" fill="var(--brass-300)"/><circle cx="50" cy="50" r="20" fill="none" stroke="var(--forest-300)" stroke-width="6"/><circle cx="50" cy="50" r="34" fill="none" stroke="var(--forest-400)" stroke-width="5"/></svg>DeepWell</div>
+          <div class="app-navitems">
+            <div class="app-navitem">Ask</div>
+            <div class="app-navitem">Dashboard</div>
+            <div class="app-navitem active">Inbox</div>
+            <div class="app-navitem">Records</div>
+          </div>
+        </div>
+        <div class="app-body">
+          <h1 class="app-h1">Add files</h1>
+          <p class="app-sub">Every document moves through the pipeline. Nothing can fall in.</p>
+          <div class="dropzone" id="s3-dropzone">
+            <div class="dz-label" id="s3-dz-label">Drag a folder of files here</div>
+            <div id="s3-files"></div>
+          </div>
+          <div class="pipeline" id="s3-pipeline">
+            <div class="pipe-tile"><div class="pt-label">1. Received</div><div class="pt-num" id="pt-received">0</div></div>
+            <div class="pipe-tile"><div class="pt-label">2. Classified</div><div class="pt-num" id="pt-classified">0</div></div>
+            <div class="pipe-tile"><div class="pt-label">3. Extracted</div><div class="pt-num" id="pt-extracted">0</div></div>
+            <div class="pipe-tile"><div class="pt-label">4. Linked</div><div class="pt-num" id="pt-linked">0</div></div>
+            <div class="pipe-tile"><div class="pt-label">5. Verified</div><div class="pt-num" id="pt-verified">0</div></div>
+          </div>
+          <div class="doc-panel" id="s3-doc">
+            <h3>06-startup-sheet-nguyen.pdf</h3>
+            <div id="s3-facts"></div>
+          </div>
+          <div class="batch-panel" id="s3-batch" style="opacity:0">
+            <h3>In this batch · 4 documents</h3>
+            <div id="s3-batch-rows"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCENE 4 — Ask Donovan -->
+  <section class="scene" id="s4">
+    <div class="cam-bg"><div class="dot-tex"></div></div>
+    <h2 class="headline" id="s4-headline">Ask anything. Get proof.</h2>
+    <div class="cam-fg" id="s4-app-wrap">
+      <div class="app">
+        <div class="app-nav">
+          <div class="brand"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="6" fill="var(--brass-300)"/><circle cx="50" cy="50" r="20" fill="none" stroke="var(--forest-300)" stroke-width="6"/><circle cx="50" cy="50" r="34" fill="none" stroke="var(--forest-400)" stroke-width="5"/></svg>DeepWell</div>
+          <div class="app-navitems">
+            <div class="app-navitem active">Ask</div>
+            <div class="app-navitem">Dashboard</div>
+            <div class="app-navitem">Inbox</div>
+            <div class="app-navitem">Records</div>
+          </div>
+        </div>
+        <div class="app-body">
+          <div class="ask-wrap">
+            <h1 class="ask-h1">Ask Donovan.</h1>
+            <canvas id="donovan-canvas" width="320" height="320"></canvas>
+            <div class="ask-typed mono"><span id="s4-typed"></span><span class="caret" id="s4-caret"></span></div>
+            <div class="answer-card" id="s4-answer" style="opacity:0">
+              <div class="ac-head">
+                <p class="ac-eyebrow mono"><b style="color:#fff">Donovan</b> · Asked: “<span id="s4-asked-echo"></span>”</p>
+                <p class="ac-text" id="s4-answer-text"></p>
+              </div>
+              <div class="ac-body" id="s4-answer-body"></div>
+            </div>
+            <div class="outreach-card" id="s4-outreach" style="opacity:0">
+              <p class="oc-text">Draft ready for <b>Whitmore</b> — parts warranty ends Nov 20, 2026, just 60 days out. Offer an extended agreement before it lapses?</p>
+              <div class="oc-btn">Copy email</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCENE 5 — field view -->
+  <section class="scene" id="s5">
+    <div class="cam-fg">
+      <h2 class="headline" id="s5-headline">Same truth, any device.</h2>
+      <div class="phone">
+        <div class="p-notch"></div>
+        <div class="p-body">
+          <p class="p-eyebrow mono">DONOVAN · ASKED: “WHAT'S THE SERIAL AT 215 N COLLEGE AVE?”</p>
+          <p class="p-answer">F2006123 — Trane 4TTR4036.</p>
+          <div class="p-fact"><span>Customer</span><span class="p-cite"><b>1</b>Nguyen</span></div>
+          <div class="p-fact"><span>Model</span><span class="p-cite"><b>1</b>4TTR4036L1000AA</span></div>
+          <div class="p-fact"><span>Source</span><span class="p-cite"><b>1</b>Startup sheet · p.1</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCENE 6 — closing -->
+  <section class="scene" id="s6">
+    <div class="cam-bg"><div class="dot-tex"></div></div>
+    <div class="cam-fg">
+      <div class="logo-wrap">
+        <svg width="200" height="200" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="8" fill="var(--brass-300)"/>
+          <circle cx="50" cy="50" r="18" fill="none" stroke="var(--forest-300)" stroke-width="2.2"/>
+          <circle cx="50" cy="50" r="30" fill="none" stroke="var(--forest-400)" stroke-width="2"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--forest-500)" stroke-width="1.6"/>
+        </svg>
+      </div>
+      <h2 class="headline serif" id="s6-tagline">Knowledge builds business.</h2>
+      <div class="close-price mono">Plans from $99/mo · setup included</div>
+      <div class="close-url mono">deepwelltechnology.com</div>
+    </div>
+  </section>
+
+</div></div>
+
+<script>
+(function(){
+  'use strict';
+  var TOTAL = 60000;
+  var params = new URLSearchParams(location.search);
+  var stageW = 1920, stageH = 1080;
+  var vw = parseInt(params.get('w') || '', 10) || window.innerWidth || stageW;
+  var vh = parseInt(params.get('h') || '', 10) || window.innerHeight || stageH;
+  var scale = Math.min(vw / stageW, vh / stageH);
+  var stage = document.getElementById('stage');
+  stage.style.transform = 'scale(' + scale + ')';
+
+  // ---------------------------------------------------------------- easing
+  function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+  function easeOutExpo(x) { return x >= 1 ? 1 : 1 - Math.pow(2, -10 * x); }
+  function easeInOutExpo(x) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    return x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2;
+  }
+  function lerp(a, b, x) { return a + (b - a) * x; }
+
+  // ------------------------------------------------------- headline split
+  // One-time DOM prep: wrap each word of every .headline in a .hw span so
+  // per-frame code only ever toggles opacity/transform, never innerHTML.
+  document.querySelectorAll('.headline').forEach(function (el) {
+    var text = el.textContent;
+    el.textContent = '';
+    text.split(' ').forEach(function (w, i) {
+      if (i > 0) el.appendChild(document.createTextNode(' '));
+      var span = document.createElement('span');
+      span.className = 'hw';
+      span.textContent = w;
+      el.appendChild(span);
+    });
+  });
+  function updateHeadline(id, lt, start) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var words = el.querySelectorAll('.hw');
+    for (var i = 0; i < words.length; i++) {
+      var ls = start + i * 90;
+      var p = clamp((lt - ls) / 320, 0, 1);
+      words[i].style.opacity = p;
+      words[i].style.transform = 'translateY(' + (1 - p) * 16 + 'px)';
+    }
+  }
+
+  // ------------------------------------------------------------ scene defs
+  var SCENES = [
+    { id: 's1', start: 0, end: 6000 },
+    { id: 's2', start: 6000, end: 14000 },
+    { id: 's3', start: 14000, end: 30000 },
+    { id: 's4', start: 30000, end: 44000 },
+    { id: 's5', start: 44000, end: 52000 },
+    { id: 's6', start: 52000, end: 60000 },
+  ];
+  var FADE = 500;
+  var els = {};
+  SCENES.forEach(function (s) { els[s.id] = document.getElementById(s.id); });
+
+  function sceneOpacity(t, s) {
+    if (t < s.start - FADE || t > s.end + FADE) return 0;
+    if (t < s.start) return clamp((t - (s.start - FADE)) / FADE, 0, 1);
+    if (t > s.end) return clamp(1 - (t - s.end) / FADE, 0, 1);
+    return 1;
+  }
+
+  // ---------------------------------------------------- camera / parallax
+  // A slow push over each scene's own duration; app scenes (3/4) also get a
+  // second, slower-moving background layer so the app window reads as
+  // sitting in front of it — simple two-plane parallax, still a pure
+  // function of elapsed time.
+  var CAM = {
+    s1: { fg: 1.05 }, s2: { fg: 1.04 },
+    s3: { bg: 1.02, fg: 1.06 }, s4: { bg: 1.02, fg: 1.07 },
+    s5: { fg: 1.045 }, s6: { fg: 1.04 },
+  };
+  function applyCam(id, t, s) {
+    var cfg = CAM[id]; if (!cfg) return;
+    var progress = clamp((t - s.start) / (s.end - s.start), 0, 1);
+    var scene = els[id];
+    var bg = scene.querySelector(':scope > .cam-bg');
+    var fg = scene.querySelector(':scope > .cam-fg');
+    if (bg && cfg.bg) {
+      bg.style.transform = 'scale(' + (1 + (cfg.bg - 1) * progress).toFixed(4) + ')';
+      var dot = bg.querySelector('.dot-tex');
+      if (dot) dot.style.backgroundPosition = (t * 0.012).toFixed(1) + 'px ' + (t * 0.008).toFixed(1) + 'px';
+    }
+    if (fg && cfg.fg) fg.style.transform = 'scale(' + (1 + (cfg.fg - 1) * progress).toFixed(4) + ')';
+  }
+
+  // ---------------------------------------------------------- typewriter
+  function typeText(el, full, lt, startMs, msPerChar, caretEl) {
+    var n = clamp(Math.floor((lt - startMs) / msPerChar), 0, full.length);
+    el.textContent = full.slice(0, n);
+    if (caretEl) caretEl.style.opacity = (n < full.length && lt > startMs) ? (Math.floor(lt / 400) % 2 === 0 ? 1 : 0.15) : (lt > startMs ? 0 : 1);
+    return n >= full.length;
+  }
+
+  // ================================================================== S1
+  var S1_QUOTE = 'Where’s the serial for the Elm Street unit?';
+  function updateS1(t) {
+    var lt = t - SCENES[0].start;
+    updateHeadline('s1-headline', lt, 100);
+    var q = document.getElementById('s1-quote');
+    typeText(q, S1_QUOTE, lt, 900, 42, null);
+    var places = document.getElementById('s1-places').children;
+    var reveals = [2600, 3050, 3500];
+    for (var i = 0; i < places.length; i++) {
+      var p = clamp((lt - reveals[i]) / 350, 0, 1);
+      places[i].style.opacity = p;
+      places[i].style.transform = 'translateY(' + (1 - p) * 14 + 'px)';
+    }
+    var pulse = 1 + Math.sin(lt / 1000 * Math.PI * 2) * 0.06;
+    document.querySelector('.phone-ic').style.transform = 'scale(' + pulse + ')';
+    document.getElementById('s1-time').style.opacity = clamp((lt - 500) / 300, 0, 1);
+  }
+
+  // ================================================================== S2
+  function updateS2(t) {
+    var lt = t - SCENES[1].start;
+    var rings = document.querySelectorAll('#s2-mark .ring');
+    rings.forEach(function (r, i) {
+      var r0 = parseFloat(r.getAttribute('data-r'));
+      var c = 2 * Math.PI * r0;
+      r.style.strokeDasharray = c;
+      var delay = 300 + i * 180;
+      var dur = 500;
+      var x = clamp((lt - delay) / dur, 0, 1);
+      r.style.strokeDashoffset = c * (1 - easeOutExpo(x));
+      r.style.opacity = x > 0 ? 1 : 0;
+    });
+    var word = document.getElementById('s2-word');
+    var wx = clamp((lt - 1100) / 400, 0, 1);
+    word.style.opacity = wx; word.style.transform = 'translate(-50%,' + (1 - wx) * 10 + 'px)';
+    updateHeadline('s2-tagline', lt, 1700);
+  }
+
+  // ================================================================== S3
+  var S3_FILES = 10;
+  var BATCH_ROWS = [
+    ['06-startup-sheet-nguyen.pdf', 'Nguyen · Tempe', 'Verified', 'ok'],
+    ['service-ticket-castillo.pdf', 'Castillo · Gilbert', 'Linked', 'info'],
+    ['maintenance-agreement-desert-ridge.pdf', 'Desert Ridge Dental · Chandler', 'Extracted', 'warn'],
+    ['invoice-whitmore.pdf', 'Whitmore · Gilbert', 'Classified', 'muted'],
+  ];
+  function updateS3(t) {
+    var lt = t - SCENES[2].start;
+    updateHeadline('s3-headline', lt, 100);
+    var dzLabel = document.getElementById('s3-dz-label');
+    var filesWrap = document.getElementById('s3-files');
+    var dropProgress = clamp(lt / 2600, 0, 1);
+    var count = Math.floor(dropProgress * S3_FILES);
+    if (filesWrap.children.length !== S3_FILES) {
+      filesWrap.innerHTML = '';
+      for (var i = 0; i < S3_FILES; i++) {
+        var f = document.createElement('div');
+        f.className = 'file-chip';
+        f.style.left = (140 + i * 118) + 'px';
+        f.style.top = '4px';
+        filesWrap.appendChild(f);
+      }
+    }
+    for (var j = 0; j < filesWrap.children.length; j++) {
+      var localX = clamp((dropProgress * S3_FILES - j), 0, 1);
+      var eased = easeOutExpo(clamp(localX, 0, 1));
+      filesWrap.children[j].style.opacity = localX > 0 ? 1 : 0;
+      filesWrap.children[j].style.transform = 'translateY(' + (1 - eased) * -70 + 'px)';
+    }
+    dzLabel.textContent = lt < 2800 ? 'Drag a folder of files here' : (count) + ' files received';
+
+    setCount('pt-received', lt, 2800, 3800, 10);
+    setCount('pt-classified', lt, 3800, 4900, 9);
+    setCount('pt-extracted', lt, 4900, 6000, 7);
+    setCount('pt-linked', lt, 6000, 7100, 6);
+    setCount('pt-verified', lt, 7100, 8200, 6);
+
+    var facts = [['Customer', 'Tom & Mai Nguyen'], ['Address', '215 N College Ave, Tempe'], ['Model', '4TTR4036L1000AA'], ['Serial', 'F2006123']];
+    var factsWrap = document.getElementById('s3-facts');
+    if (factsWrap.children.length !== facts.length) {
+      factsWrap.innerHTML = facts.map(function (f) {
+        return '<div class="fact-row"><span class="fk">' + f[0] + '</span><span class="fv">' + f[1] + '</span></div>';
+      }).join('') + '<div style="margin-top:10px"><span class="cite"><span class="cnum">1</span><span class="clabel">Startup sheet · p.1</span></span></div>';
+    }
+    for (var k = 0; k < factsWrap.children.length; k++) {
+      var rowStart = 8600 + k * 500;
+      var rp = clamp((lt - rowStart) / 300, 0, 1);
+      factsWrap.children[k].style.opacity = rp;
+      factsWrap.children[k].style.transform = 'translateX(' + (1 - rp) * -10 + 'px)';
+    }
+
+    var batch = document.getElementById('s3-batch');
+    var bp = clamp((lt - 11200) / 500, 0, 1);
+    batch.style.opacity = bp;
+    var rowsWrap = document.getElementById('s3-batch-rows');
+    if (rowsWrap.children.length !== BATCH_ROWS.length) {
+      rowsWrap.innerHTML = BATCH_ROWS.map(function (r) {
+        return '<div class="batch-row"><span class="stage-pill ' + r[3] + '">' + r[2] + '</span><span class="br-file mono">' + r[0] + '</span><span class="br-cust">' + r[1] + '</span></div>';
+      }).join('');
+    }
+    for (var m = 0; m < rowsWrap.children.length; m++) {
+      var rs = 11500 + m * 320;
+      var mp = clamp((lt - rs) / 300, 0, 1);
+      rowsWrap.children[m].style.opacity = mp;
+      rowsWrap.children[m].style.transform = 'translateX(' + (1 - mp) * 12 + 'px)';
+    }
+
+    applyCam('s3', t, SCENES[2]);
+  }
+  function setCount(id, lt, start, end, target) {
+    var el = document.getElementById(id);
+    var x = clamp((lt - start) / (end - start), 0, 1);
+    el.textContent = Math.round(easeOutExpo(x) * target);
+  }
+
+  // ================================================================== S4 — the ported "answer rising" canvas
+  var canvas = document.getElementById('donovan-canvas');
+  var cctx = canvas.getContext('2d');
+  var CW = canvas.width, CH = canvas.height;
+  var PAL = {
+    well: '22,60,44', mid: '36,82,57', rim: '157,196,178', ink: '122,146,134',
+    bronze: '140,107,62', bronzeMid: '166,124,82', bronzeHi: '200,166,122',
+    navy: '18,61,107', cream: '244,235,221',
+  };
+  var SQUASH = 0.72, BASE_LEVEL = 0.34, OVERSHOOT = 0.045, RISE_DUR = 500, OVER_DUR = 250;
+  var LIQUID_MAX = 0.78;
+
+  // ---- ported near-verbatim from index.html's Donovan v3 IIFE, palette
+  // hardcoded (no theme switching needed here) and dpr/pointer/resize logic
+  // dropped (this canvas is a fixed size, driven only by __seek). ----
+  function dvParamsFor(phase, e) {
+    switch (phase) {
+      case 'reading':
+        return { level: BASE_LEVEL, ringMode: 'reading', ringEl: e / 1000, stir: Math.min(1, e / 400), lineA: 0, lineL: 0, docs: true };
+      case 'rising': {
+        var x = Math.min(1, e / RISE_DUR);
+        return { level: lerp(BASE_LEVEL, 1, easeOutExpo(x)), ringMode: 'none', ringEl: 0, stir: Math.max(0, 1 - x * 2), lineA: 0, lineL: 0, docs: false };
+      }
+      case 'overshoot': {
+        var ox = Math.min(1, e / OVER_DUR);
+        return { level: 1 + Math.sin(Math.PI * ox) * OVERSHOOT, ringMode: 'none', ringEl: 0, stir: 0, lineA: ox * 0.55, lineL: ox * 0.3, docs: false };
+      }
+      case 'hold': {
+        var hx = Math.min(1, e / 1200);
+        return { level: 1, ringMode: 'none', ringEl: 0, stir: 0, lineA: Math.min(1, 0.55 + hx * 1.6), lineL: Math.min(1, 0.3 + hx * 1.4), docs: false };
+      }
+      case 'settle': {
+        var sx = Math.min(1, e / 900);
+        return { level: lerp(1, BASE_LEVEL, easeInOutExpo(sx)), ringMode: 'none', ringEl: 0, stir: 0, lineA: Math.max(0, 1 - sx * 2.3), lineL: Math.max(0, 1 - sx * 1.8), docs: false };
+      }
+      default:
+        return { level: BASE_LEVEL, ringMode: 'idle', ringEl: e / 1000, stir: 0, lineA: 0, lineL: 0, docs: false };
+    }
+  }
+  function dvDrawWall(liquidR, Rb) {
+    cctx.save();
+    cctx.beginPath(); cctx.arc(0, 0, Rb, 0, Math.PI * 2);
+    cctx.arc(0, 0, Math.max(0, liquidR), 0, Math.PI * 2, true);
+    cctx.clip('evenodd');
+    var wg = cctx.createLinearGradient(-Rb * 0.7, -Rb * 0.7, Rb * 0.7, Rb * 0.7);
+    wg.addColorStop(0, 'rgb(' + PAL.mid + ')'); wg.addColorStop(1, 'rgb(' + PAL.well + ')');
+    cctx.fillStyle = wg; cctx.fillRect(-Rb, -Rb, Rb * 2, Rb * 2);
+    cctx.restore();
+    var gap = Rb - liquidR;
+    if (gap > 4) {
+      var N = 3;
+      for (var i = 1; i <= N; i++) {
+        var r = liquidR + gap * (i / (N + 1));
+        var lg = cctx.createLinearGradient(-r * 0.7, -r * 0.7, r * 0.7, r * 0.7);
+        lg.addColorStop(0, 'rgba(' + PAL.rim + ',0.45)'); lg.addColorStop(1, 'rgba(' + PAL.well + ',0.6)');
+        cctx.beginPath(); cctx.arc(0, 0, r, 0, Math.PI * 2);
+        cctx.lineWidth = 1.3; cctx.strokeStyle = lg; cctx.stroke();
+      }
+    }
+  }
+  function dvDrawLiquid(level, Rb) {
+    var liquidR = Math.max(0, Math.min(Rb * LIQUID_MAX, Rb * LIQUID_MAX * level));
+    dvDrawWall(liquidR, Rb);
+    if (liquidR > 0.5) {
+      var hx = -liquidR * 0.32, hy = -liquidR * 0.26;
+      var lg = cctx.createRadialGradient(hx, hy, liquidR * 0.05, hx, hy, liquidR * 1.2);
+      lg.addColorStop(0, 'rgb(' + PAL.bronzeHi + ')'); lg.addColorStop(0.35, 'rgb(' + PAL.bronzeMid + ')'); lg.addColorStop(1, 'rgb(' + PAL.bronze + ')');
+      cctx.beginPath(); cctx.arc(0, 0, liquidR, 0, Math.PI * 2); cctx.fillStyle = lg; cctx.fill();
+      var sh = cctx.createRadialGradient(0, 0, liquidR * 0.74, 0, 0, liquidR);
+      sh.addColorStop(0, 'rgba(' + PAL.well + ',0)'); sh.addColorStop(1, 'rgba(' + PAL.well + ',0.32)');
+      cctx.beginPath(); cctx.arc(0, 0, liquidR, 0, Math.PI * 2); cctx.fillStyle = sh; cctx.fill();
+    }
+    return liquidR;
+  }
+  function dvDrawReflections(liquidR) {
+    if (liquidR <= 6) return;
+    for (var i = 1; i <= 3; i++) {
+      var r = liquidR * (0.28 + 0.24 * i); if (r >= liquidR) continue;
+      cctx.beginPath(); cctx.arc(0, 0, r, 0, Math.PI * 2);
+      cctx.lineWidth = 0.8; cctx.strokeStyle = 'rgba(' + PAL.rim + ',0.1)'; cctx.stroke();
+    }
+  }
+  function dvDrawCaustics(t, liquidR, stir) {
+    if (liquidR <= 2) return;
+    cctx.save(); cctx.beginPath(); cctx.arc(0, 0, liquidR, 0, Math.PI * 2); cctx.clip();
+    cctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < 2; i++) {
+      var ang = t * 0.12 * (i ? -1 : 1) * (1 + stir * 0.6) + i * 2.4;
+      var x = Math.cos(ang) * liquidR * 0.35, y = Math.sin(ang) * liquidR * 0.22;
+      cctx.save(); cctx.translate(x, y); cctx.rotate(ang * 0.4); cctx.scale(1, 0.3);
+      var r = liquidR * 0.6;
+      var gr = cctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      gr.addColorStop(0, 'rgba(' + PAL.navy + ',' + (0.1 + stir * 0.05).toFixed(3) + ')');
+      gr.addColorStop(1, 'rgba(' + PAL.navy + ',0)');
+      cctx.fillStyle = gr; cctx.beginPath(); cctx.arc(0, 0, r, 0, Math.PI * 2); cctx.fill();
+      cctx.restore();
+    }
+    cctx.restore();
+  }
+  function dvDrawDocs(E, Rb, liquidR) {
+    var INTERVAL = 0.65, DUR = 1.3, PER = 2;
+    var kmax = Math.floor(E / INTERVAL), kmin = Math.max(0, kmax - 2);
+    for (var k = kmin; k <= kmax; k++) {
+      for (var j = 0; j < PER; j++) {
+        var age = E - k * INTERVAL - j * 0.12; if (age < 0 || age > DUR) continue;
+        var p = age / DUR, ease = p * p;
+        var ang = k * 2.399963 + j * 1.15;
+        var r = lerp(Rb * 0.92, 0, ease);
+        if (r < liquidR) continue;
+        var op = 0.45 * (1 - ease * ease);
+        var x = Math.cos(ang) * r, y = Math.sin(ang) * r;
+        cctx.save(); cctx.translate(x, y); cctx.scale(1, 1 / SQUASH); cctx.rotate(ang * 0.3);
+        cctx.fillStyle = 'rgba(' + PAL.ink + ',' + op.toFixed(3) + ')';
+        cctx.fillRect(-3, -4, 6, 8);
+        cctx.restore();
+      }
+    }
+  }
+  function dvDrawRings(mode, E, Rb, liquidR) {
+    if (mode === 'none') return;
+    var reading = mode === 'reading';
+    var INTERVAL = reading ? 0.65 : 7.0, DUR = reading ? 0.9 : 2.6;
+    var kmax = Math.floor(E / INTERVAL), kmin = Math.max(0, kmax - 2);
+    for (var k = kmin; k <= kmax; k++) {
+      var age = E - k * INTERVAL; if (age < 0 || age > DUR) continue;
+      var p = age / DUR, e = Math.pow(p, 0.6);
+      var r = lerp(Rb, Math.max(liquidR, Rb * 0.06), e);
+      if (r <= liquidR + 0.5) continue;
+      var alpha = (reading ? 0.55 : 0.3) * (1 - p);
+      cctx.beginPath(); cctx.arc(0, 0, r, 0, Math.PI * 2);
+      cctx.lineWidth = reading ? 1.4 : 1;
+      cctx.strokeStyle = 'rgba(' + PAL.rim + ',' + alpha.toFixed(3) + ')'; cctx.stroke();
+    }
+  }
+  function dvDrawMeniscus(level, Rb, liquidR) {
+    if (level < 0.85) return;
+    var p = Math.min(1, (level - 0.85) / 0.2);
+    cctx.beginPath(); cctx.arc(0, 0, liquidR, 0, Math.PI * 2);
+    cctx.lineWidth = 1.3; cctx.strokeStyle = 'rgba(' + PAL.cream + ',' + (p * 0.75).toFixed(3) + ')'; cctx.stroke();
+  }
+  function dvDrawAnswerBar(cx, ox, baseY, Rb, headroomPx, lineA, lineL) {
+    if (lineA <= 0.003) return;
+    var e = easeOutExpo(Math.min(1, lineL));
+    var REST_PX = 22;
+    var travel = Math.min(headroomPx * 0.9, REST_PX) * e;
+    var y = baseY - travel;
+    var barLen = Rb * 0.92, x0 = cx + ox - barLen / 2, x1 = cx + ox + barLen / 2;
+    cctx.save(); cctx.globalAlpha = lineA;
+    var glowH = 10;
+    var glow = cctx.createLinearGradient(0, y - glowH / 2, 0, y + glowH / 2);
+    glow.addColorStop(0, 'rgba(' + PAL.bronzeHi + ',0)'); glow.addColorStop(0.5, 'rgba(' + PAL.bronzeHi + ',0.3)'); glow.addColorStop(1, 'rgba(' + PAL.bronzeHi + ',0)');
+    cctx.fillStyle = glow; cctx.fillRect(x0 - 8, y - glowH / 2, barLen + 16, glowH);
+    cctx.lineCap = 'round'; cctx.lineWidth = 2; cctx.strokeStyle = 'rgba(' + PAL.cream + ',1)';
+    cctx.beginPath(); cctx.moveTo(x0, y); cctx.lineTo(x1, y); cctx.stroke();
+    cctx.restore();
+  }
+  function dvRenderScene(t, p) {
+    cctx.clearRect(0, 0, CW, CH);
+    var HEADROOM = 0.1;
+    var topMargin = CH * HEADROOM;
+    var RmaxW = (Math.min(CW, CH * 1.6)) / 2 - 6, RmaxH = (CH - topMargin - 6) / (2 * SQUASH);
+    var Rbase = Math.min(RmaxW, RmaxH);
+    var breath = (p.ringMode === 'idle') ? Math.sin(t * 0.5) * 0.01 : 0;
+    var Rb = Rbase * (1 + breath);
+    var cx = CW / 2, cy = topMargin + Rb * SQUASH;
+    var wobble = p.stir > 0 ? (Math.sin(t * 3.1) * 0.006 + Math.sin(t * 5.3) * 0.003) * p.stir : 0;
+
+    cctx.save(); cctx.translate(cx, cy); cctx.scale(1, SQUASH);
+    var liquidR = dvDrawLiquid(p.level + wobble, Rb);
+    dvDrawReflections(liquidR);
+    dvDrawCaustics(t, liquidR, p.stir);
+    if (p.docs) dvDrawDocs(p.ringEl, Rb, liquidR);
+    dvDrawRings(p.ringMode, p.ringEl, Rb, liquidR);
+    cctx.save(); cctx.beginPath(); cctx.arc(0, 0, Rb, 0, Math.PI * 2); cctx.clip();
+    var rim = cctx.createLinearGradient(0, -Rb, 0, -Rb * 0.35);
+    var rimA = 0.2 + 0.16 * Math.max(0, p.level - 0.3);
+    rim.addColorStop(0, 'rgba(' + PAL.rim + ',' + rimA.toFixed(3) + ')'); rim.addColorStop(1, 'rgba(' + PAL.rim + ',0)');
+    cctx.beginPath(); cctx.arc(0, 0, Rb * 0.99, Math.PI * 1.12, Math.PI * 1.88); cctx.lineWidth = Rb * 0.16; cctx.strokeStyle = rim; cctx.stroke();
+    cctx.restore();
+    dvDrawMeniscus(p.level, Rb, liquidR);
+    cctx.restore();
+
+    dvDrawAnswerBar(cx, 0, cy - Rb * SQUASH, Rb, topMargin, p.lineA, p.lineL);
+  }
+
+  // ---- this video's own phase timeline (idle -> reading -> rising ->
+  // overshoot -> hold [-> settle]), computed once from the actual question
+  // strings so retiming a line of copy retimes the whole cycle. ----
+  var TYPE_MS = 42, READ_MS = 2000, HOLD1_MS = 1200, SETTLE_MS = 900;
+  function buildCycle(question, offset) {
+    var typeDur = question.length * TYPE_MS + 150;
+    var idleEnd = offset + typeDur;
+    var readEnd = idleEnd + READ_MS;
+    var riseEnd = readEnd + RISE_DUR;
+    var overEnd = riseEnd + OVER_DUR;
+    var holdEnd = overEnd + HOLD1_MS;
+    return { offset: offset, idleEnd: idleEnd, readEnd: readEnd, riseEnd: riseEnd, overEnd: overEnd, holdEnd: holdEnd };
+  }
+  var Q1 = 'Is the Whitmore unit still under warranty?';
+  var A1 = 'Parts warranty ends Nov 20, 2026 — 60 days out.';
+  var A1_FACTS = [['Address', '2210 E Elliot Rd, Gilbert'], ['Model', 'GSX160361FB · Goodman'], ['Warranty ends', 'Nov 20, 2026']];
+  var A1_LABEL = 'Invoice + nameplate photo';
+  var Q2 = 'What refrigerant is in RTU-3 at Desert Ridge Dental?';
+  var A2 = 'R-454B. Lennox ML14XC1-048.';
+  var A2_FACTS = [['Site', '880 S Dobson Rd, Chandler'], ['Unit', 'RTU-3 · Lennox ML14XC1-048'], ['Refrigerant', 'R-454B']];
+  var A2_LABEL = 'Maintenance agreement · p.2';
+
+  var C1 = buildCycle(Q1, 0);
+  var C2 = buildCycle(Q2, C1.holdEnd + SETTLE_MS);
+
+  function phaseOf(lt) {
+    if (lt < C1.idleEnd) return { cyc: 1, phase: 'idle', e: lt - C1.offset, q: Q1, a: A1, facts: A1_FACTS, label: A1_LABEL, asked: Q1 };
+    if (lt < C1.readEnd) return { cyc: 1, phase: 'reading', e: lt - C1.idleEnd, showAns: false, q: '', a: A1, facts: A1_FACTS, label: A1_LABEL, asked: Q1 };
+    if (lt < C1.riseEnd) return { cyc: 1, phase: 'rising', e: lt - C1.readEnd, showAns: true, q: '', a: A1, facts: A1_FACTS, label: A1_LABEL, asked: Q1 };
+    if (lt < C1.overEnd) return { cyc: 1, phase: 'overshoot', e: lt - C1.riseEnd, showAns: true, q: '', a: A1, facts: A1_FACTS, label: A1_LABEL, asked: Q1 };
+    if (lt < C1.holdEnd) return { cyc: 1, phase: 'hold', e: lt - C1.overEnd, showAns: true, q: '', a: A1, facts: A1_FACTS, label: A1_LABEL, asked: Q1 };
+    if (lt < C2.offset) return { cyc: 1, phase: 'settle', e: lt - C1.holdEnd, showAns: true, q: '', a: A1, facts: A1_FACTS, label: A1_LABEL, asked: Q1 };
+    if (lt < C2.idleEnd) return { cyc: 2, phase: 'idle', e: lt - C2.offset, q: Q2, a: A2, facts: A2_FACTS, label: A2_LABEL, asked: Q2 };
+    if (lt < C2.readEnd) return { cyc: 2, phase: 'reading', e: lt - C2.idleEnd, showAns: false, q: '', a: A2, facts: A2_FACTS, label: A2_LABEL, asked: Q2 };
+    if (lt < C2.riseEnd) return { cyc: 2, phase: 'rising', e: lt - C2.readEnd, showAns: true, q: '', a: A2, facts: A2_FACTS, label: A2_LABEL, asked: Q2 };
+    if (lt < C2.overEnd) return { cyc: 2, phase: 'overshoot', e: lt - C2.riseEnd, showAns: true, q: '', a: A2, facts: A2_FACTS, label: A2_LABEL, asked: Q2 };
+    return { cyc: 2, phase: 'hold', e: lt - C2.overEnd, showAns: true, q: '', a: A2, facts: A2_FACTS, label: A2_LABEL, asked: Q2 };
+  }
+
+  function updateS4(t) {
+    var lt = t - SCENES[3].start;
+    updateHeadline('s4-headline', lt, 100);
+    var st = phaseOf(lt);
+    var typedEl = document.getElementById('s4-typed');
+    var caret = document.getElementById('s4-caret');
+    var answerCard = document.getElementById('s4-answer');
+    var answerText = document.getElementById('s4-answer-text');
+    var answerBody = document.getElementById('s4-answer-body');
+    var askedEcho = document.getElementById('s4-asked-echo');
+    var outreach = document.getElementById('s4-outreach');
+
+    if (st.phase === 'idle') {
+      typeText(typedEl, st.q, st.e, 0, TYPE_MS, caret);
+    } else {
+      typedEl.textContent = '';
+      caret.style.opacity = 0;
+    }
+
+    dvRenderScene(t / 1000, dvParamsFor(st.phase, st.e));
+
+    var showCard = !!st.showAns;
+    answerCard.style.opacity = showCard ? 1 : 0;
+    answerCard.style.transform = showCard ? 'translateY(0)' : 'translateY(10px)';
+    if (showCard) {
+      askedEcho.textContent = st.asked;
+      answerText.textContent = st.a;
+      if (answerBody.getAttribute('data-for') !== st.a) {
+        answerBody.setAttribute('data-for', st.a);
+        answerBody.innerHTML = st.facts.map(function (f, i) {
+          return '<div class="arow"><span class="ak">' + f[0] + '</span><span style="display:flex;align-items:center;gap:10px"><span class="av">' + f[1] + '</span><span class="cite"><span class="cnum">' + (i % 2 === 0 ? 1 : 2) + '</span><span class="clabel">' + st.label + '</span></span></span></div>';
+        }).join('');
+      }
+    }
+
+    // outreach card — Whitmore's own expiring warranty (Q1), surfaced once
+    // the second cycle is well underway so it reads as "meanwhile" rather
+    // than competing with either answer landing.
+    var op = clamp((lt - (C2.riseEnd + 200)) / 500, 0, 1);
+    outreach.style.opacity = op;
+    outreach.style.transform = 'translateY(' + (1 - op) * 12 + 'px)';
+
+    applyCam('s4', t, SCENES[3]);
+  }
+
+  // ================================================================== S5
+  function updateS5(t) {
+    var lt = t - SCENES[4].start;
+    updateHeadline('s5-headline', lt, 200);
+    var phone = document.querySelector('#s5 .phone');
+    var pp = clamp((lt - 300) / 600, 0, 1);
+    phone.style.opacity = pp;
+    phone.style.transform = 'translate(-50%,-50%) translateY(' + (1 - pp) * 24 + 'px)';
+    applyCam('s5', t, SCENES[4]);
+  }
+
+  // ================================================================== S6
+  function updateS6(t) {
+    var lt = t - SCENES[5].start;
+    updateHeadline('s6-tagline', lt, 600);
+    var price = document.querySelector('.close-price');
+    var url = document.querySelector('.close-url');
+    price.style.opacity = clamp((lt - 1200) / 400, 0, 1);
+    url.style.opacity = clamp((lt - 1600) / 400, 0, 1);
+    applyCam('s6', t, SCENES[5]);
+  }
+
+  // ---------------------------------------------------------------- master
+  var UPDATERS = { s1: updateS1, s2: updateS2, s3: updateS3, s4: updateS4, s5: updateS5, s6: updateS6 };
+
+  function seek(t) {
+    t = clamp(t, 0, TOTAL);
+    SCENES.forEach(function (s) {
+      var op = sceneOpacity(t, s);
+      els[s.id].style.opacity = op;
+      if (op > 0) UPDATERS[s.id](clamp(t, s.start, s.end));
+      if (s.id === 's1' || s.id === 's2' || s.id === 's5' || s.id === 's6') applyCam(s.id, clamp(t, s.start, s.end), s);
+    });
+  }
+
+  window.__seek = seek;
+  window.__TOTAL_MS = TOTAL;
+  seek(0);
+
+  if (params.get('live') === '1') {
+    var t0 = performance.now();
+    (function loop() { seek((performance.now() - t0) % TOTAL); requestAnimationFrame(loop); })();
+  }
+})();
+</script>
+</body>
+</html>
