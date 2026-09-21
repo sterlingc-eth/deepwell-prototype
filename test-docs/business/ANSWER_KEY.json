@@ -1,0 +1,4126 @@
+{
+  "shopAddress": "4410 E Baseline Rd, Mesa, AZ 85206",
+  "shopPhone": "(480) 555-0199",
+  "shopEmail": "info@sonorancomfortair.com",
+  "generatedAt": "2026-09-21",
+  "customers": [
+    {
+      "key": "res_0",
+      "canonicalName": "Linda Fitzgerald",
+      "address": "100 E Main St, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "001-invoice-c0.pdf",
+        "002-warranty-registration-c0.pdf",
+        "003-service-ticket-c0.pdf",
+        "004-work-order-c0.pdf",
+        "005-startup-sheet-c0.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100002",
+          "model": "4TTR4002L1000AA",
+          "brand": "Trane",
+          "installDate": "2009-01-01",
+          "warrantyStatus": "expired",
+          "expires": "2019-01-01"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_1",
+      "canonicalName": "Thomas Mercer",
+      "address": "137 W Southern Ave, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "006-invoice-c1.pdf",
+        "007-proposal-quote-c1.pdf",
+        "008-service-ticket-c1.pdf",
+        "009-permit-p1.pdf",
+        "010-dispatch-note-c1.txt"
+      ],
+      "units": [
+        {
+          "serial": "2C100003",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2016-06-10",
+          "warrantyStatus": "expired",
+          "expires": "2021-06-10"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_2",
+      "canonicalName": "Sorensen",
+      "address": "174 N College Ave, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "011-invoice-c2.pdf",
+        "012-warranty-registration-c2.pdf",
+        "013-service-ticket-c2.pdf",
+        "014-inspection-report-c2.pdf",
+        "015-equipment-record-c2.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100004",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2023-11-19",
+          "warrantyStatus": "active",
+          "expires": "2033-11-19"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_3",
+      "canonicalName": "Ronald Bracken",
+      "address": "211 E University Dr, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "016-invoice-c3.pdf",
+        "017-proposal-quote-c3.pdf",
+        "018-service-ticket-c3.pdf",
+        "019-correspondence-c3.pdf",
+        "020-maintenance-agreement-c3.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100005",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2021-11-21",
+          "warrantyStatus": "expiring",
+          "expires": "2026-11-21"
+        }
+      ],
+      "expectedAlert": "expiring"
+    },
+    {
+      "key": "res_4",
+      "canonicalName": "Amy Isaacson",
+      "address": "248 W Guadalupe Rd, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "021-invoice-c4.pdf",
+        "022-warranty-registration-c4.pdf",
+        "023-service-ticket-c4.pdf",
+        "024-purchase-order-c4.pdf",
+        "025-nameplate-photo-c4.txt"
+      ],
+      "units": [
+        {
+          "serial": "2R100006",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2019-09-09",
+          "warrantyStatus": "expired",
+          "expires": "2024-09-09"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_5",
+      "canonicalName": "David Prentiss",
+      "address": "285 E Elliot Rd, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "026-invoice-c5.pdf",
+        "027-proposal-quote-c5.pdf",
+        "028-service-ticket-c5.pdf",
+        "029-startup-sheet-c5.pdf",
+        "030-other-c5.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100007",
+          "model": "YXV026BF31TAA",
+          "brand": "York",
+          "installDate": "2026-02-18",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_6",
+      "canonicalName": "Sandra Wyckoff",
+      "address": "322 N Greenfield Rd, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "031-invoice-c6.pdf",
+        "032-warranty-registration-c6.pdf",
+        "033-service-ticket-c6.pdf",
+        "034-dispatch-note-c6.txt",
+        "035-work-order-c6.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100008",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2015-07-27",
+          "warrantyStatus": "expired",
+          "expires": "2020-07-27"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_7",
+      "canonicalName": "Steven Ellison",
+      "address": "359 E Broadway Rd, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "036-invoice-c7.pdf",
+        "037-proposal-quote-c7.pdf",
+        "038-service-ticket-c7.pdf",
+        "039-equipment-record-c7.pdf",
+        "040-permit-p7.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100009",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2022-12-08",
+          "warrantyStatus": "active",
+          "expires": "2027-12-08"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_8",
+      "canonicalName": "Laura Lombardi",
+      "address": "396 W Baseline Rd, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "041-invoice-c8.pdf",
+        "042-warranty-registration-c8.pdf",
+        "043-service-ticket-c8.pdf",
+        "044-maintenance-agreement-c8.pdf",
+        "045-inspection-report-c8.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100010",
+          "model": "4TTR4004L1000AA",
+          "brand": "Trane",
+          "installDate": "2011-05-17",
+          "warrantyStatus": "expired",
+          "expires": "2021-05-17"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_9",
+      "canonicalName": "Robert Salazar",
+      "address": "433 S Alma School Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "046-invoice-c9.pdf",
+        "047-proposal-quote-c9.pdf",
+        "048-service-ticket-c9.pdf",
+        "049-nameplate-photo-c9.txt",
+        "050-correspondence-c9.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100011",
+          "model": "4TTR4003L1000AA",
+          "brand": "Trane",
+          "installDate": "2018-09-23",
+          "warrantyStatus": "expired",
+          "expires": "2023-09-23"
+        }
+      ],
+      "expectedAlert": "expired"
+    },
+    {
+      "key": "res_10",
+      "canonicalName": "Karen Abernathy",
+      "address": "470 E Chandler Blvd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "051-invoice-c10.pdf",
+        "052-warranty-registration-c10.pdf",
+        "053-service-ticket-c10.pdf",
+        "054-other-c10.pdf",
+        "055-purchase-order-c10.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100012",
+          "model": "GSX162261FB",
+          "brand": "Goodman",
+          "installDate": "2025-03-07",
+          "warrantyStatus": "active",
+          "expires": "2035-03-07"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_11",
+      "canonicalName": "Sorenson",
+      "address": "507 N Dobson Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "056-invoice-c11.pdf",
+        "057-proposal-quote-c11.pdf",
+        "058-service-ticket-c11.pdf",
+        "059-work-order-c11.pdf",
+        "060-startup-sheet-c11.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100013",
+          "model": "ML14XC1-036-230",
+          "brand": "Lennox",
+          "installDate": "2014-08-16",
+          "warrantyStatus": "expired",
+          "expires": "2019-08-16"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_12",
+      "canonicalName": "Deborah Ortega",
+      "address": "544 E Ray Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "061-invoice-c12.pdf",
+        "062-warranty-registration-c12.pdf",
+        "063-service-ticket-c12.pdf",
+        "064-permit-p12.pdf",
+        "065-dispatch-note-c12.txt"
+      ],
+      "units": [
+        {
+          "serial": "2R100014",
+          "model": "RA1436AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2021-01-25",
+          "warrantyStatus": "expired",
+          "expires": "2026-01-25"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_13",
+      "canonicalName": "Gary Villegas",
+      "address": "581 W Thomas Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "066-invoice-c13.pdf",
+        "067-proposal-quote-c13.pdf",
+        "068-service-ticket-c13.pdf",
+        "069-inspection-report-c13.pdf",
+        "070-equipment-record-c13.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100015",
+          "model": "YXV046BF31TAA",
+          "brand": "York",
+          "installDate": "2010-06-06",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_14",
+      "canonicalName": "Barbara Delgado",
+      "address": "618 N Power Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "071-invoice-c14.pdf",
+        "072-warranty-registration-c14.pdf",
+        "073-service-ticket-c14.pdf",
+        "074-correspondence-c14.pdf",
+        "075-maintenance-agreement-c14.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100016",
+          "model": "DZ16SA0561",
+          "brand": "Daikin",
+          "installDate": "2017-11-15",
+          "warrantyStatus": "expired",
+          "expires": "2022-11-15"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_15",
+      "canonicalName": "Daniel Keller",
+      "address": "655 E McKellips Rd, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "076-invoice-c15.pdf",
+        "077-proposal-quote-c15.pdf",
+        "078-service-ticket-c15.pdf",
+        "079-purchase-order-c15.pdf",
+        "080-nameplate-photo-c15.txt"
+      ],
+      "units": [
+        {
+          "serial": "M100017",
+          "model": "MUZ-FS20NA",
+          "brand": "Mitsubishi",
+          "installDate": "2024-04-24",
+          "warrantyStatus": "active",
+          "expires": "2029-04-24"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_16",
+      "canonicalName": "Carol Rios",
+      "address": "692 S Higley Rd, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "081-invoice-c16.pdf",
+        "082-warranty-registration-c16.pdf",
+        "083-service-ticket-c16.pdf",
+        "084-startup-sheet-c16.pdf",
+        "085-other-c16.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100018",
+          "model": "4TTR4003L1000AA",
+          "brand": "Trane",
+          "installDate": "2013-09-05",
+          "warrantyStatus": "expired",
+          "expires": "2023-09-05"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_17",
+      "canonicalName": "Kevin Zimmerman",
+      "address": "729 W Camelback Rd, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "086-invoice-c17.pdf",
+        "087-proposal-quote-c17.pdf",
+        "088-service-ticket-c17.pdf",
+        "089-dispatch-note-c17.txt",
+        "090-work-order-c17.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100019",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2020-02-14",
+          "warrantyStatus": "expired",
+          "expires": "2025-02-14"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_18",
+      "canonicalName": "Maria Gallardo",
+      "address": "766 N Val Vista Dr, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "091-invoice-c18.pdf",
+        "092-warranty-registration-c18.pdf",
+        "093-service-ticket-c18.pdf",
+        "094-equipment-record-c18.pdf",
+        "095-permit-p18.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100020",
+          "model": "GSX164261FB",
+          "brand": "Goodman",
+          "installDate": "2009-07-23",
+          "warrantyStatus": "expired",
+          "expires": "2019-07-23"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_19",
+      "canonicalName": "Joseph Norwood",
+      "address": "803 E Pecos Rd, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "096-invoice-c19.pdf",
+        "097-proposal-quote-c19.pdf",
+        "098-service-ticket-c19.pdf",
+        "099-maintenance-agreement-c19.pdf",
+        "100-inspection-report-c19.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100021",
+          "model": "ML14XC1-056-230",
+          "brand": "Lennox",
+          "installDate": "2016-12-04",
+          "warrantyStatus": "expired",
+          "expires": "2021-12-04"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_20",
+      "canonicalName": "Whitfield",
+      "address": "840 S Ellsworth Rd, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "101-invoice-c20.pdf",
+        "102-warranty-registration-c20.pdf",
+        "103-service-ticket-c20.pdf",
+        "104-nameplate-photo-c20.txt",
+        "105-correspondence-c20.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100022",
+          "model": "RA1426AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2023-05-13",
+          "warrantyStatus": "active",
+          "expires": "2028-05-13"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_21",
+      "canonicalName": "Brian Chavez",
+      "address": "877 W Ocotillo Rd, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "106-invoice-c21.pdf",
+        "107-proposal-quote-c21.pdf",
+        "108-service-ticket-c21.pdf",
+        "109-other-c21.pdf",
+        "110-purchase-order-c21.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100023",
+          "model": "YXV036BF31TAA",
+          "brand": "York",
+          "installDate": "2012-10-22",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_22",
+      "canonicalName": "Kathleen Jennings",
+      "address": "914 N Recker Rd, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "111-invoice-c22.pdf",
+        "112-warranty-registration-c22.pdf",
+        "113-service-ticket-c22.pdf",
+        "114-work-order-c22.pdf",
+        "115-startup-sheet-c22.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100024",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2019-03-03",
+          "warrantyStatus": "expired",
+          "expires": "2024-03-03"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_23",
+      "canonicalName": "William Quintana",
+      "address": "951 E Main St, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "116-invoice-c23.pdf",
+        "117-proposal-quote-c23.pdf",
+        "118-service-ticket-c23.pdf",
+        "119-permit-p23.pdf",
+        "120-dispatch-note-c23.txt"
+      ],
+      "units": [
+        {
+          "serial": "M100025",
+          "model": "MUZ-FS40NA",
+          "brand": "Mitsubishi",
+          "installDate": "2026-08-12",
+          "warrantyStatus": "active",
+          "expires": "2031-08-12"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_24",
+      "canonicalName": "Betty Winslow",
+      "address": "988 W Southern Ave, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "121-invoice-c24.pdf",
+        "122-warranty-registration-c24.pdf",
+        "123-service-ticket-c24.pdf",
+        "124-inspection-report-c24.pdf",
+        "125-equipment-record-c24.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100026",
+          "model": "4TTR4005L1000AA",
+          "brand": "Trane",
+          "installDate": "2015-01-21",
+          "warrantyStatus": "expired",
+          "expires": "2025-01-21"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_25",
+      "canonicalName": "Kenneth Fenwick",
+      "address": "1025 N College Ave, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "126-invoice-c25.pdf",
+        "127-proposal-quote-c25.pdf",
+        "128-service-ticket-c25.pdf",
+        "129-correspondence-c25.pdf",
+        "130-maintenance-agreement-c25.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100027",
+          "model": "24ACC624A003",
+          "brand": "Carrier",
+          "installDate": "2022-06-02",
+          "warrantyStatus": "expiring",
+          "expires": "2027-06-02"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_26",
+      "canonicalName": "Rebecca Montoya",
+      "address": "1062 E University Dr, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "131-invoice-c26.pdf",
+        "132-warranty-registration-c26.pdf",
+        "133-service-ticket-c26.pdf",
+        "134-purchase-order-c26.pdf",
+        "135-nameplate-photo-c26.txt"
+      ],
+      "units": [
+        {
+          "serial": "2G100028",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2011-11-11",
+          "warrantyStatus": "expired",
+          "expires": "2021-11-11"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_27",
+      "canonicalName": "James Tovar",
+      "address": "1099 W Guadalupe Rd, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "136-invoice-c27.pdf",
+        "137-proposal-quote-c27.pdf",
+        "138-service-ticket-c27.pdf",
+        "139-startup-sheet-c27.pdf",
+        "140-other-c27.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100029",
+          "model": "ML14XC1-036-230",
+          "brand": "Lennox",
+          "installDate": "2018-04-20",
+          "warrantyStatus": "expired",
+          "expires": "2023-04-20"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_28",
+      "canonicalName": "Jessica Bennett",
+      "address": "1136 E Elliot Rd, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "141-invoice-c28.pdf",
+        "142-warranty-registration-c28.pdf",
+        "143-service-ticket-c28.pdf",
+        "144-dispatch-note-c28.txt",
+        "145-work-order-c28.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100030",
+          "model": "RA1446AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2025-09-01",
+          "warrantyStatus": "active",
+          "expires": "2030-09-01"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_29",
+      "canonicalName": "Mark Ibarra",
+      "address": "1173 N Greenfield Rd, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "146-invoice-c29.pdf",
+        "147-proposal-quote-c29.pdf",
+        "148-service-ticket-c29.pdf",
+        "149-equipment-record-c29.pdf",
+        "150-permit-p29.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100031",
+          "model": "YXV056BF31TAA",
+          "brand": "York",
+          "installDate": "2014-02-10",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_30",
+      "canonicalName": "Melissa Pruitt",
+      "address": "1210 E Broadway Rd, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "151-invoice-c30.pdf",
+        "152-warranty-registration-c30.pdf",
+        "153-service-ticket-c30.pdf",
+        "154-maintenance-agreement-c30.pdf",
+        "155-inspection-report-c30.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100032",
+          "model": "DZ16SA0261",
+          "brand": "Daikin",
+          "installDate": "2021-07-19",
+          "warrantyStatus": "expired",
+          "expires": "2026-07-19"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_31",
+      "canonicalName": "Matthew Whitfield",
+      "address": "1247 W Baseline Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "156-invoice-c31.pdf",
+        "157-proposal-quote-c31.pdf",
+        "158-service-ticket-c31.pdf",
+        "159-nameplate-photo-c31.txt",
+        "160-correspondence-c31.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100033",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2010-12-28",
+          "warrantyStatus": "expired",
+          "expires": "2015-12-28"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_32",
+      "canonicalName": "Patricia Esparza",
+      "address": "1284 S Alma School Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "161-invoice-c32.pdf",
+        "162-warranty-registration-c32.pdf",
+        "163-service-ticket-c32.pdf",
+        "164-other-c32.pdf",
+        "165-purchase-order-c32.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100034",
+          "model": "4TTR4003L1000AA",
+          "brand": "Trane",
+          "installDate": "2017-05-09",
+          "warrantyStatus": "expiring",
+          "expires": "2027-05-09"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_33",
+      "canonicalName": "Whitford",
+      "address": "1321 E Chandler Blvd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "166-invoice-c33.pdf",
+        "167-proposal-quote-c33.pdf",
+        "168-service-ticket-c33.pdf",
+        "169-work-order-c33.pdf",
+        "170-startup-sheet-c33.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100035",
+          "model": "24ACC644A003",
+          "brand": "Carrier",
+          "installDate": "2024-10-18",
+          "warrantyStatus": "active",
+          "expires": "2029-10-18"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_34",
+      "canonicalName": "Michelle Sandoval",
+      "address": "1358 N Dobson Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "171-invoice-c34.pdf",
+        "172-warranty-registration-c34.pdf",
+        "173-service-ticket-c34.pdf",
+        "174-permit-p34.pdf",
+        "175-dispatch-note-c34.txt"
+      ],
+      "units": [
+        {
+          "serial": "2G100036",
+          "model": "GSX165261FB",
+          "brand": "Goodman",
+          "installDate": "2013-03-27",
+          "warrantyStatus": "expired",
+          "expires": "2023-03-27"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_35",
+      "canonicalName": "Anthony Alvarez",
+      "address": "1395 E Ray Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "176-invoice-c35.pdf",
+        "177-proposal-quote-c35.pdf",
+        "178-service-ticket-c35.pdf",
+        "179-inspection-report-c35.pdf",
+        "180-equipment-record-c35.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100037",
+          "model": "ML14XC1-026-230",
+          "brand": "Lennox",
+          "installDate": "2020-08-08",
+          "warrantyStatus": "expired",
+          "expires": "2025-08-08"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_36",
+      "canonicalName": "Angela Hutchins",
+      "address": "1432 W Thomas Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "181-invoice-c36.pdf",
+        "182-warranty-registration-c36.pdf",
+        "183-service-ticket-c36.pdf",
+        "184-correspondence-c36.pdf",
+        "185-maintenance-agreement-c36.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100038",
+          "model": "RA1436AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2009-01-17",
+          "warrantyStatus": "expired",
+          "expires": "2014-01-17"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_37",
+      "canonicalName": "Richard Osborn",
+      "address": "1469 N Power Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "186-invoice-c37.pdf",
+        "187-proposal-quote-c37.pdf",
+        "188-service-ticket-c37.pdf",
+        "189-purchase-order-c37.pdf",
+        "190-nameplate-photo-c37.txt"
+      ],
+      "units": [
+        {
+          "serial": "Y100039",
+          "model": "YXV036BF31TAA",
+          "brand": "York",
+          "installDate": "2016-06-26",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_38",
+      "canonicalName": "Ashley Vance",
+      "address": "1506 E McKellips Rd, Tempe, AZ 85281",
+      "phone": null,
+      "email": null,
+      "city": "Tempe",
+      "state": "AZ",
+      "zip": "85281",
+      "county": "Maricopa",
+      "docs": [
+        "191-invoice-c38.pdf",
+        "192-warranty-registration-c38.pdf",
+        "193-service-ticket-c38.pdf",
+        "194-startup-sheet-c38.pdf",
+        "195-other-c38.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100040",
+          "model": "DZ16SA0461",
+          "brand": "Daikin",
+          "installDate": "2023-11-07",
+          "warrantyStatus": "active",
+          "expires": "2028-11-07"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_39",
+      "canonicalName": "Edward Dominguez",
+      "address": "1543 S Higley Rd, Scottsdale, AZ 85251",
+      "phone": null,
+      "email": null,
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zip": "85251",
+      "county": "Maricopa",
+      "docs": [
+        "196-invoice-c39.pdf",
+        "197-proposal-quote-c39.pdf",
+        "198-service-ticket-c39.pdf",
+        "199-dispatch-note-c39.txt",
+        "200-work-order-c39.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100041",
+          "model": "MUZ-FS50NA",
+          "brand": "Mitsubishi",
+          "installDate": "2012-04-16",
+          "warrantyStatus": "expired",
+          "expires": "2017-04-16"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_40",
+      "canonicalName": "Cynthia Kowalski",
+      "address": "1580 W Camelback Rd, Scottsdale, AZ 85251",
+      "phone": null,
+      "email": null,
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zip": "85251",
+      "county": "Maricopa",
+      "docs": [
+        "201-invoice-c40.pdf",
+        "202-warranty-registration-c40.pdf",
+        "203-service-ticket-c40.pdf",
+        "204-equipment-record-c40.pdf",
+        "205-permit-p40.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100042",
+          "model": "4TTR4002L1000AA",
+          "brand": "Trane",
+          "installDate": "2019-09-25",
+          "warrantyStatus": "active",
+          "expires": "2029-09-25"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_41",
+      "canonicalName": "Michael Redwine",
+      "address": "1617 N Val Vista Dr, Scottsdale, AZ 85251",
+      "phone": null,
+      "email": null,
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zip": "85251",
+      "county": "Maricopa",
+      "docs": [
+        "206-invoice-c41.pdf",
+        "207-proposal-quote-c41.pdf",
+        "208-service-ticket-c41.pdf",
+        "209-maintenance-agreement-c41.pdf",
+        "210-inspection-report-c41.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100043",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2026-02-06",
+          "warrantyStatus": "active",
+          "expires": "2031-02-06"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_42",
+      "canonicalName": "Nancy Zamora",
+      "address": "1654 E Pecos Rd, Scottsdale, AZ 85251",
+      "phone": null,
+      "email": null,
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zip": "85251",
+      "county": "Maricopa",
+      "docs": [
+        "211-invoice-c42.pdf",
+        "212-warranty-registration-c42.pdf",
+        "213-service-ticket-c42.pdf",
+        "214-nameplate-photo-c42.txt",
+        "215-correspondence-c42.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100044",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2015-07-15",
+          "warrantyStatus": "expired",
+          "expires": "2025-07-15"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_43",
+      "canonicalName": "George Garrison",
+      "address": "1691 S Ellsworth Rd, Scottsdale, AZ 85251",
+      "phone": null,
+      "email": null,
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zip": "85251",
+      "county": "Maricopa",
+      "docs": [
+        "216-invoice-c43.pdf",
+        "217-proposal-quote-c43.pdf",
+        "218-service-ticket-c43.pdf",
+        "219-other-c43.pdf",
+        "220-purchase-order-c43.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100045",
+          "model": "ML14XC1-046-230",
+          "brand": "Lennox",
+          "installDate": "2022-12-24",
+          "warrantyStatus": "active",
+          "expires": "2027-12-24"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_44",
+      "canonicalName": "Stephanie Nakamura",
+      "address": "1728 W Ocotillo Rd, Scottsdale, AZ 85251",
+      "phone": null,
+      "email": null,
+      "city": "Scottsdale",
+      "state": "AZ",
+      "zip": "85251",
+      "county": "Maricopa",
+      "docs": [
+        "221-invoice-c44.pdf",
+        "222-warranty-registration-c44.pdf",
+        "223-service-ticket-c44.pdf",
+        "224-work-order-c44.pdf",
+        "225-startup-sheet-c44.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100046",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2011-05-05",
+          "warrantyStatus": "expired",
+          "expires": "2016-05-05"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_45",
+      "canonicalName": "Timothy Ulloa",
+      "address": "1765 N Recker Rd, Glendale, AZ 85301",
+      "phone": null,
+      "email": null,
+      "city": "Glendale",
+      "state": "AZ",
+      "zip": "85301",
+      "county": "Maricopa",
+      "docs": [
+        "226-invoice-c45.pdf",
+        "227-proposal-quote-c45.pdf",
+        "228-service-ticket-c45.pdf",
+        "229-permit-p45.pdf",
+        "230-dispatch-note-c45.txt"
+      ],
+      "units": [
+        {
+          "serial": "Y100047",
+          "model": "YXV026BF31TAA",
+          "brand": "York",
+          "installDate": "2018-10-14",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_46",
+      "canonicalName": "Susan Calloway",
+      "address": "1802 E Main St, Glendale, AZ 85301",
+      "phone": null,
+      "email": null,
+      "city": "Glendale",
+      "state": "AZ",
+      "zip": "85301",
+      "county": "Maricopa",
+      "docs": [
+        "231-invoice-c46.pdf",
+        "232-warranty-registration-c46.pdf",
+        "233-service-ticket-c46.pdf",
+        "234-inspection-report-c46.pdf",
+        "235-equipment-record-c46.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100048",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2025-03-23",
+          "warrantyStatus": "active",
+          "expires": "2030-03-23"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_47",
+      "canonicalName": "Paul Jarvis",
+      "address": "1839 W Southern Ave, Glendale, AZ 85301",
+      "phone": null,
+      "email": null,
+      "city": "Glendale",
+      "state": "AZ",
+      "zip": "85301",
+      "county": "Maricopa",
+      "docs": [
+        "236-invoice-c47.pdf",
+        "237-proposal-quote-c47.pdf",
+        "238-service-ticket-c47.pdf",
+        "239-correspondence-c47.pdf",
+        "240-maintenance-agreement-c47.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100049",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2014-08-04",
+          "warrantyStatus": "expired",
+          "expires": "2019-08-04"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_48",
+      "canonicalName": "Amanda Quinley",
+      "address": "1876 N College Ave, Glendale, AZ 85301",
+      "phone": null,
+      "email": null,
+      "city": "Glendale",
+      "state": "AZ",
+      "zip": "85301",
+      "county": "Maricopa",
+      "docs": [
+        "241-invoice-c48.pdf",
+        "242-warranty-registration-c48.pdf",
+        "243-service-ticket-c48.pdf",
+        "244-purchase-order-c48.pdf",
+        "245-nameplate-photo-c48.txt"
+      ],
+      "units": [
+        {
+          "serial": "F100050",
+          "model": "4TTR4004L1000AA",
+          "brand": "Trane",
+          "installDate": "2021-01-13",
+          "warrantyStatus": "active",
+          "expires": "2031-01-13"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_49",
+      "canonicalName": "Jason Yarborough",
+      "address": "1913 E University Dr, Glendale, AZ 85301",
+      "phone": null,
+      "email": null,
+      "city": "Glendale",
+      "state": "AZ",
+      "zip": "85301",
+      "county": "Maricopa",
+      "docs": [
+        "246-invoice-c49.pdf",
+        "247-proposal-quote-c49.pdf",
+        "248-service-ticket-c49.pdf",
+        "249-startup-sheet-c49.pdf",
+        "250-other-c49.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100051",
+          "model": "24ACC654A003",
+          "brand": "Carrier",
+          "installDate": "2010-06-22",
+          "warrantyStatus": "expired",
+          "expires": "2015-06-22"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_50",
+      "canonicalName": "Linda Garrison",
+      "address": "1950 W Guadalupe Rd, Glendale, AZ 85301",
+      "phone": null,
+      "email": null,
+      "city": "Glendale",
+      "state": "AZ",
+      "zip": "85301",
+      "county": "Maricopa",
+      "docs": [
+        "251-invoice-c50.pdf",
+        "252-warranty-registration-c50.pdf",
+        "253-service-ticket-c50.pdf",
+        "254-dispatch-note-c50.txt",
+        "255-work-order-c50.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100052",
+          "model": "GSX162261FB",
+          "brand": "Goodman",
+          "installDate": "2017-11-03",
+          "warrantyStatus": "active",
+          "expires": "2027-11-03"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_51",
+      "canonicalName": "Thomas Nakamura",
+      "address": "1987 E Elliot Rd, Peoria, AZ 85345",
+      "phone": null,
+      "email": null,
+      "city": "Peoria",
+      "state": "AZ",
+      "zip": "85345",
+      "county": "Maricopa",
+      "docs": [
+        "256-invoice-c51.pdf",
+        "257-proposal-quote-c51.pdf",
+        "258-service-ticket-c51.pdf",
+        "259-equipment-record-c51.pdf",
+        "260-permit-p51.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100053",
+          "model": "ML14XC1-036-230",
+          "brand": "Lennox",
+          "installDate": "2024-04-12",
+          "warrantyStatus": "active",
+          "expires": "2029-04-12"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_52",
+      "canonicalName": "Donna Ulloa",
+      "address": "2024 N Greenfield Rd, Peoria, AZ 85345",
+      "phone": null,
+      "email": null,
+      "city": "Peoria",
+      "state": "AZ",
+      "zip": "85345",
+      "county": "Maricopa",
+      "docs": [
+        "261-invoice-c52.pdf",
+        "262-warranty-registration-c52.pdf",
+        "263-service-ticket-c52.pdf",
+        "264-maintenance-agreement-c52.pdf",
+        "265-inspection-report-c52.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100054",
+          "model": "RA1436AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2013-09-21",
+          "warrantyStatus": "expired",
+          "expires": "2018-09-21"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_53",
+      "canonicalName": "Ronald Calloway",
+      "address": "2061 E Broadway Rd, Peoria, AZ 85345",
+      "phone": null,
+      "email": null,
+      "city": "Peoria",
+      "state": "AZ",
+      "zip": "85345",
+      "county": "Maricopa",
+      "docs": [
+        "266-invoice-c53.pdf",
+        "267-proposal-quote-c53.pdf",
+        "268-service-ticket-c53.pdf",
+        "269-nameplate-photo-c53.txt",
+        "270-correspondence-c53.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100055",
+          "model": "YXV046BF31TAA",
+          "brand": "York",
+          "installDate": "2020-02-02",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_54",
+      "canonicalName": "Amy Jarvis",
+      "address": "2098 W Baseline Rd, Peoria, AZ 85345",
+      "phone": null,
+      "email": null,
+      "city": "Peoria",
+      "state": "AZ",
+      "zip": "85345",
+      "county": "Maricopa",
+      "docs": [
+        "271-invoice-c54.pdf",
+        "272-warranty-registration-c54.pdf",
+        "273-service-ticket-c54.pdf",
+        "274-other-c54.pdf",
+        "275-purchase-order-c54.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100056",
+          "model": "DZ16SA0561",
+          "brand": "Daikin",
+          "installDate": "2009-07-11",
+          "warrantyStatus": "expired",
+          "expires": "2014-07-11"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_55",
+      "canonicalName": "David Quinley",
+      "address": "2135 S Alma School Rd, Queen Creek, AZ 85242",
+      "phone": null,
+      "email": null,
+      "city": "Queen Creek",
+      "state": "AZ",
+      "zip": "85242",
+      "county": "Maricopa",
+      "docs": [
+        "276-invoice-c55.pdf",
+        "277-proposal-quote-c55.pdf",
+        "278-service-ticket-c55.pdf",
+        "279-work-order-c55.pdf",
+        "280-startup-sheet-c55.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100057",
+          "model": "MUZ-FS20NA",
+          "brand": "Mitsubishi",
+          "installDate": "2016-12-20",
+          "warrantyStatus": "expired",
+          "expires": "2021-12-20"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_56",
+      "canonicalName": "Sandra Yarborough",
+      "address": "2172 E Chandler Blvd, Queen Creek, AZ 85242",
+      "phone": null,
+      "email": null,
+      "city": "Queen Creek",
+      "state": "AZ",
+      "zip": "85242",
+      "county": "Maricopa",
+      "docs": [
+        "281-invoice-c56.pdf",
+        "282-warranty-registration-c56.pdf",
+        "283-service-ticket-c56.pdf",
+        "284-permit-p56.pdf",
+        "285-dispatch-note-c56.txt"
+      ],
+      "units": [
+        {
+          "serial": "F100058",
+          "model": "4TTR4003L1000AA",
+          "brand": "Trane",
+          "installDate": "2023-05-01",
+          "warrantyStatus": "active",
+          "expires": "2033-05-01"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_57",
+      "canonicalName": "Steven Fitzgerald",
+      "address": "2209 N Dobson Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "286-invoice-c57.pdf",
+        "287-proposal-quote-c57.pdf",
+        "288-service-ticket-c57.pdf",
+        "289-inspection-report-c57.pdf",
+        "290-equipment-record-c57.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100059",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2012-10-10",
+          "warrantyStatus": "expired",
+          "expires": "2017-10-10"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_58",
+      "canonicalName": "Laura Mercer",
+      "address": "2246 E Ray Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "291-invoice-c58.pdf",
+        "292-warranty-registration-c58.pdf",
+        "293-service-ticket-c58.pdf",
+        "294-correspondence-c58.pdf",
+        "295-maintenance-agreement-c58.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100060",
+          "model": "GSX164261FB",
+          "brand": "Goodman",
+          "installDate": "2019-03-19",
+          "warrantyStatus": "active",
+          "expires": "2029-03-19"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_59",
+      "canonicalName": "Robert Thornton",
+      "address": "2283 W Thomas Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "296-invoice-c59.pdf",
+        "297-proposal-quote-c59.pdf",
+        "298-service-ticket-c59.pdf",
+        "299-purchase-order-c59.pdf",
+        "300-nameplate-photo-c59.txt"
+      ],
+      "units": [
+        {
+          "serial": "LX100061",
+          "model": "ML14XC1-056-230",
+          "brand": "Lennox",
+          "installDate": "2026-08-28",
+          "warrantyStatus": "active",
+          "expires": "2031-08-28"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_60",
+      "canonicalName": "Karen Bracken",
+      "address": "2320 N Power Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "301-invoice-c60.pdf",
+        "302-warranty-registration-c60.pdf",
+        "303-service-ticket-c60.pdf",
+        "304-startup-sheet-c60.pdf",
+        "305-other-c60.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100062",
+          "model": "RA1426AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2015-01-09",
+          "warrantyStatus": "expired",
+          "expires": "2020-01-09"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_61",
+      "canonicalName": "Donald Isaacson",
+      "address": "2357 E McKellips Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "306-invoice-c61.pdf",
+        "307-proposal-quote-c61.pdf",
+        "308-service-ticket-c61.pdf",
+        "309-dispatch-note-c61.txt",
+        "310-work-order-c61.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100063",
+          "model": "YXV036BF31TAA",
+          "brand": "York",
+          "installDate": "2022-06-18",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_62",
+      "canonicalName": "Deborah Prentiss",
+      "address": "2394 S Higley Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "311-invoice-c62.pdf",
+        "312-warranty-registration-c62.pdf",
+        "313-service-ticket-c62.pdf",
+        "314-equipment-record-c62.pdf",
+        "315-permit-p62.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100064",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2011-11-27",
+          "warrantyStatus": "expired",
+          "expires": "2016-11-27"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_63",
+      "canonicalName": "Gary Wyckoff",
+      "address": "2431 W Camelback Rd, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "316-invoice-c63.pdf",
+        "317-proposal-quote-c63.pdf",
+        "318-service-ticket-c63.pdf",
+        "319-maintenance-agreement-c63.pdf",
+        "320-inspection-report-c63.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100065",
+          "model": "MUZ-FS40NA",
+          "brand": "Mitsubishi",
+          "installDate": "2018-04-08",
+          "warrantyStatus": "expired",
+          "expires": "2023-04-08"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_64",
+      "canonicalName": "Barbara Ellison",
+      "address": "2468 N Val Vista Dr, San Tan Valley, AZ 85140",
+      "phone": null,
+      "email": null,
+      "city": "San Tan Valley",
+      "state": "AZ",
+      "zip": "85140",
+      "county": "Pinal",
+      "docs": [
+        "321-invoice-c64.pdf",
+        "322-warranty-registration-c64.pdf",
+        "323-service-ticket-c64.pdf",
+        "324-nameplate-photo-c64.txt",
+        "325-correspondence-c64.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100066",
+          "model": "4TTR4005L1000AA",
+          "brand": "Trane",
+          "installDate": "2025-09-17",
+          "warrantyStatus": "active",
+          "expires": "2035-09-17"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_65",
+      "canonicalName": "Daniel Lombardi",
+      "address": "2505 E Pecos Rd, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "326-invoice-c65.pdf",
+        "327-proposal-quote-c65.pdf",
+        "328-service-ticket-c65.pdf",
+        "329-other-c65.pdf",
+        "330-purchase-order-c65.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100067",
+          "model": "24ACC624A003",
+          "brand": "Carrier",
+          "installDate": "2014-02-26",
+          "warrantyStatus": "expired",
+          "expires": "2019-02-26"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_66",
+      "canonicalName": "Carol Salazar",
+      "address": "2542 S Ellsworth Rd, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "331-invoice-c66.pdf",
+        "332-warranty-registration-c66.pdf",
+        "333-service-ticket-c66.pdf",
+        "334-work-order-c66.pdf",
+        "335-startup-sheet-c66.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100068",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2021-07-07",
+          "warrantyStatus": "active",
+          "expires": "2031-07-07"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_67",
+      "canonicalName": "Kevin Abernathy",
+      "address": "2579 W Ocotillo Rd, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "336-invoice-c67.pdf",
+        "337-proposal-quote-c67.pdf",
+        "338-service-ticket-c67.pdf",
+        "339-permit-p67.pdf",
+        "340-dispatch-note-c67.txt"
+      ],
+      "units": [
+        {
+          "serial": "LX100069",
+          "model": "ML14XC1-036-230",
+          "brand": "Lennox",
+          "installDate": "2010-12-16",
+          "warrantyStatus": "expired",
+          "expires": "2015-12-16"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_68",
+      "canonicalName": "Maria Holbrook",
+      "address": "2616 N Recker Rd, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "341-invoice-c68.pdf",
+        "342-warranty-registration-c68.pdf",
+        "343-service-ticket-c68.pdf",
+        "344-inspection-report-c68.pdf",
+        "345-equipment-record-c68.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100070",
+          "model": "RA1446AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2017-05-25",
+          "warrantyStatus": "expired",
+          "expires": "2022-05-25"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_69",
+      "canonicalName": "Joseph Ortega",
+      "address": "2653 E Main St, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "346-invoice-c69.pdf",
+        "347-proposal-quote-c69.pdf",
+        "348-service-ticket-c69.pdf",
+        "349-correspondence-c69.pdf",
+        "350-maintenance-agreement-c69.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100071",
+          "model": "YXV056BF31TAA",
+          "brand": "York",
+          "installDate": "2024-10-06",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_70",
+      "canonicalName": "Emily Villegas",
+      "address": "2690 W Southern Ave, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "351-invoice-c70.pdf",
+        "352-warranty-registration-c70.pdf",
+        "353-service-ticket-c70.pdf",
+        "354-purchase-order-c70.pdf",
+        "355-nameplate-photo-c70.txt"
+      ],
+      "units": [
+        {
+          "serial": "D100072",
+          "model": "DZ16SA0261",
+          "brand": "Daikin",
+          "installDate": "2013-03-15",
+          "warrantyStatus": "expired",
+          "expires": "2018-03-15"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_71",
+      "canonicalName": "Brian Delgado",
+      "address": "2727 N College Ave, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "356-invoice-c71.pdf",
+        "357-proposal-quote-c71.pdf",
+        "358-service-ticket-c71.pdf",
+        "359-startup-sheet-c71.pdf",
+        "360-other-c71.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100073",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2020-08-24",
+          "warrantyStatus": "expired",
+          "expires": "2025-08-24"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_72",
+      "canonicalName": "Kathleen Keller",
+      "address": "2764 E University Dr, Maricopa, AZ 85138",
+      "phone": null,
+      "email": null,
+      "city": "Maricopa",
+      "state": "AZ",
+      "zip": "85138",
+      "county": "Pinal",
+      "docs": [
+        "361-invoice-c72.pdf",
+        "362-warranty-registration-c72.pdf",
+        "363-service-ticket-c72.pdf",
+        "364-dispatch-note-c72.txt",
+        "365-work-order-c72.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100074",
+          "model": "4TTR4003L1000AA",
+          "brand": "Trane",
+          "installDate": "2009-01-05",
+          "warrantyStatus": "expired",
+          "expires": "2019-01-05"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_73",
+      "canonicalName": "William Rios",
+      "address": "2801 W Guadalupe Rd, Maricopa, AZ 85138",
+      "phone": null,
+      "email": null,
+      "city": "Maricopa",
+      "state": "AZ",
+      "zip": "85138",
+      "county": "Pinal",
+      "docs": [
+        "366-invoice-c73.pdf",
+        "367-proposal-quote-c73.pdf",
+        "368-service-ticket-c73.pdf",
+        "369-equipment-record-c73.pdf",
+        "370-permit-p73.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100075",
+          "model": "24ACC644A003",
+          "brand": "Carrier",
+          "installDate": "2016-06-14",
+          "warrantyStatus": "expired",
+          "expires": "2021-06-14"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_74",
+      "canonicalName": "Betty Zimmerman",
+      "address": "2838 E Elliot Rd, Maricopa, AZ 85138",
+      "phone": null,
+      "email": null,
+      "city": "Maricopa",
+      "state": "AZ",
+      "zip": "85138",
+      "county": "Pinal",
+      "docs": [
+        "371-invoice-c74.pdf",
+        "372-warranty-registration-c74.pdf",
+        "373-service-ticket-c74.pdf",
+        "374-maintenance-agreement-c74.pdf",
+        "375-inspection-report-c74.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100076",
+          "model": "GSX165261FB",
+          "brand": "Goodman",
+          "installDate": "2023-11-23",
+          "warrantyStatus": "active",
+          "expires": "2033-11-23"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_75",
+      "canonicalName": "Kenneth Gallardo",
+      "address": "2875 N Greenfield Rd, Maricopa, AZ 85138",
+      "phone": null,
+      "email": null,
+      "city": "Maricopa",
+      "state": "AZ",
+      "zip": "85138",
+      "county": "Pinal",
+      "docs": [
+        "376-invoice-c75.pdf",
+        "377-proposal-quote-c75.pdf",
+        "378-service-ticket-c75.pdf",
+        "379-nameplate-photo-c75.txt",
+        "380-correspondence-c75.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100077",
+          "model": "ML14XC1-026-230",
+          "brand": "Lennox",
+          "installDate": "2012-04-04",
+          "warrantyStatus": "expired",
+          "expires": "2017-04-04"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_76",
+      "canonicalName": "Rebecca Norwood",
+      "address": "2912 E Broadway Rd, Maricopa, AZ 85138",
+      "phone": null,
+      "email": null,
+      "city": "Maricopa",
+      "state": "AZ",
+      "zip": "85138",
+      "county": "Pinal",
+      "docs": [
+        "381-invoice-c76.pdf",
+        "382-warranty-registration-c76.pdf",
+        "383-service-ticket-c76.pdf",
+        "384-other-c76.pdf",
+        "385-purchase-order-c76.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100078",
+          "model": "RA1436AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2019-09-13",
+          "warrantyStatus": "expired",
+          "expires": "2024-09-13"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_77",
+      "canonicalName": "James Underhill",
+      "address": "2949 W Baseline Rd, Maricopa, AZ 85138",
+      "phone": null,
+      "email": null,
+      "city": "Maricopa",
+      "state": "AZ",
+      "zip": "85138",
+      "county": "Pinal",
+      "docs": [
+        "386-invoice-c77.pdf",
+        "387-proposal-quote-c77.pdf",
+        "388-service-ticket-c77.pdf",
+        "389-work-order-c77.pdf",
+        "390-startup-sheet-c77.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100079",
+          "model": "YXV036BF31TAA",
+          "brand": "York",
+          "installDate": "2026-02-22",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_78",
+      "canonicalName": "Jessica Chavez",
+      "address": "2986 S Alma School Rd, Florence, AZ 85132",
+      "phone": null,
+      "email": null,
+      "city": "Florence",
+      "state": "AZ",
+      "zip": "85132",
+      "county": "Pinal",
+      "docs": [
+        "391-invoice-c78.pdf",
+        "392-warranty-registration-c78.pdf",
+        "393-service-ticket-c78.pdf",
+        "394-permit-p78.pdf",
+        "395-dispatch-note-c78.txt"
+      ],
+      "units": [
+        {
+          "serial": "D100080",
+          "model": "DZ16SA0461",
+          "brand": "Daikin",
+          "installDate": "2015-07-03",
+          "warrantyStatus": "expired",
+          "expires": "2020-07-03"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_79",
+      "canonicalName": "Mark Jennings",
+      "address": "3023 E Chandler Blvd, Florence, AZ 85132",
+      "phone": null,
+      "email": null,
+      "city": "Florence",
+      "state": "AZ",
+      "zip": "85132",
+      "county": "Pinal",
+      "docs": [
+        "396-invoice-c79.pdf",
+        "397-proposal-quote-c79.pdf",
+        "398-service-ticket-c79.pdf",
+        "399-inspection-report-c79.pdf",
+        "400-equipment-record-c79.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100081",
+          "model": "MUZ-FS50NA",
+          "brand": "Mitsubishi",
+          "installDate": "2022-12-12",
+          "warrantyStatus": "active",
+          "expires": "2027-12-12"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_80",
+      "canonicalName": "Melissa Quintana",
+      "address": "3060 N Dobson Rd, Florence, AZ 85132",
+      "phone": null,
+      "email": null,
+      "city": "Florence",
+      "state": "AZ",
+      "zip": "85132",
+      "county": "Pinal",
+      "docs": [
+        "401-invoice-c80.pdf",
+        "402-warranty-registration-c80.pdf",
+        "403-service-ticket-c80.pdf",
+        "404-correspondence-c80.pdf",
+        "405-maintenance-agreement-c80.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100082",
+          "model": "4TTR4002L1000AA",
+          "brand": "Trane",
+          "installDate": "2011-05-21",
+          "warrantyStatus": "expired",
+          "expires": "2021-05-21"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_81",
+      "canonicalName": "Matthew Winslow",
+      "address": "3097 E Ray Rd, Florence, AZ 85132",
+      "phone": null,
+      "email": null,
+      "city": "Florence",
+      "state": "AZ",
+      "zip": "85132",
+      "county": "Pinal",
+      "docs": [
+        "406-invoice-c81.pdf",
+        "407-proposal-quote-c81.pdf",
+        "408-service-ticket-c81.pdf",
+        "409-purchase-order-c81.pdf",
+        "410-nameplate-photo-c81.txt"
+      ],
+      "units": [
+        {
+          "serial": "2C100083",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2018-10-02",
+          "warrantyStatus": "expired",
+          "expires": "2023-10-02"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_82",
+      "canonicalName": "Patricia Fenwick",
+      "address": "3134 W Thomas Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "411-invoice-c82.pdf",
+        "412-warranty-registration-c82.pdf",
+        "413-service-ticket-c82.pdf",
+        "414-startup-sheet-c82.pdf",
+        "415-other-c82.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100084",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2025-03-11",
+          "warrantyStatus": "active",
+          "expires": "2035-03-11"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_83",
+      "canonicalName": "Charles Montoya",
+      "address": "3171 N Power Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "416-invoice-c83.pdf",
+        "417-proposal-quote-c83.pdf",
+        "418-service-ticket-c83.pdf",
+        "419-dispatch-note-c83.txt",
+        "420-work-order-c83.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100085",
+          "model": "ML14XC1-046-230",
+          "brand": "Lennox",
+          "installDate": "2014-08-20",
+          "warrantyStatus": "expired",
+          "expires": "2019-08-20"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_84",
+      "canonicalName": "Michelle Tovar",
+      "address": "3208 E McKellips Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "421-invoice-c84.pdf",
+        "422-warranty-registration-c84.pdf",
+        "423-service-ticket-c84.pdf",
+        "424-equipment-record-c84.pdf",
+        "425-permit-p84.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100086",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2021-01-01",
+          "warrantyStatus": "expired",
+          "expires": "2026-01-01"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_85",
+      "canonicalName": "Anthony Bennett",
+      "address": "3245 S Higley Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "426-invoice-c85.pdf",
+        "427-proposal-quote-c85.pdf",
+        "428-service-ticket-c85.pdf",
+        "429-maintenance-agreement-c85.pdf",
+        "430-inspection-report-c85.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100087",
+          "model": "YXV026BF31TAA",
+          "brand": "York",
+          "installDate": "2010-06-10",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_86",
+      "canonicalName": "Angela Ibarra",
+      "address": "3282 W Camelback Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "431-invoice-c86.pdf",
+        "432-warranty-registration-c86.pdf",
+        "433-service-ticket-c86.pdf",
+        "434-nameplate-photo-c86.txt",
+        "435-correspondence-c86.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100088",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2017-11-19",
+          "warrantyStatus": "expired",
+          "expires": "2022-11-19"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_87",
+      "canonicalName": "Richard Pruitt",
+      "address": "3319 N Val Vista Dr, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "436-invoice-c87.pdf",
+        "437-proposal-quote-c87.pdf",
+        "438-service-ticket-c87.pdf",
+        "439-other-c87.pdf",
+        "440-purchase-order-c87.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100089",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2024-04-28",
+          "warrantyStatus": "active",
+          "expires": "2029-04-28"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_88",
+      "canonicalName": "Ashley Whitfield",
+      "address": "3356 E Pecos Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "441-invoice-c88.pdf",
+        "442-warranty-registration-c88.pdf",
+        "443-service-ticket-c88.pdf",
+        "444-work-order-c88.pdf",
+        "445-startup-sheet-c88.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100090",
+          "model": "4TTR4004L1000AA",
+          "brand": "Trane",
+          "installDate": "2013-09-09",
+          "warrantyStatus": "expired",
+          "expires": "2023-09-09"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_89",
+      "canonicalName": "Edward Esparza",
+      "address": "3393 S Ellsworth Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "446-invoice-c89.pdf",
+        "447-proposal-quote-c89.pdf",
+        "448-service-ticket-c89.pdf",
+        "449-permit-p89.pdf",
+        "450-dispatch-note-c89.txt"
+      ],
+      "units": [
+        {
+          "serial": "2C100091",
+          "model": "24ACC654A003",
+          "brand": "Carrier",
+          "installDate": "2020-02-18",
+          "warrantyStatus": "expired",
+          "expires": "2025-02-18"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_90",
+      "canonicalName": "Cynthia Larkin",
+      "address": "3430 W Ocotillo Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "451-invoice-c90.pdf",
+        "452-warranty-registration-c90.pdf",
+        "453-service-ticket-c90.pdf",
+        "454-inspection-report-c90.pdf",
+        "455-equipment-record-c90.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100092",
+          "model": "GSX162261FB",
+          "brand": "Goodman",
+          "installDate": "2009-07-27",
+          "warrantyStatus": "expired",
+          "expires": "2019-07-27"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_91",
+      "canonicalName": "Michael Sandoval",
+      "address": "3467 N Recker Rd, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "456-invoice-c91.pdf",
+        "457-proposal-quote-c91.pdf",
+        "458-service-ticket-c91.pdf",
+        "459-correspondence-c91.pdf",
+        "460-maintenance-agreement-c91.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100093",
+          "model": "ML14XC1-036-230",
+          "brand": "Lennox",
+          "installDate": "2016-12-08",
+          "warrantyStatus": "expired",
+          "expires": "2021-12-08"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_92",
+      "canonicalName": "Nancy Alvarez",
+      "address": "3504 E Main St, Oro Valley, AZ 85737",
+      "phone": null,
+      "email": null,
+      "city": "Oro Valley",
+      "state": "AZ",
+      "zip": "85737",
+      "county": "Pima",
+      "docs": [
+        "461-invoice-c92.pdf",
+        "462-warranty-registration-c92.pdf",
+        "463-service-ticket-c92.pdf",
+        "464-purchase-order-c92.pdf",
+        "465-nameplate-photo-c92.txt"
+      ],
+      "units": [
+        {
+          "serial": "2R100094",
+          "model": "RA1436AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2023-05-17",
+          "warrantyStatus": "active",
+          "expires": "2028-05-17"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_93",
+      "canonicalName": "George Hutchins",
+      "address": "3541 W Southern Ave, Oro Valley, AZ 85737",
+      "phone": null,
+      "email": null,
+      "city": "Oro Valley",
+      "state": "AZ",
+      "zip": "85737",
+      "county": "Pima",
+      "docs": [
+        "466-invoice-c93.pdf",
+        "467-proposal-quote-c93.pdf",
+        "468-service-ticket-c93.pdf",
+        "469-startup-sheet-c93.pdf",
+        "470-other-c93.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100095",
+          "model": "YXV046BF31TAA",
+          "brand": "York",
+          "installDate": "2012-10-26",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_94",
+      "canonicalName": "Stephanie Osborn",
+      "address": "3578 N College Ave, Oro Valley, AZ 85737",
+      "phone": null,
+      "email": null,
+      "city": "Oro Valley",
+      "state": "AZ",
+      "zip": "85737",
+      "county": "Pima",
+      "docs": [
+        "471-invoice-c94.pdf",
+        "472-warranty-registration-c94.pdf",
+        "473-service-ticket-c94.pdf",
+        "474-dispatch-note-c94.txt",
+        "475-work-order-c94.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100096",
+          "model": "DZ16SA0561",
+          "brand": "Daikin",
+          "installDate": "2019-03-07",
+          "warrantyStatus": "expired",
+          "expires": "2024-03-07"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_95",
+      "canonicalName": "Timothy Vance",
+      "address": "3615 E University Dr, Oro Valley, AZ 85737",
+      "phone": null,
+      "email": null,
+      "city": "Oro Valley",
+      "state": "AZ",
+      "zip": "85737",
+      "county": "Pima",
+      "docs": [
+        "476-invoice-c95.pdf",
+        "477-proposal-quote-c95.pdf",
+        "478-service-ticket-c95.pdf",
+        "479-equipment-record-c95.pdf",
+        "480-permit-p95.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100097",
+          "model": "MUZ-FS20NA",
+          "brand": "Mitsubishi",
+          "installDate": "2026-08-16",
+          "warrantyStatus": "active",
+          "expires": "2031-08-16"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_96",
+      "canonicalName": "Susan Dominguez",
+      "address": "3652 W Guadalupe Rd, Oro Valley, AZ 85737",
+      "phone": null,
+      "email": null,
+      "city": "Oro Valley",
+      "state": "AZ",
+      "zip": "85737",
+      "county": "Pima",
+      "docs": [
+        "481-invoice-c96.pdf",
+        "482-warranty-registration-c96.pdf",
+        "483-service-ticket-c96.pdf",
+        "484-maintenance-agreement-c96.pdf",
+        "485-inspection-report-c96.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100098",
+          "model": "4TTR4003L1000AA",
+          "brand": "Trane",
+          "installDate": "2015-01-25",
+          "warrantyStatus": "expired",
+          "expires": "2025-01-25"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_97",
+      "canonicalName": "Paul Kowalski",
+      "address": "3689 E Elliot Rd, Marana, AZ 85653",
+      "phone": null,
+      "email": null,
+      "city": "Marana",
+      "state": "AZ",
+      "zip": "85653",
+      "county": "Pima",
+      "docs": [
+        "486-invoice-c97.pdf",
+        "487-proposal-quote-c97.pdf",
+        "488-service-ticket-c97.pdf",
+        "489-nameplate-photo-c97.txt",
+        "490-correspondence-c97.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100099",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2022-06-06",
+          "warrantyStatus": "expiring",
+          "expires": "2027-06-06"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_98",
+      "canonicalName": "Amanda Redwine",
+      "address": "3726 N Greenfield Rd, Marana, AZ 85653",
+      "phone": null,
+      "email": null,
+      "city": "Marana",
+      "state": "AZ",
+      "zip": "85653",
+      "county": "Pima",
+      "docs": [
+        "491-invoice-c98.pdf",
+        "492-warranty-registration-c98.pdf",
+        "493-service-ticket-c98.pdf",
+        "494-other-c98.pdf",
+        "495-purchase-order-c98.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100100",
+          "model": "GSX164261FB",
+          "brand": "Goodman",
+          "installDate": "2011-11-15",
+          "warrantyStatus": "expired",
+          "expires": "2021-11-15"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_99",
+      "canonicalName": "Jason Zamora",
+      "address": "3763 E Broadway Rd, Marana, AZ 85653",
+      "phone": null,
+      "email": null,
+      "city": "Marana",
+      "state": "AZ",
+      "zip": "85653",
+      "county": "Pima",
+      "docs": [
+        "496-invoice-c99.pdf",
+        "497-proposal-quote-c99.pdf",
+        "498-service-ticket-c99.pdf",
+        "499-work-order-c99.pdf",
+        "500-startup-sheet-c99.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100101",
+          "model": "ML14XC1-056-230",
+          "brand": "Lennox",
+          "installDate": "2018-04-24",
+          "warrantyStatus": "expired",
+          "expires": "2023-04-24"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_100",
+      "canonicalName": "Linda Hutchins",
+      "address": "3800 W Baseline Rd, Las Vegas, NV 89101",
+      "phone": null,
+      "email": null,
+      "city": "Las Vegas",
+      "state": "NV",
+      "zip": "89101",
+      "county": "Clark",
+      "docs": [
+        "501-invoice-c100.pdf",
+        "502-warranty-registration-c100.pdf",
+        "503-service-ticket-c100.pdf",
+        "504-permit-p100.pdf",
+        "505-dispatch-note-c100.txt"
+      ],
+      "units": [
+        {
+          "serial": "2R100102",
+          "model": "RA1426AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2025-09-05",
+          "warrantyStatus": "active",
+          "expires": "2030-09-05"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_101",
+      "canonicalName": "Thomas Osborn",
+      "address": "3837 S Alma School Rd, Las Vegas, NV 89101",
+      "phone": null,
+      "email": null,
+      "city": "Las Vegas",
+      "state": "NV",
+      "zip": "89101",
+      "county": "Clark",
+      "docs": [
+        "506-invoice-c101.pdf",
+        "507-proposal-quote-c101.pdf",
+        "508-service-ticket-c101.pdf",
+        "509-inspection-report-c101.pdf",
+        "510-equipment-record-c101.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100103",
+          "model": "YXV036BF31TAA",
+          "brand": "York",
+          "installDate": "2014-02-14",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_102",
+      "canonicalName": "Donna Vance",
+      "address": "3874 E Chandler Blvd, Albuquerque, NM 87101",
+      "phone": null,
+      "email": null,
+      "city": "Albuquerque",
+      "state": "NM",
+      "zip": "87101",
+      "county": "Bernalillo",
+      "docs": [
+        "511-invoice-c102.pdf",
+        "512-warranty-registration-c102.pdf",
+        "513-service-ticket-c102.pdf",
+        "514-correspondence-c102.pdf",
+        "515-maintenance-agreement-c102.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100104",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2021-07-23",
+          "warrantyStatus": "expired",
+          "expires": "2026-07-23"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "res_103",
+      "canonicalName": "Ronald Dominguez",
+      "address": "3911 N Dobson Rd, Los Angeles, CA 90001",
+      "phone": null,
+      "email": null,
+      "city": "Los Angeles",
+      "state": "CA",
+      "zip": "90001",
+      "county": "Los Angeles",
+      "docs": [
+        "516-invoice-c103.pdf",
+        "517-proposal-quote-c103.pdf",
+        "518-service-ticket-c103.pdf",
+        "519-purchase-order-c103.pdf",
+        "520-nameplate-photo-c103.txt"
+      ],
+      "units": [
+        {
+          "serial": "M100105",
+          "model": "MUZ-FS40NA",
+          "brand": "Mitsubishi",
+          "installDate": "2010-12-04",
+          "warrantyStatus": "expired",
+          "expires": "2015-12-04"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "dental_1",
+      "canonicalName": "Copper Sky Dental",
+      "address": "753 W Guadalupe Rd, Suite 105, Phoenix, AZ 85001",
+      "phone": null,
+      "email": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "zip": "85001",
+      "county": "Maricopa",
+      "docs": [
+        "521-maintenance-agreement-dental1.pdf",
+        "522-invoice-dental1.pdf",
+        "523-service-ticket-dental1.pdf",
+        "524-work-order-dental1.pdf",
+        "525-proposal-quote-dental1.pdf",
+        "526-permit-dental1.pdf",
+        "527-startup-sheet-dental1.pdf"
+      ],
+      "units": [
+        {
+          "serial": "F100106",
+          "model": "4TTR4002L1000AA",
+          "brand": "Trane",
+          "installDate": "2017-05-05",
+          "warrantyStatus": "expired",
+          "expires": "2022-05-05"
+        },
+        {
+          "serial": "2C100107",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2017-05-08",
+          "warrantyStatus": "expired",
+          "expires": "2022-05-08"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "restaurant_2",
+      "canonicalName": "Sonoran Grill Restaurant",
+      "address": "806 E Broadway Rd, Suite 110, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "528-maintenance-agreement-restaurant2.pdf",
+        "529-invoice-restaurant2.pdf",
+        "530-service-ticket-restaurant2.pdf",
+        "531-work-order-restaurant2.pdf",
+        "532-proposal-quote-restaurant2.pdf",
+        "533-permit-restaurant2.pdf",
+        "534-startup-sheet-restaurant2.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100108",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2024-10-14",
+          "warrantyStatus": "active",
+          "expires": "2029-10-14"
+        },
+        {
+          "serial": "2G100109",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2024-10-17",
+          "warrantyStatus": "active",
+          "expires": "2029-10-17"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "church_3",
+      "canonicalName": "Holy Trinity Church",
+      "address": "859 E Chandler Blvd, Suite 115, Gilbert, AZ 85234",
+      "phone": null,
+      "email": null,
+      "city": "Gilbert",
+      "state": "AZ",
+      "zip": "85234",
+      "county": "Maricopa",
+      "docs": [
+        "535-maintenance-agreement-church3.pdf",
+        "536-invoice-church3.pdf",
+        "537-service-ticket-church3.pdf",
+        "538-work-order-church3.pdf",
+        "539-proposal-quote-church3.pdf",
+        "540-permit-church3.pdf",
+        "541-startup-sheet-church3.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2G100110",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2013-03-23",
+          "warrantyStatus": "expired",
+          "expires": "2018-03-23"
+        },
+        {
+          "serial": "LX100111",
+          "model": "ML14XC1-046-230",
+          "brand": "Lennox",
+          "installDate": "2013-03-26",
+          "warrantyStatus": "expired",
+          "expires": "2018-03-26"
+        },
+        {
+          "serial": "2R100112",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2013-03-29",
+          "warrantyStatus": "expired",
+          "expires": "2018-03-29"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "restaurant_4",
+      "canonicalName": "Cactus Rose Restaurant",
+      "address": "912 W Thomas Rd, Suite 120, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "542-maintenance-agreement-restaurant4.pdf",
+        "543-invoice-restaurant4.pdf",
+        "544-service-ticket-restaurant4.pdf",
+        "545-work-order-restaurant4.pdf",
+        "546-proposal-quote-restaurant4.pdf",
+        "547-permit-restaurant4.pdf",
+        "548-startup-sheet-restaurant4.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100113",
+          "model": "ML14XC1-046-230",
+          "brand": "Lennox",
+          "installDate": "2020-08-04",
+          "warrantyStatus": "expired",
+          "expires": "2025-08-04"
+        },
+        {
+          "serial": "2R100114",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2020-08-07",
+          "warrantyStatus": "expired",
+          "expires": "2025-08-07"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "school_5",
+      "canonicalName": "Sunrise Valley Elementary School",
+      "address": "965 S Higley Rd, Suite 125, Chandler, AZ 85224",
+      "phone": null,
+      "email": null,
+      "city": "Chandler",
+      "state": "AZ",
+      "zip": "85224",
+      "county": "Maricopa",
+      "docs": [
+        "549-maintenance-agreement-school5.pdf",
+        "550-invoice-school5.pdf",
+        "551-service-ticket-school5.pdf",
+        "552-work-order-school5.pdf",
+        "553-proposal-quote-school5.pdf",
+        "554-permit-school5.pdf",
+        "555-startup-sheet-school5.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2R100115",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2009-01-13",
+          "warrantyStatus": "expired",
+          "expires": "2014-01-13"
+        },
+        {
+          "serial": "Y100116",
+          "model": "YXV026BF31TAA",
+          "brand": "York",
+          "installDate": "2009-01-16",
+          "warrantyStatus": "unknown",
+          "expires": null
+        },
+        {
+          "serial": "D100117",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2009-01-19",
+          "warrantyStatus": "expired",
+          "expires": "2014-01-19"
+        },
+        {
+          "serial": "M100118",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2009-01-22",
+          "warrantyStatus": "expired",
+          "expires": "2014-01-22"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "church_6",
+      "canonicalName": "Grace Community Church",
+      "address": "1018 E Pecos Rd, Suite 130, Casa Grande, AZ 85122",
+      "phone": null,
+      "email": null,
+      "city": "Casa Grande",
+      "state": "AZ",
+      "zip": "85122",
+      "county": "Pinal",
+      "docs": [
+        "556-maintenance-agreement-church6.pdf",
+        "557-invoice-church6.pdf",
+        "558-service-ticket-church6.pdf",
+        "559-work-order-church6.pdf",
+        "560-proposal-quote-church6.pdf",
+        "561-permit-church6.pdf",
+        "562-startup-sheet-church6.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100119",
+          "model": "YXV026BF31TAA",
+          "brand": "York",
+          "installDate": "2016-06-22",
+          "warrantyStatus": "unknown",
+          "expires": null
+        },
+        {
+          "serial": "D100120",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2016-06-25",
+          "warrantyStatus": "expired",
+          "expires": "2021-06-25"
+        },
+        {
+          "serial": "M100121",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2016-06-28",
+          "warrantyStatus": "expired",
+          "expires": "2021-06-28"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "dental_7",
+      "canonicalName": "Canyon View Dental",
+      "address": "1071 N Recker Rd, Suite 135, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "563-maintenance-agreement-dental7.pdf",
+        "564-invoice-dental7.pdf",
+        "565-service-ticket-dental7.pdf",
+        "566-work-order-dental7.pdf",
+        "567-proposal-quote-dental7.pdf",
+        "568-permit-dental7.pdf",
+        "569-startup-sheet-dental7.pdf"
+      ],
+      "units": [
+        {
+          "serial": "D100122",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2023-11-03",
+          "warrantyStatus": "active",
+          "expires": "2028-11-03"
+        },
+        {
+          "serial": "M100123",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2023-11-06",
+          "warrantyStatus": "active",
+          "expires": "2028-11-06"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "restaurant_8",
+      "canonicalName": "Mesquite Table Restaurant",
+      "address": "1124 N College Ave, Suite 140, Tucson, AZ 85701",
+      "phone": null,
+      "email": null,
+      "city": "Tucson",
+      "state": "AZ",
+      "zip": "85701",
+      "county": "Pima",
+      "docs": [
+        "570-maintenance-agreement-restaurant8.pdf",
+        "571-invoice-restaurant8.pdf",
+        "572-service-ticket-restaurant8.pdf",
+        "573-work-order-restaurant8.pdf",
+        "574-proposal-quote-restaurant8.pdf",
+        "575-permit-restaurant8.pdf",
+        "576-startup-sheet-restaurant8.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100124",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2012-04-12",
+          "warrantyStatus": "expired",
+          "expires": "2017-04-12"
+        },
+        {
+          "serial": "F100125",
+          "model": "4TTR4004L1000AA",
+          "brand": "Trane",
+          "installDate": "2012-04-15",
+          "warrantyStatus": "expired",
+          "expires": "2017-04-15"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_1",
+      "canonicalName": "Thomas Quintana",
+      "address": "3300 S Alma School Rd, Apt 101, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "577-invoice-apt1.pdf",
+        "578-service-ticket-apt1.pdf",
+        "579-work-order-apt1.pdf"
+      ],
+      "units": [
+        {
+          "serial": "2C100126",
+          "model": "24ACC634A003",
+          "brand": "Carrier",
+          "installDate": "2022-06-26",
+          "warrantyStatus": "expiring",
+          "expires": "2027-06-26"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_2",
+      "canonicalName": "Donna Winslow",
+      "address": "3300 S Alma School Rd, Apt 102, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "580-invoice-apt2.pdf",
+        "581-service-ticket-apt2.pdf",
+        "582-dispatch-note-apt2.txt"
+      ],
+      "units": [
+        {
+          "serial": "2G100127",
+          "model": "GSX163261FB",
+          "brand": "Goodman",
+          "installDate": "2011-11-07",
+          "warrantyStatus": "expired",
+          "expires": "2021-11-07"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_3",
+      "canonicalName": "Ronald Fenwick",
+      "address": "3300 S Alma School Rd, Apt 103, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "583-invoice-apt3.pdf",
+        "584-service-ticket-apt3.pdf",
+        "585-work-order-apt3.pdf"
+      ],
+      "units": [
+        {
+          "serial": "LX100128",
+          "model": "ML14XC1-046-230",
+          "brand": "Lennox",
+          "installDate": "2018-04-16",
+          "warrantyStatus": "expired",
+          "expires": "2023-04-16"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_4",
+      "canonicalName": "Amy Larkin",
+      "address": "3300 S Alma School Rd, Apt 104, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "586-invoice-apt4.pdf",
+        "587-service-ticket-apt4.pdf",
+        "588-dispatch-note-apt4.txt"
+      ],
+      "units": [
+        {
+          "serial": "2R100129",
+          "model": "RA1456AJ1NA",
+          "brand": "Rheem",
+          "installDate": "2025-09-25",
+          "warrantyStatus": "active",
+          "expires": "2030-09-25"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_5",
+      "canonicalName": "David Sandoval",
+      "address": "3300 S Alma School Rd, Apt 105, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "589-invoice-apt5.pdf",
+        "590-service-ticket-apt5.pdf",
+        "591-work-order-apt5.pdf"
+      ],
+      "units": [
+        {
+          "serial": "Y100130",
+          "model": "YXV026BF31TAA",
+          "brand": "York",
+          "installDate": "2014-02-06",
+          "warrantyStatus": "unknown",
+          "expires": null
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_6",
+      "canonicalName": "Sandra Alvarez",
+      "address": "3300 S Alma School Rd, Apt 106, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "592-invoice-apt6.pdf",
+        "593-service-ticket-apt6.pdf",
+        "594-dispatch-note-apt6.txt"
+      ],
+      "units": [
+        {
+          "serial": "D100131",
+          "model": "DZ16SA0361",
+          "brand": "Daikin",
+          "installDate": "2021-07-15",
+          "warrantyStatus": "expired",
+          "expires": "2026-07-15"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_7",
+      "canonicalName": "Steven Hutchins",
+      "address": "3300 S Alma School Rd, Apt 107, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "595-invoice-apt7.pdf",
+        "596-service-ticket-apt7.pdf",
+        "597-work-order-apt7.pdf"
+      ],
+      "units": [
+        {
+          "serial": "M100132",
+          "model": "MUZ-FS30NA",
+          "brand": "Mitsubishi",
+          "installDate": "2010-12-24",
+          "warrantyStatus": "expired",
+          "expires": "2015-12-24"
+        }
+      ],
+      "expectedAlert": null
+    },
+    {
+      "key": "apt_8",
+      "canonicalName": "Laura Nakamura",
+      "address": "3300 S Alma School Rd, Apt 108, Mesa, AZ 85201",
+      "phone": null,
+      "email": null,
+      "city": "Mesa",
+      "state": "AZ",
+      "zip": "85201",
+      "county": "Maricopa",
+      "docs": [
+        "598-invoice-apt8.pdf",
+        "599-service-ticket-apt8.pdf",
+        "600-dispatch-note-apt8.txt"
+      ],
+      "units": [
+        {
+          "serial": "F100133",
+          "model": "4TTR4004L1000AA",
+          "brand": "Trane",
+          "installDate": "2017-05-05",
+          "warrantyStatus": "expiring",
+          "expires": "2027-05-05"
+        }
+      ],
+      "expectedAlert": null
+    }
+  ],
+  "mustNotMerge": [
+    [
+      "res_2",
+      "res_11"
+    ],
+    [
+      "res_20",
+      "res_33"
+    ]
+  ],
+  "docsWithoutCustomer": [
+    "601-dispatch-note-shop-truck.txt",
+    "602-other-parts-count.pdf",
+    "603-dispatch-note-shop-radio.txt",
+    "604-other-holiday-schedule.pdf"
+  ],
+  "nameVariantCustomers": [
+    "res_5",
+    "res_40",
+    "res_55"
+  ],
+  "totals": {
+    "customers": 120,
+    "byState": {
+      "AZ": 116,
+      "NV": 2,
+      "NM": 1,
+      "CA": 1
+    },
+    "byCounty": {
+      "Maricopa": 70,
+      "Pinal": 26,
+      "Pima": 20
+    },
+    "byCity": {
+      "Phoenix": 10,
+      "Mesa": 16,
+      "Gilbert": 8,
+      "Chandler": 10,
+      "Tempe": 8,
+      "Scottsdale": 6,
+      "Glendale": 6,
+      "Peoria": 4,
+      "Queen Creek": 2,
+      "San Tan Valley": 8,
+      "Casa Grande": 8,
+      "Maricopa": 6,
+      "Florence": 4,
+      "Tucson": 12,
+      "Oro Valley": 5,
+      "Marana": 3,
+      "Las Vegas": 2,
+      "Albuquerque": 1,
+      "Los Angeles": 1
+    }
+  },
+  "equipmentByBrand": {
+    "Trane": 17,
+    "Carrier": 15,
+    "Goodman": 17,
+    "Rheem": 17,
+    "York": 16,
+    "Daikin": 17,
+    "Mitsubishi": 18,
+    "Lennox": 15
+  },
+  "warrantyStatusCounts": {
+    "expired": 77,
+    "active": 33,
+    "expiring": 6,
+    "unknown": 16
+  },
+  "documentsByType": {
+    "invoice": 120,
+    "warranty-registration": 52,
+    "service-ticket": 120,
+    "work-order": 31,
+    "startup-sheet": 27,
+    "proposal-quote": 60,
+    "permit": 27,
+    "dispatch-note": 25,
+    "inspection-report": 19,
+    "equipment-record": 19,
+    "correspondence": 19,
+    "maintenance-agreement": 27,
+    "purchase-order": 19,
+    "nameplate-photo": 19,
+    "other": 20
+  },
+  "totalDocuments": 604,
+  "totalUnits": 132,
+  "questions": [
+    {
+      "q": "How many customers do we have in Arizona?",
+      "expectedContains": [
+        "116",
+        "116 customers"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Maricopa County?",
+      "expectedContains": [
+        "70",
+        "70 customers"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Pinal County?",
+      "expectedContains": [
+        "26",
+        "26 customers"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Pima County?",
+      "expectedContains": [
+        "20",
+        "20 customers"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Nevada?",
+      "expectedContains": [
+        "2"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in New Mexico?",
+      "expectedContains": [
+        "1"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in California?",
+      "expectedContains": [
+        "1"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Yuma County?",
+      "expectedContains": [
+        "0"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "List customers in Gilbert",
+      "expectedContains": [
+        "Carol Rios",
+        "Kevin Zimmerman",
+        "Maria Gallardo"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "List customers in Tucson",
+      "expectedContains": [
+        "Patricia Fenwick",
+        "Charles Montoya",
+        "Michelle Tovar"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Chandler?",
+      "expectedContains": [
+        "10"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Mesa?",
+      "expectedContains": [
+        "16"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Casa Grande?",
+      "expectedContains": [
+        "8"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many units are out of warranty?",
+      "expectedContains": [
+        "77",
+        "77 units"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many units are still under warranty?",
+      "expectedContains": [
+        "33"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many units are expiring soon?",
+      "expectedContains": [
+        "6"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many units have an unknown warranty status?",
+      "expectedContains": [
+        "16"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "Which customers have Trane units?",
+      "expectedContains": [
+        "Linda Fitzgerald",
+        "Laura Lombardi",
+        "Robert Salazar"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "Which customers have Goodman units?",
+      "expectedContains": [
+        "Sorensen",
+        "Ronald Bracken",
+        "Karen Abernathy"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "Which customers have York units?",
+      "expectedContains": [
+        "David Prentiss",
+        "Gary Villegas",
+        "Brian Chavez"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers have Mitsubishi units?",
+      "expectedContains": [
+        "18"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many Goodman units are older than 10 years?",
+      "expectedContains": [
+        "8"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many Trane units are older than 15 years?",
+      "expectedContains": [
+        "4"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many documents did we add this month?",
+      "expectedContains": [
+        "604"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in total?",
+      "expectedContains": [
+        "120"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many units of equipment do we have on file?",
+      "expectedContains": [
+        "132"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "Give me a breakdown of customers by county",
+      "expectedContains": [
+        "Maricopa",
+        "70"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "Group equipment by brand",
+      "expectedContains": [
+        "Trane",
+        "17"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Scottsdale?",
+      "expectedContains": [
+        "6"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "How many customers do we have in Oro Valley?",
+      "expectedContains": [
+        "5"
+      ],
+      "type": "analytics"
+    },
+    {
+      "q": "What's the serial number of the unit at 100 E Main St, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "F100002"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 137 W Southern Ave, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "2C100003"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 211 E University Dr, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "LX100005"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 433 S Alma School Rd, Mesa, AZ 85201?",
+      "expectedContains": [
+        "2C100011"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 174 N College Ave, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "2G100004"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 507 N Dobson Rd, Mesa, AZ 85201?",
+      "expectedContains": [
+        "LX100013"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 840 S Ellsworth Rd, Gilbert, AZ 85234?",
+      "expectedContains": [
+        "2R100022"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 1321 E Chandler Blvd, Tempe, AZ 85281?",
+      "expectedContains": [
+        "2C100035"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 3300 S Alma School Rd, Apt 101, Mesa, AZ 85201?",
+      "expectedContains": [
+        "2C100126"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 3300 S Alma School Rd, Apt 102, Mesa, AZ 85201?",
+      "expectedContains": [
+        "2G100127"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Copper Sky Dental?",
+      "expectedContains": [
+        "F100106",
+        "2C100107"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Canyon View Dental?",
+      "expectedContains": [
+        "D100122",
+        "M100123"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Sunrise Valley Elementary School?",
+      "expectedContains": [
+        "2R100115",
+        "Y100116",
+        "D100117",
+        "M100118"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Holy Trinity Church?",
+      "expectedContains": [
+        "2G100110",
+        "LX100111",
+        "2R100112"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Grace Community Church?",
+      "expectedContains": [
+        "Y100119",
+        "D100120",
+        "M100121"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Sonoran Grill Restaurant?",
+      "expectedContains": [
+        "2C100108",
+        "2G100109"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Cactus Rose Restaurant?",
+      "expectedContains": [
+        "LX100113",
+        "2R100114"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What equipment is installed at Mesquite Table Restaurant?",
+      "expectedContains": [
+        "M100124",
+        "F100125"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 1728 W Ocotillo Rd, Scottsdale, AZ 85251?",
+      "expectedContains": [
+        "2R100046"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 2542 S Ellsworth Rd, Casa Grande, AZ 85122?",
+      "expectedContains": [
+        "2G100068"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 2949 W Baseline Rd, Maricopa, AZ 85138?",
+      "expectedContains": [
+        "Y100079"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "What's the serial number of the unit at 3356 E Pecos Rd, Tucson, AZ 85701?",
+      "expectedContains": [
+        "F100090"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 100 E Main St, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Trane"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 137 W Southern Ave, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Carrier"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 174 N College Ave, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Goodman"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 211 E University Dr, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Goodman"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 248 W Guadalupe Rd, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Rheem"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 285 E Elliot Rd, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "York"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 322 N Greenfield Rd, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Daikin"
+      ],
+      "type": "lookup"
+    },
+    {
+      "q": "Who makes the unit at 359 E Broadway Rd, Phoenix, AZ 85001?",
+      "expectedContains": [
+        "Mitsubishi"
+      ],
+      "type": "lookup"
+    }
+  ]
+}

@@ -23,6 +23,8 @@ import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
+import { preClassifyAnalytics } from "./_lib/analytics.js";
+import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -500,6 +502,13 @@ export default async function handler(req, res) {
     // ASK_FAST_PATH=0. classifyFastPath is pure (no DB) so this costs nothing
     // when it returns null, which most non-meta questions still will.
     const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
+    // Analytics pre-router (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md): a
+    // cheap deterministic regex gate (preClassifyAnalytics, no DB/model cost)
+    // decides whether this question is even WORTH the one Haiku planner call
+    // below — most questions still won't match and pay nothing extra. Tried
+    // after meta and fast path (both already own their own question shapes)
+    // and, like fast path, never fired for a meta question.
+    const analyticsCandidate = !meta && !fastPathIntent && isAnalyticsEnabled() && preClassifyAnalytics(question);
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
@@ -538,7 +547,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || fastPathIntent
+    const retrievalPromise = meta || fastPathIntent || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
 
@@ -627,7 +636,110 @@ export default async function handler(req, res) {
       // run it now, inline — identical fallback shape to the meta-router's own.
     }
 
-    // ---- 1. retrieve (already in flight above unless meta or fast path fell through) ---
+    // ---- 0.7 analytics pre-router (ONE Haiku tool-use call, before retrieval) --
+    // "how many customers in Arizona", "list customers in Gilbert", "which
+    // customers have Trane units" — counting/grouping/listing questions that
+    // otherwise have no path (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md). The
+    // model gets exactly one tool-use call with a strict, closed-vocabulary
+    // schema (api/_lib/analytics.js's ANALYTICS_TOOL) and NEVER writes SQL or
+    // free prose; the answer text itself is composed deterministically in code
+    // from the query results, same "no second model call" contract the
+    // meta-router and fast path both already keep. A plan the model returns
+    // that doesn't fit the vocabulary, or that matches no data the executor
+    // can act on, falls through to retrieval+model exactly like a fast-path
+    // miss — see runAnalyticsQuestion's own doc comment.
+    if (analyticsCandidate) {
+      let analyticsResult = null;
+      try {
+        // The one real model call this branch can make must respect the same
+        // daily spend budget the main retrieval+model path enforces — already
+        // in flight (fired concurrently with the gate check above), just
+        // consulted here instead of after retrieval.
+        await budgetPromise;
+        // No `questionHash` passed through: runAnalyticsQuestion computes its
+        // own namespaced hashes (api/_lib/analytics.js's analyticsQuestionHash/
+        // analyticsPlanHash) so an analytics cache row can never collide with
+        // — or be shadowed by — a retrieval-cached row for the same question
+        // text (2026-09-21 reviewer fix, handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md).
+        analyticsResult = await timer.time("analytics_plan", () =>
+          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved })
+        );
+      } catch (err) {
+        // A tenant already over its daily model budget must not spend a
+        // retrieval round trip finding that out a second time right below —
+        // let the outer handler's own ModelBudgetExceededError branch answer
+        // this exactly once, the same clean 429 the main model call gets.
+        if (err?.name === "ModelBudgetExceededError") throw err;
+        console.error("Analytics path failed, falling through to retrieval+model:", err?.message);
+      }
+      console.log(
+        JSON.stringify({
+          route: "ask",
+          analytics_candidate: true,
+          analytics_hit: Boolean(analyticsResult?.handled),
+          analytics_cache_hit: Boolean(analyticsResult?.cacheHit),
+        })
+      );
+      if (analyticsResult?.handled) {
+        const data = analyticsResult.cacheHit ? { ...analyticsResult.data, cached: true } : analyticsResult.data;
+        send(200, { success: true, data });
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, async (db) => {
+              try {
+                await db.logAction({
+                  action: "document.queried",
+                  resource_type: "question",
+                  clerk_user_id: auth.userId,
+                  changes: {
+                    question_hash: hashQuestion(question),
+                    documents: [],
+                    passages: 0,
+                    analytics: true,
+                    cached: analyticsResult.cacheHit,
+                  },
+                });
+              } catch (err) {
+                console.error("Failed to write document.queried audit row (analytics):", err?.message);
+              }
+              // Cache write — same corpus_stamp mechanism askCache.js already
+              // gives the retrieval+model path (design point 3: "cache via
+              // askCache with corpus_stamp"), but under analytics' OWN
+              // namespaced hashes, never the shared `questionHash` above (see
+              // runAnalyticsQuestion's doc comment). Two rows on a fresh
+              // answer — Tier 1 (this exact question text) and Tier 2 (this
+              // exact plan, reusable by a differently-worded question that
+              // resolves to it) — a cache hit above already reused a prior
+              // write, so `writes` is empty and this loop is a no-op.
+              if (!analyticsResult.cacheHit && ASK_CACHE_ENABLED && shouldCache(data.kind, 0, 0)) {
+                for (const w of analyticsResult.writes ?? []) {
+                  if (!w.corpusStamp) continue;
+                  await db.raw("SAVEPOINT analytics_cache_upsert", []);
+                  try {
+                    await upsertCacheEntry(db, {
+                      questionHash: w.questionHash, corpusStamp: w.corpusStamp, today: todayResolved, answer: data,
+                    });
+                    await db.raw("RELEASE SAVEPOINT analytics_cache_upsert", []);
+                  } catch (err) {
+                    console.error("Failed to upsert analytics cache row:", err?.message);
+                    await db.raw("ROLLBACK TO SAVEPOINT analytics_cache_upsert", []).catch(() => {});
+                  }
+                }
+              }
+            });
+          } catch (err) {
+            console.error("Analytics bookkeeping transaction failed:", err?.message);
+          }
+        });
+        return;
+      }
+      // Not handled (invalid plan, no matching data, or an error): retrieval
+      // was never started above (retrievalPromise is null for an analytics
+      // candidate), so run it now, inline — identical fallback shape to the
+      // fast-path miss above.
+    }
+
+    // ---- 1. retrieve (already in flight above unless meta, fast path, or analytics fell through) ---
     const { passages, extractions, cacheHit, cachedAnswer, corpusStamp } = retrievalPromise
       ? await retrievalPromise
       : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });

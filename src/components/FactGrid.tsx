@@ -22,6 +22,50 @@ interface FactGridProps {
 }
 
 /**
+ * Donovan analytics groupBy/list answers (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md)
+ * arrive as ordinary facts — "Gilbert" / "5" — with no sources and no status
+ * pill, same shape a meta-router count answer already used. Once there are
+ * more than a few of them (a city/county/brand breakdown), the citation-chip
+ * column buys nothing (there is nothing to cite) and the roomy per-row layout
+ * below reads as a list, not a table. This is purely a rendering choice off
+ * the EXISTING Fact shape — no new response type, no change to core/types.ts.
+ */
+const GROUP_TABLE_THRESHOLD = 5;
+
+function isGroupLikeFact(f: Fact): boolean {
+  return !f.status && f.sources.length === 0;
+}
+
+function GroupTable({ facts, onOpenEntity }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void }) {
+  return (
+    <dl className="border border-line rounded-lg bg-surface divide-y divide-line grid grid-cols-1 sm:grid-cols-2">
+      {facts.map((f, i) => {
+        const linkable = !!(f.entityId && onOpenEntity);
+        return (
+          <div
+            key={`${f.label}-${i}`}
+            className="flex items-baseline justify-between gap-3 px-3 py-1.5 border-b border-line sm:border-b-0 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0"
+          >
+            <dt className="text-body text-ink-2 truncate">{f.label}</dt>
+            {linkable ? (
+              <button
+                type="button"
+                onClick={() => f.entityId && onOpenEntity?.(f.entityId)}
+                className="font-mono text-data text-ink underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 dark:hover:decoration-brass-300"
+              >
+                {f.value}
+              </button>
+            ) : (
+              <dd className="font-mono text-data text-ink">{f.value}</dd>
+            )}
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+/**
  * Key/value grid of the records an answer is built from. Status facts render
  * as pills (with text — colour is never the only signal). Each row shows its
  * citation numbers; tapping one opens that document at the cited field.
@@ -30,6 +74,19 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLa
   const docs = useGraph((s) => s.docs);
   const schema = useGraph((s) => s.schema);
   if (!facts.length) return null;
+
+  // A groupBy/list breakdown (many sourceless, statusless rows) renders as a
+  // dense two-column table instead of the citation-oriented grid below.
+  if (facts.length > GROUP_TABLE_THRESHOLD && facts.every(isGroupLikeFact)) {
+    return (
+      <section aria-labelledby="facts-heading">
+        <div className="mb-2">
+          <h3 id="facts-heading" className="dw-label">Breakdown</h3>
+        </div>
+        <GroupTable facts={facts} onOpenEntity={onOpenEntity} />
+      </section>
+    );
+  }
   // Owner follow-up (2026-09-21): "signify the citations better". A bare
   // [2] is a footnote; "2 · Invoice" says what kind of page backs the fact
   // before you tap. Type label from the graph; filename in the tooltip.

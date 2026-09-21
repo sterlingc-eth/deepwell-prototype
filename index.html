@@ -533,6 +533,33 @@ footer a{color:var(--muted);text-decoration:none}
 .mm-ticks li:nth-child(2) path{transition-delay:.1s}
 .mm-ticks li:nth-child(3) path{transition-delay:.2s}
 .mm-ticks li:nth-child(4) path{transition-delay:.3s}
+
+/* ------------------------------------------------------------------ */
+/* Industries nav dropdown (Workstream C, 2026-09-21). Lives inside      */
+/* .navlinks alongside the plain section links; does not touch the      */
+/* hero canvas IIFE or the numbered micro-animation blocks above.       */
+/* ------------------------------------------------------------------ */
+.nav-dropdown{position:relative}
+.nav-dropdown-toggle{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:.92rem;
+  font-weight:500;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}
+.nav-dropdown-toggle:hover,.nav-dropdown.open .nav-dropdown-toggle{color:var(--text)}
+.nav-dropdown-caret{flex:none;transition:transform .2s ease}
+.nav-dropdown.open .nav-dropdown-caret{transform:rotate(180deg)}
+.nav-dropdown-menu{position:absolute;top:calc(100% + 18px);left:50%;min-width:250px;
+  transform:translateX(-50%) translateY(-6px);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow);padding:8px;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;z-index:30}
+.nav-dropdown.open .nav-dropdown-menu{opacity:1;visibility:visible;pointer-events:auto;
+  transform:translateX(-50%) translateY(0)}
+.nav-dropdown-menu a{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
+.nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
+.nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
+.nav-dropdown-menu .tag.live{color:var(--well);background:color-mix(in srgb,var(--well) 16%,transparent)}
+:root[data-theme="dark"] .nav-dropdown-menu .tag.live{color:#9DC4B2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .nav-dropdown-menu .tag.live{color:#9DC4B2}}
+.nav-dropdown-menu .tag.soon{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 18%,transparent)}
 </style>
 
 <noscript><style>
@@ -589,6 +616,24 @@ footer a{color:var(--muted);text-decoration:none}
       <a href="#platform">Platform</a>
       <a href="#demo">What it feels like</a>
       <a href="#who">Who it's for</a>
+      <!-- Industries nav dropdown (Workstream C, 2026-09-21) — see the
+           labeled CSS block above and the standalone script near the end
+           of </body>. Keyboard: Enter/Space/↓ opens and focuses the first
+           item, ↑/↓ move between items, Esc closes and returns focus, Tab
+           closes on focus-out. Touch: the toggle is a real <button>, so a
+           tap fires the same click handler as a mouse click. -->
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
+          Industries
+          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Industries">
+          <a role="menuitem" href="/industries/hvac.html">HVAC <span class="tag live">Live</span></a>
+          <a role="menuitem" href="/industries/electrical.html">Electrical <span class="tag soon">Coming</span></a>
+          <a role="menuitem" href="/industries/plumbing.html">Plumbing <span class="tag soon">Coming</span></a>
+          <a role="menuitem" href="/industries/property-management.html">Property management <span class="tag soon">Coming</span></a>
+        </div>
+      </div>
       <a href="#plans">Pricing</a>
     </div>
     <div class="navcta">
@@ -1685,6 +1730,73 @@ const DEMO=[
     }, {threshold:.4});
     io.observe(ticks);
   })();
+})();
+</script>
+<script>
+/* Industries nav dropdown (Workstream C, 2026-09-21) — a standalone script,
+   deliberately separate from the numbered micro-animation IIFEs above and
+   from the hero-well IIFE, so neither is touched by this addition. */
+(function () {
+  var dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  var toggle = dd.querySelector('.nav-dropdown-toggle');
+  var menu = dd.querySelector('.nav-dropdown-menu');
+  if (!toggle || !menu) return;
+  var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+
+  function isOpen() { return dd.classList.contains('open'); }
+  function open() {
+    dd.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+  function close(focusToggle) {
+    dd.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (focusToggle) toggle.focus();
+  }
+
+  // Click/tap toggles — a <button> receives a synthesized click on touch
+  // devices, so this covers both input types with one handler.
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isOpen()) { close(false); } else { open(); }
+  });
+
+  toggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+      if (items[0]) items[0].focus();
+    } else if (e.key === 'Escape' && isOpen()) {
+      close(true);
+    }
+  });
+
+  menu.addEventListener('keydown', function (e) {
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = items[(i + 1) % items.length];
+      if (next) next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = items[(i - 1 + items.length) % items.length];
+      if (prev) prev.focus();
+    } else if (e.key === 'Escape') {
+      close(true);
+    } else if (e.key === 'Tab') {
+      setTimeout(function () {
+        if (!dd.contains(document.activeElement)) close(false);
+      }, 0);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
 })();
 </script>
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>

@@ -42,6 +42,28 @@ AI is named Donovan. Haiku everywhere. Be efficient — cheapest model, no waste
   (`handoffs/BRAND_MOTION_A_2026-09-21.md`) + animated nav logo +
   `public/logo-animated.svg`.
 
+## Done later on 2026-09-21 (all committed; owner pushes)
+- Hard billing gate (handoffs/HARD_GATE_2026-09-21.md): no free preview; every
+  model/storage path 402s for 'none'/'canceled', cron + Inngest worker gated.
+- Tech follow-ups (handoffs/TECH_FOLLOWUPS_2026-09-21.md), Team → Follow-ups.
+- Website micro-animations (BRAND_MOTION_B), Donovan hero REVERTED to the
+  original rings at owner request (v3 code preserved in BRAND_MOTION_A3).
+- QA crawl (QA_WEBSITE, QA_APP_API): pricing ?plan= now survives sign-up.
+- Donovan analytics (DONOVAN_ANALYTICS_A): "how many customers in Maricopa
+  County / Arizona / Gilbert", "which customers have Trane units", counts by
+  brand/warranty/document type/month. One Haiku planner call, whitelisted
+  SQL, ZIP→county table api/_lib/geo/zip-county.json.
+- 604-document business corpus (BUSINESS_CORPUS): `node scripts/synth-business.mjs
+  && node scripts/build-bundle.mjs test-docs/business`, then
+  scripts/browser-ingest.js in the signed-in app console; score with
+  `node scripts/score-corpus.mjs --dir <snap> --key test-docs/business/ANSWER_KEY.json`.
+  NOT YET UPLOADED — owner's app session expired; ≈ $7 Haiku.
+- Industry expansion (INDUSTRY_EXPANSION): order electrical → plumbing →
+  property; website Industries dropdown + public/industries/*.html; domain
+  scaffolds src/domains/{electrical,plumbing,property} (inert).
+- Promo: video/deepwell-promo-v3*.mp4 (code-rendered), video/PROMO_DIY_GUIDE.md
+  (free tools + master prompt), video/STORYBOARD_APPLE_STYLE.md.
+
 ## Open requests from the owner (split across new chats)
 1. **Website micro-animations** — section B of
    `handoffs/BRAND_MOTION_BRIEF_2026-09-21.md` (reactbits.dev/c/micro style,

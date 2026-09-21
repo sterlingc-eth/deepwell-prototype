@@ -96,20 +96,28 @@ export function _resetTableExistsForTests() {
  * row alongside it. `db` is a recordsStore.js store (has `.raw`), called
  * from INSIDE api/ask.js's retrieval `withTenant` transaction.
  *
+ * `promptVersion` defaults to this file's own PROMPT_VERSION (the
+ * retrieval+model path's fingerprint) so every existing caller is unchanged.
+ * A caller with its own prompt/schema — api/_lib/routes/analytics.js passes
+ * `ANALYTICS_PROMPT_VERSION` — passes it explicitly, so its cache rows react
+ * to ITS OWN prompt/schema changing, not retrieval's (2026-09-21 reviewer
+ * fix, handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md: analytics answers used to
+ * mix in retrieval's prompt version even though they share nothing with it).
+ *
  * @returns {Promise<{corpusStamp: string|null, row: {cached_stamp: string, answer: any, created_at: Date}|null}>}
  */
-export async function getCacheEntry(db, { questionHash, today }) {
+export async function getCacheEntry(db, { questionHash, today, promptVersion = PROMPT_VERSION }) {
   if (!ASK_CACHE_ENABLED) return { corpusStamp: null, row: null };
 
   if (tableExists === false) {
     const { rows } = await db.raw(STAMP_ONLY_SQL, []);
-    return { corpusStamp: withPromptVersion(rows[0].corpus_stamp), row: null };
+    return { corpusStamp: withPromptVersion(rows[0].corpus_stamp, promptVersion), row: null };
   }
 
   const run = async () => {
     const { rows } = await db.raw(COMBINED_SQL, [questionHash, today]);
     const row = rows[0];
-    return { corpusStamp: withPromptVersion(row.corpus_stamp), row: row.cached_stamp != null ? row : null };
+    return { corpusStamp: withPromptVersion(row.corpus_stamp, promptVersion), row: row.cached_stamp != null ? row : null };
   };
 
   if (tableExists === true) return run();
@@ -129,7 +137,7 @@ export async function getCacheEntry(db, { questionHash, today }) {
       tableExists = false;
       logOnce("ask_answer_cache", err);
       const { rows } = await db.raw(STAMP_ONLY_SQL, []);
-      return { corpusStamp: withPromptVersion(rows[0].corpus_stamp), row: null };
+      return { corpusStamp: withPromptVersion(rows[0].corpus_stamp, promptVersion), row: null };
     }
     throw err;
   }
