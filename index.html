@@ -45,6 +45,12 @@
   --brass-text:#8E6530;
   --wordmark-deep:#04315A;   /* true logo navy */
   --dwflow-dur:9.5s;         /* one full "how it works" cycle */
+  --dv-rgb-well:22,60,44;       /* Donovan well: deep */
+  --dv-rgb-mid:36,82,57;        /* Donovan well: mid */
+  --dv-rgb-shallow:90,140,108;  /* Donovan well: shallow */
+  --dv-rgb-rim:157,196,178;     /* Donovan well: rim / light accent */
+  --dv-rgb-brass:185,138,78;    /* Donovan well: brass, rgb of --brass */
+  --dv-rgb-ink:79,98,89;        /* Donovan well: particle ink, rgb of --muted */
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -55,6 +61,7 @@
     --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.45), transparent 60%);
     --shadow:0 20px 50px -30px rgba(0,0,0,.8);
     --brass-text:#D8AE6E;
+    --dv-rgb-ink:169,187,178;   /* rgb of dark --muted */
   }
 }
 :root[data-theme="dark"]{
@@ -67,6 +74,7 @@
   --hero-grad:radial-gradient(1200px 600px at 80% -10%, rgba(18,61,107,.45), transparent 60%);
   --shadow:0 20px 50px -30px rgba(0,0,0,.8);
   --brass-text:#D8AE6E;
+  --dv-rgb-ink:169,187,178;   /* rgb of dark --muted */
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -134,18 +142,38 @@ a{color:inherit}
 .fact b{font-family:"Newsreader",serif;font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
 .fact span{font-size:.78rem;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-family:"IBM Plex Mono",monospace}
 .well{position:relative;max-width:380px;width:100%;margin-left:auto;display:flex;flex-direction:column;gap:14px}
-.well canvas{width:100%;aspect-ratio:1;display:block}
-/* Donovan: the well is his mark. A lit sphere with brass rings that breathe;
-   under it, a question becoming an answer — the thing the product does. */
-.donovan-chat{display:flex;flex-direction:column;gap:8px;min-height:84px;font-size:.92rem;line-height:1.35}
+.well canvas{width:100%;aspect-ratio:1;display:block;touch-action:none}
+/* Donovan: a well of concentric light seen from above, with real depth —
+   rings recede and dim toward the centre, document fragments drift at the
+   edges and are drawn in while he reads, a single brass line rises back out
+   with the answer. Under it, the question becoming an answer in text. */
+.donovan-chat{display:flex;flex-direction:column;gap:9px;min-height:92px;font-size:.92rem;line-height:1.35}
 .donovan-q,.donovan-a{display:flex;gap:10px;align-items:flex-start}
-.donovan-who{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding-top:3px;width:64px}
+.donovan-who{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding-top:2px;width:20px;display:flex;align-items:center;justify-content:flex-start}
+.donovan-q .donovan-who{width:64px;padding-top:3px;font-size:.7rem}
 .donovan-who-d{color:var(--brass)}
+.donovan-avatar{width:18px;height:18px;display:block;overflow:visible}
+.donovan-avatar circle{fill:none;stroke:currentColor;stroke-width:7}
+.donovan-avatar circle:last-child{fill:currentColor;stroke:none}
 .donovan-a{color:var(--text)}
 .donovan-q{color:var(--muted)}
+.donovan-a-wrap{display:inline}
 #donovan-a::after{content:"";display:inline-block;width:2px;height:1em;background:var(--brass);margin-left:2px;vertical-align:-2px;animation:donovan-caret 1s steps(2) infinite}
 @keyframes donovan-caret{50%{opacity:0}}
-@media (prefers-reduced-motion:reduce){#donovan-a::after{animation:none}}
+.donovan-src{display:inline-flex;align-items:center;gap:4px;margin-left:9px;padding:2px 8px 2px 6px;border-radius:999px;border:1px solid var(--line-strong);color:var(--faint);
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.03em;white-space:nowrap;vertical-align:middle;
+  opacity:0;transform:translateY(3px) scale(.94);
+  transition:opacity .4s cubic-bezier(.16,1,.3,1),transform .4s cubic-bezier(.16,1,.3,1)}
+.donovan-src.show{opacity:1;transform:translateY(0) scale(1)}
+.donovan-src-ic{width:10px;height:10px;flex:none}
+.donovan-src-ic path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.dv-msg.dv-in{animation:dv-rise .5s cubic-bezier(.16,1,.3,1)}
+@keyframes dv-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){
+  #donovan-a::after{animation:none}
+  .dv-msg.dv-in{animation:none}
+  .donovan-src{transition:none}
+}
 @media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.well{max-width:360px;margin:0 auto;order:-1}}
 
 /* hero micro-loop: a document quietly becoming an answer, next to the headline */
@@ -436,9 +464,25 @@ footer a{color:var(--muted);text-decoration:none}
   <div class="wrap">
     <a class="brand" href="#top" aria-label="DeepWell Technology home">
       <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <style>
+          .mark .dv-r{animation:dvDraw .5s cubic-bezier(.16,1,.3,1) forwards}
+          @keyframes dvDraw{to{stroke-dashoffset:0}}
+          .mark .dv-ripple{opacity:0}
+          .brand:hover .mark .dv-ripple{animation:dvRipple .7s cubic-bezier(.16,1,.3,1)}
+          @keyframes dvRipple{from{opacity:.8;r:22;stroke-width:4}to{opacity:0;r:50;stroke-width:.5}}
+          @media (prefers-reduced-motion:reduce){
+            .mark .dv-r{animation:none;stroke-dashoffset:0}
+            .mark .dv-ripple{display:none}
+          }
+        </style>
         <g fill="none" stroke="var(--well)" stroke-width="4">
-          <circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="10"/>
+          <circle class="dv-r" cx="50" cy="50" r="10" stroke-dasharray="62.83" stroke-dashoffset="62.83" style="animation-delay:0s"/>
+          <circle class="dv-r" cx="50" cy="50" r="19" stroke-dasharray="119.38" stroke-dashoffset="119.38" style="animation-delay:.09s"/>
+          <circle class="dv-r" cx="50" cy="50" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" style="animation-delay:.18s"/>
+          <circle class="dv-r" cx="50" cy="50" r="37" stroke-dasharray="232.48" stroke-dashoffset="232.48" style="animation-delay:.27s"/>
+          <circle class="dv-r" cx="50" cy="50" r="46" stroke-dasharray="289.03" stroke-dashoffset="289.03" style="animation-delay:.36s"/>
         </g>
+        <circle class="dv-ripple" cx="50" cy="50" r="22" fill="none" stroke="var(--brass)" stroke-width="4"/>
       </svg>
       <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
     </a>
@@ -496,8 +540,13 @@ footer a{color:var(--muted);text-decoration:none}
     <div class="well" aria-hidden="true">
       <canvas id="well"></canvas>
       <div class="donovan-chat">
-        <div class="donovan-q"><span class="donovan-who">You</span><span id="donovan-q"></span></div>
-        <div class="donovan-a"><span class="donovan-who donovan-who-d">Donovan</span><span id="donovan-a"></span></div>
+        <div class="donovan-q dv-msg"><span class="donovan-who">You</span><span id="donovan-q"></span></div>
+        <div class="donovan-a dv-msg">
+          <span class="donovan-who donovan-who-d">
+            <svg class="donovan-avatar" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="16"/><circle cx="50" cy="50" r="5"/></svg>
+          </span>
+          <span class="donovan-a-wrap"><span id="donovan-a"></span><span id="donovan-src" class="donovan-src"><svg class="donovan-src-ic" viewBox="0 0 24 24"><path d="M5 3h10l5 5v13H5z"/><path d="M15 3v6h5"/></svg><span id="donovan-src-t"></span></span></span>
+        </div>
       </div>
     </div>
   </div>
@@ -1217,61 +1266,225 @@ footer a{color:var(--muted);text-decoration:none}
 </footer>
 
 <script>
-/* ---- Donovan's mark: a lit well with breathing rings + a reading sweep ---- */
+/* ---- Donovan's mark: a well of light seen from above — depth, drift, a reading
+   presence and an answer that surfaces. States: idle / reading / answered. ---- */
 (function(){
   const c=document.getElementById('well');if(!c)return;
   const ctx=c.getContext('2d');
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let w,h,dpr,t0=performance.now();
-  function size(){dpr=Math.min(devicePixelRatio||1,2);const r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
-  size();addEventListener('resize',size);
-  function cssv(n,f){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||f}
+  function size(){dpr=Math.min(devicePixelRatio||1,2);const r=c.getBoundingClientRect();w=r.width;h=r.height;c.width=Math.max(1,w*dpr);c.height=Math.max(1,h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
+  size();
   window.__donovanReading=false;
-  function frame(now){
-    const t=reduce?0:(now-t0)/1000;
+
+  // theme palette, read from CSS custom properties, cached and refreshed only
+  // when the theme actually changes (not every frame)
+  function readPalette(){
+    const cs=getComputedStyle(document.documentElement);
+    const g=n=>cs.getPropertyValue(n).trim();
+    return{
+      brass:g('--brass')||'#B98A4E',
+      brassRgb:g('--dv-rgb-brass')||'185,138,78',
+      wellRgb:g('--dv-rgb-well')||'22,60,44',
+      midRgb:g('--dv-rgb-mid')||'36,82,57',
+      shallowRgb:g('--dv-rgb-shallow')||'90,140,108',
+      rimRgb:g('--dv-rgb-rim')||'157,196,178',
+      inkRgb:g('--dv-rgb-ink')||'122,146,134'
+    };
+  }
+  let pal=readPalette();
+  if('MutationObserver' in window){
+    new MutationObserver(()=>pal=readPalette()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>pal=readPalette());
+
+  function lerp(a,b,t){return a+(b-a)*t}
+  function lerpRgb(a,b,t){
+    const pa=a.split(',').map(Number),pb=b.split(',').map(Number);
+    return Math.round(lerp(pa[0],pb[0],t))+','+Math.round(lerp(pa[1],pb[1],t))+','+Math.round(lerp(pa[2],pb[2],t));
+  }
+  function easeOutCubic(x){return 1-Math.pow(1-x,3)}
+  function easeInCubic(x){return x*x*x}
+
+  // pointer: smoothed toward a target, gives gentle magnetism + per-ring parallax
+  let tnx=0,tny=0,pnx=0,pny=0;
+  const host=c.closest('.well')||c;
+  function onPointerMove(e){
+    if(e.pointerType==='touch')return;
+    const r=c.getBoundingClientRect();
+    tnx=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width/2)));
+    tny=Math.max(-1,Math.min(1,(e.clientY-(r.top+r.height/2))/(r.height/2)));
+  }
+  function onPointerLeave(){tnx=0;tny=0}
+  if(!reduce){
+    host.addEventListener('pointermove',onPointerMove,{passive:true});
+    host.addEventListener('pointerleave',onPointerLeave,{passive:true});
+  }
+
+  // a faint field of document fragments drifting at the edges; drawn into the
+  // well while Donovan reads, replaced by fresh ones after
+  const PN=14;
+  function makeParticle(){
+    return{ang:Math.random()*Math.PI*2,fac:1.14+Math.random()*0.32,spin:(Math.random()<.5?-1:1)*(0.04+Math.random()*0.07),
+      w:5+Math.random()*4,h:7+Math.random()*5,rot:Math.random()*Math.PI,op:0.14+Math.random()*0.2,
+      pulled:false,pull:0,elapsed:0,delay:Math.random()*0.5,seed:Math.random()*10};
+  }
+  const particles=Array.from({length:PN},makeParticle);
+  const ripples=[]; // brass answer-lines rising back out
+  let wasReading=false;
+
+  function drawParticle(p,t,R){
+    // called inside the well's own translated+squashed coordinate space
+    // (origin = well centre); position in that space, but drawn back at
+    // 1:1 aspect so the little document rectangles stay upright, not squashed
+    let fac=p.fac,op=p.op;
+    if(p.pulled){
+      const d=Math.max(0,Math.min(1,p.pull));
+      fac=lerp(p.fac,0.08,easeInCubic(d));
+      op=p.op*(1-Math.pow(d,2));
+    }else{
+      fac+=Math.sin(t*0.35+p.seed)*0.015;
+      op=p.op*(0.82+0.18*Math.sin(t*0.5+p.seed));
+    }
+    if(op<=0.004)return;
+    const ang=p.ang+p.spin*t*(p.pulled?2.2:1);
+    const x=Math.cos(ang)*R*fac,y=Math.sin(ang)*R*fac;
+    ctx.save();
+    ctx.translate(x,y);ctx.scale(1,1/SQUASH);ctx.rotate(p.rot+ang*0.15);
+    ctx.fillStyle='rgba('+pal.inkRgb+','+op.toFixed(3)+')';
+    ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+    ctx.fillStyle='rgba('+pal.inkRgb+','+(op*1.4).toFixed(3)+')';
+    ctx.fillRect(-p.w/2+1,-p.h/2+2,p.w-2,0.9);
+    ctx.fillRect(-p.w/2+1,-p.h/2+4,p.w-3,0.9);
+    ctx.restore();
+  }
+
+  const SQUASH=0.72; // vertical compression — reads as a shaft seen from above, not a ball
+
+  function render(now,reading){
+    const t=(now-t0)/1000;
     ctx.clearRect(0,0,w,h);
     const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;
-    const brass=cssv('--brass','#B98A4E');
-    // halo
-    const halo=ctx.createRadialGradient(cx,cy,R*0.9,cx,cy,R*1.08);
-    halo.addColorStop(0,'rgba(185,138,78,0)');halo.addColorStop(1,'rgba(185,138,78,'+(window.__donovanReading?0.35:0.18)+')');
-    ctx.beginPath();ctx.arc(cx,cy,R*1.08,0,Math.PI*2);ctx.fillStyle=halo;ctx.fill();
-    // sphere
-    const g=ctx.createRadialGradient(cx-R*0.3,cy-R*0.38,R*0.05,cx,cy,R*1.05);
-    g.addColorStop(0,'#5A8C6C');g.addColorStop(0.55,'#245239');g.addColorStop(1,'#07140E');
-    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
-    // rings breathe in sequence; faster while "reading"
-    const N=4,speed=window.__donovanReading?1.2:0.28;
-    for(let i=0;i<N;i++){
-      const r=R*(0.2+0.68*(i/(N-1)));
-      const a=0.35+0.65*Math.max(0,Math.sin((t*speed-i*0.45)*Math.PI/1.8));
-      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.lineWidth=i===0?2.4:1.6;
-      ctx.strokeStyle='rgba(232,209,168,'+a.toFixed(3)+')';ctx.stroke();
-    }
-    ctx.beginPath();ctx.arc(cx,cy,R*0.06,0,Math.PI*2);ctx.fillStyle='#E8D1A8';ctx.fill();
-    // reading sweep
-    if(window.__donovanReading&&!reduce){
-      const th=(t*2.2)%(Math.PI*2);
-      ctx.beginPath();ctx.arc(cx,cy,R*0.88,th,th+0.9);ctx.lineWidth=3;ctx.lineCap='round';ctx.strokeStyle=brass;ctx.stroke();
-    }
-    // specular highlight — makes it a sphere, not a disc
-    ctx.save();ctx.translate(cx-R*0.3,cy-R*0.42);ctx.rotate(-0.5);ctx.scale(1,0.6);
-    const hl=ctx.createRadialGradient(0,0,0,0,0,R*0.3);hl.addColorStop(0,'rgba(134,174,147,.7)');hl.addColorStop(1,'rgba(134,174,147,0)');
-    ctx.beginPath();ctx.arc(0,0,R*0.3,0,Math.PI*2);ctx.fillStyle=hl;ctx.fill();ctx.restore();
-    if(!reduce)requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+    const breath=reduce?0:Math.sin(t*0.5)*0.014;
+    const Rb=R*(1+breath);
+    const ox=reduce?0:pnx*2.4,oy=reduce?0:pny*1.6; // gentle whole-object magnetism
 
-  /* a question becoming an answer, on loop — every one a real thing Donovan does */
+    ctx.save();
+    ctx.translate(cx+ox,cy+oy);
+    ctx.scale(1,SQUASH); // everything below is drawn in a circular local space
+
+    // halo — brighter while reading
+    const halo=ctx.createRadialGradient(0,0,Rb*0.86,0,0,Rb*1.14);
+    halo.addColorStop(0,'rgba('+pal.brassRgb+',0)');
+    halo.addColorStop(1,'rgba('+pal.brassRgb+','+(reading?0.32:0.15)+')');
+    ctx.beginPath();ctx.arc(0,0,Rb*1.14,0,Math.PI*2);ctx.fillStyle=halo;ctx.fill();
+
+    // the well floor — a point of light at the centre, dark toward the rim
+    const g=ctx.createRadialGradient(0,0,Rb*0.02,0,0,Rb*1.02);
+    g.addColorStop(0,'rgb('+pal.shallowRgb+')');
+    g.addColorStop(0.42,'rgb('+pal.midRgb+')');
+    g.addColorStop(1,'rgb('+pal.wellRgb+')');
+    ctx.beginPath();ctx.arc(0,0,Rb,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+
+    // document fragments drifting at the edges, drawn into the well while reading
+    particles.forEach(p=>drawParticle(p,t,Rb));
+
+    // concentric rings: rim closest + brightest, centre farthest + dimmest —
+    // each lags the pointer by how deep it sits (real parallax), each with a
+    // faint, slow caustic glint travelling its circumference
+    const N=5,speed=reading?1.1:0.24;
+    for(let i=0;i<N;i++){
+      const depth=i/(N-1); // 0 = deep/centre, 1 = rim
+      const r=Rb*(0.15+0.82*depth);
+      const lagX=reduce?0:-(1-depth)*2.1*pnx,lagY=reduce?0:-(1-depth)*1.4*pny;
+      const rgb=lerpRgb(pal.wellRgb,pal.rimRgb,depth*0.85);
+      const a=0.42+0.4*Math.max(0,Math.sin((t*speed-i*0.42)*Math.PI/1.8));
+      ctx.save();ctx.translate(lagX,lagY);
+      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);
+      ctx.lineWidth=0.9+0.9*depth;ctx.strokeStyle='rgba('+rgb+','+a.toFixed(3)+')';ctx.stroke();
+      if(!reduce){
+        const dir=i%2?1:-1,gspeed=(reading?1.7:0.32)*(0.55+0.45*depth)*dir;
+        const gang=(t*gspeed+i*2.1)%(Math.PI*2),gwidth=0.3+0.14*(1-depth);
+        ctx.save();ctx.globalCompositeOperation='lighter';
+        ctx.beginPath();ctx.arc(0,0,r,gang,gang+gwidth);
+        ctx.lineWidth=0.9+0.9*depth;ctx.strokeStyle='rgba('+pal.rimRgb+','+(reading?0.34:0.18)+')';ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    // a soft wash of light spilling over the top of the rim
+    const rim=ctx.createLinearGradient(0,-Rb,0,-Rb*0.35);
+    rim.addColorStop(0,'rgba('+pal.rimRgb+',.28)');rim.addColorStop(1,'rgba('+pal.rimRgb+',0)');
+    ctx.beginPath();ctx.arc(0,0,Rb*0.99,Math.PI*1.12,Math.PI*1.88);ctx.lineWidth=Rb*0.16;ctx.strokeStyle=rim;ctx.stroke();
+
+    // ripples: a single brass line rising back out with each answer
+    for(let i=ripples.length-1;i>=0;i--){
+      const age=(now-ripples[i])/1000,dur=1.15;
+      if(age>dur){ripples.splice(i,1);continue}
+      const e=easeOutCubic(age/dur);
+      ctx.beginPath();ctx.arc(0,0,Rb*(0.07+0.96*e),0,Math.PI*2);
+      ctx.lineWidth=2.4*(1-e)+0.4;ctx.strokeStyle='rgba('+pal.brassRgb+','+((1-e)*0.85).toFixed(3)+')';ctx.stroke();
+    }
+
+    // the centre: where an answer surfaces
+    const pulse=reading?1+0.14*Math.sin(t*7):1;
+    ctx.beginPath();ctx.arc(0,0,Rb*0.052*pulse,0,Math.PI*2);
+    ctx.fillStyle=pal.brass;ctx.fill();
+
+    ctx.restore();
+  }
+
+  // run loop: paused off-screen and when the tab is hidden
+  let running=false,onscreen=true,lastNow=performance.now();
+  function frame(now){
+    if(!running)return;
+    const dt=Math.min(0.05,Math.max(0,(now-lastNow)/1000));lastNow=now;
+    pnx+=(tnx-pnx)*0.08;pny+=(tny-pny)*0.08;
+    const reading=!!window.__donovanReading;
+    if(reading&&!wasReading){
+      particles.forEach(p=>{if(!p.pulled)Object.assign(p,{pulled:true,pull:0,elapsed:0,delay:p.delay})});
+    }
+    if(!reading&&wasReading)ripples.push(now);
+    particles.forEach(p=>{
+      if(!p.pulled)return;
+      p.elapsed+=dt;
+      if(p.elapsed>p.delay)p.pull=Math.min(1,p.pull+dt*(reading?1.3:3.2));
+      if(p.pull>=1)Object.assign(p,makeParticle());
+    });
+    wasReading=reading;
+    render(now,reading);
+    requestAnimationFrame(frame);
+  }
+  function loopStart(){if(running||reduce)return;running=true;lastNow=performance.now();requestAnimationFrame(frame)}
+  function loopStop(){running=false}
+  function sync(){(onscreen&&!document.hidden)?loopStart():loopStop()}
+  function onResize(){size();if(!running)render(performance.now(),!!window.__donovanReading)}
+  addEventListener('resize',onResize);
+  if(reduce){
+    render(performance.now(),false);
+  }else{
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(es=>{es.forEach(e=>{onscreen=e.isIntersecting;sync()})},{threshold:0}).observe(c);
+    }
+    document.addEventListener('visibilitychange',sync);
+    sync();
+  }
+
+  /* a question becoming an answer, on loop — every one a real thing Donovan does,
+     each answer citing exactly where it came from */
   const qa=[
-    ['What\'s the serial at 215 N College Ave?','F2006123 — Trane 4TTR4036. From the startup sheet, p. 1.'],
-    ['Is the Whitmore unit still under warranty?','Parts warranty ends Nov 20, 2026 — 60 days out. Invoice + nameplate photo.'],
-    ['Who was last out to the Castillo house?','Denise Ford, 11/06/2025 — weak airflow after a filter change. Service ticket.'],
-    ['What refrigerant is in RTU-3 at Desert Ridge Dental?','R-454B. Lennox ML14XC1-048. Maintenance agreement, p. 2.'],
+    ['What\'s the serial at 215 N College Ave?','F2006123 — Trane 4TTR4036.','Startup sheet · p.1'],
+    ['Is the Whitmore unit still under warranty?','Parts warranty ends Nov 20, 2026 — 60 days out.','Invoice + nameplate photo'],
+    ['Who was last out to the Castillo house?','Denise Ford, 11/06/2025 — weak airflow after a filter change.','Service ticket'],
+    ['What refrigerant is in RTU-3 at Desert Ridge Dental?','R-454B. Lennox ML14XC1-048.','Maintenance agreement · p.2'],
   ];
+  const qRow=document.querySelector('.donovan-q'),aRow=document.querySelector('.donovan-a');
   const qEl=document.getElementById('donovan-q'),aEl=document.getElementById('donovan-a');
+  const srcEl=document.getElementById('donovan-src'),srcT=document.getElementById('donovan-src-t');
   if(!qEl||!aEl)return;
-  if(reduce){qEl.textContent=qa[0][0];aEl.textContent=qa[0][1];return;}
+  if(reduce){qEl.textContent=qa[0][0];aEl.textContent=qa[0][1];if(srcT){srcT.textContent=qa[0][2];srcEl.classList.add('show')}return;}
+  function riseIn(el){if(!el)return;el.classList.remove('dv-in');void el.offsetWidth;el.classList.add('dv-in')}
   let k=0,stop=false;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   async function type(el,text,ms){el.textContent='';for(const ch of text){el.textContent+=ch;await wait(ms);}}
@@ -1279,11 +1492,15 @@ footer a{color:var(--muted);text-decoration:none}
   (async function loop(){
     while(!stop){
       await untilVisible();
-      const [q,a]=qa[k%qa.length];k++;
-      aEl.textContent='';
+      const [q,a,src]=qa[k%qa.length];k++;
+      aEl.textContent='';srcT.textContent='';srcEl.classList.remove('show');
+      riseIn(qRow);
       await type(qEl,q,34);
       window.__donovanReading=true;await wait(900);window.__donovanReading=false;
+      riseIn(aRow);
       await type(aEl,a,16);
+      srcT.textContent=src;
+      requestAnimationFrame(()=>srcEl.classList.add('show'));
       await wait(4200);
     }
   })();
