@@ -26,7 +26,10 @@ import {
   secondsUntilUtcMidnight,
 } from '../api/_lib/rateLimit.js';
 import { R2Error } from '../api/_lib/r2.js';
+import { scaleDailyLimitForPlan, planTierFromLimits, PLAN_DAILY_ASKS, DEFAULT_LIMITS as RL_DEFAULTS } from '../api/_lib/rateLimit.js';
 import { IngestError } from '../api/_lib/readDocument.js';
+import { PLAN_LIMITS, gateAsk } from '../api/_lib/plan.js';
+import { monthStartUtc, nextMonthStartUtc, resetsOnIso, resetsOnLabel, isCountableAskSource } from '../api/_lib/usage.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -445,6 +448,83 @@ const eq = (name, got, want) =>
   check('extractDocumentFields accepts a modelAttempts option', /modelAttempts/.test(extractDocText));
   check('extractDocumentFields forwards modelAttempts into withBackoff as `attempts`',
     /withBackoff\(\(\) => client\.messages\.create[\s\S]{0,800}attempts:\s*modelAttempts/.test(extractDocText));
+}
+
+/* ------------------------------------------- plan-sized daily limits
+ * (owner decision, 2026-09-21): PLAN_DAILY_ASKS is no longer its own budget
+ * — it's a runaway guard, 30% of PLAN_LIMITS[tier].asksPerMonth, rounded.
+ * solo 3000*0.3=900, shop 9000*0.3=2700, crew 22500*0.3=6750, fleet
+ * 60000*0.3=18000. */
+{
+  const ask = RL_DEFAULTS.ask.perDay;
+  check('ask default is Solo-sized (900/day = 30% of 3,000/month)', ask === 900 && PLAN_DAILY_ASKS.solo === 900);
+  check('no plan on file -> Solo ask budget', scaleDailyLimitForPlan('ask', ask, {}) === 900);
+  check('null limits -> Solo ask budget', scaleDailyLimitForPlan('ask', ask, null) === 900);
+  check('Solo (750 pages) -> 900 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 750 }) === 900);
+  check('Shop (2000 pages) -> 2700 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 2000 }) === 2700);
+  check('Crew (5000 pages) -> 6750 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 5000 }) === 6750);
+  check('Fleet (10000 pages) -> 18000 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 10000 }) === 18000);
+  check('explicit plan name wins over pages', scaleDailyLimitForPlan('ask', ask, { plan: 'fleet', pagesPerMonth: 750 }) === 18000);
+  check('garbage pagesPerMonth -> Solo budget', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 'lots' }) === 900);
+  check('unknown page count -> Solo budget', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 4242 }) === 900);
+  const ingest = RL_DEFAULTS.ingest.perDay;
+  check('ingest: Solo unchanged', scaleDailyLimitForPlan('ingest', ingest, { pagesPerMonth: 750 }) === ingest);
+  check('ingest: Fleet 12x', scaleDailyLimitForPlan('ingest', ingest, { pagesPerMonth: 10000 }) === ingest * 12);
+  check('ingest: no plan -> unchanged', scaleDailyLimitForPlan('ingest', ingest, null) === ingest);
+  check('planTierFromLimits maps every tier', ['solo','shop','crew','fleet'].every((t, i) => planTierFromLimits({ pagesPerMonth: [750,2000,5000,10000][i] }) === t));
+}
+
+/* ------------------------------------------- PLAN_LIMITS.asksPerMonth shape */
+{
+  eq('PLAN_LIMITS.asksPerMonth by tier', {
+    solo: PLAN_LIMITS.solo.asksPerMonth, shop: PLAN_LIMITS.shop.asksPerMonth,
+    crew: PLAN_LIMITS.crew.asksPerMonth, fleet: PLAN_LIMITS.fleet.asksPerMonth,
+  }, { solo: 3000, shop: 9000, crew: 22500, fleet: 60000 });
+  check('30% of asksPerMonth, rounded, is exactly PLAN_DAILY_ASKS for every tier',
+    ['solo', 'shop', 'crew', 'fleet'].every((t) => PLAN_DAILY_ASKS[t] === Math.round(PLAN_LIMITS[t].asksPerMonth * 0.3)));
+}
+
+/* --------------------------------------------------------- resetsOn / month math */
+{
+  eq('monthStartUtc truncates to the 1st, midnight UTC', monthStartUtc(new Date('2026-09-21T17:42:00Z')).toISOString(), '2026-09-01T00:00:00.000Z');
+  eq('nextMonthStartUtc mid-September -> October 1', nextMonthStartUtc(new Date('2026-09-21T00:00:00Z')).toISOString(), '2026-10-01T00:00:00.000Z');
+  eq('nextMonthStartUtc across a year boundary: December -> January next year', nextMonthStartUtc(new Date('2026-12-15T00:00:00Z')).toISOString(), '2027-01-01T00:00:00.000Z');
+  eq('resetsOnIso is an ISO date, not a full timestamp', resetsOnIso(new Date('2026-09-21T00:00:00Z')), '2026-10-01');
+  // Short month (owner correction, 2026-09-21) — matches the client's own
+  // resetsOnShortLabel, so "resets Oct 1" reads identically everywhere.
+  eq('resetsOnLabel: mid-month reads "<Mon> 1"', resetsOnLabel(new Date('2026-09-21T00:00:00Z')), 'Oct 1');
+  eq('resetsOnLabel across a year boundary', resetsOnLabel(new Date('2026-12-31T23:59:00Z')), 'Jan 1');
+  eq('resetsOnLabel on the 1st itself still points at the FOLLOWING month (not today)', resetsOnLabel(new Date('2026-09-01T00:00:00Z')), 'Oct 1');
+}
+
+/* ---------------------------------------------------------- ask counting rule */
+{
+  check('retrieval+model counts', isCountableAskSource('model'));
+  check('the analytics planner counts', isCountableAskSource('analytics-model'));
+  check('a retrieval-cache hit does not count', !isCountableAskSource('cache'));
+  check('an analytics Tier-1 cache hit does not count', !isCountableAskSource('analytics-cache'));
+  check('the meta-router does not count', !isCountableAskSource('meta'));
+  check('the fast path does not count', !isCountableAskSource('fast-path'));
+  check('"no evidence, no model call" does not count', !isCountableAskSource('no-evidence'));
+  check('an unrecognized source defaults to not counting (fail closed on cost, not open)', !isCountableAskSource('bogus'));
+}
+
+/* ------------------------------------------------------------------ gateAsk at 0/79/80/99/100% */
+{
+  const tenant = { plan: 'solo', billing_status: 'active' };
+  const cap = PLAN_LIMITS.solo.asksPerMonth; // 3000
+  check('gateAsk: 0% used -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: 0 }).allowed);
+  check('gateAsk: 79% used -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: Math.round(cap * 0.79) }).allowed);
+  check('gateAsk: 80% used -> still allowed (warning-only threshold, not a gate)', gateAsk(tenant, { documentsStored: 1, asksThisMonth: Math.round(cap * 0.8) }).allowed);
+  check('gateAsk: 99% used -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: Math.round(cap * 0.99) }).allowed);
+  const blocked = gateAsk(tenant, { documentsStored: 1, asksThisMonth: cap });
+  check('gateAsk: 100% used -> blocked', !blocked.allowed);
+  eq('gateAsk: 100% used -> 402', blocked.status, 402);
+  check('gateAsk: 402 message never says "questions" and names the reset date', /^This month's Donovan usage is used up — resets /.test(blocked.error), blocked.error);
+  eq('gateAsk: 100% used -> points at Billing', blocked.url, '/app/?screen=billing');
+  check('gateAsk: over 100% (stale read) is still blocked, not a crash', !gateAsk(tenant, { documentsStored: 1, asksThisMonth: cap + 500 }).allowed);
+  check('gateAsk: a tenant with no plan on file skips the monthly cap (no cap to check)', gateAsk({ billing_status: 'active' }, { documentsStored: 1, asksThisMonth: 999_999 }).allowed);
+  check('gateAsk: trialing is still subject to the monthly cap', !gateAsk({ plan: 'solo', billing_status: 'trialing', trial_ends_at: new Date(Date.now() + 86400000).toISOString() }, { documentsStored: 1, asksThisMonth: cap }).allowed);
 }
 
 /* ------------------------------------------------------------------ done */

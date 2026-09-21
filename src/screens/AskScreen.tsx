@@ -9,6 +9,7 @@ import type { Answer, SourceRef } from '../core/types';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions } from '../core/suggestions';
 import { ask, AskApiError } from '../services/answerService';
+import { asksUsedFraction, resetsOnShortLabel } from '../services/billingClient';
 import { useAppStore } from '../store/appStore';
 
 // Shown only when the account has nothing ingested yet, so there is nothing
@@ -30,12 +31,18 @@ export function AskScreen() {
   const includeUnverified = useAppStore((s) => s.includeUnverified);
   const setIncludeUnverified = useAppStore((s) => s.setIncludeUnverified);
   const openEntity = useAppStore((s) => s.openEntity);
+  const billingStatus = useAppStore((s) => s.billingStatus);
   const fieldMode = useAppStore((s) => s.fieldMode);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   // Re-run the current question whenever the graph changes (a review correction changes the answer)
   const graphVersion = useGraph((s) => s.docs);
   const entities = useGraph((s) => s.entities);
   const suggestions = useMemo(() => buildSuggestions(Object.values(entities)), [entities]);
+  // Monthly question allowance (owner decision, 2026-09-21): a quiet caption
+  // once 80% of the plan's asksPerMonth is used, so the tech sees it coming
+  // before hitting the hard 402 the gateAsk block below already renders via
+  // error/billingUrl (reused as-is — see that branch's own comment).
+  const askPct = asksUsedFraction(billingStatus);
 
   const [input, setInput] = useState('');
   const [asked, setAsked] = useState<string | null>(null);
@@ -201,6 +208,16 @@ export function AskScreen() {
               ? <span className="inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Donovan is reading your records…</span>
               : <><kbd className="dw-kbd">Enter</kbd> to ask · <kbd className="dw-kbd">Esc</kbd> to clear</>}
           </p>
+          {askPct != null && askPct >= 0.8 && !billingUrl && (
+            <p className="text-caption text-ink-3">
+              {Math.round(Math.min(askPct, 1) * 100)}% of this month's usage
+              {(() => {
+                const resets = resetsOnShortLabel(billingStatus?.usage.resetsOn);
+                return resets ? ` · resets ${resets}` : '';
+              })()}
+              .
+            </p>
+          )}
         </form>
 
         {error && (

@@ -34,6 +34,7 @@
  * lowest-priority layer added underneath.
  */
 import { getAuxPool } from "./apiKeyAuth.js";
+import { PLAN_LIMITS } from "./plan.js";
 
 /**
  * bucket -> defaults. Overridable per tenant via tenants.limits (see below).
@@ -48,7 +49,7 @@ import { getAuxPool } from "./apiKeyAuth.js";
  * ingest.perDay, the same override mechanism every bucket already had.
  */
 export const DEFAULT_LIMITS = Object.freeze({
-  ask:    { perMinute: 30,  perDay: 500 },
+  ask:    { perMinute: 20,  perDay: 900 }, // 30% of Solo's 3,000/month — see PLAN_DAILY_ASKS
   ingest: { perMinute: 60,  perDay: 2000 },
   read:   { perMinute: 120, perDay: 5000 },
 });
@@ -117,20 +118,69 @@ export function envLimits(bucket, env = process.env) {
  * then any caller-supplied override. Only perMinute/perDay keys are honored;
  * anything else in an override is ignored rather than trusted blindly.
  */
+/**
+ * Per-plan daily ask RUNAWAY GUARD (owner decision, 2026-09-21): the ask
+ * bucket's daily cap is no longer its own budget — the real limit is now
+ * plan.js's PLAN_LIMITS.asksPerMonth, a % meter that resets the 1st UTC,
+ * because techs don't work every day and a flat daily number punished a
+ * shop's busy Monday for its own quiet weekend. This derived table just
+ * catches a single day's loop/bug from burning the WHOLE month in hours:
+ * 30% of the monthly allowance, rounded, so three unusually heavy days could
+ * exhaust a month but one bad script can't. Keyed on the same PLAN_LIMITS
+ * shape billing_apply() stores under tenants.limits (pagesPerMonth
+ * 750/2000/5000/10000 identifies the tier without a new column). Ingest
+ * stays bounded by the plan's monthly page cap; its daily default is scaled
+ * the same way so a big shop's bulk upload isn't throttled to Solo size. An
+ * explicit `limits.<bucket>.perDay` override on the tenant still wins over
+ * all of this.
+ */
+export const PLAN_DAILY_ASKS = Object.freeze(
+  Object.fromEntries(Object.entries(PLAN_LIMITS).map(([tier, l]) => [tier, Math.round(l.asksPerMonth * 0.3)]))
+);
+const PLAN_BY_PAGES = Object.freeze(
+  Object.fromEntries(Object.entries(PLAN_LIMITS).map(([tier, l]) => [l.pagesPerMonth, tier]))
+);
+const PLAN_INGEST_MULTIPLIER = Object.freeze({ solo: 1, shop: 2.5, crew: 6, fleet: 12 });
+
+/** Pure: which plan tier a tenants.limits row describes, or null. */
+export function planTierFromLimits(tenantLimits) {
+  if (tenantLimits?.plan && PLAN_DAILY_ASKS[tenantLimits.plan]) return tenantLimits.plan;
+  const pages = Number(tenantLimits?.pagesPerMonth);
+  return PLAN_BY_PAGES[pages] ?? null;
+}
+
+/**
+ * Pure: the daily ceiling for a bucket given the tenant's plan. Unknown /
+ * missing plan -> the conservative Solo-sized default.
+ * @param {string} bucket 'ask' | 'ingest' | 'read'
+ * @param {number} baseDaily DEFAULT_LIMITS[bucket].perDay
+ * @param {{pagesPerMonth?: number|null, plan?: string}|null|undefined} tenantLimits
+ */
+export function scaleDailyLimitForPlan(bucket, baseDaily, tenantLimits) {
+  const tier = planTierFromLimits(tenantLimits);
+  if (bucket === 'ask') return tier ? PLAN_DAILY_ASKS[tier] : PLAN_DAILY_ASKS.solo;
+  if (!tier || !Number.isFinite(baseDaily)) return baseDaily;
+  return Math.round(baseDaily * (PLAN_INGEST_MULTIPLIER[tier] ?? 1));
+}
+
 async function resolveLimits(tenantUuid, bucket, overrides) {
   const base = envLimits(bucket);
   if (!tenantUuid) return base;
   try {
     const { rows } = await getAuxPool().query("SELECT get_tenant_limits($1) AS limits", [tenantUuid]);
-    const tenantOverride = rows[0]?.limits?.[bucket] ?? {};
+    const tenantLimits = rows[0]?.limits ?? {};
+    const tenantOverride = tenantLimits?.[bucket] ?? {};
     const callerOverride = overrides ?? {};
+    // Plan-sized daily ceilings — see PLAN_DAILY_ASKS above. An explicit
+    // `limits.<bucket>.perDay` override on the tenant still wins.
+    const scaled = scaleDailyLimitForPlan(bucket, base.perDay, tenantLimits);
     return {
       perMinute: Number.isFinite(callerOverride.perMinute)
         ? callerOverride.perMinute
         : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : base.perMinute,
       perDay: Number.isFinite(callerOverride.perDay)
         ? callerOverride.perDay
-        : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : base.perDay,
+        : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : scaled,
     };
   } catch (err) {
     // A limits lookup failing must never be the reason a legitimate request

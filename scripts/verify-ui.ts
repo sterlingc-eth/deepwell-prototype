@@ -15,10 +15,12 @@ import { formatYmd } from '../src/core/answer';
 import { parseDeepLink, resolveDeepLinkRedirectPath, freshPersistedDeepLinkSearch, DEEP_LINK_TTL_MS } from '../src/hooks/useDeepLink';
 import {
   annualPrice,
+  asksUsedFraction,
   billingBannerFor,
   daysUntil,
   isValidPlanId,
   recordsRescueTotalCents,
+  resetsOnShortLabel,
   resolveRecordsRescueQuantity,
   RECORDS_RESCUE_MIN_PAGES,
   type BillingStatus,
@@ -773,6 +775,32 @@ function listFilesRecursive(dir: string): string[] {
     { kind: 'cap', message: 'Free preview used up. Start your 30-day trial to keep going.' },
   );
   eq('billingBannerFor: canceled shows no banner (upload/ask already hard-block with their own 402)', billingBannerFor(status({ status: 'canceled' }), NOW), null);
+
+  // ---- monthly question allowance (owner decision, 2026-09-21) -----------
+  eq('asksUsedFraction: no cap on file -> null', asksUsedFraction(status({ limits: {} })), null);
+  eq('asksUsedFraction: 412 of 3,000', asksUsedFraction(status({ limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 412 } })), 412 / 3000);
+  eq(
+    'billingBannerFor: active, under 80% asks -> no banner',
+    billingBannerFor(status({ plan: 'solo', status: 'active', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 2000 } }), NOW),
+    null,
+  );
+  eq(
+    'billingBannerFor: exactly 80% asks used -> the warning banner (percentage only, never says "questions")',
+    billingBannerFor(status({ plan: 'solo', status: 'active', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 2400 } }), NOW),
+    { kind: 'asks_warn', message: "Donovan is at 80% of this month's usage." },
+  );
+  eq(
+    'billingBannerFor: 100% asks used -> the exhausted banner, taking priority over a trial countdown, with the reset date and no raw count',
+    billingBannerFor(status({ plan: 'solo', status: 'trialing', trialEndsAt: '2026-09-23T12:00:00Z', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 3000, resetsOn: '2026-10-01' } }), NOW),
+    { kind: 'asks_exhausted', message: "This month's Donovan usage is used up — resets Oct 1. Need more? See plans." },
+  );
+  eq(
+    'billingBannerFor: 100% asks used with no resetsOn on file -> still reads cleanly, no dangling dash',
+    billingBannerFor(status({ plan: 'solo', status: 'active', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 3000 } }), NOW),
+    { kind: 'asks_exhausted', message: "This month's Donovan usage is used up. Need more? See plans." },
+  );
+  eq('resetsOnShortLabel: formats an ISO date as "Mon D"', resetsOnShortLabel('2026-10-01'), 'Oct 1');
+  eq('resetsOnShortLabel: missing input -> null', resetsOnShortLabel(null), null);
 
   eq('annualPrice: one month free is 11x monthly, for every catalog price', [annualPrice(99), annualPrice(199), annualPrice(399), annualPrice(899)], [1089, 2189, 4389, 9889]);
 }

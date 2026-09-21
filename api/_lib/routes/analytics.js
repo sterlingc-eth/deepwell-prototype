@@ -426,7 +426,7 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
  *                    cycle back through recordsStore.
  */
 export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today }) {
-  const EMPTY = { handled: false, data: null, cacheHit: false, writes: [] };
+  const EMPTY = { handled: false, data: null, cacheHit: false, modelCalled: false, writes: [] };
   try {
     // ---- Tier 1: exact question text, checked BEFORE the Haiku call -------
     const qHash = analyticsQuestionHash(question);
@@ -434,18 +434,28 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
       getCacheEntry(db, { questionHash: qHash, today, promptVersion: ANALYTICS_PROMPT_VERSION })
     );
     if (isCacheHit(qProbe.row, qProbe.corpusStamp)) {
-      return { handled: true, data: qProbe.row.answer, cacheHit: true, writes: [] };
+      return { handled: true, data: qProbe.row.answer, cacheHit: true, modelCalled: false, writes: [] };
     }
 
+    // modelCalled: true from here on, REGARDLESS of whether this question
+    // ends up `handled` — planAnalyticsQuestion is the one Haiku call this
+    // feature makes, and it just ran. Monthly-allowance counting (owner
+    // decision, 2026-09-21, see usage.js's isCountableAskSource) keys off
+    // this, not off `handled`: a plan that comes back but turns out
+    // unusable (invalid, no matching data) still spent a real model call,
+    // even though api/ask.js will fall through to retrieval+model right
+    // after — that fallback's own model call is the one actually counted
+    // for the question (see api/ask.js's own doc comment at its call site),
+    // so this file never double-reports one question as two.
     const plan = await planAnalyticsQuestion(question, { today });
-    if (!plan) return EMPTY;
+    if (!plan) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a
     // ZIP, a serial fragment) but produced an unfiltered customers list/count
     // plan is a sign the classifier let a single-record question through —
     // fall back to retrieval+model rather than confidently answering "every
     // customer" for what was really a lookup about one of them.
-    if (suspiciousUnfilteredCustomerPlan(plan, question)) return EMPTY;
+    if (suspiciousUnfilteredCustomerPlan(plan, question)) return { ...EMPTY, modelCalled: true };
 
     // ---- Tier 2: the plan itself, checked once the plan is known ----------
     // Two different phrasings that resolve to the identical plan reuse one
@@ -461,7 +471,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
       data = pProbe.row.answer;
     } else {
       data = await withTenant(ctxArg, (db) => executeAnalyticsPlan(db, plan, { today }));
-      if (!data) return EMPTY;
+      if (!data) return { ...EMPTY, modelCalled: true };
     }
 
     // Both tiers get written on a fresh answer (or a Tier-2 hit that Tier 1
@@ -472,7 +482,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // between them — worst case is one extra cache miss next time, never a
     // wrong answer.
     return {
-      handled: true, data, cacheHit: false,
+      handled: true, data, cacheHit: false, modelCalled: true,
       writes: [
         { questionHash: qHash, corpusStamp: qProbe.corpusStamp },
         { questionHash: pHash, corpusStamp: pProbe.corpusStamp },

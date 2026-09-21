@@ -83,15 +83,22 @@ const OUT_DIR = cliArgs.out ? path.resolve(ROOT, cliArgs.out) : path.join(ROOT, 
 // the topup invoices from. See the TOPUP_MODE block at the end of this file.
 const TOPUP_MODE = Boolean(cliArgs['contacts-topup']);
 
-// The already-uploaded 30-customer/144-file corpus at test-docs/business-small
-// must not change text on disk except where the 2026-09-21 date fix (a)
-// forces it -- printing customer phone/email into those same 144 files would
-// mean re-ingesting them at cost for no reason (the --contacts-topup mode
-// exists specifically so contact extraction can be proven via NEW documents
-// instead). So contact info is always COMPUTED and stored in the answer key
-// (both corpora), but only PRINTED into documents when this is not that
-// exact, already-shipped combination.
-const IS_FROZEN_SMALL_BASE = CUSTOMER_COUNT === 30 && OUT_DIR === path.join(ROOT, 'test-docs', 'business-small') && !TOPUP_MODE;
+// Whether this run shares its customer IDENTITY (names, addresses, units --
+// everything a --contacts-topup invoice must agree with the base corpus on)
+// with the already-uploaded 30-customer/144-file corpus at
+// test-docs/business-small. True for BOTH the frozen base run and its
+// --contacts-topup run, since the topup writes new documents FOR THOSE SAME
+// customers and must never invent a different name for one of them.
+const IS_SMALL_BASE_IDENTITY = CUSTOMER_COUNT === 30 && OUT_DIR === path.join(ROOT, 'test-docs', 'business-small');
+// The already-uploaded 144 files themselves must not change text on disk
+// except where the 2026-09-21 date fix (a) forces it -- printing customer
+// phone/email into those same 144 files would mean re-ingesting them at cost
+// for no reason (the --contacts-topup mode exists specifically so contact
+// extraction can be proven via NEW documents instead). So contact info is
+// always COMPUTED and stored in the answer key (both corpora), but only
+// PRINTED into documents when this is not that exact, already-shipped
+// combination -- topup invoices are new documents, so they DO print it.
+const IS_FROZEN_SMALL_BASE = IS_SMALL_BASE_IDENTITY && !TOPUP_MODE;
 const PRINT_CONTACTS = !IS_FROZEN_SMALL_BASE;
 
 if (CUSTOMER_COUNT < 15) {
@@ -440,6 +447,44 @@ const WANT_NAME_VARIANTS = IS_DEFAULT_SCALE ? 3 : 1;
 const WANT_SHOP_ONLY_DOCS = IS_DEFAULT_SCALE ? 4 : 2;
 const WANT_QUESTIONS_PER_TYPE = IS_DEFAULT_SCALE ? 30 : 20;
 
+/* ---- trap (c): near-miss surname pairs, resolved BEFORE any document is
+ * rendered -------------------------------------------------------------- *
+ * A previous version left residential customers' real names in place while
+ * building their documents, then overwrote just the ANSWER_KEY.json
+ * canonicalName afterwards to a deliberately near-miss surname pair (e.g.
+ * "Sorensen"/"Sorenson") to exercise dedup. That was the same class of bug as
+ * the earlier brand mismatch: the documents had already been written with
+ * the customer's REAL name (e.g. "Donna Thornton"), so the key described a
+ * name no document actually printed. Fixed by resolving which residential
+ * index gets which forced surname HERE, before buildResidential runs, and
+ * having nameFor() apply it -- so the forced surname is what actually gets
+ * typed onto every one of that customer's documents, and the key can never
+ * describe anything other than what was printed.
+ *
+ * residentialTotal is computed statically from CITIES (every entry's
+ * `residential` count is a literal, known before any building happens) so
+ * the index clamping below doesn't need to wait for the build loop to run.
+ */
+const residentialTotal = CITIES.reduce((sum, c) => sum + (c.residential ?? 0), 0);
+function clampIdx(want) { return Math.min(want, Math.max(0, residentialTotal - 1)); }
+// The small base's 144 files are already generated and must not change text
+// -- so its real, un-trapped names (whatever nameFor() naturally produced)
+// are left alone, and mustNotMerge is correctly left empty for that corpus
+// rather than describing a pair the documents don't contain. Gated on
+// IS_SMALL_BASE_IDENTITY (not IS_FROZEN_SMALL_BASE) so a --contacts-topup run
+// -- which recomputes the SAME customers in memory to write new documents FOR
+// THEM -- agrees on every name with the base run it's topping up, instead of
+// independently re-rolling the near-miss trap and inventing a different name
+// for res_2/res_11 than the base corpus's real documents already printed.
+const APPLY_NAME_TRAPS = !IS_SMALL_BASE_IDENTITY;
+const NEAR_MISS_PAIRS = (APPLY_NAME_TRAPS ? [
+  { idxA: 2, idxB: 11, nameA: 'Sorensen', nameB: 'Sorenson' }, // Phoenix / Mesa
+  { idxA: 20, idxB: 33, nameA: 'Whitfield', nameB: 'Whitford' }, // Gilbert / Tempe
+] : []).slice(0, WANT_MERGE_PAIRS).map((p) => ({ ...p, idxA: clampIdx(p.idxA), idxB: clampIdx(p.idxB) }))
+  .filter((p) => p.idxA !== p.idxB);
+const NEAR_MISS_SURNAME_BY_IDX = new Map();
+for (const p of NEAR_MISS_PAIRS) { NEAR_MISS_SURNAME_BY_IDX.set(p.idxA, p.nameA); NEAR_MISS_SURNAME_BY_IDX.set(p.idxB, p.nameB); }
+
 const STREET_NAMES = [
   'E Main St', 'W Southern Ave', 'N College Ave', 'E University Dr', 'W Guadalupe Rd', 'E Elliot Rd',
   'N Greenfield Rd', 'E Broadway Rd', 'W Baseline Rd', 'S Alma School Rd', 'E Chandler Blvd',
@@ -576,6 +621,16 @@ function nameFor(i) {
     if (bump > LAST_NAMES.length) { fi = (fi + 1) % FIRST_NAMES.length; bump = 0; }
   }
   usedNames.add(name);
+  // Near-miss surname trap (resolved above, before any document is built):
+  // this index's surname is forced to a deliberately near-miss spelling, so
+  // it's baked into `full` BEFORE buildResidential renders this customer's
+  // first document -- never patched onto the key afterwards.
+  if (NEAR_MISS_SURNAME_BY_IDX.has(i)) {
+    const forcedLast = NEAR_MISS_SURNAME_BY_IDX.get(i);
+    const forcedFull = `${FIRST_NAMES[fi]} ${forcedLast}`;
+    usedNames.add(forcedFull);
+    return { first: FIRST_NAMES[fi], last: forcedLast, full: forcedFull };
+  }
   return { first: FIRST_NAMES[fi], last: LAST_NAMES[li], full: name };
 }
 
@@ -823,28 +878,16 @@ for (const city of CITIES) {
   for (const type of city.commercial ?? []) buildCommercial({ type, city });
 }
 const apartmentKeys = buildApartmentComplex(cityByName.Mesa, APARTMENT_UNIT_COUNT);
-const residentialTotal = custIdx; // how many res_N keys actually exist
-function clampIdx(want) { return Math.min(want, Math.max(0, residentialTotal - 1)); }
-
-/* ---- trap (c): near-miss surname pairs, different cities ---------------- */
-// Overwrite residential customers' names into deliberately near-miss surname
-// pairs (must stay TWO customers - different street addresses). Full scale
-// gets both pairs; a --customers subset gets WANT_MERGE_PAIRS of them
-// (indices clamped to whatever residentialTotal actually is, so this never
-// throws or collides on a small run).
+// residentialTotal/clampIdx/NEAR_MISS_PAIRS were resolved BEFORE the build
+// loop above (see the comment near their definitions) precisely so nameFor()
+// could bake the forced near-miss surname into each customer's documents as
+// they were written, instead of patching the key afterwards. All that's left
+// now is to record the (already-correct) mustNotMerge pairs.
 function findByKey(key) { return answerCustomers.find((c) => c.key === key); }
-const NEAR_MISS_PAIRS = [
-  { idxA: 2, idxB: 11, nameA: 'Sorensen', nameB: 'Sorenson' }, // Phoenix / Mesa
-  { idxA: 20, idxB: 33, nameA: 'Whitfield', nameB: 'Whitford' }, // Gilbert / Tempe
-].slice(0, WANT_MERGE_PAIRS);
 for (const p of NEAR_MISS_PAIRS) {
-  const a = findByKey(`res_${clampIdx(p.idxA)}`);
-  const b = findByKey(`res_${clampIdx(p.idxB)}`);
-  if (a && b && a.key !== b.key) {
-    a.canonicalName = p.nameA;
-    b.canonicalName = p.nameB;
-    mustNotMerge.push([a.key, b.key]);
-  }
+  const a = findByKey(`res_${p.idxA}`);
+  const b = findByKey(`res_${p.idxB}`);
+  if (a && b && a.key !== b.key) mustNotMerge.push([a.key, b.key]);
 }
 
 /* ---- trap (a): household written 3 ways, must resolve to ONE customer --

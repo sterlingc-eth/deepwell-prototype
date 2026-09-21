@@ -11,18 +11,27 @@
  * keep the two in sync.
  */
 import { withTenant } from './recordsStore.js';
+import { resetsOnLabel } from './usage.js';
 
 /** Per-plan caps, written to tenants.limits by billing_apply() on every
  * subscription create/update webhook. Exported so api/_lib/billing.js's
  * webhook handler and scripts/verify-billing.mjs share one source of truth.
  * `null` = uncapped (Fleet has no seat/document ceiling; its own page cap is
  * a real number because it's what deep-storage overage would be sold against
- * later, per the brief). */
+ * later, per the brief).
+ *
+ * asksPerMonth (owner decision, 2026-09-21): replaces the old flat daily ask
+ * cap (rateLimit.js's PLAN_DAILY_ASKS) with a monthly allowance shown as a %
+ * meter that resets the 1st UTC — "techs don't work every day," so a hard
+ * daily number punished a shop that asks 200 questions on a busy Monday and
+ * zero over the weekend even though its monthly total was fine. The old
+ * daily cap still exists underneath as a runaway guard (30% of this number —
+ * see rateLimit.js's scaleDailyLimitForPlan), not a separate budget. */
 export const PLAN_LIMITS = Object.freeze({
-  solo:  Object.freeze({ technicians: 1,    documentsStored: 25_000,  pagesPerMonth: 750 }),
-  shop:  Object.freeze({ technicians: 4,    documentsStored: 100_000, pagesPerMonth: 2_000 }),
-  crew:  Object.freeze({ technicians: 10,   documentsStored: 500_000, pagesPerMonth: 5_000 }),
-  fleet: Object.freeze({ technicians: null, documentsStored: null,    pagesPerMonth: 10_000 }),
+  solo:  Object.freeze({ technicians: 1,    documentsStored: 25_000,  pagesPerMonth: 750,    asksPerMonth: 3_000 }),
+  shop:  Object.freeze({ technicians: 4,    documentsStored: 100_000, pagesPerMonth: 2_000,  asksPerMonth: 9_000 }),
+  crew:  Object.freeze({ technicians: 10,   documentsStored: 500_000, pagesPerMonth: 5_000,  asksPerMonth: 22_500 }),
+  fleet: Object.freeze({ technicians: null, documentsStored: null,    pagesPerMonth: 10_000, asksPerMonth: 60_000 }),
 });
 
 /**
@@ -163,8 +172,12 @@ export function gateUpload(tenantRow, usage, now = new Date()) {
  * Gate for POST /api/ask. Ask is read-only in nature, so it stays available
  * through past-due grace AND past-grace — only a never-subscribed tenant that
  * has exhausted its free preview, or a canceled subscription, blocks it.
+ * Layered on top of that (owner decision, 2026-09-21): a plan-sized MONTHLY
+ * question allowance, independent of subscription health — trialing, active,
+ * and past_due (grace or not) all get gated by it identically, since it is a
+ * usage cap, not a billing-health one.
  * @param {object} tenantRow
- * @param {{documentsStored: number}} usage
+ * @param {{documentsStored: number, asksThisMonth?: number}} usage
  * @param {Date} [now]
  */
 export function gateAsk(tenantRow, usage, now = new Date()) {
@@ -172,6 +185,20 @@ export function gateAsk(tenantRow, usage, now = new Date()) {
 
   if ((state === 'none' && freePreviewExhausted(usage)) || state === 'canceled') {
     return requireActiveBilling(tenantRow, now);
+  }
+
+  const cap = PLAN_LIMITS[tenantRow?.plan]?.asksPerMonth ?? null;
+  if (cap != null && (Number(usage?.asksThisMonth) || 0) >= cap) {
+    // Owner correction (2026-09-21): never say "questions" — a customer may
+    // just be requesting information, not "asking" in a way that should feel
+    // metered. "Donovan usage" reads as a feature name using up its
+    // allowance, not the customer being counted.
+    return {
+      allowed: false,
+      status: 402,
+      error: `This month's Donovan usage is used up — resets ${resetsOnLabel(now)}`,
+      url: '/app/?screen=billing',
+    };
   }
   return { allowed: true };
 }

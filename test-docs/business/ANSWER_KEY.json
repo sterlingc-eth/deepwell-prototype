@@ -65,10 +65,10 @@
     },
     {
       "key": "res_2",
-      "canonicalName": "Sorensen",
+      "canonicalName": "Donna Sorensen",
       "address": "174 N College Ave, Phoenix, AZ 85001",
       "phone": "Ph: 480.555.0112",
-      "email": "donna.thornton2@outlook.com",
+      "email": "donna.sorensen2@outlook.com",
       "city": "Phoenix",
       "state": "AZ",
       "zip": "85001",
@@ -326,7 +326,7 @@
     },
     {
       "key": "res_11",
-      "canonicalName": "Sorenson",
+      "canonicalName": "Donald Sorenson",
       "address": "507 N Dobson Rd, Mesa, AZ 85201",
       "phone": "Cell: 480-555-0121",
       "email": null,
@@ -587,7 +587,7 @@
     },
     {
       "key": "res_20",
-      "canonicalName": "Whitfield",
+      "canonicalName": "Emily Whitfield",
       "address": "840 S Ellsworth Rd, Gilbert, AZ 85234",
       "phone": "(480) 555-0130",
       "email": null,
@@ -964,10 +964,10 @@
     },
     {
       "key": "res_33",
-      "canonicalName": "Whitford",
+      "canonicalName": "Charles Whitford",
       "address": "1321 E Chandler Blvd, Tempe, AZ 85281",
       "phone": "480-555-0143",
-      "email": "charleslarkin3@hotmail.com",
+      "email": "charleswhitford3@hotmail.com",
       "city": "Tempe",
       "state": "AZ",
       "zip": "85281",
@@ -3814,7 +3814,7 @@
     {
       "q": "Which customers have Goodman units?",
       "expectedContains": [
-        "Sorensen",
+        "Donna Sorensen",
         "Karen Abernathy",
         "Maria Gallardo"
       ],
@@ -4145,7 +4145,7 @@
       "type": "lookup"
     },
     {
-      "q": "What's the phone number on file for Sorensen?",
+      "q": "What's the phone number on file for Donna Sorensen?",
       "expectedContains": [
         "Ph: 480.555.0112"
       ],
@@ -4159,9 +4159,9 @@
       "type": "lookup"
     },
     {
-      "q": "What's the email for Sorensen?",
+      "q": "What's the email for Donna Sorensen?",
       "expectedContains": [
-        "donna.thornton2@outlook.com"
+        "donna.sorensen2@outlook.com"
       ],
       "type": "lookup"
     },

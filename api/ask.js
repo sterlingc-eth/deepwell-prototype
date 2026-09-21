@@ -16,7 +16,7 @@ import {
   selectPassagesForContext,
 } from "./_lib/answer.js";
 import { planCacheBreakpoints, modelCallLogLine } from "./_lib/promptCache.js";
-import { recordModelCall } from "./_lib/usage.js";
+import { recordModelCall, incrementAsksThisMonth, isCountableAskSource, monthStartUtc } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
@@ -46,17 +46,26 @@ async function checkAskGateInner(auth) {
     // to be two sequential queries (the tenant row, then countDocuments()) —
     // two round trips inside a withTenant transaction that already costs
     // BEGIN + resolve_tenant + SET LOCAL + COMMIT on top. One query, one
-    // round trip, same two facts.
+    // round trip, same two facts. asksThisMonth (2026-09-21, monthly
+    // allowance) joins the same round trip rather than costing a second one —
+    // see usage.js's getAsksThisMonth for why this can't just be that
+    // function called separately (same table, same RLS, cheaper as one more
+    // subselect here than a whole extra query).
     const { rows } = await db.raw(
       `SELECT
          (SELECT row_to_json(t) FROM (
             SELECT plan, billing_status, trial_ends_at, current_period_end
               FROM tenants WHERE id = $1
           ) t) AS tenant,
-         (SELECT count(*)::int FROM documents WHERE tenant_id = $1) AS documents_stored`,
-      [db.tenantId]
+         (SELECT count(*)::int FROM documents WHERE tenant_id = $1) AS documents_stored,
+         (SELECT units FROM rate_limit_windows
+           WHERE tenant_id = $1 AND bucket = 'ask_month' AND window_start = $2::timestamptz) AS asks_this_month`,
+      [db.tenantId, monthStartUtc().toISOString()]
     );
-    return gateAsk(rows[0]?.tenant ?? {}, { documentsStored: rows[0]?.documents_stored ?? 0 });
+    return gateAsk(rows[0]?.tenant ?? {}, {
+      documentsStored: rows[0]?.documents_stored ?? 0,
+      asksThisMonth: rows[0]?.asks_this_month ?? 0,
+    });
   });
 }
 
@@ -702,6 +711,14 @@ export default async function handler(req, res) {
               } catch (err) {
                 console.error("Failed to write document.queried audit row (analytics):", err?.message);
               }
+              // Monthly ask allowance (owner decision, 2026-09-21): counts iff
+              // the one Haiku planner call actually ran (modelCalled — see
+              // routes/analytics.js's runAnalyticsQuestion doc comment). A
+              // Tier-1 cache hit answers before that call is ever made, so
+              // it's free, same as the retrieval+model path's own cache hit.
+              if (isCountableAskSource(analyticsResult.modelCalled ? "analytics-model" : "analytics-cache")) {
+                await incrementAsksThisMonth(db);
+              }
               // Cache write — same corpus_stamp mechanism askCache.js already
               // gives the retrieval+model path (design point 3: "cache via
               // askCache with corpus_stamp"), but under analytics' OWN
@@ -975,6 +992,13 @@ export default async function handler(req, res) {
           } catch (err) {
             console.error("Failed to write document.queried audit row:", err?.message);
           }
+          // Monthly ask allowance (owner decision, 2026-09-21): this branch is
+          // only ever reached after the one Anthropic call above succeeded —
+          // cache hits and the "no evidence" no-answer both already returned
+          // earlier — so it always counts, regardless of whether shapeAnswer's
+          // result kind ended up "answer" or "no-answer" (the model was still
+          // reached either way; see usage.js's isCountableAskSource doc comment).
+          if (isCountableAskSource("model")) await incrementAsksThisMonth(db);
           // Cache write (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): a cache
           // miss above means `corpusStamp` came from the SAME transaction that
           // just ran retrieval, so it is still the stamp this answer was built

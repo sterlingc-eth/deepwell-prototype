@@ -65,7 +65,7 @@
     },
     {
       "key": "res_2",
-      "canonicalName": "Sorensen",
+      "canonicalName": "Donna Thornton",
       "address": "174 N College Ave, Mesa, AZ 85201",
       "phone": "Ph: 480.555.0112",
       "email": "donna.thornton2@outlook.com",
@@ -326,7 +326,7 @@
     },
     {
       "key": "res_11",
-      "canonicalName": "Sorenson",
+      "canonicalName": "Donald Holbrook",
       "address": "507 N Dobson Rd, Casa Grande, AZ 85122",
       "phone": "Cell: 480-555-0121",
       "email": null,
@@ -868,12 +868,7 @@
       "expectedAlert": null
     }
   ],
-  "mustNotMerge": [
-    [
-      "res_2",
-      "res_11"
-    ]
-  ],
+  "mustNotMerge": [],
   "docsWithoutCustomer": [
     "143-dispatch-note-shop-truck.txt",
     "144-other-parts-count.pdf"
@@ -995,7 +990,7 @@
       "expectedContains": [
         "Linda Fitzgerald",
         "Thomas Mercer",
-        "Sorensen"
+        "Donna Thornton"
       ],
       "type": "analytics"
     },
@@ -1053,7 +1048,7 @@
     {
       "q": "Which customers have Goodman units?",
       "expectedContains": [
-        "Sorensen",
+        "Donna Thornton",
         "Karen Abernathy",
         "Maria Gallardo"
       ],
@@ -1252,7 +1247,7 @@
       "type": "lookup"
     },
     {
-      "q": "What's the phone number on file for Sorensen?",
+      "q": "What's the phone number on file for Donna Thornton?",
       "expectedContains": [
         "Ph: 480.555.0112"
       ],
@@ -1266,7 +1261,7 @@
       "type": "lookup"
     },
     {
-      "q": "What's the email for Sorensen?",
+      "q": "What's the email for Donna Thornton?",
       "expectedContains": [
         "donna.thornton2@outlook.com"
       ],

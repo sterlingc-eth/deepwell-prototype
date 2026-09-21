@@ -164,3 +164,122 @@ export async function getUsage(ctx, days = 30) {
     return [];
   }
 }
+
+/**
+ * Monthly question allowance (owner decision, 2026-09-21): a % meter per
+ * plan that resets on the 1st UTC, replacing the old daily ask cap (see
+ * rateLimit.js's PLAN_DAILY_ASKS, now a 30%-of-monthly runaway guard instead
+ * of the primary limit).
+ *
+ * WHY THIS DOESN'T LIVE IN usage_counters: that table (10-api-keys.sql) has
+ * no bucket dimension — `requests`/`model_calls` are incremented by every
+ * bucket (ask, ingest, read) alike (see limit()/recordModelCall's own doc
+ * comments), so summing it by day would count a bulk document import as
+ * "questions asked". No migration is available to add a bucket column
+ * (no-DDL constraint), so this reuses rate_limit_windows
+ * (12-rate-limit-window.sql) instead: same (tenant, bucket, window_start)
+ * primary key the per-minute burst limiter already has, just with `bucket =
+ * 'ask_month'` and `window_start` truncated to the MONTH rather than the
+ * minute. That table is already FORCE ROW LEVEL SECURITY with a tenant_id
+ * policy, so plain SQL through a withTenant `db` (RLS already scoped by
+ * app.tenant_id) is enough — no new SECURITY DEFINER function needed, unlike
+ * the burst limiter's own increment_rate_limit_window (which runs on the
+ * aux pool, OUTSIDE any tenant transaction, so it has no other way to pass
+ * RLS). One row per tenant per month persists after this build (nothing
+ * purges last month's row); at one row per tenant per month that's a few
+ * dozen rows a year — never worth its own cleanup job.
+ */
+const ASK_MONTH_BUCKET = "ask_month";
+
+/** Pure: the first instant of `now`'s UTC month. Exported for tests with no
+ *  clock/database — scripts/verify-scale.mjs. */
+export function monthStartUtc(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** Pure: the first instant of the UTC month AFTER `now`'s — the reset point
+ *  a % meter counts down to. Correct across a December -> January rollover
+ *  because Date.UTC normalizes month 12 into January of year+1 itself. */
+export function nextMonthStartUtc(now = new Date()) {
+  const d = monthStartUtc(now);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+}
+
+/** "2026-10-01" — the ISO date billing.js's status payload reports as
+ *  usage.resetsOn. */
+export function resetsOnIso(now = new Date()) {
+  return nextMonthStartUtc(now).toISOString().slice(0, 10);
+}
+
+/** "Oct 1" — the human label gateAsk's 402 message and the client's banners
+ *  use (owner correction, 2026-09-21: short month everywhere, matching the
+ *  client's own resetsOnShortLabel). Month name via Intl (no new
+ *  dependency); UTC so this never drifts a day depending on the server's
+ *  local timezone. */
+export function resetsOnLabel(now = new Date()) {
+  const d = nextMonthStartUtc(now);
+  const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  return `${month} ${d.getUTCDate()}`;
+}
+
+/**
+ * Which answer sources actually reached the model and therefore count
+ * against the monthly allowance (owner rule, 2026-09-21): cache hits, the
+ * meta-router, fast path, and no-evidence no-answers are all free; the
+ * retrieval+Haiku answer and the analytics planner's tool-use call are not,
+ * REGARDLESS of what kind of answer either one ends up producing (a model
+ * call that comes back "no-answer" still spent the call). Pure and exported
+ * so the rule itself — not just its call sites — is unit tested (see
+ * scripts/verify-scale.mjs).
+ */
+export const COUNTABLE_ASK_SOURCES = Object.freeze(["model", "analytics-model"]);
+export function isCountableAskSource(source) {
+  return COUNTABLE_ASK_SOURCES.includes(source);
+}
+
+/**
+ * Read this tenant's count of countable questions so far this UTC month.
+ * `db` is a recordsStore.js store (has `.raw`), called from INSIDE a
+ * withTenant transaction — RLS (already scoped to app.tenant_id) is what
+ * makes the plain SELECT below safe against rate_limit_windows' FORCE RLS,
+ * the same way askCache.js's raw queries already rely on it.
+ */
+export async function getAsksThisMonth(db, now = new Date()) {
+  try {
+    const { rows } = await db.raw(
+      `SELECT units FROM rate_limit_windows
+        WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid
+          AND bucket = $1 AND window_start = $2::timestamptz`,
+      [ASK_MONTH_BUCKET, monthStartUtc(now).toISOString()]
+    );
+    return Number(rows[0]?.units) || 0;
+  } catch (err) {
+    // Same fail-open principle as every other usage/limit read in this
+    // codebase: a broken read must not turn into "block every question" —
+    // see gateAsk's own cap check, which treats this as 0 asked so far.
+    console.error("usage: could not read asksThisMonth (failing open, reporting 0):", err?.message);
+    return 0;
+  }
+}
+
+/**
+ * Record one countable question against this tenant's monthly allowance.
+ * Called ONLY at the point a question actually reached the model (see
+ * isCountableAskSource above) — never from limit()'s per-request burst/daily
+ * accounting, which fires for every request regardless of what answered it.
+ * Best-effort: a failed write here must not turn an already-answered
+ * question into a failed request for the customer.
+ */
+export async function incrementAsksThisMonth(db, now = new Date()) {
+  try {
+    await db.raw(
+      `INSERT INTO rate_limit_windows (tenant_id, bucket, window_start, units)
+       VALUES ((current_setting('app.tenant_id', true))::uuid, $1, $2::timestamptz, 1)
+       ON CONFLICT (tenant_id, bucket, window_start)
+       DO UPDATE SET units = rate_limit_windows.units + 1`,
+      [ASK_MONTH_BUCKET, monthStartUtc(now).toISOString()]
+    );
+  } catch (err) {
+    console.error("usage: could not increment asksThisMonth:", err?.message);
+  }
+}

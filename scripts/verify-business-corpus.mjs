@@ -195,6 +195,43 @@ function runChecks(label, genArgs, outDirRel, expect) {
   }
   p('every document that prints a unit\'s serial also prints the key\'s brand for that unit', brandMismatches === 0);
 
+  // -- key == documents, for NAMES this time: the same class of bug as the
+  // brand check above, caught the same way a customer-facing name trap
+  // (near-miss surnames) got applied to the ANSWER_KEY.json after the
+  // documents had already been rendered with the customer's real, un-trapped
+  // name -- so the key described "Sorensen" while every document on disk
+  // still said "Donna Thornton". Two checks: (1) a customer's canonicalName
+  // must appear in at least one of its own documents (not ALL of them --
+  // e.g. a nameplate-photo transcript never prints a customer name at all,
+  // by design, and that's fine); (2) whatever name IS printed right after a
+  // "Customer:"/"Bill To:"/"Homeowner:" label, or after "Dear ... ," in
+  // correspondence, must belong to that same customer -- never someone
+  // else's name on someone else's letterhead.
+  const NAME_LABEL_RE = /^(?:Customer|Bill To|Homeowner):\s*(.+)$/;
+  const DEAR_RE = /^Dear\s+(.+),$/;
+  let noNameInDocs = 0;
+  let strayNamePrints = 0;
+  for (const c of customers) {
+    const variantList = [c.canonicalName]; // this generator never prints more than one spelling per customer
+    let foundOwnName = false;
+    for (const f of c.docs) {
+      const text = docText(outDir, f);
+      if (text.includes(c.canonicalName)) foundOwnName = true;
+      for (const line of text.split('\n')) {
+        const m = NAME_LABEL_RE.exec(line) ?? DEAR_RE.exec(line);
+        if (!m) continue;
+        const printedName = m[1].trim();
+        if (!variantList.includes(printedName)) {
+          strayNamePrints++;
+          console.log(`FAIL  ${label} ${f} prints "${printedName}" after a Customer/Bill To/Homeowner/Dear label, but ${c.key}'s name is "${c.canonicalName}"`);
+        }
+      }
+    }
+    if (!foundOwnName) { noNameInDocs++; console.log(`FAIL  ${label} ${c.key}'s canonicalName "${c.canonicalName}" does not appear in any of its documents`); }
+  }
+  p('every customer\'s canonicalName appears in at least one of its own documents', noNameInDocs === 0);
+  p('every name printed after a Customer/Bill To/Homeowner/Dear label belongs to that document\'s customer', strayNamePrints === 0);
+
   // -- no printed document date is after TODAY. maintenance-agreement is the
   // one exception: its "Agreement Period" is a contract term (e.g.
   // "01/01/2025 - 12/31/2026"), not an event date, and a contract's end date

@@ -63,7 +63,7 @@ eq('annual = 11x monthly (fleet)', annualPrice(PLAN_CATALOG.fleet.monthly), 9889
 eq('lookup key monthly', lookupKeyFor('shop', 'month'), 'shop_monthly');
 eq('lookup key annual', lookupKeyFor('shop', 'year'), 'shop_annual');
 
-eq('PLAN_LIMITS solo', PLAN_LIMITS.solo, { technicians: 1, documentsStored: 25000, pagesPerMonth: 750 });
+eq('PLAN_LIMITS solo', PLAN_LIMITS.solo, { technicians: 1, documentsStored: 25000, pagesPerMonth: 750, asksPerMonth: 3000 });
 eq('PLAN_LIMITS fleet has no technician/document cap', [PLAN_LIMITS.fleet.technicians, PLAN_LIMITS.fleet.documentsStored], [null, null]);
 
 eq('records rescue min is 4167 units (~$500 @ $0.12)', RECORDS_RESCUE.minUnits, 4167);

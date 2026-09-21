@@ -11,7 +11,7 @@ import {
   PLAN_CATALOG,
 } from "./_lib/billing.js";
 import { PLAN_LIMITS, planStateFor } from "./_lib/plan.js";
-import { getUsage, estimateCostUsd } from "./_lib/usage.js";
+import { getUsage, estimateCostUsd, getAsksThisMonth, resetsOnIso } from "./_lib/usage.js";
 
 /**
  * POST /api/billing?action=checkout|portal|webhook, GET/POST ?action=status
@@ -114,6 +114,10 @@ async function handleStatus(req, res, auth) {
     const documentsStored = await store.countDocuments();
     const monthStartIso = new Date(Date.now() - MONTH_MS).toISOString();
     const pagesThisMonth = await store.countPagesSince(monthStartIso);
+    // Monthly question allowance (owner decision, 2026-09-21) — see
+    // usage.js's getAsksThisMonth doc comment for why this reads
+    // rate_limit_windows rather than usage_counters.
+    const asksThisMonth = await getAsksThisMonth(store);
 
     // Owner ask (2026-09-20): "make sure we're not wasting money asking
     // questions" — a per-tenant monthly AI-cost estimate on the Billing
@@ -142,10 +146,20 @@ async function handleStatus(req, res, auth) {
       trialEndsAt: tenantRow?.trial_ends_at ?? null,
       currentPeriodEnd: tenantRow?.current_period_end ?? null,
       cancelAtPeriodEnd: !!tenantRow?.cancel_at_period_end,
-      limits: tenantRow?.limits ?? PLAN_LIMITS[tenantRow?.plan] ?? {},
+      // asksPerMonth is always freshly computed from the live PLAN_LIMITS
+      // table, never from the tenantRow.limits snapshot — a tenant whose
+      // limits JSONB predates this build (no webhook has re-applied
+      // billing_apply() since) would otherwise report a stale/missing cap
+      // even though gateAsk (plan.js) already enforces the current one.
+      limits: {
+        ...(tenantRow?.limits ?? PLAN_LIMITS[tenantRow?.plan] ?? {}),
+        asksPerMonth: PLAN_LIMITS[tenantRow?.plan]?.asksPerMonth ?? null,
+      },
       // aiCostEstimateUsd: last-30-days estimate, NOT a bill — see
       // usage.js's estimateCostUsd doc comment for what it blends and why.
-      usage: { documentsStored, pagesThisMonth, aiCostEstimateUsd },
+      // resetsOn: ISO date of next month's 1st UTC — the ask meter's reset
+      // point (see usage.js's resetsOnIso).
+      usage: { documentsStored, pagesThisMonth, asksThisMonth, aiCostEstimateUsd, resetsOn: resetsOnIso() },
     };
   });
   return handleCors(res, req).status(200).json(result);

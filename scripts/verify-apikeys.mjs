@@ -188,7 +188,7 @@ eq('parseLimitEnv rejects non-numeric garbage', parseLimitEnv('abc'), undefined)
 }
 
 check('DEFAULT_LIMITS defines all three buckets this codebase rate-limits', ['ask', 'ingest', 'read'].every((b) => DEFAULT_LIMITS[b]?.perMinute > 0 && DEFAULT_LIMITS[b]?.perDay > 0));
-eq('ask defaults match spec (30/min, 500/day)', DEFAULT_LIMITS.ask, { perMinute: 30, perDay: 500 });
+eq('ask defaults match spec (20/min, 900/day — 30% of Solo monthly; plans scale via scaleDailyLimitForPlan)', DEFAULT_LIMITS.ask, { perMinute: 20, perDay: 900 });
 // Bumped by the scale-readiness build (handoffs/HANDOFF-D.md): `ingest`'s
 // perDay/perMinute now count UNITS (see `limit()`'s `cost` parameter), not
 // one raw HTTP call each, and are sized for a Shop plan's daily volume plus

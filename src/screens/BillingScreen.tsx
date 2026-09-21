@@ -13,6 +13,7 @@ import {
   annualPrice,
   daysUntil,
   recordsRescueTotalCents,
+  resetsOnShortLabel,
   resolveRecordsRescueQuantity,
   type BillingInterval,
   type BillingPlanId,
@@ -187,24 +188,63 @@ export function BillingScreen() {
             </p>
 
             {status?.plan && (
-              <dl className="grid grid-cols-3 gap-3 text-body">
-                <div>
-                  <dt className="text-caption text-ink-3">Technicians</dt>
-                  <dd>{formatCap(status.limits.technicians)}</dd>
-                </div>
-                <div>
-                  <dt className="text-caption text-ink-3">Documents stored</dt>
-                  <dd>
-                    {status.usage.documentsStored.toLocaleString()} / {formatCap(status.limits.documentsStored)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-caption text-ink-3">Pages this month</dt>
-                  <dd>
-                    {status.usage.pagesThisMonth.toLocaleString()} / {formatCap(status.limits.pagesPerMonth)}
-                  </dd>
-                </div>
-              </dl>
+              <>
+                <dl className="grid grid-cols-3 gap-3 text-body">
+                  <div>
+                    <dt className="text-caption text-ink-3">Technicians</dt>
+                    <dd>{formatCap(status.limits.technicians)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-caption text-ink-3">Documents stored</dt>
+                    <dd>
+                      {status.usage.documentsStored.toLocaleString()} / {formatCap(status.limits.documentsStored)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-caption text-ink-3">Pages this month</dt>
+                    <dd>
+                      {status.usage.pagesThisMonth.toLocaleString()} / {formatCap(status.limits.pagesPerMonth)}
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* Monthly Donovan usage meter (owner decision, 2026-09-21):
+                    resets the 1st UTC, replacing the old daily ask cap —
+                    techs don't work every day. Owner correction, same day:
+                    the customer sees a PERCENTAGE only, never a raw question
+                    count ("don't intimidate them") — the exact numbers exist
+                    only in the title/aria-label, for an admin who hovers or
+                    uses a screen reader. */}
+                {status.limits.asksPerMonth != null && (() => {
+                  const cap = status.limits.asksPerMonth as number;
+                  const used = status.usage.asksThisMonth ?? 0;
+                  const pct = Math.round((used / cap) * 100);
+                  const resets = resetsOnShortLabel(status.usage.resetsOn);
+                  const barColor = pct >= 100 ? 'bg-bad-ink' : pct >= 80 ? 'bg-warn-ink' : 'bg-forest-700';
+                  const rawDetail = `${used.toLocaleString()} of ${formatCap(cap)}`;
+                  return (
+                    <div className="space-y-1.5" title={rawDetail}>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-body">
+                        <dt className="text-caption text-ink-3">Donovan usage</dt>
+                        <dd>
+                          {pct}% this month{resets ? ` · resets ${resets}` : ''}
+                        </dd>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label={`Donovan usage: ${rawDetail} this month (${pct}%)${resets ? `, resets ${resets}` : ''}`}
+                        aria-valuenow={Math.min(pct, 100)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        title={rawDetail}
+                        className="h-1.5 rounded-full bg-surface-2 overflow-hidden"
+                      >
+                        <div className={['h-full rounded-full', barColor].join(' ')} style={{ width: `${Math.min(pct, 100)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
             )}
 
             <div className="flex flex-wrap gap-2 pt-1">

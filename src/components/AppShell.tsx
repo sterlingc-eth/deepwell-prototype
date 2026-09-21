@@ -221,7 +221,9 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           onClick={() => setCurrentScreen('billing')}
           className={[
             'w-full text-left px-4 sm:px-6 py-2 flex items-center gap-2 text-body transition-colors duration-quick',
-            banner.kind === 'past_due' || banner.kind === 'cap' ? 'bg-warn-bg text-warn-ink hover:brightness-95' : 'bg-info-bg text-info-ink hover:brightness-95',
+            banner.kind === 'past_due' || banner.kind === 'cap' || banner.kind === 'asks_warn' || banner.kind === 'asks_exhausted'
+              ? 'bg-warn-bg text-warn-ink hover:brightness-95'
+              : 'bg-info-bg text-info-ink hover:brightness-95',
           ].join(' ')}
         >
           <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />

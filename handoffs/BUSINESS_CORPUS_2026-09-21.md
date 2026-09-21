@@ -328,6 +328,70 @@ anything already there.
   `test-docs/business-small` (196.5 KB, reflects the 11 changed files); new
   `test-docs/business-small-topup/bundle.json` (46.1 KB).
 
+## Update (2026-09-21, third pass): near-miss surname trap applied before rendering, not after
+
+Same class of bug as the brand mismatch above, this time on customer names.
+`ANSWER_KEY.json` said `res_2` = "Sorensen" @ 174 N College Ave and `res_11`
+= "Sorenson" @ 507 N Dobson Rd — but the base documents at those addresses
+printed "Donna Thornton" and "Donald Holbrook". Root cause: the near-miss
+trap ran *after* `buildResidential()` had already written the customer's
+real documents, patching only the in-memory answer-key object. The
+`--contacts-topup` invoices, generated from a fresh run, then picked up the
+(different) trapped names, so the topup and base disagreed with each other
+too.
+
+Fixed by resolving `residentialTotal` and the near-miss pairs' clamped
+indices statically (before any building happens — `CITIES`' `residential`
+counts are all literals) and having `nameFor()` bake the forced surname into
+the name *before* `buildResidential` renders that customer's first document.
+`mustNotMerge` is now built directly from the already-correct names, never
+patched afterward. Verified: documents are what a real system extracts, so
+they're the source of truth — the key can now never describe a name no
+document prints.
+
+**For the frozen small base**, forcing a name into `test-docs/business-small`'s
+144 already-uploaded files was not an option (would change their text for no
+reason other than this bug). A `APPLY_NAME_TRAPS` flag (gated on the same
+"is this exactly the shipped 30-customer/business-small identity" check used
+for contacts, shared by both the base run and its `--contacts-topup` run so
+they never disagree on a name) turns the trap off entirely for that specific
+corpus: `res_2`/`res_11`'s key now correctly reads **Donna Thornton** / 174 N
+College Ave and **Donald Holbrook** / 507 N Dobson Rd — exactly what the
+documents already said — and `mustNotMerge` is `[]` for that key (there is no
+naturally-occurring near-miss surname pair among the real, un-trapped names;
+per the coordinator's own fallback, the trap is dropped from this one key
+rather than invented). The full corpus and any other/future `--customers`
+run still get the real trap, now correctly baked into the documents:
+`res_2`/`res_11` → **Donna Sorensen** / **Donald Sorenson**, `res_20`/`res_33`
+→ **Emily Whitfield** / **Charles Whitford**, verified present in the actual
+PDF text.
+
+**Key entries that changed:**
+- `test-docs/business/ANSWER_KEY.json` (full, free to change): `res_2`,
+  `res_11`, `res_20`, `res_33` canonicalName now matches what's baked into
+  their (regenerated) documents; `mustNotMerge` unchanged in shape (still 2
+  pairs) but now true.
+- `test-docs/business-small/ANSWER_KEY.json`: `res_2` → "Donna Thornton",
+  `res_11` → "Donald Holbrook" (both previously "Sorensen"/"Sorenson"),
+  `mustNotMerge` → `[]` (previously `[["res_2","res_11"]]`). **The 144 files
+  on disk did not change** (byte-for-byte identical, re-verified).
+- `test-docs/business-small-topup/TOPUP_KEY.json`: regenerated so its two
+  affected invoices (`res_2`, `res_11`) print "Donna Thornton"/"Donald
+  Holbrook" — matching the base corpus — instead of the old, now-incorrect
+  "Sorensen"/"Sorenson"; their sha256s changed (new content, still
+  collision-free against both corpora) — everyone else's topup invoice is
+  unaffected.
+
+**New verify checks** (`scripts/verify-business-corpus.mjs`, +2 per corpus):
+for every customer, `canonicalName` appears in at least one of its own
+documents (not necessarily all — a nameplate-photo transcript never prints a
+customer name, by design); and every name printed right after a `Customer:`/
+`Bill To:`/`Homeowner:`/`Dear ... ,` label belongs to that document's
+customer, never someone else's. Verify suite is now 90 checks total (41 full
++ 39 small + 10 small-topup — full has 2 more than small since it has 2
+mustNotMerge pairs to check where the frozen small key correctly has 0),
+`npm run verify:all` green.
+
 ## Files touched
 
 - `scripts/synth-business.mjs` — new (generator); extended with

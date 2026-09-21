@@ -76,6 +76,7 @@ export interface PlanLimits {
   technicians: number | null;
   documentsStored: number | null;
   pagesPerMonth: number | null;
+  asksPerMonth: number | null;
 }
 
 export interface BillingStatus {
@@ -85,7 +86,9 @@ export interface BillingStatus {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   limits: Partial<PlanLimits>;
-  usage: { documentsStored: number; pagesThisMonth: number };
+  // resetsOn: ISO date of next month's 1st UTC — mirrors api/billing.js's
+  // usage.resetsOn (api/_lib/usage.js's resetsOnIso).
+  usage: { documentsStored: number; pagesThisMonth: number; asksThisMonth?: number; resetsOn?: string };
 }
 
 /** Monthly USD price per plan — mirrors api/_lib/billing.js's PLAN_CATALOG. */
@@ -98,10 +101,10 @@ export const PLAN_CATALOG: Record<BillingPlanId, { name: string; monthly: number
 
 /** Mirrors api/_lib/plan.js's PLAN_LIMITS — display only. */
 export const PLAN_LIMITS: Record<BillingPlanId, PlanLimits> = {
-  solo: { technicians: 1, documentsStored: 25_000, pagesPerMonth: 750 },
-  shop: { technicians: 4, documentsStored: 100_000, pagesPerMonth: 2_000 },
-  crew: { technicians: 10, documentsStored: 500_000, pagesPerMonth: 5_000 },
-  fleet: { technicians: null, documentsStored: null, pagesPerMonth: 10_000 },
+  solo: { technicians: 1, documentsStored: 25_000, pagesPerMonth: 750, asksPerMonth: 3_000 },
+  shop: { technicians: 4, documentsStored: 100_000, pagesPerMonth: 2_000, asksPerMonth: 9_000 },
+  crew: { technicians: 10, documentsStored: 500_000, pagesPerMonth: 5_000, asksPerMonth: 22_500 },
+  fleet: { technicians: null, documentsStored: null, pagesPerMonth: 10_000, asksPerMonth: 60_000 },
 };
 
 /** One month free: annual = 11 * monthly (mirrors api/_lib/billing.js's annualPrice). */
@@ -140,8 +143,27 @@ export function daysUntil(iso: string | null | undefined, now: Date = new Date()
 }
 
 export interface BillingBanner {
-  kind: 'trialing' | 'past_due' | 'cap';
+  kind: 'trialing' | 'past_due' | 'cap' | 'asks_exhausted' | 'asks_warn';
   message: string;
+}
+
+/** Fraction of the plan's monthly question allowance used so far, or null
+ *  when the plan has no cap on file yet. Pure, exported for
+ *  scripts/verify-ui.ts. */
+export function asksUsedFraction(status: BillingStatus | null): number | null {
+  const cap = status?.limits.asksPerMonth;
+  if (!cap) return null;
+  return (status?.usage.asksThisMonth ?? 0) / cap;
+}
+
+/** "Oct 1" from an ISO date (status.usage.resetsOn) — UTC so it never drifts
+ *  a day depending on the viewer's timezone. Shared by the billing row, the
+ *  banners below, and AskScreen's caption so the reset date reads identically
+ *  everywhere. */
+export function resetsOnShortLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 /** Never-subscribed tenants may ingest/ask about this many documents before
@@ -157,6 +179,20 @@ export const FREE_PREVIEW_DOCUMENTS = 3;
  */
 export function billingBannerFor(status: BillingStatus | null, now: Date = new Date()): BillingBanner | null {
   if (!status) return null;
+  // Monthly question allowance (owner decision, 2026-09-21): a tenant that
+  // has used up the whole month's questions needs to know before anything
+  // else, including a trial countdown — Ask is fully blocked until it
+  // resets or they upgrade. Checked first, ahead of trialing/past_due.
+  const asksPct = asksUsedFraction(status);
+  if (asksPct != null && asksPct >= 1) {
+    // Owner correction (2026-09-21): never say "questions" — read as a
+    // feature ("Donovan") using up its usage, not the customer being counted.
+    const resets = resetsOnShortLabel(status.usage.resetsOn);
+    return {
+      kind: 'asks_exhausted',
+      message: `This month's Donovan usage is used up${resets ? ` — resets ${resets}` : ''}. Need more? See plans.`,
+    };
+  }
   if (status.status === 'trialing') {
     const days = daysUntil(status.trialEndsAt, now);
     const message =
@@ -169,6 +205,9 @@ export function billingBannerFor(status: BillingStatus | null, now: Date = new D
   }
   if (status.status === 'past_due') {
     return { kind: 'past_due', message: 'Your last payment failed. Update billing to keep uploading.' };
+  }
+  if (asksPct != null && asksPct >= 0.8) {
+    return { kind: 'asks_warn', message: `Donovan is at ${Math.round(asksPct * 100)}% of this month's usage.` };
   }
   if (status.status === 'none' && status.usage.documentsStored >= FREE_PREVIEW_DOCUMENTS) {
     return { kind: 'cap', message: 'Free preview used up. Start your 30-day trial to keep going.' };
