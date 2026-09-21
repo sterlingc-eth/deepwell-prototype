@@ -38,6 +38,7 @@ import {
   UNKNOWN_BUCKET,
   TOP_CUSTOMERS_LIMIT,
 } from '../analytics.js';
+import { normalizeQuestion } from '../nlNormalize.js';
 
 export const ANALYTICS_MODEL = process.env.ANALYTICS_MODEL || process.env.ASK_MODEL || 'claude-haiku-4-5';
 export function isAnalyticsEnabled(env = process.env) {
@@ -466,9 +467,16 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
  */
 export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today }) {
   const EMPTY = { handled: false, data: null, cacheHit: false, modelCalled: false, writes: [] };
+  // Day 1 training-plan normalization layer (nlNormalize.js): both the plan
+  // and every cache key below key off the NORMALIZED text (more cache hits,
+  // cheaper — a repeated question typed three different sloppy ways still
+  // hits the same Tier-1 row) — `question` itself is kept only for anything
+  // that might ever need to show the dispatcher back their own original
+  // wording, which nothing in this file currently does.
+  const { normalized: question_n } = normalizeQuestion(question);
   try {
     // ---- Tier 1: exact question text, checked BEFORE the Haiku call -------
-    const qHash = analyticsQuestionHash(question);
+    const qHash = analyticsQuestionHash(question_n);
     const qProbe = await withTenant(ctxArg, (db) =>
       getCacheEntry(db, { questionHash: qHash, today, promptVersion: ANALYTICS_PROMPT_VERSION })
     );
@@ -486,7 +494,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // after — that fallback's own model call is the one actually counted
     // for the question (see api/ask.js's own doc comment at its call site),
     // so this file never double-reports one question as two.
-    const plan = await planAnalyticsQuestion(question, { today });
+    const plan = await planAnalyticsQuestion(question_n, { today });
     if (!plan) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a
@@ -494,7 +502,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // plan is a sign the classifier let a single-record question through —
     // fall back to retrieval+model rather than confidently answering "every
     // customer" for what was really a lookup about one of them.
-    if (suspiciousUnfilteredCustomerPlan(plan, question)) return { ...EMPTY, modelCalled: true };
+    if (suspiciousUnfilteredCustomerPlan(plan, question_n)) return { ...EMPTY, modelCalled: true };
 
     // Round 5 item 3: the plan silently dropped a condition the question
     // actually named (email/phone/brand/county/month) — answering the
@@ -502,7 +510,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // (exactly item 2's original bug shape). Answered honestly instead of
     // executed or falling through, and not cached — see missingConditions'
     // own doc comment in analytics.js.
-    const missing = missingConditions(plan, question);
+    const missing = missingConditions(plan, question_n);
     if (missing.size > 0) {
       const [condition] = missing;
       return { handled: true, data: unsupportedConditionAnswer(condition, plan.entity), cacheHit: false, modelCalled: true, writes: [] };

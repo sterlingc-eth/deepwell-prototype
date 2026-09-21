@@ -107,6 +107,15 @@ export const ENTITY_SYNONYMS = {
   documents: [
     'document', 'documents', 'doc', 'docs', 'file', 'files', 'paperwork', 'record', 'records',
     'invoice', 'invoices', 'ticket', 'tickets', 'work order', 'work orders',
+    // Day 1 training-plan question bank (2026-09-21, gen-question-bank.mjs)
+    // measured a real classifier gap here: "how many permits do we have" /
+    // "how many proposal quotes are there" / etc. never matched AGGREGATE_NOUN
+    // at all — these are just more of the same per-document-type nouns as
+    // "invoice"/"ticket"/"work order" above, not a new shape.
+    'permit', 'permits', 'quote', 'quotes', 'proposal', 'proposals', 'agreement', 'agreements',
+    'photo', 'photos', 'correspondence', 'startup sheet', 'startup sheets',
+    'dispatch note', 'dispatch notes', 'inspection report', 'inspection reports',
+    'purchase order', 'purchase orders',
   ],
   serviceVisits: [
     'service visit', 'service visits', 'job', 'jobs', 'visit', 'visits', 'call', 'calls',

@@ -23,8 +23,15 @@ import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
-import { preClassifyAnalytics } from "./_lib/analytics.js";
+import { preClassifyAnalytics, looksLikeSingleRecordReference } from "./_lib/analytics.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
+// Day 1 training-plan normalization layer (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
+// aliased because this file already has its own `normalizeQuestion` (the
+// retrieval-cache one, below) — the analytics pre-classifier gate needs the
+// NL-normalized text (abbreviations expanded, typos fixed) so a sloppy
+// phrasing gets the same routing decision a clean one would, not this file's
+// plainer lowercase/trim/strip-punctuation normalization.
+import { normalizeQuestion as normalizeQuestionForAnalytics } from "./_lib/nlNormalize.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -517,7 +524,18 @@ export default async function handler(req, res) {
     // below — most questions still won't match and pay nothing extra. Tried
     // after meta and fast path (both already own their own question shapes)
     // and, like fast path, never fired for a meta question.
-    const analyticsCandidate = !meta && !fastPathIntent && isAnalyticsEnabled() && preClassifyAnalytics(question);
+    // looksLikeSingleRecordReference is checked against the RAW question, not
+    // the normalized one: SINGULAR_NAMED_RECORD_RE (analytics.js) keys off a
+    // capitalized proper noun ("the Whitmore unit") to catch a named-record
+    // question with no address/identifier — a signal normalization's own
+    // lowercasing necessarily destroys. Checking it here, before
+    // normalization, keeps that exclusion working for input that arrives
+    // capitalized, on top of whatever preClassifyAnalytics(normalized) itself
+    // already re-checks (redundant on lowercased text, never wrong).
+    const analyticsCandidate =
+      !meta && !fastPathIntent && isAnalyticsEnabled() &&
+      !looksLikeSingleRecordReference(question) &&
+      preClassifyAnalytics(normalizeQuestionForAnalytics(question).normalized);
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
