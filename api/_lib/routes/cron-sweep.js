@@ -110,6 +110,11 @@ export default async function handler(req, res) {
     // ingests.
     integritySplitUnitsHealed: 0,
     integrityContactsFilled: 0,
+    // Round 2 gap 4 (2026-09-21): absorbAddressPlaceholders, same safe-to-
+    // auto-apply reasoning as healSplitUnits/refillCustomerContacts above —
+    // repairs already-damaged state (a placeholder that should have matched
+    // an existing named customer) from before the write-path fix existed.
+    integrityAddressPlaceholdersAbsorbed: 0,
     // Review fix (2026-09-20): relinkMismatchedNames runs dry-run only from
     // cron (see below) — this is how many documents it WOULD relink, not how
     // many it did. An admin applies them from the Customers-tab panel.
@@ -235,7 +240,7 @@ export default async function handler(req, res) {
         const fixed = await integrityFixTenant(ctx, {
           apply: [
             'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
-            'stripShopContact', 'healSplitUnits', 'refillCustomerContacts',
+            'stripShopContact', 'healSplitUnits', 'refillCustomerContacts', 'absorbAddressPlaceholders',
           ],
           minMergeScore: 0.95,
           dryRun: false,
@@ -246,6 +251,7 @@ export default async function handler(req, res) {
         summary.integrityContactStripped += fixed.shopContactStripped?.length ?? 0;
         summary.integritySplitUnitsHealed += fixed.splitUnitsHealed?.length ?? 0;
         summary.integrityContactsFilled += fixed.customerContactsFilled?.length ?? 0;
+        summary.integrityAddressPlaceholdersAbsorbed += fixed.addressPlaceholdersAbsorbed?.length ?? 0;
 
         const relinkPreview = await integrityFixTenant(ctx, { apply: ['relinkMismatchedNames'], dryRun: true });
         summary.integrityNamesRelinkable += relinkPreview.mismatchedNamesRelinked?.length ?? 0;

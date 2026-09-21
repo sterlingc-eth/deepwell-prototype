@@ -45,6 +45,22 @@ export function normalizeUnitKey(raw) {
   return m ? m[1].toLowerCase() : '';
 }
 
+/**
+ * Leading house number off a raw address string ("544 E Ray Rd..." -> "544"),
+ * or null when the address doesn't start with one (rare — a rural route, a
+ * lot number). Round 3 fix (2026-09-21, reviewer NO-GO item 1): the ONE piece
+ * both recordsStore.js's findOrCreateCustomerByAddress and
+ * routes/integrity.js's loadAddressPlaceholderCandidates need to narrow a
+ * candidate query in SQL BEFORE the exact normalizeAddressKey(+unit) match
+ * decides anything — a customer at a genuinely different street essentially
+ * never shares this exact house-number prefix, so filtering on it in SQL is
+ * a cheap, safe narrowing, never a guess. Shared here so both call sites
+ * narrow the identical way instead of drifting apart. */
+export function houseNumberOf(address) {
+  const m = String(address ?? '').trim().match(/^(\d{1,6})\b/);
+  return m ? m[1] : null;
+}
+
 /** City + zip pulled out of the "city, state zip" tail of an address string
  *  (everything after the first comma). No comma at all -> both empty
  *  (a bare street line like "1519 W Juniper" carries no city/zip either
@@ -159,6 +175,65 @@ export function addressOnlyCustomerName(address) {
  *  second customer at the same address. */
 export function isAddressOnlyCustomer(data) {
   return !!data && data.name_source === 'address';
+}
+
+/**
+ * Reviewer NO-GO (2026-09-21, round 2, gap 4) — pure decision for the
+ * `absorbAddressPlaceholders` heal step (routes/integrity.js): which
+ * address-only placeholder customers should be merged INTO an existing named
+ * customer at the exact same address, because recordsStore.js's own write-
+ * time match (findOrCreateCustomerByAddress) missed them — live case:
+ * "Customer at 544 E Ray Rd..." sitting alongside "Deborah Ortega @ 544 E Ray
+ * Rd...", the identical address.
+ *
+ * `customers`: {id, address, isPlaceholder, isLocked?}[] — every non-merged
+ * customer with a service_address on file (or, at scale, the narrowed subset
+ * routes/integrity.js's loadAddressPlaceholderCandidates fetches — see its
+ * own doc comment). Matching is EXACT (normalizeAddressKey, narrowed by
+ * normalizeUnitKey when a placeholder's own address names a unit) — the same
+ * "don't know, so don't guess" rule findOrCreateCustomerByAddress itself
+ * already applies: a placeholder whose street matches MORE THAN ONE named
+ * customer (with no unit to break the tie) is left alone for a human, never
+ * guessed at.
+ *
+ * Reviewer NO-GO (2026-09-21, round 3, item 2): a placeholder is excluded
+ * outright when `isLocked` is true — set by the caller (routes/integrity.js)
+ * when ANY document linked to that placeholder fails `isEligibleForRelink`
+ * (a human-made link, or a document a human has already verified). A human
+ * touching that document implicitly confirmed the placeholder as ITS OWN
+ * customer; silently merging it into a different named customer would
+ * override that human judgment, exactly what relinkMismatchedNames itself
+ * refuses to do unattended.
+ *
+ * Returns [{keepId, dropId}] — dropId is always the placeholder, ready to
+ * pass straight to reviewStore.js's mergeCustomers (docs/units move onto
+ * keepId; dropId ends up `merged_into` keepId).
+ */
+export function planAddressPlaceholderAbsorptions(customers) {
+  const rows = (customers ?? []).filter((c) => c && c.id && c.address);
+  const named = rows.filter((c) => !c.isPlaceholder);
+  const placeholders = rows.filter((c) => c.isPlaceholder && !c.isLocked);
+
+  const namedByStreet = new Map();
+  for (const c of named) {
+    const key = normalizeAddressKey(c.address);
+    if (!key) continue;
+    if (!namedByStreet.has(key)) namedByStreet.set(key, []);
+    namedByStreet.get(key).push(c);
+  }
+
+  const plans = [];
+  for (const p of placeholders) {
+    const key = normalizeAddressKey(p.address);
+    if (!key) continue;
+    let candidates = namedByStreet.get(key) ?? [];
+    if (candidates.length > 1) {
+      const unitKey = normalizeUnitKey(p.address);
+      candidates = unitKey ? candidates.filter((c) => normalizeUnitKey(c.address) === unitKey) : [];
+    }
+    if (candidates.length === 1) plans.push({ keepId: candidates[0].id, dropId: p.id });
+  }
+  return plans;
 }
 
 // ---------------------------------------------------------- shop addresses

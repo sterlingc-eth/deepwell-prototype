@@ -38,7 +38,7 @@ function isGroupLikeFact(f: Fact): boolean {
 
 function GroupTable({ facts, onOpenEntity }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void }) {
   return (
-    <dl className="border border-line rounded-lg bg-surface divide-y divide-line grid grid-cols-1 sm:grid-cols-2">
+    <dl className="border border-line rounded-lg bg-surface divide-y divide-line grid grid-cols-1 sm:grid-cols-2 max-h-[28rem] overflow-y-auto">
       {facts.map((f, i) => {
         const linkable = !!(f.entityId && onOpenEntity);
         return (

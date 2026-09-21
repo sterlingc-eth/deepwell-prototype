@@ -13,7 +13,7 @@ import {
   normalizeUnitKey, normalizeCityKey, normalizeZipKey, normalizePhoneKey, normalizeEmailKey,
   compareNamesStrict, damerauLevenshteinDistance, SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
   buildContactAddressCounts, isLikelyShopPhone, isLikelyShopEmail, SHOP_CONTACT_ADDRESS_FLOOR,
-  chooseUpgradedCustomerName,
+  chooseUpgradedCustomerName, planAddressPlaceholderAbsorptions, houseNumberOf,
 } from '../api/_lib/integrity.js';
 import { isEligibleForRelink, planSerialMovesByGroup, planSplitUnitMoves } from '../api/_lib/routes/integrity.js';
 
@@ -833,6 +833,125 @@ check(
   ]).length === 0
 );
 check('a unit with no documents naming its serial at all forms no candidate', planSplitUnitMoves([]).length === 0);
+
+/* --------------------- Round 2 gap 4: absorbAddressPlaceholders (2026-09-21) */
+// Live case: "Customer at 544 E Ray Rd, Casa Grande, AZ 85122" (a placeholder,
+// data.name_source='address') sitting alongside "Deborah Ortega @ 544 E Ray
+// Rd, Casa Grande, AZ 85122" (a named customer, identical address) —
+// findOrCreateCustomerByAddress's own write-time candidate query missed the
+// match (see recordsStore.js's gap-4 fix); this heal step repairs the
+// already-damaged state.
+
+{
+  const customers = [
+    { id: 'named-ortega', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: false },
+    { id: 'placeholder-ray-rd', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: true },
+  ];
+  eq(
+    'a placeholder at the exact same address as exactly one named customer -> merge into it',
+    planAddressPlaceholderAbsorptions(customers),
+    [{ keepId: 'named-ortega', dropId: 'placeholder-ray-rd' }]
+  );
+}
+{
+  // Two named customers at the same street, placeholder names no unit ->
+  // ambiguous, don't guess, leave for a human.
+  const customers = [
+    { id: 'named-a', address: '100 Main St, Mesa, AZ 85201', isPlaceholder: false },
+    { id: 'named-b', address: '100 Main St, Mesa, AZ 85201', isPlaceholder: false },
+    { id: 'placeholder', address: '100 Main St, Mesa, AZ 85201', isPlaceholder: true },
+  ];
+  eq('several named customers at the same street, no unit to disambiguate -> no absorption', planAddressPlaceholderAbsorptions(customers), []);
+}
+{
+  // Two named customers at the same street in different units, placeholder
+  // names the matching unit -> narrows to the one match.
+  const customers = [
+    { id: 'named-unit-1', address: '100 Main St Unit 1, Mesa, AZ 85201', isPlaceholder: false },
+    { id: 'named-unit-2', address: '100 Main St Unit 2, Mesa, AZ 85201', isPlaceholder: false },
+    { id: 'placeholder-unit-2', address: '100 Main St Unit 2, Mesa, AZ 85201', isPlaceholder: true },
+  ];
+  eq(
+    'a unit number narrows an otherwise-ambiguous street match to the one matching named customer',
+    planAddressPlaceholderAbsorptions(customers),
+    [{ keepId: 'named-unit-2', dropId: 'placeholder-unit-2' }]
+  );
+}
+check(
+  'no matching named customer at all -> no absorption (stays a placeholder, not silently dropped)',
+  planAddressPlaceholderAbsorptions([
+    { id: 'placeholder-alone', address: '9 Nowhere Ln, Yuma, AZ 85364', isPlaceholder: true },
+  ]).length === 0
+);
+check(
+  'two placeholders, no named customer -> no absorption (never merges placeholder into placeholder)',
+  planAddressPlaceholderAbsorptions([
+    { id: 'placeholder-1', address: '20 Elm St, Tempe, AZ 85281', isPlaceholder: true },
+    { id: 'placeholder-2', address: '20 Elm St, Tempe, AZ 85281', isPlaceholder: true },
+  ]).length === 0
+);
+check(
+  'no placeholders at all -> no absorption plans',
+  planAddressPlaceholderAbsorptions([
+    { id: 'named-only', address: '1 First Ave, Gilbert, AZ 85234', isPlaceholder: false },
+  ]).length === 0
+);
+
+/* ------------------------------- Round 3 item 1: houseNumberOf (2026-09-21) */
+// The narrowing key both findOrCreateCustomerByAddress (recordsStore.js) and
+// loadAddressPlaceholderCandidates (routes/integrity.js) now use to filter a
+// candidate query in SQL before the exact normalizeAddressKey(+unit) match.
+
+eq('houseNumberOf: leading house number', houseNumberOf('544 E Ray Rd, Casa Grande, AZ 85122'), '544');
+eq('houseNumberOf: leading house number, no comma', houseNumberOf('123 Main St'), '123');
+eq('houseNumberOf: no leading number -> null', houseNumberOf('Lot 5 Rural Route 2'), null);
+eq('houseNumberOf: empty/missing -> null', houseNumberOf(''), null);
+eq('houseNumberOf: null input -> null', houseNumberOf(null), null);
+
+/* ------------------- Round 3 item 2: isLocked excludes a human-touched --- */
+/* ------------------------- placeholder from absorbAddressPlaceholders ---- */
+// A placeholder linked to a document a human already touched (a manual link,
+// or a human verification) must never be silently merged away — reuses
+// isEligibleForRelink's exact rule, loaded per placeholder by
+// routes/integrity.js's loadAddressPlaceholderLinkEligibility and passed in
+// as `isLocked`.
+
+{
+  const customers = [
+    { id: 'named-ortega', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: false },
+    { id: 'placeholder-ray-rd', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: true, isLocked: true },
+  ];
+  eq(
+    'a placeholder locked by a human-touched document -> no absorption, however clean the address match',
+    planAddressPlaceholderAbsorptions(customers),
+    []
+  );
+}
+{
+  const customers = [
+    { id: 'named-ortega', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: false },
+    { id: 'placeholder-ray-rd', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: true, isLocked: false },
+  ];
+  eq(
+    'an explicitly unlocked placeholder still absorbs normally',
+    planAddressPlaceholderAbsorptions(customers),
+    [{ keepId: 'named-ortega', dropId: 'placeholder-ray-rd' }]
+  );
+}
+{
+  // Backward-compatible default: a placeholder with no isLocked field at all
+  // (every round-2 test case above, and any caller that never learned about
+  // locking) is treated as eligible, not silently excluded.
+  const customers = [
+    { id: 'named-ortega', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: false },
+    { id: 'placeholder-ray-rd', address: '544 E Ray Rd, Casa Grande, AZ 85122', isPlaceholder: true },
+  ];
+  eq(
+    'isLocked omitted entirely -> defaults to eligible (backward compatible)',
+    planAddressPlaceholderAbsorptions(customers),
+    [{ keepId: 'named-ortega', dropId: 'placeholder-ray-rd' }]
+  );
+}
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

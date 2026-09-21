@@ -170,7 +170,7 @@ export interface IntegrityScanResult {
 export type IntegrityApplyAction =
   | 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits'
   | 'healMergedSurvivors' | 'retireShopCustomers' | 'stripShopContact' | 'relinkMismatchedNames'
-  | 'healSplitUnits' | 'refillCustomerContacts';
+  | 'healSplitUnits' | 'refillCustomerContacts' | 'absorbAddressPlaceholders';
 
 // Review fix (2026-09-20, reviewer NO-GO item 2): relinkMismatchedNames is
 // deliberately NOT in this list. It repoints a document from one customer to
@@ -189,6 +189,10 @@ export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = [
   // unanimously agrees on a different customer; refillCustomerContacts only
   // ever fills an EMPTY phone/email, never overwrites one.
   'healSplitUnits', 'refillCustomerContacts',
+  // Round 2 gap 4 (2026-09-21): also safe/additive — only ever merges a
+  // placeholder into an UNAMBIGUOUSLY matched named customer at the same
+  // address (see planAddressPlaceholderAbsorptions in api/_lib/integrity.js).
+  'absorbAddressPlaceholders',
 ];
 
 /** The ordinary result of an integrityFix call. */
@@ -213,6 +217,11 @@ export interface IntegrityFixApplied {
   /** Round 4 (2026-09-21): refillCustomerContacts — a customer whose phone/
    *  email was empty, filled from that customer's own documents. */
   customerContactsFilled: { customerId: string; field: 'phone' | 'email'; value: string }[];
+  /** Round 2 gap 4 (2026-09-21): absorbAddressPlaceholders — a placeholder
+   *  customer (data.name_source='address') merged into the one named
+   *  customer at the identical normalized address. keepId is the survivor
+   *  (the named customer); dropId (the placeholder) ends up merged_into it. */
+  addressPlaceholdersAbsorbed: { keepId: string; dropId: string }[];
   skipped: { documentId: string | null; reason: string }[];
 }
 

@@ -22,7 +22,17 @@
  * synth-corpus.mjs) is used only for cosmetic labor-hour jitter. Re-running
  * this script always produces byte-identical documents and answer key.
  *
- * Usage: node scripts/synth-business.mjs
+ * Usage:
+ *   node scripts/synth-business.mjs                                  (default: 120 customers, test-docs/business/ -- UNCHANGED shape/output from before --customers existed)
+ *   node scripts/synth-business.mjs --customers 30 --out test-docs/business-small
+ *     (a cheaper ~150-doc subset for testing: still 3 AZ counties, >=1
+ *     out-of-state customer, all 8 brands, all 15 document types, mixed
+ *     warranty tiers, a scaled-down apartment complex, one name-variant
+ *     household, one near-miss surname pair, 2 letterhead-only docs, and a
+ *     40-question (20 analytics + 20 lookup) answer key. Also switches
+ *     correspondence docs to .txt instead of .pdf -- cheaper to extract,
+ *     same content -- since "cheap testing" is the point of this mode; the
+ *     default 120-customer run is untouched by this flag.)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,8 +42,29 @@ import { deriveWarranty, normalizeBrand } from '../api/_lib/warrantyRules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const OUT_DIR = path.join(ROOT, 'test-docs', 'business');
 const TODAY = '2026-09-21';
+
+/* ------------------------------------------------------------------ CLI -- */
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) { out[a.slice(2)] = argv[i + 1]; i++; }
+  }
+  return out;
+}
+const cliArgs = parseArgs(process.argv.slice(2));
+const CUSTOMER_COUNT = cliArgs.customers ? Math.max(4, Math.trunc(Number(cliArgs.customers))) : 120;
+const IS_DEFAULT_SCALE = CUSTOMER_COUNT === 120 && !cliArgs.out;
+// Cheap-forms only kicks in for a non-default (--customers) run, so the
+// default 120-customer output is byte-for-byte unchanged from before this
+// flag existed.
+const CHEAP_FORMS = !IS_DEFAULT_SCALE;
+const OUT_DIR = cliArgs.out ? path.resolve(ROOT, cliArgs.out) : path.join(ROOT, 'test-docs', 'business');
+
+if (CUSTOMER_COUNT < 15) {
+  console.warn(`--customers ${CUSTOMER_COUNT} is small enough that full document-type/brand coverage cannot be guaranteed (need at least ~15). Proceeding anyway.`);
+}
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 // Clean any previous run's generated docs + answer key, but leave a built
@@ -285,7 +316,7 @@ function shopMemoDoc({ date, subject, body }) {
  * which table entry each one hits) - these are the SAME zips fed through
  * deriveGeo() below, not a parallel hand-maintained mapping.
  */
-const CITIES = [
+const FULL_CITIES = [
   // Maricopa county (9 cities) - all 850-853 prefix, default table entry
   { name: 'Phoenix', state: 'AZ', zip: '85001', residential: 9, commercial: ['dental'] },
   { name: 'Mesa', state: 'AZ', zip: '85201', residential: 7, commercial: ['restaurant'], apartmentUnits: 8 },
@@ -311,6 +342,50 @@ const CITIES = [
   { name: 'Los Angeles', state: 'CA', zip: '90001', residential: 1 },
 ];
 const STATE_NAMES = { AZ: 'Arizona', NV: 'Nevada', NM: 'New Mexico', CA: 'California' };
+
+/**
+ * A reduced, representative city plan for `--customers N` (N != 120): one
+ * city per AZ county -- Mesa/Maricopa, Casa Grande/Pinal, Tucson/Pima --
+ * guaranteeing all 3 counties every time, plus one out-of-state city (Las
+ * Vegas, NV). Reuses the EXACT SAME zips as the matching entries in
+ * FULL_CITIES, so geo derivation resolves identically to the full corpus.
+ * No commercial (dental/restaurant/church/school) customers at this scale --
+ * not one of the required capabilities for the small subset, and every
+ * document type is already reachable through the residential rotation alone
+ * (see EXTRA_TYPE_POOL below) once there are enough residential customers.
+ */
+function smallCityPlan(n) {
+  const outOfState = 1;
+  const minResidentialForFullTypeCoverage = 11; // == EXTRA_TYPE_POOL.length below
+  const apartmentUnits = n >= 60 ? 8 : Math.min(4, Math.max(0, n - outOfState - minResidentialForFullTypeCoverage));
+  const residential = Math.max(0, n - outOfState - apartmentUnits);
+  if (residential < minResidentialForFullTypeCoverage) {
+    console.warn(`--customers ${n}: only ${residential} residential customers after reserving the apartment ` +
+      `complex/out-of-state slots -- fewer than the ${minResidentialForFullTypeCoverage} needed to guarantee ` +
+      'every document type appears. Consider a larger --customers value.');
+  }
+  const per = Math.floor(residential / 3);
+  const rem = residential - per * 3;
+  return {
+    apartmentUnits,
+    cities: [
+      { name: 'Mesa', state: 'AZ', zip: '85201', residential: per + (rem > 0 ? 1 : 0), apartmentUnits },
+      { name: 'Casa Grande', state: 'AZ', zip: '85122', residential: per + (rem > 1 ? 1 : 0) },
+      { name: 'Tucson', state: 'AZ', zip: '85701', residential: per },
+      { name: 'Las Vegas', state: 'NV', zip: '89101', residential: outOfState },
+    ],
+  };
+}
+const SMALL_PLAN = IS_DEFAULT_SCALE ? null : smallCityPlan(CUSTOMER_COUNT);
+const CITIES = IS_DEFAULT_SCALE ? FULL_CITIES : SMALL_PLAN.cities;
+const APARTMENT_UNIT_COUNT = IS_DEFAULT_SCALE ? 8 : SMALL_PLAN.apartmentUnits;
+// Full scale: 2 mustNotMerge pairs, 3 name-variant households, 4 letterhead-
+// only docs. Small scale: 1 of each (or 1/1/2 per the brief's small-subset
+// requirements).
+const WANT_MERGE_PAIRS = IS_DEFAULT_SCALE ? 2 : 1;
+const WANT_NAME_VARIANTS = IS_DEFAULT_SCALE ? 3 : 1;
+const WANT_SHOP_ONLY_DOCS = IS_DEFAULT_SCALE ? 4 : 2;
+const WANT_QUESTIONS_PER_TYPE = IS_DEFAULT_SCALE ? 30 : 20;
 
 const STREET_NAMES = [
   'E Main St', 'W Southern Ave', 'N College Ave', 'E University Dr', 'W Guadalupe Rd', 'E Elliot Rd',
@@ -415,6 +490,8 @@ function nameFor(i) {
   return { first: FIRST_NAMES[fi], last: LAST_NAMES[li], full: name };
 }
 
+// Kept at 11 entries -- smallCityPlan's minResidentialForFullTypeCoverage
+// above assumes this length.
 const EXTRA_TYPE_POOL = ['work-order', 'permit', 'inspection-report', 'correspondence', 'purchase-order',
   'startup-sheet', 'dispatch-note', 'equipment-record', 'maintenance-agreement', 'nameplate-photo', 'other'];
 
@@ -486,11 +563,16 @@ function buildExtraDoc(type, { i, name, address, city, unit, tech }) {
         nameVariant: name.full, address, date: addDaysIso(unit.installDate, 900 + (i % 500)), tech,
         findings: ['Coil clean, no leaks found', 'Refrigerant charge within spec'],
       }));
-    case 'correspondence':
-      return writePdf('correspondence', `c${i}`, correspondenceDoc({
+    case 'correspondence': {
+      // Cheap-forms mode (--customers, any non-default scale) writes this as
+      // .txt instead of .pdf -- same content, cheaper to extract, and the
+      // default 120-customer run is untouched (CHEAP_FORMS is false there).
+      const writer = CHEAP_FORMS ? writeTxt : writePdf;
+      return writer('correspondence', `c${i}`, correspondenceDoc({
         nameVariant: name.full, address, date: addDaysIso(unit.installDate, 700 + (i % 300)),
         body: 'Thank you for your business. Let us know if the system needs anything further.',
       }));
+    }
     case 'purchase-order':
       return writePdf('purchase-order', `c${i}`, purchaseOrderDoc({
         poNumber: `PO-${9000 + i}`, date: addDaysIso(unit.installDate, 650 + (i % 300)),
@@ -588,12 +670,12 @@ function buildCommercial({ type, city }) {
   return label;
 }
 
-/* ---- apartment complex (trap b, scaled): 8 units, one address ----------- */
-function buildApartmentComplex(city) {
+/* ---- apartment complex (trap b, scaled): unitCount units, one address --- */
+function buildApartmentComplex(city, unitCount = 8) {
   const streetNo = 3300;
   const street = 'S Alma School Rd';
   const created = [];
-  for (let u = 1; u <= 8; u++) {
+  for (let u = 1; u <= unitCount; u++) {
     const i = 6000 + u;
     const name = nameFor(i);
     const address = `${streetNo} ${street}, Apt ${100 + u}, ${city.name}, ${city.state} ${city.zip}`;
@@ -640,26 +722,28 @@ const cityByName = Object.fromEntries(CITIES.map((c) => [c.name, c]));
 for (const city of CITIES) {
   for (const type of city.commercial ?? []) buildCommercial({ type, city });
 }
-const apartmentKeys = buildApartmentComplex(cityByName.Mesa);
+const apartmentKeys = buildApartmentComplex(cityByName.Mesa, APARTMENT_UNIT_COUNT);
+const residentialTotal = custIdx; // how many res_N keys actually exist
+function clampIdx(want) { return Math.min(want, Math.max(0, residentialTotal - 1)); }
 
 /* ---- trap (c): near-miss surname pairs, different cities ---------------- */
-// Overwrite two residential customers' names into deliberately near-miss
-// surname pairs (must stay TWO customers - different street addresses).
+// Overwrite residential customers' names into deliberately near-miss surname
+// pairs (must stay TWO customers - different street addresses). Full scale
+// gets both pairs; a --customers subset gets WANT_MERGE_PAIRS of them
+// (indices clamped to whatever residentialTotal actually is, so this never
+// throws or collides on a small run).
 function findByKey(key) { return answerCustomers.find((c) => c.key === key); }
-{
-  const a = findByKey('res_2'); // Phoenix
-  const b = findByKey('res_11'); // Mesa
-  if (a && b) {
-    a.canonicalName = 'Sorensen';
-    b.canonicalName = 'Sorenson';
+const NEAR_MISS_PAIRS = [
+  { idxA: 2, idxB: 11, nameA: 'Sorensen', nameB: 'Sorenson' }, // Phoenix / Mesa
+  { idxA: 20, idxB: 33, nameA: 'Whitfield', nameB: 'Whitford' }, // Gilbert / Tempe
+].slice(0, WANT_MERGE_PAIRS);
+for (const p of NEAR_MISS_PAIRS) {
+  const a = findByKey(`res_${clampIdx(p.idxA)}`);
+  const b = findByKey(`res_${clampIdx(p.idxB)}`);
+  if (a && b && a.key !== b.key) {
+    a.canonicalName = p.nameA;
+    b.canonicalName = p.nameB;
     mustNotMerge.push([a.key, b.key]);
-  }
-  const c = findByKey('res_20'); // Gilbert
-  const d = findByKey('res_33'); // Tempe
-  if (c && d) {
-    c.canonicalName = 'Whitfield';
-    d.canonicalName = 'Whitford';
-    mustNotMerge.push([c.key, d.key]);
   }
 }
 
@@ -667,61 +751,61 @@ function findByKey(key) { return answerCustomers.find((c) => c.key === key); }
  * (documented here; the underlying documents already carry the customer's
  * legal name consistently on every template, matching how synth-corpus.mjs's
  * Nguyen trap varies the "nameVariant" string per document type, not the
- * canonicalName stored in the answer key.) These three are flagged so the
- * handoff can describe them, not double-counted anywhere. */
-const nameVariantCustomers = ['res_5', 'res_40', 'res_55'].filter((k) => findByKey(k));
+ * canonicalName stored in the answer key.) Full scale flags three; a
+ * --customers subset flags WANT_NAME_VARIANTS of them (deduped/clamped the
+ * same way as the near-miss pairs above). */
+const nameVariantCustomers = [...new Set([5, 40, 55].slice(0, WANT_NAME_VARIANTS).map((idx) => `res_${clampIdx(idx)}`))]
+  .filter((k) => findByKey(k));
 
-/* ---- trap (i): guaranteed warranty edge cases for lookup questions ------ */
-// One clean "expiring within 90 days" and one clean "already expired" case,
-// same shape as synth-corpus.mjs's Whitmore/Bell, so there is at least one
-// deterministic instance of each regardless of how the bulk random spread
-// happens to land.
+/* ---- trap (i): flag one "expiring" and one "expired" case for lookup
+ * questions, WITHOUT ever touching brand/model/installDate --------------- *
+ * A previous version forced a specific brand/model/installDate onto
+ * res_3/res_9's KEY entry to guarantee an "expiring within 90 days" and an
+ * "already expired" example, exactly like synth-corpus.mjs's Whitmore/Bell.
+ * That was wrong: buildResidential() had ALREADY written that customer's
+ * actual PDFs (with their real, un-forced brand/model/installDate) before
+ * this block ran, so it silently forked the key away from what the
+ * documents actually print (e.g. res_3's docs print "Lennox ML14XC1-046-230"
+ * dated 2012, while the key claimed "Goodman GSX163261FB" dated 2021 -- same
+ * serial, since that field was untouched, which is what made the mismatch
+ * visible). The documents are what actually gets ingested and extracted, so
+ * they are the source of truth; the key must describe THEM, never a fact
+ * invented after the fact. Fixed by never mutating a unit's facts here --
+ * only find whichever customer the NORMAL brand/date spread already made
+ * "expiring" or "expired" (every run has some, per the natural
+ * install-year/registration mix) and flag `expectedAlert` on it, purely as
+ * metadata for the trap-summary log below. */
 {
-  const expiring = findByKey('res_3'); // Phoenix, forced to Goodman, unregistered 5yr floor
-  if (expiring) {
-    const u = expiring.units[0];
-    // Force install date so install+5y lands ~60 days from TODAY (2026-09-21).
-    const forcedInstall = addDaysIso(TODAY, -5 * 365 + 60);
-    u.installDate = forcedInstall;
-    u.model = BRAND_MODEL.Goodman(3);
-    u.brand = 'Goodman';
-    const { stable, status } = warrantyFor({ manufacturer: 'Goodman', installDate: forcedInstall }, null);
-    u.warrantyStatus = status;
-    u.expires = stable.expires;
-    expiring.expectedAlert = 'expiring';
-  }
-  const expired = findByKey('res_9'); // Mesa, forced to Trane, unregistered floor
-  if (expired) {
-    const u = expired.units[0];
-    const forcedInstall = addDaysIso(TODAY, -8 * 365);
-    u.installDate = forcedInstall;
-    u.brand = 'Trane';
-    u.model = BRAND_MODEL.Trane(3);
-    const { stable, status } = warrantyFor({ manufacturer: 'Trane', installDate: forcedInstall }, null);
-    u.warrantyStatus = status;
-    u.expires = stable.expires;
-    expired.expectedAlert = 'expired';
-  }
+  const firstWithStatus = (status) => answerCustomers.find((c) => c.key.startsWith('res_') && c.units.some((u) => u.warrantyStatus === status));
+  const expiring = firstWithStatus('expiring');
+  if (expiring) expiring.expectedAlert = 'expiring';
+  const expired = firstWithStatus('expired');
+  if (expired) expired.expectedAlert = 'expired';
 }
 
 /* ---- trap (f): shop-letterhead-only documents, no customer ------------- */
+// Full scale writes all 4; a --customers subset writes the first
+// WANT_SHOP_ONLY_DOCS (2, per the brief) of the same set.
 {
-  docsWithoutCustomer.push(writeTxt('dispatch-note', 'shop-truck', [
-    `Dispatch note - ${mdY('2026-08-03')}`, `Shop: ${SHOP.name}`, `Address: ${SHOP.address}`, '',
-    'Truck #4 due for oil change and AC recharge. Take to the Baseline Rd shop bay before end of week.', '',
-    'Tech: Kevin Pratt',
-  ]));
-  docsWithoutCustomer.push(writePdf('other', 'parts-count', shopMemoDoc({
-    date: '2026-08-10', subject: 'Quarterly parts inventory count',
-    body: 'Count all capacitors, filters, and refrigerant cylinders in the Baseline Rd warehouse by Friday.',
-  })));
-  docsWithoutCustomer.push(writeTxt('dispatch-note', 'shop-radio', [
-    `Dispatch note - ${mdY('2026-05-14')}`, `Shop: ${SHOP.name}`, `Address: ${SHOP.address}`, '',
-    'New dispatch radios arrived at the shop, hand out at Monday morning meeting.', '', 'Tech: Ray Sutton',
-  ]));
-  docsWithoutCustomer.push(writePdf('other', 'holiday-schedule', shopMemoDoc({
-    date: '2026-11-01', subject: 'Holiday on-call schedule', body: 'On-call rotation for the holiday week posted on the shop board.',
-  })));
+  const shopOnlyWriters = [
+    () => writeTxt('dispatch-note', 'shop-truck', [
+      `Dispatch note - ${mdY('2026-08-03')}`, `Shop: ${SHOP.name}`, `Address: ${SHOP.address}`, '',
+      'Truck #4 due for oil change and AC recharge. Take to the Baseline Rd shop bay before end of week.', '',
+      'Tech: Kevin Pratt',
+    ]),
+    () => writePdf('other', 'parts-count', shopMemoDoc({
+      date: '2026-08-10', subject: 'Quarterly parts inventory count',
+      body: 'Count all capacitors, filters, and refrigerant cylinders in the Baseline Rd warehouse by Friday.',
+    })),
+    () => writeTxt('dispatch-note', 'shop-radio', [
+      `Dispatch note - ${mdY('2026-05-14')}`, `Shop: ${SHOP.name}`, `Address: ${SHOP.address}`, '',
+      'New dispatch radios arrived at the shop, hand out at Monday morning meeting.', '', 'Tech: Ray Sutton',
+    ]),
+    () => writePdf('other', 'holiday-schedule', shopMemoDoc({
+      date: '2026-11-01', subject: 'Holiday on-call schedule', body: 'On-call rotation for the holiday week posted on the shop board.',
+    })),
+  ];
+  for (const write of shopOnlyWriters.slice(0, WANT_SHOP_ONLY_DOCS)) docsWithoutCustomer.push(write());
 }
 
 /* ------------------------------------------------------------ totals --- */
@@ -748,39 +832,71 @@ const totalUnits = allUnits.length;
 const analyticsQuestions = [];
 const lookupQuestions = [];
 
-// ---- analytics (30): counts/lists/groupBy over the closed vocabulary -----
-analyticsQuestions.push(
-  { q: 'How many customers do we have in Arizona?', expectedContains: [String(byState.AZ), `${byState.AZ} customers`] },
-  { q: 'How many customers do we have in Maricopa County?', expectedContains: [String(byCounty.Maricopa), `${byCounty.Maricopa} customers`] },
-  { q: 'How many customers do we have in Pinal County?', expectedContains: [String(byCounty.Pinal), `${byCounty.Pinal} customers`] },
-  { q: 'How many customers do we have in Pima County?', expectedContains: [String(byCounty.Pima), `${byCounty.Pima} customers`] },
-  { q: 'How many customers do we have in Nevada?', expectedContains: [String(byState.NV || 0)] },
-  { q: 'How many customers do we have in New Mexico?', expectedContains: [String(byState.NM || 0)] },
-  { q: 'How many customers do we have in California?', expectedContains: [String(byState.CA || 0)] },
-  { q: 'How many customers do we have in Yuma County?', expectedContains: ['0'] }, // ambiguity rule: 0 rows for a county that exists in AZ but has none of our customers
-  { q: `List customers in Gilbert`, expectedContains: answerCustomers.filter((c) => c.city === 'Gilbert').slice(0, 3).map((c) => c.canonicalName) },
-  { q: `List customers in Tucson`, expectedContains: answerCustomers.filter((c) => c.city === 'Tucson').slice(0, 3).map((c) => c.canonicalName) },
-  { q: 'How many customers do we have in Chandler?', expectedContains: [String(byCity.Chandler)] },
-  { q: 'How many customers do we have in Mesa?', expectedContains: [String(byCity.Mesa)] },
-  { q: 'How many customers do we have in Casa Grande?', expectedContains: [String(byCity['Casa Grande'])] },
-  { q: 'How many units are out of warranty?', expectedContains: [String(warrantyStatusCounts.expired), `${warrantyStatusCounts.expired} units`] },
-  { q: 'How many units are still under warranty?', expectedContains: [String(warrantyStatusCounts.active)] },
-  { q: 'How many units are expiring soon?', expectedContains: [String(warrantyStatusCounts.expiring)] },
-  { q: 'How many units have an unknown warranty status?', expectedContains: [String(warrantyStatusCounts.unknown)] },
-  { q: 'Which customers have Trane units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Trane')).slice(0, 3).map((c) => c.canonicalName) },
-  { q: 'Which customers have Goodman units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Goodman')).slice(0, 3).map((c) => c.canonicalName) },
-  { q: 'Which customers have York units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'York')).slice(0, 3).map((c) => c.canonicalName) },
-  { q: 'How many customers have Mitsubishi units?', expectedContains: [String(answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Mitsubishi')).length)] },
-  { q: 'How many Goodman units are older than 10 years?', expectedContains: [String(allUnits.filter((u) => u.brand === 'Goodman' && Number(u.installDate.slice(0, 4)) <= 2016).length)] },
-  { q: 'How many Trane units are older than 15 years?', expectedContains: [String(allUnits.filter((u) => u.brand === 'Trane' && Number(u.installDate.slice(0, 4)) <= 2011).length)] },
-  { q: 'How many documents did we add this month?', expectedContains: [String(totalDocs)] },
-  { q: 'How many customers do we have in total?', expectedContains: [String(answerCustomers.length)] },
-  { q: 'How many units of equipment do we have on file?', expectedContains: [String(totalUnits)] },
-  { q: 'Give me a breakdown of customers by county', expectedContains: [`Maricopa`, String(byCounty.Maricopa)] },
-  { q: 'Group equipment by brand', expectedContains: ['Trane', String(equipmentByBrand.Trane)] },
-  { q: 'How many customers do we have in Scottsdale?', expectedContains: [String(byCity.Scottsdale)] },
-  { q: 'How many customers do we have in Oro Valley?', expectedContains: [String(byCity['Oro Valley'])] },
-);
+// ---- analytics: counts/lists/groupBy over the closed vocabulary ----------
+// Full scale (120 customers, all 19 cities) keeps the exact original 30
+// questions unchanged. A --customers subset only has Mesa/Casa Grande/Tucson
+// + Las Vegas (see smallCityPlan above), so it gets its own city-safe list
+// instead of one that would reference a city (Gilbert, Chandler, Scottsdale,
+// Oro Valley) that doesn't exist at that scale -- everything else (state,
+// the 3 AZ counties, all 8 brands, warranty status, document/customer/unit
+// totals) is guaranteed present at either scale by construction.
+if (IS_DEFAULT_SCALE) {
+  analyticsQuestions.push(
+    { q: 'How many customers do we have in Arizona?', expectedContains: [String(byState.AZ), `${byState.AZ} customers`] },
+    { q: 'How many customers do we have in Maricopa County?', expectedContains: [String(byCounty.Maricopa), `${byCounty.Maricopa} customers`] },
+    { q: 'How many customers do we have in Pinal County?', expectedContains: [String(byCounty.Pinal), `${byCounty.Pinal} customers`] },
+    { q: 'How many customers do we have in Pima County?', expectedContains: [String(byCounty.Pima), `${byCounty.Pima} customers`] },
+    { q: 'How many customers do we have in Nevada?', expectedContains: [String(byState.NV || 0)] },
+    { q: 'How many customers do we have in New Mexico?', expectedContains: [String(byState.NM || 0)] },
+    { q: 'How many customers do we have in California?', expectedContains: [String(byState.CA || 0)] },
+    { q: 'How many customers do we have in Yuma County?', expectedContains: ['0'] }, // ambiguity rule: 0 rows for a county that exists in AZ but has none of our customers
+    { q: `List customers in Gilbert`, expectedContains: answerCustomers.filter((c) => c.city === 'Gilbert').slice(0, 3).map((c) => c.canonicalName) },
+    { q: `List customers in Tucson`, expectedContains: answerCustomers.filter((c) => c.city === 'Tucson').slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'How many customers do we have in Chandler?', expectedContains: [String(byCity.Chandler)] },
+    { q: 'How many customers do we have in Mesa?', expectedContains: [String(byCity.Mesa)] },
+    { q: 'How many customers do we have in Casa Grande?', expectedContains: [String(byCity['Casa Grande'])] },
+    { q: 'How many units are out of warranty?', expectedContains: [String(warrantyStatusCounts.expired), `${warrantyStatusCounts.expired} units`] },
+    { q: 'How many units are still under warranty?', expectedContains: [String(warrantyStatusCounts.active)] },
+    { q: 'How many units are expiring soon?', expectedContains: [String(warrantyStatusCounts.expiring)] },
+    { q: 'How many units have an unknown warranty status?', expectedContains: [String(warrantyStatusCounts.unknown)] },
+    { q: 'Which customers have Trane units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Trane')).slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'Which customers have Goodman units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Goodman')).slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'Which customers have York units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'York')).slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'How many customers have Mitsubishi units?', expectedContains: [String(answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Mitsubishi')).length)] },
+    { q: 'How many Goodman units are older than 10 years?', expectedContains: [String(allUnits.filter((u) => u.brand === 'Goodman' && Number(u.installDate.slice(0, 4)) <= 2016).length)] },
+    { q: 'How many Trane units are older than 15 years?', expectedContains: [String(allUnits.filter((u) => u.brand === 'Trane' && Number(u.installDate.slice(0, 4)) <= 2011).length)] },
+    { q: 'How many documents did we add this month?', expectedContains: [String(totalDocs)] },
+    { q: 'How many customers do we have in total?', expectedContains: [String(answerCustomers.length)] },
+    { q: 'How many units of equipment do we have on file?', expectedContains: [String(totalUnits)] },
+    { q: 'Give me a breakdown of customers by county', expectedContains: [`Maricopa`, String(byCounty.Maricopa)] },
+    { q: 'Group equipment by brand', expectedContains: ['Trane', String(equipmentByBrand.Trane)] },
+    { q: 'How many customers do we have in Scottsdale?', expectedContains: [String(byCity.Scottsdale)] },
+    { q: 'How many customers do we have in Oro Valley?', expectedContains: [String(byCity['Oro Valley'])] },
+  );
+} else {
+  analyticsQuestions.push(
+    { q: 'How many customers do we have in Arizona?', expectedContains: [String(byState.AZ), `${byState.AZ} customers`] },
+    { q: 'How many customers do we have in Maricopa County?', expectedContains: [String(byCounty.Maricopa), `${byCounty.Maricopa} customers`] },
+    { q: 'How many customers do we have in Pinal County?', expectedContains: [String(byCounty.Pinal), `${byCounty.Pinal} customers`] },
+    { q: 'How many customers do we have in Pima County?', expectedContains: [String(byCounty.Pima), `${byCounty.Pima} customers`] },
+    { q: 'How many customers do we have in Nevada?', expectedContains: [String(byState.NV || 0)] },
+    { q: 'How many customers do we have in Yuma County?', expectedContains: ['0'] }, // ambiguity rule
+    { q: 'List customers in Tucson', expectedContains: answerCustomers.filter((c) => c.city === 'Tucson').slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'List customers in Mesa', expectedContains: answerCustomers.filter((c) => c.city === 'Mesa').slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'How many customers do we have in Mesa?', expectedContains: [String(byCity.Mesa)] },
+    { q: 'How many customers do we have in Casa Grande?', expectedContains: [String(byCity['Casa Grande'])] },
+    { q: 'How many units are out of warranty?', expectedContains: [String(warrantyStatusCounts.expired)] },
+    { q: 'How many units are still under warranty?', expectedContains: [String(warrantyStatusCounts.active)] },
+    { q: 'How many units are expiring soon?', expectedContains: [String(warrantyStatusCounts.expiring)] },
+    { q: 'How many units have an unknown warranty status?', expectedContains: [String(warrantyStatusCounts.unknown)] },
+    { q: 'Which customers have Trane units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Trane')).slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'Which customers have Goodman units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'Goodman')).slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'Which customers have York units?', expectedContains: answerCustomers.filter((c) => c.units.some((u) => u.brand === 'York')).slice(0, 3).map((c) => c.canonicalName) },
+    { q: 'How many documents did we add this month?', expectedContains: [String(totalDocs)] },
+    { q: 'How many customers do we have in total?', expectedContains: [String(answerCustomers.length)] },
+    { q: 'Group equipment by brand', expectedContains: ['Trane', String(equipmentByBrand.Trane)] },
+  );
+}
 
 // ---- lookup (30): single-record fact lookups, fastPath/retrieval shape ---
 const lookupSubjects = [
@@ -794,7 +910,7 @@ const lookupSubjects = [
   findByKey('res_44'), findByKey('res_66'), findByKey('res_77'), findByKey('res_88'),
 ].filter(Boolean);
 
-for (const c of lookupSubjects.slice(0, 30)) {
+for (const c of lookupSubjects.slice(0, WANT_QUESTIONS_PER_TYPE)) {
   const u = c.units[0];
   if (c.units.length > 1) {
     lookupQuestions.push({ q: `What equipment is installed at ${c.canonicalName}?`, expectedContains: c.units.map((x) => x.serial) });
@@ -802,19 +918,19 @@ for (const c of lookupSubjects.slice(0, 30)) {
     lookupQuestions.push({ q: `What's the serial number of the unit at ${c.address}?`, expectedContains: [u.serial] });
   }
 }
-// top up to exactly 30 with brand/model/warranty-style lookups if short
+// top up to exactly WANT_QUESTIONS_PER_TYPE with brand/model-style lookups if short
 let li = 0;
-while (lookupQuestions.length < 30 && li < answerCustomers.length) {
+while (lookupQuestions.length < WANT_QUESTIONS_PER_TYPE && li < answerCustomers.length) {
   const c = answerCustomers[li];
   li += 1;
   if (!c || !c.units.length) continue;
   lookupQuestions.push({ q: `Who makes the unit at ${c.address}?`, expectedContains: [c.units[0].brand] });
 }
-lookupQuestions.length = Math.min(lookupQuestions.length, 30);
+lookupQuestions.length = Math.min(lookupQuestions.length, WANT_QUESTIONS_PER_TYPE);
 
 const questions = [
-  ...analyticsQuestions.slice(0, 30).map((q) => ({ ...q, type: 'analytics' })),
-  ...lookupQuestions.slice(0, 30).map((q) => ({ ...q, type: 'lookup' })),
+  ...analyticsQuestions.slice(0, WANT_QUESTIONS_PER_TYPE).map((q) => ({ ...q, type: 'analytics' })),
+  ...lookupQuestions.slice(0, WANT_QUESTIONS_PER_TYPE).map((q) => ({ ...q, type: 'lookup' })),
 ];
 
 /* ------------------------------------------------------------ answer key */
@@ -854,5 +970,10 @@ console.log(`By county (AZ only): ${JSON.stringify(byCounty)}`);
 console.log(`Equipment by brand: ${JSON.stringify(equipmentByBrand)} (total units: ${totalUnits})`);
 console.log(`Warranty status counts: ${JSON.stringify(warrantyStatusCounts)}`);
 console.log(`mustNotMerge pairs: ${mustNotMerge.length}; nameVariant customers: ${nameVariantCustomers.length}; docsWithoutCustomer: ${docsWithoutCustomer.length}`);
-console.log(`Questions: ${questions.length} (${analyticsQuestions.slice(0, 30).length} analytics, ${lookupQuestions.slice(0, 30).length} lookup)`);
+console.log(`Questions: ${questions.length} (${questions.filter((q) => q.type === 'analytics').length} analytics, ${questions.filter((q) => q.type === 'lookup').length} lookup)`);
+const pdfCount = filesWritten.filter((f) => f.endsWith('.pdf')).length;
+const txtCount = filesWritten.filter((f) => f.endsWith('.txt')).length;
+const estCost = pdfCount * 0.012 + txtCount * 0.006;
+console.log(`Document forms: ${pdfCount} PDF, ${txtCount} txt`);
+console.log(`Estimated Haiku extraction cost: $${estCost.toFixed(2)} (${pdfCount} x $0.012/PDF + ${txtCount} x $0.006/txt)`);
 console.log('Wrote', path.join(path.relative(ROOT, OUT_DIR), 'ANSWER_KEY.json'));

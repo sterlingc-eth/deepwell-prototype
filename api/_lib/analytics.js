@@ -24,8 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { deriveCity } from './routes/customers.js';
-import { alertTier } from './warrantyRules.js';
-import { normalizeBrand } from './warrantyRules.js';
+import { alertTier, normalizeBrand, BRAND_RULES } from './warrantyRules.js';
 
 // Plain readFileSync + JSON.parse rather than an import attribute (`with {
 // type: 'json' }`) — same idiom claude.js already uses for .env.local, and it
@@ -64,7 +63,7 @@ export const DEFAULT_LIMIT = 500;
  */
 const AGGREGATE_NOUN = /\b(customers?|clients?|units?|equipment|pieces? of equipment|documents?|invoices?|warrant(?:y|ies)|records?)\b/i;
 const QUANTIFIER = /\b(how many|count|list|which|show me|total)\b/i;
-const CONTEXT = /\b(in|from|by|of|older than|newer than|out of warranty|under warranty|expiring|expired|active|this month|last month|this year|county|arizona|\baz\b|city|state|zip|brand|technician)\b/i;
+const CONTEXT = /\b(in|from|by|of|older than|newer than|out of warranty|under warranty|expiring|expired|active|unknown|warranty status|this month|last month|this year|county|arizona|\baz\b|city|state|zip|brand|technician)\b/i;
 /** "group X by Y" / "breakdown by Y" / "grouped by Y" — an aggregate-request
  *  shape regardless of which noun is being broken down, so a groupBy
  *  dimension word alone (technician, brand, month) is enough even without one
@@ -72,6 +71,42 @@ const CONTEXT = /\b(in|from|by|of|older than|newer than|out of warranty|under wa
 const GROUP_SHAPE_RE = /\b(group(?:ed)?\b[\s\S]*\bby\b|breakdown\b[\s\S]*\bby\b|\bby\b\s+(city|county|state|zip|brand|month|technician|warranty status)\b)/i;
 const WHO_SERVICED_RE = /\bwho did we (service|work for)\b/i;
 const WHICH_CUSTOMERS_RE = /\bwhich customers\b/i;
+/**
+ * Reviewer NO-GO (2026-09-21, round 2, gap 1): "who has Trane units" and
+ * "customers with expired warranties" / "units older than 10 years" named a
+ * real aggregate question but matched none of the bypass triggers above and
+ * failed the generic QUANTIFIER check (no how-many/count/list/which/show-me/
+ * total word present at all) — so they fell through to retrieval and got a
+ * partial, unfiltered model answer instead of a real analytics one. These
+ * three triggers bypass QUANTIFIER the same way WHICH_CUSTOMERS_RE already
+ * does, for the same reason: the SHAPE of the sentence already says "many",
+ * regardless of which specific quantifier word (if any) it used.
+ */
+const WHO_HAS_RE = /\bwho (?:has|have)\b/i;
+/** "customers with X" / "units that have X" / "equipment who have X" — a
+ *  noun followed by a possessive-filter preposition, never a single named
+ *  record's own question (that's POSSESSIVE_SINGLE_RE's "does/did X have"
+ *  shape, checked first and unaffected by this). */
+const NOUN_WITH_RE = /\b(customers?|clients?|units?|equipment)\s+(with|that have|which have|who have|having)\b/i;
+/** "units older than N years" / "installed before/after 2020" — an age/date
+ *  filter shape on its own aggregate noun, with no quantifier word needed. */
+const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b/i;
+/**
+ * Every accepted brand spelling (BRAND_RULES' labels + aliases,
+ * warrantyRules.js — the SAME list normalizeBrand/brandMatches already
+ * recognize, so the classifier never knows a brand name the planner
+ * couldn't also resolve), so "how many Trane units" / "how many Goodman
+ * units" pass CONTEXT even though neither names any of CONTEXT's other
+ * generic words (a county, "brand", a time range, ...). Built once at module
+ * load, not hand-duplicated, so a brand added to warrantyRules.js is
+ * recognized here for free.
+ */
+const BRAND_NAME_RE = new RegExp(
+  `\\b(${[...new Set(Object.values(BRAND_RULES).flatMap((v) => [v.label, ...(v.aliases ?? [])]))]
+    .map((s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')})\\b`,
+  'i'
+);
 /** "how many documents does Plaza Dental have" / "does X have a warranty" —
  *  a single, named record's own attribute, not an aggregate across many. */
 const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+[\s\S]+\b(have|has|need)\b/i;
@@ -93,6 +128,22 @@ const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+[\s\S]+\b(have|has|need)\b/i;
  */
 const STREET_ADDRESS_RE =
   /\b\d{2,6}\s+[NSEW]?\.?\s*[A-Za-z0-9.' ]+\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|way|ct|court|cir|circle|hwy|pkwy|pl|ter)\b/i;
+/**
+ * Reviewer NO-GO (2026-09-21, round 3, item 3): round 2's WHO_HAS_RE bypass
+ * ("who has Trane units") let "who has the unit at 1234 Main" through too —
+ * STREET_ADDRESS_RE requires a recognized street-suffix word (st/ave/rd/...)
+ * that "1234 Main" alone never supplies. "at <number> <word>" is a weaker but
+ * still reliable single-record signal on its own — a real aggregate question
+ * essentially never phrases itself "at 1234 Main" — so it is checked here too,
+ * before WHO_HAS_RE (or any other trigger) gets a chance to fire. Known,
+ * accepted trade-off: a question like "how many customers do we have at 3
+ * locations" would also match this and get excluded; that is the same
+ * "single-record signal outranks any aggregate signal" call
+ * looksLikeSingleRecordReference already makes for STREET_ADDRESS_RE/serial
+ * tokens, and false negatives here cost nothing (the question still reaches
+ * retrieval, same as any other fast-path/analytics miss).
+ */
+const AT_ADDRESS_RE = /\bat\s+\d{1,6}\s+\w/i;
 /** An alnum token >= 8 chars with at least one digit — the same serial/model
  *  shape fastPath.js's own IDENTIFIER_RE looks for (see its file for why:
  *  that's the printed shape of a real HVAC serial/model number, and a bare
@@ -105,13 +156,13 @@ function looksLikeIdentifierToken(question) {
   return tokens.some((tok) => /\d/.test(tok));
 }
 
-/** True when the question names one specific record (a street address, or a
- *  serial/model-shaped token) rather than asking about many. Exported so
- *  routes/analytics.js and scripts/verify-analytics.mjs can both exercise it
- *  directly. */
+/** True when the question names one specific record (a street address, an
+ *  "at <number> <word>" reference, or a serial/model-shaped token) rather
+ *  than asking about many. Exported so routes/analytics.js and
+ *  scripts/verify-analytics.mjs can both exercise it directly. */
 export function looksLikeSingleRecordReference(question) {
   const q = String(question ?? '');
-  return STREET_ADDRESS_RE.test(q) || looksLikeIdentifierToken(q);
+  return STREET_ADDRESS_RE.test(q) || AT_ADDRESS_RE.test(q) || looksLikeIdentifierToken(q);
 }
 
 export function preClassifyAnalytics(question) {
@@ -119,8 +170,17 @@ export function preClassifyAnalytics(question) {
   if (!q) return false;
   if (looksLikeSingleRecordReference(q)) return false;
   if (POSSESSIVE_SINGLE_RE.test(q)) return false;
-  if (WHO_SERVICED_RE.test(q) || WHICH_CUSTOMERS_RE.test(q) || GROUP_SHAPE_RE.test(q)) return true;
-  return QUANTIFIER.test(q) && AGGREGATE_NOUN.test(q) && CONTEXT.test(q);
+  if (
+    WHO_SERVICED_RE.test(q) ||
+    WHICH_CUSTOMERS_RE.test(q) ||
+    GROUP_SHAPE_RE.test(q) ||
+    WHO_HAS_RE.test(q) ||
+    NOUN_WITH_RE.test(q) ||
+    (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q))
+  ) {
+    return true;
+  }
+  return QUANTIFIER.test(q) && AGGREGATE_NOUN.test(q) && (CONTEXT.test(q) || BRAND_NAME_RE.test(q));
 }
 
 /**
@@ -625,8 +685,13 @@ const GROUP_LABEL = {
 
 /** Cap on how many groupBy/list rows go into `facts` — the client's "compact
  *  table" (see AnswerCard/FactGrid). Anything past this is summarized in
- *  `text` as "... and N more" rather than growing the response without bound. */
-export const MAX_FACT_ROWS = 12;
+ *  `text` as "... and N more" rather than growing the response without bound.
+ *  Reviewer NO-GO (2026-09-21, round 2, gap 2): 12 was too low for a live
+ *  "which customers have Trane units" style answer ("18 customers — showing
+ *  the first 12" cut off a third of them) — raised to 50, still bounded, and
+ *  FactGrid's GroupTable (src/components/FactGrid.tsx) stays a compact
+ *  one-line-per-row table at 50 rows exactly as it already did at 12. */
+export const MAX_FACT_ROWS = 50;
 
 /**
  * @param plan       the validated plan
@@ -694,9 +759,14 @@ export function formatAnalyticsAnswer(plan, opts) {
   // op === 'list'
   const shown = rows.slice(0, MAX_FACT_ROWS);
   const rest = total - shown.length;
+  // Reviewer NO-GO (2026-09-21, round 2, gap 2): "and N more" past the cap,
+  // matching groupBy's own phrasing above, instead of a bare "showing the
+  // first N" that never said how many were left out.
   const text = total === 0
     ? `No ${noun} match that.`
-    : `${total} ${noun}${rest > 0 ? ` — showing the first ${shown.length}` : ''}.`;
+    : rest > 0
+      ? `${total} ${noun} — showing ${shown.length}, and ${rest} more.`
+      : `${total} ${noun}.`;
   return {
     kind: 'answer', text,
     facts: shown.map((r) => ({ label: r.label, value: r.value ?? '—', entityId: r.entityId, sources: [] })),

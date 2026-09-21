@@ -31,7 +31,7 @@
           "expires": "2019-01-01"
         }
       ],
-      "expectedAlert": null
+      "expectedAlert": "expired"
     },
     {
       "key": "res_1",
@@ -111,14 +111,14 @@
       "units": [
         {
           "serial": "LX100005",
-          "model": "GSX163261FB",
-          "brand": "Goodman",
-          "installDate": "2021-11-21",
-          "warrantyStatus": "expiring",
-          "expires": "2026-11-21"
+          "model": "ML14XC1-046-230",
+          "brand": "Lennox",
+          "installDate": "2012-04-28",
+          "warrantyStatus": "expired",
+          "expires": "2017-04-28"
         }
       ],
-      "expectedAlert": "expiring"
+      "expectedAlert": null
     },
     {
       "key": "res_4",
@@ -285,14 +285,14 @@
       "units": [
         {
           "serial": "2C100011",
-          "model": "4TTR4003L1000AA",
-          "brand": "Trane",
-          "installDate": "2018-09-23",
+          "model": "24ACC654A003",
+          "brand": "Carrier",
+          "installDate": "2018-10-26",
           "warrantyStatus": "expired",
-          "expires": "2023-09-23"
+          "expires": "2023-10-26"
         }
       ],
-      "expectedAlert": "expired"
+      "expectedAlert": null
     },
     {
       "key": "res_10",
@@ -756,7 +756,7 @@
           "expires": "2027-06-02"
         }
       ],
-      "expectedAlert": null
+      "expectedAlert": "expiring"
     },
     {
       "key": "res_26",
@@ -3638,20 +3638,20 @@
     }
   },
   "equipmentByBrand": {
-    "Trane": 17,
-    "Carrier": 15,
-    "Goodman": 17,
+    "Trane": 16,
+    "Carrier": 16,
+    "Goodman": 16,
+    "Lennox": 16,
     "Rheem": 17,
     "York": 16,
     "Daikin": 17,
-    "Mitsubishi": 18,
-    "Lennox": 15
+    "Mitsubishi": 18
   },
   "warrantyStatusCounts": {
-    "expired": 77,
+    "expired": 78,
     "active": 33,
-    "expiring": 6,
-    "unknown": 16
+    "unknown": 16,
+    "expiring": 5
   },
   "documentsByType": {
     "invoice": 120,
@@ -3775,8 +3775,8 @@
     {
       "q": "How many units are out of warranty?",
       "expectedContains": [
-        "77",
-        "77 units"
+        "78",
+        "78 units"
       ],
       "type": "analytics"
     },
@@ -3790,7 +3790,7 @@
     {
       "q": "How many units are expiring soon?",
       "expectedContains": [
-        "6"
+        "5"
       ],
       "type": "analytics"
     },
@@ -3806,7 +3806,7 @@
       "expectedContains": [
         "Linda Fitzgerald",
         "Laura Lombardi",
-        "Robert Salazar"
+        "Carol Rios"
       ],
       "type": "analytics"
     },
@@ -3814,8 +3814,8 @@
       "q": "Which customers have Goodman units?",
       "expectedContains": [
         "Sorensen",
-        "Ronald Bracken",
-        "Karen Abernathy"
+        "Karen Abernathy",
+        "Maria Gallardo"
       ],
       "type": "analytics"
     },
@@ -3882,7 +3882,7 @@
       "q": "Group equipment by brand",
       "expectedContains": [
         "Trane",
-        "17"
+        "16"
       ],
       "type": "analytics"
     },
@@ -4090,7 +4090,7 @@
     {
       "q": "Who makes the unit at 211 E University Dr, Phoenix, AZ 85001?",
       "expectedContains": [
-        "Goodman"
+        "Lennox"
       ],
       "type": "lookup"
     },

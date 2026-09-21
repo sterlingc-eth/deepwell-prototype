@@ -17,8 +17,17 @@
  *      unknown ZIP/city.
  *   6. SQL builder: per-entity shape and parameterization, against a fixture.
  *   7. Answer formatting: count/groupBy/list/sum, the ambiguity rule, the
- *      12-row cap with "and N more".
+ *      50-row cap (raised from 12, round-2 gap 2) with "and N more".
  *   8. Filter matching, grouping, brand/year/warranty-status helpers.
+ *   10. Reviewer NO-GO A2 (2026-09-21) — analytics cache key derivation.
+ *   11. Reviewer round 2 (2026-09-21) gap 1 — classifier phrasings that fell
+ *       through to retrieval on the live corpus ("which customers have Trane
+ *       units", "who has X units", "customers with expired warranties",
+ *       "units older than N years", "how many <brand> units").
+ *   12. Reviewer round 2 (2026-09-21) gaps 1+3 — the brand-filtered
+ *       customers->equipment join, end to end against a mock db.
+ *   13. Reviewer round 3 (2026-09-21) item 3 — WHO_HAS_RE over an "at
+ *       <number> <word>" single-record reference with no street suffix.
  *
  *   node scripts/verify-analytics.mjs
  */
@@ -47,7 +56,7 @@ import {
   analyticsQuestionHash,
   analyticsPlanHash,
 } from '../api/_lib/analytics.js';
-import { isAnalyticsEnabled } from '../api/_lib/routes/analytics.js';
+import { isAnalyticsEnabled, executeAnalyticsPlan } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
 
 let failures = 0;
@@ -369,19 +378,40 @@ eq('normalizeStateValue: empty -> null', normalizeStateValue(''), null);
   eq('format groupBy: fact label/value are city/count', out.facts[0], { label: 'Gilbert', value: '5', sources: [] });
 }
 {
-  // 12-row cap + "and N more".
+  // MAX_FACT_ROWS cap + "and N more" — reviewer NO-GO (2026-09-21, round 2,
+  // gap 2) raised this from 12 to 50; the test itself scales off
+  // MAX_FACT_ROWS rather than a hardcoded row count, so it stays correct
+  // whatever the cap is.
   const plan = validatePlan({ entity: 'equipment', op: 'groupBy', groupBy: 'brand' });
-  const groups = Array.from({ length: 15 }, (_, i) => ({ key: `Brand${i}`, count: 15 - i }));
+  const groups = Array.from({ length: MAX_FACT_ROWS + 3 }, (_, i) => ({ key: `Brand${i}`, count: MAX_FACT_ROWS + 3 - i }));
   const out = formatAnalyticsAnswer(plan, { total: 100, groups });
   eq('format groupBy: facts capped at MAX_FACT_ROWS', out.facts.length, MAX_FACT_ROWS);
   check('format groupBy: text says how many more', out.text.includes('3 more'));
 }
+check('gap 2: MAX_FACT_ROWS raised to 50', MAX_FACT_ROWS, 50);
 {
   const plan = validatePlan({ entity: 'equipment', op: 'list', filters: [{ field: 'brand', op: 'eq', value: 'Trane' }] });
   const rows = [{ label: 'Trane condenser', value: 'XR16', entityId: 'c1' }];
   const out = formatAnalyticsAnswer(plan, { total: 1, rows });
   check('format list: text mentions the count', out.text.includes('1'));
   eq('format list: fact carries entityId (linkable)', out.facts[0].entityId, 'c1');
+}
+{
+  // Gap 2: list op past the 50-row cap keeps "and N more", not a bare
+  // "showing the first N" with no count of what was left out.
+  const plan = validatePlan({ entity: 'customers', op: 'list' });
+  const rows = Array.from({ length: MAX_FACT_ROWS + 18 }, (_, i) => ({ label: `Customer ${i}`, value: 'Mesa', entityId: `c${i}` }));
+  const out = formatAnalyticsAnswer(plan, { total: rows.length, rows });
+  eq('gap 2: list facts capped at MAX_FACT_ROWS (50)', out.facts.length, MAX_FACT_ROWS);
+  check('gap 2: list text says "and N more" past the cap', out.text.includes('and 18 more'));
+  check('gap 2: list text still states the true total', out.text.includes(String(rows.length)));
+}
+{
+  // Gap 2: a list at or under the cap needs no "and N more" at all.
+  const plan = validatePlan({ entity: 'customers', op: 'list' });
+  const rows = Array.from({ length: 9 }, (_, i) => ({ label: `Customer ${i}`, value: 'Mesa', entityId: `c${i}` }));
+  const out = formatAnalyticsAnswer(plan, { total: 9, rows });
+  check('gap 2: list under the cap has no "more" text', !out.text.includes('more'));
 }
 {
   const plan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'county', op: 'eq', value: 'Pima' }] });
@@ -473,6 +503,120 @@ check('ANALYTICS_PROMPT_VERSION: is a 12-char hex fingerprint', /^[0-9a-f]{12}$/
   check('analyticsPlanHash: filter order does not change the hash (canonicalized)', analyticsPlanHash(planAReordered) === analyticsPlanHash(planAOriginalOrder));
   check('analyticsPlanHash: looks like a real sha256 hex digest', /^[0-9a-f]{64}$/.test(analyticsPlanHash(planA)));
   check('analyticsPlanHash: never equals analyticsQuestionHash of anything (disjoint namespaces)', analyticsPlanHash(planA) !== ANALYTICS_HASH);
+}
+
+/* ======================================================================
+ * 11. Reviewer round 2 (2026-09-21) gap 1 — live-corpus classifier misses.
+ * Every one of these fell through to retrieval and got a partial, unfiltered
+ * model answer instead of a real analytics one. Exact strings from the
+ * coordinator's report, plus the negatives/controls that must stay unchanged.
+ * ====================================================================== */
+
+const GAP1_POSITIVE_QUESTIONS = [
+  'Which customers have Trane units?',
+  'Which customers have Goodman units?',
+  'Which customers have York units?',
+  'How many units have an unknown warranty status?',
+  'who has Trane units',
+  'customers with expired warranties',
+  'units older than 10 years',
+  'how many Trane units',
+  'how many Goodman units',
+  'which customers have refrigerant R-22',
+  'customers with Carrier units',
+  'who has Rheem units',
+];
+check('gap 1 corpus has >= 10 exact live-reported phrasings', GAP1_POSITIVE_QUESTIONS.length >= 10, String(GAP1_POSITIVE_QUESTIONS.length));
+for (const q of GAP1_POSITIVE_QUESTIONS) {
+  check(`gap 1 pre-classify (positive) :: "${q}"`, preClassifyAnalytics(q) === true);
+}
+
+// Controls: the round-1 (A1) single-record exclusions must still hold after
+// widening the classifier for gap 1 — a brand/age word must never override a
+// street address or serial/model identifier.
+const GAP1_STILL_EXCLUDED = [
+  ['who has the Trane unit at 1234 Main St, Mesa AZ', 'street address still wins over WHO_HAS_RE'],
+  ['customers with serial 4N2119-08772', 'identifier token still wins over NOUN_WITH_RE'],
+  ['does the unit at 3247 Elm have a warranty', 'possessive single-record, unaffected by gap 1'],
+];
+for (const [q, why] of GAP1_STILL_EXCLUDED) {
+  check(`gap 1 pre-classify (still excluded) :: "${q}" (${why})`, preClassifyAnalytics(q) === false);
+}
+
+/* ======================================================================
+ * 12. Reviewer round 2 (2026-09-21) gaps 1 + 3 — brand->customers join.
+ * "which customers have Trane units" already passed the classifier AND
+ * validatePlan (brand is in the closed vocabulary) but was rejected at the
+ * EXECUTOR level (no equipment-level column on `customers`) and fell through
+ * to retrieval anyway. This runs executeAnalyticsPlan end to end against a
+ * mock db (no real Postgres) to pin the fix, including gap 3's row detail
+ * ("Linda Fitzgerald · Trane 4TTR4036 · Mesa").
+ * ====================================================================== */
+
+{
+  const equipmentRows = [
+    {
+      id: 'eq1', customer_id: 'cust1', model: '4TTR4036', manufacturer: 'Trane', equipment_type: 'RTU',
+      tonnage: '3', refrigerant: 'R-410A', installation_date: '2019-05-01',
+      service_address: '123 Main St, Mesa, AZ 85201', warranty: null, updated_at: '2026-01-01',
+    },
+    {
+      id: 'eq2', customer_id: 'cust2', model: 'XR16', manufacturer: 'Goodman', equipment_type: 'Condenser',
+      tonnage: '2', refrigerant: 'R-410A', installation_date: '2020-01-01',
+      service_address: '55 Oak Ave, Gilbert, AZ 85234', warranty: null, updated_at: '2026-01-01',
+    },
+  ];
+  const customerRows = [
+    { id: 'cust1', customer_name: 'Linda Fitzgerald', service_address: '123 Main St, Mesa, AZ 85201' },
+  ];
+  const mockDb = {
+    raw: async (sql) => {
+      if (sql.includes("entity_type = 'equipment'")) return { rows: equipmentRows };
+      if (sql.includes("entity_type = 'customer'")) return { rows: customerRows };
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({ entity: 'customers', op: 'list', filters: [{ field: 'brand', op: 'eq', value: 'Trane' }] });
+  check('gap 1: brand filter on customers validates (closed vocabulary)', plan !== null);
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  check('gap 1: brand->customers join is handled, not a fall-through null', answer !== null);
+  eq('gap 1: only the Trane customer is returned (Goodman excluded)', answer.facts.length, 1);
+  eq('gap 3: row label is the customer name', answer.facts[0].label, 'Linda Fitzgerald');
+  eq('gap 3: row detail is "brand model · city"', answer.facts[0].value, 'Trane 4TTR4036 · Mesa');
+  eq('gap 1/3: row is linkable to the customer entity', answer.facts[0].entityId, 'cust1');
+}
+{
+  // No matching unit at all -> a real 0, not a crash or a fall-through null.
+  const mockDb = { raw: async () => ({ rows: [] }) };
+  const plan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'brand', op: 'eq', value: 'Trane' }] });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  check('gap 1: zero matching units -> a real answer, not null', answer !== null);
+  check('gap 1: zero matching units -> text says 0', answer.text.includes('0 customer'));
+}
+
+/* ======================================================================
+ * 13. Reviewer round 3 (2026-09-21) item 3 — WHO_HAS_RE over an "at <number>
+ * <word>" single-record reference. STREET_ADDRESS_RE requires a recognized
+ * street-suffix word ("Main St"); "1234 Main" alone (no suffix) slipped
+ * through round 2's WHO_HAS_RE bypass. AT_ADDRESS_RE closes that.
+ * ====================================================================== */
+
+check('looksLikeSingleRecordReference: "at <number> <word>" with no street suffix', looksLikeSingleRecordReference('who has the unit at 1234 Main'));
+check('looksLikeSingleRecordReference: "at <number> <word>" still catches a full street address too', looksLikeSingleRecordReference('who has the unit at 1234 Main St'));
+check('looksLikeSingleRecordReference: no "at <number> <word>" shape -> unaffected', !looksLikeSingleRecordReference('who has Trane units'));
+
+const ROUND3_ITEM3_EXCLUDED = [
+  ['who has the unit at 1234 Main', 'no recognized street suffix, still a single-record reference'],
+  ['who has the Trane unit at 500 Oak', 'brand word present, "at <number> <word>" still wins'],
+  ['customers with a unit at 42 Elm', 'NOUN_WITH_RE would otherwise fire'],
+];
+for (const [q, why] of ROUND3_ITEM3_EXCLUDED) {
+  check(`round 3 item 3 pre-classify (excluded) :: "${q}" (${why})`, preClassifyAnalytics(q) === false);
+}
+// Controls: real aggregate questions with no "at <number> <word>" shape must
+// still classify, unaffected by this narrower exclusion.
+for (const q of ['who has Trane units', 'which customers have Goodman units?', 'customers with expired warranties']) {
+  check(`round 3 item 3 pre-classify (still analytics) :: "${q}"`, preClassifyAnalytics(q) === true);
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

@@ -81,10 +81,16 @@ export async function planAnalyticsQuestion(question, { today } = {}) {
  * (both pure, in analytics.js) ever see them.
  */
 
+// Reviewer NO-GO (2026-09-21, round 2, gap 2): `value` used to be the full
+// service_address, which read fine at a 12-row cap but got noisy once the
+// list cap rose to 50 (MAX_FACT_ROWS, analytics.js) — "compact one-line rows
+// (name · city)" is the requested shape, so a plain customer-list row shows
+// just the city here (still the full address on the row itself in the app
+// once opened via entityId).
 function shapeCustomerRow(r) {
   const geo = deriveGeo(r.service_address);
   return {
-    id: r.id, label: r.customer_name || 'Unnamed customer', value: r.service_address || '—',
+    id: r.id, label: r.customer_name || 'Unnamed customer', value: geo.city || r.service_address || '—',
     entityId: r.id, city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
     customerName: r.customer_name,
   };
@@ -122,9 +128,26 @@ const ENTITY_SUPPORTED_FIELDS = {
   serviceVisits: new Set(['technician']),
 };
 
+/**
+ * Reviewer NO-GO (2026-09-21, round 2, gap 1): "Which customers have Trane
+ * units?" already passed the classifier AND validatePlan (brand is in the
+ * closed FILTER_FIELDS vocabulary) — the planner correctly returned
+ * `{entity: 'customers', op: 'list', filters: [{field: 'brand', ...}]}` — but
+ * filtersSupported (above) rejected it outright because `customers` carries
+ * no equipment-level column, so the whole question fell through to
+ * retrieval+model. These are the equipment-level fields customers can be
+ * filtered by via a join through equipment.customer_id — see
+ * queryCustomersByEquipmentFilter below.
+ */
+const EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN = new Set([
+  'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
+]);
+
 function filtersSupported(entity, filters) {
   const supported = ENTITY_SUPPORTED_FIELDS[entity] ?? new Set();
-  return (filters ?? []).every((f) => supported.has(f.field));
+  return (filters ?? []).every(
+    (f) => supported.has(f.field) || (entity === 'customers' && EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN.has(f.field))
+  );
 }
 
 /** brand/state filters need special-cased matching (normalizeBrand,
@@ -152,6 +175,77 @@ function applyEntityFilters(rows, filters) {
   });
 }
 
+const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+
+/**
+ * Reviewer NO-GO (2026-09-21, round 2, gaps 1 + 3): "customers" filtered by
+ * an equipment-level field (brand, model, equipmentType, tonnage,
+ * refrigerant, installYear, warrantyStatus) — "which customers have Trane
+ * units", "how many customers have units older than 10 years". There is no
+ * single `customers` SQL statement for this (a customer has zero or more
+ * units), so this queries EQUIPMENT (reusing buildAnalyticsSQL's own
+ * equipment branch + shapeEquipmentRow + applyEntityFilters — the exact same
+ * matching a plain equipment-entity question already gets), then resolves
+ * each surviving unit's customer_id to a customer row and de-duplicates to
+ * ONE row per customer (a customer with 3 matching Trane units still counts
+ * once). The matching unit's own brand/model is carried onto that row as the
+ * list's detail column (gap 3: "Linda Fitzgerald · Trane 4TTR4036 · Mesa") —
+ * the most-recently-updated matching unit wins when a customer has more than
+ * one (buildAnalyticsSQL's equipment query is already `ORDER BY updated_at
+ * DESC`), since that is the one most likely to be what "have Trane units"
+ * was actually asking about today.
+ */
+async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
+  const equipmentPlan = { ...plan, entity: 'equipment' };
+  const { sql, params } = buildAnalyticsSQL(equipmentPlan);
+  const { rows: raw } = await db.raw(sql, params);
+  const unitRows = raw
+    .map((r) => ({ ...shapeEquipmentRow(r, today), customerId: r.customer_id || null }))
+    .filter((r) => r.customerId);
+
+  // Only the equipment-level filters apply here (state/county/city/zip are
+  // already on the unit's own row via its service_address; customerName has
+  // no equivalent on an equipment row and is intentionally left to fail
+  // closed — see matchesFilter's own null-actual -> false rule — rather than
+  // silently ignored).
+  const filtered = applyEntityFilters(unitRows, plan.filters);
+  if (!filtered.length) return { rows: [], unfilteredCustomerIds: [] };
+
+  const customerIds = [...new Set(filtered.map((r) => r.customerId))];
+  const { rows: custRaw } = await db.raw(
+    `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address
+       FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} AND id = ANY($1::uuid[])`,
+    [customerIds]
+  );
+  const custById = new Map(custRaw.map((c) => [c.id, c]));
+
+  const rows = [];
+  const seen = new Set();
+  for (const unit of filtered) {
+    if (seen.has(unit.customerId)) continue;
+    const cust = custById.get(unit.customerId);
+    if (!cust) continue; // merged/removed between the two queries — skip, don't guess
+    seen.add(unit.customerId);
+    const geo = deriveGeo(cust.service_address);
+    const detail = [unit.brand, unit.model].filter(Boolean).join(' ');
+    rows.push({
+      id: unit.customerId, label: cust.customer_name || 'Unnamed customer',
+      value: [detail, geo.city].filter(Boolean).join(' · ') || geo.city || cust.service_address || '—',
+      entityId: unit.customerId, city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
+      customerName: cust.customer_name,
+      // Every equipment-level field, not just brand/model — executeAnalyticsPlan
+      // re-runs applyEntityFilters on whatever this function returns (the same
+      // idempotent second pass every other entity branch gets), so a plan
+      // combining e.g. brand + warrantyStatus must still find both fields here.
+      brand: unit.brand, model: unit.model, equipmentType: unit.equipmentType,
+      tonnage: unit.tonnage, refrigerant: unit.refrigerant, installYear: unit.installYear,
+      warrantyStatus: unit.warrantyStatus,
+    });
+  }
+  return { rows };
+}
+
 function keyOf(groupBy) {
   return (row) => {
     if (groupBy === 'warrantyStatus') return row.warrantyStatus ?? UNKNOWN_BUCKET;
@@ -168,8 +262,18 @@ function keyOf(groupBy) {
 export async function executeAnalyticsPlan(db, plan, { today } = {}) {
   if (!filtersSupported(plan.entity, plan.filters)) return null;
 
+  const hasEquipmentJoinFilter =
+    plan.entity === 'customers' && (plan.filters ?? []).some((f) => EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN.has(f.field));
+
   let rows;
-  if (plan.entity === 'customers') {
+  if (hasEquipmentJoinFilter) {
+    // Gaps 1 + 3: "which customers have Trane units" — a customer filtered
+    // by an equipment-level attribute. queryCustomersByEquipmentFilter already
+    // applies every filter itself (equipment-level AND the geo ones a unit's
+    // own address also carries), so `filtered` below is a no-op pass-through
+    // (matchesAllFilters([], []) === true) rather than re-filtering.
+    ({ rows } = await queryCustomersByEquipmentFilter(db, plan, { today }));
+  } else if (plan.entity === 'customers') {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeCustomerRow(r));

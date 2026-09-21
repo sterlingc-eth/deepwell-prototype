@@ -21,8 +21,8 @@
  */
 import pg from 'pg';
 import {
-  customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey,
-  addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress,
+  customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
+  addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress, houseNumberOf,
   normalizePhoneKey, normalizeEmailKey, compareNamesStrict, chooseUpgradedCustomerName,
 } from './integrity.js';
 
@@ -649,9 +649,11 @@ async function resolveCustomerContact(db, tenantId, facts, shopContext) {
  * real occupant upgrades it in place (see the name-path's own placeholder
  * check below) instead of creating a duplicate.
  *
- * Address matching here is EXACT (normalizeAddressKey equality) — no fuzzy
- * scoring — because there is no name to disambiguate with; two different
- * candidates at the same normalized address is exactly the "don't know, so
+ * Address matching here is EXACT (normalizeAddressKey equality, plus
+ * normalizeUnitKey when the incoming address names a unit — round-2 gap-4
+ * fix, 2026-09-21) — no fuzzy scoring — because there is no name to
+ * disambiguate with; two different candidates at the same normalized address
+ * (and, when a unit is named, the same unit) is exactly the "don't know, so
  * don't guess" case selectCustomerMatch already refuses on the name side.
  *
  * Reviewer follow-up (2026-09-20): refuses outright for a likely SHOP address
@@ -661,10 +663,44 @@ async function resolveCustomerContact(db, tenantId, facts, shopContext) {
  * `{tenantAddressKey, letterheadCounts}` a bulk caller (routes/integrity.js)
  * precomputed once for its whole loop; left undefined, it's computed here
  * (cheap — this only runs once per document at ingest/verify time).
+ *
+ * Reviewer NO-GO (2026-09-21, round 2, gap 4): live data showed a NAMED
+ * customer ("Deborah Ortega @ 544 E Ray Rd...") coexisting with an
+ * address-only placeholder ("Customer at 544 E Ray Rd...") for the identical
+ * address — the permit that should have matched Deborah instead minted a
+ * second row. Root cause: the candidate query below was `ORDER BY created_at
+ * LIMIT 500` — for a tenant with more than 500 customers on file, that
+ * silently drops any customer NOT among the oldest 500, so a real match sitting
+ * just outside that window was never even considered before falling through
+ * to "create a placeholder".
+ *
+ * Reviewer NO-GO (2026-09-21, round 3, item 1): the round-2 fix removed the
+ * cap ENTIRELY, trading a silent-truncation bug for a full-tenant table scan
+ * on every single address-only document — fine at 144 documents, not at
+ * scale. Narrowed in SQL first, exact match still decides: extract the
+ * incoming address's leading house number (houseNumberOf) and ILIKE-filter
+ * service_address to values starting with "<number> " or "<number>,",
+ * LIMIT 200 — a customer at a genuinely different street never shares that
+ * exact house-number prefix, so this is a cheap, safe narrowing, not a
+ * guess. When the address has no leading house number at all (rare — a rural
+ * route, a lot number), falls back to a 200-row ILIKE prefix on the first 12
+ * characters of normalizeAddressKey's own output. Either way this is a
+ * pre-filter, not the decision: `matches` below still requires the EXACT
+ * normalizeAddressKey(+unit) equality this function has always required, so
+ * the only risk this narrowing adds is missing a real match that (a) shares
+ * no house-number/12-char prefix with the incoming address — cannot happen,
+ * both are the SAME address — or (b) sits outside the 200-row cap because
+ * 200+ OTHER customers happen to share this exact house number across
+ * different streets, the same "safe fallback" ceiling `findOrCreateCustomer`
+ * already accepts for its own 200-row name cap (see its own KNOWN
+ * LIMITATIONS note). houseNumberOf itself lives in integrity.js, shared with
+ * routes/integrity.js's loadAddressPlaceholderCandidates so both call sites
+ * narrow the identical way.
  */
 async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext) {
   const addrKey = normalizeAddressKey(address);
   if (!addrKey) return null; // too sparse (a bare "Suite 4", say) to match safely
+  const unitKey = normalizeUnitKey(address);
 
   const ctx = shopContext ?? await computeShopAddressContext(db, tenantId);
   if (isLikelyShopAddress(addrKey, ctx)) {
@@ -677,14 +713,34 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
   // arriving at the same instant must not both decide "create new".
   await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:customeraddr:${addrKey}`]);
 
-  const candidates = (await db.query(
-    `SELECT id, data, customer_number FROM entities
-      WHERE entity_type = 'customer' AND ${TENANT} AND merged_into IS NULL
-        AND data->>'service_address' IS NOT NULL
-      ORDER BY created_at LIMIT 500`,
-    []
-  )).rows;
-  const matches = candidates.filter((c) => normalizeAddressKey(c.data?.service_address) === addrKey);
+  // Narrowed candidate query — see the round-3 doc comment above.
+  const houseNumber = houseNumberOf(address);
+  const candidates = houseNumber
+    ? (await db.query(
+        `SELECT id, data, customer_number FROM entities
+          WHERE entity_type = 'customer' AND ${TENANT} AND merged_into IS NULL
+            AND data->>'service_address' IS NOT NULL
+            AND (data->>'service_address' ILIKE $1 OR data->>'service_address' ILIKE $2)
+          LIMIT 200`,
+        [`${houseNumber} %`, `${houseNumber},%`]
+      )).rows
+    : (await db.query(
+        `SELECT id, data, customer_number FROM entities
+          WHERE entity_type = 'customer' AND ${TENANT} AND merged_into IS NULL
+            AND data->>'service_address' IS NOT NULL
+            AND data->>'service_address' ILIKE $1
+          LIMIT 200`,
+        [`${addrKey.slice(0, 12)}%`]
+      )).rows;
+  let matches = candidates.filter((c) => normalizeAddressKey(c.data?.service_address) === addrKey);
+  // A unit named on the incoming address (an apartment/suite complex) narrows
+  // among several same-street candidates to the one sharing that unit, same
+  // as planAddressPlaceholderAbsorptions (integrity.js) does for the heal
+  // step — never widens a single unambiguous street match into a guess.
+  if (matches.length > 1 && unitKey) {
+    const unitMatches = matches.filter((c) => normalizeUnitKey(c.data?.service_address) === unitKey);
+    if (unitMatches.length) matches = unitMatches;
+  }
 
   // Round-3 fix (2026-09-21): the address-only path can carry a
   // customer_phone/customer_email too (a permit with a phone number but no

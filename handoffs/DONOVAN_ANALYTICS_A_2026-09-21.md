@@ -91,6 +91,181 @@ FAIL** with no other script affected (the jump from 195 to 3018 in the total
 includes checks other, parallel workstreams added to the same chain in the
 meantime — none of this workstream's files touch theirs).
 
+## Reviewer round 2 — four live-corpus gaps fixed (2026-09-21)
+
+A live test against the real 144-document corpus surfaced four gaps. All
+four fixed under the same standing constraints (no git, no DDL, no new deps,
+Haiku only, 12 files under `api/`).
+
+**Gap 1 — classifier misses + the brand→customers executor gap.** Two
+distinct root causes behind the same symptom ("fell through to retrieval,
+got a partial model answer"):
+- Three phrasings ("Which customers have Trane/Goodman/York units?")
+  **already passed** the classifier (`WHICH_CUSTOMERS_RE` is unconditional)
+  and `validatePlan` (`brand` is closed vocabulary) — the real block was the
+  **executor**: `routes/analytics.js`'s `ENTITY_SUPPORTED_FIELDS.customers`
+  carried no equipment-level column, so `filtersSupported` rejected the
+  plan outright. Fixed by adding `EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN` (brand,
+  model, equipmentType, tonnage, refrigerant, installYear, warrantyStatus) —
+  `filtersSupported` now accepts these for `customers`, and a new
+  `queryCustomersByEquipmentFilter` (`routes/analytics.js`) queries equipment
+  (reusing `buildAnalyticsSQL`'s own equipment branch + `shapeEquipmentRow` +
+  `applyEntityFilters` — the same matching a plain equipment question
+  already gets), resolves each surviving unit's `customer_id` to a customer
+  row, and de-duplicates to one row per customer (the most-recently-updated
+  matching unit wins when a customer has more than one).
+- Six phrasings genuinely missed the classifier: "How many units have an
+  unknown warranty status?" (`CONTEXT` lacked "unknown"), "who has Trane
+  units" / "customers with expired warranties" / "units older than 10 years"
+  (no bypass trigger, and the generic path requires a `QUANTIFIER` word none
+  of these have), "how many Trane/Goodman units" (`QUANTIFIER` and
+  `AGGREGATE_NOUN` both matched, but `CONTEXT` recognized only the literal
+  word "brand", not actual brand names). Fixed in `api/_lib/analytics.js`:
+  added "unknown"/"warranty status" to `CONTEXT`; added `WHO_HAS_RE`
+  (`/\bwho (?:has|have)\b/i`), `NOUN_WITH_RE` (a noun + with/that have/who
+  have/having), and `AGGREGATE_NOUN && AGE_FILTER_RE` (older/newer
+  than, installed before/after/in) as new unconditional bypass triggers,
+  same tier as `WHICH_CUSTOMERS_RE`; and built `BRAND_NAME_RE` from
+  `warrantyRules.js`'s own `BRAND_RULES` labels/aliases (never a
+  hand-duplicated brand list, so a brand added there is recognized here for
+  free) as an alternative to `CONTEXT`. All checked against
+  `looksLikeSingleRecordReference`/`POSSESSIVE_SINGLE_RE` FIRST, unchanged —
+  a street address or serial token still excludes a question outright
+  regardless of a brand/age word appearing in it (verified explicitly: "who
+  has the Trane unit at 1234 Main St, Mesa AZ" stays excluded).
+- 12 new verify cases (`scripts/verify-analytics.mjs` §11, ≥10 required) use
+  the coordinator's exact reported strings plus 3 exclusion controls.
+
+**Gap 2 — the list cap was too low for a real answer.** `MAX_FACT_ROWS`
+raised from 12 to 50 (`api/_lib/analytics.js`); the list-op answer text now
+says "N customers — showing 50, and 18 more." past the cap instead of a bare
+"showing the first N" that never said how many were left out. A plain
+customer-list row's `value` changed from the full `service_address` to just
+the city (`shapeCustomerRow`, `routes/analytics.js`) — "compact one-line rows
+(name · city)" as requested; opening the row still reaches the full record
+via `entityId`. `FactGrid.tsx`'s `GroupTable` got a `max-h-[28rem]
+overflow-y-auto` so 50 rows stays a bounded, scrollable table instead of
+growing the page without limit. New verify cases scale off `MAX_FACT_ROWS`
+itself (not a hardcoded row count) so they stay correct at whatever the cap
+is.
+
+**Gap 3 — brand→customers list needed a useful row detail.** Solved by the
+same `queryCustomersByEquipmentFilter` as gap 1: each row's `value` is
+`"<brand> <model> · <city>"` (falls back to just the city, then the full
+address, if either piece is missing) — e.g. `label: "Linda Fitzgerald",
+value: "Trane 4TTR4036 · Mesa"`, verified byte-for-byte in
+`scripts/verify-analytics.mjs` §12 against a mock db (no real Postgres).
+
+**Gap 4 — an address-only placeholder can miss an existing named customer.**
+Live data: `"Customer at 544 E Ray Rd, Casa Grande, AZ 85122"` (a placeholder,
+`data.name_source='address'`) sitting alongside `"Deborah Ortega @ 544 E Ray
+Rd, Casa Grande, AZ 85122"` (a named customer, identical address). Two
+fixes:
+- **Write path** (`api/_lib/recordsStore.js`,
+  `findOrCreateCustomerByAddress`): the candidate query was `ORDER BY
+  created_at LIMIT 500` — for a tenant past 500 customers-with-an-address,
+  this silently drops any customer not among the oldest 500, so a real match
+  outside that window was never even considered before minting a
+  placeholder. This is an exact-match lookup (not the fuzzy narrowing the
+  200/500 caps elsewhere in the file exist for), so the cap is **removed
+  entirely** rather than raised. Also added unit-key disambiguation
+  (`normalizeUnitKey`, `integrity.js`): when a street match is ambiguous
+  (more than one named customer) and the incoming address names a unit, it
+  narrows to the one sharing that unit instead of refusing outright.
+- **Heal step** `absorbAddressPlaceholders` (`api/_lib/integrity.js`'s new
+  pure `planAddressPlaceholderAbsorptions` + `routes/integrity.js`'s wiring):
+  a placeholder at the same normalized address (+ unit, when named) as
+  **exactly one** named customer is merged into it via the existing
+  `mergeCustomers` (docs/units move, placeholder ends up `merged_into`);
+  more than one named match at that address is left alone for a human, same
+  "don't know, so don't guess" rule the write path itself follows. Safe/
+  additive (only ever merges an unambiguously-matched pair), so it joins
+  `ALL_INTEGRITY_FIXES` (`src/services/reviewClient.ts`) and cron's
+  auto-apply list (`api/_lib/routes/cron-sweep.js`) directly, no admin gate.
+  7 new verify cases (`scripts/verify-integrity.mjs`): exact match, ambiguous
+  street with no unit to disambiguate, unit key narrowing an otherwise-
+  ambiguous match, no match at all, placeholder-into-placeholder never
+  happens, no placeholders present.
+
+Verified: `npm run typecheck && npm run typecheck:api && npm run lint &&
+npm run verify:all` all green. `verify-analytics.mjs` alone: **224/224**
+(was 195; +29 — gap 1's 12 classifier cases plus 3 exclusion controls, gap
+1/3's 6-case brand→customers join fixture, gap 2's 3 list-cap cases, gap 1's
+`MAX_FACT_ROWS` assertion). `verify-integrity.mjs` alone: **208/208** (+7 for
+gap 4). Full `verify:all` chain: **3093 PASS / 0 FAIL, exit 0**. `npm run
+lint`: exit 0 (only pre-existing warnings in files this workstream never
+touched). Still exactly 12 files directly under `api/`; no DDL; no new
+dependencies.
+
+## Reviewer round 3 — three NO-GOs fixed (2026-09-21)
+
+**Item 1 — round-2's gap-4 fix removed a query cap entirely, trading a
+silent-truncation bug for a full-tenant table scan.** Both
+`findOrCreateCustomerByAddress` (`api/_lib/recordsStore.js`) and
+`loadAddressPlaceholderCandidates` (`api/_lib/routes/integrity.js`) now
+narrow in SQL BEFORE the exact `normalizeAddressKey`(+unit) match decides
+anything:
+- New shared pure helper `houseNumberOf` (`api/_lib/integrity.js`) pulls the
+  leading house number off a raw address ("544 E Ray Rd..." → "544"). Both
+  call sites use it so they narrow identically instead of drifting apart.
+- `findOrCreateCustomerByAddress`: when the incoming address has a house
+  number, the candidate query becomes `... AND (service_address ILIKE
+  '<number> %' OR service_address ILIKE '<number>,%') LIMIT 200`; with no
+  leading number at all (rare — a rural route, a lot number), it falls back
+  to a `LIMIT 200` ILIKE on the first 12 characters of
+  `normalizeAddressKey`'s own output.
+- `loadAddressPlaceholderCandidates`: fetches placeholders in a batch
+  (`LIMIT 500` — a nightly sweep runs again tomorrow), splits them by
+  whether their address has a leading house number, then fetches NAMED
+  customers only when they share a house number with one of the batch's
+  placeholders (`substring(... FROM '^(\d{1,6})') = ANY($1)`) or, for the
+  numberless remainder, an ILIKE-ANY over each one's 12-character prefix —
+  never the tenant's full customer list either way.
+- Either narrowing is a pre-filter, never the decision: the EXACT
+  `normalizeAddressKey`(+unit) match both functions already required is
+  unchanged, so the only new risk is a real match sitting outside a 200-row
+  (or 5000-row named-candidate) window — the same accepted "safe fallback"
+  ceiling `findOrCreateCustomer`'s own 200-row name cap already lives with.
+- 5 new verify cases for `houseNumberOf` (`scripts/verify-integrity.mjs`).
+
+**Item 2 — a placeholder could be silently merged away even if a human had
+already confirmed it.** `planAddressPlaceholderAbsorptions`
+(`api/_lib/integrity.js`) now excludes any placeholder with `isLocked: true`
+— set by a new `loadAddressPlaceholderLinkEligibility`
+(`api/_lib/routes/integrity.js`) that checks every document linked to that
+placeholder against the EXACT SAME `isEligibleForRelink` rule
+`relinkMismatchedNames` already uses: a manual link (`linked_by` not in
+`('ai','ai:name-only')`) or a document a human has already verified
+(`verified_by` set to anything other than `'ai'`) locks the placeholder out
+of this heal step entirely, regardless of how cleanly its address matches.
+`isLocked` omitted (every round-2 caller, including the existing test cases)
+defaults to eligible — backward compatible. 3 new verify cases: locked ->
+no absorption, explicitly unlocked -> absorbs normally, omitted ->
+defaults to eligible.
+
+**Item 3 — WHO_HAS_RE bypassed a single-record reference with no street
+suffix.** "who has the unit at 1234 Main" isn't caught by `STREET_ADDRESS_RE`
+(no recognized suffix word — "Main" alone, not "Main St") and round 2's
+`WHO_HAS_RE` bypass let it through as if it were an aggregate question. New
+`AT_ADDRESS_RE` (`/\bat\s+\d{1,6}\s+\w/i`) in
+`looksLikeSingleRecordReference` (`api/_lib/analytics.js`) catches "at
+&lt;number&gt; &lt;word&gt;" as its own single-record signal, checked first,
+same as `STREET_ADDRESS_RE`/identifier tokens — a brand word or "who has"
+elsewhere in the sentence never overrides it. Accepted, documented
+trade-off: "how many customers do we have at 3 locations" would also match
+and get excluded; false negatives here cost nothing (the question still
+reaches retrieval). 6 new verify cases (3 direct
+`looksLikeSingleRecordReference` checks, 3 exclusion cases, 3 still-analytics
+controls) in `scripts/verify-analytics.mjs`.
+
+Verified: `npm run typecheck && npm run typecheck:api && npm run lint &&
+npm run verify:all` all green. `verify-analytics.mjs` alone: **233/233**
+(was 224; +9 — item 3's direct/exclusion/control cases). `verify-integrity.mjs`
+alone: **216/216** (was 208; +8 — 5 `houseNumberOf` cases + 3 `isLocked`
+cases). Full `verify:all` chain: **3110 PASS / 0 FAIL, exit 0**. Standing
+constraints still hold: exactly 12 files directly under `api/`, no DDL, no
+new dependencies, Haiku only.
+
 ## What changed
 
 Today `/api/ask` had: meta-router (exact-phrase inventory questions) → fast
@@ -271,8 +446,9 @@ answer.
   returns instead of a single shared one. No other behavior changed; meta and
   fast-path code is untouched.
 - `src/components/FactGrid.tsx` — added the compact groupBy table renderer.
-  `AnswerCard.tsx` and `src/core/types.ts` unchanged.
-- `scripts/verify-analytics.mjs` — new, 195 checks (brief asked for ≥60), all
+  Round 2 (gap 2): `GroupTable` bounded to a scrollable `max-h-[28rem]` so 50
+  rows stays readable. `AnswerCard.tsx` and `src/core/types.ts` unchanged.
+- `scripts/verify-analytics.mjs` — 224 checks (brief asked for ≥60), all
   pure/no-DB/no-network: the 25-question pre-classifier corpus, 12 round-1
   adversarial single-record checks (§1b) plus direct unit tests of
   `looksLikeSingleRecordReference`/`suspiciousUnfilteredCustomerPlan`, a
@@ -281,9 +457,46 @@ answer.
   geo derivation (suites, missing ZIP, ZIP+4, no-comma-before-state,
   out-of-state), county lookup (prefix default, exceptions, city fallback,
   unknown), per-entity SQL shape, answer formatting (count/groupBy/list/sum,
-  the ambiguity rule, the 12-row cap), the filter/group/brand/warranty
-  helpers, and (§10) the cache-key derivation.
+  the ambiguity rule, the 50-row cap), the filter/group/brand/warranty
+  helpers, (§10) the cache-key derivation, (§11, round 2 gap 1) 12 live-
+  reported classifier phrasings + exclusion controls, and (§12, round 2 gaps
+  1+3) the brand→customers join end to end against a mock db.
 - `package.json` — added `verify:analytics` and wired it into `verify:all`.
+- Round 2 (2026-09-21) additional files touched, gaps 1–4:
+  - `api/_lib/routes/analytics.js` — `EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN`,
+    `queryCustomersByEquipmentFilter`, `filtersSupported`/
+    `executeAnalyticsPlan` branching on it (gaps 1+3); `shapeCustomerRow`'s
+    `value` now the city, not the full address (gap 2).
+  - `api/_lib/recordsStore.js` — `findOrCreateCustomerByAddress`'s candidate
+    query lost its `ORDER BY created_at LIMIT 500` cap and gained unit-key
+    disambiguation (gap 4 write path).
+  - `api/_lib/integrity.js` — new pure `planAddressPlaceholderAbsorptions`
+    (gap 4 heal step decision).
+  - `api/_lib/routes/integrity.js` — `loadAddressPlaceholderCandidates`, the
+    `absorbAddressPlaceholders` block in `applyIntegrityFix`, added to
+    `APPLY_ACTIONS` (gap 4 heal step wiring).
+  - `src/services/reviewClient.ts` — `absorbAddressPlaceholders` added to
+    `IntegrityApplyAction`/`ALL_INTEGRITY_FIXES`/`IntegrityFixApplied`.
+  - `api/_lib/routes/cron-sweep.js` — `absorbAddressPlaceholders` added to
+    the nightly auto-apply list + a summary counter.
+  - `scripts/verify-integrity.mjs` — 7 new cases for
+    `planAddressPlaceholderAbsorptions` (gap 4).
+- Round 3 (2026-09-21) additional files touched, items 1–3:
+  - `api/_lib/integrity.js` — new pure `houseNumberOf` (shared narrowing key,
+    item 1); `planAddressPlaceholderAbsorptions` now excludes a placeholder
+    with `isLocked: true` (item 2).
+  - `api/_lib/recordsStore.js` — `findOrCreateCustomerByAddress`'s candidate
+    query narrowed by house-number/12-char-prefix ILIKE + `LIMIT 200`
+    instead of a full-tenant load (item 1).
+  - `api/_lib/routes/integrity.js` — `loadAddressPlaceholderCandidates`
+    rewritten to a batched, narrowed two-part query (item 1); new
+    `loadAddressPlaceholderLinkEligibility` feeds `isLocked` per placeholder
+    (item 2).
+  - `api/_lib/analytics.js` — new `AT_ADDRESS_RE` in
+    `looksLikeSingleRecordReference` (item 3).
+  - `scripts/verify-integrity.mjs` — 5 `houseNumberOf` cases + 3 `isLocked`
+    cases.
+  - `scripts/verify-analytics.mjs` — 9 new cases for `AT_ADDRESS_RE`.
 
 ## Question types now supported end to end
 
@@ -340,8 +553,8 @@ Original build: `npm run typecheck && npm run typecheck:api && npm run lint
 && npm run verify:all` all green, `verify:all` at **2951 PASS / 0 FAIL**
 (baseline 2792 + this workstream's 159), `npm run build` succeeded.
 
-After the reviewer round 1 fixes (A1 + A2, this update): reran `npm run
-typecheck`, `npm run typecheck:api`, and `npm run verify:all` — all green.
+After the reviewer round 1 fixes (A1 + A2): reran `npm run typecheck`, `npm
+run typecheck:api`, and `npm run verify:all` — all green.
 `scripts/verify-analytics.mjs` alone: **195/195** (was 159; +36 — the 12
 adversarial checks A1 asked for, plus direct unit coverage of
 `looksLikeSingleRecordReference`/`suspiciousUnfilteredCustomerPlan`, plus
@@ -349,6 +562,22 @@ A2's §10 cache-key-derivation section). Full `verify:all` chain: **3018 PASS
 / 0 FAIL, exit 0** (the total now also includes checks parallel workstreams
 added to the shared chain in the meantime — `verify:business-corpus` now
 runs after `verify:analytics` — none of it touches this workstream's files).
+
+After the reviewer round 2 fixes (gaps 1–4): reran `npm run typecheck`, `npm
+run typecheck:api`, `npm run lint`, and `npm run verify:all` — all green.
+`scripts/verify-analytics.mjs` alone: **224/224** (was 195; +29).
+`scripts/verify-integrity.mjs` alone: **208/208** (+7 for gap 4's
+`planAddressPlaceholderAbsorptions`). Full `verify:all` chain: **3093 PASS /
+0 FAIL, exit 0**.
+
+After the reviewer round 3 fixes (items 1–3, this update): reran `npm run
+typecheck`, `npm run typecheck:api`, `npm run lint`, and `npm run
+verify:all` — all green. `scripts/verify-analytics.mjs` alone: **233/233**
+(was 224; +9). `scripts/verify-integrity.mjs` alone: **216/216** (was 208;
++8). Full `verify:all` chain: **3110 PASS / 0 FAIL, exit 0**. `npm run
+lint`: exit 0 (pre-existing warnings only, none in a file this workstream
+touched). Standing constraints still hold: exactly 12 files directly under
+`api/`, no DDL, no new dependencies, Haiku only.
 
 ---
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>

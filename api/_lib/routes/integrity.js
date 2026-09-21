@@ -23,7 +23,7 @@ import {
   unitIndexBackfillPlan, groupExtractionRowsByUnit, coalesceEntityData,
   isLikelyShopAddress, normalizeAddressKey, normalizeSurname, compareNamesStrict,
   isAddressOnlyCustomer, isLikelyShopPhone, isLikelyShopEmail, buildContactAddressCounts,
-  normalizePhoneKey, normalizeEmailKey,
+  normalizePhoneKey, normalizeEmailKey, planAddressPlaceholderAbsorptions, houseNumberOf,
 } from '../integrity.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -49,6 +49,10 @@ const APPLY_ACTIONS = new Set([
   // effectiveDryRun gate and a place in ALL_INTEGRITY_FIXES/cron, not the
   // admin-only "ask twice" gate above.
   'healSplitUnits', 'refillCustomerContacts',
+  // Round 2 gap 4 (2026-09-21): also additive/fill-only — only ever merges a
+  // placeholder INTO an unambiguously-matched named customer (see
+  // planAddressPlaceholderAbsorptions's own doc comment in integrity.js).
+  'absorbAddressPlaceholders',
 ]);
 
 // ------------------------------------------------------------------ reads --
@@ -67,6 +71,108 @@ async function loadCustomersForScan(db) {
   return rows.rows.map((r) => ({
     id: r.id, customerNumber: r.customer_number, name: r.name, address: r.address, phone: r.phone, email: r.email,
   }));
+}
+
+const ADDRESS_PLACEHOLDER_BATCH_LIMIT = 500;
+const ADDRESS_PLACEHOLDER_NAMED_CANDIDATE_LIMIT = 5000;
+
+/**
+ * Reviewer NO-GO (2026-09-21, round 3, item 1): the round-2 version of this
+ * loaded EVERY non-merged customer with a service_address on file — correct
+ * (this feeds an EXACT match, so nothing could be sampled away safely), but a
+ * full-tenant load on every run. Narrowed the same way
+ * recordsStore.js's findOrCreateCustomerByAddress now narrows its own
+ * candidate query (houseNumberOf, integrity.js): placeholders are fetched in
+ * batches of `ADDRESS_PLACEHOLDER_BATCH_LIMIT` (a nightly sweep runs again
+ * tomorrow — this never needs to clear a whole tenant in one pass), then
+ * named customers are fetched ONLY when they share a leading house number
+ * with one of THIS batch's placeholders (or, for the rare placeholder
+ * address with no leading house number, the first 12 characters of
+ * normalizeAddressKey) — never the tenant's full customer list.
+ * planAddressPlaceholderAbsorptions still requires an EXACT
+ * normalizeAddressKey(+unit) match before proposing anything; this only
+ * narrows which named rows it gets to compare against.
+ */
+async function loadAddressPlaceholderCandidates(db) {
+  const placeholderRows = (await db.raw(
+    `SELECT id, data->>'service_address' AS address
+       FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+        AND data->>'name_source' = 'address'
+        AND data->>'service_address' IS NOT NULL AND data->>'service_address' <> ''
+      LIMIT ${ADDRESS_PLACEHOLDER_BATCH_LIMIT}`,
+    []
+  )).rows;
+  if (!placeholderRows.length) return [];
+
+  const withNumber = placeholderRows.filter((r) => houseNumberOf(r.address));
+  const withoutNumber = placeholderRows.filter((r) => !houseNumberOf(r.address));
+
+  const named = new Map();
+  if (withNumber.length) {
+    const numbers = [...new Set(withNumber.map((r) => houseNumberOf(r.address)))];
+    const rows = (await db.raw(
+      `SELECT id, data->>'service_address' AS address
+         FROM entities
+        WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+          AND (data->>'name_source' IS DISTINCT FROM 'address')
+          AND data->>'service_address' IS NOT NULL
+          AND substring(data->>'service_address' FROM '^(\\d{1,6})') = ANY($1::text[])
+        LIMIT ${ADDRESS_PLACEHOLDER_NAMED_CANDIDATE_LIMIT}`,
+      [numbers]
+    )).rows;
+    for (const r of rows) named.set(r.id, r.address);
+  }
+  if (withoutNumber.length) {
+    const patterns = [...new Set(withoutNumber.map((r) => `${normalizeAddressKey(r.address).slice(0, 12)}%`))].filter((p) => p.length > 1);
+    if (patterns.length) {
+      const rows = (await db.raw(
+        `SELECT id, data->>'service_address' AS address
+           FROM entities
+          WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+            AND (data->>'name_source' IS DISTINCT FROM 'address')
+            AND data->>'service_address' IS NOT NULL
+            AND data->>'service_address' ILIKE ANY($1::text[])
+          LIMIT ${ADDRESS_PLACEHOLDER_NAMED_CANDIDATE_LIMIT}`,
+        [patterns]
+      )).rows;
+      for (const r of rows) named.set(r.id, r.address);
+    }
+  }
+
+  // Reviewer NO-GO (2026-09-21, round 3, item 2): a placeholder linked to a
+  // document a human already touched (a manual link, or a human
+  // verification — isEligibleForRelink, above) is locked out of this heal
+  // step entirely, regardless of how cleanly its address matches.
+  const locked = await loadAddressPlaceholderLinkEligibility(db, placeholderRows.map((r) => r.id));
+
+  const out = placeholderRows.map((r) => ({ id: r.id, address: r.address, isPlaceholder: true, isLocked: locked.has(r.id) }));
+  for (const [id, address] of named) out.push({ id, address, isPlaceholder: false });
+  return out;
+}
+
+/** Reviewer NO-GO (2026-09-21, round 3, item 2): which of `placeholderIds`
+ *  have at least one linked document that fails isEligibleForRelink (a
+ *  human-made link, or a document a human has already verified) — reuses the
+ *  exact same rule relinkMismatchedNames applies, so a placeholder a human
+ *  already confirmed via one of its documents is never silently absorbed.
+ *  Returns a Set of the LOCKED ids only (absent = eligible). */
+async function loadAddressPlaceholderLinkEligibility(db, placeholderIds) {
+  const locked = new Set();
+  if (!placeholderIds.length) return locked;
+  const rows = (await db.raw(
+    `SELECT l.entity_id AS customer_id, l.linked_by, d.verified_by, d.stage
+       FROM document_entity_links l
+       JOIN documents d ON d.id = l.document_id
+      WHERE l.entity_id = ANY($1::uuid[]) AND l.${TENANT}`,
+    [placeholderIds]
+  )).rows;
+  for (const r of rows) {
+    if (!isEligibleForRelink({ linkedBy: r.linked_by, verifiedBy: r.verified_by, stage: r.stage })) {
+      locked.add(r.customer_id);
+    }
+  }
+  return locked;
 }
 
 /** One row per document that names a customer_name/service_address, with
@@ -1017,7 +1123,7 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
   const result = {
     dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [],
     survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [],
-    unitsMovedByGroup: [], splitUnitsHealed: [], customerContactsFilled: [], skipped: [],
+    unitsMovedByGroup: [], splitUnitsHealed: [], customerContactsFilled: [], addressPlaceholdersAbsorbed: [], skipped: [],
   };
 
   if (applySet.has('mergeDuplicates')) {
@@ -1223,6 +1329,34 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
         clerk_user_id: actorClerkId, action: 'integrity.refill_customer_contacts', resource_type: 'tenant',
         changes: { count: result.customerContactsFilled.length },
       }));
+    }
+  }
+
+  if (applySet.has('absorbAddressPlaceholders')) {
+    // Round 2 gap 4 (2026-09-21), safe/additive like healMergedSurvivors:
+    // mergeCustomers only ever runs on a pair planAddressPlaceholderAbsorptions
+    // (integrity.js) already matched EXACTLY (never an ambiguous "several
+    // named customers at this street" case), so this gets the plain
+    // effectiveDryRun gate, not the admin-only "ask twice" gate mergeDuplicates
+    // uses. dropId is always the placeholder (data.name_source='address');
+    // mergeCustomers moves its docs/units onto keepId and marks it
+    // merged_into, same as any other customer merge.
+    const customers = await withRecordsTenant(ctx, loadAddressPlaceholderCandidates);
+    const plans = planAddressPlaceholderAbsorptions(customers);
+    for (const plan of plans) {
+      if (effectiveDryRun) { result.addressPlaceholdersAbsorbed.push(plan); continue; }
+      try {
+        await mergeCustomers(ctx, { keepId: plan.keepId, dropId: plan.dropId }, actorClerkId);
+        await withRecordsTenant(ctx, (db) => db.logAction({
+          clerk_user_id: actorClerkId, action: 'integrity.absorb_address_placeholder',
+          resource_type: 'entity', resource_id: plan.keepId, changes: plan,
+        }));
+        result.addressPlaceholdersAbsorbed.push(plan);
+      } catch (err) {
+        if (!/already been merged/i.test(err?.message ?? '')) {
+          result.skipped.push({ documentId: null, reason: `absorb placeholder ${plan.dropId}: ${err?.message}` });
+        }
+      }
     }
   }
 

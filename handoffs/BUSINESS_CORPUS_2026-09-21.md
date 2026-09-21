@@ -51,14 +51,49 @@ byte-for-byte (no em-dashes in any PDF text); no git, no DDL, no new deps.
      ≤900-character pieces read back via `window.__dwPiece(i)` /
      `window.__dwPieceCount()` — for a tool with small per-call output limits
      to reconstruct the whole snapshot without ever reading one giant blob.
-- `scripts/verify-business-corpus.mjs` — new, 31 pure checks, wired as the
-  last step of `verify:all`. Covers: generator determinism (two runs
-  produce byte-identical output), key internal consistency (county sum = AZ
-  state total, state sum = customer total, every document belongs to exactly
-  one customer or the letterhead-only set — never both, never neither, never
-  twice — tallies of brand/warranty-status/document-type independently
-  recomputed and compared), and every question's expected value independently
-  re-derived from the key rather than just re-read.
+- `scripts/verify-business-corpus.mjs` — new, 71 pure checks (35 for the
+  default corpus + 36 for the small subset below), wired as the last step of
+  `verify:all`, run against **both** scales. Covers: generator determinism
+  (two runs produce byte-identical output), key internal consistency (county
+  sum = AZ state total, state sum = customer total, every document belongs
+  to exactly one customer or the letterhead-only set — never both, never
+  neither, never twice — tallies of brand/warranty-status/document-type
+  independently recomputed and compared), every question's expected value
+  independently re-derived from the key, and — for the small subset
+  specifically — that all 3 AZ counties, ≥1 out-of-state customer, all 8
+  brands, all 15 document types, and ≥3 of the 4 warranty-status buckets are
+  actually *present* in the generated data, not just internally consistent.
+
+### Cheaper testing: `--customers N` / `--out <dir>`
+
+`scripts/synth-business.mjs` now takes two flags for a smaller, cheaper
+corpus, per the owner's request:
+
+```
+node scripts/synth-business.mjs --customers 30 --out test-docs/business-small
+```
+
+The **default run (no flags) is byte-for-byte unchanged** — verified by
+hashing `ANSWER_KEY.json` before and after this change (same
+`04b48bb2...` SHA-256). A `--customers` run:
+
+- uses a reduced, representative geography (Mesa/Maricopa, Casa Grande/
+  Pinal, Tucson/Pima, Las Vegas/NV) instead of all 19 full-scale cities, so
+  it still guarantees all 3 AZ counties and ≥1 out-of-state customer at any
+  size;
+- scales the apartment complex to 4 units (8 at `--customers 60` or above);
+- scales the traps down: 1 near-miss surname pair (of the full run's 2), 1
+  name-variant household (of 3), 2 letterhead-only documents (of 4);
+- reduces to 20 analytics + 20 lookup questions (of 30/30), built from
+  city-safe phrasing (no question names a city that doesn't exist at that
+  scale);
+- switches correspondence documents from `.pdf` to `.txt` (cheaper to
+  extract, same content) — dispatch notes and nameplate-photo transcripts
+  were already `.txt`. PDFs stay single-page at every scale (every template
+  is well under the ~53-lines-per-page budget the hand-rolled PDF writer
+  uses, full or small);
+- warns (not fails) if `--customers` is small enough (<15) that full
+  document-type/brand coverage can no longer be guaranteed.
 
 ## Numbers
 
@@ -104,22 +139,61 @@ byte-for-byte (no em-dashes in any PDF text); no git, no DDL, no new deps.
   at 100% (backward compatibility confirmed).
 - **`npm run typecheck && npm run typecheck:api && npm run lint && npm run
   verify:all`** — all green, `verify:all` now ends with
-  `verify:business-corpus` (all checks pass).
+  `verify:business-corpus` (all checks pass, both scales).
+
+### Small subset (`--customers 30 --out test-docs/business-small`)
+
+- **30 customers, 144 documents** (139.5 KB raw / ~197 KB base64).
+- **By state:** AZ 29, NV 1. **By county (AZ only):** Maricopa 13, Pinal 8,
+  Pima 8 — all 3 present.
+- **Equipment by brand** (30 units, all 8 present): Trane 5, Carrier 4,
+  Goodman 5, Lennox 3, Rheem 4, York 3, Daikin 3, Mitsubishi 3.
+- **Warranty status:** expired 17, active 7, expiring 3, unknown 3 — all 4
+  buckets present.
+- **Documents by type:** all 15/15 present (invoice 30, service-ticket 30,
+  proposal-quote 13, warranty-registration 13, dispatch-note 8, work-order 7,
+  startup-sheet/inspection-report/equipment-record/correspondence/
+  maintenance-agreement 5 each, permit 5, other 5, purchase-order 4,
+  nameplate-photo 4).
+- **Traps:** 1 near-miss-surname pair, 1 name-variant household, a 4-unit
+  apartment complex, 2 letterhead-only documents.
+- **40 questions** (20 analytics + 20 lookup); self-test: 40/40 correct,
+  30/30 customers matched, 1/1 merge trap held, 100% docs/units linked.
 
 ## Cost estimate
 
-604 documents x ~$0.012/doc (Haiku extraction, per the owner's already-
-accepted rate from `handoffs/LIMIT_TEST_PLAN_2026-09-20.md`) ≈ **$7.25**.
+Computed per document FORM, not a flat rate, now that the small subset mixes
+`.pdf` and `.txt`: **$0.012/PDF, $0.006/txt** (a plain-text extraction is
+half the token cost of a rendered PDF page).
+
+- **Full corpus:** 560 PDF + 44 txt = 604 docs → 560×$0.012 + 44×$0.006 =
+  **$6.98**.
+- **Small subset:** 127 PDF + 17 txt = 144 docs → 127×$0.012 + 17×$0.006 =
+  **$1.63**.
+
+Both figures are printed by the generator itself on every run (`Document
+forms:` / `Estimated Haiku extraction cost:` lines), so they never drift
+from what actually got written to disk.
 
 ## Exact ingest steps (for the owner, or for me once he's signed in)
+
+Use the small subset (`test-docs/business-small/`, ~$1.63) for a first pass
+or to test a code change cheaply; use the full corpus
+(`test-docs/business/`, ~$6.98) for the real analytics-accuracy scoring run.
+Steps are identical either way, just point at the other directory.
 
 1. **Build the bundle** (already done, re-run any time the corpus changes):
    ```
    node scripts/synth-business.mjs        # regenerates test-docs/business/ + ANSWER_KEY.json
    node scripts/build-bundle.mjs test-docs/business
+
+   # or, for the cheaper subset:
+   node scripts/synth-business.mjs --customers 30 --out test-docs/business-small
+   node scripts/build-bundle.mjs test-docs/business-small
    ```
-   Writes `test-docs/business/bundle.json` (851.9 KB — well under the 8 MB
-   single-file budget, so no chunking occurs).
+   Writes `test-docs/business/bundle.json` (851.9 KB) or
+   `test-docs/business-small/bundle.json` (196.5 KB) — both well under the
+   8 MB single-file budget, so no chunking occurs either way.
 
 2. **Sign in** to the DeepWell app in a browser tab, open DevTools console on
    that tab (so `window.Clerk` and same-origin `fetch` both work).
@@ -168,14 +242,19 @@ accepted rate from `handoffs/LIMIT_TEST_PLAN_2026-09-20.md`) ≈ **$7.25**.
 
 ## Files touched
 
-- `scripts/synth-business.mjs` — new (generator).
+- `scripts/synth-business.mjs` — new (generator); extended with
+  `--customers N` / `--out <dir>` for a cheaper subset (default-run output
+  unchanged, hash-verified).
 - `test-docs/business/` — new (604 generated docs + `ANSWER_KEY.json` +
   `bundle.json`).
+- `test-docs/business-small/` — new (144 generated docs + `ANSWER_KEY.json`
+  + `bundle.json`, from `--customers 30`).
 - `scripts/score-corpus.mjs` — extended (`containsAnalyticsMatch`,
   `--key` flag, `analytics`/`lookups` breakdown in the scorecard).
 - `scripts/build-bundle.mjs` — new (generalized, chunking).
 - `scripts/browser-ingest.js` — new (paste-in console script).
-- `scripts/verify-business-corpus.mjs` — new.
+- `scripts/verify-business-corpus.mjs` — new; runs its full check suite
+  against both `test-docs/business/` and `test-docs/business-small/`.
 - `package.json` — added `verify:business-corpus`, wired into `verify:all`.
 
 ---
