@@ -24,6 +24,12 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
   const docOrder = new Map<string, number>();
   for (const s of answer.sources) if (!docOrder.has(s.documentId)) docOrder.set(s.documentId, docOrder.size + 1);
   const citation = (ref: SourceRef) => docOrder.get(ref.documentId) ?? 0;
+  const docName = new Map<string, string>();
+  for (const s of answer.sources) {
+    const n = (s as { filename?: string }).filename;
+    if (n && !docName.has(s.documentId)) docName.set(s.documentId, n);
+  }
+  const sourceLabel = (ref: SourceRef) => docName.get(ref.documentId);
 
   const isEmpty = answer.kind === 'no-answer';
   const recordWord = answer.verifiedCount === 1 ? 'record' : 'records';
@@ -67,7 +73,7 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
           <SourceList sources={answer.closest} onOpen={onOpenSource} title="Closest documents" emptyText="No documents look related. Try an address, a serial number, or a customer name." />
         ) : (
           <>
-            <FactGrid facts={answer.facts} citation={citation} onOpenSource={onOpenSource} {...(onOpenEntity ? { onOpenEntity } : {})} />
+            <FactGrid facts={answer.facts} citation={citation} onOpenSource={onOpenSource} sourceLabel={sourceLabel} {...(onOpenEntity ? { onOpenEntity } : {})} />
             <SourceList sources={answer.sources} onOpen={onOpenSource} />
           </>
         )}

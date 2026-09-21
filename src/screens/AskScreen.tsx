@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, Camera, Clock, Loader2, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { DonovanMark } from '../components/DonovanMark';
 import { AnswerCard } from '../components/AnswerCard';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SerialCapture } from '../components/SerialCapture';
@@ -140,9 +141,16 @@ export function AskScreen() {
   return (
     <AppShell width="ask">
       <div className="space-y-8">
-        <header className="space-y-2">
-          <h1 className={asked ? 'text-h2 sm:text-h1' : 'text-display sm:text-display-lg'}>Ask Donovan.</h1>
-          {!asked && <p className="text-ink-2 text-body-lg field:text-body-xl">Donovan reads your records and answers with the documents it came from.</p>}
+        <header className="flex items-start gap-4 sm:gap-5">
+          <DonovanMark
+            state={loading ? 'reading' : answer ? 'answered' : 'idle'}
+            size={asked ? 48 : 72}
+            className="shrink-0 mt-1 transition-[width,height] duration-300"
+          />
+          <div className="space-y-2 min-w-0">
+            <h1 className={asked ? 'text-h2 sm:text-h1' : 'text-display sm:text-display-lg'}>Ask Donovan.</h1>
+            {!asked && <p className="text-ink-2 text-body-lg field:text-body-xl">Donovan reads your records and answers with the documents it came from.</p>}
+          </div>
         </header>
 
         <form onSubmit={onSubmit} role="search" aria-label="Ask a question" className="space-y-3">

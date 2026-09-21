@@ -111,7 +111,7 @@ export function EntityScreen() {
           {!includeUnverified && <p className="text-caption text-ink-3">Fields below show every document that mentions them, including unverified ones. Ask answers use verified documents only.</p>}
         </header>
 
-        <FactGrid facts={facts} citation={citation} onOpenSource={setPreview} />
+        <FactGrid facts={facts} citation={citation} onOpenSource={setPreview} sourceLabel={(r) => graph.docs[r.documentId]?.filename} />
 
         {related.map((group) => (
           <section key={group.title} aria-label={group.title} className="space-y-2">

@@ -15,6 +15,9 @@ interface FactGridProps {
   citation: (ref: SourceRef) => number;
   onOpenSource: (ref: SourceRef) => void;
   onOpenEntity?: (entityId: string) => void;
+  /** Filename (or other label) for a source, shown as the chip's tooltip so
+   *  "[2]" reads as "[2] 48-invoice-whitmore.pdf" on hover/long-press. */
+  sourceLabel?: (ref: SourceRef) => string | undefined;
 }
 
 /**
@@ -22,13 +25,21 @@ interface FactGridProps {
  * as pills (with text — colour is never the only signal). Each row shows its
  * citation numbers; tapping one opens that document at the cited field.
  */
-export function FactGrid({ facts, citation, onOpenSource, onOpenEntity }: FactGridProps) {
+export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLabel }: FactGridProps) {
   if (!facts.length) return null;
   return (
     <section aria-labelledby="facts-heading">
-      <h3 id="facts-heading" className="dw-label mb-2">
-        Linked facts
-      </h3>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 id="facts-heading" className="dw-label">
+          Linked facts
+        </h3>
+        {/* Owner question (2026-09-21): "what are those numbers on the side?"
+            — they are the source documents, numbered to match the list
+            further down the page. Say so where the eye lands. */}
+        <p className="text-caption text-ink-3">
+          [1] [2] [3] = which document says so · tap to open it
+        </p>
+      </div>
       <dl className="border border-line rounded-lg bg-surface divide-y divide-line">
         {facts.map((f, i) => {
           const refs = f.sources;
@@ -61,7 +72,8 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity }: FactGr
                     key={`${r.documentId}-${j}`}
                     type="button"
                     onClick={() => onOpenSource(r)}
-                    aria-label={`Open source ${citation(r)} for ${f.label}`}
+                    aria-label={`Open source ${citation(r)} for ${f.label}${sourceLabel?.(r) ? ` (${sourceLabel(r)})` : ''}`}
+                    title={sourceLabel?.(r) ? `Source ${citation(r)}: ${sourceLabel(r)}` : `Source ${citation(r)}`}
                     className="font-mono text-caption text-ink-3 hover:text-ink border border-line hover:border-line-2 rounded-sm min-w-[28px] h-7 px-1.5 grid place-items-center transition-colors duration-quick"
                   >
                     [{citation(r)}]
