@@ -167,6 +167,11 @@ async function resolveLimits(tenantUuid, bucket, overrides) {
   const base = envLimits(bucket);
   if (!tenantUuid) return base;
   try {
+    // get_tenant_limits() (M3-config/24) folds tenants.plan into the JSON it
+    // returns, so planTierFromLimits sees the subscription tier even when no
+    // per-tenant override was ever written. Before 24 is pasted the JSON has
+    // no plan and every tenant gets the conservative Solo-sized daily cap
+    // (live 2026-09-21: the Fleet founder account hit "Daily limit of 900").
     const { rows } = await getAuxPool().query("SELECT get_tenant_limits($1) AS limits", [tenantUuid]);
     const tenantLimits = rows[0]?.limits ?? {};
     const tenantOverride = tenantLimits?.[bucket] ?? {};

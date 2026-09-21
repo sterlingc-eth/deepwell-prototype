@@ -196,6 +196,38 @@ const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b
  * just above. Paired with AGGREGATE_NOUN the same way AGE_FILTER_RE is.
  */
 const CONTACT_FILTER_RE = /\b(have|has|with|no|missing|without)\s+(an?\s+)?(email|phone)\b/i;
+
+/**
+ * Live miss (2026-09-21, "which units had service this month" cluster),
+ * item 3: "what units were serviced this month" / "what equipment got
+ * serviced this month" name no QUANTIFIER word at all ("which"/"how many"/
+ * "list"/"show me"/"total") — plain English "what" is exactly as much a
+ * quantifier as "which" is when it's immediately followed by a PLURAL entity
+ * noun ("what units", "what customers") or when the question is a "what ...
+ * did we" clause about US doing something to many ("what did we service in
+ * September"). Bare "what" is ALSO how a genuine single-record lookup starts
+ * ("what's the serial number at 1234 Elm St", "what's the phone number for
+ * Sandra Wyckoff") — those never reach this far: looksLikeSingleRecordReference
+ * is checked first and short-circuits preClassifyAnalytics entirely (see its
+ * own doc comment), and a real single-record "what's ..." contraction never
+ * matches "what\s+" in the first place (no space between "what" and "'s").
+ * PLURAL_ENTITY_WORDS is every ENTITY_SYNONYMS word that is actually plural
+ * (ends in "s"), plus "equipment" itself (a mass noun with no distinct plural
+ * form) — never a bare singular ("what unit", "what customer") on its own,
+ * which stays exactly as excludable as it already was.
+ */
+const PLURAL_ENTITY_WORDS = [
+  ...new Set([
+    ...ENTITY_SYNONYMS.customers, ...ENTITY_SYNONYMS.equipment,
+    ...ENTITY_SYNONYMS.documents, ...ENTITY_SYNONYMS.serviceVisits,
+    ...ENTITY_SYNONYMS.warranties,
+  ]),
+].filter((w) => /s$/i.test(w) || w === 'equipment');
+const WHAT_PLURAL_RE = new RegExp(`\\bwhat\\s+(${synonymAlternation(PLURAL_ENTITY_WORDS)})\\b`, 'i');
+// "what <plural entity noun> did we <verb>" only — a bare "what did we do for
+// Ramirez" is a single customer's history and must stay on retrieval.
+const WHAT_DID_WE_RE = new RegExp(`\\bwhat\\s+(${synonymAlternation(PLURAL_ENTITY_WORDS)})\\b[\\s\\S]{0,40}\\bdid we\\b|\\bwhat\\s+did we\\s+(service|install|repair|replace|fix|visit)\\b`, 'i');
+
 /** "how many documents does Plaza Dental have" / "does X have a warranty" —
  *  a single, named record's own attribute, not an aggregate across many. */
 /**
@@ -310,6 +342,8 @@ export function preClassifyAnalytics(question) {
     WHO_HAS_RE.test(q) ||
     NOUN_WITH_RE.test(q) ||
     BIGGEST_CUSTOMER_RE.test(q) ||
+    WHAT_PLURAL_RE.test(q) ||
+    WHAT_DID_WE_RE.test(q) ||
     (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q)) ||
     (AGGREGATE_NOUN.test(q) && CONTACT_FILTER_RE.test(q))
   ) {
@@ -666,6 +700,12 @@ export const ANALYTICS_FEW_SHOT = [
     q: 'which customers in mesa have trane units',
     plan: { entity: 'customers', op: 'list', filters: [{ field: 'city', op: 'eq', value: 'Mesa' }, { field: 'brand', op: 'eq', value: 'Trane' }] },
   },
+  // ---- "had/were serviced" shape (live miss, 2026-09-21) — entity
+  // serviceVisits, never equipment/customers, which carry no service_date
+  // column at all; see resolveServiceVisitsOverride's own doc comment for why
+  // this is also forced deterministically rather than left to the model. ----
+  { q: 'which units had service this month', plan: { entity: 'serviceVisits', op: 'list', timeRange: { from: '2026-09', to: '2026-09' } } },
+  { q: 'how many service calls this month', plan: { entity: 'serviceVisits', op: 'count', timeRange: { from: '2026-09', to: '2026-09' } } },
   // ---- NEGATIVE: never plan these — already handled before/instead of you ----
   { q: 'how much did we invoice last month', fallback: 'money' },
   { q: 'which customers are overdue for maintenance', fallback: 'maintenance' },
@@ -737,7 +777,13 @@ export const ANALYTICS_SYSTEM_PROMPT = ANALYTICS_SYSTEM_PROMPT_BASE + ANALYTICS_
 // prior cache row (planned under the few-shot-less prompt) must invalidate
 // the same way v2's hasEmail/hasPhone bump and v3's belt-and-suspenders bump
 // both already did.
-export const ANALYTICS_VERSION = 'analytics-v4';
+// Bumped v4 -> v5 ("which units had service this month" live miss,
+// 2026-09-21): two new few-shot examples were added to ANALYTICS_FEW_SHOT
+// (another real prompt change) and the serviceVisits SQL now returns
+// customer_name/model columns it never did before — any plan cached under
+// the old vocabulary/shape must be invalidated the same way every prior bump
+// already was.
+export const ANALYTICS_VERSION = 'analytics-v5';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
@@ -890,6 +936,57 @@ export function reconcileTimeRange(rawTimeRange, question, today) {
   const yearInQuestion = yearMatch && new RegExp(`\\b${yearMatch[1]}\\b`).test(String(question ?? ''));
   if (validShape && yearInQuestion) return rawTimeRange;
   return override;
+}
+
+/**
+ * Live miss (2026-09-21): the owner asked Donovan live "which units had
+ * services this month" and got no usable answer. Root cause: entity choice
+ * for a "did this get serviced" question was left entirely to the model —
+ * exactly the kind of judgment call resolveQuestionTimeRange (above) already
+ * refuses to leave to the model for DATES, for the same reason. `equipment`/
+ * `customers` carry no service_date column at all, so a plan that picked
+ * either one either got rejected downstream (no matching filter/column) or,
+ * worse, silently ignored the timeRange and answered with EVERY row — the
+ * data itself doesn't matter here; the entity choice must never depend on
+ * the model getting it right. `serviceVisits` (backed by the
+ * extractions.field_key = 'service_date' rows — see buildAnalyticsSQL) is
+ * the ONLY entity whose rows are actually keyed by when the work happened, so
+ * any question shaped like "<units/equipment/customers/...> <had/got/were/
+ * received> service(d)" or "<did/do> we service" or naming "service call(s)"
+ * outright is forced to entity 'serviceVisits' regardless of what the model
+ * returned — see planAnalyticsQuestion (routes/analytics.js), which applies
+ * this the same way it applies reconcileTimeRange, before validatePlan ever
+ * runs. `service(?:d)?` (not just "service") so this still matches whether or
+ * not nlNormalize's fuzzy-typo pass "corrects" a genuine "serviced" back to
+ * "service" first (see EXTRA_DOMAIN_WORDS in nlNormalize.js, which now keeps
+ * "serviced" in the vocabulary so that correction stops happening at all —
+ * this regex is written to not depend on either behavior).
+ */
+const SERVICE_VISITS_OVERRIDE_RE =
+  /\b(?:had|got|were|received)\s+service(?:d)?\b|\b(?:did|do)\s+we\s+service\b|\bwe\s+service(?:d)?\b|\bservice\s+calls?\b/i;
+
+/** True for any question this session's live-miss cluster named — exported
+ *  so scripts/verify-analytics.mjs can pin the exact shapes down directly. */
+export function isServiceVisitsQuestion(question) {
+  return SERVICE_VISITS_OVERRIDE_RE.test(String(question ?? ''));
+}
+
+/**
+ * The forced {entity, op} for a question isServiceVisitsQuestion recognizes,
+ * or null. `op` is 'count' for a "how many" question, 'list' for every other
+ * phrasing ("which"/"what"/"list ...") — the same count-vs-list distinction
+ * every other entity already gets from the model, just decided deterministically
+ * here instead of trusted from the model's own `op` choice, for the same
+ * "never depend on the model getting it right" reason the entity itself is
+ * forced. Never returns filters/timeRange — planAnalyticsQuestion layers
+ * reconcileTimeRange's own deterministic timeRange on top of this separately,
+ * and drops whatever filters the model may have guessed (this shape's 7 known
+ * phrasings never need one).
+ */
+export function resolveServiceVisitsOverride(question) {
+  if (!isServiceVisitsQuestion(question)) return null;
+  const op = /\bhow many\b/i.test(String(question ?? '')) ? 'count' : 'list';
+  return { entity: 'serviceVisits', op };
 }
 
 /** "August 2026" from a validated plan's {from: '2026-08', to: '2026-08'} —
@@ -1244,8 +1341,29 @@ export function buildAnalyticsSQL(plan) {
   // no single row here carries both service_date and technician, so this returns
   // the base set (service_date rows); the executor runs a second, identically
   // shaped query for field_key = 'technician' and joins by document_id itself.
+  //
+  // Live miss (2026-09-21, "which units had service this month"): a bare
+  // service_date row names no unit or customer at all — "which units/
+  // customers had service this month" had nothing to list. Two cheap
+  // correlated scalar subqueries, both tenant-scoped identically to the outer
+  // query and to the documents branch's own service_date lookup above: the
+  // document's linked CUSTOMER entity (via document_entity_links — a document
+  // can link to a customer and/or equipment entity; entity_type = 'customer'
+  // picks only the customer one, so a document also linked to an equipment
+  // entity can never fan this out into two rows) for the customer's name, and
+  // the document's own 'model' extraction for the unit. Most-recent-row-wins
+  // (ORDER BY ... DESC LIMIT 1) on both, same idiom as service_date itself.
   return {
-    sql: `SELECT x.document_id, x.value, x.confidence, x.stage
+    sql: `SELECT x.document_id, x.value, x.confidence, x.stage,
+                 (SELECT c.data->>'customer_name'
+                    FROM document_entity_links l
+                    JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer'
+                                   AND c.merged_into IS NULL AND c.${TENANT_SQL}
+                   WHERE l.document_id = x.document_id AND l.${TENANT_SQL}
+                   ORDER BY l.created_at DESC LIMIT 1) AS customer_name,
+                 (SELECT m.value FROM extractions m
+                   WHERE m.document_id = x.document_id AND m.field_key = 'model' AND m.${TENANT_SQL}
+                   ORDER BY m.created_at DESC LIMIT 1) AS model
             FROM extractions x
            WHERE x.field_key = 'service_date' AND ${TENANT_SQL}
            ORDER BY x.value DESC
@@ -1291,6 +1409,25 @@ const GROUP_LABEL = {
   city: 'city', county: 'county', state: 'state', zip: 'ZIP', brand: 'brand',
   documentType: 'document type', month: 'month', technician: 'technician', warrantyStatus: 'warranty status',
 };
+
+/** "September 3, 2026" from a YYYY-MM-DD service_date value, "September 2026"
+ *  from a bare YYYY-MM one, or the raw string as a last resort — used only by
+ *  the serviceVisits zero-result wording below. Never throws on a garbled
+ *  value; it just falls back to printing whatever was there. */
+function formatServiceDateLabel(rawDate) {
+  const s = String(rawDate ?? '').trim();
+  const full = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (full) {
+    const idx = Number(full[2]) - 1;
+    if (idx >= 0 && idx <= 11) return `${MONTH_LABELS[idx]} ${Number(full[3])}, ${full[1]}`;
+  }
+  const monthOnly = /^(\d{4})-(\d{2})$/.exec(s);
+  if (monthOnly) {
+    const idx = Number(monthOnly[2]) - 1;
+    if (idx >= 0 && idx <= 11) return `${MONTH_LABELS[idx]} ${monthOnly[1]}`;
+  }
+  return s || 'an unknown date';
+}
 
 /** Cap on how many groupBy/list rows go into `facts` — the client's "compact
  *  table" (see AnswerCard/FactGrid). Anything past this is summarized in
@@ -1348,7 +1485,10 @@ function brandFactLabel(entity, filters) {
 }
 
 export function formatAnalyticsAnswer(plan, opts) {
-  const { total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null } = opts ?? {};
+  const {
+    total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null,
+    mostRecentServiceVisit,
+  } = opts ?? {};
   const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
 
   // "who's our biggest customer" (round 4, item 1) — a ranked list, not a
@@ -1364,6 +1504,29 @@ export function formatAnalyticsAnswer(plan, opts) {
       facts: rows.map((r) => ({ label: r.label, value: r.value ?? '—', entityId: r.entityId, sources: [] })),
       sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     };
+  }
+
+  // Zero-result wording for a timeRange'd serviceVisits question (2026-09-21
+  // "which units had service this month" cluster): the owner's account
+  // genuinely has zero service visits in the asked-about range, and a bare
+  // "0 service visits match that" (or, worse, a fall-through to retrieval's
+  // "Nothing in your records answers that") is technically true but useless.
+  // An honest zero needs the same kind of context the geo ambiguity rule
+  // below gives a named filter that matched nothing: when the most recent
+  // visit actually WAS. mostRecentServiceVisit is only ever passed for entity
+  // 'serviceVisits' (see executeAnalyticsPlan, routes/analytics.js) — null
+  // means the tenant has no service visits on file at all, ever; an object
+  // names the single most recent one (rows are already fetched sorted DESC by
+  // date, so this costs no extra query).
+  if (plan.entity === 'serviceVisits' && plan.timeRange && total === 0 && mostRecentServiceVisit !== undefined) {
+    const monthLabel = monthRangeLabel(plan.timeRange);
+    const scope = monthLabel ? ` in ${monthLabel}` : '';
+    const text = mostRecentServiceVisit
+      ? `No service visits${scope}. The most recent one on file is ` +
+        `${formatServiceDateLabel(mostRecentServiceVisit.date)}` +
+        `${mostRecentServiceVisit.customer ? ` (${mostRecentServiceVisit.customer})` : ''}.`
+      : 'No service visits on file yet.';
+    return { kind: 'answer', text, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
   }
 
   // ---- ambiguity rule (design point 5): a named filter matched zero rows,

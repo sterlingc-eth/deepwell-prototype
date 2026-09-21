@@ -73,6 +73,18 @@ const EXTRA_DOMAIN_WORDS = [
   // vocabulary is built from, so a typo'd "reevnue" or "overde" had nothing
   // to fuzzy-correct back to.
   'billed', 'revenue', 'overdue', 'maintenance',
+  // Live miss ("which units had service this month", 2026-09-21): "serviced"
+  // is a real, correctly-spelled word (past tense of "service"), never a typo
+  // of "service" — but at 8 letters, one edit-distance-1 deletion away from
+  // the 7-letter "service" already in this vocabulary (via ENTITY_SYNONYMS'
+  // "service visit"/"service call"), it was getting silently "corrected" to
+  // "service" by fuzzyCorrect below every time, on every question that used
+  // it. Harmless for classification itself (every consumer of "service(d)"
+  // text — analytics.js's SERVICE_VISITS_OVERRIDE_RE included — matches both
+  // spellings on purpose, see that regex's own doc comment) but still a
+  // needless, surprising rewrite of a real word; keeping "serviced" in vocab
+  // stops fuzzyCorrect from ever touching it in the first place.
+  'serviced',
 ];
 
 function buildVocab() {

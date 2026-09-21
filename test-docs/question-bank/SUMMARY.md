@@ -1,10 +1,10 @@
 # Question bank summary
 
-Generated: 2026-09-21T20:30:50.664Z
+Generated: 2026-09-21T22:38:24.037Z
 
-- Base questions: 403
+- Base questions: 410
 - Variants per base: 8
-- Total entries: 3224
+- Total entries: 3280
 
 ## Per category
 
@@ -20,6 +20,7 @@ Generated: 2026-09-21T20:30:50.664Z
 | history | 240 |
 | lists | 152 |
 | live-misses-2026-09-21 | 160 |
+| live-misses-2026-09-21b | 56 |
 | lookups | 1288 |
 | maintenance-due | 24 |
 | money | 48 |
@@ -31,11 +32,11 @@ Generated: 2026-09-21T20:30:50.664Z
 
 | variant | entries |
 |---|---|
-| abbreviated | 403 |
-| canonical | 403 |
-| filler-prefix | 403 |
-| lowercase-no-punct | 403 |
-| statement-form | 403 |
-| trailing-context | 403 |
-| typo | 403 |
-| voice-style | 403 |
+| abbreviated | 410 |
+| canonical | 410 |
+| filler-prefix | 410 |
+| lowercase-no-punct | 410 |
+| statement-form | 410 |
+| trailing-context | 410 |
+| typo | 410 |
+| voice-style | 410 |

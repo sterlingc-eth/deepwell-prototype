@@ -22,6 +22,7 @@ import {
   analyticsPlanHash,
   suspiciousUnfilteredCustomerPlan,
   reconcileTimeRange,
+  resolveServiceVisitsOverride,
   missingConditions,
   detectedConditions,
   unsupportedConditionAnswer,
@@ -76,6 +77,19 @@ export async function planAnalyticsQuestion(question, { today } = {}) {
     );
     const toolUse = response.content.find((b) => b.type === 'tool_use');
     const rawInput = toolUse?.input;
+    // Live miss (2026-09-21, "which units had service this month"): a
+    // "<units/equipment/customers> <had/got/were> service(d)" / "<did/do> we
+    // service" / "service call(s)" shape forces entity 'serviceVisits' and a
+    // deterministic op, exactly like reconcileTimeRange below forces
+    // timeRange — see resolveServiceVisitsOverride's own doc comment for why
+    // this can never depend on the model choosing the entity correctly.
+    // Filters are dropped when this fires: none of the known phrasings need
+    // one, and a stray model filter for the WRONG entity (customers/
+    // equipment) would otherwise reject the whole plan downstream.
+    const serviceVisitsOverride = resolveServiceVisitsOverride(question);
+    const base = serviceVisitsOverride
+      ? { ...(rawInput ?? {}), ...serviceVisitsOverride, filters: [] }
+      : rawInput;
     // Item 1 (2026-09-21 live miss) + round 5 item 2: a literal month name/
     // "this month"/"last month" phrase in the QUESTION overrides whatever
     // timeRange the model filled in, computed deterministically from `today`
@@ -83,7 +97,7 @@ export async function planAnalyticsQuestion(question, { today } = {}) {
     // question itself actually wrote out (reconcileTimeRange, analytics.js) —
     // see that function's own doc comment for why the model's date math is
     // not trusted by default, and when it is trusted anyway.
-    const input = rawInput ? { ...rawInput, timeRange: reconcileTimeRange(rawInput.timeRange, question, today) } : rawInput;
+    const input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
     return validatePlan(input);
   } catch (err) {
     console.error('Analytics planner failed, falling through:', err?.message);
@@ -357,6 +371,11 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
     plan.entity === 'customers' && (plan.filters ?? []).some((f) => EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN.has(f.field));
 
   let rows;
+  // Set only in the serviceVisits branch below, from the SAME already-fetched
+  // (and already DESC-by-date-sorted) rows — never a second query — see
+  // formatAnalyticsAnswer's own doc comment for how this powers the honest
+  // zero-result wording ("which units had service this month" live miss).
+  let mostRecentServiceVisit;
   if (hasEquipmentJoinFilter) {
     // Gaps 1 + 3: "which customers have Trane units" — a customer filtered
     // by an equipment-level attribute. queryCustomersByEquipmentFilter already
@@ -387,7 +406,10 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
     // serviceVisits: service_date + technician are two different
     // extractions.field_key rows for the same document — fetched separately
     // and merged here, tenant-scoped identically to buildAnalyticsSQL's own
-    // service_date query.
+    // service_date query. customer_name/model now come back ON the
+    // service_date row itself (buildAnalyticsSQL's own correlated
+    // subqueries) — see that function's own doc comment ("which units had
+    // service this month" live miss).
     const { sql, params } = buildAnalyticsSQL(plan);
     const [{ rows: dateRows }, { rows: techRows }] = await Promise.all([
       db.raw(sql, params),
@@ -399,19 +421,43 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
       ),
     ]);
     const techByDoc = new Map(techRows.map((r) => [r.document_id, r.value]));
-    rows = dateRows.map((r) => ({
-      id: r.document_id, label: techByDoc.get(r.document_id) || 'Unassigned',
-      value: r.value, entityId: undefined,
+    const allServiceVisitRows = dateRows.map((r) => ({
+      id: r.document_id,
+      label: r.customer_name || techByDoc.get(r.document_id) || 'Unassigned',
+      // "brand/model · date" when a unit's model was extracted, else just the
+      // date — the row's own raw date lives separately in `date` so the
+      // timeRange filter below (and the zero-result "most recent" wording)
+      // never has to parse this display string back apart.
+      value: [r.model, r.value].filter(Boolean).join(' · ') || r.value,
+      date: r.value, entityId: undefined,
       technician: techByDoc.get(r.document_id) ?? null,
+      customerName: r.customer_name ?? null,
+      model: r.model ?? null,
       month: /^\d{4}-\d{2}/.test(r.value ?? '') ? r.value.slice(0, 7) : null,
     }));
-    if (plan.timeRange) {
-      rows = rows.filter((r) => {
-        if (plan.timeRange.from && (r.value ?? '') < plan.timeRange.from) return false;
-        if (plan.timeRange.to && (r.value ?? '') > plan.timeRange.to) return false;
-        return true;
-      });
-    }
+    // buildAnalyticsSQL's own query is `ORDER BY x.value DESC`, so the first
+    // row (if any) is already the single most recent service visit on file,
+    // regardless of what plan.timeRange narrows it to below — no second
+    // query needed.
+    mostRecentServiceVisit = allServiceVisitRows.length
+      ? { date: allServiceVisitRows[0].date, customer: allServiceVisitRows[0].customerName || null }
+      : null;
+    // Reviewer NO-GO (2026-09-21, "which units had service this month" live
+    // miss): comparing the full YYYY-MM-DD date directly against a YYYY-MM
+    // timeRange bound is a lexicographic trap — '2026-09-10' > '2026-09' is
+    // TRUE (a longer string sharing the shorter one's prefix sorts after it),
+    // so a real September visit was wrongly excluded from its OWN month's
+    // range by the `to` check. Compare on `r.month` (already truncated to
+    // YYYY-MM) against the bound truncated the same way, exactly like the
+    // documents branch above already does — never the raw date against a
+    // bound of a different granularity.
+    rows = plan.timeRange
+      ? allServiceVisitRows.filter((r) => {
+          if (plan.timeRange.from && (r.month ?? '') < plan.timeRange.from.slice(0, 7)) return false;
+          if (plan.timeRange.to && (r.month ?? '') > plan.timeRange.to.slice(0, 7)) return false;
+          return true;
+        })
+      : allServiceVisitRows;
   }
 
   const filtered = applyEntityFilters(rows, plan.filters);
@@ -451,7 +497,7 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
   }
 
   return formatAnalyticsAnswer(plan, {
-    total, groups, rows: filtered, sum, unfilteredTotal, broaderGroups,
+    total, groups, rows: filtered, sum, unfilteredTotal, broaderGroups, mostRecentServiceVisit,
   });
 }
 
@@ -499,10 +545,16 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // so a stale/wrong cached answer can never be returned for them again.
     const conditionsUpFront = detectedConditions(question_n);
     if (conditionsUpFront.has('money')) {
-      return { handled: true, data: moneyFallbackAnswer(), cacheHit: false, modelCalled: false, writes: [] };
+      // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): missOutcome
+      // is api/ask.js's own signal to log this to ask_misses (api/_lib/
+      // missStore.js) — a real answer never sets it, only an honest fallback.
+      return { handled: true, data: moneyFallbackAnswer(), cacheHit: false, modelCalled: false, writes: [], missOutcome: 'money-fallback' };
     }
     if (conditionsUpFront.has('maintenance')) {
-      return { handled: true, data: unsupportedConditionAnswer('maintenance', 'customers'), cacheHit: false, modelCalled: false, writes: [] };
+      return {
+        handled: true, data: unsupportedConditionAnswer('maintenance', 'customers'), cacheHit: false, modelCalled: false, writes: [],
+        missOutcome: 'maintenance-fallback',
+      };
     }
 
     // ---- Tier 1: exact question text, checked BEFORE the Haiku call -------
@@ -543,7 +595,10 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     const missing = missingConditions(plan, question_n);
     if (missing.size > 0) {
       const [condition] = missing;
-      return { handled: true, data: unsupportedConditionAnswer(condition, plan.entity), cacheHit: false, modelCalled: true, writes: [] };
+      return {
+        handled: true, data: unsupportedConditionAnswer(condition, plan.entity), cacheHit: false, modelCalled: true, writes: [],
+        missOutcome: 'unsupported-condition', missMeta: { condition, plan },
+      };
     }
 
     // ---- Tier 2: the plan itself, checked once the plan is known ----------

@@ -26768,6 +26768,846 @@
     }
   },
   {
+    "id": "live-misses-2026-09-21b-0001-abbreviated",
+    "base": "Which units had services this month?",
+    "text": "which units had services this mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-canonical",
+    "base": "Which units had services this month?",
+    "text": "Which units had services this month?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-filler-prefix",
+    "base": "Which units had services this month?",
+    "text": "quick question, which units had services this month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-lowercase-no-punct",
+    "base": "Which units had services this month?",
+    "text": "which units had services this month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-statement-form",
+    "base": "Which units had services this month?",
+    "text": "pull up which units had services this month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-trailing-context",
+    "base": "Which units had services this month?",
+    "text": "Which units had services this month so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-typo",
+    "base": "Which units had services this month?",
+    "text": "which units had sservices this month",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0001-voice-style",
+    "base": "Which units had services this month?",
+    "text": "which units had services this month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-abbreviated",
+    "base": "What units were serviced this month?",
+    "text": "what units were serviced this mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-canonical",
+    "base": "What units were serviced this month?",
+    "text": "What units were serviced this month?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-filler-prefix",
+    "base": "What units were serviced this month?",
+    "text": "hey what units were serviced this month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-lowercase-no-punct",
+    "base": "What units were serviced this month?",
+    "text": "what units were serviced this month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-statement-form",
+    "base": "What units were serviced this month?",
+    "text": "list what units were serviced this month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-trailing-context",
+    "base": "What units were serviced this month?",
+    "text": "What units were serviced this month for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-typo",
+    "base": "What units were serviced this month?",
+    "text": "what unitts were serviced this month",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0002-voice-style",
+    "base": "What units were serviced this month?",
+    "text": "what units were serviced this month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-abbreviated",
+    "base": "Which units did we service in September?",
+    "text": "which units did we service in september",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-canonical",
+    "base": "Which units did we service in September?",
+    "text": "Which units did we service in September?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-filler-prefix",
+    "base": "Which units did we service in September?",
+    "text": "can you tell me which units did we service in september",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-lowercase-no-punct",
+    "base": "Which units did we service in September?",
+    "text": "which units did we service in september",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-statement-form",
+    "base": "Which units did we service in September?",
+    "text": "need the which units did we service in september",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-trailing-context",
+    "base": "Which units did we service in September?",
+    "text": "Which units did we service in September so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-typo",
+    "base": "Which units did we service in September?",
+    "text": "which units did we service in septeber",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0003-voice-style",
+    "base": "Which units did we service in September?",
+    "text": "which units did we service in september",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-abbreviated",
+    "base": "List the units we serviced last month",
+    "text": "list the units we serviced last mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-canonical",
+    "base": "List the units we serviced last month",
+    "text": "List the units we serviced last month",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-filler-prefix",
+    "base": "List the units we serviced last month",
+    "text": "real quick, list the units we serviced last month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-lowercase-no-punct",
+    "base": "List the units we serviced last month",
+    "text": "list the units we serviced last month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-statement-form",
+    "base": "List the units we serviced last month",
+    "text": "show me list the units we serviced last month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-trailing-context",
+    "base": "List the units we serviced last month",
+    "text": "List the units we serviced last month for the newsletter",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-typo",
+    "base": "List the units we serviced last month",
+    "text": "list the units we serviced last mooth",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0004-voice-style",
+    "base": "List the units we serviced last month",
+    "text": "list the units we serviced last month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-08",
+        "to": "2026-08"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-abbreviated",
+    "base": "What equipment got serviced this month?",
+    "text": "what equipment got serviced this mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-canonical",
+    "base": "What equipment got serviced this month?",
+    "text": "What equipment got serviced this month?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-filler-prefix",
+    "base": "What equipment got serviced this month?",
+    "text": "could you what equipment got serviced this month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-lowercase-no-punct",
+    "base": "What equipment got serviced this month?",
+    "text": "what equipment got serviced this month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-statement-form",
+    "base": "What equipment got serviced this month?",
+    "text": "pull up what equipment got serviced this month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-trailing-context",
+    "base": "What equipment got serviced this month?",
+    "text": "What equipment got serviced this month before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-typo",
+    "base": "What equipment got serviced this month?",
+    "text": "what equipment got serviced this moth",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0005-voice-style",
+    "base": "What equipment got serviced this month?",
+    "text": "what equipment got serviced this month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-abbreviated",
+    "base": "Which customers did we service this month?",
+    "text": "which custs did we service this mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-canonical",
+    "base": "Which customers did we service this month?",
+    "text": "Which customers did we service this month?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-filler-prefix",
+    "base": "Which customers did we service this month?",
+    "text": "i need to know which customers did we service this month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-lowercase-no-punct",
+    "base": "Which customers did we service this month?",
+    "text": "which customers did we service this month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-statement-form",
+    "base": "Which customers did we service this month?",
+    "text": "list which customers did we service this month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-trailing-context",
+    "base": "Which customers did we service this month?",
+    "text": "Which customers did we service this month so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-typo",
+    "base": "Which customers did we service this month?",
+    "text": "whch customers did we service this month",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0006-voice-style",
+    "base": "Which customers did we service this month?",
+    "text": "which customers did we service this month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-abbreviated",
+    "base": "How many service calls this month?",
+    "text": "how many service calls this mo",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-canonical",
+    "base": "How many service calls this month?",
+    "text": "How many service calls this month?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-filler-prefix",
+    "base": "How many service calls this month?",
+    "text": "can you tell me how many service calls this month",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-lowercase-no-punct",
+    "base": "How many service calls this month?",
+    "text": "how many service calls this month",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-statement-form",
+    "base": "How many service calls this month?",
+    "text": "need the how many service calls this month",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-trailing-context",
+    "base": "How many service calls this month?",
+    "text": "How many service calls this month for the newsletter",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-typo",
+    "base": "How many service calls this month?",
+    "text": "how many service caalls this month",
+    "variant": "typo",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
+    "id": "live-misses-2026-09-21b-0007-voice-style",
+    "base": "How many service calls this month?",
+    "text": "how many service calls this month",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-21b",
+    "expect": {
+      "route": "analytics",
+      "entity": "serviceVisits",
+      "timeRange": {
+        "from": "2026-09",
+        "to": "2026-09"
+      }
+    }
+  },
+  {
     "id": "lookups-0001-abbreviated",
     "base": "What's the serial number of the unit at 100 E Main St, Mesa, AZ 85201?",
     "text": "what's the serial number of the unit at 100 e main st, mesa, az 85201",

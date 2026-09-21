@@ -495,6 +495,38 @@ for (const { q, expect } of LIVE_MISSES_2026_09_21) {
   add('live-misses-2026-09-21', q, expect);
 }
 
+/* ============================================================ live miss:
+ * "which units had services this month" (2026-09-21) — the owner asked
+ * Donovan this live and got no answer at all. Root cause: entity choice for
+ * a "did this get serviced" question was left to the model, which either
+ * picked equipment/customers (neither carries a service_date column, so the
+ * plan's own timeRange was silently ignored downstream) or produced a plan
+ * validatePlan/the executor rejected outright, falling all the way through to
+ * retrieval's "Nothing in your records answers that" — a wrong answer, since
+ * this tenant's synthetic data has zero service visits in September 2026 and
+ * the honest answer is a real zero WITH context, never "nothing answers that".
+ * Fixed with a deterministic entity/op override (resolveServiceVisitsOverride,
+ * analytics.js) that never depends on the model recognizing this shape —
+ * see that function's own doc comment. Every phrasing here expects entity
+ * 'serviceVisits' and a timeRange resolveQuestionTimeRange itself would
+ * compute for the same text (verify-question-bank.mjs checks the timeRange
+ * expectation directly with no model call; the override/entity choice itself
+ * is checked in scripts/verify-analytics.mjs, which the bank has no way to
+ * exercise with no database).
+ */
+const LIVE_MISSES_2026_09_21b = [
+  { q: 'Which units had services this month?', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } } },
+  { q: 'What units were serviced this month?', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } } },
+  { q: 'Which units did we service in September?', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } } },
+  { q: 'List the units we serviced last month', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-08', to: '2026-08' } } },
+  { q: 'What equipment got serviced this month?', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } } },
+  { q: 'Which customers did we service this month?', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } } },
+  { q: 'How many service calls this month?', expect: { route: 'analytics', entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } } },
+];
+for (const { q, expect } of LIVE_MISSES_2026_09_21b) {
+  add('live-misses-2026-09-21b', q, expect);
+}
+
 /* ============================================================ expand into the bank */
 
 const catSlug = (c) => c.replace(/[^a-z0-9]+/gi, '-').toLowerCase();

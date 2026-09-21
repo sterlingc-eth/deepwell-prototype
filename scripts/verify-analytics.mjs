@@ -65,6 +65,8 @@ import {
   resolveQuestionTimeRange,
   reconcileTimeRange,
   monthRangeLabel,
+  isServiceVisitsQuestion,
+  resolveServiceVisitsOverride,
   detectedConditions,
   missingConditions,
   unsupportedConditionAnswer,
@@ -79,6 +81,7 @@ import { hashQuestion, normalizeQuestion } from '../api/ask.js';
 import { parseContactLookupQuestion, fuzzyNameMatches, nameTokens, buildContactAnswer, buildAmbiguousContactAnswer } from '../api/_lib/contactLookup.js';
 import { extractStreetTokens, correctStreetTypos } from '../api/_lib/streetVocab.js';
 import { insertAskMiss } from '../api/_lib/missStore.js';
+import { normalizeQuestion as normalizeQuestionNL } from '../api/_lib/nlNormalize.js';
 
 let failures = 0;
 let count = 0;
@@ -1278,6 +1281,150 @@ check('ANALYTICS_SYSTEM_PROMPT ends with the few-shot block (stable prefix first
   const okDb = { raw: async (sql) => { calls2.push(sql); } };
   await insertAskMiss(okDb, { question: 'x', outcome: 'no-answer' });
   check('insertAskMiss releases the SAVEPOINT on success', calls2.some((c) => /RELEASE SAVEPOINT ask_miss_insert/.test(c)));
+}
+
+/* ======================================================================
+ * 16. Live miss (2026-09-21) — "which units had service this month". The
+ * owner asked this live and got no answer at all: entity choice for a "did
+ * this get serviced" question was left to the model, and the ONLY entity
+ * whose rows are actually keyed by service_date (serviceVisits) was never
+ * guaranteed to be picked. Covers the deterministic override itself, the
+ * validatePlan acceptance of timeRange on entity serviceVisits, the honest
+ * zero-result wording as a pure function, and the "what" quantifier change
+ * (with 3 negatives pinning looksLikeSingleRecordReference's precedence).
+ * ====================================================================== */
+
+// ---- the deterministic override never depends on the model ----
+const SERVICE_VISITS_LIVE_MISSES = [
+  ['which units had service this month', 'list'],
+  ['what units were serviced this month', 'list'],
+  ['which units did we service in september', 'list'],
+  ['list the units we serviced last month', 'list'],
+  ['what equipment got serviced this month', 'list'],
+  ['which customers did we service this month', 'list'],
+  ['how many service calls this month', 'count'],
+];
+for (const [q, op] of SERVICE_VISITS_LIVE_MISSES) {
+  check(`isServiceVisitsQuestion :: "${q}"`, isServiceVisitsQuestion(q));
+  eq(`resolveServiceVisitsOverride :: "${q}" -> serviceVisits/${op}`, resolveServiceVisitsOverride(q), { entity: 'serviceVisits', op });
+}
+check('resolveServiceVisitsOverride: unrelated question -> null', resolveServiceVisitsOverride('how many customers do we have') === null);
+check('resolveServiceVisitsOverride: never trusts the model\'s op for this shape (always count/list from the text)', resolveServiceVisitsOverride('how many service calls this month').op === 'count');
+
+// ---- validatePlan accepts timeRange on entity serviceVisits ----
+check(
+  'validatePlan: timeRange on entity serviceVisits is accepted',
+  validatePlan({ entity: 'serviceVisits', op: 'list', timeRange: { from: '2026-09', to: '2026-09' } }) !== null
+);
+check(
+  'validatePlan: serviceVisits/count with timeRange is accepted',
+  validatePlan({ entity: 'serviceVisits', op: 'count', timeRange: { from: '2026-09', to: '2026-09' } }) !== null
+);
+
+// ---- zero-result wording is a pure function of formatAnalyticsAnswer ----
+eq(
+  'formatAnalyticsAnswer: serviceVisits zero-in-range names the most recent visit',
+  formatAnalyticsAnswer(
+    { entity: 'serviceVisits', op: 'list', timeRange: { from: '2026-09', to: '2026-09' } },
+    { total: 0, rows: [], mostRecentServiceVisit: { date: '2026-08-12', customer: 'Plaza Dental' } }
+  ).text,
+  'No service visits in September 2026. The most recent one on file is August 12, 2026 (Plaza Dental).'
+);
+eq(
+  'formatAnalyticsAnswer: serviceVisits zero-in-range with no customer on the most recent visit omits the parenthetical',
+  formatAnalyticsAnswer(
+    { entity: 'serviceVisits', op: 'count', timeRange: { from: '2026-09', to: '2026-09' } },
+    { total: 0, mostRecentServiceVisit: { date: '2026-08-12', customer: null } }
+  ).text,
+  'No service visits in September 2026. The most recent one on file is August 12, 2026.'
+);
+eq(
+  'formatAnalyticsAnswer: serviceVisits with nothing on file ever',
+  formatAnalyticsAnswer(
+    { entity: 'serviceVisits', op: 'list', timeRange: { from: '2026-09', to: '2026-09' } },
+    { total: 0, mostRecentServiceVisit: null }
+  ).text,
+  'No service visits on file yet.'
+);
+check(
+  'formatAnalyticsAnswer: non-zero serviceVisits answer is unaffected (no mostRecentServiceVisit branch)',
+  !formatAnalyticsAnswer(
+    { entity: 'serviceVisits', op: 'count', timeRange: { from: '2026-09', to: '2026-09' } },
+    { total: 3, rows: [], mostRecentServiceVisit: { date: '2026-09-05', customer: 'X' } }
+  ).text.startsWith('No service visits')
+);
+
+// ---- end to end against a mock db: honest zero + the customer/model join ----
+{
+  const mockDb = {
+    raw: async (sql) => {
+      if (sql.includes("field_key = 'service_date'")) {
+        return { rows: [{ document_id: 'd1', value: '2026-08-12', confidence: 1, stage: 'x', customer_name: 'Plaza Dental', model: '4TTR4036' }] };
+      }
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({ entity: 'serviceVisits', op: 'list', timeRange: { from: '2026-09', to: '2026-09' } });
+  check('live miss: "which units had service this month" plan validates', plan !== null);
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq(
+    'live miss end to end: honest zero names the most recent visit, never "Nothing in your records answers that"',
+    answer.text,
+    'No service visits in September 2026. The most recent one on file is August 12, 2026 (Plaza Dental).'
+  );
+}
+{
+  const mockDb = { raw: async () => ({ rows: [] }) };
+  const plan = validatePlan({ entity: 'serviceVisits', op: 'count', timeRange: { from: '2026-09', to: '2026-09' } });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('live miss end to end: no service visits on file at all, ever', answer.text, 'No service visits on file yet.');
+}
+{
+  const mockDb = {
+    raw: async (sql) => {
+      if (sql.includes("field_key = 'service_date'")) {
+        return { rows: [{ document_id: 'd1', value: '2026-09-10', customer_name: 'Plaza Dental', model: '4TTR4036' }] };
+      }
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({ entity: 'serviceVisits', op: 'list', timeRange: { from: '2026-09', to: '2026-09' } });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('live miss end to end: a real match names the customer in the row label', answer.facts[0].label, 'Plaza Dental');
+  check('live miss end to end: row detail includes the unit model', answer.facts[0].value.includes('4TTR4036'));
+}
+
+// ---- buildAnalyticsSQL: the customer/model join is real SQL, not silently ignored ----
+{
+  const built = buildAnalyticsSQL({ entity: 'serviceVisits', op: 'list' });
+  check('SQL (serviceVisits): joins the document\'s linked customer entity', built.sql.includes('document_entity_links') && built.sql.includes("entity_type = 'customer'"));
+  check('SQL (serviceVisits): pulls the document\'s own model extraction', built.sql.includes("field_key = 'model'"));
+}
+
+// ---- "what" quantifier change: positives + 3 negatives pinning precedence ----
+for (const q of ['what units were serviced this month', 'what equipment got serviced this month', 'what did we service in september']) {
+  check(`what-quantifier pre-classify (positive) :: "${q}"`, preClassifyAnalytics(q) === true);
+}
+const WHAT_QUANTIFIER_NEGATIVES = [
+  ["what's the serial number at 1234 elm street", 'street-address single record wins over the "what" quantifier'],
+  ["what's the phone number for sandra wyckoff", 'no space after "what" ("what\'s"), and no plural noun/": did we" shape'],
+  ['what customers own serial 4n2119-08772', 'identifier-token single record wins even though "what customers" would otherwise match'],
+];
+for (const [q, why] of WHAT_QUANTIFIER_NEGATIVES) {
+  check(`what-quantifier pre-classify (negative) :: "${q}" (${why})`, preClassifyAnalytics(q) === false);
+}
+
+// ---- nlNormalize: "serviced" is a real word, never fuzzy-"corrected" ----
+{
+  const { normalized } = normalizeQuestionNL('which units had serviced this week');
+  check('normalizeQuestion: "serviced" survives unchanged (kept in vocab, never a typo)', normalized.includes('serviced'));
+}
+
+for (const q of ['what did we do for ramirez', 'what did we charge the smiths last time', 'what did we install at 1234 E Main St']) {
+  check(`WHAT_DID_WE_RE negative :: "${q}" is not analytics`, !preClassifyAnalytics(q));
+}
+for (const q of ['what units did we service this month', 'what customers did we service in august']) {
+  check(`WHAT_DID_WE_RE positive :: "${q}" is analytics`, preClassifyAnalytics(q));
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);
