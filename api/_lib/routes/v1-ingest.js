@@ -2,7 +2,7 @@ import { handleCors } from "../claude.js";
 import { denyAuth } from "../auth.js";
 import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
 import { limit } from "../rateLimit.js";
-import { createUploadUrl, respondUploadError } from "../../upload-url.js";
+import { createUploadUrl, respondUploadError, checkUploadGate } from "../../upload-url.js";
 
 /**
  * POST /api/v1-ingest
@@ -37,6 +37,16 @@ export default async function handler(req, res) {
   }
 
   if (!(await limit(req, res, auth, "ingest"))) return; // 429 already written
+
+  // Same billing gate api/upload-url.js's own handler runs before its
+  // createUploadUrl() call — this route calls createUploadUrl() directly and
+  // was missing it entirely (Reviewer NO-GO, 2026-09-21). Fails OPEN, same as
+  // upload-url.js: a billing lookup error here must never turn into a hard
+  // failure for an already-paying partner integration.
+  const gate = await checkUploadGate(auth);
+  if (!gate.allowed) {
+    return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
+  }
 
   try {
     const { documentId, uploadUrl, alreadyUploaded } = await createUploadUrl(auth, req.body);

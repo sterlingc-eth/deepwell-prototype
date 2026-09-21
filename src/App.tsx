@@ -158,11 +158,20 @@ function App() {
   // it waits for the graph internally and is a no-op without a query string.
   useDeepLink();
 
-  // Billing status backs AppShell's global banner and BillingScreen's own
-  // display — fetched once here (not per-screen) so the banner can show on
-  // any screen, not just Billing. Best-effort: a failed fetch just means no
-  // banner shows this session, never a hard error blocking the app.
+  // Billing status backs AppShell's global banner, BillingScreen's own
+  // display, and — HARD GATE (owner decision, 2026-09-21) — whether this
+  // tenant gets the app at all: a tenant whose status is 'none' or
+  // 'canceled' sees only Billing until they pick a plan (see the render
+  // guards below). Fetched once here (not per-screen). `billingStatusLoaded`
+  // flips true whether the fetch succeeds or fails so a broken endpoint
+  // can't hang the app on the blank/busy screen forever — a failed fetch
+  // just means `billingStatus` stays null, which the gate below treats as
+  // "not gated" (fails open, same best-effort spirit as the banner always
+  // had).
+  const billingStatus = useAppStore((s) => s.billingStatus);
   const setBillingStatus = useAppStore((s) => s.setBillingStatus);
+  const setBillingConfirming = useAppStore((s) => s.setBillingConfirming);
+  const [billingStatusLoaded, setBillingStatusLoaded] = useState(false);
   useEffect(() => {
     if (DEMO_MODE || !isSignedIn || !orgId) return;
     let cancelled = false;
@@ -173,6 +182,9 @@ function App() {
       })
       .catch(() => {
         /* best effort — see comment above */
+      })
+      .finally(() => {
+        if (!cancelled) setBillingStatusLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -197,10 +209,42 @@ function App() {
     const url = new URL(window.location.href);
     url.search = params.toString();
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-    if (billing === 'success' && !DEMO_MODE) {
-      void billingClient.status().then(setBillingStatus).catch(() => {});
-    }
-  }, [setBillingStatus]);
+    if (billing !== 'success' || DEMO_MODE) return;
+
+    // The webhook that actually flips billing_status away from 'none' can
+    // land a beat after Checkout's redirect — a single refetch here would
+    // often still show 'none' and re-trap the person behind the hard gate
+    // for a few seconds. Poll instead: every 3s for up to 60s, until the
+    // status is no longer 'none' (or we give up — a reload/"Manage billing"
+    // still works after that). `billingConfirming` drives BillingScreen's
+    // "Confirming your subscription…" state while this runs.
+    let cancelled = false;
+    setBillingConfirming(true);
+    const deadline = Date.now() + 60_000;
+    const poll = () => {
+      void billingClient
+        .status()
+        .then((s) => {
+          if (cancelled) return;
+          setBillingStatus(s);
+          if (s.status !== 'none') {
+            setBillingConfirming(false);
+            return;
+          }
+          if (Date.now() < deadline) window.setTimeout(poll, 3000);
+          else setBillingConfirming(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (Date.now() < deadline) window.setTimeout(poll, 3000);
+          else setBillingConfirming(false);
+        });
+    };
+    poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [setBillingStatus, setBillingConfirming]);
 
   // Server-side pipeline polling behind the header's "Processing N of M…"
   // pill (store/appStore.ts's selectIngestProgress). Lives here — mounted for
@@ -271,16 +315,42 @@ function App() {
     return <OnboardingScreen />;
   }
 
+  // HARD GATE (owner decision, 2026-09-21): don't decide "full app or
+  // paywall" until billing status has actually loaded once — same blank/busy
+  // treatment as the auth guard above, so a never-subscribed tenant never
+  // sees the real app flash before the gate below yanks it away.
+  if (!DEMO_MODE && !billingStatusLoaded) {
+    return <div className="min-h-screen bg-bg" aria-busy="true" />;
+  }
+
+  // A tenant with no active subscription — never subscribed ('none') or a
+  // canceled one — gets ONLY Billing (plus Team/Sign out in AppShell's nav)
+  // until they pick a plan. No free preview any more; api/_lib/plan.js's
+  // FREE_PREVIEW_DOCUMENTS enforces the same rule server-side on upload/ask
+  // so this is UI convenience, not the actual security boundary.
+  // `billingStatus` staying null (never fetched, or the fetch failed) fails
+  // OPEN — consistent with the banner's existing best-effort handling above.
+  const billingGateActive = !DEMO_MODE && !!billingStatus && (billingStatus.status === 'none' || billingStatus.status === 'canceled');
+
   // Block on real data the same way we already block on auth: a screen
   // rendered mid-fetch would show zero documents for a beat and look exactly
   // like a fake "empty tenant", which is the one thing this bridge must never
   // do. Demo mode skips this — `sync` never leaves 'idle' there, and the
   // fixture bootstrap in main.tsx already ran synchronously before render.
-  if (!DEMO_MODE && (sync.status === 'idle' || sync.status === 'loading')) {
+  // Skipped while the billing gate is active — a gated tenant never sees
+  // synced document data, so there's nothing worth waiting on here.
+  if (!billingGateActive && !DEMO_MODE && (sync.status === 'idle' || sync.status === 'loading')) {
     return <div className="min-h-screen bg-bg" aria-busy="true" />;
   }
 
   const screen = (() => {
+    // Gated: only Billing and Team (matching AppShell's restricted nav) are
+    // reachable — anything else (including the 'ask' default) falls back to
+    // Billing rather than rendering a screen full of data this tenant can't
+    // have yet.
+    if (billingGateActive) {
+      return currentScreen === 'team' ? <TeamScreen /> : <BillingScreen />;
+    }
     switch (currentScreen) {
       case 'ask':
         return <AskScreen />;

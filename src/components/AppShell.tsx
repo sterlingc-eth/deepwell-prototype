@@ -46,6 +46,18 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const { orgRole } = useAuth();
   const isAdmin = isAdminRole(orgRole ?? null);
 
+  // HARD GATE (owner decision, 2026-09-21): a tenant App.tsx has routed into
+  // the paywall (billingStatus 'none' or 'canceled') gets a stripped-down
+  // shell here too — no Ask/Dashboard/Inbox/Records nav, no ingest pill, no
+  // notifications, no billing banner (BillingScreen already says it all) —
+  // just the brand mark, Billing, Team (admin-only, unchanged), field mode,
+  // the org switcher (so a person in more than one shop can switch to one
+  // that IS subscribed without signing all the way out), and Sign out. Derived
+  // straight from the store rather than a prop so every screen App.tsx can
+  // render while gated (Billing, Team) gets the same restricted shell for
+  // free.
+  const billingGateActive = !!billingStatus && (billingStatus.status === 'none' || billingStatus.status === 'canceled');
+
   // The one-line sub-bar shown below `sm`, so a phone-width session always
   // has a legible label for the active screen instead of relying on the
   // underline-only active state in the icon-only nav row above it.
@@ -68,7 +80,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             <Wordmark />
           </button>
 
-          {ingestProgress && (
+          {!billingGateActive && ingestProgress && (
             <button
               type="button"
               onClick={() => setCurrentScreen('ingest')}
@@ -81,44 +93,54 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             </button>
           )}
 
-          <nav aria-label="Primary" className="ml-auto flex items-center gap-0.5 sm:gap-1">
-            {NAV.map(({ screen, label, icon: Icon, matches }) => {
-              const active = matches.includes(currentScreen);
-              return (
-                <button
-                  key={screen}
-                  type="button"
-                  onClick={() => setCurrentScreen(screen)}
-                  aria-current={active ? 'page' : undefined}
-                  className={[
-                    'inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 sm:px-3 rounded-md text-body-lg font-medium transition-colors duration-quick whitespace-nowrap focus-visible:outline-brass-300',
-                    active
-                      ? 'text-stone-0 shadow-[inset_0_-2px_0_0_#C99C5C]'
-                      : 'text-forest-100 hover:text-stone-0 hover:bg-forest-800',
-                  ].join(' ')}
-                >
-                  <Icon className="w-[18px] h-[18px]" active={active} />
-                  <span className="hidden sm:inline">{label}</span>
-                  <span className="sr-only sm:hidden">{label}</span>
-                </button>
-              );
-            })}
-          </nav>
+          {!billingGateActive && (
+            <nav aria-label="Primary" className="ml-auto flex items-center gap-0.5 sm:gap-1">
+              {NAV.map(({ screen, label, icon: Icon, matches }) => {
+                const active = matches.includes(currentScreen);
+                return (
+                  <button
+                    key={screen}
+                    type="button"
+                    onClick={() => setCurrentScreen(screen)}
+                    aria-current={active ? 'page' : undefined}
+                    className={[
+                      'inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 sm:px-3 rounded-md text-body-lg font-medium transition-colors duration-quick whitespace-nowrap focus-visible:outline-brass-300',
+                      active
+                        ? 'text-stone-0 shadow-[inset_0_-2px_0_0_#C99C5C]'
+                        : 'text-forest-100 hover:text-stone-0 hover:bg-forest-800',
+                    ].join(' ')}
+                  >
+                    <Icon className="w-[18px] h-[18px]" active={active} />
+                    <span className="hidden sm:inline">{label}</span>
+                    <span className="sr-only sm:hidden">{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
 
           {/* "Website" (the marketing site) is not a task inside the product
               for a signed-in user, so it lives in the footer, not this row —
               see the footer below. */}
 
-          {/* Bell, next to Billing — see NotificationsPanel.tsx. */}
-          <NotificationsPanel />
+          {/* Bell, next to Billing — see NotificationsPanel.tsx. Hidden while
+              gated: notifications reference records a paywalled tenant has
+              no access to. */}
+          {!billingGateActive && <NotificationsPanel />}
 
           {/* Billing lives in the account area, not the primary nav — it's
-              not one of the four destinations NAV enumerates above. */}
+              not one of the four destinations NAV enumerates above.
+              Pushed to the far right with ml-auto when the primary nav
+              above it is hidden (gated), same as it would sit after NAV
+              otherwise. */}
           <button
             type="button"
             onClick={() => setCurrentScreen('billing')}
             aria-current={currentScreen === 'billing' ? 'page' : undefined}
-            className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
+            className={[
+              'inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300',
+              billingGateActive ? 'ml-auto' : '',
+            ].join(' ')}
           >
             <CreditCard className="w-5 h-5" aria-hidden="true" />
             <span className="hidden md:inline text-body">Billing</span>
@@ -189,10 +211,11 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
         </div>
       )}
 
-      {/* Global billing banner: trial countdown, a failed payment, or a
-          never-subscribed tenant that's used up its free preview. Hidden on
-          Billing itself — the person is already looking at the answer. */}
-      {banner && currentScreen !== 'billing' && (
+      {/* Global billing banner: trial countdown or a failed payment. Hidden
+          on Billing itself (the person is already looking at the answer)
+          and while the hard gate is active — BillingScreen's own gated
+          headline already says everything this banner would. */}
+      {banner && currentScreen !== 'billing' && !billingGateActive && (
         <button
           type="button"
           onClick={() => setCurrentScreen('billing')}

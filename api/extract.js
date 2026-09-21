@@ -7,6 +7,7 @@ import { extractDocumentFields, EXTRACT_MODEL, splitExtractPrompt } from "./_lib
 import { sniffMagicBytes } from "./_lib/readDocument.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
+import { assertActiveBilling } from "./_lib/plan.js";
 import { recordModelCall } from "./_lib/usage.js";
 import { withCache, modelCallLogLine } from "./_lib/promptCache.js";
 
@@ -50,6 +51,18 @@ export default async function handler(req, res) {
   }
 
   if (!(await limit(req, res, auth, "ingest"))) return; // 429 already written
+
+  // HARD GATE (Reviewer NO-GO, 2026-09-21): checked once, here, before
+  // either path below — the stored-document path (extractDocumentFields,
+  // gated internally by assertModelBudget in extractDocument.js, shared with
+  // the Inngest worker) and the photographed-plate path (extractFromImage's
+  // own direct assertModelBudget call) both spend a real Anthropic-billed
+  // model call, and neither should run for a tenant with no active
+  // subscription. Fails CLOSED — see assertActiveBilling's own doc comment.
+  const billingGate = await assertActiveBilling({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId });
+  if (!billingGate.allowed) {
+    return handleCors(res, req).status(billingGate.status).json({ error: billingGate.error, ...(billingGate.url ? { url: billingGate.url } : {}) });
+  }
 
   const { documentId, imageData, mediaType, documentType } = req.body ?? {};
 

@@ -54,6 +54,16 @@ export function BillingScreen() {
   const setBillingStatus = useAppStore((s) => s.setBillingStatus);
   const pendingPlan = useAppStore((s) => s.pendingPlan);
   const clearPendingPlan = useAppStore((s) => s.clearPendingPlan);
+  // HARD GATE (owner decision, 2026-09-21): App.tsx renders this screen
+  // itself, with nothing to switch to, whenever billingStatus is 'none' or
+  // 'canceled' — this component derives the same condition from the store
+  // rather than taking a prop, so it reads correctly both there and when
+  // opened normally from the nav (e.g. an active-plan tenant just checking
+  // their usage, where this is always false).
+  const gated = !!status && (status.status === 'none' || status.status === 'canceled');
+  // Set by App.tsx's ?billing=success poll while it waits for Stripe's
+  // webhook to land — see App.tsx and store/appStore.ts's billingConfirming.
+  const confirming = useAppStore((s) => s.billingConfirming);
 
   const [interval, setInterval] = useState<BillingInterval>(pendingPlan?.interval ?? 'month');
   const [busy, setBusy] = useState<Busy>(null);
@@ -111,75 +121,111 @@ export function BillingScreen() {
     <AppShell>
       <div className="space-y-8 max-w-3xl mx-auto">
         <header>
-          <h1 className="text-h1">Billing</h1>
-          <p className="text-ink-2 mt-1">Your DeepWell plan, trial, and usage.</p>
+          <h1 className="text-h1">{gated ? 'Pick a plan to open your account' : 'Billing'}</h1>
+          <p className="text-ink-2 mt-1">
+            {gated ? 'Start your 30-day Solo trial, or choose a plan below, to unlock DeepWell.' : 'Your DeepWell plan, trial, and usage.'}
+          </p>
         </header>
 
-        <section className="dw-card p-5 space-y-4" aria-labelledby="current-plan-heading">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="current-plan-heading" className="text-h3">
-              Current plan
-            </h2>
-            {loadingStatus ? (
-              <Loader2 className="w-4 h-4 animate-spin text-ink-3" aria-hidden="true" />
-            ) : (
-              <span className={STATUS_PILL[status?.status ?? 'none']}>{STATUS_LABEL[status?.status ?? 'none']}</span>
-            )}
+        {confirming && (
+          <div role="status" className="dw-card p-5 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-ink-3" aria-hidden="true" />
+            <p>Confirming your subscription…</p>
           </div>
+        )}
 
-          <p className="text-body">
-            {status?.plan ? PLAN_CATALOG[status.plan]?.name ?? status.plan : 'No plan selected yet — try 3 documents free, no card required.'}
-            {status?.status === 'trialing' && trialDaysLeft != null && (
-              <> — trial ends in {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'}.</>
-            )}
-            {status?.cancelAtPeriodEnd && status.currentPeriodEnd && <> Ends {new Date(status.currentPeriodEnd).toLocaleDateString()}.</>}
+        {actionError && (
+          <p role="alert" className="dw-pill-warn inline-flex items-start gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" /> {actionError}
           </p>
+        )}
 
-          {status?.plan && (
-            <dl className="grid grid-cols-3 gap-3 text-body">
-              <div>
-                <dt className="text-caption text-ink-3">Technicians</dt>
-                <dd>{formatCap(status.limits.technicians)}</dd>
-              </div>
-              <div>
-                <dt className="text-caption text-ink-3">Documents stored</dt>
-                <dd>
-                  {status.usage.documentsStored.toLocaleString()} / {formatCap(status.limits.documentsStored)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-caption text-ink-3">Pages this month</dt>
-                <dd>
-                  {status.usage.pagesThisMonth.toLocaleString()} / {formatCap(status.limits.pagesPerMonth)}
-                </dd>
-              </div>
-            </dl>
-          )}
-
-          {actionError && (
-            <p role="alert" className="dw-pill-warn inline-flex items-start gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" /> {actionError}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            {trialEligible && (
-              <button
-                type="button"
-                className="dw-btn-primary"
-                disabled={busy !== null}
-                onClick={() => void runCheckout('trial', () => billingClient.checkout('solo', interval))}
-              >
-                {busy === 'trial' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
-                Start 30-day free trial
-              </button>
-            )}
-            <button type="button" className="dw-btn-secondary" disabled={busy !== null} onClick={() => void runCheckout('portal', () => billingClient.portal())}>
-              {busy === 'portal' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
-              Manage billing
+        {/* Gated: lead with the Solo trial (card required, cancel anytime) —
+            the plan grid below still has Solo as an alternative for someone
+            who wants to skip straight to a paid plan or pick a bigger tier.
+            Not shown for a canceled tenant re-subscribing — they've already
+            used their trial (trialEligible / isTrialEligible in
+            api/_lib/billing.js is 'never subscribed' only), so the plan grid
+            is their whole path back in. */}
+        {gated && trialEligible && (
+          <section className="dw-card p-5 space-y-3 border-2 border-forest-700" aria-labelledby="trial-heading">
+            <h2 id="trial-heading" className="text-h3">
+              Start your 30-day free trial
+            </h2>
+            <p className="text-ink-2">DeepWell Solo — card required, cancel anytime. Nothing is charged until the trial ends.</p>
+            <button
+              type="button"
+              className="dw-btn-primary"
+              disabled={busy !== null}
+              onClick={() => void runCheckout('trial', () => billingClient.checkout('solo', interval))}
+            >
+              {busy === 'trial' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+              Start 30-day free trial
             </button>
-          </div>
-        </section>
+          </section>
+        )}
+
+        {!gated && (
+          <section className="dw-card p-5 space-y-4" aria-labelledby="current-plan-heading">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="current-plan-heading" className="text-h3">
+                Current plan
+              </h2>
+              {loadingStatus ? (
+                <Loader2 className="w-4 h-4 animate-spin text-ink-3" aria-hidden="true" />
+              ) : (
+                <span className={STATUS_PILL[status?.status ?? 'none']}>{STATUS_LABEL[status?.status ?? 'none']}</span>
+              )}
+            </div>
+
+            <p className="text-body">
+              {status?.plan ? PLAN_CATALOG[status.plan]?.name ?? status.plan : 'No plan selected yet.'}
+              {status?.status === 'trialing' && trialDaysLeft != null && (
+                <> — trial ends in {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'}.</>
+              )}
+              {status?.cancelAtPeriodEnd && status.currentPeriodEnd && <> Ends {new Date(status.currentPeriodEnd).toLocaleDateString()}.</>}
+            </p>
+
+            {status?.plan && (
+              <dl className="grid grid-cols-3 gap-3 text-body">
+                <div>
+                  <dt className="text-caption text-ink-3">Technicians</dt>
+                  <dd>{formatCap(status.limits.technicians)}</dd>
+                </div>
+                <div>
+                  <dt className="text-caption text-ink-3">Documents stored</dt>
+                  <dd>
+                    {status.usage.documentsStored.toLocaleString()} / {formatCap(status.limits.documentsStored)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-caption text-ink-3">Pages this month</dt>
+                  <dd>
+                    {status.usage.pagesThisMonth.toLocaleString()} / {formatCap(status.limits.pagesPerMonth)}
+                  </dd>
+                </div>
+              </dl>
+            )}
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {trialEligible && (
+                <button
+                  type="button"
+                  className="dw-btn-primary"
+                  disabled={busy !== null}
+                  onClick={() => void runCheckout('trial', () => billingClient.checkout('solo', interval))}
+                >
+                  {busy === 'trial' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                  Start 30-day free trial
+                </button>
+              )}
+              <button type="button" className="dw-btn-secondary" disabled={busy !== null} onClick={() => void runCheckout('portal', () => billingClient.portal())}>
+                {busy === 'portal' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                Manage billing
+              </button>
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="plans-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

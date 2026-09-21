@@ -13,8 +13,13 @@ const MS_PER_MONTH = 30 * 24 * 60 * 60 * 1000;
  * and batch), never for `mode: 'get'` — reading a document you already have
  * is not new ingestion. One extra withTenant round trip per request; cheap
  * next to the R2 presign + document-row work that follows it.
+ *
+ * Exported so api/_lib/routes/v1-ingest.js — the partner-facing ingest
+ * surface, which calls createUploadUrl() directly rather than going through
+ * this route's own handler below — runs the identical gate instead of
+ * bypassing it (Reviewer NO-GO, 2026-09-21: it previously ran none at all).
  */
-async function checkUploadGate(auth) {
+export async function checkUploadGate(auth) {
   // Fail OPEN: a billing lookup that errors (e.g. migration 14 not applied
   // yet, or a DB blip) must never turn into a 500 for every customer.
   try {

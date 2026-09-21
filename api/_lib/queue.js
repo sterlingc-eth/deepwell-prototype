@@ -1,6 +1,7 @@
 import { ingestDocument, recordIngestFailure } from "./readDocument.js";
 import { extractDocumentFields } from "./extractDocument.js";
 import { getDailyModelBudgetStatus } from "./rateLimit.js";
+import { assertActiveBilling } from "./plan.js";
 
 /**
  * The ingestion queue.
@@ -305,6 +306,28 @@ function buildFunctions(inngest, NonRetriableError) {
       if (!documentId || !tenantKey) throw new NonRetriableError("documentId and tenantKey are required");
       const ctx = { tenantKey, tenantName: tenantName ?? tenantKey };
 
+      // HARD GATE (Reviewer NO-GO, 2026-09-21): re-checked here, not just at
+      // enqueue time — a document can sit queued for a while (throttled,
+      // retried, or just behind other work), and the tenant's subscription
+      // can lapse in the meantime. Checked BEFORE the read itself, since that
+      // is the Anthropic-billed step this whole gate exists to stop.
+      //
+      // Deliberately does NOT call recordIngestFailure: extract_error must
+      // stay null, so this document looks exactly like one still waiting its
+      // turn, not a failed one — the browser's status poll treats any
+      // extract_error as terminal (see readDocument.js), and "the tenant
+      // hasn't paid" is not a per-document failure to report, it is a
+      // whole-account state that resolves itself the moment they do (cron-
+      // sweep's listStuckDocuments will pick this document back up then, no
+      // extra plumbing needed). NonRetriableError so Inngest marks this run
+      // skipped once and does not retry-storm a condition that retrying
+      // cannot fix within this run's own retry window either.
+      const billingGate = await step.run("check-active-billing", () => assertActiveBilling(ctx));
+      if (!billingGate.allowed) {
+        console.log(`queue: billing-gated, skipping read for document ${documentId} (tenant ${tenantKey})`);
+        throw new NonRetriableError("billing-gated");
+      }
+
       // Cost guard: a customer's daily model-spend cap (tenants.limits.
       // maxModelCallsPerDay, default sized for a Shop plan — see
       // rateLimit.js) is checked BEFORE this run pays for another Anthropic
@@ -371,6 +394,19 @@ function buildFunctions(inngest, NonRetriableError) {
       const { documentId, tenantKey, tenantName, userId } = event.data ?? {};
       if (!documentId || !tenantKey) throw new NonRetriableError("documentId and tenantKey are required");
       const ctx = { tenantKey, tenantName: tenantName ?? tenantKey };
+
+      // HARD GATE (Reviewer NO-GO, 2026-09-21): same re-check as the read
+      // step above, and for the same reason — this event can be queued for a
+      // while, and extraction is its own Anthropic-billed call. No
+      // recordIngestFailure here either: extract_error stays null, leaving
+      // the document at whatever stage the (billing-gated) read step left it
+      // — see the read step's own comment for why this is silent rather than
+      // a recorded failure.
+      const billingGate = await step.run("check-active-billing", () => assertActiveBilling(ctx));
+      if (!billingGate.allowed) {
+        console.log(`queue: billing-gated, skipping extraction for document ${documentId} (tenant ${tenantKey})`);
+        throw new NonRetriableError("billing-gated");
+      }
 
       return step.run("extract", async () => {
         try {

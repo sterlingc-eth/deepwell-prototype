@@ -4,6 +4,7 @@ import { ingestDocument, recordIngestFailure, isTransientError, isValidDocumentI
 import { isQueueEnabled, enqueueDocument } from "./_lib/queue.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
+import { assertActiveBilling } from "./_lib/plan.js";
 
 /**
  * POST /api/read-document
@@ -76,6 +77,19 @@ export default async function handler(req, res) {
   }
 
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+
+  // HARD GATE (Reviewer NO-GO, 2026-09-21): a tenant with no active
+  // subscription must not be able to spend a real Anthropic-billed model
+  // call reading a document — checked here, before EITHER path below
+  // (queued or inline, including `force: true`), since the queued path
+  // never calls assertModelBudget itself in this file (queue.js does its
+  // own budget check once Inngest picks the run up, which is too late to
+  // stop a 'none'/'canceled' tenant from having successfully enqueued it).
+  // Fails CLOSED — see assertActiveBilling's own doc comment.
+  const billingGate = await assertActiveBilling(ctx);
+  if (!billingGate.allowed) {
+    return handleCors(res, req).status(billingGate.status).json({ error: billingGate.error, ...(billingGate.url ? { url: billingGate.url } : {}) });
+  }
 
   // ---- queued ------------------------------------------------------------
   if (isQueueEnabled() && !sync) {

@@ -240,6 +240,13 @@ interface AppState {
   pendingPlan: PendingPlan | null;
   setPendingPlan: (plan: PendingPlan | null) => void;
   clearPendingPlan: () => void;
+
+  // HARD GATE (2026-09-21): true while App.tsx is polling for the webhook
+  // to land after a Stripe Checkout redirect (?billing=success) — drives
+  // BillingScreen's "Confirming your subscription…" state. See App.tsx's
+  // ?billing=success effect for the polling loop that sets this.
+  billingConfirming: boolean;
+  setBillingConfirming: (confirming: boolean) => void;
 }
 
 const initialFieldMode = readFieldMode();
@@ -370,4 +377,7 @@ export const useAppStore = create<AppState>((set) => ({
   pendingPlan: null,
   setPendingPlan: (plan) => set({ pendingPlan: plan }),
   clearPendingPlan: () => set({ pendingPlan: null }),
+
+  billingConfirming: false,
+  setBillingConfirming: (confirming) => set({ billingConfirming: confirming }),
 }));

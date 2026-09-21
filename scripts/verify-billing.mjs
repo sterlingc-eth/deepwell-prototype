@@ -33,6 +33,8 @@ import {
   isPastGrace,
   gateUpload,
   gateAsk,
+  requireActiveBilling,
+  assertActiveBilling,
 } from '../api/_lib/plan.js';
 
 let failures = 0;
@@ -185,11 +187,15 @@ check('past_due within 7-day grace is not past grace',
 check('past_due past 7-day grace IS past grace',
   isPastGrace({ billing_status: 'past_due', current_period_end: new Date(now.getTime() - 8 * DAY).toISOString() }, now));
 eq('grace window is 7 days', PAST_DUE_GRACE_DAYS, 7);
-eq('free preview is 3 documents', FREE_PREVIEW_DOCUMENTS, 3);
+// HARD GATE (owner decision, 2026-09-21): no free preview any more — a
+// never-subscribed tenant is blocked at document #0, same as a canceled one.
+eq('free preview is 0 documents (hard gate — no free preview)', FREE_PREVIEW_DOCUMENTS, 0);
 
 /* ------------------------------------------------------------------ gateUpload */
 
-check('none + 0 docs: upload allowed', gateUpload({}, { documentsStored: 0, pagesThisMonth: 0 }, now).allowed);
+check('none + 0 docs: upload blocked (hard gate)', !gateUpload({}, { documentsStored: 0, pagesThisMonth: 0 }, now).allowed);
+eq('none + 0 docs: 402', gateUpload({}, { documentsStored: 0, pagesThisMonth: 0 }, now).status, 402);
+eq('none + 0 docs: 402 message', gateUpload({}, { documentsStored: 0, pagesThisMonth: 0 }, now).error, 'Choose a plan to get started');
 check('none + 3 docs: upload blocked', !gateUpload({}, { documentsStored: 3, pagesThisMonth: 0 }, now).allowed);
 eq('none + 3 docs: 402', gateUpload({}, { documentsStored: 3, pagesThisMonth: 0 }, now).status, 402);
 
@@ -211,13 +217,55 @@ check('past_due past grace: upload blocked',
 
 /* --------------------------------------------------------------------- gateAsk */
 
-check('none + 2 docs: ask allowed', gateAsk({}, { documentsStored: 2 }, now).allowed);
+check('none + 0 docs: ask blocked (hard gate — no free preview)', !gateAsk({}, { documentsStored: 0 }, now).allowed);
+eq('none + 0 docs: 402 message', gateAsk({}, { documentsStored: 0 }, now).error, 'Choose a plan to get started');
 check('none + 3 docs: ask blocked', !gateAsk({}, { documentsStored: 3 }, now).allowed);
 check('canceled: ask blocked', !gateAsk({ billing_status: 'canceled' }, { documentsStored: 0 }, now).allowed);
+eq('canceled: 402 message', gateAsk({ billing_status: 'canceled' }, { documentsStored: 0 }, now).error, 'Choose a plan to get started');
 check('past_due past grace: ask STILL allowed (read-only, not blocked)',
   gateAsk({ billing_status: 'past_due', current_period_end: new Date(now.getTime() - 30 * DAY).toISOString() },
     { documentsStored: 50 }, now).allowed);
 check('active: ask allowed', gateAsk({ billing_status: 'active' }, { documentsStored: 999 }, now).allowed);
+
+/* ------------------------------------------------------- requireActiveBilling */
+// The shared HARD GATE (Reviewer NO-GO, 2026-09-21) behind gateUpload,
+// gateAsk, and the model-costing routes (read-document, extract, review's
+// reclassify action, via assertActiveBilling below). Pure — no DB — so every
+// branch is a fixture-row check same as planStateFor's own tests above.
+
+check('none: blocked', !requireActiveBilling({}, now).allowed);
+eq('none: 402', requireActiveBilling({}, now).status, 402);
+eq('none: message', requireActiveBilling({}, now).error, 'Choose a plan to get started');
+eq('none: points at Billing', requireActiveBilling({}, now).url, '/app/?screen=billing');
+check('canceled: blocked', !requireActiveBilling({ billing_status: 'canceled' }, now).allowed);
+eq('canceled: message', requireActiveBilling({ billing_status: 'canceled' }, now).error, 'Choose a plan to get started');
+
+check('trialing (unexpired): allowed',
+  requireActiveBilling({ billing_status: 'trialing', trial_ends_at: new Date(now.getTime() + DAY).toISOString() }, now).allowed);
+check('active: allowed', requireActiveBilling({ billing_status: 'active' }, now).allowed);
+check('past_due within grace: allowed',
+  requireActiveBilling({ billing_status: 'past_due', current_period_end: new Date(now.getTime() - DAY).toISOString() }, now).allowed);
+// past_due PAST grace is deliberately still "allowed" here — this bare
+// function only answers "is there a billing relationship at all", not the
+// page-cap/grace-window nuance gateUpload layers on top of it for uploads
+// specifically (its own past-grace branch above returns its own message
+// first and never reaches this function).
+check('past_due past grace: still allowed at this bare check (gateUpload/read-document apply their own stricter rule)',
+  requireActiveBilling({ billing_status: 'past_due', current_period_end: new Date(now.getTime() - 10 * DAY).toISOString() }, now).allowed);
+
+/* -------------------------------------------------------- assertActiveBilling */
+// DB-touching sibling used directly by read-document.js/extract.js/
+// review.js's reclassify action (no bespoke gate wrapper of their own).
+// This test file runs with NEON_CONNECTION_STRING deleted (top of file), so
+// every call below hits the exact "billing lookup itself is broken" case —
+// FAILS CLOSED (503), the opposite of every other gate in this file and of
+// assertModelBudget's own fail-OPEN default.
+{
+  const closed = await assertActiveBilling({ tenantKey: 'verify-billing-fixture' });
+  check('assertActiveBilling: a lookup failure fails CLOSED, not open', !closed.allowed);
+  eq('assertActiveBilling: 503 on a lookup failure', closed.status, 503);
+  eq('assertActiveBilling: message', closed.error, 'Billing check unavailable, try again');
+}
 
 /* -------------------------------------------------------- aiCostEstimateUsd */
 // GET /api/billing?action=status now exposes usage.aiCostEstimateUsd (owner

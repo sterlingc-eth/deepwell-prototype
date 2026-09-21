@@ -26,6 +26,7 @@ import * as reviewStore from './_lib/reviewStore.js';
 import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
 import { limit } from './_lib/rateLimit.js';
+import { assertActiveBilling } from './_lib/plan.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -35,6 +36,16 @@ import { limit } from './_lib/rateLimit.js';
 // bucket, which is what this gets — tracked under its own (tenantId,
 // 'write') counters, not shared with the 'read' bucket's own traffic.
 const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix']);
+
+// HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
+// spend a real Anthropic-billed model call and so need the billing gate
+// before running. 'aiVerify' (reviewStore.aiVerifyDocument) does NOT belong
+// here — read its doc comment: it recomputes completeness from ALREADY-
+// STORED extractions and never calls the model. 'reclassify'
+// (reviewStore.reclassifyDocuments) does, as a Haiku fallback when its
+// deterministic heuristic can't place a document — see RECLASSIFY_MODEL in
+// reviewStore.js.
+const MODEL_BILLED_ACTIONS = new Set(['reclassify']);
 
 // Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
 // renumbers/retires customer or equipment records, so on a Clerk org tenant
@@ -105,6 +116,14 @@ export default async (req, res) => {
 
   if (INTEGRITY_RATE_LIMIT_ACTIONS.has(action)) {
     if (!(await limit(req, res, auth, 'write'))) return; // 429 already written
+  }
+
+  if (MODEL_BILLED_ACTIONS.has(action)) {
+    // Fails CLOSED — see assertActiveBilling's own doc comment.
+    const billingGate = await assertActiveBilling(ctx);
+    if (!billingGate.allowed) {
+      return res.status(billingGate.status).json({ error: billingGate.error, ...(billingGate.url ? { url: billingGate.url } : {}) });
+    }
   }
 
   try {

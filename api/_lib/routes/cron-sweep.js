@@ -1,6 +1,7 @@
 import { ingestDocument, recordIngestFailure } from "../readDocument.js";
 import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeys } from "../opsStore.js";
 import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
+import { assertActiveBilling } from "../plan.js";
 import { captureMessage, captureException } from "../telemetry.js";
 import { runWarrantyNotificationSweep } from "../notify.js";
 import { runOutreachSweep } from "./outreach.js";
@@ -114,8 +115,13 @@ export default async function handler(req, res) {
     // many it did. An admin applies them from the Customers-tab panel.
     integrityNamesRelinkable: 0,
     integritySkippedTenants: 0,
+    billingGatedTenants: 0,
     errors: [],
   };
+
+  // Distinct tenants skipped for billing below, across both retryOnce()
+  // call sites (stuck + budget-deferred) — a tenant hit in both counts once.
+  const billingGatedTenantKeys = new Set();
 
   /**
    * One attempt per document, ONE attempt only — this is a nightly safety
@@ -123,8 +129,31 @@ export default async function handler(req, res) {
    * recordIngestFailure exactly like any other permanent failure, and the
    * tenant sees it (with `failMessage`) on their next visit instead of it
    * silently sitting at 'received' again.
+   *
+   * HARD GATE (Reviewer NO-GO, 2026-09-21): a tenant with no active
+   * subscription must not have this nightly sweep spend Anthropic-billed
+   * model calls re-reading their documents on their behalf. Checked ONCE per
+   * call (there is nothing per-document to gain — the whole point of "skip
+   * the tenant" is that none of its documents in this batch get retried),
+   * and only when there is actually something to retry, so a tenant with an
+   * empty `docs` list costs no extra query. Silent to the tenant on purpose:
+   * this is a background recovery pass, not a user-facing action, so there
+   * is no 402 to send anywhere — logging (+ the summary counter below) is
+   * enough for an operator to see why a canceled tenant's stuck documents
+   * aren't clearing. Every document is left completely untouched (no
+   * recordIngestFailure), so a later run — once billing is fixed — finds it
+   * exactly as stuck/deferred as before, not marked failed in the meantime.
    */
   async function retryOnce(ctx, docs, failMessage) {
+    if (docs.length === 0) return { recovered: 0, stillFailing: 0, billingGated: false };
+
+    const billingGate = await assertActiveBilling(ctx);
+    if (!billingGate.allowed) {
+      console.log(`cron-sweep: billing-gated, skipping ${docs.length} document(s) for tenant ${ctx.tenantKey}`);
+      billingGatedTenantKeys.add(ctx.tenantKey);
+      return { recovered: 0, stillFailing: 0, billingGated: true };
+    }
+
     let recovered = 0;
     let stillFailing = 0;
     for (const doc of docs.slice(0, MAX_DOCS_PER_TENANT)) {
@@ -136,7 +165,7 @@ export default async function handler(req, res) {
         await recordIngestFailure(ctx, doc.id, new Error(failMessage(err)));
       }
     }
-    return { recovered, stillFailing };
+    return { recovered, stillFailing, billingGated: false };
   }
 
   for (const t of tenants) {
@@ -264,6 +293,8 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "followups" });
   }
 
+  summary.billingGatedTenants = billingGatedTenantKeys.size;
+
   await captureMessage(
     `cron-sweep: ${summary.tenantsChecked} tenant(s) checked, ${summary.stuckFound} stuck document(s) found, ` +
       `${summary.recovered} recovered, ${summary.stillFailing} still failing; ` +
@@ -280,7 +311,8 @@ export default async function handler(req, res) {
       `${summary.integrityHealed} survivor(s) healed, ${summary.integrityContactStripped} shop contact field(s) stripped, ` +
       `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
-      `${summary.integritySkippedTenants} tenant(s) skipped (deadline).`,
+      `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
+      `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped).`,
     { route: "/api/cron-sweep" }
   );
 
