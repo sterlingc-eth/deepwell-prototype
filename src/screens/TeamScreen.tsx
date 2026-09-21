@@ -7,6 +7,7 @@ import { isAdminRole, seatStatus } from '../services/teamClient';
 import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
+import { DonovanMissesCard } from '../components/DonovanMissesCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -147,6 +148,7 @@ export function TeamScreen() {
 
         {admin && <NotificationsCard />}
         {admin && <FollowupsCard />}
+        {admin && <DonovanMissesCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

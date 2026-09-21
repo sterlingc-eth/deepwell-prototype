@@ -23,9 +23,15 @@ import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
-import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer } from "./_lib/analytics.js";
+import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
+// Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
+// fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
+// in ask_misses for the weekly review — see missStore.js's own doc comment
+// for why every call site here is fire-and-forget and tolerant of the table
+// not existing yet.
+import { insertAskMiss, recordAskMiss, MISS_OUTCOMES } from "./_lib/missStore.js";
 import { getStreetVocab, correctStreetTypos } from "./_lib/streetVocab.js";
 // Day 1 training-plan normalization layer (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
 // aliased because this file already has its own `normalizeQuestion` (the
@@ -643,16 +649,21 @@ export default async function handler(req, res) {
         const data = await timer.time("retrieve", () => withTenant(ctxArg, (db) => runMetaQuestion(db, meta)));
         await timer.time("bookkeeping", async () => {
           try {
-            await withTenant(ctxArg, (db) => db.logAction({
-              action: "document.queried",
-              resource_type: "question",
-              clerk_user_id: auth.userId,
-              changes: {
-                question_hash: hashQuestion(question),
-                documents: [...new Set(data.sources.map((s) => s.documentId))],
-                passages: 0,
-              },
-            }));
+            await withTenant(ctxArg, async (db) => {
+              await db.logAction({
+                action: "document.queried",
+                resource_type: "question",
+                clerk_user_id: auth.userId,
+                changes: {
+                  question_hash: hashQuestion(question),
+                  documents: [...new Set(data.sources.map((s) => s.documentId))],
+                  passages: 0,
+                },
+              });
+              if (data.kind === "no-answer") {
+                await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER });
+              }
+            });
           } catch (err) {
             console.error("Failed to write document.queried audit row (meta):", err?.message);
           }
@@ -740,27 +751,44 @@ export default async function handler(req, res) {
       if (contactData) {
         await timer.time("bookkeeping", async () => {
           try {
-            await withTenant(ctxArg, (db) => db.logAction({
-              action: "document.queried",
-              resource_type: "question",
-              clerk_user_id: auth.userId,
-              changes: {
-                question_hash: hashQuestion(question),
-                documents: [],
-                passages: 0,
-                contactLookup: true,
-              },
-            }));
+            await withTenant(ctxArg, async (db) => {
+              await db.logAction({
+                action: "document.queried",
+                resource_type: "question",
+                clerk_user_id: auth.userId,
+                changes: {
+                  question_hash: hashQuestion(question),
+                  documents: [],
+                  passages: 0,
+                  contactLookup: true,
+                },
+              });
+              // Miss loop: more than one customer matched the name — the
+              // dispatcher got a "which one did you mean" instead of a value
+              // (candidateCount, contactLookup.js's buildAmbiguousContactAnswer).
+              if ((contactData.candidateCount ?? 1) > 1) {
+                await insertAskMiss(db, {
+                  question, questionNormalized: normalizedForAnalytics,
+                  outcome: MISS_OUTCOMES.CONTACT_AMBIGUOUS,
+                });
+              }
+            });
           } catch (err) {
             console.error("Failed to write document.queried audit row (contact lookup):", err?.message);
           }
         });
         return send(200, { success: true, data: contactData });
       }
-      // contactData is null: no customer matched the name. Retrieval was
-      // never started above (retrievalPromise is null for a contact-lookup
-      // candidate), so run it now, inline — identical fallback shape to the
-      // fast-path miss above.
+      // contactData is null: no customer matched the name. Miss loop: zero
+      // candidates is itself the miss worth reviewing, regardless of what
+      // retrieval (run inline just below, same fallback shape as the
+      // fast-path miss above) manages to answer instead — fired with no
+      // await (true fire-and-forget: nothing else here is awaited yet
+      // either), never delaying the retrieval fallback.
+      recordAskMiss(ctxArg, {
+        question, questionNormalized: normalizedForAnalytics,
+        outcome: MISS_OUTCOMES.CONTACT_ZERO,
+      }).catch(() => {});
     }
 
     // ---- 0.65 money gate (no model, no DB, no cache) -----------------------
@@ -774,12 +802,15 @@ export default async function handler(req, res) {
       const data = moneyFallbackAnswer();
       send(200, { success: true, data });
       await timer.time("bookkeeping", () =>
-        withTenant(ctxArg, (db) => db.logAction({
-          action: "document.queried",
-          resource_type: "question",
-          clerk_user_id: auth.userId,
-          changes: { question_hash: hashQuestion(question), documents: [], passages: 0, money: true },
-        })).catch((err) => console.error("Failed to write document.queried audit row (money):", err?.message))
+        withTenant(ctxArg, async (db) => {
+          await db.logAction({
+            action: "document.queried",
+            resource_type: "question",
+            clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [], passages: 0, money: true },
+          });
+          await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.MONEY_FALLBACK });
+        }).catch((err) => console.error("Failed to write document.queried audit row (money):", err?.message))
       );
       return;
     }
@@ -850,6 +881,19 @@ export default async function handler(req, res) {
               } catch (err) {
                 console.error("Failed to write document.queried audit row (analytics):", err?.message);
               }
+              // Miss loop: this "handled" answer is actually an honest
+              // fallback (money/maintenance/"can't filter by X yet"), not a
+              // real count/list — runAnalyticsQuestion (routes/analytics.js)
+              // marks these with missOutcome; a genuine analytics answer
+              // never sets it.
+              if (analyticsResult.missOutcome) {
+                await insertAskMiss(db, {
+                  question, questionNormalized: normalizedForAnalytics,
+                  outcome: analyticsResult.missOutcome,
+                  detectedConditions: detectedConditions(normalizedForAnalytics),
+                  plan: analyticsResult.missMeta?.plan ?? null,
+                });
+              }
               // Monthly ask allowance (owner decision, 2026-09-21): counts iff
               // the one Haiku planner call actually ran (modelCalled — see
               // routes/analytics.js's runAnalyticsQuestion doc comment). A
@@ -892,7 +936,15 @@ export default async function handler(req, res) {
       // Not handled (invalid plan, no matching data, or an error): retrieval
       // was never started above (retrievalPromise is null for an analytics
       // candidate), so run it now, inline — identical fallback shape to the
-      // fast-path miss above.
+      // fast-path miss above. Miss loop: this fallthrough is itself worth
+      // reviewing regardless of what retrieval manages next — fired with no
+      // await (nothing else here is awaited yet either), never delaying the
+      // retrieval fallback.
+      recordAskMiss(ctxArg, {
+        question, questionNormalized: normalizedForAnalytics,
+        outcome: MISS_OUTCOMES.ANALYTICS_FALLTHROUGH,
+        detectedConditions: detectedConditions(normalizedForAnalytics),
+      }).catch(() => {});
     }
 
     // ---- 1. retrieve (already in flight above unless meta, fast path, or analytics fell through) ---
@@ -921,6 +973,9 @@ export default async function handler(req, res) {
     }
 
     if (passages.length === 0 && extractions.length === 0) {
+      // Miss loop: fired with no await — nothing else on this path is
+      // awaited before the response either, and this must never delay it.
+      recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER }).catch(() => {});
       return send(200, {
         success: true,
         data: {
@@ -1130,6 +1185,12 @@ export default async function handler(req, res) {
             });
           } catch (err) {
             console.error("Failed to write document.queried audit row:", err?.message);
+          }
+          // Miss loop: the model itself declined (shapeAnswer downgraded
+          // every fact to no-answer, e.g. nothing it cited actually
+          // grounded) — reuses this same connection/transaction.
+          if (data.kind === "no-answer") {
+            await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER });
           }
           // Monthly ask allowance (owner decision, 2026-09-21): this branch is
           // only ever reached after the one Anthropic call above succeeded —

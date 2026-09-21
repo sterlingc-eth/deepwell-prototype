@@ -246,6 +246,27 @@ export function isIntegrityFixDebounced(result: IntegrityFixResult): result is I
   return result.skipped === true;
 }
 
+/** One outcome bucket in a miss report — see api/_lib/missStore.js's
+ *  MISS_OUTCOMES for the codes ('no-answer', 'money-fallback',
+ *  'maintenance-fallback', 'unsupported-condition', 'contact-lookup-zero',
+ *  'contact-lookup-ambiguous', 'analytics-fallthrough'). */
+export interface MissReportGroup {
+  outcome: string;
+  count: number;
+  topQuestions: { text: string; count: number }[];
+}
+
+export interface MissReport {
+  total: number;
+  groups: MissReportGroup[];
+}
+
+/** One row of scripts/miss-review.mjs's / the question bank's export shape. */
+export interface MissExportItem {
+  text: string;
+  suggestedRoute: string;
+}
+
 export const reviewClient = {
   /** Correct an extracted field, or add one that was never extracted. */
   correctField(documentId: string, fieldKey: string, value: string, by: string) {
@@ -350,5 +371,20 @@ export const reviewClient = {
    *  Idempotent: safe to call again after a partial failure. */
   integrityFix(apply: IntegrityApplyAction[] = ALL_INTEGRITY_FIXES, dryRun = false) {
     return postJson<IntegrityFixResult>({ action: 'integrityFix', apply, dryRun });
+  },
+
+  /** Donovan misses (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md) — up to
+   *  the last 200 ask_misses rows for this tenant, grouped by outcome.
+   *  `days`, when passed, additionally restricts to the last N days (the
+   *  Team screen's card passes 7). Owner/admin only (the server enforces
+   *  this too). */
+  missReport(days?: number) {
+    return postJson<MissReport>({ action: 'missReport', days });
+  },
+
+  /** Same underlying table, shaped for the question bank instead of the
+   *  review card: {text, suggestedRoute} per distinct normalized question. */
+  exportMisses() {
+    return postJson<{ items: MissExportItem[] }>({ action: 'exportMisses' });
   },
 };

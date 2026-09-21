@@ -27,6 +27,9 @@ import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
 import { limit } from './_lib/rateLimit.js';
 import { assertActiveBilling } from './_lib/plan.js';
+// Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): owner/admin-only
+// read of the ask_misses table missStore.js writes from api/ask.js.
+import { missReport, exportMisses } from './_lib/missStore.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -59,6 +62,11 @@ function requireAdminForMerge(auth) {
   }
 }
 
+// Same gate, generic name — used by the miss-report/export actions below
+// (owner/admin only; a solo tenant with no shop is its own admin, same as
+// every other admin-gated action in this file).
+const requireAdmin = requireAdminForMerge;
+
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
   // reclassify can make up to 20 sequential model calls (see reviewStore.js's
@@ -86,6 +94,8 @@ const ACTIONS = new Set([
   'mergeCustomers',
   'integrityScan',
   'integrityFix',
+  'missReport',
+  'exportMisses',
 ]);
 
 export default async (req, res) => {
@@ -184,6 +194,14 @@ export default async (req, res) => {
         break;
       case 'integrityFix':
         result = await integrityFix(ctx, payload, auth);
+        break;
+      case 'missReport':
+        requireAdmin(auth);
+        result = await missReport(ctx, { days: payload.days });
+        break;
+      case 'exportMisses':
+        requireAdmin(auth);
+        result = await exportMisses(ctx);
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

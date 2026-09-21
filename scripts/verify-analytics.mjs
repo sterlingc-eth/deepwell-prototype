@@ -71,11 +71,14 @@ import {
   isMoneyQuestion,
   moneyFallbackAnswer,
   MONEY_FALLBACK_TEXT,
+  ANALYTICS_FEW_SHOT,
+  ANALYTICS_FEW_SHOT_BLOCK,
 } from '../api/_lib/analytics.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan, runAnalyticsQuestion } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
 import { parseContactLookupQuestion, fuzzyNameMatches, nameTokens, buildContactAnswer, buildAmbiguousContactAnswer } from '../api/_lib/contactLookup.js';
 import { extractStreetTokens, correctStreetTypos } from '../api/_lib/streetVocab.js';
+import { insertAskMiss } from '../api/_lib/missStore.js';
 
 let failures = 0;
 let count = 0;
@@ -1221,6 +1224,60 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
   check('pre-cache guard: money question never consults the cache', !withTenantCalled);
   eq('pre-cache guard: money question returns the exact honest fallback text', result.data.text, MONEY_FALLBACK_TEXT);
   eq('pre-cache guard: money question makes no model call', result.modelCalled, false);
+}
+
+/* ======================================================================
+ * 15. Day 2 training plan (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md) —
+ *     ANALYTICS_FEW_SHOT: every positive example's plan must pass
+ *     validatePlan (a curated example that the closed vocabulary itself
+ *     would reject is worse than no example at all), every negative
+ *     example's question must actually trip the real detector its
+ *     `fallback` marker names (so the prompt's "never plan this" guidance
+ *     can never drift out of sync with what the code actually intercepts),
+ *     and the whole rendered block must stay within the ~900-token budget
+ *     (estimated the same chars/4 way promptCache.js's own doc comment
+ *     describes, floored — see that file for why this is a safe
+ *     under-estimate, never an over-claim).
+ * ====================================================================== */
+check('ANALYTICS_FEW_SHOT has 18-25 examples', ANALYTICS_FEW_SHOT.length >= 18 && ANALYTICS_FEW_SHOT.length <= 25, String(ANALYTICS_FEW_SHOT.length));
+check('ANALYTICS_FEW_SHOT has exactly 3 negative (fallback) examples', ANALYTICS_FEW_SHOT.filter((ex) => ex.fallback).length === 3);
+
+for (const ex of ANALYTICS_FEW_SHOT) {
+  if (ex.fallback) {
+    const detector =
+      ex.fallback === 'money' ? isMoneyQuestion(ex.q)
+      : ex.fallback === 'maintenance' ? detectedConditions(ex.q).has('maintenance')
+      : ex.fallback === 'single-record' ? looksLikeSingleRecordReference(ex.q)
+      : false;
+    check(`few-shot negative :: "${ex.q}" actually trips its "${ex.fallback}" detector`, detector);
+    check(`few-shot negative :: "${ex.q}" carries no plan`, ex.plan === undefined);
+  } else {
+    check(`few-shot :: "${ex.q}" plan passes validatePlan`, validatePlan(ex.plan) !== null);
+  }
+}
+
+const FEW_SHOT_TOKEN_ESTIMATE = Math.ceil(ANALYTICS_FEW_SHOT_BLOCK.length / 4);
+check(
+  `ANALYTICS_FEW_SHOT_BLOCK stays under the 900-token budget (chars/4 estimate: ${FEW_SHOT_TOKEN_ESTIMATE})`,
+  FEW_SHOT_TOKEN_ESTIMATE <= 900
+);
+check('ANALYTICS_SYSTEM_PROMPT ends with the few-shot block (stable prefix first, for prompt caching)', ANALYTICS_SYSTEM_PROMPT.endsWith(ANALYTICS_FEW_SHOT_BLOCK));
+
+// Miss logging must never poison the caller's transaction: a missing
+// ask_misses table (migration 23 not yet run) must SAVEPOINT / ROLLBACK TO
+// SAVEPOINT around the failed INSERT and never throw.
+{
+  const calls = [];
+  const fakeDb = { raw: async (sql) => { calls.push(sql); if (/INSERT INTO ask_misses/.test(sql)) throw new Error('relation "ask_misses" does not exist'); } };
+  let threw = false;
+  try { await insertAskMiss(fakeDb, { question: 'x', outcome: 'no-answer' }); } catch { threw = true; }
+  check('insertAskMiss never throws when the table is missing', !threw);
+  check('insertAskMiss opens a SAVEPOINT before the INSERT', /^SAVEPOINT ask_miss_insert/.test(calls[0] ?? ''));
+  check('insertAskMiss rolls back to the SAVEPOINT on failure', calls.some((c) => /ROLLBACK TO SAVEPOINT ask_miss_insert/.test(c)));
+  const calls2 = [];
+  const okDb = { raw: async (sql) => { calls2.push(sql); } };
+  await insertAskMiss(okDb, { question: 'x', outcome: 'no-answer' });
+  check('insertAskMiss releases the SAVEPOINT on success', calls2.some((c) => /RELEASE SAVEPOINT ask_miss_insert/.test(c)));
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

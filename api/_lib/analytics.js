@@ -569,7 +569,7 @@ function synonymPromptLine() {
     .join('; ');
 }
 
-export const ANALYTICS_SYSTEM_PROMPT =
+export const ANALYTICS_SYSTEM_PROMPT_BASE =
   'You turn an HVAC dispatch company\'s counting/listing/grouping question into a query plan ' +
   'using the "analytics_plan" tool. You never see or write SQL, and you never answer the question ' +
   'yourself — you only choose entity/op/groupBy/filters from the closed vocabulary the tool schema ' +
@@ -583,6 +583,114 @@ export const ANALYTICS_SYSTEM_PROMPT =
   '— never a filter. "have/has an email on file" means filter hasEmail=true; "missing/without/no email" ' +
   'means hasEmail=false; the same mapping applies to "phone"/hasPhone. If the question names no entity, ' +
   'assume "customers". Always call the tool exactly once.';
+
+/* ============================================================ few-shot examples
+ *
+ * Day 2 training plan (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): ~25
+ * tricky question -> plan pairs, curated from the shapes the Day 1 question
+ * bank and the live miss clusters actually found hard — a bare month with no
+ * year, county vs city vs state, a brand+county combo, hasEmail/hasPhone in
+ * both polarities, warrantyStatus, an installYear age filter, documentType
+ * synonyms, a technician filter, every groupBy dimension, list vs count, a
+ * brand-vs-brand comparison (groupBy + an `in` filter), and the customers-
+ * via-equipment-join shape ("which customers in Mesa have Trane units").
+ *
+ * Each `plan` here is a real `analytics_plan` tool-input shape — every one is
+ * checked against validatePlan by scripts/verify-analytics.mjs, so this list
+ * can never silently drift out of the closed vocabulary it's meant to teach.
+ * Questions are written in the NORMALIZED form the planner actually receives
+ * (nlNormalize.js has already lowercased, expanded abbreviations like "az" ->
+ * "arizona", and fixed typos before this prompt ever sees the question) — see
+ * routes/analytics.js's planAnalyticsQuestion, which is called with
+ * `question_n`, never the raw text.
+ *
+ * The last three are NEGATIVE examples: shapes the planner must not spend a
+ * confident plan on because api/ask.js / runAnalyticsQuestion already
+ * intercept them before (or instead of) trusting a plan — a money question
+ * (isMoneyQuestion), a maintenance-due question (detectedConditions'
+ * 'maintenance', MAINTENANCE_DUE_RE) and a single-record address lookup
+ * (looksLikeSingleRecordReference). `fallback` names the exact internal
+ * marker each one maps to — the same string these real detectors key off —
+ * rather than a plan, and `plan` is deliberately absent (renderFewShotLine
+ * below renders these as a `SKIP` line, never a JSON tool-input, since the
+ * schema has no field for "decline"). scripts/verify-analytics.mjs checks
+ * each of these three questions actually trips its named detector, so this
+ * list can never drift out of sync with the real fallback logic either.
+ */
+export const ANALYTICS_FEW_SHOT = [
+  // ---- time ----
+  { q: 'how many jobs did we do in august', plan: { entity: 'serviceVisits', op: 'count' } },
+  {
+    q: 'how many invoices from august of 2023',
+    plan: {
+      entity: 'documents', op: 'count',
+      filters: [{ field: 'documentType', op: 'eq', value: 'invoice' }],
+      timeRange: { from: '2023-08', to: '2023-08' },
+    },
+  },
+  // ---- geo: county vs city vs state ----
+  { q: 'how many customers in maricopa county', plan: { entity: 'customers', op: 'count', filters: [{ field: 'county', op: 'eq', value: 'Maricopa' }] } },
+  { q: 'how many customers in chandler', plan: { entity: 'customers', op: 'count', filters: [{ field: 'city', op: 'eq', value: 'Chandler' }] } },
+  { q: 'how many customers in arizona', plan: { entity: 'customers', op: 'count', filters: [{ field: 'state', op: 'eq', value: 'AZ' }] } },
+  // ---- brand + county combo ----
+  {
+    q: 'how many trane units in pima county',
+    plan: { entity: 'equipment', op: 'count', filters: [{ field: 'brand', op: 'eq', value: 'Trane' }, { field: 'county', op: 'eq', value: 'Pima' }] },
+  },
+  // ---- hasEmail / hasPhone, both polarities ----
+  { q: 'how many customers have an email on file', plan: { entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] } },
+  { q: 'how many customers are missing a phone number', plan: { entity: 'customers', op: 'count', filters: [{ field: 'hasPhone', op: 'eq', value: false }] } },
+  // ---- warrantyStatus ----
+  { q: 'which units have an expired warranty', plan: { entity: 'warranties', op: 'list', filters: [{ field: 'warrantyStatus', op: 'eq', value: 'expired' }] } },
+  // ---- installYear age filter ----
+  { q: 'which customers have units older than 10 years', plan: { entity: 'customers', op: 'list', filters: [{ field: 'installYear', op: 'lt', value: 2016 }] } },
+  // ---- documentType synonyms ----
+  { q: 'how many permits do we have', plan: { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'permit' }] } },
+  { q: 'how many proposal quotes are there', plan: { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'proposal-quote' }] } },
+  { q: 'how many service tickets do we have', plan: { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'service-ticket' }] } },
+  // ---- technician ----
+  { q: 'how many jobs did mike do last week', plan: { entity: 'serviceVisits', op: 'count', filters: [{ field: 'technician', op: 'eq', value: 'Mike' }] } },
+  // ---- groupBy: month, brand, county ----
+  { q: 'jobs per month this year', plan: { entity: 'serviceVisits', op: 'groupBy', groupBy: 'month' } },
+  { q: 'how many units do we have by brand', plan: { entity: 'equipment', op: 'groupBy', groupBy: 'brand' } },
+  { q: 'customers by county', plan: { entity: 'customers', op: 'groupBy', groupBy: 'county' } },
+  // ---- list vs count ----
+  { q: 'list customers in gilbert', plan: { entity: 'customers', op: 'list', filters: [{ field: 'city', op: 'eq', value: 'Gilbert' }] } },
+  // ---- comparison: groupBy + an `in` filter, not two separate plans ----
+  {
+    q: 'trane vs carrier units',
+    plan: { entity: 'equipment', op: 'groupBy', groupBy: 'brand', filters: [{ field: 'brand', op: 'in', value: ['Trane', 'Carrier'] }] },
+  },
+  // ---- customers-via-equipment join ----
+  {
+    q: 'which customers in mesa have trane units',
+    plan: { entity: 'customers', op: 'list', filters: [{ field: 'city', op: 'eq', value: 'Mesa' }, { field: 'brand', op: 'eq', value: 'Trane' }] },
+  },
+  // ---- NEGATIVE: never plan these — already handled before/instead of you ----
+  { q: 'how much did we invoice last month', fallback: 'money' },
+  { q: 'which customers are overdue for maintenance', fallback: 'maintenance' },
+  { q: "what's the warranty on the unit at 1234 elm street", fallback: 'single-record' },
+];
+
+/** One compact line per few-shot example — minified JSON for a real plan, or
+ *  a `SKIP(marker)` line for a negative example (see ANALYTICS_FEW_SHOT's own
+ *  doc comment for why a negative can't be a tool-input JSON value). */
+function renderFewShotLine(ex) {
+  if (ex.fallback) return `Q:"${ex.q}"->SKIP(${ex.fallback})`;
+  return `Q:"${ex.q}"->${JSON.stringify(ex.plan)}`;
+}
+
+/** Appended at the END of the system prompt, after every other line, so the
+ *  long STABLE prefix above (task framing, entity synonyms, rules) stays
+ *  byte-for-byte first — Anthropic's prompt cache matches on a shared prefix,
+ *  so anything that might grow/reorder in the future belongs after it, not
+ *  interleaved with it. */
+export const ANALYTICS_FEW_SHOT_BLOCK =
+  '\n\nEXAMPLES (question -> analytics_plan tool input; SKIP means a question you must not invent a ' +
+  "plan for — it's already handled before you're ever called):\n" +
+  ANALYTICS_FEW_SHOT.map(renderFewShotLine).join('\n');
+
+export const ANALYTICS_SYSTEM_PROMPT = ANALYTICS_SYSTEM_PROMPT_BASE + ANALYTICS_FEW_SHOT_BLOCK;
 
 /* ============================================================ cache namespace
  *
@@ -624,7 +732,12 @@ export const ANALYTICS_SYSTEM_PROMPT =
 // this deploy just because its promptVersion still matched — every prior
 // analytics cache row is invalidated on deploy regardless of the new
 // pre-cache guard above, which is the real fix; this is belt-and-suspenders.
-export const ANALYTICS_VERSION = 'analytics-v3';
+// Bumped v3 -> v4 (Day 2 training plan, 2026-09-21): ANALYTICS_SYSTEM_PROMPT
+// now carries the ANALYTICS_FEW_SHOT block — a real prompt change, so every
+// prior cache row (planned under the few-shot-less prompt) must invalidate
+// the same way v2's hasEmail/hasPhone bump and v3's belt-and-suspenders bump
+// both already did.
+export const ANALYTICS_VERSION = 'analytics-v4';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
