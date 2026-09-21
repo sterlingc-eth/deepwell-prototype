@@ -619,7 +619,12 @@ export const ANALYTICS_SYSTEM_PROMPT =
 // schema/prompt, so any plan cached under the old vocabulary must be
 // invalidated (a cached "customers count" answer to "how many customers have
 // an email on file" must never be served again now that the filter exists).
-export const ANALYTICS_VERSION = 'analytics-v2';
+// Bumped v2 -> v3 (2026-09-21, round 6): a stale pre-fix cache row (e.g. the
+// "49 customers." answer for a maintenance-due question) must never survive
+// this deploy just because its promptVersion still matched — every prior
+// analytics cache row is invalidated on deploy regardless of the new
+// pre-cache guard above, which is the real fix; this is belt-and-suspenders.
+export const ANALYTICS_VERSION = 'analytics-v3';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))

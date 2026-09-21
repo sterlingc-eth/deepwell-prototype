@@ -23,7 +23,9 @@ import {
   suspiciousUnfilteredCustomerPlan,
   reconcileTimeRange,
   missingConditions,
+  detectedConditions,
   unsupportedConditionAnswer,
+  moneyFallbackAnswer,
   BOOLEAN_FILTER_FIELDS,
   validatePlan,
   deriveGeo,
@@ -485,6 +487,24 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
   // wording, which nothing in this file currently does.
   const { normalized: question_n } = normalizeQuestion(question);
   try {
+    // Reviewer NO-GO (2026-09-21, round 6): production still served a stale
+    // cached "49 customers." for maintenance-due questions after this file's
+    // own missingConditions check was added, because that check only ran
+    // AFTER a plan existed, downstream of the Tier-1 cache probe below — a
+    // cache row written before the fix (or under any future plan) short-
+    // circuited straight past it. 'money' and 'maintenance' both have no
+    // entry in CONDITION_PLAN_FIELD (analytics.js), so missingConditions()
+    // would flag them as unsupported no matter what any plan says — that
+    // makes them safe to decide HERE, before any cache lookup or model call,
+    // so a stale/wrong cached answer can never be returned for them again.
+    const conditionsUpFront = detectedConditions(question_n);
+    if (conditionsUpFront.has('money')) {
+      return { handled: true, data: moneyFallbackAnswer(), cacheHit: false, modelCalled: false, writes: [] };
+    }
+    if (conditionsUpFront.has('maintenance')) {
+      return { handled: true, data: unsupportedConditionAnswer('maintenance', 'customers'), cacheHit: false, modelCalled: false, writes: [] };
+    }
+
     // ---- Tier 1: exact question text, checked BEFORE the Haiku call -------
     const qHash = analyticsQuestionHash(question_n);
     const qProbe = await withTenant(ctxArg, (db) =>

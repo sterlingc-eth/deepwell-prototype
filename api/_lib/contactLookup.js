@@ -27,6 +27,7 @@
  * scripts/verify-analytics.mjs's contact-lookup section. resolveContact/
  * runContactLookup are the only functions here that touch `db`.
  */
+import { normalizeQuestion } from "./nlNormalize.js";
 
 /* ============================================================ shape detection */
 
@@ -96,6 +97,31 @@ function firstWordIsStopword(namePhrase) {
   return NAME_STOPWORD_RE.test(namePhrase.split(/\s+/)[0]);
 }
 
+// Reviewer NO-GO (2026-09-21, round 6, item 2): "what's the phne number on
+// file for amy isaacson" / "what's the emali for sandra wyckoff" reached
+// production still misspelled — this file used to run on the RAW question,
+// never nlNormalize.js's own normalizeQuestion pass (every other gate in
+// api/ask.js already runs through it). Two fixes: (1) below, this file now
+// normalizes its input the same way; (2) normalizeQuestion's own fuzzy
+// correction only ever touches a token of 5+ letters (nlNormalize.js's own
+// floor), which structurally can never reach a 4-letter typo like "phne" or
+// "pone" — this tiny, closed table covers exactly the short field-word typos
+// that floor misses. "e mail" (a literal typed space) is a phrase, not a
+// token, so it's a substring replace rather than a table entry.
+const FIELD_WORD_TYPO_FIXES = [
+  [/\b(?:phne|phon|pone)\b/g, "phone"],
+  [/\be mail\b/g, "email"],
+  [/\b(?:emal|emial|emali)\b/g, "email"],
+  [/\b(?:adress|addres|adres)\b/g, "address"],
+  [/\b(?:numbr|nubmer)\b/g, "number"],
+];
+
+function fixFieldWordTypos(q) {
+  let out = q;
+  for (const [re, to] of FIELD_WORD_TYPO_FIXES) out = out.replace(re, to);
+  return out;
+}
+
 /**
  * Pure: question text -> {field, namePhrase} or null.
  *   field: 'phone' | 'email' | 'address'
@@ -107,7 +133,9 @@ function firstWordIsStopword(namePhrase) {
  * question anyway.
  */
 export function parseContactLookupQuestion(question) {
-  const q = String(question ?? "").trim();
+  const raw = String(question ?? "").trim();
+  if (!raw) return null;
+  const q = fixFieldWordTypos(normalizeQuestion(raw).normalized);
   if (!q) return null;
 
   // Shape 1: "<field> ... for/of <name>" (the original, more specific shape

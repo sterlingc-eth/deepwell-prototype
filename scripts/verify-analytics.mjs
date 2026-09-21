@@ -72,7 +72,7 @@ import {
   moneyFallbackAnswer,
   MONEY_FALLBACK_TEXT,
 } from '../api/_lib/analytics.js';
-import { isAnalyticsEnabled, executeAnalyticsPlan } from '../api/_lib/routes/analytics.js';
+import { isAnalyticsEnabled, executeAnalyticsPlan, runAnalyticsQuestion } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
 import { parseContactLookupQuestion, fuzzyNameMatches, nameTokens, buildContactAnswer, buildAmbiguousContactAnswer } from '../api/_lib/contactLookup.js';
 import { extractStreetTokens, correctStreetTypos } from '../api/_lib/streetVocab.js';
@@ -1061,6 +1061,11 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
     ["whats thomas mercer's phone number", 'phone', 'thomas mercer'],
     ["donna thornton's email", 'email', 'donna thornton'],
     ['brian chavez address?', 'address', 'brian chavez'],
+    // Reviewer NO-GO (round 6, item 2): short field-word typos the 5+-letter
+    // general normalization floor structurally can't reach, plus running on
+    // the normalized (not raw) question.
+    ["what's the phne number on file for amy isaacson", 'phone', 'amy isaacson'],
+    ["what's the emali for sandra wyckoff", 'email', 'sandra wyckoff'],
   ];
   for (const [q, field, name] of POSITIVES) {
     const parsed = parseContactLookupQuestion(q);
@@ -1163,6 +1168,59 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
     );
     eq('street-typo: no correction reported for the out-of-span name', corrections.length, 0);
   }
+}
+
+/* ======================================================================
+ * 19. Reviewer NO-GO (2026-09-21, round 6, item 1) — production still served
+ * a stale cached "49 customers." for a maintenance-due question after the
+ * missingConditions fix landed, because that check only ran once a plan
+ * existed, downstream of runAnalyticsQuestion's Tier-1 cache probe. Proves
+ * the money/maintenance guards now run BEFORE any cache lookup: a
+ * `withTenant` that would hand back a wrong cached answer if ever called
+ * must never be consulted for these questions.
+ * ====================================================================== */
+{
+  let withTenantCalled = false;
+  const poisonedWithTenant = async (_ctxArg, fn) =>
+    fn({
+      raw: async () => {
+        withTenantCalled = true;
+        return { rows: [{ answer: { kind: 'answer', text: '49 customers.', facts: [] }, corpus_stamp: 'x', created_at: new Date().toISOString() }] };
+      },
+    });
+
+  const result = await runAnalyticsQuestion({
+    withTenant: poisonedWithTenant,
+    ctxArg: {},
+    question: 'Which customers are overdue for maintenance?',
+    today: '2026-09-21',
+  });
+  check('pre-cache guard: maintenance question never consults the cache', !withTenantCalled);
+  check(
+    'pre-cache guard: maintenance question returns the honest fallback, not a cached count',
+    result.handled && result.data.text.includes("can't filter by maintenance")
+  );
+  eq('pre-cache guard: maintenance question makes no model call', result.modelCalled, false);
+}
+{
+  let withTenantCalled = false;
+  const poisonedWithTenant = async (_ctxArg, fn) =>
+    fn({
+      raw: async () => {
+        withTenantCalled = true;
+        return { rows: [{ answer: { kind: 'answer', text: '$0.00', facts: [] }, corpus_stamp: 'x', created_at: new Date().toISOString() }] };
+      },
+    });
+
+  const result = await runAnalyticsQuestion({
+    withTenant: poisonedWithTenant,
+    ctxArg: {},
+    question: "What's the total dollar amount of our open invoices?",
+    today: '2026-09-21',
+  });
+  check('pre-cache guard: money question never consults the cache', !withTenantCalled);
+  eq('pre-cache guard: money question returns the exact honest fallback text', result.data.text, MONEY_FALLBACK_TEXT);
+  eq('pre-cache guard: money question makes no model call', result.modelCalled, false);
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);
