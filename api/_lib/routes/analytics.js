@@ -21,6 +21,10 @@ import {
   analyticsQuestionHash,
   analyticsPlanHash,
   suspiciousUnfilteredCustomerPlan,
+  reconcileTimeRange,
+  missingConditions,
+  unsupportedConditionAnswer,
+  BOOLEAN_FILTER_FIELDS,
   validatePlan,
   deriveGeo,
   normalizeStateValue,
@@ -68,7 +72,16 @@ export async function planAnalyticsQuestion(question, { today } = {}) {
       { deadlineAt }
     );
     const toolUse = response.content.find((b) => b.type === 'tool_use');
-    return validatePlan(toolUse?.input);
+    const rawInput = toolUse?.input;
+    // Item 1 (2026-09-21 live miss) + round 5 item 2: a literal month name/
+    // "this month"/"last month" phrase in the QUESTION overrides whatever
+    // timeRange the model filled in, computed deterministically from `today`
+    // — UNLESS the model's own timeRange is well-formed and names a year the
+    // question itself actually wrote out (reconcileTimeRange, analytics.js) —
+    // see that function's own doc comment for why the model's date math is
+    // not trusted by default, and when it is trusted anyway.
+    const input = rawInput ? { ...rawInput, timeRange: reconcileTimeRange(rawInput.timeRange, question, today) } : rawInput;
+    return validatePlan(input);
   } catch (err) {
     console.error('Analytics planner failed, falling through:', err?.message);
     return null;
@@ -94,6 +107,10 @@ function shapeCustomerRow(r) {
     id: r.id, label: r.customer_name || 'Unnamed customer', value: geo.city || r.service_address || '—',
     entityId: r.id, city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
     customerName: r.customer_name,
+    // hasEmail/hasPhone (item 2) read these two via matchesFilter's own
+    // HAS_FIELD_ROW_KEY map (analytics.js) — buildAnalyticsSQL's customers
+    // SELECT already carries both columns.
+    email: r.email, phone: r.phone,
   };
 }
 
@@ -110,10 +127,18 @@ function shapeEquipmentRow(r, today) {
 }
 
 function shapeDocumentRow(r) {
+  // Item 1: month by the WORK date (extractions.service_date, left-joined in
+  // buildAnalyticsSQL's documents branch), not the upload date — falls back
+  // to created_at only for a document nothing was ever extracted as its
+  // service_date for.
+  const month = r.service_date
+    ? String(r.service_date).slice(0, 7)
+    : r.created_at
+      ? new Date(r.created_at).toISOString().slice(0, 7)
+      : null;
   return {
     id: r.id, label: documentTypeLabel(r.document_type), value: r.original_filename || r.id,
-    entityId: undefined, documentType: r.document_type,
-    month: r.created_at ? new Date(r.created_at).toISOString().slice(0, 7) : null,
+    entityId: undefined, documentType: r.document_type, month,
   };
 }
 
@@ -122,7 +147,7 @@ function shapeDocumentRow(r) {
  *  entity. Rather than silently ignoring it (answering a DIFFERENT question
  *  than what was asked), treat it as a fall-through, same as an invalid plan. */
 const ENTITY_SUPPORTED_FIELDS = {
-  customers: new Set(['state', 'county', 'city', 'zip', 'customerName']),
+  customers: new Set(['state', 'county', 'city', 'zip', 'customerName', 'hasEmail', 'hasPhone']),
   equipment: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus']),
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus']),
   documents: new Set(['documentType']),
@@ -204,17 +229,29 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
     .map((r) => ({ ...shapeEquipmentRow(r, today), customerId: r.customer_id || null }))
     .filter((r) => r.customerId);
 
+  // Reviewer NO-GO (2026-09-21, round 5, item 1): hasEmail/hasPhone are
+  // CUSTOMER-level facts a unit row never carries — applying them here (with
+  // the rest of plan.filters, against a row that has no email/phone at all)
+  // made matchesFilter compare against undefined and silently return wrong
+  // rows (every unit looking like "no contact info"). Only the genuinely
+  // equipment-level filters apply at this stage; hasEmail/hasPhone are
+  // deferred to the CUSTOMER rows fetched below, then re-checked by
+  // executeAnalyticsPlan's own second applyEntityFilters pass over what this
+  // function returns (see that idempotent-pass comment further down).
+  const unitFilters = (plan.filters ?? []).filter((f) => !BOOLEAN_FILTER_FIELDS.includes(f.field));
+
   // Only the equipment-level filters apply here (state/county/city/zip are
   // already on the unit's own row via its service_address; customerName has
   // no equivalent on an equipment row and is intentionally left to fail
   // closed — see matchesFilter's own null-actual -> false rule — rather than
   // silently ignored).
-  const filtered = applyEntityFilters(unitRows, plan.filters);
+  const filtered = applyEntityFilters(unitRows, unitFilters);
   if (!filtered.length) return { rows: [], unfilteredCustomerIds: [] };
 
   const customerIds = [...new Set(filtered.map((r) => r.customerId))];
   const { rows: custRaw } = await db.raw(
-    `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address
+    `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address,
+            data->>'email' AS email, data->>'phone' AS phone
        FROM entities
       WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} AND id = ANY($1::uuid[])`,
     [customerIds]
@@ -234,11 +271,13 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
       id: unit.customerId, label: cust.customer_name || 'Unnamed customer',
       value: [detail, geo.city].filter(Boolean).join(' · ') || geo.city || cust.service_address || '—',
       entityId: unit.customerId, city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
-      customerName: cust.customer_name,
+      customerName: cust.customer_name, email: cust.email, phone: cust.phone,
       // Every equipment-level field, not just brand/model — executeAnalyticsPlan
       // re-runs applyEntityFilters on whatever this function returns (the same
       // idempotent second pass every other entity branch gets), so a plan
       // combining e.g. brand + warrantyStatus must still find both fields here.
+      // hasEmail/hasPhone (round 5 item 1) are genuinely checked for the
+      // FIRST time in that second pass, now that email/phone are on the row.
       brand: unit.brand, model: unit.model, equipmentType: unit.equipmentType,
       tonnage: unit.tonnage, refrigerant: unit.refrigerant, installYear: unit.installYear,
       warrantyStatus: unit.warrantyStatus,
@@ -456,6 +495,18 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // fall back to retrieval+model rather than confidently answering "every
     // customer" for what was really a lookup about one of them.
     if (suspiciousUnfilteredCustomerPlan(plan, question)) return { ...EMPTY, modelCalled: true };
+
+    // Round 5 item 3: the plan silently dropped a condition the question
+    // actually named (email/phone/brand/county/month) — answering the
+    // unfiltered query anyway would look confidently right and be wrong
+    // (exactly item 2's original bug shape). Answered honestly instead of
+    // executed or falling through, and not cached — see missingConditions'
+    // own doc comment in analytics.js.
+    const missing = missingConditions(plan, question);
+    if (missing.size > 0) {
+      const [condition] = missing;
+      return { handled: true, data: unsupportedConditionAnswer(condition, plan.entity), cacheHit: false, modelCalled: true, writes: [] };
+    }
 
     // ---- Tier 2: the plan itself, checked once the plan is known ----------
     // Two different phrasings that resolve to the identical plan reuse one

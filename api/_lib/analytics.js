@@ -43,7 +43,14 @@ export const GROUP_BY_FIELDS = ['city', 'county', 'state', 'zip', 'brand', 'docu
 export const FILTER_FIELDS = [
   'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage',
   'refrigerant', 'installYear', 'warrantyStatus', 'documentType', 'technician', 'customerName',
+  'hasEmail', 'hasPhone',
 ];
+/** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
+ *  an email on file" returned the plain customer count — there was no filter
+ *  field for "has contact info" at all, so the model's plan silently dropped
+ *  the condition. Boolean-only (true/false), customers-only — see
+ *  buildAnalyticsSQL/matchesFilter below for the two places that read them. */
+export const BOOLEAN_FILTER_FIELDS = ['hasEmail', 'hasPhone'];
 export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'in'];
 export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown'];
 export const MAX_LIMIT = 500;
@@ -171,6 +178,15 @@ const NOUN_WITH_RE = /\b(customers?|clients?|units?|equipment)\s+(with|that have
 /** "units older than N years" / "installed before/after 2020" — an age/date
  *  filter shape on its own aggregate noun, with no quantifier word needed. */
 const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b/i;
+/**
+ * Item 2 (2026-09-21 live miss): "customers missing a phone number" is a real
+ * aggregate/filter question (the hasEmail/hasPhone shape below) but names no
+ * QUANTIFIER word ("how many customers have an email on file" already passes
+ * via QUANTIFIER + AGGREGATE_NOUN alone, same as any other filtered count) —
+ * only the QUANTIFIER-less phrasings need this bypass, mirroring AGE_FILTER_RE
+ * just above. Paired with AGGREGATE_NOUN the same way AGE_FILTER_RE is.
+ */
+const CONTACT_FILTER_RE = /\b(have|has|with|no|missing|without)\s+(an?\s+)?(email|phone)\b/i;
 /** "how many documents does Plaza Dental have" / "does X have a warranty" —
  *  a single, named record's own attribute, not an aggregate across many. */
 /**
@@ -285,7 +301,8 @@ export function preClassifyAnalytics(question) {
     WHO_HAS_RE.test(q) ||
     NOUN_WITH_RE.test(q) ||
     BIGGEST_CUSTOMER_RE.test(q) ||
-    (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q))
+    (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q)) ||
+    (AGGREGATE_NOUN.test(q) && CONTACT_FILTER_RE.test(q))
   ) {
     return true;
   }
@@ -311,6 +328,79 @@ export function suspiciousUnfilteredCustomerPlan(plan, question) {
   if (plan.op !== 'list' && plan.op !== 'count') return false;
   if (Array.isArray(plan.filters) && plan.filters.length > 0) return false;
   return TWO_OR_MORE_DIGITS_RE.test(String(question ?? ''));
+}
+
+/* ============================================================ honest fallback
+ *
+ * Reviewer NO-GO (2026-09-21, round 5, item 3): a plan that silently DROPS a
+ * condition the question actually named (the model has no filter for it, or
+ * just forgot) still executes as an unfiltered query and answers confidently
+ * — exactly item 2's original bug shape ("how many customers have an email
+ * on file" -> the plain customer count), which the hasEmail/hasPhone filters
+ * fixed for THAT one phrasing but not for the general case (a brand, a
+ * county, a month the model dropped for some other reason). detectedConditions
+ * is deliberately dumb and self-contained (word/known-name matching, nothing
+ * from the classifier's own regexes) — a false positive here just means an
+ * honest "can't filter by X yet" where a fuller plan would have worked, never
+ * a wrong answer; see missingConditions/unsupportedConditionAnswer below for
+ * how routes/analytics.js's runAnalyticsQuestion uses this.
+ */
+const CONTACT_WORD_RE = { email: /\bemail\b/i, phone: /\bphone\b/i };
+const BRAND_WORDS = ['trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi'];
+const KNOWN_COUNTY_NAMES = [
+  ...new Set(
+    [...Object.values(zipCounty.azZip3Default), ...Object.values(zipCounty.azZipExceptions)]
+      .filter(Boolean)
+      .map((c) => String(c).toLowerCase())
+  ),
+];
+
+/** A dumb, self-contained scan of the question TEXT for a handful of
+ *  conditions a plan might drop: 'email'/'phone' (the hasEmail/hasPhone
+ *  shape), 'brand' (a known manufacturer name), 'county' (the word "county"
+ *  or a known AZ county name), 'month' (anything resolveQuestionTimeRange
+ *  recognizes). Returns a Set; order is insertion order (email, phone,
+ *  brand, county, month) so a caller picking "the" missing condition when
+ *  several are detected gets a stable, deterministic choice. */
+export function detectedConditions(question) {
+  const q = String(question ?? '').toLowerCase();
+  const found = new Set();
+  if (CONTACT_WORD_RE.email.test(q)) found.add('email');
+  if (CONTACT_WORD_RE.phone.test(q)) found.add('phone');
+  if (BRAND_WORDS.some((b) => new RegExp(`\\b${b}\\b`).test(q))) found.add('brand');
+  if (/\bcounty\b/.test(q) || KNOWN_COUNTY_NAMES.some((c) => new RegExp(`\\b${c}\\b`).test(q))) found.add('county');
+  if (/\bthis month\b|\blast month\b/.test(q) || resolveQuestionTimeRange(question) != null) found.add('month');
+  return found;
+}
+
+const CONDITION_PLAN_FIELD = { email: 'hasEmail', phone: 'hasPhone', brand: 'brand', county: 'county' };
+
+/** Conditions detectedConditions(question) found that the validated PLAN has
+ *  no corresponding filter (or, for 'month', no timeRange) for — the plan
+ *  silently dropped something the question actually asked for. */
+export function missingConditions(plan, question) {
+  const missing = new Set();
+  for (const c of detectedConditions(question)) {
+    if (c === 'month') {
+      if (!plan?.timeRange) missing.add(c);
+      continue;
+    }
+    const field = CONDITION_PLAN_FIELD[c];
+    if (!plan?.filters?.some((f) => f.field === field)) missing.add(c);
+  }
+  return missing;
+}
+
+/** The honest "I can't do that yet" answer for one dropped condition —
+ *  `kind: 'answer'` (never an error) so the client renders it exactly like
+ *  any other analytics reply, just with no facts and no false count. */
+export function unsupportedConditionAnswer(condition, entity = 'customers') {
+  const noun = (ENTITY_NOUN[entity] ?? ENTITY_NOUN.customers)(2);
+  return {
+    kind: 'answer',
+    text: `I can count ${noun}, but I can't filter by ${condition} yet.`,
+    facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
 }
 
 /* =================================================================== schema */
@@ -357,7 +447,10 @@ export const ANALYTICS_TOOL = {
                 'no the word "County" ("Maricopa", not "Maricopa County"). warrantyStatus: one of ' +
                 `${WARRANTY_STATUSES.join('|')} ("out of warranty"/"expired" -> expired; "still under ` +
                 'warranty"/"active" -> active; "expiring soon" -> expiring). installYear: the calendar ' +
-                'year installed, for "older/newer than N years" compute the year and use op gt/lt.',
+                'year installed, for "older/newer than N years" compute the year and use op gt/lt. ' +
+                'hasEmail (customers only, boolean value, op "eq"): "have/has an email on file" -> true; ' +
+                '"missing/without/no email" -> false. hasPhone (customers only, boolean value, op "eq"): ' +
+                '"have/has a phone (number) on file" -> true; "missing/without/no phone (number)" -> false.',
             },
             op: { type: 'string', enum: FILTER_OPS },
             value: { description: 'A string or number matching the field (an array only for op "in").' },
@@ -405,7 +498,9 @@ export const ANALYTICS_SYSTEM_PROMPT =
   'Mitsubishi, ...) means the brand filter. "this month"/"last month"/"this week"/a named month means ' +
   'timeRange. "who\'s our biggest/largest/top customer(s)" means entity "customers", op "list", and ' +
   'sortBy "equipmentCount" (or "documentCount" if the question specifically names documents/invoices) ' +
-  '— never a filter. If the question names no entity, assume "customers". Always call the tool exactly once.';
+  '— never a filter. "have/has an email on file" means filter hasEmail=true; "missing/without/no email" ' +
+  'means hasEmail=false; the same mapping applies to "phone"/hasPhone. If the question names no entity, ' +
+  'assume "customers". Always call the tool exactly once.';
 
 /* ============================================================ cache namespace
  *
@@ -438,7 +533,11 @@ export const ANALYTICS_SYSTEM_PROMPT =
  * See routes/analytics.js's runAnalyticsQuestion for how both tiers are used,
  * and askCache.js's getCacheEntry for the promptVersion parameter.
  */
-export const ANALYTICS_VERSION = 'analytics-v1';
+// Bumped v1 -> v2 (2026-09-21, items 1+2): hasEmail/hasPhone added to the tool
+// schema/prompt, so any plan cached under the old vocabulary must be
+// invalidated (a cached "customers count" answer to "how many customers have
+// an email on file" must never be served again now that the filter exists).
+export const ANALYTICS_VERSION = 'analytics-v2';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
@@ -496,6 +595,121 @@ export function analyticsPlanHash(plan) {
   return sha256Hex(`analytics-plan:${canonicalPlanString(plan)}`);
 }
 
+/* ============================================================ month resolution
+ *
+ * Item 1 (2026-09-21 live miss): "how many jobs did we do in August" fell
+ * through to retrieval. Root cause: the model was asked to fill `timeRange`
+ * itself ("this month"/"last month"/a named month means timeRange" was the
+ * only guidance) with no year math spelled out for a BARE month name, and a
+ * bad/missing timeRange fails validatePlan's `^\d{4}(-\d{2}...)?$` shape check
+ * and rejects the WHOLE plan -> null -> full fall-through, exactly like any
+ * other invalid plan. Rather than trust the model's date arithmetic (the same
+ * "the model never computes the real answer, code does" rule this file's
+ * header already states for SQL and formatting), a literal month name/"this
+ * month"/"last month" phrase in the QUESTION TEXT is resolved to an exact
+ * YYYY-MM here, deterministically, from `today` — and routes/analytics.js
+ * uses this to OVERRIDE whatever the model put in timeRange whenever the
+ * question contains one of these phrases, so the model's only job is
+ * recognizing that a time filter applies at all, never doing the year math.
+ */
+const MONTH_NAMES = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+// Round 5 item 2 (2026-09-21 reviewer NO-GO): the year capture only matched a
+// bare "August 2023" — "August of 2023" and "August, 2023" (both real ways an
+// owner phrases it) never captured a year at all, so a genuinely-provided
+// year was silently dropped. "[\s,]+" swallows any run of spaces/commas
+// between the month and the year, and an optional "of " before the digits.
+const MONTH_NAME_RE = new RegExp(`\\b(${MONTH_NAMES.join('|')})\\b(?:[\\s,]+(?:of\\s+)?(\\d{4}))?`, 'i');
+
+function monthRange(year, month1to12) {
+  const ym = `${year}-${String(month1to12).padStart(2, '0')}`;
+  return { from: ym, to: ym };
+}
+
+/**
+ * Resolves "in August" / "in August 2024" / "this month" / "last month" in
+ * `question` to an exact {from, to} YYYY-MM timeRange, using `today` (an
+ * ISO date/timestamp string) as "now". A bare month name with no year
+ * resolves to that month in today's year — unless that month is still in
+ * the FUTURE relative to today, in which case it must mean last year's
+ * occurrence of it (an owner asking about "August" in March 2026 means
+ * August 2025, not a month that hasn't happened yet). Returns null when the
+ * question contains none of these phrases — callers then leave the model's
+ * own timeRange (if any) untouched.
+ */
+export function resolveQuestionTimeRange(question, today) {
+  const q = String(question ?? '').toLowerCase();
+  const now = today ? new Date(today) : new Date();
+  if (Number.isNaN(now.getTime())) return null;
+
+  if (/\bthis month\b/.test(q)) return monthRange(now.getUTCFullYear(), now.getUTCMonth() + 1);
+  if (/\blast month\b/.test(q)) {
+    const m = now.getUTCMonth(); // 0-indexed current month
+    return m === 0 ? monthRange(now.getUTCFullYear() - 1, 12) : monthRange(now.getUTCFullYear(), m);
+  }
+
+  const m = q.match(MONTH_NAME_RE);
+  if (!m) return null;
+  const monthNum = MONTH_NAMES.indexOf(m[1].toLowerCase()) + 1;
+  if (m[2]) return monthRange(Number(m[2]), monthNum);
+  const currentMonth = now.getUTCMonth() + 1;
+  const year = monthNum > currentMonth ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  return monthRange(year, monthNum);
+}
+
+const VALID_TIME_PART_RE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
+
+/**
+ * Round 5 item 2: decides whether the model's own `timeRange` (raw tool_use
+ * input, pre-validation) should be trusted as-is, or overridden by
+ * resolveQuestionTimeRange's deterministic reading of the question text. The
+ * model's timeRange wins ONLY when it is well-formed AND names a year that is
+ * actually written in the question — i.e. the model read something real off
+ * the page that our simple month-name regex has no way to know about (a plan
+ * combining a month with a non-current year the question explicitly gave).
+ * Every other case (the question names no year at all, or the model's
+ * timeRange is malformed/missing) defers to the deterministic override,
+ * exactly as before — see resolveQuestionTimeRange's own doc comment for why
+ * the model's date math is not trusted by default. Pure, so this is testable
+ * with no model call — see routes/analytics.js's planAnalyticsQuestion for
+ * where the raw tool_use input is actually produced.
+ */
+export function reconcileTimeRange(rawTimeRange, question, today) {
+  const override = resolveQuestionTimeRange(question, today);
+  if (!override) return rawTimeRange ?? undefined;
+
+  const from = String(rawTimeRange?.from ?? '');
+  const validShape =
+    rawTimeRange &&
+    typeof rawTimeRange === 'object' &&
+    VALID_TIME_PART_RE.test(from) &&
+    (rawTimeRange.to == null || VALID_TIME_PART_RE.test(String(rawTimeRange.to)));
+  const yearMatch = /^(\d{4})/.exec(from);
+  const yearInQuestion = yearMatch && new RegExp(`\\b${yearMatch[1]}\\b`).test(String(question ?? ''));
+  if (validShape && yearInQuestion) return rawTimeRange;
+  return override;
+}
+
+/** "August 2026" from a validated plan's {from: '2026-08', to: '2026-08'} —
+ *  used to word a count answer as "N jobs in August 2026" (item 1) instead of
+ *  a bare "You have N jobs.". Only fires for a single-month range (from ===
+ *  to); a genuine multi-month range ("since 2024") gets no such label and
+ *  falls back to the plain count wording. */
+const MONTH_LABELS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+export function monthRangeLabel(timeRange) {
+  if (!timeRange?.from || timeRange.from !== timeRange.to) return null;
+  const m = /^(\d{4})-(\d{2})$/.exec(timeRange.from);
+  if (!m) return null;
+  const idx = Number(m[2]) - 1;
+  if (idx < 0 || idx > 11) return null;
+  return `${MONTH_LABELS[idx]} ${m[1]}`;
+}
+
 /**
  * Validate + normalize the model's raw tool_use input against the closed
  * vocabulary. Returns a clean plan object, or null if ANYTHING is outside the
@@ -520,6 +734,18 @@ export function validatePlan(raw) {
     if (f.value === undefined || f.value === null || f.value === '') return null;
     if (f.op === 'in' && !Array.isArray(f.value)) return null;
     if (f.field === 'warrantyStatus' && !WARRANTY_STATUSES.includes(String(f.value).toLowerCase())) return null;
+    if (BOOLEAN_FILTER_FIELDS.includes(f.field)) {
+      // hasEmail/hasPhone: customers-only, boolean-only, op "eq" only — a
+      // closed enough shape that "in"/"gt"/etc make no sense and are rejected
+      // rather than silently coerced. Accepts true/false or the strings
+      // "true"/"false" (Haiku's tool_use JSON occasionally stringifies a
+      // boolean argument) and normalizes to a real boolean either way.
+      if (p.entity !== 'customers' || f.op !== 'eq') return null;
+      const s = String(f.value).toLowerCase();
+      if (f.value !== true && f.value !== false && s !== 'true' && s !== 'false') return null;
+      filters.push({ field: f.field, op: f.op, value: f.value === true || s === 'true' });
+      continue;
+    }
     filters.push({ field: f.field, op: f.op, value: f.value });
   }
 
@@ -649,8 +875,19 @@ function coerceNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** hasEmail/hasPhone read the row's own `email`/`phone` property (its
+ *  presence/non-blankness), never a literal `row.hasEmail` field — see
+ *  shapeCustomerRow (routes/analytics.js), which is the only row shape that
+ *  carries these two properties at all. */
+const HAS_FIELD_ROW_KEY = { hasEmail: 'email', hasPhone: 'phone' };
+
 export function matchesFilter(row, filter) {
   const { field, op, value } = filter;
+  if (field in HAS_FIELD_ROW_KEY) {
+    const raw = row[HAS_FIELD_ROW_KEY[field]];
+    const has = raw != null && String(raw).trim() !== '';
+    return has === (value === true);
+  }
   const actual = row[field];
   if (op === 'in') {
     const arr = Array.isArray(value) ? value : [value];
@@ -708,6 +945,13 @@ const SQL_COLUMN = {
   documents: { documentType: 'document_type' },
 };
 
+/** hasEmail/hasPhone (item 2): not a plain column comparison (there is no
+ *  value to bind — "IS NOT NULL AND <> ''" takes no parameter), so these are
+ *  handled separately from pushColumnFilter/SQL_COLUMN below rather than
+ *  forced into that shape. Column names are fixed text from this file, never
+ *  model input, exactly like every other column expression in this file. */
+const HAS_FIELD_COLUMN = { hasEmail: "data->>'email'", hasPhone: "data->>'phone'" };
+
 const SQL_OP = { eq: '=', neq: '<>', contains: 'ILIKE', gt: '>', gte: '>=', lt: '<', lte: '<=' };
 
 function pushColumnFilter(where, params, column, filter) {
@@ -737,6 +981,11 @@ export function buildAnalyticsSQL(plan) {
   const params = [];
   const columnsFor = SQL_COLUMN[plan.entity === 'warranties' ? 'equipment' : plan.entity] ?? {};
   for (const f of plan.filters ?? []) {
+    if (f.field in HAS_FIELD_COLUMN) {
+      const col = HAS_FIELD_COLUMN[f.field];
+      where.push(f.value ? `(${col} IS NOT NULL AND ${col} <> '')` : `(${col} IS NULL OR ${col} = '')`);
+      continue;
+    }
     const col = columnsFor[f.field];
     if (col) pushColumnFilter(where, params, col, f);
   }
@@ -744,7 +993,8 @@ export function buildAnalyticsSQL(plan) {
   if (plan.entity === 'customers') {
     return {
       sql: `SELECT id, customer_number, data->>'customer_name' AS customer_name,
-                   data->>'service_address' AS service_address, updated_at
+                   data->>'service_address' AS service_address,
+                   data->>'email' AS email, data->>'phone' AS phone, updated_at
               FROM entities
              WHERE entity_type = 'customer' AND merged_into IS NULL AND ${where.join(' AND ')}
              ORDER BY updated_at DESC
@@ -766,11 +1016,26 @@ export function buildAnalyticsSQL(plan) {
     };
   }
   if (plan.entity === 'documents') {
+    // Item 1 (2026-09-21 live miss): "how many jobs/documents/invoices did we
+    // do IN AUGUST" means the month the WORK happened, not the month the
+    // paper was uploaded — documents.created_at is upload time and has no
+    // reliable relationship to it (a job done in August scanned in October
+    // would be missed entirely; an old backlog batch-uploaded in August would
+    // be wrongly counted). extractions.field_key = 'service_date' (see
+    // extractFields.js FIELD_SPECS) is the real job/service date; documents
+    // itself has no such column (see M3-config/01-create-schema.sql), so it
+    // is pulled via a correlated scalar subquery, same tenant scope as the
+    // outer query, most-recent value per document. shapeDocumentRow (below)
+    // falls back to created_at only for a document with no service_date
+    // extraction at all, so a doc-count with no time filter is unaffected.
     return {
-      sql: `SELECT id, document_type, original_filename, created_at
-              FROM documents
+      sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at,
+                   (SELECT x.value FROM extractions x
+                     WHERE x.document_id = d.id AND x.field_key = 'service_date' AND x.${TENANT_SQL}
+                     ORDER BY x.created_at DESC LIMIT 1) AS service_date
+              FROM documents d
              WHERE ${where.join(' AND ')}
-             ORDER BY created_at DESC
+             ORDER BY d.created_at DESC
              LIMIT ${MAX_LIMIT}`,
       params,
     };
@@ -853,6 +1118,35 @@ export const MAX_FACT_ROWS = 50;
  *                    when a named filter value matches zero rows, name what
  *                    the tenant's data actually has instead.
  */
+
+/** "Customers with an email on file" / "Customers missing a phone number" —
+ *  item 2 (2026-09-21): a hasEmail/hasPhone-filtered count needs a fact label
+ *  that says WHICH condition was counted, not the generic "Customers" a plain
+ *  count gets. Both filters together ("have an email and a phone") join with
+ *  "and". Returns null when neither filter is present, so callers fall back
+ *  to the generic noun-based label. */
+function customerContactFactLabel(entity, filters) {
+  if (entity !== 'customers') return null;
+  const parts = [];
+  const email = (filters ?? []).find((f) => f.field === 'hasEmail');
+  const phone = (filters ?? []).find((f) => f.field === 'hasPhone');
+  if (email) parts.push(email.value ? 'with an email on file' : 'missing an email address');
+  if (phone) parts.push(phone.value ? 'with a phone number on file' : 'missing a phone number');
+  return parts.length ? `Customers ${parts.join(' and ')}` : null;
+}
+
+/** "Carrier units" instead of the generic "Pieces of equipment" — a
+ *  brand-filtered equipment/warranties count should name the brand it was
+ *  actually filtered to. Returns null when no brand filter (eq/in) is
+ *  present, so callers fall back to the generic noun-based label. */
+function brandFactLabel(entity, filters) {
+  if (entity !== 'equipment' && entity !== 'warranties') return null;
+  const f = (filters ?? []).find((x) => x.field === 'brand' && (x.op === 'eq' || x.op === 'in'));
+  if (!f) return null;
+  const brand = Array.isArray(f.value) ? f.value[0] : f.value;
+  return brand ? `${brand} units` : null;
+}
+
 export function formatAnalyticsAnswer(plan, opts) {
   const { total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null } = opts ?? {};
   const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
@@ -883,10 +1177,17 @@ export function formatAnalyticsAnswer(plan, opts) {
 
   if (plan.op === 'count') {
     const of = unfilteredTotal != null && unfilteredTotal !== total ? ` (of ${unfilteredTotal} total)` : '';
-    const text = `You have ${total} ${noun}${of}.`;
+    // Item 1: "N jobs in August 2026" style, once there's a real single-month
+    // range to name — otherwise the plain "You have N X" wording.
+    const monthLabel = monthRangeLabel(plan.timeRange);
+    const text = monthLabel ? `${total} ${noun} in ${monthLabel}${of}.` : `You have ${total} ${noun}${of}.`;
+    const label =
+      customerContactFactLabel(plan.entity, plan.filters) ??
+      brandFactLabel(plan.entity, plan.filters) ??
+      noun[0].toUpperCase() + noun.slice(1);
     return {
       kind: 'answer', text,
-      facts: [{ label: noun[0].toUpperCase() + noun.slice(1), value: String(total), sources: [] }],
+      facts: [{ label, value: String(total), sources: [] }],
       sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     };
   }

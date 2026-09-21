@@ -62,6 +62,12 @@ import {
   ENTITY_SYNONYMS,
   ANALYTICS_SYSTEM_PROMPT,
   TOP_CUSTOMERS_LIMIT,
+  resolveQuestionTimeRange,
+  reconcileTimeRange,
+  monthRangeLabel,
+  detectedConditions,
+  missingConditions,
+  unsupportedConditionAnswer,
 } from '../api/_lib/analytics.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
@@ -733,6 +739,235 @@ eq('validatePlan: sortBy caps the limit to TOP_CUSTOMERS_LIMIT even if a larger 
   const plan = validatePlan({ entity: 'customers', op: 'list', sortBy: 'equipmentCount' });
   const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
   eq('round 4 item 1: zero customers -> honest empty answer', answer.text, 'No customers on file yet.');
+}
+
+/* ======================================================================
+ * 15. Live miss (2026-09-21) item 1 — "how many jobs did we do in August"
+ * fell through to retrieval. Deterministic month resolution (never the
+ * model's own date math), the classifier still routing the shape, and the
+ * documents SQL keying month off the extracted service_date, not created_at.
+ * ====================================================================== */
+
+eq('resolveQuestionTimeRange: bare month name -> current year', resolveQuestionTimeRange('how many jobs did we do in August', '2026-09-21'), { from: '2026-08', to: '2026-08' });
+eq('resolveQuestionTimeRange: bare month in the future -> previous year', resolveQuestionTimeRange('how many jobs did we do in December', '2026-09-21'), { from: '2025-12', to: '2025-12' });
+eq('resolveQuestionTimeRange: month name with an explicit year is used as-is', resolveQuestionTimeRange('how many jobs did we do in August 2024', '2026-09-21'), { from: '2024-08', to: '2024-08' });
+eq('resolveQuestionTimeRange: "this month"', resolveQuestionTimeRange('how many jobs did we do this month', '2026-09-21'), { from: '2026-09', to: '2026-09' });
+eq('resolveQuestionTimeRange: "last month"', resolveQuestionTimeRange('how many jobs did we do last month', '2026-09-21'), { from: '2026-08', to: '2026-08' });
+eq('resolveQuestionTimeRange: "last month" across a year boundary', resolveQuestionTimeRange('how many jobs did we do last month', '2026-01-15'), { from: '2025-12', to: '2025-12' });
+eq('resolveQuestionTimeRange: no month phrase -> null (model\'s own timeRange, if any, is kept)', resolveQuestionTimeRange('how many jobs did we do', '2026-09-21'), null);
+
+eq('monthRangeLabel: single-month range', monthRangeLabel({ from: '2026-08', to: '2026-08' }), 'August 2026');
+eq('monthRangeLabel: multi-month range -> null (not a "N X in Month Year" answer)', monthRangeLabel({ from: '2026-01', to: '2026-08' }), null);
+eq('monthRangeLabel: no timeRange -> null', monthRangeLabel(null), null);
+
+for (const q of [
+  'how many jobs did we do in August',
+  'how many service visits were there last month',
+  'how many invoices did we complete in 2024',
+  'how many calls did we do in September',
+]) {
+  check(`item 1 pre-classify (positive) :: "${q}"`, preClassifyAnalytics(q) === true);
+}
+
+{
+  // "N X in Month Year" wording, once formatAnalyticsAnswer sees a validated
+  // single-month range — the pattern the live miss's fix answer follows.
+  const plan = validatePlan({ entity: 'documents', op: 'count', timeRange: { from: '2026-08', to: '2026-08' } });
+  const out = formatAnalyticsAnswer(plan, { total: 5 });
+  eq('item 1: count answer names the resolved month', out.text, '5 documents in August 2026.');
+}
+{
+  const plan = validatePlan({ entity: 'documents', op: 'count', timeRange: { from: '2026-08', to: '2026-08' } });
+  const built = buildAnalyticsSQL(plan);
+  check('item 1: documents-by-month SQL reads the extracted service_date, not just created_at', built.sql.includes("field_key = 'service_date'"));
+}
+
+/* ======================================================================
+ * 16. Live miss (2026-09-21) item 2 — "how many customers have an email on
+ * file" returned the plain customer count; the email condition had nowhere
+ * to go in the closed vocabulary and was silently dropped. hasEmail/hasPhone
+ * end to end: classifier, validatePlan, SQL, matchesFilter, fact label.
+ * ====================================================================== */
+
+for (const q of [
+  'how many customers have an email on file',
+  'how many customers are missing a phone number',
+  'customers missing a phone number',
+  'customers without a phone number',
+]) {
+  check(`item 2 pre-classify (positive) :: "${q}"`, preClassifyAnalytics(q) === true);
+}
+check('item 2 pre-classify (negative) :: single-record possessive still excluded', preClassifyAnalytics('does Henderson have an email on file') === false);
+
+check('validatePlan: hasEmail true on customers is valid', validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] }) !== null);
+eq('validatePlan: hasEmail normalizes a stringified boolean', validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: 'false' }] }).filters[0].value, false);
+check('validatePlan: hasPhone on a non-customers entity -> null', validatePlan({ entity: 'equipment', op: 'count', filters: [{ field: 'hasPhone', op: 'eq', value: true }] }) === null);
+check('validatePlan: hasEmail with op other than "eq" -> null', validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'neq', value: true }] }) === null);
+check('validatePlan: hasEmail with a non-boolean value -> null', validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: 'maybe' }] }) === null);
+
+{
+  const plan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] });
+  const built = buildAnalyticsSQL(plan);
+  check('SQL (customers): hasEmail=true builds an IS NOT NULL/non-empty predicate', built.sql.includes("email' IS NOT NULL") && built.sql.includes("email' <> ''"));
+}
+{
+  const plan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasPhone', op: 'eq', value: false }] });
+  const built = buildAnalyticsSQL(plan);
+  check('SQL (customers): hasPhone=false builds an IS NULL/empty predicate', built.sql.includes("phone' IS NULL") && built.sql.includes("phone' = ''"));
+}
+
+check('matchesFilter: hasEmail true matches a row with an email', matchesFilter({ email: 'a@b.com' }, { field: 'hasEmail', op: 'eq', value: true }));
+check('matchesFilter: hasEmail true does not match a blank email', !matchesFilter({ email: '' }, { field: 'hasEmail', op: 'eq', value: true }));
+check('matchesFilter: hasPhone false matches a row with no phone', matchesFilter({ phone: null }, { field: 'hasPhone', op: 'eq', value: false }));
+check('matchesFilter: hasPhone false does not match a row with a phone', !matchesFilter({ phone: '480-555-0000' }, { field: 'hasPhone', op: 'eq', value: false }));
+
+{
+  const custRows = [
+    { id: 'c1', customer_name: 'A', service_address: '1 Main St, Mesa, AZ 85201', email: 'a@x.com', phone: null, updated_at: '2026-01-01' },
+    { id: 'c2', customer_name: 'B', service_address: '2 Main St, Mesa, AZ 85201', email: '', phone: '480-555-0000', updated_at: '2026-01-01' },
+  ];
+  const mockDb = { raw: async () => ({ rows: custRows }) };
+  const plan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('item 2: hasEmail filter narrows to the one customer with an email', answer.facts[0].value, '1');
+  eq('item 2: fact label reflects the email condition', answer.facts[0].label, 'Customers with an email on file');
+}
+{
+  const custRows = [
+    { id: 'c1', customer_name: 'A', service_address: '1 Main St, Mesa, AZ 85201', email: 'a@x.com', phone: null, updated_at: '2026-01-01' },
+  ];
+  const mockDb = { raw: async () => ({ rows: custRows }) };
+  const plan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'hasPhone', op: 'eq', value: false }] });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('item 2: fact label reflects the missing-phone condition', answer.facts[0].label, 'Customers missing a phone number');
+}
+
+/* ======================================================================
+ * 17. "how many Carrier units do we service" returned 9 with a generic
+ * "Pieces of equipment" fact label — should name the brand it filtered to.
+ * ====================================================================== */
+
+{
+  const plan = validatePlan({ entity: 'equipment', op: 'count', filters: [{ field: 'brand', op: 'eq', value: 'Carrier' }] });
+  const out = formatAnalyticsAnswer(plan, { total: 9 });
+  eq('item 3: brand-filtered equipment count label names the brand', out.facts[0].label, 'Carrier units');
+}
+{
+  // No brand filter -> unaffected, still the generic noun label.
+  const plan = validatePlan({ entity: 'equipment', op: 'count' });
+  const out = formatAnalyticsAnswer(plan, { total: 40 });
+  eq('item 3: unfiltered equipment count keeps the generic label', out.facts[0].label, 'Pieces of equipment');
+}
+
+/* ======================================================================
+ * 18. Reviewer NO-GO round 5 (2026-09-21).
+ * ====================================================================== */
+
+// Item 2: MONTH_NAME_RE year capture also accepts "of"/comma-separated years.
+eq('resolveQuestionTimeRange: "August of 2023"', resolveQuestionTimeRange('how many jobs did we do in August of 2023', '2026-09-21'), { from: '2023-08', to: '2023-08' });
+eq('resolveQuestionTimeRange: "August, 2023"', resolveQuestionTimeRange('how many jobs did we do in August, 2023', '2026-09-21'), { from: '2023-08', to: '2023-08' });
+
+// Item 2: precedence between the model's own timeRange and the deterministic
+// override — the model wins only when well-formed AND its year is actually
+// written in the question; otherwise the deterministic reading wins.
+eq(
+  'reconcileTimeRange: model year matches a year written in the question -> model wins',
+  reconcileTimeRange({ from: '2019-08', to: '2019-08' }, 'how many jobs did we do in August 2019', '2026-09-21'),
+  { from: '2019-08', to: '2019-08' }
+);
+eq(
+  'reconcileTimeRange: model year does NOT match the question -> deterministic override wins',
+  reconcileTimeRange({ from: '2021-08', to: '2021-08' }, 'how many jobs did we do in August 2019', '2026-09-21'),
+  { from: '2019-08', to: '2019-08' }
+);
+eq(
+  'reconcileTimeRange: question names no year at all -> deterministic override wins even if model guessed one',
+  reconcileTimeRange({ from: '2026-08', to: '2026-08' }, 'how many jobs did we do in August', '2026-09-21'),
+  { from: '2026-08', to: '2026-08' }
+);
+eq(
+  'reconcileTimeRange: malformed model timeRange -> deterministic override wins',
+  reconcileTimeRange({ from: 'August' }, 'how many jobs did we do in August', '2026-09-21'),
+  { from: '2026-08', to: '2026-08' }
+);
+eq(
+  'reconcileTimeRange: no month phrase in the question at all -> model timeRange passed through untouched',
+  reconcileTimeRange({ from: '2024-01', to: '2024-12' }, 'how many jobs did we do since 2024', '2026-09-21'),
+  { from: '2024-01', to: '2024-12' }
+);
+
+// Item 1: hasEmail/hasPhone through the customers<-equipment join path
+// (brand/model/etc filters) must read the CUSTOMER's own email/phone, never
+// silently compare against undefined.
+{
+  const equipmentRows = [
+    { id: 'eq1', customer_id: 'c1', model: '4TTR4036', manufacturer: 'Trane', equipment_type: 'RTU', service_address: '1 Main St, Mesa, AZ 85201', updated_at: '2026-01-01' },
+    { id: 'eq2', customer_id: 'c2', model: 'XR16', manufacturer: 'Trane', equipment_type: 'RTU', service_address: '2 Main St, Mesa, AZ 85201', updated_at: '2026-01-01' },
+  ];
+  const customerRows = [
+    { id: 'c1', customer_name: 'Has Email', service_address: '1 Main St, Mesa, AZ 85201', email: 'a@x.com', phone: null },
+    { id: 'c2', customer_name: 'No Email', service_address: '2 Main St, Mesa, AZ 85201', email: '', phone: '480-555-0000' },
+  ];
+  const mockDb = {
+    raw: async (sql) => {
+      if (sql.includes("entity_type = 'equipment'")) return { rows: equipmentRows };
+      if (sql.includes("entity_type = 'customer'")) return { rows: customerRows };
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({
+    entity: 'customers', op: 'list',
+    filters: [{ field: 'brand', op: 'eq', value: 'Trane' }, { field: 'hasEmail', op: 'eq', value: true }],
+  });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('round 5 item 1: brand+hasEmail join only returns the customer that actually has an email', answer.facts.length, 1);
+  eq('round 5 item 1: the surviving row is the right customer', answer.facts[0].label, 'Has Email');
+}
+{
+  // Same join, hasEmail:false this time (the customer with NO email).
+  const equipmentRows = [
+    { id: 'eq1', customer_id: 'c1', model: '4TTR4036', manufacturer: 'Trane', equipment_type: 'RTU', service_address: '1 Main St, Mesa, AZ 85201', updated_at: '2026-01-01' },
+    { id: 'eq2', customer_id: 'c2', model: 'XR16', manufacturer: 'Trane', equipment_type: 'RTU', service_address: '2 Main St, Mesa, AZ 85201', updated_at: '2026-01-01' },
+  ];
+  const customerRows = [
+    { id: 'c1', customer_name: 'Has Email', service_address: '1 Main St, Mesa, AZ 85201', email: 'a@x.com', phone: null },
+    { id: 'c2', customer_name: 'No Email', service_address: '2 Main St, Mesa, AZ 85201', email: '', phone: '480-555-0000' },
+  ];
+  const mockDb = {
+    raw: async (sql) => {
+      if (sql.includes("entity_type = 'equipment'")) return { rows: equipmentRows };
+      if (sql.includes("entity_type = 'customer'")) return { rows: customerRows };
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({
+    entity: 'customers', op: 'list',
+    filters: [{ field: 'brand', op: 'eq', value: 'Trane' }, { field: 'hasEmail', op: 'eq', value: false }],
+  });
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-21' });
+  eq('round 5 item 1: brand+hasEmail:false join returns the customer with no email', answer.facts.length, 1);
+  eq('round 5 item 1: the surviving row is the right customer', answer.facts[0].label, 'No Email');
+}
+
+// Item 3: the honest fallback when the plan drops a condition the question named.
+check('detectedConditions: "email" question names the email condition', detectedConditions('how many customers have an email on file').has('email'));
+check('detectedConditions: no relevant words -> empty set', detectedConditions('how many customers do we have').size === 0);
+{
+  // Email condition DROPPED by the plan (filters is empty) -> fallback text, no facts.
+  const plan = { entity: 'customers', op: 'count', filters: [] };
+  const missing = missingConditions(plan, 'how many customers have an email on file');
+  check('round 5 item 3: dropped email condition is detected as missing', missing.has('email'));
+  const answer = unsupportedConditionAnswer([...missing][0]);
+  check('unsupported-condition answer uses the plan entity noun',
+    unsupportedConditionAnswer('month', 'equipment').text === "I can count pieces of equipment, but I can't filter by month yet.");
+  eq('round 5 item 3: fallback text names the dropped condition', answer.text, "I can count customers, but I can't filter by email yet.");
+  eq('round 5 item 3: fallback answer carries no facts', answer.facts.length, 0);
+}
+{
+  // Email condition PRESENT in the plan -> nothing missing, normal count proceeds.
+  const plan = { entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] };
+  const missing = missingConditions(plan, 'how many customers have an email on file');
+  eq('round 5 item 3: email condition present in the plan -> nothing missing', missing.size, 0);
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);
