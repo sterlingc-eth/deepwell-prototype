@@ -48,19 +48,11 @@
 -- 3. insert_platform_notification(tenant_key, kind, title, body, link) —
 --    writes one row directly to `notifications` (the bell-icon table) for a
 --    named tenant, same clerk_org_id resolution as above. `notifications`
---    was warranty-only until now (unit_id NOT NULL, one row per notified
---    unit) — the ALTER below drops that NOT NULL so a platform-level
---    notification (no unit involved at all) can have unit_id NULL. This is
---    additive and backward compatible: every existing warranty notification
---    already has a real unit_id, GET /api/account?action=notifications
---    (api/_lib/routes/notifications.js) never selects unit_id, and the FK
---    itself (REFERENCES entities(id)) is untouched — NULL simply satisfies
---    any FK trivially. Running the ALTER again once the column is already
---    nullable is a no-op, not an error.
+--    (M3-config/16) has columns tenant_id, kind, title, body, link — no unit
+--    column — so no table change is needed here.
 -- ============================================================================
 
--- ---- 1. notifications.unit_id becomes optional -------------------------------
-ALTER TABLE notifications ALTER COLUMN unit_id DROP NOT NULL;
+-- ---- 1. (no table changes; sections 2-5 are functions + grants) ------------
 
 -- ---- 2. cross-tenant read: grouped ask_misses in a time window --------------
 CREATE OR REPLACE FUNCTION list_ask_misses_window(p_from timestamptz, p_to timestamptz)
@@ -150,11 +142,6 @@ BEGIN
 END $$;
 
 -- ---- 6. proof -----------------------------------------------------------------
--- Expect: not null (column is nullable now).
-SELECT attnotnull AS unit_id_still_not_null
-  FROM pg_attribute
- WHERE attrelid = 'notifications'::regclass AND attname = 'unit_id';
-
 -- Expect: three rows, prosecdef = true for each.
 SELECT p.proname, p.prosecdef FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
