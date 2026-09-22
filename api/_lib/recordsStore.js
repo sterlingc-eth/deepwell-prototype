@@ -188,14 +188,33 @@ async function fetchRequestContextRow(tenantKey, tenantName) {
     }
   }
 
-  // Fallback: the exact three calls this replaces, run in sequence.
+  // Fallback: the exact calls this replaces. resolve_tenant / get_tenant_limits
+  // are SECURITY DEFINER and safe on a bare pool connection; the billing row
+  // is NOT — `tenants` has FORCE ROW LEVEL SECURITY, so it must be read inside
+  // a transaction with app.tenant_id SET LOCAL exactly as withTenant does
+  // (PRODUCTION INCIDENT 2026-09-22: reading it on a bare connection threw on
+  // every request — RLS's current_setting('app.tenant_id')::uuid cast on an
+  // empty/absent GUC — and took every endpoint down with a 500).
   const { rows: idRows } = await getPool().query('SELECT resolve_tenant($1, $2) AS id', [tenantKey, tenantName]);
   const id = idRows[0].id;
-  const [{ rows: tRows }, { rows: lRows }] = await Promise.all([
-    getPool().query('SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1', [id]),
-    getPool().query('SELECT get_tenant_limits($1) AS limits', [id]),
-  ]);
-  const t = tRows[0] ?? {};
+  const { rows: lRows } = await getPool().query('SELECT get_tenant_limits($1) AS limits', [id]);
+  let t = {};
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [id]);
+    const { rows: tRows } = await client.query(
+      'SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1',
+      [id]
+    );
+    await client.query('COMMIT');
+    t = tRows[0] ?? {};
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
   return {
     id,
     plan: t.plan ?? null,

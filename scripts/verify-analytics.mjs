@@ -1849,6 +1849,14 @@ for (const [f, v] of [['hasDocType', 'not-a-real-type'], ['lacksDocType', 'invoi
   check(`item 7 validatePlan (negative) :: ${f} rejects bad ${v === 'invoice' ? 'op' : 'value'}`, badOp === null);
 }
 
+// Live miss 2026-09-22: warranty status must be a code-decided condition.
+for (const [q, status] of [['how many active warranties do we have','active'],['how many units are still under warranty','active'],['which units are out of warranty','expired'],['how many warranties expire soon','expiring'],['units with unknown warranty status','unknown']]) {
+  check(`warranty condition :: "${q}" -> ${status}`, detectedConditions(q).has('warranty') && buildConditionOverrideFilter('warranty', q)?.value === status);
+}
+for (const q of ['how many active customers do we have', 'how many current customers in mesa', 'which units are covered by a maintenance agreement']) {
+  check(`warranty condition negative :: "${q}"`, !detectedConditions(q).has('warranty'));
+}
+
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {
   console.error(`${failures} FAILURE(S)`);

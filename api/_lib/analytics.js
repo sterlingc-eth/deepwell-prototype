@@ -1034,12 +1034,32 @@ export function detectedConditions(question) {
   if (/\bthis month\b|\blast month\b/.test(q) || resolveAnyTimeRange(question) != null) found.add('month');
   if (MONEY_RE.test(q)) found.add('money');
   if (MAINTENANCE_DUE_RE.test(q)) found.add('maintenance');
+  if (/\bwarrant/.test(q) && WARRANTY_STATUS_WORD_RE.test(q)) found.add('warranty');
   return found;
+}
+
+/** "active warranties" / "still under warranty" / "expired" / "out of
+ *  warranty" / "expiring soon" — a warranty-status condition the plan must
+ *  carry as a warrantyStatus filter. Live miss 2026-09-22 ("how many active
+ *  warranties do we have"): the model dropped the status and the count came
+ *  back as every unit, so this is decided in code like email/brand/geo. */
+const WARRANTY_STATUS_WORD_RE =
+  /\b(?:active|current|valid|still (?:under|covered|in) warranty|under warranty|in warranty|covered|expired|out of warranty|no longer (?:under|covered)|lapsed|expiring|expires? soon|about to expire|running out|unknown warranty|warranty (?:status )?unknown)\b/i;
+
+/** The warrantyStatus bucket a question names, or null. Pure. */
+export function warrantyStatusFromQuestion(question) {
+  const q = String(question ?? '').toLowerCase();
+  if (!/\bwarrant/.test(q)) return null;
+  if (/\bexpir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/.test(q)) return 'expiring';
+  if (/\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/.test(q)) return 'expired';
+  if (/\bunknown\b/.test(q)) return 'unknown';
+  if (/\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/.test(q)) return 'active';
+  return null;
 }
 
 const CONDITION_PLAN_FIELD = {
   email: 'hasEmail', phone: 'hasPhone', brand: 'brand', county: 'county',
-  city: 'city', state: 'state', zip: 'zip',
+  city: 'city', state: 'state', zip: 'zip', warranty: 'warrantyStatus',
 };
 
 /** Conditions detectedConditions(question) found that the validated PLAN has
@@ -1111,6 +1131,10 @@ export function buildConditionOverrideFilter(condition, question) {
   if (condition === 'zip') {
     const m = q.match(/\b(\d{5})\b/);
     return m ? { field: 'zip', op: 'eq', value: m[1] } : null;
+  }
+  if (condition === 'warranty') {
+    const status = warrantyStatusFromQuestion(q);
+    return status ? { field: 'warrantyStatus', op: 'eq', value: status } : null;
   }
   return null;
 }
@@ -1500,7 +1524,7 @@ export function buildAnalyticsSystemPrompt({ extraFewShot } = {}) {
 // "has X but no Y" question answers — a plan or answer cached under the old
 // behavior must never be served again just because its own prompt text
 // happened not to change.
-export const ANALYTICS_VERSION = 'analytics-v7';
+export const ANALYTICS_VERSION = 'analytics-v8';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
