@@ -135,43 +135,100 @@ export function customerSortName(name: string | null): string {
   return (tokens[tokens.length - 1] ?? n).toLowerCase();
 }
 
-export type CustomerSortBy = 'recent' | 'name' | 'docs' | 'equipment' | 'alerts';
+export type CustomerSortBy = 'recent' | 'name' | 'address' | 'docs' | 'equipment' | 'alerts';
 export const CUSTOMER_SORT_OPTIONS: { id: CustomerSortBy; label: string }[] = [
   { id: 'recent', label: 'Recent activity' },
   { id: 'name', label: 'Name A–Z' },
+  { id: 'address', label: 'Address A–Z' },
   { id: 'docs', label: 'Most documents' },
   { id: 'equipment', label: 'Most equipment' },
   { id: 'alerts', label: 'Alerts first' },
 ];
 
+export type CustomerSortDirection = 'asc' | 'desc';
+
+/** Each mode's own natural reading order — a name/address column reads A-Z,
+ *  a count column reads highest-first — so a caller (or a fixture test) that
+ *  omits `direction` keeps getting exactly the order it always has. Column
+ *  headers use this to pick the starting direction the first time a header
+ *  is clicked. */
+const DEFAULT_SORT_DIRECTION: Record<CustomerSortBy, CustomerSortDirection> = {
+  recent: 'desc',
+  name: 'asc',
+  address: 'asc',
+  docs: 'desc',
+  equipment: 'desc',
+  alerts: 'desc',
+};
+export function defaultSortDirection(by: CustomerSortBy): CustomerSortDirection {
+  return DEFAULT_SORT_DIRECTION[by];
+}
+
+/** The key the 'address' sort mode compares: city first, then street —
+ *  case/punctuation-insensitive (via `normalize`), blanks sort first.
+ *  Exported so the header click handler and fixture tests can pin it
+ *  directly, same as `customerSortName`. */
+export function customerSortAddress(c: CustomerSummary): [string, string] {
+  return [normalize(c.city ?? ''), normalize(c.serviceAddress ?? '')];
+}
+
 /** Sort is never a filter: it reorders, it never hides a row. A stable sort
  *  (ties broken by original position) so re-sorting the same list twice
- *  never visibly shuffles rows that compare equal. */
-export function sortCustomers(rows: CustomerSummary[], by: CustomerSortBy): CustomerSummary[] {
+ *  never visibly shuffles rows that compare equal. `direction` defaults to
+ *  each mode's own natural order (see `defaultSortDirection`) so existing
+ *  call sites that only ever passed `by` keep behaving exactly as before. */
+export function sortCustomers(rows: CustomerSummary[], by: CustomerSortBy, direction?: CustomerSortDirection): CustomerSummary[] {
+  const dir = direction ?? DEFAULT_SORT_DIRECTION[by];
   const totalAlerts = (c: CustomerSummary) => c.alerts.expiring + c.alerts.expired;
   const cmp = (a: CustomerSummary, b: CustomerSummary): number => {
     switch (by) {
-      case 'name':
-        return customerSortName(a.name).localeCompare(customerSortName(b.name));
-      case 'docs':
-        return b.documentCount - a.documentCount;
-      case 'equipment':
-        return b.equipmentCount - a.equipmentCount;
-      case 'alerts':
-        return totalAlerts(b) - totalAlerts(a);
+      case 'name': {
+        const c = customerSortName(a.name).localeCompare(customerSortName(b.name));
+        return dir === 'desc' ? -c : c;
+      }
+      case 'address': {
+        const [ac, aStreet] = customerSortAddress(a);
+        const [bc, bStreet] = customerSortAddress(b);
+        const c = ac.localeCompare(bc) || aStreet.localeCompare(bStreet);
+        return dir === 'desc' ? -c : c;
+      }
+      case 'docs': {
+        const c = a.documentCount - b.documentCount;
+        return dir === 'desc' ? -c : c;
+      }
+      case 'equipment': {
+        const c = a.equipmentCount - b.equipmentCount;
+        return dir === 'desc' ? -c : c;
+      }
+      case 'alerts': {
+        const c = totalAlerts(a) - totalAlerts(b);
+        return dir === 'desc' ? -c : c;
+      }
       case 'recent':
       default:
-        // Most recent first; no activity on file always sorts last.
+        // No activity on file always sorts last, regardless of direction —
+        // only which end the dated rows start from flips.
         if (!a.lastActivity && !b.lastActivity) return 0;
         if (!a.lastActivity) return 1;
         if (!b.lastActivity) return -1;
-        return b.lastActivity.localeCompare(a.lastActivity);
+        return dir === 'desc' ? b.lastActivity.localeCompare(a.lastActivity) : a.lastActivity.localeCompare(b.lastActivity);
     }
   };
   return rows
     .map((r, i) => ({ r, i }))
     .sort((x, y) => cmp(x.r, y.r) || x.i - y.i)
     .map((x) => x.r);
+}
+
+/** The alert pill's hover/focus tooltip text, built entirely from the
+ *  summary row's own per-tier counts (no per-row API call). Singular forms
+ *  where the count is 1; expired reported before expiring, since it is
+ *  always the more urgent of the two. Null when there's nothing to say. */
+export function alertsTooltip(alerts: { expiring: number; expired: number }): string | null {
+  const parts: string[] = [];
+  if (alerts.expired > 0) parts.push(`${alerts.expired} warrant${alerts.expired === 1 ? 'y' : 'ies'} expired`);
+  if (alerts.expiring > 0) parts.push(`${alerts.expiring} expiring within 90 days`);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /** The search box: name, customer number, address, phone, email — combined,

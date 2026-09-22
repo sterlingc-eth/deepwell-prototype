@@ -8,7 +8,9 @@ import {
   CUSTOMER_SORT_OPTIONS,
   DEFAULT_CUSTOMER_FILTERS,
   EQUIPMENT_OPTIONS,
+  alertsTooltip,
   cityOptions,
+  defaultSortDirection,
   describeActiveFilters,
   matchesCustomerFilters,
   matchesSearch,
@@ -16,13 +18,39 @@ import {
   type AlertsFilter,
   type CustomerFilters,
   type CustomerSortBy,
+  type CustomerSortDirection,
   type EquipmentFilter,
   type LastActivityFilter,
 } from '../core/customerFilters';
 import { defaultKeepId, pairKey, reduceDuplicates, visibleDuplicates } from '../core/duplicates';
 import { downloadExportCsv } from '../services/exportClient';
 import { IntegrityPanel } from '../components/IntegrityPanel';
+import { Tooltip } from '../components/Tooltip';
 import { useAppStore } from '../store/appStore';
+
+/** A "Sort:" header cell's clickable label + ▲/▼ direction indicator.
+ *  `aria-sort` belongs on the enclosing `<th>` (WAI-ARIA table sort
+ *  pattern), not here — the caller sets it. */
+function SortHeaderButton({
+  label, active, dir, onClick, align = 'left',
+}: { label: string; active: boolean; dir: CustomerSortDirection; onClick: () => void; align?: 'left' | 'right' }) {
+  return (
+    <button
+      type="button"
+      className={[
+        'inline-flex items-center gap-1 font-medium hover:text-ink',
+        align === 'right' ? 'flex-row-reverse' : '',
+        active ? 'text-ink' : 'text-ink-3',
+      ].join(' ')}
+      onClick={onClick}
+    >
+      {label}
+      <span aria-hidden="true" className="inline-block w-2.5 text-[10px] leading-none">
+        {active ? (dir === 'asc' ? '▲' : '▼') : ''}
+      </span>
+    </button>
+  );
+}
 
 /**
  * "Customers" tab on Records (BrowseScreen.tsx) — a searchable, filterable
@@ -45,6 +73,7 @@ export function CustomersScreen() {
   // touches more than one of them.
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<CustomerSortBy>('recent');
+  const [sortDir, setSortDir] = useState<CustomerSortDirection>('desc');
   const [rows, setRows] = useState<CustomerSummary[]>([]);
   const [duplicates, setDuplicates] = useState<CustomerDuplicatePair[]>([]);
   const [loading, setLoading] = useState(false);
@@ -197,7 +226,22 @@ export function CustomersScreen() {
   const cities = useMemo(() => cityOptions(rows), [rows]);
   const searched = useMemo(() => rows.filter((r) => matchesSearch(r, query)), [rows, query]);
   const filtered = useMemo(() => searched.filter((r) => matchesCustomerFilters(r, filters)), [searched, filters]);
-  const shown = useMemo(() => sortCustomers(filtered, sortBy), [filtered, sortBy]);
+  const shown = useMemo(() => sortCustomers(filtered, sortBy, sortDir), [filtered, sortBy, sortDir]);
+
+  // Column headers and the "Sort:" dropdown share this one pair of state —
+  // picking from the dropdown always resets to that mode's natural
+  // direction; clicking the already-active header flips it; clicking a
+  // different header switches to it at its natural direction, same as the
+  // dropdown would.
+  const clickSort = (col: CustomerSortBy) => {
+    if (sortBy === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(col);
+      setSortDir(defaultSortDirection(col));
+    }
+  };
+  const ariaSortFor = (col: CustomerSortBy) => (sortBy === col ? (sortDir === 'asc' ? 'ascending' as const : 'descending' as const) : undefined);
 
   const activeChips = useMemo(() => describeActiveFilters(filters), [filters]);
   const searchActive = query.trim().length > 0;
@@ -362,7 +406,16 @@ export function CustomersScreen() {
           </select>
           <span className="w-px self-stretch bg-line mx-1" aria-hidden="true" />
           <label className="sr-only" htmlFor="customer-sort">Sort by</label>
-          <select id="customer-sort" className="dw-input !w-auto !min-h-[36px] !py-1" value={sortBy} onChange={(e) => setSortBy(e.target.value as CustomerSortBy)}>
+          <select
+            id="customer-sort"
+            className="dw-input !w-auto !min-h-[36px] !py-1"
+            value={sortBy}
+            onChange={(e) => {
+              const next = e.target.value as CustomerSortBy;
+              setSortBy(next);
+              setSortDir(defaultSortDirection(next));
+            }}
+          >
             {CUSTOMER_SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>Sort: {o.label}</option>)}
           </select>
         </div>
@@ -393,12 +446,24 @@ export function CustomersScreen() {
           <thead>
             <tr className="border-b border-line text-caption text-ink-3">
               <th className="px-3 py-2">Number</th>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Address</th>
-              <th className="px-3 py-2 text-right">Docs</th>
-              <th className="px-3 py-2 text-right">Equipment</th>
-              <th className="px-3 py-2">Last activity</th>
-              <th className="px-3 py-2 text-right">Alerts</th>
+              <th className="px-3 py-2" aria-sort={ariaSortFor('name')}>
+                <SortHeaderButton label="Name" active={sortBy === 'name'} dir={sortDir} onClick={() => clickSort('name')} />
+              </th>
+              <th className="px-3 py-2" aria-sort={ariaSortFor('address')}>
+                <SortHeaderButton label="Address" active={sortBy === 'address'} dir={sortDir} onClick={() => clickSort('address')} />
+              </th>
+              <th className="px-3 py-2 text-right" aria-sort={ariaSortFor('docs')}>
+                <SortHeaderButton label="Docs" active={sortBy === 'docs'} dir={sortDir} onClick={() => clickSort('docs')} align="right" />
+              </th>
+              <th className="px-3 py-2 text-right" aria-sort={ariaSortFor('equipment')}>
+                <SortHeaderButton label="Equipment" active={sortBy === 'equipment'} dir={sortDir} onClick={() => clickSort('equipment')} align="right" />
+              </th>
+              <th className="px-3 py-2" aria-sort={ariaSortFor('recent')}>
+                <SortHeaderButton label="Last activity" active={sortBy === 'recent'} dir={sortDir} onClick={() => clickSort('recent')} />
+              </th>
+              <th className="px-3 py-2 text-right" aria-sort={ariaSortFor('alerts')}>
+                <SortHeaderButton label="Alerts" active={sortBy === 'alerts'} dir={sortDir} onClick={() => clickSort('alerts')} align="right" />
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -416,7 +481,9 @@ export function CustomersScreen() {
                 <td className="px-3 py-2 align-top text-ink-2 whitespace-nowrap">{c.lastActivity ? formatYmd(c.lastActivity) : '—'}</td>
                 <td className="px-3 py-2 align-top text-right">
                   {c.warrantyAlerts > 0 ? (
-                    <span className="dw-pill-warn inline-flex"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> {c.warrantyAlerts}</span>
+                    <Tooltip label={alertsTooltip(c.alerts)}>
+                      <span className="dw-pill-warn inline-flex"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> {c.warrantyAlerts}</span>
+                    </Tooltip>
                   ) : (
                     <span className="text-ink-3">—</span>
                   )}

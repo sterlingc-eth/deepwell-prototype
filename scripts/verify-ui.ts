@@ -45,7 +45,9 @@ import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
 import {
   DEFAULT_CUSTOMER_FILTERS,
+  alertsTooltip,
   cityOptions,
+  customerSortAddress,
   customerSortName,
   describeActiveFilters,
   matchesCustomerFilters,
@@ -1011,6 +1013,45 @@ function listFilesRecursive(dir: string): string[] {
   eq('sort=equipment: most equipment first', ids(sortCustomers(all, 'equipment')), ['c3', 'c6', 'c1', 'c4', 'c2', 'c5']);
   eq('sort=alerts: highest combined alert count first', ids(sortCustomers(all, 'alerts')), ['c3', 'c1', 'c2', 'c4', 'c5', 'c6']);
   eq('sort=recent: most recent activity first, no-activity rows always last (in original order)', ids(sortCustomers(all, 'recent')), ['c4', 'c6', 'c1', 'c3', 'c2', 'c5']);
+
+  /* ---- sortCustomers: explicit direction — owner feedback "I can't sort
+   * the customers by alphabetical order" (2026-09-22) added a direction
+   * parameter to every mode. Omitting it must still match every case above
+   * exactly (each mode's own default), and passing the opposite direction
+   * must flip the order while still breaking ties by original position. */
+  eq('sort=name, direction=asc matches the no-direction default (its natural order)', ids(sortCustomers(all, 'name', 'asc')), ids(sortCustomers(all, 'name')));
+  eq('sort=name, direction=desc: Z-A', ids(sortCustomers(all, 'name', 'desc')), ['c5', 'c4', 'c3', 'c6', 'c1', 'c2']);
+  eq(
+    'sort=docs, direction=asc: fewest documents first, ties still keep original order',
+    ids(sortCustomers(all, 'docs', 'asc')),
+    ['c5', 'c2', 'c4', 'c6', 'c1', 'c3'],
+  );
+  eq('sort=docs, direction=desc matches the no-direction default', ids(sortCustomers(all, 'docs', 'desc')), ids(sortCustomers(all, 'docs')));
+  eq(
+    'sort=recent, direction=asc: oldest activity first, no-activity rows still always last',
+    ids(sortCustomers(all, 'recent', 'asc')),
+    ['c3', 'c1', 'c6', 'c4', 'c2', 'c5'],
+  );
+
+  /* ---- customerSortAddress / sort=address: city then street, for the new
+   * sortable "Address" column header */
+  eq('customerSortAddress: [city, street], normalized, blanks first', customerSortAddress(c1), ['sterling', '1 main st']);
+  eq('customerSortAddress: a null city/street both normalize to \'\'', customerSortAddress(c2), ['sterling', '']);
+  eq(
+    'sort=address (default asc): by city A-Z, then street A-Z within a city; a null city sorts first',
+    ids(sortCustomers(all, 'address')),
+    ['c4', 'c5', 'c3', 'c2', 'c1', 'c6'],
+  );
+  eq('sort=address, direction=desc: exact reverse (every row has a distinct city/street key)', ids(sortCustomers(all, 'address', 'desc')), ['c6', 'c1', 'c2', 'c3', 'c5', 'c4']);
+
+  /* ---- alertsTooltip: the alert pill's hover/focus tooltip text — owner
+   * feedback "I should be able to hover over the alerts and see what the
+   * alerts are" (2026-09-22). Pure and built only from the summary row's own
+   * {expiring, expired} counts, no per-row API call. */
+  eq('alertsTooltip: both tiers, plural, expired reported first', alertsTooltip({ expiring: 1, expired: 2 }), '2 warranties expired · 1 expiring within 90 days');
+  eq('alertsTooltip: both zero -> null (nothing to say)', alertsTooltip({ expiring: 0, expired: 0 }), null);
+  eq('alertsTooltip: singular expired only', alertsTooltip({ expiring: 0, expired: 1 }), '1 warranty expired');
+  eq('alertsTooltip: singular expiring only', alertsTooltip({ expiring: 1, expired: 0 }), '1 expiring within 90 days');
 
   /* ---- matchesSearch: name/number/address/phone/email, case/punctuation-insensitive, padded number */
   check('matchesSearch: empty query matches everyone', all.every((c) => matchesSearch(c, '')));
