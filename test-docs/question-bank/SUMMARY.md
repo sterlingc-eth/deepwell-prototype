@@ -1,10 +1,10 @@
 # Question bank summary
 
-Generated: 2026-09-22T00:10:44.815Z
+Generated: 2026-09-22T02:01:15.419Z
 
-- Base questions: 724 (410 core + 314 HVAC persona)
+- Base questions: 746 (432 core + 314 HVAC persona)
 - Variants per base: 8
-- Total entries: 5792
+- Total entries: 5968
 
 ## Per category
 
@@ -23,6 +23,7 @@ Generated: 2026-09-22T00:10:44.815Z
 | lists | 160 |
 | live-misses-2026-09-21 | 160 |
 | live-misses-2026-09-21b | 56 |
+| live-misses-2026-09-22 | 176 |
 | lookups | 2120 |
 | maintenance-due | 64 |
 | money | 136 |
@@ -37,14 +38,14 @@ Generated: 2026-09-22T00:10:44.815Z
 
 | variant | entries |
 |---|---|
-| abbreviated | 724 |
-| canonical | 724 |
-| filler-prefix | 724 |
-| lowercase-no-punct | 724 |
-| statement-form | 724 |
-| trailing-context | 724 |
-| typo | 724 |
-| voice-style | 724 |
+| abbreviated | 746 |
+| canonical | 746 |
+| filler-prefix | 746 |
+| lowercase-no-punct | 746 |
+| statement-form | 746 |
+| trailing-context | 746 |
+| typo | 746 |
+| voice-style | 746 |
 
 ## Per persona (HVAC bank only)
 

@@ -146,6 +146,60 @@ export function fieldLabel(fieldKey) {
   return FIELD_LABELS[fieldKey] ?? fieldKey;
 }
 
+/**
+ * Plain-English synonyms per canonical document type id — the single source
+ * both api/_lib/docLookup.js (document-by-customer/type lookup) and
+ * api/_lib/analytics.js (the "has X but no Y" cross-doc filter) key off, so a
+ * synonym added here is recognized by both without hand-duplicating the list.
+ * Longest-phrase-first ordering is handled by docTypeSynonymAlternation()
+ * below, not by the order words are listed here.
+ */
+export const DOCUMENT_TYPE_SYNONYMS = {
+  'work-order': ['work order', 'work orders'],
+  invoice: ['invoice', 'invoices'],
+  'warranty-registration': ['warranty registration', 'warranty registrations', 'warranty reg', 'warranty regs'],
+  'startup-sheet': ['startup sheet', 'startup sheets'],
+  permit: ['permit', 'permits'],
+  'nameplate-photo': ['nameplate photo', 'nameplate photos', 'nameplate', 'nameplates', 'photo', 'photos'],
+  'maintenance-agreement': [
+    'maintenance agreement', 'maintenance agreements', 'agreement', 'agreements',
+    'contract', 'contracts', 'maintenance plan', 'maintenance plans',
+  ],
+  'service-ticket': ['service ticket', 'service tickets', 'ticket', 'tickets'],
+  'dispatch-note': ['dispatch note', 'dispatch notes'],
+  'proposal-quote': ['proposal', 'proposals', 'quote', 'quotes', 'estimate', 'estimates', 'proposal quote', 'proposal quotes'],
+  'inspection-report': ['inspection report', 'inspection reports'],
+  'purchase-order': ['purchase order', 'purchase orders', 'po'],
+  'equipment-record': ['equipment record', 'equipment records'],
+  correspondence: ['correspondence'],
+  internal: ['shop record', 'shop records'],
+};
+
+/** Canonical id for a single matched word/phrase (already lowercase from the
+ *  regex the alternation below builds), or null. Falls back to a literal
+ *  DOCUMENT_TYPE_IDS member so a caller that already has a canonical id can
+ *  pass it through unchanged. */
+export function docTypeFromWord(word) {
+  const w = String(word ?? '').trim().toLowerCase();
+  if (!w) return null;
+  for (const [id, words] of Object.entries(DOCUMENT_TYPE_SYNONYMS)) {
+    if (words.includes(w)) return id;
+  }
+  return DOCUMENT_TYPE_IDS.has(w) ? w : null;
+}
+
+/** One regex-alternation string of every synonym word/phrase across every
+ *  type, longest first so a multi-word phrase ("purchase order") matches
+ *  before a shorter word that happens to be its own suffix could. */
+export function docTypeSynonymAlternation() {
+  const all = [];
+  for (const words of Object.values(DOCUMENT_TYPE_SYNONYMS)) all.push(...words);
+  return [...new Set(all)]
+    .sort((a, b) => b.length - a.length)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+}
+
 export const AI_VERIFY_MIN_CONFIDENCE = 0.85;
 
 /**

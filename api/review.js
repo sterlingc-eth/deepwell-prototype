@@ -33,6 +33,13 @@ import { missReport, exportMisses } from './_lib/missStore.js';
 // Miss digest, Tier 1 of the self-learning loop (api/_lib/missDigest.js):
 // platform-operator-only, cross-tenant — a normal tenant admin never sees this.
 import { buildMissDigest, sendMissDigest, isPlatformOperator } from './_lib/missDigest.js';
+// Donovan self-learning, Tier 2 Part B (handoffs/DONOVAN_SELF_LEARNING_2026-09-22.md):
+// the operator-only proposal queue/decide/deactivate/run-now/export actions.
+// Same platform-operator gate as missDigest above — a tenant's own admin,
+// even the founder shop's non-founder admins, gets 403 on all five.
+import * as learningStore from './_lib/learning/store.js';
+import { verifyProposalLive } from './_lib/learning/verify.js';
+import { runLearningNow } from './_lib/learning/sweep.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -44,7 +51,12 @@ import { buildMissDigest, sendMissDigest, isPlatformOperator } from './_lib/miss
 // missDigest joins this bucket too: it's not a billed model call, but it's a
 // cross-tenant scan (list_ask_misses_window, capped at 5000 rows per window,
 // run twice) that an operator's dashboard could otherwise poll without limit.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest']);
+// learningRunNow joins this bucket too: unlike missDigest it's a REAL billed
+// model call (up to DONOVAN_LEARN_MAX_CALLS Haiku calls per invocation, see
+// api/_lib/learning/proposer.js) — all the more reason a runaway client tab
+// must not be able to poll it without limit.
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -113,6 +125,11 @@ const ACTIONS = new Set([
   'missReport',
   'exportMisses',
   'missDigest',
+  'learningList',
+  'learningDecide',
+  'learningDeactivate',
+  'learningRunNow',
+  'learningExport',
 ]);
 
 export default async (req, res) => {
@@ -140,6 +157,13 @@ export default async (req, res) => {
   }
 
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+
+  // Operator-only actions are gated BEFORE the rate limiter so a forged
+  // non-operator request never causes a resolve_tenant / counter write on its
+  // way to the 403 (reviewer, Tier 2 round, 2026-09-22).
+  if (OPERATOR_ACTIONS.has(action) && !isPlatformOperator(auth)) {
+    return res.status(403).json({ error: 'This action is restricted to DeepWell platform operators.' });
+  }
 
   if (INTEGRITY_RATE_LIMIT_ACTIONS.has(action)) {
     if (!(await limit(req, res, auth, 'write'))) return; // 429 already written
@@ -228,6 +252,83 @@ export default async (req, res) => {
         result = payload.send === true
           ? await sendMissDigest({ since: payload.since })
           : { digest: await buildMissDigest({ since: payload.since }) };
+        break;
+      case 'learningList': {
+        requireOperator(auth);
+        // Both the proposal queue AND the currently-active learned items in
+        // one round trip — the DonovanLearningCard UI needs both (pending
+        // proposals to decide, active items to deactivate) and there is no
+        // separate action for the latter (see api/_lib/learning/store.js's
+        // listActiveLearned).
+        const [items, activeLearned] = await Promise.all([
+          learningStore.listProposals({ status: payload.status ?? null, limit: payload.limit }),
+          learningStore.listActiveLearned(),
+        ]);
+        result = { items, activeLearned };
+        break;
+      }
+      case 'learningDecide': {
+        requireOperator(auth);
+        const id = payload.id;
+        const decision = payload.decision;
+        if (!id || (decision !== 'approved' && decision !== 'rejected')) {
+          throw new reviewStore.ReviewError('learningDecide requires an id and decision of "approved" or "rejected".', 400);
+        }
+        const proposal = await learningStore.getProposal(id);
+        if (!proposal) throw new reviewStore.ReviewError('Proposal not found.', 404);
+
+        if (decision === 'rejected') {
+          const ok = await learningStore.decideProposal(id, 'rejected', auth.userId);
+          if (!ok) throw new reviewStore.ReviewError('Could not reject this proposal.', 409);
+          result = { ok: true, status: 'rejected' };
+          break;
+        }
+
+        // Approve: RE-VERIFY against the CURRENT routing bank/vocabulary
+        // first — a proposal can go stale between being proposed and an
+        // operator clicking Approve (see learning/policy.js's own doc
+        // comment) — so a proposal that verified clean last night but would
+        // no longer pass today is refused rather than silently applied.
+        const verification = verifyProposalLive(
+          { kind: proposal.kind, payload: proposal.payload },
+          { missQuestions: proposal.evidence?.questions ?? [] }
+        );
+        if (!verification.ok) {
+          throw new reviewStore.ReviewError(
+            `This proposal no longer verifies cleanly and cannot be approved: ${verification.reasons.join('; ')}`,
+            409
+          );
+        }
+        const ok = await learningStore.decideProposal(id, 'approved', auth.userId);
+        if (!ok) throw new reviewStore.ReviewError('Could not approve this proposal.', 409);
+        result = { ok: true, status: 'approved', verification };
+        break;
+      }
+      case 'learningDeactivate': {
+        requireOperator(auth);
+        if (!payload.learnedId) throw new reviewStore.ReviewError('learningDeactivate requires a learnedId.', 400);
+        const ok = await learningStore.deactivateLearned(payload.learnedId);
+        if (!ok) throw new reviewStore.ReviewError('Learned item not found.', 404);
+        result = { ok: true };
+        break;
+      }
+      case 'learningRunNow':
+        requireOperator(auth);
+        result = await runLearningNow();
+        break;
+      case 'learningExport':
+        requireOperator(auth);
+        {
+          const rows = await learningStore.listProposals({ limit: 1000 });
+          result = {
+            items: rows
+              .filter((r) => r.status === 'approved' || r.status === 'auto_approved')
+              .map((r) => ({
+                id: r.id, kind: r.kind, payload: r.payload, status: r.status,
+                decidedAt: r.decided_at, decidedBy: r.decided_by, createdAt: r.created_at,
+              })),
+          };
+        }
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

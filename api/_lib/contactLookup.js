@@ -29,6 +29,7 @@
  */
 import { normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS } from "./analytics.js";
+import { documentTypeLabel } from "./documentTypes.js";
 
 /* ============================================================ shape detection */
 
@@ -276,6 +277,37 @@ const STREET_ONLY_RE = new RegExp(
   "i"
 );
 
+// Live 100-question persona sample (2026-09-22), cluster "contact card
+// completeness": "what's the serial on the Wyckoff unit" / "what's the model
+// on the Wyckoff unit" — the field word comes BEFORE "the <name> unit", not
+// after a "for"/possessive connector, so none of shapes 1-3 above match it.
+// Both map to field 'serial' (never a separate 'model' field): runContactLookup
+// answers either one with the customer's full equipment list, not a single
+// scalar — see attachEquipmentFacts' own doc comment below.
+const ON_THE_NAME_UNIT_RE =
+  /^what(?:'s|\s+is)\s+the\s+(?:serial(?:\s*number)?|model(?:\s*number)?)\s+(?:on|for|of)\s+the\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s+unit\s*\??$/i;
+
+// Live 100-question persona sample (2026-09-22), cluster "last visit/history
+// by customer": "when were we last at Ellison's", "when did we last service
+// Wyckoff", "last time we were at 322 N Greenfield", "how many times have we
+// been to Mercer's" — none of these contain FIELD_RE.lastVisit's own "last
+// visit"/"last service" words together, so they need their own shapes. A
+// trailing possessive ("Ellison's") is stripped by the caller (see
+// stripPossessive below); a phrase starting with a digit ("322 N
+// Greenfield") is treated the same as STREET_ONLY_RE's own street shape.
+const WHEN_LAST_AT_RE =
+  /^when\s+(?:were\s+we|was\s+(?:the\s+)?(?:tech|crew|team))\s+last\s+(?:at|out\s+to)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,3})\s*\??$/i;
+const WHEN_LAST_SERVICE_RE =
+  /^when\s+did\s+we\s+last\s+service\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s*\??$/i;
+const LAST_TIME_AT_RE =
+  /^last\s+time\s+we\s+were\s+(?:at|out\s+to)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,4})\s*\??$/i;
+const HOW_MANY_TIMES_RE =
+  /^how\s+many\s+times\s+have\s+we\s+been\s+(?:to|out\s+to)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,3})\s*\??$/i;
+
+function stripPossessive(s) {
+  return String(s ?? "").replace(/'s$/i, "");
+}
+
 function titleCase(s) {
   return s
     .split(/\s+/)
@@ -293,10 +325,11 @@ function titleCase(s) {
  * (runContactLookup) then defers to whatever would have handled the
  * question anyway.
  */
-export function parseContactLookupQuestion(question) {
+export function parseContactLookupQuestion(question, opts = {}) {
+  const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
   if (!raw) return null;
-  const q = stripTrailingChatter(fixFieldWordTypos(normalizeQuestion(raw).normalized));
+  const q = stripTrailingChatter(fixFieldWordTypos(normalizeQuestion(raw, { overlay }).normalized));
   if (!q) return null;
 
   // Shape 1: "<field> ... for/of <name>" (the original, more specific shape
@@ -362,6 +395,44 @@ export function parseContactLookupQuestion(question) {
     if (m) {
       const namePhrase = m[1].trim();
       if (namePhrase && isRealNamePhrase(namePhrase)) return { field: "full", namePhrase };
+    }
+  }
+
+  // Shape 3b: "what's the serial/model on the Wyckoff unit" — see
+  // ON_THE_NAME_UNIT_RE's own doc comment. Always field 'serial': both the
+  // serial and model wording resolve to the customer's full equipment list.
+  {
+    const m = q.match(ON_THE_NAME_UNIT_RE);
+    if (m) {
+      const namePhrase = m[1].trim();
+      if (namePhrase && isRealNamePhrase(namePhrase)) return { field: "serial", namePhrase };
+    }
+  }
+
+  // Shape 3c: visit-history questions with no "last visit"/"last service"
+  // field word (see WHEN_LAST_AT_RE et al.'s own doc comment). Tried against
+  // both `q` and the quantifier/filler-stripped `stripped` — same as Shape 4
+  // below — so a leading "show me"/"list" ("show me when did we last service
+  // Wyckoff") resolves the same way the bare form does. A trailing possessive
+  // ("Ellison's") is stripped before the name/street check; a phrase starting
+  // with a digit is treated as a street reference, the same "isStreet" shape
+  // Shape 4 already returns.
+  for (const candidate of [q, stripped]) {
+    for (const [re, field] of [
+      [WHEN_LAST_AT_RE, "lastVisit"],
+      [WHEN_LAST_SERVICE_RE, "lastVisit"],
+      [LAST_TIME_AT_RE, "lastVisit"],
+      [HOW_MANY_TIMES_RE, "visitCount"],
+    ]) {
+      const m = candidate.match(re);
+      if (!m) continue;
+      const captured = stripPossessive(m[1].trim());
+      if (!captured) continue;
+      if (/^\d/.test(captured)) {
+        const streetLabel = titleCase(captured);
+        return { field, namePhrase: captured, isStreet: true, street: captured, streetLabel };
+      }
+      if (isRealNamePhrase(captured)) return { field, namePhrase: captured };
     }
   }
 
@@ -689,8 +760,9 @@ export async function resolveStreetCandidates(db, street) {
  * comment), and a namePhrase that matches no customer is reported as a miss,
  * not guessed at.
  */
-export async function runContactLookup(db, question) {
-  const parsed = parseContactLookupQuestion(question);
+export async function runContactLookup(db, question, opts = {}) {
+  const overlay = opts?.overlay;
+  const parsed = parseContactLookupQuestion(question, { overlay });
   if (!parsed) return null;
 
   // Street-only shape (no customer name at all — see STREET_ONLY_RE's own
@@ -704,11 +776,162 @@ export async function runContactLookup(db, question) {
     const candidates = await resolveStreetCandidates(db, parsed.street);
     if (candidates.length === 0) return buildNoStreetMatchAnswer(parsed.streetLabel);
     if (candidates.length > 1) return buildStreetAmbiguousAnswer(parsed.streetLabel, candidates);
-    return buildContactAnswer("full", candidates[0]);
+    return buildResolvedAnswer(db, parsed.field === "lastVisit" || parsed.field === "visitCount" ? parsed.field : "full", candidates[0]);
   }
 
   const candidates = await resolveContactCandidates(db, parsed.namePhrase);
   if (candidates.length === 0) return null;
   if (candidates.length > 1) return buildAmbiguousContactAnswer(parsed.namePhrase, candidates);
-  return buildContactAnswer(parsed.field, candidates[0]);
+  return buildResolvedAnswer(db, parsed.field, candidates[0]);
+}
+
+/* ============================================================ item 2: last
+ * visit / visit history by customer, and item 3: contact card completeness
+ * (equipment facts). Both need `db` (a real query against extractions/
+ * equipment, not just the customer's own row), so they're orchestrated here
+ * rather than in the pure buildContactAnswer above — that function's
+ * existing behavior/signature is left untouched for its own callers/tests.
+ */
+const TENANT_SQL_VISITS = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+
+function formatVisitDateLabel(rawDate) {
+  const s = String(rawDate ?? "").trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (!m) return s || "an unknown date";
+  const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const idx = Number(m[2]) - 1;
+  if (idx < 0 || idx > 11) return s;
+  return `${MONTH_LABELS[idx]} ${Number(m[3])}, ${m[1]}`;
+}
+
+/**
+ * Every service-visit fact for one customer: their most recent service_date
+ * extraction (with the document's type and, if extracted, the technician),
+ * plus how many DISTINCT documents on file carry a service_date at all. Only
+ * looks at documents this customer is directly/equipment-linked to (
+ * db.listCustomerDocumentLinks) — a name-matched-but-never-linked document is
+ * deliberately not counted here, the same "never guess" caution
+ * buildAmbiguousContactAnswer's own doc comment states elsewhere in this
+ * file. Returns {mostRecent: null, count: 0} for a customer with no service
+ * visits on file at all — never a guess, never a crash.
+ */
+export async function computeVisitHistory(db, customerId) {
+  const linkRows = await db.listCustomerDocumentLinks(customerId);
+  const ids = [...new Set(linkRows.map((r) => r.document_id))];
+  if (!ids.length) return { mostRecent: null, count: 0 };
+
+  const { rows } = await db.raw(
+    `SELECT x.document_id, x.value AS service_date, d.document_type,
+            (SELECT t.value FROM extractions t
+              WHERE t.document_id = x.document_id AND t.field_key = 'technician' AND t.${TENANT_SQL_VISITS}
+              ORDER BY t.created_at DESC LIMIT 1) AS technician
+       FROM extractions x
+       JOIN documents d ON d.id = x.document_id
+      WHERE x.field_key = 'service_date' AND x.document_id = ANY($1::uuid[]) AND x.${TENANT_SQL_VISITS}
+      ORDER BY x.value DESC`,
+    [ids]
+  );
+  if (!rows.length) return { mostRecent: null, count: 0 };
+  const count = new Set(rows.map((r) => r.document_id)).size;
+  const top = rows[0];
+  return {
+    mostRecent: { date: top.service_date, documentType: top.document_type, technician: top.technician ?? null },
+    count,
+  };
+}
+
+/** Pure: {field, row-derived name, visit history} -> the final answer. Honest
+ *  zero when the customer has no service visits on file at all — never a
+ *  guess, matching every other honest-zero answer in this file. */
+export function buildVisitAnswer(field, row, visits) {
+  const name = row.customer_name || row.customer_number || "This customer";
+  if (!visits?.mostRecent) {
+    return {
+      kind: "answer", text: `No service visits on file for ${name}.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
+  const n = visits.count;
+  if (field === "visitCount") {
+    return {
+      kind: "answer", text: `${n} visit${n === 1 ? "" : "s"} to ${name} on file.`,
+      facts: [{ label: "Visits on file", value: String(n), sources: [] }],
+      sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
+    };
+  }
+  const dateLabel = formatVisitDateLabel(visits.mostRecent.date);
+  const typeLabel = documentTypeLabel(visits.mostRecent.documentType).toLowerCase();
+  const techPart = visits.mostRecent.technician ? `, tech ${visits.mostRecent.technician}` : "";
+  return {
+    kind: "answer",
+    text: `Last visit for ${name}: ${dateLabel} (${typeLabel}${techPart}). ${n} visit${n === 1 ? "" : "s"} on file.`,
+    facts: [
+      { label: "Last visit", value: dateLabel, sources: [] },
+      { label: "Visits on file", value: String(n), sources: [] },
+    ],
+    sources: [], confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
+  };
+}
+
+/** "M100017 · Trane XR16 · installed 2019-04-02 · warranty exp 2029-04-02" —
+ *  every equipment fact this codebase has for one unit, in one compact line.
+ *  Never guesses a value that isn't on the row; a unit with nothing at all
+ *  falls back to a plain placeholder rather than an empty string. */
+function equipmentFactValue(u) {
+  const parts = [];
+  if (u.serial_number) parts.push(u.serial_number);
+  const brandModel = [u.manufacturer, u.model].filter(Boolean).join(" ");
+  if (brandModel) parts.push(brandModel);
+  if (u.installation_date) parts.push(`installed ${u.installation_date}`);
+  const expires = u.warranty?.expires;
+  if (expires) parts.push(`warranty exp ${expires}`);
+  return parts.length ? parts.join(" · ") : "No details on file";
+}
+
+/**
+ * Item 3 (contact card completeness): appends one fact per unit on file to an
+ * already-built contact answer — "bracken serial" / "what's the serial on
+ * the Wyckoff unit" / a bare "pull up X" must return the unit(s), not just
+ * the single latest serial number buildContactAnswer's own 'serial' branch
+ * already names. Pure given the equipment rows (db.listCustomerEquipment's
+ * own shape); a customer with zero units on file gets the answer back
+ * unchanged (its own "No X on file"/full-card text already stands on its
+ * own).
+ */
+export function attachEquipmentFacts(answer, equipmentRows) {
+  if (!equipmentRows?.length) return answer;
+  const facts = equipmentRows.map((u, i) => ({
+    label: equipmentRows.length === 1 ? "Equipment" : `Unit ${i + 1}`,
+    value: equipmentFactValue(u),
+    sources: [],
+  }));
+  return { ...answer, facts: [...answer.facts, ...facts], verifiedCount: answer.verifiedCount + facts.length };
+}
+
+const EQUIPMENT_ATTACHED_FIELDS = new Set(["serial", "full"]);
+
+/** Resolves one candidate row to its final answer, dispatching on `field` —
+ *  the one place runContactLookup needs `db` beyond the name/street
+ *  resolution it already does. */
+async function buildResolvedAnswer(db, field, row) {
+  if (field === "lastVisit" || field === "visitCount") {
+    const visits = await computeVisitHistory(db, row.id);
+    return buildVisitAnswer(field, row, visits);
+  }
+  const answer = buildContactAnswer(field, row);
+  if (EQUIPMENT_ATTACHED_FIELDS.has(field)) {
+    // Item 3 (100-question persona sample, 2026-09-22): an enrichment step,
+    // never load-bearing for the answer itself — a db shim that doesn't (yet)
+    // implement listCustomerEquipment, or any other failure fetching it,
+    // still returns the plain contact card rather than throwing the whole
+    // lookup away.
+    try {
+      const equipmentRows = await db.listCustomerEquipment(row.id);
+      return attachEquipmentFacts(answer, equipmentRows);
+    } catch (err) {
+      console.error("attachEquipmentFacts: listCustomerEquipment failed, returning plain contact card:", err?.message);
+      return answer;
+    }
+  }
+  return answer;
 }

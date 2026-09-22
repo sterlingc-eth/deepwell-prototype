@@ -8,6 +8,7 @@ import { fetchNotifications, setEmailDigestPreference } from '../services/notify
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { DonovanMissesCard } from '../components/DonovanMissesCard';
+import { DonovanLearningCard } from '../components/DonovanLearningCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -149,6 +150,7 @@ export function TeamScreen() {
         {admin && <NotificationsCard />}
         {admin && <FollowupsCard />}
         {admin && <DonovanMissesCard />}
+        {admin && <DonovanLearningCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

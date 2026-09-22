@@ -528,6 +528,79 @@ for (const { q, expect } of LIVE_MISSES_2026_09_21b) {
   add('live-misses-2026-09-21b', q, expect);
 }
 
+/* ---- 100-question persona sample (2026-09-22) — items 1-8 --------------
+ * Regression pins for the eight feature clusters built this session:
+ *   1. document lookup by customer/address + type -> docLookup.js
+ *   2. last visit/history by customer -> contactLookup.js
+ *   3. contact card completeness (equipment facts) -> contactLookup.js
+ *   4. condition overrides (email/phone/brand/geo) -> analytics.js
+ *   5. extended time windows (this week, since <year>, ...) -> analytics.js
+ *   6. MONEY_RE additions (collected, fees, paid us, receivables, outstanding)
+ *   7. cross-doc "has X but no Y" -> analytics.js/routes/analytics.js
+ *   8. retrieval honest-zero for a resolved single-record question
+ * `route: 'lookup'` for 1-3 means "must not route to analytics" — the same
+ * convention LIVE_MISSES_2026_09_21 already uses, now additionally satisfied
+ * by isDocLookup (verify-question-bank.mjs's classify()) alongside
+ * isContactLookup. The actual DB-backed answer text for every item is
+ * unit-tested directly in scripts/verify-doclookup.mjs / verify-analytics.mjs
+ * — this script has no database (see its own header comment).
+ */
+const LIVE_MISSES_2026_09_22 = [
+  // 1. document lookup by customer/address + type.
+  { q: 'do we have a maintenance agreement on file for the Bracken job', expect: { route: 'lookup', singleRecord: true } },
+  { q: 'did we pull a permit for 322 N Greenfield Rd', expect: { route: 'lookup', singleRecord: true } },
+  { q: 'list invoices for Fitzgerald', expect: { route: 'lookup' } },
+  { q: 'what proposal did we give Amy Isaacson', expect: { route: 'lookup' } },
+  // must NOT hijack — stays analytics, exactly as before docLookup.js existed
+  // (the "must not hijack" half itself is unit-tested directly and precisely
+  // in scripts/verify-doclookup.mjs's own item 1 negatives).
+  { q: 'how many invoices this year', expect: { route: 'analytics' } },
+
+  // 2. last visit / history by customer.
+  { q: "when were we last at Ellison's", expect: { route: 'lookup' } },
+  { q: 'when did we last service Wyckoff', expect: { route: 'lookup' } },
+  { q: "how many times have we been to Mercer's", expect: { route: 'lookup' } },
+
+  // 3. contact card completeness (serial/model -> equipment facts).
+  { q: "what's the serial on the Wyckoff unit", expect: { route: 'lookup' } },
+  { q: "bracken serial", expect: { route: 'lookup' } },
+
+  // 4. condition overrides — email/phone/brand/geo the model's plan might
+  // silently drop, now filled in deterministically instead of an honest
+  // fallback. conditionsOnly documents what detectedConditions must catch.
+  { q: 'how many customers have no email on file', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['email'] } },
+  { q: 'which customers have a phone number on file', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['phone'] } },
+  { q: 'how many customers are in Mesa', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['city'] } },
+  { q: 'how many customers do we have in Arizona', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['state'] } },
+
+  // 5. extended time windows — resolveAnyTimeRange, not resolveQuestionTimeRange
+  // (this script's own timeRange check only calls the latter — see
+  // gen-question-bank.mjs's Step 14 comment). expect.unsupported: true marks
+  // these needs-capability (isNeedsCapability, verify-question-bank.mjs), the
+  // same conservative treatment the HVAC bank's own "this quarter"/relative-
+  // day-window entries already get — routing alone is checked offline; the
+  // real day-grain answer is unit-tested directly in verify-analytics.mjs.
+  { q: 'how many jobs did we do this week', expect: { route: 'analytics', entity: 'serviceVisits', unsupported: true } },
+  { q: 'how many customers did we bill year to date', expect: { route: 'analytics', entity: 'documents', unsupported: true } },
+  { q: 'how many jobs since 2024', expect: { route: 'analytics', entity: 'serviceVisits', unsupported: true } },
+
+  // 6. MONEY_RE additions — honest fallback, never a fabricated figure.
+  { q: 'how much have we collected this month', expect: { route: 'lookup', conditionsOnly: ['money'] } },
+  { q: 'what fees do we owe on the Mercer account', expect: { route: 'lookup', conditionsOnly: ['money'] } },
+  { q: 'what are our outstanding receivables', expect: { route: 'lookup', conditionsOnly: ['money'] } },
+
+  // 7. cross-doc "has X but no Y" — a fully deterministic up-front plan
+  // (parseCrossDocCondition), never reaching the model at all. Marked
+  // needs-capability since this script's classify() has no notion of it —
+  // checked directly in verify-analytics.mjs, which has a real db-free
+  // fixture for both the resolved and the unsupported half.
+  { q: 'customers with a proposal but no invoice', expect: { route: 'analytics', entity: 'customers', unsupported: true } },
+  { q: 'which customers have a maintenance agreement but no service this year', expect: { route: 'analytics', entity: 'customers', unsupported: true } },
+];
+for (const { q, expect } of LIVE_MISSES_2026_09_22) {
+  add('live-misses-2026-09-22', q, expect);
+}
+
 /* ============================================================ expand into the bank */
 
 const catSlug = (c) => c.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
@@ -612,3 +685,44 @@ writeFileSync(join(OUT_DIR, 'SUMMARY.md'), summary);
 console.log(`Generated ${numBases} base questions -> ${bank.length} entries.`);
 console.log(`Wrote ${join(OUT_DIR, 'bank.json')}`);
 console.log(`Wrote ${join(OUT_DIR, 'SUMMARY.md')}`);
+
+/* ============================================================ routing bank
+ * Tier 2 "Donovan learns nightly" (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md),
+ * Part A: a COMPACT export of the same bank — `[text, expectedRouteCode]`
+ * pairs only, no plan/timeRange/conditions detail — that
+ * api/_lib/learning/verify.js's verifyProposal() loads to run the ENTIRE
+ * bank through its own pure classifier and check a candidate learning
+ * proposal for regressions vs. the no-overlay baseline. Kept as a SEPARATE,
+ * smaller file (not read from bank.json directly) so that check stays cheap
+ * to load and diff, and so bank.json's own richer shape is free to grow
+ * without ever pushing this file over its own size budget.
+ *
+ * Route codes:
+ *   A — analytics (a real, supported aggregate/count/list/groupBy answer)
+ *   L — lookup / contact (contactLookup.js, or any other single-record
+ *       "who/what/where for NAME" shape that isn't a bare address)
+ *   R — retrieval (a genuine single-record reference: an address, a serial/
+ *       model token, a named record — fastPath/retrieval's own territory)
+ *   U — unsupported-honest (money/maintenance/no-such-filter honest
+ *       fallbacks, and every entry gen-question-bank.mjs marked
+ *       `unsupported: true` above, regardless of which route family it
+ *       otherwise names — "this reaches an honest fallback" is the thing
+ *       being pinned, not which internal path got it there)
+ */
+function routeCodeFor(expect) {
+  if (expect?.unsupported === true) return 'U';
+  if (expect?.route === 'analytics') return 'A';
+  if (expect?.route === 'lookup') return 'L';
+  if (expect?.route === 'retrieval') return 'R';
+  return 'R';
+}
+
+const routingBank = bank.map((e) => [e.text, routeCodeFor(e.expect)]);
+const routingBankJson = JSON.stringify(routingBank) + '\n';
+writeFileSync(join(OUT_DIR, 'routing-bank.json'), routingBankJson);
+const routingBankKb = Buffer.byteLength(routingBankJson, 'utf8') / 1024;
+console.log(`Wrote ${join(OUT_DIR, 'routing-bank.json')} (${routingBank.length} entries, ${routingBankKb.toFixed(1)} KB)`);
+if (routingBankKb > 600) {
+  console.error(`routing-bank.json is ${routingBankKb.toFixed(1)} KB, over the 600 KB budget`);
+  process.exitCode = 1;
+}

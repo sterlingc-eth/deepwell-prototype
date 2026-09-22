@@ -312,6 +312,73 @@ export interface MissExportItem {
   suggestedRoute: string;
 }
 
+/* -------------------------------------------------------- self-learning loop
+ * Tier 2 Part B (handoffs/DONOVAN_SELF_LEARNING_2026-09-22.md) — the nightly
+ * learner's proposal queue. Operator-only, same as MissDigest above (the
+ * server 403s anyone who isn't a platform operator). See
+ * api/_lib/learning/proposals.js's PROPOSAL_KINDS for `kind`, and
+ * M3-config/26-donovan-learning.sql for the `status` lifecycle. */
+
+export type LearningProposalKind = 'abbreviation' | 'typo' | 'synonym' | 'few_shot' | 'capability_gap';
+export type LearningProposalStatus = 'pending' | 'approved' | 'rejected' | 'auto_rejected' | 'auto_approved';
+
+/** api/_lib/learning/verify.js's verifyProposal/verifyProposalLive result,
+ *  stored verbatim on the proposal row at the time it was decided (or, for a
+ *  still-pending one, the check the sweep already ran before leaving it
+ *  pending). */
+export interface LearningVerification {
+  ok: boolean;
+  reasons: string[];
+  missFixed: { fixed: number; total: number };
+  bankPass: number;
+  bankTotal: number;
+  regressions: unknown[];
+  negativesPass: boolean;
+}
+
+export interface LearningProposal {
+  id: string;
+  kind: LearningProposalKind;
+  payload: Record<string, unknown>;
+  evidence: { questions?: string[]; count?: number; tenantCount?: number };
+  verification: LearningVerification;
+  status: LearningProposalStatus;
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+}
+
+export interface LearningRunSummary {
+  totalMissGroups?: number;
+  modelCallsMade?: number;
+  estimatedCostUsd?: number;
+  byStatus?: Record<string, number>;
+  byKind?: Record<string, number>;
+  skipped?: string;
+  error?: string;
+}
+
+/** One row of donovan_learned (M3-config/26-donovan-learning.sql) — an
+ *  ACTIVE learned item, deactivatable by `id`. */
+export interface LearningLearnedItem {
+  id: string;
+  kind: LearningProposalKind;
+  key: string;
+  value: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface LearningExportItem {
+  id: string;
+  kind: LearningProposalKind;
+  payload: Record<string, unknown>;
+  status: LearningProposalStatus;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  createdAt: string;
+}
+
 export const reviewClient = {
   /** Correct an extracted field, or add one that was never extracted. */
   correctField(documentId: string, fieldKey: string, value: string, by: string) {
@@ -440,5 +507,49 @@ export const reviewClient = {
    *  only shows the button when MissReport.isOperator says so. */
   missDigest(opts?: { since?: string; send?: boolean }) {
     return postJson<MissDigestResult>({ action: 'missDigest', since: opts?.since, send: opts?.send });
+  },
+
+  /** Platform-operator-only: the nightly learner's proposal queue AND the
+   *  currently-active learned items, in one round trip. `status` omitted
+   *  returns every proposal status; the server caps `limit` at 1000. */
+  learningList(opts?: { status?: LearningProposalStatus; limit?: number }) {
+    return postJson<{ items: LearningProposal[]; activeLearned: LearningLearnedItem[] }>({
+      action: 'learningList',
+      status: opts?.status,
+      limit: opts?.limit,
+    });
+  },
+
+  /** Approve or reject one pending proposal. An approve RE-VERIFIES against
+   *  the current routing bank/vocabulary server-side first — a stale
+   *  proposal (something changed since it was proposed) comes back as a 409,
+   *  not a silently-applied learned row. */
+  learningDecide(id: string, decision: 'approved' | 'rejected') {
+    return postJson<{ ok: boolean; status: LearningProposalStatus; verification?: LearningVerification }>({
+      action: 'learningDecide',
+      id,
+      decision,
+    });
+  },
+
+  /** Retires one ACTIVE donovan_learned row (soft-delete — its history and
+   *  the proposal it came from are kept). */
+  learningDeactivate(learnedId: string) {
+    return postJson<{ ok: boolean }>({ action: 'learningDeactivate', learnedId });
+  },
+
+  /** Runs the nightly learning sweep on demand ("Run learning now"). Same
+   *  work as the cron step, no once-per-day guard, but still a REAL billed
+   *  model call (up to DONOVAN_LEARN_MAX_CALLS Haiku calls) — the server
+   *  rate-limits this action for exactly that reason. */
+  learningRunNow() {
+    return postJson<LearningRunSummary>({ action: 'learningRunNow' });
+  },
+
+  /** approved + auto_approved items as JSON, for folding into the repo's
+   *  vocab/bank by the weekly Claude Code session (handoffs/
+   *  DONOVAN_SELF_LEARNING_2026-09-22.md's "weekly repo-sync step"). */
+  learningExport() {
+    return postJson<{ items: LearningExportItem[] }>({ action: 'learningExport' });
   },
 };

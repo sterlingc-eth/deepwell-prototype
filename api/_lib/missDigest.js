@@ -40,6 +40,12 @@
 import { getPool } from "./recordsStore.js";
 import { sendEmail } from "./email.js";
 import { capRecipients } from "./notify.js";
+// Tier 2 Part B (handoffs/DONOVAN_SELF_LEARNING_2026-09-22.md): read-only —
+// this file never writes a proposal, it only folds the LAST 24h's already-
+// decided ones into the digest so an operator sees "what Donovan proposed
+// last night" beside "what Donovan missed last night" in one place. Tolerant
+// of migration 26 not being applied (listProposals returns [] on its own).
+import { listProposals } from "./learning/store.js";
 
 /** Cross-tenant aggregation window default: the last 24h. Exported so
  *  scripts/verify-miss-digest.mjs and callers can reason about it without
@@ -241,6 +247,33 @@ export function buildDigestFromRows({ currentRows, priorRows, since, now }) {
   };
 }
 
+/* ------------------------------------------------- learning proposals fold-in */
+
+/**
+ * donovan_proposals rows -> `{total, byStatus, byKind}` for whichever of them
+ * were CREATED within [since, now) — i.e. by the most recent nightly learning
+ * run(s) that landed inside this digest's own 24h window. Pure (no DB, no
+ * clock read) so scripts/verify-learning.mjs can assert it against fabricated
+ * rows. A row with no created_at (shouldn't happen — the column is NOT NULL —
+ * but defensive) is excluded rather than crashing the comparison.
+ * @param {{status: string, kind: string, created_at: string|Date}[]} rows
+ * @param {string} sinceIso
+ */
+export function summarizeLearningProposals(rows, sinceIso) {
+  const byStatus = {};
+  const byKind = {};
+  let total = 0;
+  for (const row of rows ?? []) {
+    if (!row?.created_at) continue;
+    const createdIso = new Date(row.created_at).toISOString();
+    if (createdIso < sinceIso) continue;
+    total += 1;
+    if (row.status) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
+    if (row.kind) byKind[row.kind] = (byKind[row.kind] ?? 0) + 1;
+  }
+  return { total, byStatus, byKind };
+}
+
 /* -------------------------------------------------------------- DB reads */
 
 /**
@@ -271,17 +304,23 @@ export async function buildMissDigest({ since } = {}) {
   const sinceDate = since ? new Date(since) : new Date(now.getTime() - DIGEST_WINDOW_MS);
   const priorFrom = new Date(sinceDate.getTime() - NEW_LOOKBACK_MS);
 
-  const [currentRows, priorRows] = await Promise.all([
+  const [currentRows, priorRows, proposalRows] = await Promise.all([
     fetchMissWindow(sinceDate, now),
     fetchMissWindow(priorFrom, sinceDate),
+    // Tier 2 Part B: whatever the nightly learning step has proposed lately —
+    // listProposals is already tolerant of migration 26 not being applied
+    // (returns [] rather than throwing), so this costs nothing extra to try.
+    listProposals({ limit: 200 }),
   ]);
 
-  return buildDigestFromRows({
+  const digest = buildDigestFromRows({
     currentRows,
     priorRows,
     since: sinceDate.toISOString(),
     now: now.toISOString(),
   });
+  digest.learning = summarizeLearningProposals(proposalRows, digest.since);
+  return digest;
 }
 
 /* ------------------------------------------------------------- rendering */
@@ -297,8 +336,14 @@ function escapeHtml(s) {
  * @param {string} dateLabel e.g. "2026-09-22"
  */
 export function renderMissDigestEmail(digest, dateLabel) {
-  const { totals, groups, topQuestions } = digest;
+  const { totals, groups, topQuestions, learning } = digest;
   const subject = `Donovan misses — ${dateLabel}: ${totals.newQuestionsCount} new, ${totals.totalMisses} total`;
+
+  // Tier 2 Part B: a "Proposed fixes" section, only when there's anything to
+  // show — a digest built before migration 26 or before the learning step
+  // has ever run has `learning.total === 0` and gets exactly the old email.
+  const hasLearning = Boolean(learning?.total);
+  const statusLine = (byMap) => Object.entries(byMap ?? {}).map(([k, n]) => `${n} ${k}`).join(", ");
 
   const textLines = [
     subject,
@@ -311,6 +356,9 @@ export function renderMissDigestEmail(digest, dateLabel) {
     ...topQuestions.map(
       (q) => `  - ${q.isNew ? "[NEW] " : ""}"${q.question}" (${q.outcome}) — ${q.count}x across ${q.tenantCount} tenant(s)`
     ),
+    ...(hasLearning
+      ? ["", `Proposed fixes (last 24h): ${learning.total} total — ${statusLine(learning.byStatus)}.`]
+      : []),
   ];
 
   const html =
@@ -325,7 +373,10 @@ export function renderMissDigestEmail(digest, dateLabel) {
           `<tr><td>${escapeHtml(q.question)}</td><td>${escapeHtml(q.outcome ?? "")}</td><td>${q.count}</td><td>${q.tenantCount}</td><td>${q.isNew ? "new" : ""}</td></tr>`
       )
       .join("\n") +
-    `</tbody></table>`;
+    `</tbody></table>` +
+    (hasLearning
+      ? `<p><strong>Proposed fixes (last 24h)</strong>: ${learning.total} total — ${escapeHtml(statusLine(learning.byStatus))}.</p>`
+      : "");
 
   return { subject, text: textLines.join("\n"), html };
 }
@@ -334,7 +385,9 @@ export function renderMissDigestEmail(digest, dateLabel) {
 
 async function writeFounderNotification(founderTenantKey, digest, dateLabel) {
   const title = `Donovan misses — ${dateLabel}: ${digest.totals.newQuestionsCount} new, ${digest.totals.totalMisses} total`;
-  const body = `${digest.totals.totalTenants} tenant(s), ${digest.totals.totalQuestions} distinct question(s) in the last 24h.`;
+  const body =
+    `${digest.totals.totalTenants} tenant(s), ${digest.totals.totalQuestions} distinct question(s) in the last 24h.` +
+    (digest.learning?.total ? ` ${digest.learning.total} learning proposal(s) proposed.` : "");
   try {
     const { rows } = await getPool().query("SELECT insert_platform_notification($1,$2,$3,$4,$5) AS ok", [
       founderTenantKey,

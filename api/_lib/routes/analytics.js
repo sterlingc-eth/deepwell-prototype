@@ -16,18 +16,24 @@ import { getCacheEntry, isCacheHit } from '../askCache.js';
 import { documentTypeLabel } from '../documentTypes.js';
 import {
   ANALYTICS_TOOL,
-  ANALYTICS_SYSTEM_PROMPT,
+  buildAnalyticsSystemPrompt,
   ANALYTICS_PROMPT_VERSION,
   analyticsQuestionHash,
   analyticsPlanHash,
   suspiciousUnfilteredCustomerPlan,
   reconcileTimeRange,
   resolveServiceVisitsOverride,
+  resolveAnyTimeRange,
+  withinTimeRange,
   missingConditions,
   detectedConditions,
   unsupportedConditionAnswer,
+  buildConditionOverrideFilter,
+  parseCrossDocCondition,
+  crossDocUnsupportedAnswer,
   moneyFallbackAnswer,
   BOOLEAN_FILTER_FIELDS,
+  DOC_TYPE_FILTER_FIELDS,
   validatePlan,
   deriveGeo,
   normalizeStateValue,
@@ -42,6 +48,11 @@ import {
   TOP_CUSTOMERS_LIMIT,
 } from '../analytics.js';
 import { normalizeQuestion } from '../nlNormalize.js';
+// Tier 2 learning loop, Part A (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
+// overlayFewShotHash mixes the active overlay's few-shot items into this
+// file's own analytics cache promptVersion (see runAnalyticsQuestion below)
+// so approving a new example invalidates every previously-cached plan.
+import { overlayFewShotHash } from '../learning/overlay.js';
 
 export const ANALYTICS_MODEL = process.env.ANALYTICS_MODEL || process.env.ASK_MODEL || 'claude-haiku-4-5';
 export function isAnalyticsEnabled(env = process.env) {
@@ -55,10 +66,16 @@ export function isAnalyticsEnabled(env = process.env) {
  * like a fast-path miss: run retrieval+model instead. `max_tokens` is small
  * (a plan is a handful of enum strings) — see the brief's cost note.
  */
-export async function planAnalyticsQuestion(question, { today } = {}) {
+export async function planAnalyticsQuestion(question, { today, overlay } = {}) {
   try {
     const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
     const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
+    // Tier 2 learning (Part A): the active overlay's approved few-shot
+    // examples, appended after the curated ANALYTICS_FEW_SHOT_BLOCK — see
+    // buildAnalyticsSystemPrompt's own doc comment for the 12-item/500-token
+    // cap. No overlay (or none with few-shot items) returns the exact same
+    // ANALYTICS_SYSTEM_PROMPT constant as before this existed.
+    const systemPrompt = buildAnalyticsSystemPrompt({ extraFewShot: overlay?.fewShot });
     const response = await withBackoff(
       () =>
         client.messages.create(
@@ -66,7 +83,7 @@ export async function planAnalyticsQuestion(question, { today } = {}) {
             model: ANALYTICS_MODEL,
             max_tokens: 400,
             temperature: 0,
-            system: ANALYTICS_SYSTEM_PROMPT,
+            system: systemPrompt,
             tools: [ANALYTICS_TOOL],
             tool_choice: { type: 'tool', name: 'analytics_plan' },
             messages: [{ role: 'user', content: `Today's date: ${today}\n\nQUESTION: ${question}` }],
@@ -147,15 +164,18 @@ function shapeDocumentRow(r) {
   // Item 1: month by the WORK date (extractions.service_date, left-joined in
   // buildAnalyticsSQL's documents branch), not the upload date — falls back
   // to created_at only for a document nothing was ever extracted as its
-  // service_date for.
-  const month = r.service_date
-    ? String(r.service_date).slice(0, 7)
-    : r.created_at
-      ? new Date(r.created_at).toISOString().slice(0, 7)
-      : null;
+  // service_date for. `date` (item 5, 2026-09-22) is the same value at full
+  // day precision, for the extended day-grain time windows (this week,
+  // since 2024, ...) that a month truncation alone can't compare correctly —
+  // see analytics.js's withinTimeRange.
+  const fullDate = r.service_date && /^\d{4}-\d{2}-\d{2}/.test(String(r.service_date))
+    ? String(r.service_date).slice(0, 10)
+    : null;
+  const date = fullDate ?? (r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : null);
+  const month = date ? date.slice(0, 7) : r.service_date ? String(r.service_date).slice(0, 7) : null;
   return {
     id: r.id, label: documentTypeLabel(r.document_type), value: r.original_filename || r.id,
-    entityId: undefined, documentType: r.document_type, month,
+    entityId: undefined, documentType: r.document_type, month, date,
   };
 }
 
@@ -164,7 +184,7 @@ function shapeDocumentRow(r) {
  *  entity. Rather than silently ignoring it (answering a DIFFERENT question
  *  than what was asked), treat it as a fall-through, same as an invalid plan. */
 const ENTITY_SUPPORTED_FIELDS = {
-  customers: new Set(['state', 'county', 'city', 'zip', 'customerName', 'hasEmail', 'hasPhone']),
+  customers: new Set(['state', 'county', 'city', 'zip', 'customerName', 'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType']),
   equipment: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus']),
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus']),
   documents: new Set(['documentType']),
@@ -343,6 +363,48 @@ async function queryTopCustomers(db, sortBy, limit) {
   });
 }
 
+/**
+ * Item 7 (100-question persona sample, 2026-09-22): "customers with a
+ * proposal but no invoice" — hasDocType/lacksDocType filters, resolved by
+ * finding every customer directly/manually linked (document_entity_links) to
+ * a document of the "has" type, then excluding any of THOSE customers also
+ * linked to a document of the "lacks" type (when one is given at all — a
+ * bare hasDocType with no lacksDocType is just "which customers have an X").
+ * Deliberately simpler than queryCustomersByEquipmentFilter's own join: only
+ * documents linked straight to the customer entity count (not a document
+ * reachable only via one of their units, and not a name-matched-but-never-
+ * linked document) — a maintenance agreement or invoice is, in practice,
+ * always a customer-scoped document, never an equipment-scoped one, so this
+ * trade-off costs nothing on the corpus this ships against.
+ */
+async function queryCustomersByDocTypeCondition(db, plan) {
+  const hasFilter = (plan.filters ?? []).find((f) => f.field === 'hasDocType');
+  const lacksFilter = (plan.filters ?? []).find((f) => f.field === 'lacksDocType');
+  if (!hasFilter) return { rows: [] };
+
+  const docCustomerSql = `
+    SELECT DISTINCT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address,
+           c.data->>'email' AS email, c.data->>'phone' AS phone
+      FROM entities c
+      JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
+      JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+     WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND d.document_type = $1`;
+
+  const { rows: hasRows } = await db.raw(docCustomerSql, [hasFilter.value]);
+  if (!lacksFilter) return { rows: hasRows.map((r) => shapeCustomerRow(r)) };
+
+  const { rows: lacksRows } = await db.raw(
+    `SELECT DISTINCT c.id
+       FROM entities c
+       JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
+       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+      WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND d.document_type = $1`,
+    [lacksFilter.value]
+  );
+  const lacksIds = new Set(lacksRows.map((r) => r.id));
+  return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+}
+
 function keyOf(groupBy) {
   return (row) => {
     if (groupBy === 'warrantyStatus') return row.warrantyStatus ?? UNKNOWN_BUCKET;
@@ -356,7 +418,7 @@ function keyOf(groupBy) {
  * recordsStore.js store (has `.raw`), called from inside a withTenant
  * transaction — same calling convention as fastPathQuery.js.
  */
-export async function executeAnalyticsPlan(db, plan, { today } = {}) {
+export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } = {}) {
   // "who's our biggest customer" (round 4, item 1) — a distinct shape from
   // every other op: ranked, not filtered/counted. validatePlan already
   // guarantees sortBy only ever appears with entity 'customers' + op 'list'.
@@ -369,6 +431,15 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
 
   const hasEquipmentJoinFilter =
     plan.entity === 'customers' && (plan.filters ?? []).some((f) => EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN.has(f.field));
+  // Item 7 (100-question persona sample, 2026-09-22): hasDocType/lacksDocType
+  // are resolved by their own dedicated query (queryCustomersByDocTypeCondition
+  // above) — never by buildAnalyticsSQL, which has no notion of a
+  // document_entity_links join. Checked before hasEquipmentJoinFilter since
+  // the two are mutually exclusive in practice (validatePlan never mixes an
+  // equipment-level filter into a cross-doc plan) but this ordering costs
+  // nothing either way.
+  const hasDocTypeFilter =
+    plan.entity === 'customers' && (plan.filters ?? []).some((f) => DOC_TYPE_FILTER_FIELDS.includes(f.field));
 
   let rows;
   // Set only in the serviceVisits branch below, from the SAME already-fetched
@@ -376,7 +447,9 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
   // formatAnalyticsAnswer's own doc comment for how this powers the honest
   // zero-result wording ("which units had service this month" live miss).
   let mostRecentServiceVisit;
-  if (hasEquipmentJoinFilter) {
+  if (hasDocTypeFilter) {
+    ({ rows } = await queryCustomersByDocTypeCondition(db, plan));
+  } else if (hasEquipmentJoinFilter) {
     // Gaps 1 + 3: "which customers have Trane units" — a customer filtered
     // by an equipment-level attribute. queryCustomersByEquipmentFilter already
     // applies every filter itself (equipment-level AND the geo ones a unit's
@@ -395,13 +468,14 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeDocumentRow(r));
-    if (plan.timeRange) {
-      rows = rows.filter((r) => {
-        if (plan.timeRange.from && (r.month ?? '') < plan.timeRange.from.slice(0, 7)) return false;
-        if (plan.timeRange.to && (r.month ?? '') > plan.timeRange.to.slice(0, 7)) return false;
-        return true;
-      });
-    }
+    // Item 5 (100-question persona sample, 2026-09-22): withinTimeRange
+    // compares on the row's own `date` (full YYYY-MM-DD) when plan.timeRange
+    // is itself day-grain (the new "this week"/"last N days"/etc. windows —
+    // see resolveExtendedTimeRange in analytics.js), and falls back to the
+    // pre-existing month-grain `month` comparison for a plain "August 2026"
+    // style range — never a raw-date-vs-month-bound lexicographic compare
+    // (see the serviceVisits branch's own comment below for why that traps).
+    if (plan.timeRange) rows = rows.filter((r) => withinTimeRange(r, plan.timeRange));
   } else {
     // serviceVisits: service_date + technician are two different
     // extractions.field_key rows for the same document — fetched separately
@@ -451,16 +525,21 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
     // YYYY-MM) against the bound truncated the same way, exactly like the
     // documents branch above already does — never the raw date against a
     // bound of a different granularity.
-    rows = plan.timeRange
-      ? allServiceVisitRows.filter((r) => {
-          if (plan.timeRange.from && (r.month ?? '') < plan.timeRange.from.slice(0, 7)) return false;
-          if (plan.timeRange.to && (r.month ?? '') > plan.timeRange.to.slice(0, 7)) return false;
-          return true;
-        })
-      : allServiceVisitRows;
+    // Item 5: same withinTimeRange helper as the documents branch above — day
+    // grain for the new extended windows, month grain (via r.month) otherwise.
+    rows = plan.timeRange ? allServiceVisitRows.filter((r) => withinTimeRange(r, plan.timeRange)) : allServiceVisitRows;
   }
 
-  const filtered = applyEntityFilters(rows, plan.filters);
+  // hasDocType/lacksDocType are already fully resolved by
+  // queryCustomersByDocTypeCondition's own two queries above — matchesFilter
+  // has no notion of either field (row[field] is always undefined for them),
+  // so re-applying them here would zero out every row. Every OTHER filter in
+  // the plan (a geo filter combined with the doc-type condition, say) still
+  // needs this pass, same as hasEquipmentJoinFilter's own rows above.
+  const filtersToApply = hasDocTypeFilter
+    ? (plan.filters ?? []).filter((f) => !DOC_TYPE_FILTER_FIELDS.includes(f.field))
+    : plan.filters;
+  const filtered = applyEntityFilters(rows, filtersToApply);
   const total = filtered.length;
 
   let groups = [];
@@ -497,7 +576,7 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
   }
 
   return formatAnalyticsAnswer(plan, {
-    total, groups, rows: filtered, sum, unfilteredTotal, broaderGroups, mostRecentServiceVisit,
+    total, groups, rows: filtered, sum, unfilteredTotal, broaderGroups, mostRecentServiceVisit, timeRangeLabel,
   });
 }
 
@@ -523,7 +602,7 @@ export async function executeAnalyticsPlan(db, plan, { today } = {}) {
  *                    stays easy to call from ask.js without a second import
  *                    cycle back through recordsStore.
  */
-export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today }) {
+export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today, overlay }) {
   const EMPTY = { handled: false, data: null, cacheHit: false, modelCalled: false, writes: [] };
   // Day 1 training-plan normalization layer (nlNormalize.js): both the plan
   // and every cache key below key off the NORMALIZED text (more cache hits,
@@ -531,7 +610,13 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
   // hits the same Tier-1 row) — `question` itself is kept only for anything
   // that might ever need to show the dispatcher back their own original
   // wording, which nothing in this file currently does.
-  const { normalized: question_n } = normalizeQuestion(question);
+  const { normalized: question_n } = normalizeQuestion(question, { overlay });
+  // Tier 2 learning (Part A): the promptVersion namespace now also carries a
+  // fingerprint of the active overlay's own few-shot items, so approving (or
+  // retiring) one invalidates every previously-cached analytics answer —
+  // otherwise a plan cached under the OLD prompt could be served forever
+  // even after the planner starts seeing a new example.
+  const promptVersion = `${ANALYTICS_PROMPT_VERSION}:${overlayFewShotHash(overlay)}`;
   try {
     // Reviewer NO-GO (2026-09-21, round 6): production still served a stale
     // cached "49 customers." for maintenance-due questions after this file's
@@ -557,10 +642,40 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
       };
     }
 
+    // Item 7 (100-question persona sample, 2026-09-22): "customers with a
+    // proposal but no invoice" — a fully deterministic hasDocType/lacksDocType
+    // plan, decided the same up-front way as money/maintenance above (never
+    // asked of the model — see parseCrossDocCondition's own doc comment in
+    // analytics.js for why this is safer than teaching the planner a new
+    // vocabulary). A cross-doc phrasing paired with a time window this file
+    // can't express against a customers-level plan (e.g. "...but no service
+    // this year" — service visits aren't a document type) falls back
+    // honestly, naming the unsupported half, rather than silently ignoring it.
+    const cross = parseCrossDocCondition(question_n);
+    if (cross) {
+      if (cross.unsupported) {
+        return {
+          handled: true, data: crossDocUnsupportedAnswer(cross), cacheHit: false, modelCalled: false, writes: [],
+          missOutcome: 'cross-doc-unsupported',
+        };
+      }
+      const crossPlan = {
+        entity: 'customers', op: 'list',
+        filters: [
+          { field: 'hasDocType', op: 'eq', value: cross.hasType },
+          ...(cross.lacksType ? [{ field: 'lacksDocType', op: 'eq', value: cross.lacksType }] : []),
+        ],
+      };
+      const data = await withTenant(ctxArg, (db) => executeAnalyticsPlan(db, crossPlan, { today }));
+      if (data) return { handled: true, data, cacheHit: false, modelCalled: false, writes: [] };
+      // Fell through (no data) — treat like any other unusable plan and let
+      // ask.js's own retrieval+model path take the question instead.
+    }
+
     // ---- Tier 1: exact question text, checked BEFORE the Haiku call -------
     const qHash = analyticsQuestionHash(question_n);
     const qProbe = await withTenant(ctxArg, (db) =>
-      getCacheEntry(db, { questionHash: qHash, today, promptVersion: ANALYTICS_PROMPT_VERSION })
+      getCacheEntry(db, { questionHash: qHash, today, promptVersion })
     );
     if (isCacheHit(qProbe.row, qProbe.corpusStamp)) {
       return { handled: true, data: qProbe.row.answer, cacheHit: true, modelCalled: false, writes: [] };
@@ -576,7 +691,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // after — that fallback's own model call is the one actually counted
     // for the question (see api/ask.js's own doc comment at its call site),
     // so this file never double-reports one question as two.
-    const plan = await planAnalyticsQuestion(question_n, { today });
+    const plan = await planAnalyticsQuestion(question_n, { today, overlay });
     if (!plan) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a
@@ -592,29 +707,55 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // (exactly item 2's original bug shape). Answered honestly instead of
     // executed or falling through, and not cached — see missingConditions'
     // own doc comment in analytics.js.
+    // Item 4 (100-question persona sample, 2026-09-22): a condition the
+    // question named but the model's plan dropped is no longer an automatic
+    // honest fallback — buildConditionOverrideFilter first tries to add the
+    // filter deterministically (email/phone polarity from "no"/"without" vs
+    // "have"/"on file"; brand/county/city/state/zip from the matched word
+    // itself). Only a condition it genuinely can't resolve this way still
+    // falls back honestly, and only for that one condition.
     const missing = missingConditions(plan, question_n);
+    let planWithOverrides = plan;
     if (missing.size > 0) {
-      const [condition] = missing;
-      return {
-        handled: true, data: unsupportedConditionAnswer(condition, plan.entity), cacheHit: false, modelCalled: true, writes: [],
-        missOutcome: 'unsupported-condition', missMeta: { condition, plan },
-      };
+      const stillMissing = [];
+      const addedFilters = [];
+      for (const condition of missing) {
+        const override = buildConditionOverrideFilter(condition, question_n);
+        if (override) addedFilters.push(override);
+        else stillMissing.push(condition);
+      }
+      if (stillMissing.length > 0) {
+        const [condition] = stillMissing;
+        return {
+          handled: true, data: unsupportedConditionAnswer(condition, plan.entity), cacheHit: false, modelCalled: true, writes: [],
+          missOutcome: 'unsupported-condition', missMeta: { condition, plan },
+        };
+      }
+      planWithOverrides = { ...plan, filters: [...(plan.filters ?? []), ...addedFilters] };
     }
 
     // ---- Tier 2: the plan itself, checked once the plan is known ----------
     // Two different phrasings that resolve to the identical plan reuse one
     // answer here without ever re-running the SQL — see analyticsPlanHash's
     // own doc comment for why this can never collide with a DIFFERENT plan.
-    const pHash = analyticsPlanHash(plan);
+    // Hashed with the overrides already applied (planWithOverrides) so a
+    // question needing a condition override never shares a cache row with
+    // one that didn't.
+    const pHash = analyticsPlanHash(planWithOverrides);
     const pProbe = await withTenant(ctxArg, (db) =>
-      getCacheEntry(db, { questionHash: pHash, today, promptVersion: ANALYTICS_PROMPT_VERSION })
+      getCacheEntry(db, { questionHash: pHash, today, promptVersion })
     );
+    // Item 5: the extended windows' own label ("in Q2 2026", "year to date",
+    // ...) — resolveAnyTimeRange re-derives it from the question text rather
+    // than threading it through planAnalyticsQuestion/validatePlan, since the
+    // label is display-only and never part of the closed plan vocabulary.
+    const timeRangeLabel = planWithOverrides.timeRange ? resolveAnyTimeRange(question_n, today)?.label ?? null : null;
 
     let data;
     if (isCacheHit(pProbe.row, pProbe.corpusStamp)) {
       data = pProbe.row.answer;
     } else {
-      data = await withTenant(ctxArg, (db) => executeAnalyticsPlan(db, plan, { today }));
+      data = await withTenant(ctxArg, (db) => executeAnalyticsPlan(db, planWithOverrides, { today, timeRangeLabel }));
       if (!data) return { ...EMPTY, modelCalled: true };
     }
 

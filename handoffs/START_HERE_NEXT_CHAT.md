@@ -130,3 +130,30 @@ one implementation agent + one reviewer per round; avoid re-reading big files.
   ~3.5 days). Owner has not yet said go.
 - Do NOT claim an accuracy % for business questions on the website until the
   bank is measured live at ≥97%; document lookup keeps its measured claim.
+
+## 2026-09-22 — bank expansion, self-learning loop, Tier 3 lookups (deploy-0922a..d)
+- Bank: 724 base / 5,968 entries incl. 314 HVAC persona questions
+  (test-docs/question-bank/hvac-personas.mjs; owner/office/tech/bookkeeper);
+  offline routing 100%; routing-bank.json is the compact copy the API uses to
+  verify learning proposals.
+- Tier 1: nightly cross-tenant miss digest (api/_lib/missDigest.js, M3-config/25)
+  → email via Resend (DEEPWELL_OWNER_ALERT_EMAILS) + founder bell; operator-only
+  "Send digest now". Migration 25 was corrected (notifications has no unit_id).
+- Tier 2: self-learning (handoffs/DONOVAN_SELF_LEARNING_2026-09-22.md,
+  api/_lib/learning/*, M3-config/26): nightly proposer (deterministic typo/abbrev
+  + ≤20 Haiku calls) → every proposal verified against the full routing bank +
+  negatives → auto-approve only typo/abbrev (DONOVAN_AUTO_LEARN=vocab default),
+  synonyms/few-shot pending for operator approve on the Team screen; learned
+  overlay applied at request time (10-min cache); weekly repo sync via
+  learningExport → gen-question-bank / vocab. Operator gate before rate limit.
+- Tier 3: api/_lib/docLookup.js (documents by customer/address + type, honest
+  zero), last-visit/history + unit facts in the contact card, deterministic
+  condition overrides (email/phone/brand/geo), extended time windows (week,
+  quarter, YTD, last N days, since <year>), cross-doc hasDocType/lacksDocType,
+  honest-zero wording for retrieval misses. Money still parked (financials).
+- Live persona sample before Tier 3: 32/68 scorable (many scorer artifacts:
+  key vs live doc counts differ after top-up). Rerun after deploy-0922d push.
+- Known data issue: Donna Thornton's contact sits on a duplicate customer —
+  run Customers → Check records → Fix everything, then merge.
+- Rate limits: migration 24 makes daily caps plan-sized; 99 lifts the founder
+  tenant's caps for testing.

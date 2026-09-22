@@ -25,6 +25,7 @@ import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { deriveCity } from './routes/customers.js';
 import { alertTier, normalizeBrand } from './warrantyRules.js';
+import { DOCUMENT_TYPE_IDS, docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from './documentTypes.js';
 
 // Plain readFileSync + JSON.parse rather than an import attribute (`with {
 // type: 'json' }`) — same idiom claude.js already uses for .env.local, and it
@@ -48,14 +49,17 @@ const KNOWN_COUNTY_NAMES = [
       .map((c) => String(c).toLowerCase())
   ),
 ];
-const KNOWN_AZ_CITY_NAMES = Object.keys(zipCounty.azCityCounty ?? {});
+// Exported (item 1, 2026-09-22): docLookup.js's own "must not hijack a
+// geo-scoped analytics question" guard (e.g. "list invoices for Gilbert")
+// reuses this SAME city-name vocabulary rather than hand-duplicating it.
+export const KNOWN_AZ_CITY_NAMES = Object.keys(zipCounty.azCityCounty ?? {});
 // HVAC persona bank (2026-09-21): "Who are our customers in Las Vegas?" —
 // this corpus's own header names Phoenix/Tucson AND Nevada dispatchers, but
 // GEO_WORD_RE (below) only ever knew AZ city names, missing every NV one
 // (usCityCounty's keys are "city|state" — nlNormalize.js's own VOCAB builder
 // already reads this same map for typo-correction; this is the
 // classification side of the same data).
-const KNOWN_US_CITY_NAMES = Object.keys(zipCounty.usCityCounty ?? {}).map((k) => k.split('|')[0]);
+export const KNOWN_US_CITY_NAMES = Object.keys(zipCounty.usCityCounty ?? {}).map((k) => k.split('|')[0]);
 
 /* ============================================================ plan vocabulary */
 
@@ -66,7 +70,7 @@ export const GROUP_BY_FIELDS = ['city', 'county', 'state', 'zip', 'brand', 'docu
 export const FILTER_FIELDS = [
   'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage',
   'refrigerant', 'installYear', 'warrantyStatus', 'documentType', 'technician', 'customerName',
-  'hasEmail', 'hasPhone',
+  'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -74,6 +78,18 @@ export const FILTER_FIELDS = [
  *  the condition. Boolean-only (true/false), customers-only — see
  *  buildAnalyticsSQL/matchesFilter below for the two places that read them. */
 export const BOOLEAN_FILTER_FIELDS = ['hasEmail', 'hasPhone'];
+/** hasDocType/lacksDocType (100-question persona sample, 2026-09-22, item 7
+ *  "customers with a maintenance agreement but no invoice"): customers-only,
+ *  value a canonical DOCUMENT_TYPE_IDS string, op 'eq' only — see
+ *  parseCrossDocCondition/validatePlan below and routes/analytics.js's
+ *  queryCustomersByDocTypeCondition. The model never fills these itself
+ *  today (no few-shot teaches it to); parseCrossDocCondition builds the plan
+ *  deterministically instead, the same "code decides, not the model" rule
+ *  resolveServiceVisitsOverride already follows for entity/op. Listed here
+ *  anyway (rather than validated ad hoc) so the closed-vocabulary contract —
+ *  "the model never contributes anything outside FILTER_FIELDS" — still
+ *  holds for a plan built by this file's own code, not just the model's.*/
+export const DOC_TYPE_FILTER_FIELDS = ['hasDocType', 'lacksDocType'];
 export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'in'];
 export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown'];
 export const MAX_LIMIT = 500;
@@ -167,25 +183,69 @@ function synonymAlternation(words) {
     .join('|');
 }
 
-const AGGREGATE_NOUN = new RegExp(
-  `\\b(${synonymAlternation([
-    ...ENTITY_SYNONYMS.customers,
-    ...ENTITY_SYNONYMS.equipment,
-    ...ENTITY_SYNONYMS.documents,
-    ...ENTITY_SYNONYMS.serviceVisits,
-    ...ENTITY_SYNONYMS.warranties,
-  ])})\\b`,
-  'i'
-);
+/**
+ * Tier 2 "Donovan learns nightly" (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md),
+ * Part A: every regex below that is built FROM ENTITY_SYNONYMS is produced by
+ * this one factory, so a runtime-learned overlay (a newly-approved synonym
+ * word for an existing entity) can rebuild exactly the same regexes from a
+ * WIDENED synonym table with no risk of the two ever drifting apart. Called
+ * once at module load with the base ENTITY_SYNONYMS (BASE_CLASSIFIER_REGEXES,
+ * below — every existing top-level const just aliases a field of it, so
+ * nothing downstream changes), and again, on demand, by withLearnedOverlay
+ * for a specific overlay object.
+ */
+function buildClassifierRegexes(entitySynonyms) {
+  const aggregateNoun = new RegExp(
+    `\\b(${synonymAlternation([
+      ...entitySynonyms.customers,
+      ...entitySynonyms.equipment,
+      ...entitySynonyms.documents,
+      ...entitySynonyms.serviceVisits,
+      ...entitySynonyms.warranties,
+    ])})\\b`,
+    'i'
+  );
+  const groupShape = new RegExp(
+    `\\b(group(?:ed)?\\b[\\s\\S]*\\bby\\b|breakdown\\b[\\s\\S]*\\bby\\b|\\bby\\b\\s+(city|county|state|zip|brand|month|warranty status|${synonymAlternation(entitySynonyms.technicians)})\\b)`,
+    'i'
+  );
+  const customersWhose = new RegExp(`\\b(${synonymAlternation(entitySynonyms.customers)})\\s+whose\\b`, 'i');
+  const biggestCustomer = new RegExp(`\\b(biggest|largest|top)\\s+(\\d+\\s+)?(${synonymAlternation(entitySynonyms.customers)})\\b`, 'i');
+  const weYesNoNoun = new RegExp(
+    `\\b(${synonymAlternation([
+      ...entitySynonyms.customers,
+      ...entitySynonyms.equipment,
+      ...entitySynonyms.documents,
+      ...entitySynonyms.serviceVisits.filter((w) => w !== 'call' && w !== 'calls'),
+      ...entitySynonyms.warranties,
+    ])})\\b`,
+    'i'
+  );
+  const pluralEntityWords = [
+    ...new Set([
+      ...entitySynonyms.customers, ...entitySynonyms.equipment,
+      ...entitySynonyms.documents, ...entitySynonyms.serviceVisits,
+      ...entitySynonyms.warranties,
+    ]),
+  ].filter((w) => /s$/i.test(w) || w === 'equipment');
+  const whatPlural = new RegExp(`\\bwhat\\s+(${synonymAlternation(pluralEntityWords)})\\b`, 'i');
+  const whatDidWe = new RegExp(
+    `\\bwhat\\s+(${synonymAlternation(pluralEntityWords)})\\b[\\s\\S]{0,40}\\bdid we\\b|\\bwhat\\s+did we\\s+(service|install|repair|replace|fix|visit)\\b`,
+    'i'
+  );
+  return { aggregateNoun, groupShape, customersWhose, biggestCustomer, weYesNoNoun, pluralEntityWords, whatPlural, whatDidWe };
+}
+
+const BASE_CLASSIFIER_REGEXES = buildClassifierRegexes(ENTITY_SYNONYMS);
+const AGGREGATE_NOUN = BASE_CLASSIFIER_REGEXES.aggregateNoun;
 const QUANTIFIER = /\b(how many|count|list|which|show me|total)\b/i;
-/** "group X by Y" / "breakdown by Y" / "grouped by Y" — an aggregate-request
- *  shape regardless of which noun is being broken down, so a groupBy
- *  dimension word alone (technician, brand, month) is enough even without one
- *  of AGGREGATE_NOUN's fixed nouns ("show me a breakdown by technician"). */
-const GROUP_SHAPE_RE = new RegExp(
-  `\\b(group(?:ed)?\\b[\\s\\S]*\\bby\\b|breakdown\\b[\\s\\S]*\\bby\\b|\\bby\\b\\s+(city|county|state|zip|brand|month|warranty status|${synonymAlternation(ENTITY_SYNONYMS.technicians)})\\b)`,
-  'i'
-);
+// "group X by Y" / "breakdown by Y" / "grouped by Y" — an aggregate-request
+// shape regardless of which noun is being broken down, so a groupBy
+// dimension word alone (technician, brand, month) is enough even without one
+// of AGGREGATE_NOUN's fixed nouns ("show me a breakdown by technician").
+// Read as cr.groupShape (preClassifyAnalytics, below) — never through a
+// top-level alias, since it must reflect whatever overlay is active for a
+// given call (withLearnedOverlay).
 const WHO_SERVICED_RE = /\bwho did we (service|work for)\b/i;
 const WHICH_CUSTOMERS_RE = /\bwhich customers\b/i;
 // HVAC persona bank (2026-09-21): "Customers whose warranty expires in the
@@ -193,21 +253,14 @@ const WHICH_CUSTOMERS_RE = /\bwhich customers\b/i;
 // shape WHICH_CUSTOMERS_RE already bypasses QUANTIFIER for, just opening
 // with the bare noun ("Customers whose...") instead of "which customers".
 // Built from the same customer synonym list so it matches as readily as
-// "clients whose"/"accounts whose".
-const CUSTOMERS_WHOSE_RE = new RegExp(
-  `\\b(${synonymAlternation(ENTITY_SYNONYMS.customers)})\\s+whose\\b`,
-  'i'
-);
-/** "who's/who is our biggest client" / "top 10 customers" / "our largest
- *  accounts" — asks for customers RANKED by some size measure (equipment or
- *  document count), not filtered/counted — a distinct op from every other
- *  bypass trigger (see routes/analytics.js's queryTopCustomers). Built from
- *  the SAME customer synonym list, so "biggest account"/"largest client"
- *  match exactly as readily as "biggest customer". */
-const BIGGEST_CUSTOMER_RE = new RegExp(
-  `\\b(biggest|largest|top)\\s+(\\d+\\s+)?(${synonymAlternation(ENTITY_SYNONYMS.customers)})\\b`,
-  'i'
-);
+// "clients whose"/"accounts whose". Read as cr.customersWhose, same reason
+// as GROUP_SHAPE_RE above.
+// "who's/who is our biggest client" / "top 10 customers" / "our largest
+// accounts" — asks for customers RANKED by some size measure (equipment or
+// document count), not filtered/counted — a distinct op from every other
+// bypass trigger (see routes/analytics.js's queryTopCustomers). Built from
+// the SAME customer synonym list, so "biggest account"/"largest client"
+// match exactly as readily as "biggest customer". Read as cr.biggestCustomer.
 /**
  * Reviewer NO-GO (2026-09-21, round 2, gap 1): "who has Trane units" and
  * "customers with expired warranties" / "units older than 10 years" named a
@@ -272,17 +325,9 @@ const WE_YES_NO_RE = /\b(?:do|does|have|has)\s+we\b|\bwe\s+got\b/i;
  *  "before end of day" callback-pleasantry tail (a sloppiness variant this
  *  bank generates, and plausible real dispatcher chatter too) which has
  *  nothing to do with a service call. "service call(s)" itself is unaffected
- *  (still present via ENTITY_SYNONYMS.serviceVisits' own two-word phrases). */
-const WE_YES_NO_NOUN_RE = new RegExp(
-  `\\b(${synonymAlternation([
-    ...ENTITY_SYNONYMS.customers,
-    ...ENTITY_SYNONYMS.equipment,
-    ...ENTITY_SYNONYMS.documents,
-    ...ENTITY_SYNONYMS.serviceVisits.filter((w) => w !== 'call' && w !== 'calls'),
-    ...ENTITY_SYNONYMS.warranties,
-  ])})\\b`,
-  'i'
-);
+ *  (still present via ENTITY_SYNONYMS.serviceVisits' own two-word phrases).
+ *  Read as cr.weYesNoNoun (preClassifyAnalytics, below), same reason as
+ *  GROUP_SHAPE_RE's own comment above. */
 const BRAND_RE = new RegExp(`\\b(${synonymAlternation(BRAND_WORDS)})\\b`, 'i');
 const GEO_WORD_RE = new RegExp(
   `\\b(arizona|nevada|az|nv|${synonymAlternation(KNOWN_AZ_CITY_NAMES)}|${synonymAlternation(KNOWN_US_CITY_NAMES)}|${synonymAlternation(KNOWN_COUNTY_NAMES)})\\b`,
@@ -351,22 +396,17 @@ const COVERAGE_NOUN_RE = /\b(zip\s*codes?|counties|cities|states)\b/i;
  * is checked first and short-circuits preClassifyAnalytics entirely (see its
  * own doc comment), and a real single-record "what's ..." contraction never
  * matches "what\s+" in the first place (no space between "what" and "'s").
- * PLURAL_ENTITY_WORDS is every ENTITY_SYNONYMS word that is actually plural
- * (ends in "s"), plus "equipment" itself (a mass noun with no distinct plural
- * form) — never a bare singular ("what unit", "what customer") on its own,
- * which stays exactly as excludable as it already was.
+ * buildClassifierRegexes' own pluralEntityWords is every ENTITY_SYNONYMS word
+ * that is actually plural (ends in "s"), plus "equipment" itself (a mass noun
+ * with no distinct plural form) — never a bare singular ("what unit", "what
+ * customer") on its own, which stays exactly as excludable as it already was.
+ * Read as cr.whatPlural (preClassifyAnalytics, below) — never through a
+ * top-level alias, same reason as GROUP_SHAPE_RE's own comment above.
+ *
+ * "what <plural entity noun> did we <verb>" (cr.whatDidWe) only — a bare
+ * "what did we do for Ramirez" is a single customer's history and must stay
+ * on retrieval.
  */
-const PLURAL_ENTITY_WORDS = [
-  ...new Set([
-    ...ENTITY_SYNONYMS.customers, ...ENTITY_SYNONYMS.equipment,
-    ...ENTITY_SYNONYMS.documents, ...ENTITY_SYNONYMS.serviceVisits,
-    ...ENTITY_SYNONYMS.warranties,
-  ]),
-].filter((w) => /s$/i.test(w) || w === 'equipment');
-const WHAT_PLURAL_RE = new RegExp(`\\bwhat\\s+(${synonymAlternation(PLURAL_ENTITY_WORDS)})\\b`, 'i');
-// "what <plural entity noun> did we <verb>" only — a bare "what did we do for
-// Ramirez" is a single customer's history and must stay on retrieval.
-const WHAT_DID_WE_RE = new RegExp(`\\bwhat\\s+(${synonymAlternation(PLURAL_ENTITY_WORDS)})\\b[\\s\\S]{0,40}\\bdid we\\b|\\bwhat\\s+did we\\s+(service|install|repair|replace|fix|visit)\\b`, 'i');
 
 /** "how many documents does Plaza Dental have" / "does X have a warranty" —
  *  a single, named record's own attribute, not an aggregate across many. */
@@ -721,6 +761,49 @@ export function looksLikeSingleRecordReference(question) {
   );
 }
 
+/* ============================================================ learned overlay
+ *
+ * Tier 2 "Donovan learns nightly" (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md),
+ * Part A — see nlNormalize.js's own copy of this same pattern for the fuller
+ * rationale. No shared mutable overlay lives in this file: every caller
+ * passes its own overlay object explicitly, and a WeakMap keyed on that
+ * object's identity is the only "cache" involved, so two overlays (the
+ * process-wide active one vs. a single candidate proposal being verified)
+ * can never leak into each other regardless of call order.
+ */
+function isOverlayEmpty(overlay) {
+  if (!overlay) return true;
+  return !(overlay.synonyms && Object.keys(overlay.synonyms).length);
+}
+
+function mergedEntitySynonyms(overlay) {
+  const merged = {};
+  for (const [entity, words] of Object.entries(ENTITY_SYNONYMS)) merged[entity] = [...words];
+  if (overlay?.synonyms) {
+    for (const [entity, words] of Object.entries(overlay.synonyms)) {
+      if (!merged[entity] || !Array.isArray(words)) continue;
+      merged[entity] = [...new Set([...merged[entity], ...words.map((w) => String(w ?? '').toLowerCase())])];
+    }
+  }
+  return merged;
+}
+
+const overlayClassifierCache = new WeakMap();
+
+/** Calls `fn(classifierRegexes)` — the base, module-level regex bag when
+ *  `overlay` is empty/absent (byte-for-byte the pre-overlay behavior), or a
+ *  freshly-merged one (cached per overlay OBJECT identity) otherwise.
+ *  Exported for scripts/verify-learning.mjs's overlay-purity checks. */
+export function withLearnedOverlay(overlay, fn) {
+  if (isOverlayEmpty(overlay)) return fn(BASE_CLASSIFIER_REGEXES);
+  let cr = overlayClassifierCache.get(overlay);
+  if (!cr) {
+    cr = buildClassifierRegexes(mergedEntitySynonyms(overlay));
+    overlayClassifierCache.set(overlay, cr);
+  }
+  return fn(cr);
+}
+
 /**
  * Reviewer NO-GO (2026-09-21, round 4, item 1): the generic path used to
  * require QUANTIFIER && AGGREGATE_NOUN && CONTEXT, where CONTEXT was a
@@ -740,46 +823,57 @@ export function looksLikeSingleRecordReference(question) {
  * that validatePlan/the executor then reject — the same trade-off this
  * file's own header comment has always accepted.
  */
-export function preClassifyAnalytics(question) {
+/**
+ * `opts.overlay` (Tier 2 learning, Part A): an optional runtime-learned
+ * `{ synonyms: { <entity>: [words] } }` bag that widens the entity-noun
+ * regexes above for this call only (see withLearnedOverlay below) — omitted,
+ * null, or empty, this is byte-for-byte the same function as before overlays
+ * existed. Every OTHER regex used here (WHO_HAS_RE, GEO_WORD_RE, BRAND_RE,
+ * ...) is not synonym-driven and stays exactly as-is regardless of overlay.
+ */
+export function preClassifyAnalytics(question, opts = {}) {
+  const overlay = opts?.overlay;
   const q = String(question ?? '').trim();
   if (!q) return false;
   // looksLikeSingleRecordReference now also covers POSSESSIVE_SINGLE_RE's own
   // "does/did NAME have" shape (see that function's own doc comment) — no
   // separate check needed here any more.
   if (looksLikeSingleRecordReference(q)) return false;
-  if (
-    WHO_SERVICED_RE.test(q) ||
-    WHICH_CUSTOMERS_RE.test(q) ||
-    CUSTOMERS_WHOSE_RE.test(q) ||
-    GROUP_SHAPE_RE.test(q) ||
-    WHO_HAS_RE.test(q) ||
-    NOUN_WITH_RE.test(q) ||
-    BIGGEST_CUSTOMER_RE.test(q) ||
-    WHAT_PLURAL_RE.test(q) ||
-    WHAT_DID_WE_RE.test(q) ||
-    THE_MOST_RE.test(q) ||
-    WHO_DUE_RE.test(q) ||
-    (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q)) ||
-    (AGGREGATE_NOUN.test(q) && SUPERLATIVE_RE.test(q)) ||
-    (AGGREGATE_NOUN.test(q) && CONTACT_FILTER_RE.test(q)) ||
-    (AGGREGATE_NOUN.test(q) && FOLLOWUP_NARROW_RE.test(q)) ||
-    // BRAND_RE deliberately excluded from this bare, no-quantifier combo —
-    // unlike a city/zip (GEO_WORD_RE/ZIP_*, which only ever names a LOCATION,
-    // never a single unit's own attribute), a brand name shows up just as
-    // often inside a genuine single-record attribute question ("what is the
-    // serial number on the Trane condenser") as it does in a real aggregate
-    // one, and every real brand-aggregate case already reaches analytics via
-    // QUANTIFIER+AGGREGATE_NOUN ("how many Trane units...") or WE_YES_NO_RE
-    // ("do we have any Daikin customers...") below, both of which pair the
-    // brand with an explicit count/existence question word first.
-    (AGGREGATE_NOUN.test(q) && (GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q) || ZIP_VALUE_RE.test(q))) ||
-    (WE_YES_NO_RE.test(q) && (WE_YES_NO_NOUN_RE.test(q) || BRAND_RE.test(q) || GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q))) ||
-    (QUANTIFIER.test(q) && COVERAGE_NOUN_RE.test(q)) ||
-    (/\bwhat\b/i.test(q) && COVERAGE_NOUN_RE.test(q) && /\bdo we\b/i.test(q))
-  ) {
-    return true;
-  }
-  return QUANTIFIER.test(q) && AGGREGATE_NOUN.test(q);
+  return withLearnedOverlay(overlay, (cr) => {
+    if (
+      WHO_SERVICED_RE.test(q) ||
+      WHICH_CUSTOMERS_RE.test(q) ||
+      cr.customersWhose.test(q) ||
+      cr.groupShape.test(q) ||
+      WHO_HAS_RE.test(q) ||
+      NOUN_WITH_RE.test(q) ||
+      cr.biggestCustomer.test(q) ||
+      cr.whatPlural.test(q) ||
+      cr.whatDidWe.test(q) ||
+      THE_MOST_RE.test(q) ||
+      WHO_DUE_RE.test(q) ||
+      (cr.aggregateNoun.test(q) && AGE_FILTER_RE.test(q)) ||
+      (cr.aggregateNoun.test(q) && SUPERLATIVE_RE.test(q)) ||
+      (cr.aggregateNoun.test(q) && CONTACT_FILTER_RE.test(q)) ||
+      (cr.aggregateNoun.test(q) && FOLLOWUP_NARROW_RE.test(q)) ||
+      // BRAND_RE deliberately excluded from this bare, no-quantifier combo —
+      // unlike a city/zip (GEO_WORD_RE/ZIP_*, which only ever names a LOCATION,
+      // never a single unit's own attribute), a brand name shows up just as
+      // often inside a genuine single-record attribute question ("what is the
+      // serial number on the Trane condenser") as it does in a real aggregate
+      // one, and every real brand-aggregate case already reaches analytics via
+      // QUANTIFIER+AGGREGATE_NOUN ("how many Trane units...") or WE_YES_NO_RE
+      // ("do we have any Daikin customers...") below, both of which pair the
+      // brand with an explicit count/existence question word first.
+      (cr.aggregateNoun.test(q) && (GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q) || ZIP_VALUE_RE.test(q))) ||
+      (WE_YES_NO_RE.test(q) && (cr.weYesNoNoun.test(q) || BRAND_RE.test(q) || GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q))) ||
+      (QUANTIFIER.test(q) && COVERAGE_NOUN_RE.test(q)) ||
+      (/\bwhat\b/i.test(q) && COVERAGE_NOUN_RE.test(q) && /\bdo we\b/i.test(q))
+    ) {
+      return true;
+    }
+    return QUANTIFIER.test(q) && cr.aggregateNoun.test(q);
+  });
 }
 
 /**
@@ -852,13 +946,20 @@ const INVOICE_STEM = 'invoic(?:e|ed|es|ing)';
 //     size", "what's the average invoice amount for our Trane jobs".
 //   - "what did we bill <customer>" — bare "bill" (not just "billed") as its
 //     own verb, the same INVOICE_STEM-style gap "invoiced" once was.
+// Live 100-question persona sample (2026-09-22): "total we've collected in
+// maintenance agreement fees" / "what fees have we collected" / "have
+// customers paid us" / "outstanding receivables" / "what's outstanding" all
+// missed MONEY_RE — "collected"/"fees"/"paid us"/"receivables"/"outstanding"
+// (bare, not just "outstanding balance") are just as much a no-financials-
+// layer-yet money question as "billed"/"invoiced" already are.
 const MONEY_RE = new RegExp(
   '\\b(revenue|' + INVOICE_STEM + '\\s+(?:total|amount)|' +
-    'total\\s+(?:' + INVOICE_STEM + '|billed|dollar|amount)|' +
+    'total\\s+(?:' + INVOICE_STEM + '|billed|dollar|amount|collected)|' +
     'average\\s+(?:ticket|' + INVOICE_STEM + ')\\s+(?:size|amount)|' +
-    'how much (?:did we|have we|do we)\\s+(?:bill|' + INVOICE_STEM + '|charge|make|earn|spend)|' +
+    'how much (?:did we|have we|do we)\\s+(?:bill|' + INVOICE_STEM + '|charge|make|earn|spend|collect)|' +
     'what did we bill|' +
-    'dollar amount|\\$\\s?\\d|\\bbill(?:ed)?\\b|owed|outstanding balance|unpaid invoices?|by revenue|by sales|spend(?:ing)?)\\b',
+    'dollar amount|\\$\\s?\\d|\\bbill(?:ed)?\\b|owed|outstanding(?:\\s+balance)?|unpaid invoices?|by revenue|by sales|' +
+    'spend(?:ing)?|collected|\\bfees?\\b|paid us|receivables?)\\b',
   'i'
 );
 
@@ -922,13 +1023,24 @@ export function detectedConditions(question) {
   if (CONTACT_WORD_RE.phone.test(q)) found.add('phone');
   if (BRAND_WORDS.some((b) => new RegExp(`\\b${b}\\b`).test(q))) found.add('brand');
   if (/\bcounty\b/.test(q) || KNOWN_COUNTY_NAMES.some((c) => new RegExp(`\\b${c}\\b`).test(q))) found.add('county');
-  if (/\bthis month\b|\blast month\b/.test(q) || resolveQuestionTimeRange(question) != null) found.add('month');
+  // city/state/zip (item 4, 2026-09-22): the same "a known geo word is
+  // present" signal GEO_WORD_RE/ZIP_VALUE_RE already use for classification,
+  // reused here so missingConditions can flag a plan that dropped one.
+  if ([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].some((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q))) {
+    found.add('city');
+  }
+  if (/\barizona\b|\bnevada\b|\baz\b|\bnv\b/.test(q)) found.add('state');
+  if (ZIP_VALUE_RE.test(q) || ZIP_CODE_WORD_RE.test(q)) found.add('zip');
+  if (/\bthis month\b|\blast month\b/.test(q) || resolveAnyTimeRange(question) != null) found.add('month');
   if (MONEY_RE.test(q)) found.add('money');
   if (MAINTENANCE_DUE_RE.test(q)) found.add('maintenance');
   return found;
 }
 
-const CONDITION_PLAN_FIELD = { email: 'hasEmail', phone: 'hasPhone', brand: 'brand', county: 'county' };
+const CONDITION_PLAN_FIELD = {
+  email: 'hasEmail', phone: 'hasPhone', brand: 'brand', county: 'county',
+  city: 'city', state: 'state', zip: 'zip',
+};
 
 /** Conditions detectedConditions(question) found that the validated PLAN has
  *  no corresponding filter (or, for 'month', no timeRange) for — the plan
@@ -946,6 +1058,63 @@ export function missingConditions(plan, question) {
   return missing;
 }
 
+function titleCaseWords(s) {
+  return String(s ?? '')
+    .split(/\s+/)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ');
+}
+
+/**
+ * Item 4 (100-question persona sample, 2026-09-22): rather than always
+ * falling back honestly whenever the model's plan drops a condition the
+ * question named, build the missing filter DETERMINISTICALLY when the
+ * question gives enough to construct it with confidence — polarity from
+ * "missing/without/no" vs "have/with/on file" for email/phone, the matched
+ * brand/county/city word itself, a bare 5-digit zip, or a recognized state
+ * name. Returns null when this specific condition can't be turned into a
+ * filter this way (an unrecognized brand/county/city word, or a
+ * state/zip that never actually appears despite the condition being
+ * detected some other way) — the caller (routes/analytics.js) then keeps the
+ * honest "can't filter by X yet" fallback for THAT condition, exactly as
+ * before this existed. Never called for 'money'/'maintenance'/'month' —
+ * those have no CONDITION_PLAN_FIELD entry at all and are handled earlier,
+ * by the plan-independent up-front checks in runAnalyticsQuestion.
+ */
+export function buildConditionOverrideFilter(condition, question) {
+  const q = String(question ?? '').toLowerCase();
+  if (condition === 'email' || condition === 'phone') {
+    const field = condition === 'email' ? 'hasEmail' : 'hasPhone';
+    const negative = new RegExp(`\\b(?:no|missing|without)\\s+(?:an?\\s+)?${condition}\\b`, 'i');
+    return { field, op: 'eq', value: !negative.test(q) };
+  }
+  if (condition === 'brand') {
+    const word = BRAND_WORDS.find((b) => new RegExp(`\\b${b}\\b`).test(q));
+    return word ? { field: 'brand', op: 'eq', value: titleCaseWords(word) } : null;
+  }
+  if (condition === 'county') {
+    const word = [...KNOWN_COUNTY_NAMES]
+      .sort((a, b) => b.length - a.length)
+      .find((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q));
+    return word ? { field: 'county', op: 'eq', value: titleCaseWords(word) } : null;
+  }
+  if (condition === 'city') {
+    const names = [...new Set([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES])].sort((a, b) => b.length - a.length);
+    const word = names.find((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q));
+    return word ? { field: 'city', op: 'eq', value: titleCaseWords(word) } : null;
+  }
+  if (condition === 'state') {
+    if (/\barizona\b|\baz\b/.test(q)) return { field: 'state', op: 'eq', value: 'AZ' };
+    if (/\bnevada\b|\bnv\b/.test(q)) return { field: 'state', op: 'eq', value: 'NV' };
+    return null;
+  }
+  if (condition === 'zip') {
+    const m = q.match(/\b(\d{5})\b/);
+    return m ? { field: 'zip', op: 'eq', value: m[1] } : null;
+  }
+  return null;
+}
+
 /** The honest "I can't do that yet" answer for one dropped condition —
  *  `kind: 'answer'` (never an error) so the client renders it exactly like
  *  any other analytics reply, just with no facts and no false count. */
@@ -954,6 +1123,63 @@ export function unsupportedConditionAnswer(condition, entity = 'customers') {
   return {
     kind: 'answer',
     text: `I can count ${noun}, but I can't filter by ${condition} yet.`,
+    facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+}
+
+/**
+ * Item 7 (100-question persona sample, 2026-09-22), "has X but no Y":
+ * "customers with a maintenance agreement but no service this year" /
+ * "customers with a proposal but no invoice" — a cross-document-type filter
+ * with no path through the ordinary entity/filter vocabulary at all (a
+ * customer either has or lacks a document of some type; nothing in
+ * FILTER_FIELDS before hasDocType/lacksDocType existed could express that).
+ * Detected and turned into a plan HERE, deterministically, before the model
+ * is ever asked — the same "code decides the shape, never the model"
+ * contract resolveServiceVisitsOverride already keeps for entity/op.
+ *
+ * When the "no ___" half names a real document type ("no invoice", "no
+ * proposal"), both halves resolve to real hasDocType/lacksDocType filters and
+ * the question is answered for real. When it names "service" instead (a
+ * SERVICE VISIT, not a document type this corpus tracks as such) — optionally
+ * with a time window ("no service this year") — there is no filter field for
+ * that at all, so this returns `unsupported` naming exactly the part that
+ * can't be expressed, and the caller (runAnalyticsQuestion) gives the honest
+ * fallback instead of guessing.
+ */
+const CROSS_DOC_BUT_NO_RE = new RegExp(
+  `\\b(${docTypeSynonymAlternation()})\\b(?:s)?[\\s\\S]{0,10}\\bbut\\s+no\\s+(${docTypeSynonymAlternation()}|service)\\b([\\s\\S]{0,25})?`,
+  'i'
+);
+const CROSS_DOC_TIME_WINDOW_RE = /\b(this year|last year|this month|last month|this week|last week|since\s+\d{4})\b/i;
+
+export function parseCrossDocCondition(question) {
+  const q = String(question ?? '').toLowerCase();
+  const m = q.match(CROSS_DOC_BUT_NO_RE);
+  if (!m) return null;
+  const hasType = docTypeFromWord(m[1]);
+  if (!hasType) return null;
+  const lacksWord = m[2].toLowerCase();
+  const trailing = m[3] ?? '';
+  if (lacksWord === 'service') {
+    const windowMatch = trailing.match(CROSS_DOC_TIME_WINDOW_RE);
+    return { hasType, lacksType: null, unsupported: 'service', windowLabel: windowMatch ? windowMatch[1] : null };
+  }
+  const lacksType = docTypeFromWord(lacksWord);
+  if (!lacksType) return null;
+  return { hasType, lacksType, unsupported: null };
+}
+
+/** The honest fallback for a cross-doc condition this file can't express
+ *  (the "no service ___" half) — names the part that DOES work (the
+ *  hasDocType half) alongside the part that doesn't, never a silent
+ *  unfiltered answer. */
+export function crossDocUnsupportedAnswer(cross) {
+  const label = documentTypeLabel(cross.hasType).toLowerCase();
+  const windowPart = cross.windowLabel ? ` ${cross.windowLabel}` : '';
+  return {
+    kind: 'answer',
+    text: `I can find customers with a ${label}, but I can't filter by "no ${cross.unsupported}${windowPart}" yet.`,
     facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
   };
 }
@@ -1171,6 +1397,50 @@ export const ANALYTICS_FEW_SHOT_BLOCK =
 
 export const ANALYTICS_SYSTEM_PROMPT = ANALYTICS_SYSTEM_PROMPT_BASE + ANALYTICS_FEW_SHOT_BLOCK;
 
+/** ~4 chars/token is a standard, conservative estimate for English prose and
+ *  compact JSON alike — good enough for a soft cap, never sent to a
+ *  tokenizer. Exported so scripts/verify-learning.mjs can pin the same
+ *  arithmetic the cap below uses. */
+export function estimateTokens(s) {
+  return Math.ceil(String(s ?? '').length / 4);
+}
+
+const LEARNED_FEW_SHOT_MAX_ITEMS = 12;
+const LEARNED_FEW_SHOT_MAX_TOKENS = 500;
+
+/**
+ * Tier 2 learning (Part A): `extraFewShot` is the ACTIVE overlay's own
+ * approved `few_shot` items (learning/overlay.js's getActiveOverlay) —
+ * `{question, plan}` pairs an operator approved after seeing them fix a real
+ * miss. Appended AFTER ANALYTICS_FEW_SHOT_BLOCK (never interleaved with the
+ * curated, stable examples above it — same prompt-cache-prefix reasoning
+ * ANALYTICS_FEW_SHOT_BLOCK's own doc comment gives), capped at 12 items / an
+ * estimated 500 tokens so a runaway learned set can never blow up every
+ * planner call's cost. Greedy: items are taken in order until either cap
+ * would be exceeded, then stops (never drops an earlier item to fit a later,
+ * bigger one). No `extraFewShot` (or none of it fits) returns the exact same
+ * ANALYTICS_SYSTEM_PROMPT constant — so this is a pure widening, never a
+ * mutation of the base prompt.
+ */
+export function buildAnalyticsSystemPrompt({ extraFewShot } = {}) {
+  if (!Array.isArray(extraFewShot) || !extraFewShot.length) return ANALYTICS_SYSTEM_PROMPT;
+  const lines = [];
+  let tokens = 0;
+  for (const ex of extraFewShot) {
+    if (lines.length >= LEARNED_FEW_SHOT_MAX_ITEMS) break;
+    if (!ex || typeof ex.question !== 'string' || !ex.question.trim() || !ex.plan) continue;
+    const validated = validatePlan(ex.plan);
+    if (!validated) continue;
+    const line = `Q:"${ex.question}"->${JSON.stringify(validated)}`;
+    const lineTokens = estimateTokens(line);
+    if (tokens + lineTokens > LEARNED_FEW_SHOT_MAX_TOKENS) break;
+    lines.push(line);
+    tokens += lineTokens;
+  }
+  if (!lines.length) return ANALYTICS_SYSTEM_PROMPT;
+  return `${ANALYTICS_SYSTEM_PROMPT}\n\nLEARNED EXAMPLES (operator-approved, same format as above):\n${lines.join('\n')}`;
+}
+
 /* ============================================================ cache namespace
  *
  * Reviewer NO-GO (2026-09-21, A2): analytics answers were being cached and
@@ -1222,7 +1492,15 @@ export const ANALYTICS_SYSTEM_PROMPT = ANALYTICS_SYSTEM_PROMPT_BASE + ANALYTICS_
 // customer_name/model columns it never did before — any plan cached under
 // the old vocabulary/shape must be invalidated the same way every prior bump
 // already was.
-export const ANALYTICS_VERSION = 'analytics-v6';
+// Bumped v6 -> v7 (100-question persona sample, 2026-09-22): FILTER_FIELDS
+// grew hasDocType/lacksDocType (ANALYTICS_TOOL's own enum, so this is already
+// covered by the tool-hash half of ANALYTICS_PROMPT_VERSION below — bumped
+// anyway, belt-and-suspenders, matching v2/v3's own precedent) and the
+// condition-override/cross-doc logic changed what a "missing condition" or
+// "has X but no Y" question answers — a plan or answer cached under the old
+// behavior must never be served again just because its own prompt text
+// happened not to change.
+export const ANALYTICS_VERSION = 'analytics-v7';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
@@ -1344,6 +1622,125 @@ export function resolveQuestionTimeRange(question, today) {
   return monthRange(year, monthNum);
 }
 
+/**
+ * Live 100-question persona sample (2026-09-22), item 5 "TIME WINDOWS": this
+ * week / last week / this quarter / last quarter / year to date|ytd / this
+ * year / last year / since <year> / in the last N days|weeks|months / past N
+ * ... — none of these are month-name phrases resolveQuestionTimeRange (above)
+ * recognizes, and unlike a month they need DAY-grain bounds (a week or a
+ * "since 2024" range never lines up on a calendar-month boundary). Kept as a
+ * separate function (rather than folded into resolveQuestionTimeRange itself)
+ * so that function's existing {from,to}-only return shape — and every eq()
+ * test pinned to it — stays byte-for-byte unchanged; resolveAnyTimeRange
+ * below is the single combined entry point every caller that needs BOTH
+ * families (reconcileTimeRange, detectedConditions, the executor's zero-
+ * result/count wording) actually uses.
+ *
+ * Returns {from, to, label} (day-grain YYYY-MM-DD) or null. `label` is prose
+ * for the honest/zero-result wording ("this week", "Q2 2026", "since 2024",
+ * "the last 30 days") — see routes/analytics.js's use of it in
+ * formatAnalyticsAnswer's opts.
+ */
+export function resolveExtendedTimeRange(question, today) {
+  const q = String(question ?? '').toLowerCase();
+  const now = today ? new Date(today) : new Date();
+  if (Number.isNaN(now.getTime())) return null;
+
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const addDays = (d, n) => {
+    const x = new Date(d);
+    x.setUTCDate(x.getUTCDate() + n);
+    return x;
+  };
+  const todayISO = iso(now);
+
+  if (/\byear[\s-]?to[\s-]?date\b|\bytd\b/.test(q)) {
+    return { from: `${now.getUTCFullYear()}-01-01`, to: todayISO, label: 'year to date' };
+  }
+  // Reviewer NO-GO (2026-09-22): Monday-anchored, not Sunday-anchored —
+  // getUTCDay() is 0=Sunday..6=Saturday, so (getUTCDay()+6)%7 is the number
+  // of days since the most recent Monday (0 on a Monday itself, 6 on a
+  // Sunday). Verified: today 2026-09-22 (a Tuesday, getUTCDay()=2) -> offset
+  // 1 -> this week starts 2026-09-21 (Monday); last week is then
+  // 2026-09-14..2026-09-20.
+  const mondayOffset = (now.getUTCDay() + 6) % 7;
+  if (/\bthis week\b/.test(q)) {
+    const start = addDays(now, -mondayOffset);
+    return { from: iso(start), to: todayISO, label: 'this week' };
+  }
+  if (/\blast week\b/.test(q)) {
+    const thisStart = addDays(now, -mondayOffset);
+    const lastStart = addDays(thisStart, -7);
+    const lastEnd = addDays(thisStart, -1);
+    return { from: iso(lastStart), to: iso(lastEnd), label: 'last week' };
+  }
+  if (/\bthis quarter\b/.test(q)) {
+    const qStartMonth = Math.floor(now.getUTCMonth() / 3) * 3;
+    const from = `${now.getUTCFullYear()}-${String(qStartMonth + 1).padStart(2, '0')}-01`;
+    return { from, to: todayISO, label: `in Q${qStartMonth / 3 + 1} ${now.getUTCFullYear()}` };
+  }
+  if (/\blast quarter\b/.test(q)) {
+    const curQStart = Math.floor(now.getUTCMonth() / 3) * 3;
+    let lastQStart = curQStart - 3;
+    let year = now.getUTCFullYear();
+    if (lastQStart < 0) {
+      lastQStart += 12;
+      year -= 1;
+    }
+    const from = `${year}-${String(lastQStart + 1).padStart(2, '0')}-01`;
+    const endMonth = lastQStart + 2; // 0-indexed last month of that quarter
+    const to = iso(new Date(Date.UTC(year, endMonth + 1, 0))); // last day of that month
+    return { from, to, label: `in Q${lastQStart / 3 + 1} ${year}` };
+  }
+  if (/\bthis year\b/.test(q)) {
+    const y = now.getUTCFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31`, label: `in ${y}` };
+  }
+  if (/\blast year\b/.test(q)) {
+    const y = now.getUTCFullYear() - 1;
+    return { from: `${y}-01-01`, to: `${y}-12-31`, label: `in ${y}` };
+  }
+  const sinceMatch = q.match(/\bsince\s+(\d{4})\b/);
+  if (sinceMatch) {
+    return { from: `${sinceMatch[1]}-01-01`, to: todayISO, label: `since ${sinceMatch[1]}` };
+  }
+  const lastNMatch = q.match(/\b(?:in\s+the\s+last|last|past)\s+(\d+)\s+(day|days|week|weeks|month|months)\b/);
+  if (lastNMatch) {
+    const n = Number(lastNMatch[1]);
+    const unit = lastNMatch[2];
+    let fromDate;
+    let unitLabel;
+    if (unit.startsWith('day')) {
+      fromDate = addDays(now, -n);
+      unitLabel = 'day';
+    } else if (unit.startsWith('week')) {
+      fromDate = addDays(now, -n * 7);
+      unitLabel = 'week';
+    } else {
+      fromDate = new Date(now);
+      fromDate.setUTCMonth(fromDate.getUTCMonth() - n);
+      unitLabel = 'month';
+    }
+    return { from: iso(fromDate), to: todayISO, label: `in the last ${n} ${unitLabel}${n === 1 ? '' : 's'}` };
+  }
+  return null;
+}
+
+/** Combined entry point: resolveQuestionTimeRange's own month-name/this-
+ *  month/last-month families first (labeled via monthRangeLabel, defined
+ *  further below — forward-referenced here since it's a plain function
+ *  declaration, hoisted), then resolveExtendedTimeRange's day-grain families.
+ *  Returns {from, to, label} or null. Used wherever BOTH families need to be
+ *  recognized as one capability (reconcileTimeRange, detectedConditions'
+ *  own 'month' bit, and the executor's count/zero-result wording) — never by
+ *  validatePlan, which only ever sees the stripped {from,to} a caller pulls
+ *  out of this. */
+export function resolveAnyTimeRange(question, today) {
+  const base = resolveQuestionTimeRange(question, today);
+  if (base) return { from: base.from, to: base.to, label: monthRangeLabel(base) };
+  return resolveExtendedTimeRange(question, today);
+}
+
 const VALID_TIME_PART_RE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
 
 /**
@@ -1362,7 +1759,14 @@ const VALID_TIME_PART_RE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
  * where the raw tool_use input is actually produced.
  */
 export function reconcileTimeRange(rawTimeRange, question, today) {
-  const override = resolveQuestionTimeRange(question, today);
+  // resolveAnyTimeRange (item 5, 2026-09-22) also recognizes this week/last
+  // week/this quarter/last quarter/YTD/this year/last year/since <year>/the
+  // last N days|weeks|months, on top of resolveQuestionTimeRange's original
+  // month-name families — only {from,to} is ever kept here (never `label`,
+  // which validatePlan would strip anyway; see resolveAnyTimeRange's own
+  // doc comment for who actually reads `label`).
+  const overrideFull = resolveAnyTimeRange(question, today);
+  const override = overrideFull ? { from: overrideFull.from, to: overrideFull.to } : null;
   if (!override) return rawTimeRange ?? undefined;
 
   const from = String(rawTimeRange?.from ?? '');
@@ -1446,6 +1850,39 @@ export function monthRangeLabel(timeRange) {
   return `${MONTH_LABELS[idx]} ${m[1]}`;
 }
 
+/** True when a timeRange's bounds are full YYYY-MM-DD dates (item 5's
+ *  extended windows) rather than the original YYYY-MM month-grain shape —
+ *  the executor (routes/analytics.js) uses this to decide whether to compare
+ *  a row's exact date or its truncated month against the range. */
+export function timeRangeIsDayGrain(timeRange) {
+  const s = String(timeRange?.from ?? timeRange?.to ?? '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+/**
+ * Item 5: day-grain windows (this week, since 2024, the last 30 days, ...)
+ * need the row's own exact date compared against the range, never its
+ * truncated month — comparing '2026-09-10' against a month-grain '2026-09'
+ * bound already works (documents/serviceVisits' existing month filtering),
+ * but a WEEK-grain range needs day precision or every day in the month would
+ * wrongly match. `row` is {date, month} — date is the row's own YYYY-MM-DD
+ * (or null if never extracted), month its YYYY-MM truncation.
+ */
+export function withinTimeRange(row, timeRange) {
+  if (!timeRange) return true;
+  if (timeRangeIsDayGrain(timeRange)) {
+    const d = row?.date ?? null;
+    if (!d) return false;
+    if (timeRange.from && d < timeRange.from) return false;
+    if (timeRange.to && d > timeRange.to) return false;
+    return true;
+  }
+  const m = row?.month ?? '';
+  if (timeRange.from && m < timeRange.from.slice(0, 7)) return false;
+  if (timeRange.to && m > timeRange.to.slice(0, 7)) return false;
+  return true;
+}
+
 /**
  * Validate + normalize the model's raw tool_use input against the closed
  * vocabulary. Returns a clean plan object, or null if ANYTHING is outside the
@@ -1480,6 +1917,14 @@ export function validatePlan(raw) {
       const s = String(f.value).toLowerCase();
       if (f.value !== true && f.value !== false && s !== 'true' && s !== 'false') return null;
       filters.push({ field: f.field, op: f.op, value: f.value === true || s === 'true' });
+      continue;
+    }
+    if (DOC_TYPE_FILTER_FIELDS.includes(f.field)) {
+      // hasDocType/lacksDocType: customers-only, op "eq" only, value a real
+      // canonical document type id — see this constant's own doc comment.
+      if (p.entity !== 'customers' || f.op !== 'eq') return null;
+      if (!DOCUMENT_TYPE_IDS.has(String(f.value))) return null;
+      filters.push({ field: f.field, op: f.op, value: String(f.value) });
       continue;
     }
     filters.push({ field: f.field, op: f.op, value: f.value });
@@ -1933,7 +2378,7 @@ function brandFactLabel(entity, filters) {
 export function formatAnalyticsAnswer(plan, opts) {
   const {
     total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null,
-    mostRecentServiceVisit,
+    mostRecentServiceVisit, timeRangeLabel = null,
   } = opts ?? {};
   const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
 
@@ -1965,8 +2410,19 @@ export function formatAnalyticsAnswer(plan, opts) {
   // names the single most recent one (rows are already fetched sorted DESC by
   // date, so this costs no extra query).
   if (plan.entity === 'serviceVisits' && plan.timeRange && total === 0 && mostRecentServiceVisit !== undefined) {
+    // Item 5 (2026-09-22): timeRangeLabel covers the extended day-grain
+    // windows (this week, since 2024, ...) formatAnalyticsAnswer itself has
+    // no way to reverse-engineer from {from,to} alone — see
+    // resolveAnyTimeRange's own doc comment. Falls back to the original
+    // month-only label when the caller didn't pass one (e.g. a plan whose
+    // timeRange came from the model's own well-formed, year-matching guess).
+    // timeRangeLabel (item 5, 2026-09-22) already carries its own connector
+    // word where one reads naturally ("in Q2 2026", "since 2024") and none
+    // where it doesn't ("this week", "year to date") — never re-prefixed
+    // with "in " here. The bare monthRangeLabel fallback (no connector of
+    // its own) keeps needing one, exactly as before this existed.
     const monthLabel = monthRangeLabel(plan.timeRange);
-    const scope = monthLabel ? ` in ${monthLabel}` : '';
+    const scope = timeRangeLabel ? ` ${timeRangeLabel}` : monthLabel ? ` in ${monthLabel}` : '';
     const text = mostRecentServiceVisit
       ? `No service visits${scope}. The most recent one on file is ` +
         `${formatServiceDateLabel(mostRecentServiceVisit.date)}` +
@@ -1987,9 +2443,18 @@ export function formatAnalyticsAnswer(plan, opts) {
   if (plan.op === 'count') {
     const of = unfilteredTotal != null && unfilteredTotal !== total ? ` (of ${unfilteredTotal} total)` : '';
     // Item 1: "N jobs in August 2026" style, once there's a real single-month
-    // range to name — otherwise the plain "You have N X" wording.
+    // range to name — otherwise the plain "You have N X" wording. Item 5
+    // (2026-09-22): timeRangeLabel covers the extended day-grain windows
+    // ("this week", "year to date", "since 2024", ...) the same way — see
+    // the serviceVisits zero-result branch above for why it's never
+    // re-prefixed with "in " here.
     const monthLabel = monthRangeLabel(plan.timeRange);
-    const text = monthLabel ? `${total} ${noun} in ${monthLabel}${of}.` : `You have ${total} ${noun}${of}.`;
+    const scopedText = timeRangeLabel
+      ? `${total} ${noun} ${timeRangeLabel}${of}.`
+      : monthLabel
+        ? `${total} ${noun} in ${monthLabel}${of}.`
+        : null;
+    const text = scopedText ?? `You have ${total} ${noun}${of}.`;
     const label =
       customerContactFactLabel(plan.entity, plan.filters) ??
       brandFactLabel(plan.entity, plan.filters) ??

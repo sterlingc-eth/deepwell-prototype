@@ -8,6 +8,7 @@ import { runOutreachSweep } from "./outreach.js";
 import { runFollowupsSweep } from "./followups.js";
 import { integrityFixTenant } from "./integrity.js";
 import { runMissDigestSweepStep } from "../missDigest.js";
+import { runLearningSweepStep } from "../learning/sweep.js";
 
 /**
  * GET /api/cron-sweep
@@ -311,6 +312,19 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "miss-digest" });
   }
 
+  // Donovan self-learning, Tier 2 Part B (handoffs/DONOVAN_SELF_LEARNING_2026-09-22.md):
+  // runs AFTER the miss digest above so the SAME night's freshly-logged misses
+  // are what it proposes fixes for. Own once-per-UTC-day guard (task key
+  // 'donovan-learning'), skips entirely when migration 26 isn't applied or
+  // there's nothing new to learn from — never allowed to fail the rest of
+  // this sweep.
+  try {
+    summary.learning = await runLearningSweepStep();
+  } catch (err) {
+    summary.learning = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "learning" });
+  }
+
   summary.billingGatedTenants = billingGatedTenantKeys.size;
 
   await captureMessage(
@@ -331,7 +345,8 @@ export default async function handler(req, res) {
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
       `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +
-      `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}.`,
+      `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}; ` +
+      `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}.`,
     { route: "/api/cron-sweep" }
   );
 

@@ -34,6 +34,7 @@ import {
   isMoneyQuestion,
 } from '../api/_lib/analytics.js';
 import { parseContactLookupQuestion } from '../api/_lib/contactLookup.js';
+import { parseDocLookupQuestion } from '../api/_lib/docLookup.js';
 
 /** filter `field` -> the detectedConditions(question) name it corresponds to
  *  (analytics.js) — used below to check a follow-up/two-condition entry's
@@ -75,9 +76,15 @@ const bank = JSON.parse(readFileSync(BANK_PATH, 'utf8'));
 function classify(rawText) {
   const { normalized } = normalizeQuestion(rawText);
   const isContactLookup = Boolean(parseContactLookupQuestion(rawText));
+  // Item 1 (100-question persona sample, 2026-09-22): the doc-lookup
+  // pre-router runs right after contact-lookup and before analytics in the
+  // real api/ask.js (see docLookupIntent there) — mirrored here the same way
+  // contact-lookup already is, so a "list invoices for Fitzgerald" bank entry
+  // doesn't get wrongly scored as a missed-analytics routing failure.
+  const isDocLookup = !isContactLookup && Boolean(parseDocLookupQuestion(rawText));
   const isAnalytics =
-    !isContactLookup && !looksLikeSingleRecordReference(rawText) && preClassifyAnalytics(normalized);
-  return { normalized, isAnalytics, isContactLookup };
+    !isContactLookup && !isDocLookup && !looksLikeSingleRecordReference(rawText) && preClassifyAnalytics(normalized);
+  return { normalized, isAnalytics, isContactLookup, isDocLookup };
 }
 
 /** Step 2 (HVAC persona bank, 2026-09-21): an entry naming a capability this
@@ -96,7 +103,7 @@ function isNeedsCapability(entry) {
 
 const results = [];
 for (const entry of bank) {
-  const { normalized, isAnalytics, isContactLookup } = classify(entry.text);
+  const { normalized, isAnalytics, isContactLookup, isDocLookup } = classify(entry.text);
   const expectAnalytics = entry.expect?.route === 'analytics';
   const reasons = [];
   const needsCapability = isNeedsCapability(entry);
@@ -138,17 +145,17 @@ for (const entry of bank) {
     // routing fix, since neither shape was ever what they're asking about.
     const isMoneyLookup = (entry.expect?.conditionsOnly ?? []).includes('money');
     const routedSomewhere =
-      isContactLookup || looksLikeSingleRecordReference(entry.text) || (isMoneyLookup && isMoneyQuestion(normalized));
+      isContactLookup || isDocLookup || looksLikeSingleRecordReference(entry.text) || (isMoneyLookup && isMoneyQuestion(normalized));
     if (!routedSomewhere) reasons.push('lookup:not-routed');
   }
 
   if (entry.expect?.singleRecord === true) {
-    // contactLookup.js resolving the question is just as much "this reaches
-    // a real single-record answer" as looksLikeSingleRecordReference saying
-    // so — e.g. "Pull up Thornton" (expect.route 'retrieval') is answered by
-    // contactLookup's own "full record" shape, never by an address/serial
-    // signal at all.
-    if (!looksLikeSingleRecordReference(entry.text) && !isContactLookup) reasons.push('single-record:not-detected');
+    // contactLookup.js/docLookup.js resolving the question is just as much
+    // "this reaches a real single-record answer" as looksLikeSingleRecordReference
+    // saying so — e.g. "Pull up Thornton" (expect.route 'retrieval') is
+    // answered by contactLookup's own "full record" shape, never by an
+    // address/serial signal at all.
+    if (!looksLikeSingleRecordReference(entry.text) && !isContactLookup && !isDocLookup) reasons.push('single-record:not-detected');
   }
 
   if (expectAnalytics && entry.expect?.timeRange !== undefined) {

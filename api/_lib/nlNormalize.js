@@ -95,6 +95,13 @@ const EXTRA_DOMAIN_WORDS = [
   // 'billed'/'overdue' above already do — none were anywhere in this
   // vocabulary for a typo ("oewest") to fuzzy-correct back to.
   'oldest', 'newest', 'latest', 'earliest',
+  // 100-question persona sample (2026-09-22): the same load-bearing-word gap
+  // as 'billed'/'overdue' above, now for this session's own new exact-word
+  // regexes — HOW_MANY_TIMES_RE (contactLookup.js) keys off "times", and
+  // MONEY_RE's item 6 additions (analytics.js) key off "collected"/"fees"/
+  // "receivables"/"outstanding". "quarter" backs item 5's "this quarter"/
+  // "last quarter" time windows the same way "week"/"month" above already do.
+  'times', 'collected', 'fees', 'receivables', 'outstanding', 'quarter', 'quarters',
 ];
 
 function buildVocab() {
@@ -176,16 +183,74 @@ function withinEditDistance1(a, b) {
 
 /** A likely-typo correction for `token`, or null. Never called on a token
  *  already in vocab, shorter than 5 letters, or containing a digit — see
- *  normalizeQuestion's own guards, which check all three before calling this. */
-function fuzzyCorrect(token) {
+ *  normalizeQuestion's own guards, which check all three before calling this.
+ *  `vocabByLen` defaults to the base table but a learned-overlay call passes
+ *  its own merged one (see withLearnedOverlay below) — never mutated here. */
+function fuzzyCorrect(token, vocabByLen = VOCAB_BY_LEN) {
   for (const len of [token.length - 1, token.length, token.length + 1]) {
-    const candidates = VOCAB_BY_LEN.get(len);
+    const candidates = vocabByLen.get(len);
     if (!candidates) continue;
     for (const cand of candidates) {
       if (withinEditDistance1(token, cand)) return cand;
     }
   }
   return null;
+}
+
+/* ============================================================ learned overlay
+ *
+ * Tier 2 "Donovan learns nightly" (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md),
+ * Part A: an optional, explicit `overlay` object —
+ * `{ abbreviations: {from:to}, typos: {from:to}, vocab: [words] }` — that
+ * WIDENS the tables above for one call, with ZERO effect when omitted or
+ * empty (every existing caller/behavior is byte-for-byte unchanged). This
+ * file never holds a shared, mutable "current overlay": normalizeQuestion
+ * always takes the overlay as an explicit argument, so two callers (e.g. a
+ * live request using the process-wide active overlay vs.
+ * api/_lib/learning/verify.js probing a single CANDIDATE proposal) can never
+ * see or leak into each other's tables, no matter what order they run in.
+ *
+ * withLearnedOverlay(overlay, fn) builds the merged {abbrev, vocab,
+ * vocabByLen} bag (or reuses the base tables untouched when the overlay is
+ * empty) and calls `fn(tables)` with it. A WeakMap caches the merged bag per
+ * overlay OBJECT identity — the process-wide active overlay
+ * (learning/overlay.js's getActiveOverlay, cached 10 minutes) is the same
+ * object across many requests, so it's only ever merged once; a fresh
+ * overlay object (a new proposal being tested) never collides with, or
+ * reuses, another one's cached bag.
+ */
+function isOverlayEmpty(overlay) {
+  if (!overlay) return true;
+  return !(
+    (overlay.abbreviations && Object.keys(overlay.abbreviations).length) ||
+    (overlay.typos && Object.keys(overlay.typos).length) ||
+    (overlay.vocab && overlay.vocab.length)
+  );
+}
+
+function buildVocabByLen(vocab) {
+  const map = new Map();
+  for (const w of vocab) {
+    if (w.length < 4) continue;
+    if (!map.has(w.length)) map.set(w.length, []);
+    map.get(w.length).push(w);
+  }
+  return map;
+}
+
+function mergeOverlayTables(overlay) {
+  const abbrev =
+    (overlay.abbreviations && Object.keys(overlay.abbreviations).length) ||
+    (overlay.typos && Object.keys(overlay.typos).length)
+      ? { ...ABBREV, ...(overlay.abbreviations ?? {}), ...(overlay.typos ?? {}) }
+      : ABBREV;
+  let vocab = VOCAB;
+  if (overlay.vocab && overlay.vocab.length) {
+    vocab = new Set(VOCAB);
+    for (const w of overlay.vocab) vocab.add(String(w ?? '').toLowerCase());
+  }
+  const vocabByLen = vocab === VOCAB ? VOCAB_BY_LEN : buildVocabByLen(vocab);
+  return { abbrev, vocab, vocabByLen };
 }
 
 /**
@@ -211,6 +276,22 @@ const ABBREV = {
   // need to leave alone for some OTHER meaning.
   tuc: 'tucson', cg: 'casa grande',
 };
+
+// Base tables + per-overlay-object cache for withLearnedOverlay above —
+// declared here (not next to that function) because they need ABBREV, which
+// must be defined first.
+const BASE_TABLES = { abbrev: ABBREV, vocab: VOCAB, vocabByLen: VOCAB_BY_LEN };
+const overlayTableCache = new WeakMap();
+
+export function withLearnedOverlay(overlay, fn) {
+  if (isOverlayEmpty(overlay)) return fn(BASE_TABLES);
+  let tables = overlayTableCache.get(overlay);
+  if (!tables) {
+    tables = mergeOverlayTables(overlay);
+    overlayTableCache.set(overlay, tables);
+  }
+  return fn(tables);
+}
 
 // Leading filler this project's dispatchers/owners actually type before the
 // real question (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md's sloppiness
@@ -257,6 +338,12 @@ const SHORT_WORD_TYPO_FIXES = [
   // floor to bridge) — mapped straight to the fully-expanded form so it
   // doesn't need a second, separate ABBREV-table pass to finish the job.
   [/\bcsuts\b/g, 'customers'],
+  // 100-question persona sample (2026-09-22): "how many tims have we been to
+  // Mercer's" — a deletion typo of "times" lands on a 4-letter token, the
+  // same "too short for the general fuzzy floor" gap 'toal'/'whch' above
+  // already document. HOW_MANY_TIMES_RE (contactLookup.js) needs the literal
+  // word "times".
+  [/\btims\b/g, 'times'],
 ];
 
 // Used by normalizeQuestion's own fuzzy-correction guard (below) to protect
@@ -285,13 +372,19 @@ function expandSymbols(q) {
 }
 
 /**
- * normalizeQuestion(text) -> { normalized, original, corrections }
+ * normalizeQuestion(text, { overlay }) -> { normalized, original, corrections }
  * `corrections` lists every abbreviation-expansion/fuzzy-fix actually made
  * (never filler/punctuation removal, which isn't a "correction" worth
  * surfacing) — kept for a future "showing results for..." UI affordance, not
  * wired into any UI yet.
+ *
+ * `overlay` (optional): a runtime-learned `{abbreviations, typos, vocab}`
+ * bag (see withLearnedOverlay above) that widens the abbreviation/typo/vocab
+ * tables for this call only — omitted, null, or empty, behavior is byte-for-
+ * byte identical to before overlays existed.
  */
-export function normalizeQuestion(text) {
+export function normalizeQuestion(text, opts = {}) {
+  const overlay = opts?.overlay;
   const original = String(text ?? '');
   let q = original.toLowerCase().trim().replace(/\s+/g, ' ');
   q = q.replace(/[?!.]+$/, '').trim();
@@ -308,52 +401,54 @@ export function normalizeQuestion(text) {
   const singleRecord = looksLikeSingleRecordReference(original);
   const words = q.split(' ').filter(Boolean);
 
-  const out = words.map((raw, idx) => {
-    // HVAC persona bank (2026-09-21): "which custs' addresses might need
-    // double checking" — a trailing bare possessive apostrophe ("custs'")
-    // used to survive untouched (only ,;: were stripped here), so the ABBREV
-    // exact-token lookup below never matched "custs'" against its "custs"
-    // key and the question never got its "customers" expansion at all. A
-    // trailing apostrophe with nothing after it is always a plural
-    // possessive marker, never part of the word itself, so it's safe to
-    // strip the same way trailing punctuation already is.
-    const trailMatch = raw.match(/['’,;:]+$/);
-    const trail = trailMatch ? trailMatch[0] : '';
-    const core = trail ? raw.slice(0, -trail.length) : raw;
-    const lower = core.toLowerCase();
+  const normalized = withLearnedOverlay(overlay, (tables) => {
+    const out = words.map((raw, idx) => {
+      // HVAC persona bank (2026-09-21): "which custs' addresses might need
+      // double checking" — a trailing bare possessive apostrophe ("custs'")
+      // used to survive untouched (only ,;: were stripped here), so the ABBREV
+      // exact-token lookup below never matched "custs'" against its "custs"
+      // key and the question never got its "customers" expansion at all. A
+      // trailing apostrophe with nothing after it is always a plural
+      // possessive marker, never part of the word itself, so it's safe to
+      // strip the same way trailing punctuation already is.
+      const trailMatch = raw.match(/['’,;:]+$/);
+      const trail = trailMatch ? trailMatch[0] : '';
+      const core = trail ? raw.slice(0, -trail.length) : raw;
+      const lower = core.toLowerCase();
 
-    if (Object.prototype.hasOwnProperty.call(ABBREV, lower)) {
-      const to = ABBREV[lower];
-      corrections.push({ from: lower, to });
-      return to + trail;
-    }
+      if (Object.prototype.hasOwnProperty.call(tables.abbrev, lower)) {
+        const to = tables.abbrev[lower];
+        corrections.push({ from: lower, to });
+        return to + trail;
+      }
 
-    const isPlainWord = /^[a-z]+$/.test(lower);
-    if (!singleRecord && isPlainWord && lower.length >= 5 && !VOCAB.has(lower)) {
-      // Extra belt-and-suspenders guard even outside the single-record case:
-      // a word immediately after a number is almost always a street name
-      // component ("123 Maple") — never fuzzy-corrected.
-      const prevRaw = idx > 0 ? words[idx - 1].replace(/[^a-z0-9]/gi, '') : '';
-      const prevIsNumber = /^\d+$/.test(prevRaw);
-      // Reviewer NO-GO (2026-09-22): "Cgrande Ave" — a word immediately
-      // BEFORE a street-suffix word (ave/rd/st/blvd/dr/ln/ct/way, or the
-      // spelled-out forms) is a street name, the same strong "don't touch
-      // this" signal a number right before it already is above. This one
-      // has no digit anywhere to trip STREET_ADDRESS_RE/the singleRecord
-      // guard at all, so it needed its own check.
-      const nextRaw = idx < words.length - 1 ? words[idx + 1].replace(/[^a-z]/gi, '').toLowerCase() : '';
-      const nextIsStreetSuffix = STREET_SUFFIX_WORD_RE.test(nextRaw);
-      if (!prevIsNumber && !nextIsStreetSuffix) {
-        const fixed = fuzzyCorrect(lower);
-        if (fixed) {
-          corrections.push({ from: lower, to: fixed });
-          return fixed + trail;
+      const isPlainWord = /^[a-z]+$/.test(lower);
+      if (!singleRecord && isPlainWord && lower.length >= 5 && !tables.vocab.has(lower)) {
+        // Extra belt-and-suspenders guard even outside the single-record case:
+        // a word immediately after a number is almost always a street name
+        // component ("123 Maple") — never fuzzy-corrected.
+        const prevRaw = idx > 0 ? words[idx - 1].replace(/[^a-z0-9]/gi, '') : '';
+        const prevIsNumber = /^\d+$/.test(prevRaw);
+        // Reviewer NO-GO (2026-09-22): "Cgrande Ave" — a word immediately
+        // BEFORE a street-suffix word (ave/rd/st/blvd/dr/ln/ct/way, or the
+        // spelled-out forms) is a street name, the same strong "don't touch
+        // this" signal a number right before it already is above. This one
+        // has no digit anywhere to trip STREET_ADDRESS_RE/the singleRecord
+        // guard at all, so it needed its own check.
+        const nextRaw = idx < words.length - 1 ? words[idx + 1].replace(/[^a-z]/gi, '').toLowerCase() : '';
+        const nextIsStreetSuffix = STREET_SUFFIX_WORD_RE.test(nextRaw);
+        if (!prevIsNumber && !nextIsStreetSuffix) {
+          const fixed = fuzzyCorrect(lower, tables.vocabByLen);
+          if (fixed) {
+            corrections.push({ from: lower, to: fixed });
+            return fixed + trail;
+          }
         }
       }
-    }
-    return raw;
+      return raw;
+    });
+    return out.join(' ').replace(/\s+/g, ' ').trim();
   });
 
-  const normalized = out.join(' ').replace(/\s+/g, ' ').trim();
   return { normalized, original, corrections };
 }

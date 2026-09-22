@@ -26,6 +26,7 @@ import { runFastPath } from "./_lib/fastPathQuery.js";
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
+import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText } from "./_lib/docLookup.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -40,6 +41,12 @@ import { getStreetVocab, correctStreetTypos } from "./_lib/streetVocab.js";
 // phrasing gets the same routing decision a clean one would, not this file's
 // plainer lowercase/trim/strip-punctuation normalization.
 import { normalizeQuestion as normalizeQuestionForAnalytics } from "./_lib/nlNormalize.js";
+// Tier 2 learning loop, Part A (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
+// the process-wide ACTIVE overlay of every approved learned abbreviation/
+// typo/synonym/few-shot example — cached 10 minutes, {} on any error (e.g.
+// migration 26 not applied yet). Threaded explicitly into every overlay-aware
+// call below rather than read again by each one.
+import { getActiveOverlay } from "./_lib/learning/overlay.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -519,6 +526,9 @@ export default async function handler(req, res) {
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
     const meta = classifyMetaQuestion(question);
+    // Never throws (see getActiveOverlay's own doc comment) — safe to await
+    // directly with no try/catch here.
+    const overlay = await timer.time("overlay", () => getActiveOverlay());
 
     // ---- street-name typo correction (live miss cluster 4, 2026-09-21) ----
     // "when was the unit at 766 n val ivsta dr, tucson installed" — the
@@ -565,8 +575,17 @@ export default async function handler(req, res) {
     // (extractSubject's name regexes require capitalization; hasAnchor needs
     // an HVAC-specific word) so fastPath itself never claims these. Pure
     // shape detection only here (no DB) — see contactLookup.js.
-    const contactLookupIntent = !meta ? parseContactLookupQuestion(question) : null;
-    const normalizedForAnalytics = normalizeQuestionForAnalytics(question).normalized;
+    const contactLookupIntent = !meta ? parseContactLookupQuestion(question, { overlay }) : null;
+    // Document-lookup-by-customer/address pre-router (100-question persona
+    // sample, item 1, 2026-09-22): "do we have a maintenance agreement on file
+    // for the Bracken job" / "list the invoices for 214 Mercer St" — resolved
+    // straight from documents/document_entity_links, no model call, no
+    // citation-worthy passage needed. Only tried when contact-lookup itself
+    // didn't already claim the question (its own field-lookup shapes are
+    // checked first and take priority on any overlap). Pure shape detection
+    // only here (no DB) — see docLookup.js.
+    const docLookupIntent = !meta && !contactLookupIntent ? parseDocLookupQuestion(question, { overlay }) : null;
+    const normalizedForAnalytics = normalizeQuestionForAnalytics(question, { overlay }).normalized;
     // Money gate (live miss cluster 2, 2026-09-21): "what's the total dollar
     // amount of our open invoices" style questions have no honest answer yet
     // — there is no financials layer (handoffs/FINANCIALS_DESIGN_2026-09-21.md,
@@ -575,7 +594,7 @@ export default async function handler(req, res) {
     // documents." Checked here, before the analytics pre-router, so a money
     // question NEVER reaches the Haiku planner at all — see
     // isMoneyQuestion/moneyFallbackAnswer (analytics.js).
-    const moneyQuestion = !meta && isMoneyQuestion(normalizedForAnalytics);
+    const moneyQuestion = !meta && !docLookupIntent && isMoneyQuestion(normalizedForAnalytics);
     // Analytics pre-router (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md): a
     // cheap deterministic regex gate (preClassifyAnalytics, no DB/model cost)
     // decides whether this question is even WORTH the one Haiku planner call
@@ -592,9 +611,9 @@ export default async function handler(req, res) {
     // capitalized, on top of whatever preClassifyAnalytics(normalized) itself
     // already re-checks (redundant on lowercased text, never wrong).
     const analyticsCandidate =
-      !meta && !fastPathIntent && !contactLookupIntent && !moneyQuestion && isAnalyticsEnabled() &&
+      !meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !moneyQuestion && isAnalyticsEnabled() &&
       !looksLikeSingleRecordReference(question) &&
-      preClassifyAnalytics(normalizedForAnalytics);
+      preClassifyAnalytics(normalizedForAnalytics, { overlay });
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
@@ -633,7 +652,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || fastPathIntent || contactLookupIntent || moneyQuestion || analyticsCandidate
+    const retrievalPromise = meta || fastPathIntent || contactLookupIntent || docLookupIntent || moneyQuestion || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
 
@@ -738,7 +757,7 @@ export default async function handler(req, res) {
       let contactData = null;
       try {
         contactData = await timer.time("contact", () =>
-          withTenant(ctxArg, (db) => runContactLookup(db, question))
+          withTenant(ctxArg, (db) => runContactLookup(db, question, { overlay }))
         );
       } catch (err) {
         console.error("Contact lookup failed, falling through to retrieval+model:", err?.message);
@@ -788,6 +807,64 @@ export default async function handler(req, res) {
       recordAskMiss(ctxArg, {
         question, questionNormalized: normalizedForAnalytics,
         outcome: MISS_OUTCOMES.CONTACT_ZERO,
+      }).catch(() => {});
+    }
+
+    // ---- 0.62 doc-lookup pre-router (no model, DB only) --------------------
+    // "do we have a maintenance agreement on file for the Bracken job" —
+    // answered straight from documents/document_entity_links, no model call.
+    // Never counted against the monthly model allowance: 'doc-lookup' is not
+    // in usage.js's COUNTABLE_ASK_SOURCES, so nothing here ever touches
+    // incrementAsksThisMonth.
+    if (docLookupIntent) {
+      let docData = null;
+      try {
+        docData = await timer.time("doclookup", () =>
+          withTenant(ctxArg, (db) => runDocLookup(db, question, { overlay }))
+        );
+      } catch (err) {
+        console.error("Doc lookup failed, falling through to retrieval+model:", err?.message);
+      }
+      console.log(JSON.stringify({
+        route: "ask",
+        doc_lookup_type: docLookupIntent.doctype,
+        doc_lookup_hit: Boolean(docData),
+      }));
+      if (docData) {
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, async (db) => {
+              await db.logAction({
+                action: "document.queried",
+                resource_type: "question",
+                clerk_user_id: auth.userId,
+                changes: {
+                  question_hash: hashQuestion(question),
+                  documents: [...new Set((docData.sources ?? []).map((s) => s.documentId))],
+                  passages: 0,
+                  docLookup: true,
+                },
+              });
+              if ((docData.candidateCount ?? 1) > 1) {
+                await insertAskMiss(db, {
+                  question, questionNormalized: normalizedForAnalytics,
+                  outcome: MISS_OUTCOMES.CONTACT_AMBIGUOUS,
+                });
+              }
+            });
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (doc lookup):", err?.message);
+          }
+        });
+        return send(200, { success: true, data: docData });
+      }
+      // docData is null: no customer/address matched, or matched but had no
+      // document of that type on file — same fallback shape as contact
+      // lookup's own miss above: retrieval (run inline just below) still gets
+      // a shot, fire-and-forget miss logging never delays it.
+      recordAskMiss(ctxArg, {
+        question, questionNormalized: normalizedForAnalytics,
+        outcome: MISS_OUTCOMES.DOC_LOOKUP_ZERO,
       }).catch(() => {});
     }
 
@@ -841,7 +918,7 @@ export default async function handler(req, res) {
         // — or be shadowed by — a retrieval-cached row for the same question
         // text (2026-09-21 reviewer fix, handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md).
         analyticsResult = await timer.time("analytics_plan", () =>
-          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved })
+          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay })
         );
       } catch (err) {
         // A tenant already over its daily model budget must not spend a
@@ -976,11 +1053,30 @@ export default async function handler(req, res) {
       // Miss loop: fired with no await — nothing else on this path is
       // awaited before the response either, and this must never delay it.
       recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER }).catch(() => {});
+      // Item 8 (100-question persona sample, 2026-09-22): a single-record
+      // question ("do we have anything about a compressor replacement for
+      // Thomas Mercer") that resolves to exactly one known customer/address
+      // gets a specific honest zero naming them, instead of the generic
+      // "Nothing in your records answers that yet" — see docLookup.js's own
+      // doc comment. Only attempted for a question that already looks like a
+      // single-record reference (never for an aggregate/analytics-shaped one
+      // that merely happened to retrieve nothing); any failure here falls
+      // back to the generic line rather than risking a wrong/500 response on
+      // an already-given-up path.
+      let honestZeroText = null;
+      if (looksLikeSingleRecordReference(question)) {
+        try {
+          const ctx = await withTenant(ctxArg, (db) => resolveHonestZeroContext(db, question));
+          if (ctx) honestZeroText = buildHonestZeroText(ctx);
+        } catch (err) {
+          console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
+        }
+      }
       return send(200, {
         success: true,
         data: {
           kind: "no-answer",
-          text: "Nothing in your records answers that yet. Your documents may still be processing.",
+          text: honestZeroText ?? "Nothing in your records answers that yet. Your documents may still be processing.",
           facts: [], sources: [], confidence: 0,
           verifiedCount: 0, unverifiedCount: 0, closest: [],
         },

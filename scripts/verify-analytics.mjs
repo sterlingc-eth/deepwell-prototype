@@ -63,6 +63,10 @@ import {
   ANALYTICS_SYSTEM_PROMPT,
   TOP_CUSTOMERS_LIMIT,
   resolveQuestionTimeRange,
+  resolveExtendedTimeRange,
+  resolveAnyTimeRange,
+  withinTimeRange,
+  timeRangeIsDayGrain,
   reconcileTimeRange,
   monthRangeLabel,
   isServiceVisitsQuestion,
@@ -70,12 +74,18 @@ import {
   detectedConditions,
   missingConditions,
   unsupportedConditionAnswer,
+  buildConditionOverrideFilter,
+  parseCrossDocCondition,
+  crossDocUnsupportedAnswer,
   isMoneyQuestion,
   moneyFallbackAnswer,
   MONEY_FALLBACK_TEXT,
   ANALYTICS_FEW_SHOT,
   ANALYTICS_FEW_SHOT_BLOCK,
+  FILTER_FIELDS,
+  DOC_TYPE_FILTER_FIELDS,
 } from '../api/_lib/analytics.js';
+import { DOCUMENT_TYPE_IDS } from '../api/_lib/documentTypes.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan, runAnalyticsQuestion } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
 import {
@@ -1742,6 +1752,102 @@ check(
   'street-suffix guard (negative): "servicedd" with no suffix following still normalizes',
   normalizeQuestionNL('which units had servicedd this week').normalized !== 'which units had servicedd this week'
 );
+
+/* ======================================================================
+ * 15. 100-question persona sample (2026-09-22) — items 4-7. Pure only, no DB,
+ * no model call — see api/_lib/analytics.js's own doc comments for each.
+ * ====================================================================== */
+
+// -- item 6: MONEY_RE additions ("collected", "fees", "paid us",
+// "receivables", bare "outstanding") -- via isMoneyQuestion, never a raw
+// regex import (MONEY_RE itself is module-private). --
+for (const q of [
+  'how much have we collected this month',
+  'what fees do we owe on the Mercer account',
+  'which customers paid us last quarter',
+  'what are our outstanding receivables',
+  "what's outstanding on the Wyckoff account",
+]) {
+  check(`item 6 MONEY_RE (positive) :: "${q}"`, isMoneyQuestion(q) === true);
+}
+for (const q of ['how many customers do we have', 'list documents for Mercer', 'how many invoices this year']) {
+  check(`item 6 MONEY_RE (negative) :: "${q}"`, isMoneyQuestion(q) === false);
+}
+
+// -- item 5: extended time windows -- resolveAnyTimeRange returns a
+// {from,to,label} day-grain range for each new phrasing, and falls through to
+// null for a question naming no time window at all. --
+for (const q of [
+  'this week', 'last week', 'this quarter', 'last quarter', 'year to date', 'ytd',
+  'this year', 'last year', 'since 2024', 'in the last 30 days', 'past 2 weeks', 'in the last 3 months',
+]) {
+  const r = resolveAnyTimeRange(`how many jobs did we do ${q}`, '2026-09-22');
+  check(`item 5 time window (positive) :: "${q}" resolves`, Boolean(r && r.from && r.to && r.label), JSON.stringify(r));
+  if (r) check(`item 5 time window (positive) :: "${q}" is day-grain`, timeRangeIsDayGrain(r));
+}
+for (const q of ['how many customers do we have', 'list customers in Mesa']) {
+  eq(`item 5 time window (negative) :: "${q}" resolves to null`, resolveAnyTimeRange(q, '2026-09-22'), null);
+}
+// Reviewer NO-GO (2026-09-22): "this week"/"last week" must be Monday-
+// anchored, not Sunday-anchored. 2026-09-22 is a Tuesday.
+eq('item 5 this week :: Monday-anchored (today Tue 2026-09-22)', resolveExtendedTimeRange('this week', '2026-09-22'), { from: '2026-09-21', to: '2026-09-22', label: 'this week' });
+eq('item 5 last week :: Monday-anchored (today Tue 2026-09-22)', resolveExtendedTimeRange('last week', '2026-09-22'), { from: '2026-09-14', to: '2026-09-20', label: 'last week' });
+// withinTimeRange: day-grain compares the row's own date; month-grain falls
+// back to the row's month, exactly as before this existed.
+{
+  const dayRange = resolveAnyTimeRange('jobs this week', '2026-09-22'); // a Tuesday
+  check('item 5 withinTimeRange: in-range day matches', withinTimeRange({ date: dayRange.from }, dayRange));
+  check('item 5 withinTimeRange: out-of-range day rejected', !withinTimeRange({ date: '2020-01-01' }, dayRange));
+  check('item 5 withinTimeRange: no date on row rejected (day-grain)', !withinTimeRange({ date: null }, dayRange));
+  const monthRange = { from: '2026-08', to: '2026-08' };
+  check('item 5 withinTimeRange: month-grain still matches on row.month', withinTimeRange({ month: '2026-08' }, monthRange));
+  check('item 5 withinTimeRange: month-grain rejects a different month', !withinTimeRange({ month: '2026-07' }, monthRange));
+}
+
+// -- item 4: condition overrides -- deterministic filter built from the
+// question's own wording, polarity-aware for email/phone. --
+eq('item 4 override :: "customer with no email on file"', buildConditionOverrideFilter('email', 'customer with no email on file'), { field: 'hasEmail', op: 'eq', value: false });
+eq('item 4 override :: "customer with an email on file"', buildConditionOverrideFilter('email', 'customer with an email on file'), { field: 'hasEmail', op: 'eq', value: true });
+eq('item 4 override :: "customers without a phone"', buildConditionOverrideFilter('phone', 'customers without a phone'), { field: 'hasPhone', op: 'eq', value: false });
+eq('item 4 override :: "customers who have a phone"', buildConditionOverrideFilter('phone', 'customers who have a phone number'), { field: 'hasPhone', op: 'eq', value: true });
+eq('item 4 override :: brand word resolved', buildConditionOverrideFilter('brand', 'how many trane units do we have'), { field: 'brand', op: 'eq', value: 'Trane' });
+eq('item 4 override :: zip extracted', buildConditionOverrideFilter('zip', 'customers in 85201'), { field: 'zip', op: 'eq', value: '85201' });
+eq('item 4 override :: state (arizona)', buildConditionOverrideFilter('state', 'customers in arizona'), { field: 'state', op: 'eq', value: 'AZ' });
+eq('item 4 override (negative) :: unresolvable state', buildConditionOverrideFilter('state', 'customers we service'), null);
+eq('item 4 override (negative) :: month never overridden here', buildConditionOverrideFilter('month', 'jobs this year'), null);
+// detectedConditions now also catches city/state/zip (feeds the override above).
+check('item 4 detectedConditions :: city word detected', detectedConditions('list customers in Mesa').has('city'));
+check('item 4 detectedConditions :: state word detected', detectedConditions('how many customers in Arizona').has('state'));
+check('item 4 detectedConditions :: zip detected', detectedConditions('customers in 85201').has('zip'));
+eq('item 4 detectedConditions (negative) :: no geo/contact word', detectedConditions('how many customers do we have').size, 0);
+
+// -- item 7: cross-doc "has X but no Y" -- resolved to hasDocType/lacksDocType,
+// or an honest, specific fallback when the "no ___" half names a service visit
+// rather than a document type. --
+{
+  const cross = parseCrossDocCondition('customers with a proposal but no invoice');
+  eq('item 7 cross-doc (positive) :: proposal but no invoice', cross, { hasType: 'proposal-quote', lacksType: 'invoice', unsupported: null });
+  check('item 7 :: hasDocType/lacksDocType are in FILTER_FIELDS', FILTER_FIELDS.includes('hasDocType') && FILTER_FIELDS.includes('lacksDocType'));
+  eq('item 7 :: DOC_TYPE_FILTER_FIELDS is exactly the two', DOC_TYPE_FILTER_FIELDS, ['hasDocType', 'lacksDocType']);
+  check('item 7 :: resolved hasType is a real document type id', DOCUMENT_TYPE_IDS.has(cross.hasType));
+}
+{
+  const cross = parseCrossDocCondition('which customers have a maintenance agreement but no service this year');
+  check('item 7 cross-doc (unsupported) :: names service + window', cross && cross.unsupported === 'service' && cross.windowLabel === 'this year', JSON.stringify(cross));
+  const ans = crossDocUnsupportedAnswer(cross);
+  check('item 7 cross-doc (unsupported) :: fallback text names both halves', ans.text.includes('maintenance agreement') && ans.text.includes('no service this year'));
+}
+for (const q of ['customers with a proposal', 'how many invoices this year', 'list customers in Mesa']) {
+  eq(`item 7 cross-doc (negative) :: "${q}"`, parseCrossDocCondition(q), null);
+}
+for (const [f, v] of [['hasDocType', 'invoice'], ['lacksDocType', 'proposal-quote']]) {
+  const plan = validatePlan({ entity: 'customers', op: 'list', filters: [{ field: f, op: 'eq', value: v }] });
+  check(`item 7 validatePlan (positive) :: ${f}=${v} accepted`, Boolean(plan));
+}
+for (const [f, v] of [['hasDocType', 'not-a-real-type'], ['lacksDocType', 'invoice']]) {
+  const badOp = validatePlan({ entity: 'customers', op: 'list', filters: [{ field: f, op: v === 'invoice' ? 'neq' : 'eq', value: v }] });
+  check(`item 7 validatePlan (negative) :: ${f} rejects bad ${v === 'invoice' ? 'op' : 'value'}`, badOp === null);
+}
 
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {

@@ -36,6 +36,11 @@ export const MISS_OUTCOMES = {
   CONTACT_ZERO: 'contact-lookup-zero',
   CONTACT_AMBIGUOUS: 'contact-lookup-ambiguous',
   ANALYTICS_FALLTHROUGH: 'analytics-fallthrough',
+  // Item 1/7 (100-question persona sample, 2026-09-22): doc-lookup's own zero-
+  // candidate miss, distinct from contact-lookup's — see api/ask.js's
+  // doc-lookup pre-router and analytics.js's parseCrossDocCondition.
+  DOC_LOOKUP_ZERO: 'doc-lookup-zero',
+  CROSS_DOC_UNSUPPORTED: 'cross-doc-unsupported',
 };
 
 const MAX_QUESTION_CHARS = 300;
@@ -205,6 +210,8 @@ const OUTCOME_SUGGESTED_ROUTE = {
   [MISS_OUTCOMES.CONTACT_ZERO]: 'contact-lookup',
   [MISS_OUTCOMES.CONTACT_AMBIGUOUS]: 'contact-lookup',
   [MISS_OUTCOMES.ANALYTICS_FALLTHROUGH]: 'analytics',
+  [MISS_OUTCOMES.DOC_LOOKUP_ZERO]: 'doc-lookup',
+  [MISS_OUTCOMES.CROSS_DOC_UNSUPPORTED]: 'analytics',
 };
 
 /**
