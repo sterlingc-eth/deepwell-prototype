@@ -73,6 +73,11 @@ const EXTRA_DOMAIN_WORDS = [
   // vocabulary is built from, so a typo'd "reevnue" or "overde" had nothing
   // to fuzzy-correct back to.
   'billed', 'revenue', 'overdue', 'maintenance',
+  // HVAC persona bank (2026-09-21): "how many different zip coeds do we
+  // cover" — analytics.js's ZIP_CODE_WORD_RE keys off the exact word "codes",
+  // same load-bearing-word gap as 'billed'/'overdue' above; "codes" was
+  // nowhere in this vocabulary for the typo to fuzzy-correct back to.
+  'codes',
   // Live miss ("which units had service this month", 2026-09-21): "serviced"
   // is a real, correctly-spelled word (past tense of "service"), never a typo
   // of "service" — but at 8 letters, one edit-distance-1 deletion away from
@@ -85,6 +90,11 @@ const EXTRA_DOMAIN_WORDS = [
   // needless, surprising rewrite of a real word; keeping "serviced" in vocab
   // stops fuzzyCorrect from ever touching it in the first place.
   'serviced',
+  // HVAC persona bank (2026-09-21): analytics.js's own SUPERLATIVE_RE keys off
+  // these exact words ("oldest"/"newest"/...) the same load-bearing-word way
+  // 'billed'/'overdue' above already do — none were anywhere in this
+  // vocabulary for a typo ("oewest") to fuzzy-correct back to.
+  'oldest', 'newest', 'latest', 'earliest',
 ];
 
 function buildVocab() {
@@ -192,7 +202,14 @@ const ABBREV = {
   az: 'arizona', nv: 'nevada', ca: 'california',
   cust: 'customer', custs: 'customers', ppl: 'people',
   ac: 'air conditioner', mo: 'month', yr: 'year', yrs: 'years',
-  tech: 'technician', techs: 'technicians', qty: 'quantity', addy: 'address',
+  tech: 'technician', techs: 'technicians', qty: 'quantity', addy: 'address', addr: 'address',
+  // HVAC persona bank (2026-09-21): "tuc customers" / "cg customers" —
+  // dispatcher shorthand for the two AZ service-area cities this corpus
+  // actually covers. "tuc" has no other meaning in this domain; "cg" is
+  // added only for the one unambiguous city it already stands for in the
+  // answer key (Casa Grande) — neither is a real word this table would ever
+  // need to leave alone for some OTHER meaning.
+  tuc: 'tucson', cg: 'casa grande',
 };
 
 // Leading filler this project's dispatchers/owners actually type before the
@@ -217,8 +234,47 @@ function stripFillerPrefixes(q) {
  *  string substitutions before word-level splitting. Order matters: "w/o"
  *  must be checked before the plainer "w/" pattern, and "ph#" before the bare
  *  "#" one. */
+// A handful of common short-word typos ("toal" for "total") that fuzzyCorrect
+// below can never reach — its own floor only ever touches a 5+ letter token
+// (see fuzzyCorrect's own doc comment for why), which structurally excludes
+// a 4-letter word no matter how close it is to a real one. HVAC persona bank
+// (2026-09-21): "what's the toal amount we've invoiced" fell through
+// isMoneyQuestion entirely because MONEY_RE needs the literal word "total"
+// right before "amount" — a tiny, closed table, the same shape
+// contactLookup.js's own FIELD_WORD_TYPO_FIXES already uses for exactly this
+// "too short for the general fuzzy floor" gap.
+const SHORT_WORD_TYPO_FIXES = [
+  [/\btoal\b/g, 'total'],
+  [/\bwhch\b/g, 'which'],
+  [/\bcals\b/g, 'calls'],
+  // "moth" is a real word (the insect) so it's never in this domain's own
+  // vocabulary to correct TO, but it never legitimately appears in an HVAC
+  // dispatch question either — "what equipment got serviced this moth" is
+  // always the "month" typo, never a bug question.
+  [/\bmoth\b/g, 'month'],
+  // "csuts" is a typo of the ABBREVIATION "custs", not of the full word
+  // "customers" itself (too far apart for fuzzyCorrect's own edit-distance-1
+  // floor to bridge) — mapped straight to the fully-expanded form so it
+  // doesn't need a second, separate ABBREV-table pass to finish the job.
+  [/\bcsuts\b/g, 'customers'],
+];
+
+// Used by normalizeQuestion's own fuzzy-correction guard (below) to protect
+// the word right before a street-suffix from being "corrected" against the
+// general vocabulary — a street name is never in that vocabulary to begin
+// with, so without this guard a genuine one gets silently rewritten into
+// whatever vocab word happens to be closest.
+const STREET_SUFFIX_WORD_RE =
+  /^(?:ave|avenue|rd|road|st|street|blvd|boulevard|dr|drive|ln|lane|ct|court|way)$/i;
+
+function fixShortWordTypos(q) {
+  let out = q;
+  for (const [re, to] of SHORT_WORD_TYPO_FIXES) out = out.replace(re, to);
+  return out;
+}
+
 function expandSymbols(q) {
-  return q
+  return fixShortWordTypos(q)
     .replace(/\bph#/g, 'phone number')
     .replace(/\be-mail\b/g, 'email')
     .replace(/\bw\/o\b/g, 'without')
@@ -253,7 +309,15 @@ export function normalizeQuestion(text) {
   const words = q.split(' ').filter(Boolean);
 
   const out = words.map((raw, idx) => {
-    const trailMatch = raw.match(/[,;:]+$/);
+    // HVAC persona bank (2026-09-21): "which custs' addresses might need
+    // double checking" — a trailing bare possessive apostrophe ("custs'")
+    // used to survive untouched (only ,;: were stripped here), so the ABBREV
+    // exact-token lookup below never matched "custs'" against its "custs"
+    // key and the question never got its "customers" expansion at all. A
+    // trailing apostrophe with nothing after it is always a plural
+    // possessive marker, never part of the word itself, so it's safe to
+    // strip the same way trailing punctuation already is.
+    const trailMatch = raw.match(/['’,;:]+$/);
     const trail = trailMatch ? trailMatch[0] : '';
     const core = trail ? raw.slice(0, -trail.length) : raw;
     const lower = core.toLowerCase();
@@ -271,7 +335,15 @@ export function normalizeQuestion(text) {
       // component ("123 Maple") — never fuzzy-corrected.
       const prevRaw = idx > 0 ? words[idx - 1].replace(/[^a-z0-9]/gi, '') : '';
       const prevIsNumber = /^\d+$/.test(prevRaw);
-      if (!prevIsNumber) {
+      // Reviewer NO-GO (2026-09-22): "Cgrande Ave" — a word immediately
+      // BEFORE a street-suffix word (ave/rd/st/blvd/dr/ln/ct/way, or the
+      // spelled-out forms) is a street name, the same strong "don't touch
+      // this" signal a number right before it already is above. This one
+      // has no digit anywhere to trip STREET_ADDRESS_RE/the singleRecord
+      // guard at all, so it needed its own check.
+      const nextRaw = idx < words.length - 1 ? words[idx + 1].replace(/[^a-z]/gi, '').toLowerCase() : '';
+      const nextIsStreetSuffix = STREET_SUFFIX_WORD_RE.test(nextRaw);
+      if (!prevIsNumber && !nextIsStreetSuffix) {
         const fixed = fuzzyCorrect(lower);
         if (fixed) {
           corrections.push({ from: lower, to: fixed });

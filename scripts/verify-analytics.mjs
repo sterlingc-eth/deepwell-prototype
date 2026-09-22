@@ -78,7 +78,17 @@ import {
 } from '../api/_lib/analytics.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan, runAnalyticsQuestion } from '../api/_lib/routes/analytics.js';
 import { hashQuestion, normalizeQuestion } from '../api/ask.js';
-import { parseContactLookupQuestion, fuzzyNameMatches, nameTokens, buildContactAnswer, buildAmbiguousContactAnswer } from '../api/_lib/contactLookup.js';
+import {
+  parseContactLookupQuestion,
+  fuzzyNameMatches,
+  nameTokens,
+  buildContactAnswer,
+  buildAmbiguousContactAnswer,
+  buildStreetAmbiguousAnswer,
+  buildNoStreetMatchAnswer,
+  resolveStreetCandidates,
+  runContactLookup,
+} from '../api/_lib/contactLookup.js';
 import { extractStreetTokens, correctStreetTypos } from '../api/_lib/streetVocab.js';
 import { insertAskMiss } from '../api/_lib/missStore.js';
 import { normalizeQuestion as normalizeQuestionNL } from '../api/_lib/nlNormalize.js';
@@ -1439,6 +1449,299 @@ for (const q of ['what units did we service this month', 'what customers did we 
   for (const c of new Set(used)) check(`serviceVisits SQL column x.${c} exists on extractions`, cols.has(c));
   check('serviceVisits SQL reads at least document_id and value', used.includes('document_id') && used.includes('value'));
 }
+
+/* ======================================================================
+ * 19. HVAC persona bank (2026-09-21) — every classifier/lookup rule added or
+ * widened while integrating HVAC_PERSONA_QUESTIONS, each with >= 2 negatives
+ * proving it never hijacks an address/single-record/unrelated question.
+ * ====================================================================== */
+
+// -- hasNamedActionObject: case no longer required, but a real aggregate
+// tail ("this quarter"/"invoices") must still never be misread as a name. --
+for (const q of ['did we send isaacson a quote', 'what proposal did we give amy isaacson', 'did we ever quote thornton']) {
+  check(`action-object (positive, lowercase) :: "${q}" is single-record`, looksLikeSingleRecordReference(q));
+}
+for (const q of [
+  'how many quotes did we send this quarter',
+  'how many invoices have we sent year to date',
+  'did we send any invoices this month',
+]) {
+  check(`action-object (negative) :: "${q}" is not single-record`, !looksLikeSingleRecordReference(q));
+}
+
+// -- SINGULAR_NAMED_RECORD_RE: a superlative in the "the <word> unit" slot is
+// never a customer name. --
+for (const q of ["what's the oldest unit we're still servicing", "what's the newest unit we've installed"]) {
+  check(`superlative-unit (positive) :: "${q}" is analytics, not single-record`, preClassifyAnalytics(q) && !looksLikeSingleRecordReference(q));
+}
+for (const q of ['the thornton unit is leaking', 'schedule service for the mercer account']) {
+  check(`superlative-unit (negative) :: "${q}" still single-record (a real name in the slot)`, looksLikeSingleRecordReference(q));
+}
+
+// -- CUSTOMERS_WHOSE_RE: "customers whose ..." bypasses QUANTIFIER the same
+// way "which customers" already does. --
+for (const q of ["customers whose warranty expires in the next 90 days", 'clients whose email is missing']) {
+  check(`customers-whose (positive) :: "${q}" is analytics`, preClassifyAnalytics(q));
+}
+for (const q of ['whose phone number is this', 'the unit whose filter needs replacing']) {
+  check(`customers-whose (negative) :: "${q}" is not analytics`, !preClassifyAnalytics(q));
+}
+
+// -- WE_YES_NO_RE: "we got" is the voice-style transform of "do we have". --
+for (const q of ['we got any commercial accounts', 'we got more invoices or more service tickets on file']) {
+  check(`we-got (positive) :: "${q}" is analytics`, preClassifyAnalytics(q));
+}
+for (const q of ['we got a callback from thornton', 'we got the part in for the mercer job']) {
+  check(`we-got (negative) :: "${q}" is not analytics (no domain-count noun/geo/brand/zip)`, !preClassifyAnalytics(q));
+}
+
+// -- WHO_DUE_RE: "whos due" (voice-style, apostrophe stripped) must match
+// alongside "who's due", without "whose" (a different word) ever matching. --
+check('who-due (positive) :: "whos due for fall maintenance" is analytics', preClassifyAnalytics('whos due for fall maintenance'));
+check('who-due (positive) :: "who\'s due for maintenance" is analytics', preClassifyAnalytics("who's due for maintenance"));
+for (const q of ['customers whose maintenance lapsed', 'whose maintenance is this']) {
+  check(`who-due (negative) :: "${q}" does not trigger WHO_DUE_RE`, !/\bwho(?:'s|s\b|\s+is|\s+needs)\s+(?:due|overdue)\b/i.test(q));
+}
+
+// -- ZIP_VALUE_RE: a bare 5-digit ZIP combined with an aggregate noun. --
+for (const q of ['customers in 85201', 'how many customers do we have in 85122']) {
+  check(`zip-value (positive) :: "${q}" is analytics`, preClassifyAnalytics(q));
+}
+for (const q of ['serial 85201', "what's the serial number on the unit at 85201 e main st"]) {
+  check(`zip-value (negative) :: "${q}" is not analytics (single-record wins)`, !preClassifyAnalytics(q) || looksLikeSingleRecordReference(q));
+}
+
+// -- GEO_WORD_RE: NV cities (e.g. Las Vegas), not just AZ ones. --
+for (const q of ['who are our customers in las vegas', 'how many customers do we have in north las vegas']) {
+  check(`nv-city (positive) :: "${q}" is analytics`, preClassifyAnalytics(q));
+}
+for (const q of ['what is the model number', 'thanks']) {
+  check(`nv-city (negative) :: "${q}" is not analytics`, !preClassifyAnalytics(q));
+}
+
+// -- TRAILING_NAME_RE (analytics.js): a per-customer document question, now
+// tolerant of trailing chatter after the name. --
+for (const q of ['List invoices for Fitzgerald so I can call them', 'List invoices for Bracken for the file', 'List invoices for Delgado, thanks']) {
+  check(`trailing-name+chatter (positive) :: "${q}" is single-record, not analytics`, looksLikeSingleRecordReference(q) && !preClassifyAnalytics(q));
+}
+for (const q of ['how many invoices did we send this quarter', 'list invoices from last month']) {
+  check(`trailing-name+chatter (negative) :: "${q}" stays analytics`, preClassifyAnalytics(q) && !looksLikeSingleRecordReference(q));
+}
+
+// -- MONEY_RE: "unpaid invoices" (plural) must match, same as the singular. --
+check('money (positive) :: "we got any unpaid invoices" is a money question', isMoneyQuestion('we got any unpaid invoices'));
+check('money (positive) :: "unpaid invoice" (singular) still matches', isMoneyQuestion('is this an unpaid invoice'));
+for (const q of ['we got any invoices on file', 'how many invoices do we have']) {
+  check(`money (negative) :: "${q}" is not a money question`, !isMoneyQuestion(q));
+}
+
+// -- contactLookup.js: serial / lastVisit fields, "pull up"/"on file for"
+// full-record shape, chatter/quantifier stripping, and the guards added
+// against the regressions those introduced. --
+{
+  const SERIAL_LASTVISIT_POSITIVES = [
+    ['bracken serial', 'serial', 'bracken'],
+    ["whats bracken's serial", 'serial', 'bracken'],
+    ['ellison last visit', 'lastVisit', 'ellison'],
+    ['pull up thornton', 'full', 'thornton'],
+    ['what do we have on file for sandra wyckoff', 'full', 'sandra wyckoff'],
+    ['list pull up thornton', 'full', 'thornton'],
+    ['need the pull up ortega', 'full', 'ortega'],
+    ["what's the number for donna thornton for the file", 'phone', 'donna thornton'],
+    ['addr for wyckoff so i can call them', 'address', 'wyckoff'],
+  ];
+  for (const [q, field, name] of SERIAL_LASTVISIT_POSITIVES) {
+    const parsed = parseContactLookupQuestion(q);
+    check(`contact-lookup v2: detects shape for "${q}"`, parsed !== null);
+    if (parsed) {
+      eq(`contact-lookup v2: field for "${q}"`, parsed.field, field);
+      eq(`contact-lookup v2: name phrase for "${q}"`, parsed.namePhrase.toLowerCase(), name);
+    }
+  }
+
+  const CONTACT_V2_NEGATIVES = [
+    'list customers missing a phone number',
+    'which customers have no email so i know who to call instead of emailing',
+    'how many customers do we have an email on file for in mesa',
+    "what's the serial number of the unit at 248 w huard rd",
+    'how many customers do we have',
+    'list customers in mesa',
+  ];
+  for (const q of CONTACT_V2_NEGATIVES) {
+    check(`contact-lookup v2: never hijacks "${q}"`, parseContactLookupQuestion(q) === null);
+  }
+
+  const lastVisitRow = { id: 'c9', customer_number: 'C-00009', customer_name: 'Pat Ellison', phone: '555-0100' };
+  const lastVisitAnswer = buildContactAnswer('lastVisit', lastVisitRow);
+  eq('contact-lookup v2: last-visit has no backing column, always the honest fallback', lastVisitAnswer.text, 'No last visit on file for Pat Ellison.');
+  eq('contact-lookup v2: honest last-visit miss carries no facts', lastVisitAnswer.facts.length, 0);
+
+  const serialRow = { id: 'c10', customer_number: 'C-00010', customer_name: 'Bea Bracken', serial_number: 'M100017' };
+  const serialAnswer = buildContactAnswer('serial', serialRow);
+  check('contact-lookup v2: serial answer names the value on file', serialAnswer.facts.some((f) => f.value === 'M100017'));
+}
+
+// -- nlNormalize.js: tuc/cg/addr abbreviations, short-word typo fixes, and
+// the trailing-possessive-apostrophe fix. --
+{
+  const ABBREV_CASES = [
+    ['tuc customers', 'tucson customers'],
+    ['cg customers', 'casa grande customers'],
+  ];
+  for (const [q, want] of ABBREV_CASES) {
+    eq(`normalize: abbreviation "${q}"`, normalizeQuestionNL(q).normalized, want);
+  }
+  const TYPO_CASES = [
+    ["what's the toal amount we've invoiced", 'total'],
+    ['whch customers did we service this month', 'which'],
+    ['how many service cals did our technicians make', 'calls'],
+    ['what equipment got serviced this moth', 'month'],
+    ['csuts in mesa az', 'customers'],
+  ];
+  for (const [q, wantWord] of TYPO_CASES) {
+    check(`normalize: short-word typo fix in "${q}"`, normalizeQuestionNL(q).normalized.includes(wantWord));
+  }
+  eq(
+    'normalize: trailing possessive apostrophe survives so ABBREV can still expand the token',
+    normalizeQuestionNL("which custs' addresses might need double checking").normalized,
+    "which customers' addresses night need double checking"
+  );
+  // Negatives: a real word must never be corrupted by these narrow fixes.
+  for (const q of ['what time is it', 'the customer moved last week']) {
+    eq(`normalize: leaves unrelated text alone :: "${q}"`, normalizeQuestionNL(q).normalized, q);
+  }
+}
+
+/* ======================================================================
+ * 20. Reviewer NO-GO (2026-09-22) — street-name-only lookup ("the guy on
+ * Greenfield Road") and typo'd-superlative single-record detection
+ * ("oewest"/"oldst"), each with negatives proving they never hijack an
+ * unrelated list/analytics question.
+ * ====================================================================== */
+
+// -- street-only shape: parseContactLookupQuestion's own shape detection --
+{
+  const STREET_POSITIVES = [
+    ['the guy on greenfield road', 'greenfield', 'Greenfield Road'],
+    ['pull up the guy on greenfield road', 'greenfield', 'Greenfield Road'],
+    ['uh pull up the guy on greenfield road', 'greenfield', 'Greenfield Road'],
+    ['list uh pull up the guy on greenfield road', 'greenfield', 'Greenfield Road'],
+    ['the lady on greenfield road', 'greenfield', 'Greenfield Road'],
+    ['customers on greenfield rd', 'greenfield', 'Greenfield Rd'],
+    ['customer at greenfield road', 'greenfield', 'Greenfield Road'],
+    ['the account over on greenfield', 'greenfield', 'Greenfield'],
+  ];
+  for (const [q, street, label] of STREET_POSITIVES) {
+    const parsed = parseContactLookupQuestion(q);
+    check(`street-only: detects shape for "${q}"`, parsed !== null && parsed.isStreet === true);
+    if (parsed) {
+      eq(`street-only: street value for "${q}"`, parsed.street, street);
+      eq(`street-only: display label for "${q}"`, parsed.streetLabel, label);
+    }
+  }
+
+  const STREET_NEGATIVES = [
+    'customers in mesa',
+    'greenfield customers',
+    'how many customers on greenfield rd',
+    'how many customers on greenfield road do we have',
+    'which customers are on greenfield road',
+    'the thornton unit is on greenfield road',
+  ];
+  for (const q of STREET_NEGATIVES) {
+    check(`street-only: never hijacks "${q}"`, parseContactLookupQuestion(q) === null);
+  }
+
+  // The real ask.js gate: a street-only question must be single-record so
+  // analytics never grabs it, while a genuine aggregate "on <street>" count
+  // stays analytics.
+  for (const q of ['the guy on greenfield road', 'uh pull up the guy on greenfield road', 'customers on greenfield rd']) {
+    check(`street-only: "${q}" is single-record`, looksLikeSingleRecordReference(q));
+  }
+  for (const q of ['how many customers on greenfield rd', 'customers in mesa', 'greenfield customers']) {
+    check(`street-only: "${q}" is NOT single-record (stays list/analytics)`, !looksLikeSingleRecordReference(q));
+  }
+  check('street-only: "how many customers on greenfield rd" still classifies as analytics', preClassifyAnalytics('how many customers on greenfield rd'));
+
+  // DB resolution + answer wording, against a mock db (no network/model).
+  {
+    const rows = [{ id: 'c1', customer_number: 'C-00001', customer_name: 'Sandra Wyckoff', service_address: '322 N Greenfield Rd', phone: '555-0100' }];
+    const mockDb = { raw: async () => ({ rows }) };
+    const answer = await runContactLookup(mockDb, 'the guy on greenfield road');
+    check('street-only end-to-end: single match returns the contact card', answer.text.includes('Sandra Wyckoff'));
+  }
+  {
+    const rows = [
+      { id: 'c1', customer_number: 'C-00001', customer_name: 'Amy Isaacson', service_address: '10 Greenfield Rd' },
+      { id: 'c2', customer_number: 'C-00002', customer_name: 'Brian Chavez', service_address: '20 Greenfield Rd' },
+    ];
+    const mockDb = { raw: async () => ({ rows }) };
+    const answer = await runContactLookup(mockDb, 'customers on greenfield rd');
+    check('street-only end-to-end: 2-5 matches asks which one', answer.text.startsWith('I found 2 customers on Greenfield Rd:'));
+    check('street-only end-to-end: names both candidates', answer.text.includes('Amy Isaacson') && answer.text.includes('Brian Chavez'));
+  }
+  {
+    const mockDb = { raw: async () => ({ rows: [] }) };
+    const answer = await runContactLookup(mockDb, 'the guy on greenfield road');
+    eq('street-only end-to-end: zero matches is the honest fallback', answer.text, 'No customers on Greenfield Road on file.');
+  }
+  eq('buildNoStreetMatchAnswer: exact wording', buildNoStreetMatchAnswer('Elm St').text, 'No customers on Elm St on file.');
+  {
+    const rows = [
+      { id: 'c1', customer_number: 'C-1', customer_name: 'A One' },
+      { id: 'c2', customer_number: 'C-2', customer_name: 'B Two' },
+      { id: 'c3', customer_number: 'C-3', customer_name: 'C Three' },
+    ];
+    const ans = buildStreetAmbiguousAnswer('Greenfield Rd', rows);
+    check('buildStreetAmbiguousAnswer: names the street and count', ans.text.includes('3 customers on Greenfield Rd'));
+    eq('buildStreetAmbiguousAnswer: one fact per candidate', ans.facts.length, 3);
+  }
+  // resolveStreetCandidates: parameterized (never string-concatenated) ILIKE, tenant-scoped, capped at 5.
+  {
+    let capturedSql = null;
+    let capturedParams = null;
+    const mockDb = {
+      raw: async (sql, params) => {
+        capturedSql = sql;
+        capturedParams = params;
+        return { rows: [] };
+      },
+    };
+    await resolveStreetCandidates(mockDb, 'greenfield');
+    check('resolveStreetCandidates: query is tenant-scoped', capturedSql.includes("tenant_id = (current_setting('app.tenant_id', true))::uuid"));
+    check('resolveStreetCandidates: filters on service_address', capturedSql.includes("data->>'service_address'"));
+    check('resolveStreetCandidates: caps at 5', capturedSql.includes('LIMIT 5'));
+    eq('resolveStreetCandidates: value is parameterized, never concatenated', capturedParams, ['%greenfield%']);
+  }
+}
+
+// -- typo'd superlatives: SINGULAR_NAMED_RECORD_RE must not swallow a typo'd
+// "oldest"/"newest" as if it were a real customer name. --
+for (const q of ["what's the oewest unit we've installed", "what's the oldst unit we've installed", "what's the earlyest unit we've installed"]) {
+  check(`superlative-typo (positive) :: "${q}" is not single-record`, !looksLikeSingleRecordReference(q));
+  const n = normalizeQuestionNL(q).normalized;
+  check(`superlative-typo (positive) :: "${q}" is analytics once normalized`, preClassifyAnalytics(n));
+}
+for (const q of ['the thornton unit is leaking', 'schedule service for the mercer account', 'the biggest customer']) {
+  const wantSingle = q !== 'the biggest customer';
+  eq(`superlative-typo (negative) :: "${q}" single-record stays ${wantSingle}`, looksLikeSingleRecordReference(q), wantSingle);
+}
+
+// -- street-suffix guard on the generic fuzzy corrector: a word right
+// before a street-suffix word is never "corrected" against the vocabulary. --
+for (const [q, want] of [
+  ['Cgrande Ave', 'cgrande ave'],
+  ['unit on Bewley Rd', 'unit on bewley rd'],
+  ['the shop on Vveley St', 'the shop on vveley st'],
+]) {
+  eq(`street-suffix guard: "${q}" left unchanged`, normalizeQuestionNL(q).normalized, want);
+}
+// Negative: the SAME word with no street suffix following it still gets
+// fuzzy-corrected as normal (the guard is about the suffix, not the word).
+check(
+  'street-suffix guard (negative): "servicedd" with no suffix following still normalizes',
+  normalizeQuestionNL('which units had servicedd this week').normalized !== 'which units had servicedd this week'
+);
 
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {

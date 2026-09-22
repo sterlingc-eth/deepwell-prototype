@@ -31,8 +31,21 @@ import {
   looksLikeSingleRecordReference,
   resolveQuestionTimeRange,
   detectedConditions,
+  isMoneyQuestion,
 } from '../api/_lib/analytics.js';
 import { parseContactLookupQuestion } from '../api/_lib/contactLookup.js';
+
+/** filter `field` -> the detectedConditions(question) name it corresponds to
+ *  (analytics.js) — used below to check a follow-up/two-condition entry's
+ *  plan actually named every condition detectedConditions can independently
+ *  recognize in the question text. city/county/state/zip/warrantyStatus/
+ *  installYear/documentType/customerName have no such correspondence (there
+ *  is no detectedConditions() bit for "names a city" the way there is for
+ *  "names an email/phone/brand/county/month word") so they are simply
+ *  skipped — see this file's own header comment, Step 2. */
+const FILTER_FIELD_TO_CONDITION = {
+  brand: 'brand', county: 'county', hasEmail: 'email', hasPhone: 'phone',
+};
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BANK_PATH = join(__dirname, '..', 'test-docs', 'question-bank', 'bank.json');
@@ -64,21 +77,78 @@ function classify(rawText) {
   const isContactLookup = Boolean(parseContactLookupQuestion(rawText));
   const isAnalytics =
     !isContactLookup && !looksLikeSingleRecordReference(rawText) && preClassifyAnalytics(normalized);
-  return { normalized, isAnalytics };
+  return { normalized, isAnalytics, isContactLookup };
+}
+
+/** Step 2 (HVAC persona bank, 2026-09-21): an entry naming a capability this
+ *  product genuinely doesn't have yet (a relative day-window, "this quarter",
+ *  a min/max op, a cross-document-type filter, ...) can only ever be verified
+ *  live against a real answer — the honest-fallback TEXT itself is checked by
+ *  scripts/verify-analytics.mjs, not here, which has no database. Offline,
+ *  the only thing worth asserting is that the question actually REACHES that
+ *  fallback (routes to analytics/lookup as expected) rather than silently
+ *  falling through to an unfiltered/wrong-looking answer — so these are
+ *  scored on routing alone, skipping the singleRecord/timeRange/conditions
+ *  checks below that a genuinely-supported entry still has to pass. */
+function isNeedsCapability(entry) {
+  return Boolean(entry.expect?.unsupported) || (entry.tags ?? []).includes('time-window-unsupported');
 }
 
 const results = [];
 for (const entry of bank) {
-  const { normalized, isAnalytics } = classify(entry.text);
+  const { normalized, isAnalytics, isContactLookup } = classify(entry.text);
   const expectAnalytics = entry.expect?.route === 'analytics';
   const reasons = [];
+  const needsCapability = isNeedsCapability(entry);
+
+  if (needsCapability) {
+    // A money question is answered by api/ask.js's own money gate BEFORE the
+    // analytics classifier ever runs (see analytics.js's isMoneyQuestion doc
+    // comment) — reaching that gate is just as much "honest routing achieved"
+    // as reaching the analytics unsupported-condition fallback is, so either
+    // satisfies this relaxed check regardless of what expect.route literally
+    // says (some live-miss money entries say 'lookup', the HVAC bank's own
+    // bookkeeper money entries say 'analytics' — both really mean "the
+    // dispatcher gets an honest answer, never a fabricated one").
+    const routed = isAnalytics === expectAnalytics || isMoneyQuestion(normalized);
+    if (!routed) reasons.push(expectAnalytics ? 'needs-capability:missed-analytics' : 'needs-capability:false-positive-analytics');
+    results.push({ entry, pass: reasons.length === 0, reasons, needsCapability });
+    continue;
+  }
 
   if (isAnalytics !== expectAnalytics) {
     reasons.push(expectAnalytics ? 'route:missed-analytics' : 'route:false-positive-analytics');
   }
 
+  // Step 2: a bare-name contact-style lookup ("thornton phone", "pull up
+  // Thornton", "what do we have on file for Amy Isaacson") is only a real
+  // PASS when it actually reaches a handler that can answer it — either
+  // contactLookup.js's own shape detection, or the (address/serial/named-
+  // record) singleRecord signal fastPath/retrieval key off. Not routing to
+  // analytics alone (the old, weaker check) says nothing about whether the
+  // question reaches anything at all.
+  if (entry.expect?.route === 'lookup') {
+    // A handful of older money entries spell their expectation
+    // `{ route: 'lookup', conditionsOnly: ['money'] }` — not a contact/
+    // single-record lookup at all, but the money gate's own honest fallback
+    // (api/ask.js checks isMoneyQuestion BEFORE contactLookup/analytics ever
+    // run — same "reaching the honest gate is the real pass" reasoning the
+    // needsCapability branch above already applies). Checking contactLookup/
+    // singleRecord shape for these would always fail regardless of any real
+    // routing fix, since neither shape was ever what they're asking about.
+    const isMoneyLookup = (entry.expect?.conditionsOnly ?? []).includes('money');
+    const routedSomewhere =
+      isContactLookup || looksLikeSingleRecordReference(entry.text) || (isMoneyLookup && isMoneyQuestion(normalized));
+    if (!routedSomewhere) reasons.push('lookup:not-routed');
+  }
+
   if (entry.expect?.singleRecord === true) {
-    if (!looksLikeSingleRecordReference(entry.text)) reasons.push('single-record:not-detected');
+    // contactLookup.js resolving the question is just as much "this reaches
+    // a real single-record answer" as looksLikeSingleRecordReference saying
+    // so — e.g. "Pull up Thornton" (expect.route 'retrieval') is answered by
+    // contactLookup's own "full record" shape, never by an address/serial
+    // signal at all.
+    if (!looksLikeSingleRecordReference(entry.text) && !isContactLookup) reasons.push('single-record:not-detected');
   }
 
   if (expectAnalytics && entry.expect?.timeRange !== undefined) {
@@ -94,7 +164,26 @@ for (const entry of bank) {
     if (missing.length) reasons.push('conditions:missing');
   }
 
-  results.push({ entry, pass: reasons.length === 0, reasons });
+  // Step 2: for a follow-up/two-condition entry, assert detectedConditions
+  // is a SUPERSET of every filter field that has a known detectedConditions
+  // mapping (FILTER_FIELD_TO_CONDITION, above) — i.e. the question's own text
+  // actually names every condition its expected plan filters on, so a plan
+  // that silently dropped one (missingConditions, analytics.js) would be
+  // caught the same way it is live. city/county-less filters (city/state/
+  // zip/warrantyStatus/installYear) have no such mapping and are skipped.
+  const tags = entry.tags ?? [];
+  if (expectAnalytics && (tags.includes('two-condition') || tags.includes('follow-up')) && Array.isArray(entry.expect?.filters)) {
+    const expectedConditions = entry.expect.filters
+      .map((f) => FILTER_FIELD_TO_CONDITION[f.field])
+      .filter(Boolean);
+    if (expectedConditions.length) {
+      const got = detectedConditions(normalized);
+      const missing = expectedConditions.filter((c) => !got.has(c));
+      if (missing.length) reasons.push('conditions:missing-two-condition');
+    }
+  }
+
+  results.push({ entry, pass: reasons.length === 0, reasons, needsCapability });
 }
 
 const total = results.length;
@@ -102,10 +191,11 @@ const passed = results.filter((r) => r.pass).length;
 const pct = total ? (100 * passed) / total : 100;
 
 /* ---- per-category / per-variant tables ---------------------------------- */
-function tableBy(keyFn) {
+function tableBy(keyFn, rows = results) {
   const buckets = new Map();
-  for (const r of results) {
+  for (const r of rows) {
     const k = keyFn(r.entry);
+    if (k == null) continue;
     if (!buckets.has(k)) buckets.set(k, { total: 0, pass: 0 });
     const b = buckets.get(k);
     b.total++;
@@ -125,6 +215,26 @@ function printTable(title, rows) {
 
 printTable('Per category:', tableBy((e) => e.category));
 printTable('Per variant:', tableBy((e) => e.variant));
+
+/* ---- per-persona / per-tag tables (HVAC persona bank, Step 1) ------------ */
+function tableByMulti(keysFn) {
+  const buckets = new Map();
+  for (const r of results) {
+    for (const k of keysFn(r.entry)) {
+      if (!buckets.has(k)) buckets.set(k, { total: 0, pass: 0 });
+      const b = buckets.get(k);
+      b.total++;
+      if (r.pass) b.pass++;
+    }
+  }
+  return [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+const personaRows = tableBy((e) => e.persona);
+if (personaRows.length) printTable('Per persona (HVAC bank):', personaRows);
+
+const tagRows = tableByMulti((e) => e.tags ?? []);
+if (tagRows.length) printTable('Per tag (HVAC bank):', tagRows);
 
 /* ---- failure clusters ---------------------------------------------------- */
 const failures = results.filter((r) => !r.pass);
@@ -148,6 +258,53 @@ for (const [cause, list] of [...byCause.entries()].sort((a, b) => b[1].length - 
     console.log(`     [${f.entry.category}/${f.entry.variant}] "${f.entry.text}"`);
     shown++;
     if (shown >= 40) break;
+  }
+}
+
+/* ---- "Needs capability" section (Step 1/2, HVAC persona bank) -----------
+ * Every entry with expect.unsupported or the time-window-unsupported tag is
+ * scored above on routing alone (isNeedsCapability) — the actual honest-
+ * fallback TEXT is a live check (scripts/verify-analytics.mjs), not this
+ * offline one. Grouped by `note` (why it's unsupported) and by tag, each
+ * counted both by distinct base question and by total bank entry (8 variants
+ * each), so this reads as "N missing capabilities affecting M base
+ * questions" rather than an inflated per-variant count. */
+const needsCapResults = results.filter((r) => r.needsCapability);
+if (needsCapResults.length) {
+  const needsCapPassed = needsCapResults.filter((r) => r.pass).length;
+  const needsCapBases = new Set(needsCapResults.map((r) => r.entry.base)).size;
+  console.log(
+    `\nNeeds capability: ${needsCapPassed}/${needsCapResults.length} entries routed correctly ` +
+      `(${needsCapBases} distinct base questions; the honest-fallback wording itself is verified live, not offline)`
+  );
+
+  const byNote = new Map();
+  for (const r of needsCapResults) {
+    const note = r.entry.expect?.note ?? '(no note)';
+    if (!byNote.has(note)) byNote.set(note, { entries: 0, bases: new Set() });
+    const b = byNote.get(note);
+    b.entries++;
+    b.bases.add(r.entry.base);
+  }
+  console.log('\nNeeds capability, by note:');
+  for (const [note, { entries, bases }] of [...byNote.entries()].sort((a, b) => b[1].bases.size - a[1].bases.size)) {
+    console.log(`  ${bases.size} base q${bases.size === 1 ? '' : 's'} (${entries} entries) — ${note}`);
+  }
+
+  const byTag = new Map();
+  for (const r of needsCapResults) {
+    for (const t of r.entry.tags ?? []) {
+      if (!byTag.has(t)) byTag.set(t, { entries: 0, bases: new Set() });
+      const b = byTag.get(t);
+      b.entries++;
+      b.bases.add(r.entry.base);
+    }
+  }
+  if (byTag.size) {
+    console.log('\nNeeds capability, by tag:');
+    for (const [tag, { entries, bases }] of [...byTag.entries()].sort((a, b) => b[1].bases.size - a[1].bases.size)) {
+      console.log(`  ${tag}: ${bases.size} base qs (${entries} entries)`);
+    }
   }
 }
 

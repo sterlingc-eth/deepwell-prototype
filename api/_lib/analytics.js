@@ -34,6 +34,29 @@ import { alertTier, normalizeBrand } from './warrantyRules.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const zipCounty = JSON.parse(readFileSync(join(__dirname, 'geo', 'zip-county.json'), 'utf8'));
 
+/** Brand/county name tables, moved above the classifier (they used to live
+ *  down in the "honest fallback" section, below preClassifyAnalytics) so the
+ *  classifier's own GEO_WORD_RE/BRAND_RE (see WE_YES_NO_RE's doc comment)
+ *  can be built from them at module load without a temporal-dead-zone
+ *  ordering problem — both are still exported/used exactly as before by
+ *  detectedConditions further down. */
+const BRAND_WORDS = ['trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi'];
+const KNOWN_COUNTY_NAMES = [
+  ...new Set(
+    [...Object.values(zipCounty.azZip3Default), ...Object.values(zipCounty.azZipExceptions)]
+      .filter(Boolean)
+      .map((c) => String(c).toLowerCase())
+  ),
+];
+const KNOWN_AZ_CITY_NAMES = Object.keys(zipCounty.azCityCounty ?? {});
+// HVAC persona bank (2026-09-21): "Who are our customers in Las Vegas?" —
+// this corpus's own header names Phoenix/Tucson AND Nevada dispatchers, but
+// GEO_WORD_RE (below) only ever knew AZ city names, missing every NV one
+// (usCityCounty's keys are "city|state" — nlNormalize.js's own VOCAB builder
+// already reads this same map for typo-correction; this is the
+// classification side of the same data).
+const KNOWN_US_CITY_NAMES = Object.keys(zipCounty.usCityCounty ?? {}).map((k) => k.split('|')[0]);
+
 /* ============================================================ plan vocabulary */
 
 export const ENTITIES = ['customers', 'equipment', 'documents', 'serviceVisits', 'warranties'];
@@ -103,6 +126,11 @@ export const ENTITY_SYNONYMS = {
     'equipment', 'unit', 'units', 'system', 'systems', 'ac', 'acs', 'air conditioner', 'air conditioners',
     'furnace', 'furnaces', 'heat pump', 'heat pumps', 'condenser', 'condensers', 'rtu', 'rtus',
     'rooftop unit', 'rooftop units', 'piece of equipment', 'pieces of equipment',
+    // HVAC persona bank (2026-09-21, hvac-personas.mjs): "how many Trane
+    // installs have we done since 2020" — "install"/"installs" is a plain,
+    // common owner synonym for "installed unit", same shape as "unit"/
+    // "system" above, not a new noun category.
+    'install', 'installs',
   ],
   documents: [
     'document', 'documents', 'doc', 'docs', 'file', 'files', 'paperwork', 'record', 'records',
@@ -116,6 +144,9 @@ export const ENTITY_SYNONYMS = {
     'photo', 'photos', 'correspondence', 'startup sheet', 'startup sheets',
     'dispatch note', 'dispatch notes', 'inspection report', 'inspection reports',
     'purchase order', 'purchase orders',
+    // HVAC persona bank: "how many maintenance plans do we have running" —
+    // the owner's own name for a maintenance-agreement document.
+    'maintenance plan', 'maintenance plans',
   ],
   serviceVisits: [
     'service visit', 'service visits', 'job', 'jobs', 'visit', 'visits', 'call', 'calls',
@@ -157,6 +188,16 @@ const GROUP_SHAPE_RE = new RegExp(
 );
 const WHO_SERVICED_RE = /\bwho did we (service|work for)\b/i;
 const WHICH_CUSTOMERS_RE = /\bwhich customers\b/i;
+// HVAC persona bank (2026-09-21): "Customers whose warranty expires in the
+// next 90 days?" — the same "a customer-noun filtered by a relative clause"
+// shape WHICH_CUSTOMERS_RE already bypasses QUANTIFIER for, just opening
+// with the bare noun ("Customers whose...") instead of "which customers".
+// Built from the same customer synonym list so it matches as readily as
+// "clients whose"/"accounts whose".
+const CUSTOMERS_WHOSE_RE = new RegExp(
+  `\\b(${synonymAlternation(ENTITY_SYNONYMS.customers)})\\s+whose\\b`,
+  'i'
+);
 /** "who's/who is our biggest client" / "top 10 customers" / "our largest
  *  accounts" — asks for customers RANKED by some size measure (equipment or
  *  document count), not filtered/counted — a distinct op from every other
@@ -187,6 +228,12 @@ const NOUN_WITH_RE = /\b(customers?|clients?|units?|equipment)\s+(with|that have
 /** "units older than N years" / "installed before/after 2020" — an age/date
  *  filter shape on its own aggregate noun, with no quantifier word needed. */
 const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b/i;
+// HVAC persona bank (2026-09-21): "What's the oldest unit we're still
+// servicing?" — a superlative-ranked ask on its own aggregate noun, the same
+// "no quantifier word needed" shape AGE_FILTER_RE/BIGGEST_CUSTOMER_RE already
+// bypass QUANTIFIER for; this covers oldest/newest/latest/earliest, which
+// BIGGEST_CUSTOMER_RE's own biggest/largest/top list doesn't.
+const SUPERLATIVE_RE = /\b(oldest|newest|latest|earliest)\b/i;
 /**
  * Item 2 (2026-09-21 live miss): "customers missing a phone number" is a real
  * aggregate/filter question (the hasEmail/hasPhone shape below) but names no
@@ -196,6 +243,99 @@ const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b
  * just above. Paired with AGGREGATE_NOUN the same way AGE_FILTER_RE is.
  */
 const CONTACT_FILTER_RE = /\b(have|has|with|no|missing|without)\s+(an?\s+)?(email|phone)\b/i;
+
+/**
+ * HVAC persona bank (2026-09-21): a whole cluster of real yes/no owner
+ * questions — "Do we have any commercial accounts?", "Do we have any
+ * Goodman customers in Tucson?", "Have we ever installed a Daikin?", "Do we
+ * service anything in Nevada?" — name no QUANTIFIER word at all and often no
+ * fixed AGGREGATE_NOUN word either (a bare brand or state name is the only
+ * noun present). The subject here is always the generic "we" — never a named
+ * customer record, which POSSESSIVE_SINGLE_RE already excludes via its own
+ * we/you/they/company/shop negative lookahead — so a "do/does/have/has we"
+ * yes/no shape is safe to trust broadly once paired with SOME domain signal
+ * (an entity noun, a known brand, a known AZ/NV city/county/state name, or a
+ * bare zip-code mention). Deliberately excludes "did we" (the money live-miss
+ * cluster's own "did we invoice/bill last month" phrasings must stay OFF
+ * analytics and reach the money gate instead — see isMoneyQuestion, which is
+ * checked before this classifier ever runs in api/ask.js).
+ */
+// HVAC persona bank (2026-09-21): "Do we have more invoices or more service
+// tickets on file?" -> gen-question-bank.mjs's own voice-style transform
+// rewrites "do we have" to "we got" ("we got more invoices or more service
+// tickets on file"), the same plain dispatcher phrasing toVoiceStyle already
+// applies everywhere else in this bank — "we got" added as its own
+// alternative rather than widening the "do/does/have/has we" shape itself.
+const WE_YES_NO_RE = /\b(?:do|does|have|has)\s+we\b|\bwe\s+got\b/i;
+/** Same noun list AGGREGATE_NOUN uses, minus the bare 'call'/'calls' words —
+ *  those two, alone, collide with an ordinary "...so I can call them" /
+ *  "before end of day" callback-pleasantry tail (a sloppiness variant this
+ *  bank generates, and plausible real dispatcher chatter too) which has
+ *  nothing to do with a service call. "service call(s)" itself is unaffected
+ *  (still present via ENTITY_SYNONYMS.serviceVisits' own two-word phrases). */
+const WE_YES_NO_NOUN_RE = new RegExp(
+  `\\b(${synonymAlternation([
+    ...ENTITY_SYNONYMS.customers,
+    ...ENTITY_SYNONYMS.equipment,
+    ...ENTITY_SYNONYMS.documents,
+    ...ENTITY_SYNONYMS.serviceVisits.filter((w) => w !== 'call' && w !== 'calls'),
+    ...ENTITY_SYNONYMS.warranties,
+  ])})\\b`,
+  'i'
+);
+const BRAND_RE = new RegExp(`\\b(${synonymAlternation(BRAND_WORDS)})\\b`, 'i');
+const GEO_WORD_RE = new RegExp(
+  `\\b(arizona|nevada|az|nv|${synonymAlternation(KNOWN_AZ_CITY_NAMES)}|${synonymAlternation(KNOWN_US_CITY_NAMES)}|${synonymAlternation(KNOWN_COUNTY_NAMES)})\\b`,
+  'i'
+);
+const ZIP_CODE_WORD_RE = /\bzip\s*codes?\b/i;
+// HVAC persona bank (2026-09-21): "customers in 85201" — a bare 5-digit ZIP
+// value with no word "zip" at all, the same geo-filter shape GEO_WORD_RE
+// already covers for a city/county name. Safe to combine with AGGREGATE_NOUN
+// the same way GEO_WORD_RE is: a genuine single-record reference (a street
+// address, an "at 123 Main St, 85201" full address, a serial number that
+// happens to be 5 digits) is caught by looksLikeSingleRecordReference
+// upstream and short-circuits preClassifyAnalytics before this ever runs.
+const ZIP_VALUE_RE = /\b\d{5}\b/;
+
+/**
+ * "Which brand do we have the most of?" / "Who did the most jobs in August?"
+ * — a ranking-by-count question, the same "SHAPE already says many" idea
+ * BIGGEST_CUSTOMER_RE/WHO_SERVICED_RE already bypass QUANTIFIER for, just for
+ * a non-customer entity (brand, technician) BIGGEST_CUSTOMER_RE's own
+ * customer-only synonym list doesn't cover. Stands alone (no AGGREGATE_NOUN
+ * required) the same way those two do — "the most" is on its own a strong
+ * enough ranking signal in this domain, and any single-record phrasing that
+ * happened to also say "the most" would already have been excluded above by
+ * looksLikeSingleRecordReference (an address/serial/named-record question).
+ */
+const THE_MOST_RE = /\bthe\s+most\b/i;
+/** "Who's due for fall maintenance?" — no aggregate noun at all ("fall
+ *  maintenance" names neither a customer/equipment/document synonym), but
+ *  "who's/who is/who needs due" is the same "which customers are overdue"
+ *  aggregate ask in a different, equally common phrasing. */
+// "whos due" (no apostrophe) is this bank's own voice-style transform of
+// "who's due" (toVoiceStyle strips every apostrophe) — "whos" added as its
+// own alternative alongside "who's" rather than making the apostrophe
+// optional inside "who's", which would also start matching an unrelated
+// "whose" ("customers whose warranty...", a different shape entirely).
+const WHO_DUE_RE = /\bwho(?:'s|s\b|\s+is|\s+needs)\s+(?:due|overdue)\b/i;
+/**
+ * "Expired warranties -- what about just the Mesa ones?" / "Casa Grande
+ * customers -- now just the ones with Goodman units" — a follow-up question
+ * that narrows a PRIOR aggregate answer, phrased as a dash + "what about"/
+ * "now" rather than repeating a quantifier word. Paired with AGGREGATE_NOUN
+ * (never stands alone) since the dash-prefix shape alone isn't a strong
+ * enough signal on its own.
+ */
+const FOLLOWUP_NARROW_RE = /--\s*(?:what about|now)\b/i;
+/** "What zip codes do we serve?" / "How many different zip codes do we
+ *  cover?" — zip/county/city/state are GROUP_BY_FIELDS dimension words, not
+ *  entity nouns, so AGGREGATE_NOUN itself never covers them; this is the
+ *  parallel noun list for exactly the "coverage" style questions that ask
+ *  about the dimension itself ("what zip codes", "what counties") rather
+ *  than a filtered count of customers/equipment/documents. */
+const COVERAGE_NOUN_RE = /\b(zip\s*codes?|counties|cities|states)\b/i;
 
 /**
  * Live miss (2026-09-21, "which units had service this month" cluster),
@@ -289,7 +429,114 @@ export const AT_ADDRESS_RE = /\bat\s+\d{1,6}\s+\w/i;
  * purpose — a capital letter is the signal; "the rooftop units" (lowercase,
  * plural) never matches this.
  */
-const SINGULAR_NAMED_RECORD_RE = /\bthe\s+[A-Z][A-Za-z]*\s+(unit|system|account|job|customer|client|property)\b/;
+// HVAC persona bank (2026-09-21): "do we have a PO on file for the mercer
+// job" / "is the isaacson unit still under warranty" / "startup sheet for the
+// prentiss install" — real dispatcher phrasings of this exact shape, just
+// never typed with a capital letter (a sloppy/voice/typo'd question is
+// lowercase by construction). The capital-letter requirement above was a
+// reasonable proxy when this rule was first written but is actually stricter
+// than the signal it needs: "the <word> unit/job/account/..." naming ONE of
+// this fixed, closed set of singular-record nouns is unambiguous regardless
+// of case — a real aggregate question is never phrased "the X job" for any
+// word X. Case-insensitive now; 'install'/'ticket'/'visit' added alongside
+// the original noun set for the same "startup sheet for the X install"/
+// "last service ticket for X" shapes.
+// HVAC persona bank (2026-09-21): "What's the oldest unit we're still
+// servicing?" fit this exact "the <word> unit" shape just as well as "the
+// Thornton unit" does, wrongly flagging a genuine aggregate superlative ask
+// as a single-record reference — "the X job" ISN'T always unambiguous, a
+// superlative adjective in the X slot is the one case that names no specific
+// record at all. Excluded via a negative lookahead (SUPERLATIVE_RE's own
+// word list, plus the ranking adjectives BIGGEST_CUSTOMER_RE already
+// recognizes) rather than narrowing the noun set, which still needs to catch
+// every OTHER "the <real name> unit" phrasing untouched.
+// Reviewer NO-GO (2026-09-22): a literal-word lookahead only ever excludes a
+// CORRECTLY-SPELLED superlative — "what's the oewest unit we've installed"
+// (a typo of "newest") still matched the broad "the <word> unit" shape,
+// wrongly single-record-flagging it. Worse, this check runs on the
+// ORIGINAL, uncorrected text (normalizeQuestion's own singleRecord guard, so
+// nlNormalize's fuzzy corrector never even gets a chance to fix "oewest" to
+// "newest" first — a typo that blocks its own fix from ever running, the
+// same class of bug "mainttenance" was above. Fixed by splitting the check in
+// two: SINGULAR_NAMED_RECORD_RE now just captures the adjective slot
+// (group 1) with no exclusion built in, and hasSingularNamedRecord (below)
+// rejects the match itself when that captured word is an EXACT OR
+// near-typo (edit distance <= 1) match of a superlative/ranking word —
+// covering "oewest"/"oldst"/every other single-edit misspelling of
+// oldest/newest/latest/earliest/biggest/largest/smallest/most, not just the
+// ones spelled correctly.
+// Reviewer NO-GO (2026-09-22, follow-up): "Startup sheet for the Holbrook
+// instbll?" — a typo of "install" ("instbll") isn't literally in the noun
+// alternation, so the whole shape missed this single-record question.
+// Tried a fully generic, fuzzy-matched noun slot first, but that reopened a
+// worse hole: "instbll" earns its edit-distance-1 tolerance against
+// "install", but so does the common PLURAL "customers" against the
+// SINGULAR "customer" already in this list — and unlike "install", the
+// singular/plural distinction here is load-bearing (an aggregate "group
+// customers by county" must never single-record-match). Reverted to a
+// literal alternation; "instbll" is added as its own named alternative
+// instead, the same narrow, closed-list approach "mainttenance" above
+// already uses for exactly this class of typo.
+const SINGULAR_NAMED_RECORD_RE =
+  /\bthe\s+([a-zA-Z][a-zA-Z']*)\s+(unit|system|account|job|customer|client|property|install|instbll|ticket|visit)\b/gi;
+const SUPERLATIVE_WORDS = ['oldest', 'newest', 'latest', 'earliest', 'biggest', 'largest', 'smallest', 'most'];
+
+/** Same Damerau-Levenshtein-<=1 idea nlNormalize.js's own withinEditDistance1
+ *  and contactLookup.js's own copy of it already use — duplicated rather
+ *  than imported (nlNormalize.js imports FROM this file, so the reverse
+ *  import would be circular; see this file's own "must stay DB/model-free,
+ *  duplicate the small stuff" convention elsewhere, e.g.
+ *  TRAILING_NAME_STOPWORD_RE). Six lines of pure string math, not worth a
+ *  shared module for. */
+function isCloseTo(a, b) {
+  if (a === b) return true;
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  if (la === lb) {
+    let diffs = 0;
+    let i1 = -1;
+    let i2 = -1;
+    for (let i = 0; i < la; i++) {
+      if (a[i] !== b[i]) {
+        diffs++;
+        if (diffs === 1) i1 = i;
+        else if (diffs === 2) i2 = i;
+        else return false;
+      }
+    }
+    if (diffs <= 1) return true;
+    return i2 === i1 + 1 && a[i1] === b[i2] && a[i2] === b[i1];
+  }
+  const [s, l] = la < lb ? [a, b] : [b, a];
+  let i = 0, j = 0, skipped = false;
+  while (i < s.length && j < l.length) {
+    if (s[i] === l[j]) { i++; j++; continue; }
+    if (skipped) return false;
+    skipped = true;
+    j++;
+  }
+  return true;
+}
+
+function isSuperlativeWord(word) {
+  const w = word.toLowerCase();
+  return SUPERLATIVE_WORDS.some((sw) => isCloseTo(w, sw));
+}
+
+// Reviewer NO-GO (2026-09-22, follow-up 2): with the noun back to a literal
+// alternation, a single question can still legitimately contain more than
+// one "the <word> <noun>" occurrence (e.g. "the oldest unit" earlier in a
+// sentence and "the Thornton job" later) — matchAll (global flag on the
+// regex) checks every one for a superlative adjective rather than only the
+// first, so an early false one can never mask a real match later in the
+// same question.
+function hasSingularNamedRecord(q) {
+  for (const m of q.matchAll(SINGULAR_NAMED_RECORD_RE)) {
+    if (!isSuperlativeWord(m[1])) return true;
+  }
+  return false;
+}
 /** An alnum token >= 8 chars with at least one digit — the same serial/model
  *  shape fastPath.js's own IDENTIFIER_RE looks for (see its file for why:
  *  that's the printed shape of a real HVAC serial/model number, and a bare
@@ -302,13 +549,176 @@ function looksLikeIdentifierToken(question) {
   return tokens.some((tok) => /\d/.test(tok));
 }
 
+/** "for serial M100017" / "serial number Y100023" — a serial VALUE named
+ *  right after the word "serial" is a single-record reference regardless of
+ *  its own length (IDENTIFIER_TOKEN_RE's 8-char floor misses a short one like
+ *  "M100017"'s 7 characters) — the word "serial" is itself the strong signal
+ *  here, not the token shape. Excludes a bare "serial number(s)" with no
+ *  value following (e.g. "what's the serial number of the unit at ...", "how
+ *  many serial numbers do we have") so this never fires on a generic mention
+ *  of the field name alone. */
+const SERIAL_VALUE_RE = /\bserial\s*(?:number)?\s+(?!numbers?\b)[a-z0-9-]{3,}\b/i;
+
+/** "at Thornton's" / "at Prentiss's" — a possessive name right after "at" is
+ *  a single-record reference ("when were we last at Thornton's", "last 3
+ *  visits at Prentiss's") the same way AT_ADDRESS_RE catches "at <number>
+ *  <word>" — case-insensitive on purpose (see SINGULAR_NAMED_RECORD_RE's own
+ *  doc comment for why case is not a reliable signal once sloppiness variants
+ *  lowercase everything). */
+const AT_POSSESSIVE_RE = /\bat\s+[a-z][a-z']*'s\b/i;
+
+/** A small, fixed set of words that can never be the FIRST word of a real
+ *  customer/company name — reused from contactLookup.js's own
+ *  NAME_STOPWORD_RE list (kept as a separate, slightly larger copy here
+ *  rather than an import, since this file must stay DB/model-free and
+ *  contactLookup.js additionally touches `db`) plus the prepositions/
+ *  quantifiers TRAILING_NAME_RE (below) actually needs to reject that
+ *  contactLookup's own list never had to worry about ("in Mesa", "our Trane
+ *  jobs", "last month's work"). */
+const TRAILING_NAME_STOPWORD_RE =
+  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have|in|on|at|of|for|with|without|and|or|no|not|any|some|all|last|next|first|second|third|most|many|few|several|day|days|today|week|weeks|month|months|year|years|end)$/i;
+
+/** A captured "name" that is actually one of this domain's own nouns
+ *  ("maintenance", "warranty", "service", "file", ...) is never a real
+ *  customer name — guards the same trailing-preposition shape against a
+ *  question like "which customers are overdue for maintenance" (a real
+ *  aggregate ask, not "Maintenance" the customer). */
+// "mainttenance" (a double-t typo this bank tests) needs its own alternative
+// here rather than relying on nlNormalize.js's own fuzzy correction to fix it
+// first: this check runs on the ORIGINAL, uncorrected text (see
+// normalizeQuestion's own singleRecord guard, above), so a typo'd domain word
+// that fails this match gets misread as a trailing NAME instead, which then
+// blocks fuzzy correction for the whole question — a typo that stops its own
+// fix from ever running.
+const TRAILING_NAME_DOMAIN_WORD_RE =
+  /\b(maintenance|mainttenance|warrant(?:y|ies)|service|services|tune-?up|checkup|agreement|agreements|invoice|invoices|quote|quotes|permit|permits|proposal|proposals|record|records|paperwork)\b/i;
+
+/**
+ * "List invoices for Fitzgerald" / "What was the last service ticket for
+ * Bracken?" / "Show me all the invoices for Mercer" — a customer's SURNAME
+ * (or short name) is the very last thing in the question, right after "for"/
+ * "at", exactly the shape contactLookup.js's own CONNECTOR_NAME_RE
+ * recognizes for a phone/email/address ask — this is the same shape for
+ * every OTHER per-customer document/history question (invoices, tickets,
+ * proposals, ...) that contactLookup.js has no field for and was never meant
+ * to own. "of" is deliberately NOT one of the trigger prepositions here (it
+ * is for contactLookup.js's own CONNECTOR_NAME_RE) — "of" introduces far more
+ * generic English tails in this domain ("end of day", "breakdown of units")
+ * than it ever introduces a trailing name. Capped at 1-2 words (a first+last
+ * name at most) and anchored to the END of the string so a genuine aggregate
+ * tail like "...on file for in Mesa" or "...owe us for last month's work"
+ * (3+ words, or starting with a stopword) never matches — see
+ * TRAILING_NAME_STOPWORD_RE/TRAILING_NAME_DOMAIN_WORD_RE above for the two
+ * halves of that guard.
+ */
+const TRAILING_NAME_RE = /\b(?:for|at)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*)?)\s*[?!.]*\s*$/;
+
+// HVAC persona bank (2026-09-21): "List invoices for Fitzgerald so I can call
+// them" / "...for Bracken for the file" / "...for Delgado, thanks" — a
+// trailing-context sloppiness variant appends a pleasantry/purpose clause
+// AFTER the real trailing name, which TRAILING_NAME_RE's own `$` anchor then
+// never reaches (the name is no longer the last thing in the string) —
+// wrongly falling through to a false-positive analytics classification
+// instead ("list"+"invoices" alone satisfy QUANTIFIER+AGGREGATE_NOUN). The
+// same closed, narrow chatter list contactLookup.js's own
+// stripTrailingChatter already strips for exactly this reason — duplicated
+// here rather than imported, same "this file must stay DB/model-free"
+// reasoning TRAILING_NAME_STOPWORD_RE's own doc comment gives.
+const TRAILING_CHATTER_RE =
+  /,?\s*(?:so\s+i\s+can\s+[a-z]+(?:\s+[a-z]+){0,3}|for\s+the\s+(?:newsletter|file)|before\s+(?:end\s+of\s+day|eod)|thanks?|please)\s*$/i;
+
+function stripTrailingChatterForNameCheck(q) {
+  let out = q;
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(TRAILING_CHATTER_RE, "").trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+function hasTrailingNameReference(q) {
+  const m = TRAILING_NAME_RE.exec(stripTrailingChatterForNameCheck(q));
+  if (!m) return false;
+  const namePhrase = m[1].trim();
+  if (TRAILING_NAME_STOPWORD_RE.test(namePhrase.split(/\s+/)[0])) return false;
+  return !TRAILING_NAME_DOMAIN_WORD_RE.test(namePhrase);
+}
+
+/**
+ * "Did we send Isaacson a quote?" / "What proposal did we give Amy Isaacson?"
+ * — a named customer as the OBJECT of "did/do/does we give/send/quote",
+ * rather than the subject POSSESSIVE_SINGLE_RE already excludes.
+ *
+ * HVAC persona bank (2026-09-21): this used to require the captured object
+ * word to be capitalized, the same trade-off SINGULAR_NAMED_RECORD_RE's own
+ * case-sensitive era made — safe against "How many quotes did we send this
+ * quarter?" (a real aggregate; "this"/"quarter" are always lowercase) but it
+ * also silently failed every lowercase/typo/voice-style sloppiness variant of
+ * the SAME lookup question ("did we send isaacson a quote"). Replaced with an
+ * explicit stopword/aggregate-noun rejection instead — the same fix
+ * TRAILING_NAME_STOPWORD_RE/AGGREGATE_NOUN already give hasTrailingNameReference
+ * — which keeps the "this quarter" guard without needing case at all.
+ */
+const WE_ACTION_OBJECT_RE = /\b(?:did|do|does)\s+we\s+(?:ever\s+)?(?:give|send|quote)\s+(?:an?\s+)?([A-Za-z][a-zA-Z]*)/i;
+
+function hasNamedActionObject(q) {
+  const m = WE_ACTION_OBJECT_RE.exec(q);
+  if (!m) return false;
+  const word = m[1].toLowerCase();
+  if (TRAILING_NAME_STOPWORD_RE.test(word)) return false;
+  if (AGGREGATE_NOUN.test(word)) return false;
+  return true;
+}
+
 /** True when the question names one specific record (a street address, an
- *  "at <number> <word>" reference, or a serial/model-shaped token) rather
- *  than asking about many. Exported so routes/analytics.js and
+ *  "at <number> <word>" reference, a serial/model-shaped token, a "does/did
+ *  NAME have" possessive, a "the NAME unit/job/..." reference, a trailing
+ *  "for/of/at NAME", or a named object of "did we give/send/quote NAME") —
+ *  rather than asking about many. Exported so routes/analytics.js and
  *  scripts/verify-analytics.mjs can both exercise it directly. */
+// Reviewer NO-GO (2026-09-22): duplicated from contactLookup.js's own
+// STREET_ONLY_RE (same "this file must stay DB/model-free" reasoning
+// TRAILING_NAME_STOPWORD_RE's own doc comment already gives — contactLookup.js
+// touches `db`, so importing it here would pull that dependency in). Anchored
+// the same way: "how many customers on Greenfield Rd" starts with "how
+// many", never with "the guy .../customers? on|at", so it never matches here
+// either and stays a normal analytics count.
+const STREET_ONLY_RE =
+  /^(?:the\s+(?:guy|lady|customer|account|people|folks)\s+(?:on|at|over on)|customers?\s+(?:on|at))\s+[a-zA-Z][a-zA-Z']*(?:\s+[a-zA-Z][a-zA-Z']*){0,2}\b/i;
+// Same leading-noise words contactLookup.js's own UH_FILLER_RE/
+// LEADING_QUANTIFIER_RE strip before trying its shapes — a sloppiness
+// variant can stack "uh"/"list"/"pull up" in front of "the guy on
+// Greenfield Road" the same way it does everywhere else in this bank, and
+// STREET_ONLY_RE above is anchored at `^` so it never sees past them
+// otherwise.
+const UH_FILLER_STRIP_RE = /^(?:uh+|um+)\s+/i;
+const LEADING_QUANTIFIER_STRIP_RE = /^(?:show me|pull up|list|need the)\s+/i;
+
+function stripLeadingNoiseForStreetCheck(q) {
+  let out = q;
+  for (let i = 0; i < 5; i++) {
+    const next = out.replace(UH_FILLER_STRIP_RE, '').replace(LEADING_QUANTIFIER_STRIP_RE, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 export function looksLikeSingleRecordReference(question) {
   const q = String(question ?? '');
-  return STREET_ADDRESS_RE.test(q) || AT_ADDRESS_RE.test(q) || SINGULAR_NAMED_RECORD_RE.test(q) || looksLikeIdentifierToken(q);
+  return (
+    STREET_ADDRESS_RE.test(q) ||
+    AT_ADDRESS_RE.test(q) ||
+    hasSingularNamedRecord(q) ||
+    looksLikeIdentifierToken(q) ||
+    SERIAL_VALUE_RE.test(q) ||
+    AT_POSSESSIVE_RE.test(q) ||
+    POSSESSIVE_SINGLE_RE.test(q) ||
+    hasTrailingNameReference(q) ||
+    hasNamedActionObject(q) ||
+    STREET_ONLY_RE.test(stripLeadingNoiseForStreetCheck(q))
+  );
 }
 
 /**
@@ -333,19 +743,39 @@ export function looksLikeSingleRecordReference(question) {
 export function preClassifyAnalytics(question) {
   const q = String(question ?? '').trim();
   if (!q) return false;
+  // looksLikeSingleRecordReference now also covers POSSESSIVE_SINGLE_RE's own
+  // "does/did NAME have" shape (see that function's own doc comment) — no
+  // separate check needed here any more.
   if (looksLikeSingleRecordReference(q)) return false;
-  if (POSSESSIVE_SINGLE_RE.test(q)) return false;
   if (
     WHO_SERVICED_RE.test(q) ||
     WHICH_CUSTOMERS_RE.test(q) ||
+    CUSTOMERS_WHOSE_RE.test(q) ||
     GROUP_SHAPE_RE.test(q) ||
     WHO_HAS_RE.test(q) ||
     NOUN_WITH_RE.test(q) ||
     BIGGEST_CUSTOMER_RE.test(q) ||
     WHAT_PLURAL_RE.test(q) ||
     WHAT_DID_WE_RE.test(q) ||
+    THE_MOST_RE.test(q) ||
+    WHO_DUE_RE.test(q) ||
     (AGGREGATE_NOUN.test(q) && AGE_FILTER_RE.test(q)) ||
-    (AGGREGATE_NOUN.test(q) && CONTACT_FILTER_RE.test(q))
+    (AGGREGATE_NOUN.test(q) && SUPERLATIVE_RE.test(q)) ||
+    (AGGREGATE_NOUN.test(q) && CONTACT_FILTER_RE.test(q)) ||
+    (AGGREGATE_NOUN.test(q) && FOLLOWUP_NARROW_RE.test(q)) ||
+    // BRAND_RE deliberately excluded from this bare, no-quantifier combo —
+    // unlike a city/zip (GEO_WORD_RE/ZIP_*, which only ever names a LOCATION,
+    // never a single unit's own attribute), a brand name shows up just as
+    // often inside a genuine single-record attribute question ("what is the
+    // serial number on the Trane condenser") as it does in a real aggregate
+    // one, and every real brand-aggregate case already reaches analytics via
+    // QUANTIFIER+AGGREGATE_NOUN ("how many Trane units...") or WE_YES_NO_RE
+    // ("do we have any Daikin customers...") below, both of which pair the
+    // brand with an explicit count/existence question word first.
+    (AGGREGATE_NOUN.test(q) && (GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q) || ZIP_VALUE_RE.test(q))) ||
+    (WE_YES_NO_RE.test(q) && (WE_YES_NO_NOUN_RE.test(q) || BRAND_RE.test(q) || GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q))) ||
+    (QUANTIFIER.test(q) && COVERAGE_NOUN_RE.test(q)) ||
+    (/\bwhat\b/i.test(q) && COVERAGE_NOUN_RE.test(q) && /\bdo we\b/i.test(q))
   ) {
     return true;
   }
@@ -389,14 +819,6 @@ export function suspiciousUnfilteredCustomerPlan(plan, question) {
  * how routes/analytics.js's runAnalyticsQuestion uses this.
  */
 const CONTACT_WORD_RE = { email: /\bemail\b/i, phone: /\bphone\b/i };
-const BRAND_WORDS = ['trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi'];
-const KNOWN_COUNTY_NAMES = [
-  ...new Set(
-    [...Object.values(zipCounty.azZip3Default), ...Object.values(zipCounty.azZipExceptions)]
-      .filter(Boolean)
-      .map((c) => String(c).toLowerCase())
-  ),
-];
 
 /**
  * Live miss cluster 2 (2026-09-21 270-question sample): "What's the total
@@ -419,11 +841,24 @@ const KNOWN_COUNTY_NAMES = [
 // (word char 'd' next) never has. INVOICE_STEM covers invoice/invoiced/
 // invoices/invoicing wherever this regex used to spell out only one form.
 const INVOICE_STEM = 'invoic(?:e|ed|es|ing)';
+// HVAC persona bank (2026-09-21) added three more real bookkeeper phrasings
+// MONEY_RE was still missing:
+//   - "total amount we've invoiced" — "total" and the invoice stem are both
+//     present but in the OPPOSITE order/adjacency the two existing
+//     "invoice-word total" patterns above require ("invoiced total"/"total
+//     invoiced"); a bare "total amount" is just as much a money phrase on its
+//     own in this domain and needs no invoice word next to it at all.
+//   - "average ticket/invoice size/amount" — "what's our average ticket
+//     size", "what's the average invoice amount for our Trane jobs".
+//   - "what did we bill <customer>" — bare "bill" (not just "billed") as its
+//     own verb, the same INVOICE_STEM-style gap "invoiced" once was.
 const MONEY_RE = new RegExp(
   '\\b(revenue|' + INVOICE_STEM + '\\s+(?:total|amount)|' +
-    'total\\s+(?:' + INVOICE_STEM + '|billed|dollar)|' +
+    'total\\s+(?:' + INVOICE_STEM + '|billed|dollar|amount)|' +
+    'average\\s+(?:ticket|' + INVOICE_STEM + ')\\s+(?:size|amount)|' +
     'how much (?:did we|have we|do we)\\s+(?:bill|' + INVOICE_STEM + '|charge|make|earn|spend)|' +
-    'dollar amount|\\$\\s?\\d|billed|owed|outstanding balance|by revenue|by sales|spend(?:ing)?)\\b',
+    'what did we bill|' +
+    'dollar amount|\\$\\s?\\d|\\bbill(?:ed)?\\b|owed|outstanding balance|unpaid invoices?|by revenue|by sales|spend(?:ing)?)\\b',
   'i'
 );
 
@@ -464,8 +899,12 @@ export function moneyFallbackAnswer() {
  * unsupportedConditionAnswer('maintenance', ...) instead of executing an
  * unfiltered query.
  */
+// HVAC persona bank (2026-09-21): "Who's due for fall maintenance?" — a
+// seasonal qualifier (fall/spring/annual/seasonal) between "due for" and the
+// maintenance/tune-up word itself, which the original pattern's fixed
+// "due for (?:a )" gap never allowed for.
 const MAINTENANCE_DUE_RE =
-  /\b(overdue for (?:a )?(?:maintenance|service)|due for (?:a )?(?:tune-?up|maintenance|service|checkup)|haven'?t been serviced|not had service|no (?:maintenance|service) in \d+\s*months?|needs?\s+(?:a )?service)\b/i;
+  /\b(overdue for (?:a )?(?:maintenance|service)|due for (?:a )?(?:fall |spring |annual |seasonal )?(?:tune-?up|maintenance|service|checkup)|haven'?t been serviced|not had service|no (?:maintenance|service) in \d+\s*months?|needs?\s+(?:a )?service)\b/i;
 
 /** A dumb, self-contained scan of the question TEXT for a handful of
  *  conditions a plan might drop: 'email'/'phone' (the hasEmail/hasPhone
@@ -783,7 +1222,7 @@ export const ANALYTICS_SYSTEM_PROMPT = ANALYTICS_SYSTEM_PROMPT_BASE + ANALYTICS_
 // customer_name/model columns it never did before — any plan cached under
 // the old vocabulary/shape must be invalidated the same way every prior bump
 // already was.
-export const ANALYTICS_VERSION = 'analytics-v5';
+export const ANALYTICS_VERSION = 'analytics-v6';
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))

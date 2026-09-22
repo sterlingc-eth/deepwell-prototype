@@ -14,6 +14,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { HVAC_PERSONA_QUESTIONS } from '../test-docs/question-bank/hvac-personas.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -549,6 +550,32 @@ for (const { category, base, expect } of bases) {
   }
 }
 
+/* ---- HVAC persona bases (test-docs/question-bank/hvac-personas.mjs) -----
+ * Same 8-variant pipeline as every other base, deterministic ids keyed by
+ * persona so they never collide with (and are trivially distinguishable
+ * from) the category-keyed ids above: `hvac-<persona>-NNNN-<variant>`.
+ * persona/tags carry through to the emitted bank entry so
+ * verify-question-bank.mjs and SUMMARY.md can report on them directly.
+ */
+const seqByPersona = {};
+for (const { persona, category, base, tags, expect } of HVAC_PERSONA_QUESTIONS) {
+  const seq = (seqByPersona[persona] = (seqByPersona[persona] ?? 0) + 1);
+  const baseId = `hvac-${persona}-${String(seq).padStart(4, '0')}`;
+  for (const [variant, fn] of VARIANTS) {
+    const text = fn(base, baseId);
+    bank.push({
+      id: `${baseId}-${variant}`,
+      base,
+      text,
+      variant,
+      category,
+      persona,
+      tags,
+      expect,
+    });
+  }
+}
+
 bank.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -558,20 +585,28 @@ writeFileSync(join(OUT_DIR, 'bank.json'), JSON.stringify(bank, null, 2) + '\n');
 
 const perCategory = {};
 const perVariant = {};
+const perPersona = {};
+const perTag = {};
 for (const e of bank) {
   perCategory[e.category] = (perCategory[e.category] ?? 0) + 1;
   perVariant[e.variant] = (perVariant[e.variant] ?? 0) + 1;
+  if (e.persona) perPersona[e.persona] = (perPersona[e.persona] ?? 0) + 1;
+  for (const t of e.tags ?? []) perTag[t] = (perTag[t] ?? 0) + 1;
 }
-const numBases = bases.length;
+const numBases = bases.length + HVAC_PERSONA_QUESTIONS.length;
 let summary = `# Question bank summary\n\n`;
 summary += `Generated: ${new Date().toISOString()}\n\n`;
-summary += `- Base questions: ${numBases}\n`;
+summary += `- Base questions: ${numBases} (${bases.length} core + ${HVAC_PERSONA_QUESTIONS.length} HVAC persona)\n`;
 summary += `- Variants per base: ${VARIANTS.length}\n`;
 summary += `- Total entries: ${bank.length}\n\n`;
 summary += `## Per category\n\n| category | entries |\n|---|---|\n`;
 for (const [c, n] of Object.entries(perCategory).sort()) summary += `| ${c} | ${n} |\n`;
 summary += `\n## Per variant\n\n| variant | entries |\n|---|---|\n`;
 for (const [v, n] of Object.entries(perVariant).sort()) summary += `| ${v} | ${n} |\n`;
+summary += `\n## Per persona (HVAC bank only)\n\n| persona | entries |\n|---|---|\n`;
+for (const [p, n] of Object.entries(perPersona).sort()) summary += `| ${p} | ${n} |\n`;
+summary += `\n## Per tag (HVAC bank only)\n\n| tag | entries |\n|---|---|\n`;
+for (const [t, n] of Object.entries(perTag).sort()) summary += `| ${t} | ${n} |\n`;
 writeFileSync(join(OUT_DIR, 'SUMMARY.md'), summary);
 
 console.log(`Generated ${numBases} base questions -> ${bank.length} entries.`);

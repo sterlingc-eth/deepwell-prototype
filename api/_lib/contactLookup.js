@@ -28,6 +28,7 @@
  * runContactLookup are the only functions here that touch `db`.
  */
 import { normalizeQuestion } from "./nlNormalize.js";
+import { ENTITY_SYNONYMS } from "./analytics.js";
 
 /* ============================================================ shape detection */
 
@@ -39,27 +40,57 @@ import { normalizeQuestion } from "./nlNormalize.js";
 // alternatives' trailing `\b` (a word boundary requires one side to be a
 // word character — "#" followed by a space has no boundary there at all) —
 // given its own alternative with no trailing boundary requirement instead.
+// HVAC persona bank (2026-09-21): "bracken serial" / "whats bracken's
+// serial" / "ellison last visit" — half-sentence dispatcher shorthand for
+// exactly the same "<name> <field>" shape phone/email/address already own,
+// just for two more fields. 'serial' resolves for real (a correlated
+// subquery onto the customer's own equipment row — see CUSTOMER_ROW_COLUMNS
+// below); 'lastVisit' has no backing column at all (this corpus tracks no
+// service-visit history — same note hvac-personas.mjs's own "last visit"
+// questions carry) so it always falls into buildContactAnswer's honest
+// "No X on file" branch below, never a guess.
+// HVAC persona bank (2026-09-21): "what's the number for donna thornton" —
+// dispatcher shorthand for "phone number" that never says the word "phone"
+// at all. A bare "number" is safe to treat as phone specifically (never
+// email/address, which always name themselves) as long as it isn't the
+// TAIL of "serial number" — the negative lookbehind excludes exactly that
+// one collision, so "serial number"/"serial #" still only ever matches the
+// serial field below, never phone.
 const FIELD_RE = {
-  phone: /\bphone(?:\s*number)?\b|\bph\s?#/i,
+  phone: /\bphone(?:\s*number)?\b|\bph\s?#|(?<!serial\s)\bnumber\b/i,
   email: /\be-?mail\b/i,
   address: /\b(?:service\s+)?address\b/i,
+  serial: /\bserial(?:\s*number)?\b/i,
+  lastVisit: /\blast\s+(?:visit|service)\b/i,
 };
-const FIELD_ORDER = ["phone", "email", "address"];
+const FIELD_ORDER = ["phone", "email", "address", "serial", "lastVisit"];
 
 // The name phrase must be the LAST thing in the question, right after
-// "for"/"of"/"on file for" — every word slot here is letters (plus
+// "for"/"on file for" — every word slot here is letters (plus
 // apostrophe/period/hyphen) only, so a street address ("...for 1234 Main
 // St") or an analytics question with no trailing name ("...have a phone")
 // never satisfies this and the whole match fails, deferring to fastPath/
 // retrieval/analytics exactly as before. Capped at 3 words (a first + middle
 // + last name), matching the brief's "1-3 capitalized-or-not words".
+// HVAC persona bank (2026-09-21): "of" was dropped from this alternation —
+// "which customers have no email so i know who to call instead of emailing"
+// matched its own trailing "of emailing" and captured namePhrase="emailing",
+// a false-positive contact lookup on a real aggregate question. "of"
+// introduces far more generic English tails ("end of day", "instead of
+// emailing") than it ever introduces a trailing name — the exact reasoning
+// analytics.js's own TRAILING_NAME_RE already documents for excluding "of"
+// from its own, near-identical trailing-name shape.
 const CONNECTOR_NAME_RE =
-  /\b(?:on file for|for|of)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,2})\s*\??\s*$/i;
+  /\b(?:on file for|for)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,2})\s*\??\s*$/i;
 
 // The same field words FIELD_RE recognizes, as one alternation string, for
 // the possessive shape below ("<name>'s phone number" / "<name> address") —
 // built from FIELD_RE's own source text so the two can never drift apart.
-const FIELD_WORDS_ALT = "phone(?:\\s*number)?|ph\\s?#|e-?mail|(?:service\\s+)?address";
+// "serial(?:\s*number)?" is listed BEFORE the bare "number" alternative on
+// purpose — a name-first "bracken serial number" must still resolve to the
+// serial field, never phone, the same collision FIELD_RE's own phone pattern
+// guards against with its negative lookbehind.
+const FIELD_WORDS_ALT = "phone(?:\\s*number)?|ph\\s?#|e-?mail|(?:service\\s+)?address|serial(?:\\s*number)?|last\\s+(?:visit|service)|number";
 
 // Reviewer NO-GO (2026-09-21): "whats thomas mercer's phone number" / "donna
 // thornton's email" / "brian chavez address?" put the NAME before the field
@@ -90,11 +121,55 @@ const BARE_NAME_FIELD_RE = new RegExp(
 // analytics question" requirement). Rejecting a captured phrase that STARTS
 // with one of these closes that off without narrowing the name pattern
 // itself.
+// Reviewer NO-GO (2026-09-21, HVAC persona bank): "How many customers do we
+// have an email on file for in Mesa?" — a real aggregate question, not a
+// contact lookup at all — matched CONNECTOR_NAME_RE anyway (its trailing "for
+// in Mesa" looks exactly like "for <name>") and namePhrase captured "in mesa"
+// whole. "in"/"on"/"at"/"of"/"for"/"with" are prepositions, never the first
+// word of a real name, the same reasoning firstWordIsStopword already applies
+// to "the"/"our"/"which"/etc — added here rather than narrowing
+// CONNECTOR_NAME_RE's own shape, which still needs to accept a real name that
+// happens to start with any other word.
+// 'serial'/'number'/'visit' guard the new serial/lastVisit fields the same
+// way: "for serial M100017" must never be misread as a name "serial
+// M100017" — see the serial/lastVisit fields' own doc comment above FIELD_RE.
 const NAME_STOPWORD_RE =
-  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have)$/i;
+  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have|in|on|at|of|for|with|without|serial|number|visit)$/i;
 
 function firstWordIsStopword(namePhrase) {
   return NAME_STOPWORD_RE.test(namePhrase.split(/\s+/)[0]);
+}
+
+// HVAC persona bank (2026-09-21): "List customers missing a phone number" —
+// a real aggregate/analytics question, not a contact lookup at all — was
+// wrongly captured once LEADING_QUANTIFIER_RE (below) started stripping a
+// leading "list ", leaving "customers missing a phone number", whose first
+// three words ("customers missing a") satisfy BARE_NAME_FIELD_RE's generous
+// up-to-3-word name capture just as well as a real name would ("customers"
+// is not a NAME_STOPWORD_RE word — a real name can start with almost
+// anything). A namePhrase containing one of analytics.js's own aggregate
+// nouns (customer/unit/invoice/...) is never an actual person/company name,
+// the same reasoning TRAILING_NAME_DOMAIN_WORD_RE already applies in
+// analytics.js for its own trailing-name shape — reused here via
+// ENTITY_SYNONYMS (analytics.js is DB/model-free, so importing it adds no
+// dependency this file didn't already have transitively through
+// normalizeQuestion's own vocabulary building).
+const AGGREGATE_WORD_RE = new RegExp(
+  `\\b(${[...new Set([
+    ...ENTITY_SYNONYMS.customers,
+    ...ENTITY_SYNONYMS.equipment,
+    ...ENTITY_SYNONYMS.documents,
+    ...ENTITY_SYNONYMS.serviceVisits,
+    ...ENTITY_SYNONYMS.warranties,
+  ])]
+    .sort((a, b) => b.length - a.length)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})\\b`,
+  "i"
+);
+
+function isRealNamePhrase(namePhrase) {
+  return !firstWordIsStopword(namePhrase) && !AGGREGATE_WORD_RE.test(namePhrase);
 }
 
 // Reviewer NO-GO (2026-09-21, round 6, item 2): "what's the phne number on
@@ -113,6 +188,7 @@ const FIELD_WORD_TYPO_FIXES = [
   [/\be mail\b/g, "email"],
   [/\b(?:emal|emial|emali)\b/g, "email"],
   [/\b(?:adress|addres|adres)\b/g, "address"],
+  [/\b(?:terial|sreial|serail)\b/g, "serial"],
   [/\b(?:numbr|nubmer)\b/g, "number"],
 ];
 
@@ -120,6 +196,91 @@ function fixFieldWordTypos(q) {
   let out = q;
   for (const [re, to] of FIELD_WORD_TYPO_FIXES) out = out.replace(re, to);
   return out;
+}
+
+// Question-bank sloppiness variants (and plausible real dispatcher chatter)
+// wrap this file's own end-anchored shapes in a leading quantifier word
+// nlNormalize.js deliberately leaves alone (its own doc comment: "give me"/
+// "show me"/"pull up"/"list"/"need the" carry the QUANTIFIER analytics.js
+// relies on, so normalizeQuestion never strips them) and/or a trailing
+// pleasantry/purpose clause ("thanks", "before end of day", "for the file",
+// "so I can call them"). Neither belongs to the actual field/name shape this
+// file matches, so both are stripped locally, only for THIS file's own
+// parsing — analytics.js's own QUANTIFIER classification never sees this
+// stripped text, so nothing about "list customers in Mesa" staying analytics
+// changes. A strip that turns out to be wrong just means this file tries to
+// match a slightly different string and still returns null on a real miss —
+// never a wrong customer, per this file's own "never hijack" contract.
+const LEADING_QUANTIFIER_RE = /^(?:show me|pull up|list|need the)\s+/i;
+// Reviewer NO-GO (2026-09-22): "uh pull up the guy on greenfield road" — a
+// spoken "uh"/"um" filler nlNormalize.js's own FILLER_PREFIX_RE doesn't strip
+// (it isn't a real word carrying any meaning to preserve, unlike "show me"/
+// "list"), folded into the SAME strip-until-stable loop as the quantifier
+// words below rather than a separate one-shot replace, so "list uh pull up
+// ..." (both stacked) still resolves once every leading noise word is gone.
+const UH_FILLER_RE = /^(?:uh+|um+)\s+/i;
+const TRAILING_CHATTER_RE =
+  /,?\s*(?:so\s+i\s+can\s+[a-z]+(?:\s+[a-z]+){0,3}|for\s+the\s+(?:newsletter|file)|before\s+(?:end\s+of\s+day|eod)|thanks?|please)\s*$/i;
+
+function stripTrailingChatter(q) {
+  let out = q;
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(TRAILING_CHATTER_RE, "").trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+// HVAC persona bank (2026-09-21): "Pull up Thornton" / "What do we have on
+// file for Sandra Wyckoff?" ask for the WHOLE contact card, not one field —
+// field: "full" below (buildContactAnswer's own branch) rather than a value
+// from FIELD_RE. Anchored to the whole remaining string ($) the same way
+// POSSESSIVE_NAME_FIELD_RE/BARE_NAME_FIELD_RE are, so this never fires on a
+// question that merely happens to contain "pull up" or "on file" elsewhere
+// (an analytics "list customers on file in Mesa" never matches — no name
+// tail after "for", and "pull up" is never a QUANTIFIER prefix this file's
+// own statement-form variant strips first).
+const PULL_UP_NAME_RE = /^pull\s+up\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s*\??\s*$/i;
+const ON_FILE_FOR_NAME_RE =
+  /^what(?:'?s|\s+is)?\s+(?:do\s+we\s+have\s+on\s+file\s+for|on\s+file\s+for)\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s*\??\s*$/i;
+// HVAC persona bank (2026-09-21): "list pull up thornton" / "need the pull up
+// ortega" — a statement-form sloppiness variant stacks its OWN quantifier
+// ("list "/"need the ") in front of the base question's already-quantified
+// "pull up thornton", and the loop above (which strips leading
+// quantifiers/filler one at a time until none are left) ends up removing
+// "pull up" too, leaving a bare name with nothing left for PULL_UP_NAME_RE's
+// own literal "pull up" prefix to match. Once EVERY leading quantifier/filler
+// word has been stripped, whatever bare 1-3 word phrase remains is the same
+// "full card" request PULL_UP_NAME_RE/ON_FILE_FOR_NAME_RE already grant — only
+// tried when `stripped !== q` (see call site) so this never fires on a
+// question that never had a quantifier to strip in the first place.
+const BARE_NAME_ONLY_RE = /^([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s*\??\s*$/i;
+
+// Reviewer NO-GO (2026-09-22): "pull up the guy on Greenfield Road" — the
+// dispatcher never learned or never typed the customer's NAME at all, only
+// the street they're on. Nothing above this point resolves that (every other
+// shape needs an actual name token), so it's its own shape rather than a
+// variant of one of them: a generic person/account noun ("the guy"/"the
+// lady"/"the customer"/"the account"/"the people"/"the folks") or a bare
+// "customer(s)" right before "on"/"at"/"over on" a street, with an optional
+// trailing street-suffix word. The street WORDS are captured separately from
+// the optional suffix (group 2) so the DB query (below) can search on just
+// the street name — "Rd" vs "Road" in the address column must never block a
+// match the way an exact-suffix requirement would.
+const STREET_SUFFIX_ALT = "road|rd|street|st|ave|avenue|blvd|dr|drive|ln|lane|ct|way";
+const STREET_ONLY_RE = new RegExp(
+  `^(?:the\\s+(?:guy|lady|customer|account|people|folks)\\s+(?:on|at|over on)|customers?\\s+(?:on|at))\\s+` +
+    `([a-zA-Z][a-zA-Z']*(?:\\s+[a-zA-Z][a-zA-Z']*){0,2}?)` +
+    `(?:\\s+(${STREET_SUFFIX_ALT}))?\\s*\\??\\s*$`,
+  "i"
+);
+
+function titleCase(s) {
+  return s
+    .split(/\s+/)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ");
 }
 
 /**
@@ -135,7 +296,7 @@ function fixFieldWordTypos(q) {
 export function parseContactLookupQuestion(question) {
   const raw = String(question ?? "").trim();
   if (!raw) return null;
-  const q = fixFieldWordTypos(normalizeQuestion(raw).normalized);
+  const q = stripTrailingChatter(fixFieldWordTypos(normalizeQuestion(raw).normalized));
   if (!q) return null;
 
   // Shape 1: "<field> ... for/of <name>" (the original, more specific shape
@@ -152,22 +313,72 @@ export function parseContactLookupQuestion(question) {
     const m = q.match(CONNECTOR_NAME_RE);
     if (m) {
       const namePhrase = m[1].trim();
-      if (namePhrase && !firstWordIsStopword(namePhrase)) return { field, namePhrase };
+      if (namePhrase && isRealNamePhrase(namePhrase)) return { field, namePhrase };
     }
   }
 
   // Shape 2: "<name>['s] <field>" — the name comes first. Filler ("whats"/
-  // "what's"/"what is") is stripped, then the possessive form is tried
-  // before the bare form (see POSSESSIVE_NAME_FIELD_RE's own doc comment).
-  const stripped = q.replace(LEADING_FILLER_RE, "").trim();
+  // "what's"/"what is") and a leading quantifier word ("list"/"pull up"/
+  // "show me"/"need the" — see LEADING_QUANTIFIER_RE's own doc comment) are
+  // both stripped, then the possessive form is tried before the bare form
+  // (see POSSESSIVE_NAME_FIELD_RE's own doc comment).
+  //
+  // Stripped IN A LOOP, not once: a statement-form sloppiness variant can
+  // stack two quantifiers ("list pull up thornton" — "list " layered in
+  // front of the already-quantified "pull up thornton"), and a single
+  // non-global .replace() only ever removes the first one, leaving "pull up
+  // thornton" with no field word for shape 2 to match and no bare-"pull up"
+  // start for shape 3 (below) to match either. Reused for shape 3 too, for
+  // exactly that reason.
+  let stripped = q.replace(LEADING_FILLER_RE, "").trim();
+  for (let i = 0; i < 5; i++) {
+    const next = stripped.replace(UH_FILLER_RE, "").replace(LEADING_QUANTIFIER_RE, "").trim();
+    if (next === stripped) break;
+    stripped = next;
+  }
   for (const re of [POSSESSIVE_NAME_FIELD_RE, BARE_NAME_FIELD_RE]) {
     const m = stripped.match(re);
     if (!m) continue;
     const namePhrase = m[1].trim();
     const matchedField = fieldFromText(m[2]);
-    if (namePhrase && matchedField && !firstWordIsStopword(namePhrase)) {
+    if (namePhrase && matchedField && isRealNamePhrase(namePhrase)) {
       return { field: matchedField, namePhrase };
     }
+  }
+
+  // Shape 3: "pull up <name>" / "what do we have on file for <name>" — no
+  // field named at all, the whole contact card (see buildContactAnswer's
+  // "full" branch).
+  for (const candidate of [q, stripped]) {
+    for (const re of [PULL_UP_NAME_RE, ON_FILE_FOR_NAME_RE]) {
+      const m = candidate.match(re);
+      if (!m) continue;
+      const namePhrase = m[1].trim();
+      if (namePhrase && isRealNamePhrase(namePhrase)) return { field: "full", namePhrase };
+    }
+  }
+  if (stripped !== q) {
+    const m = stripped.match(BARE_NAME_ONLY_RE);
+    if (m) {
+      const namePhrase = m[1].trim();
+      if (namePhrase && isRealNamePhrase(namePhrase)) return { field: "full", namePhrase };
+    }
+  }
+
+  // Shape 4: "the guy on Greenfield Road" / "customers on Greenfield Rd" — a
+  // street-name-only reference, no customer name at all (see STREET_ONLY_RE's
+  // own doc comment). Tried against both `q` and the quantifier/filler-
+  // stripped `stripped` so "list uh pull up the guy on greenfield road"
+  // resolves the same way the bare form does. `street` carries the bare
+  // street name for the DB query; `streetLabel` is the same words, title-
+  // cased with whatever suffix was actually typed, for the answer text.
+  for (const candidate of [q, stripped]) {
+    const m = candidate.match(STREET_ONLY_RE);
+    if (!m) continue;
+    const street = m[1].trim().toLowerCase();
+    if (!street || NAME_STOPWORD_RE.test(street.split(/\s+/)[0])) continue;
+    const streetLabel = titleCase(street) + (m[2] ? " " + titleCase(m[2]) : "");
+    return { field: "full", namePhrase: street, isStreet: true, street, streetLabel };
   }
 
   return null;
@@ -259,8 +470,20 @@ export function fuzzyNameMatches(customerName, searchTokens) {
 
 /* ============================================================ answer building */
 
-const FIELD_WORD = { phone: "phone", email: "email", address: "service address" };
-const CUSTOMER_FIELD_KEY = { phone: "phone", email: "email", address: "service_address" };
+const FIELD_WORD = {
+  phone: "phone", email: "email", address: "service address",
+  serial: "serial number",
+  // No backing column for this one — see the serial/lastVisit fields' own
+  // doc comment above FIELD_RE. CUSTOMER_FIELD_KEY intentionally has no
+  // 'lastVisit' entry, so row[CUSTOMER_FIELD_KEY.lastVisit] is always
+  // undefined and buildContactAnswer's honest "No X on file" branch fires
+  // every time, never a guess.
+  lastVisit: "last visit",
+};
+const CUSTOMER_FIELD_KEY = { phone: "phone", email: "email", address: "service_address", serial: "serial_number" };
+// "full" (shape 3, above) has no single requested value to check — every
+// field on file is shown regardless, same as the multi-field summary line
+// every other branch below already builds.
 
 /** {label, value, entityId, sources} for every contact field this customer
  *  row actually has on file — same "entityId links a fact to the customer,
@@ -273,6 +496,7 @@ function contactFacts(row) {
   if (row.phone) facts.push({ label: "Phone", value: row.phone, entityId: row.id, sources: [] });
   if (row.email) facts.push({ label: "Email", value: row.email, entityId: row.id, sources: [] });
   if (row.service_address) facts.push({ label: "Address", value: row.service_address, entityId: row.id, sources: [] });
+  if (row.serial_number) facts.push({ label: "Serial", value: row.serial_number, entityId: row.id, sources: [] });
   return facts;
 }
 
@@ -284,6 +508,23 @@ function contactFacts(row) {
  *  the one asked about), same as a customer-profile card would show. */
 export function buildContactAnswer(field, row) {
   const name = row.customer_name || row.customer_number || "This customer";
+
+  if (field === "full") {
+    const facts = contactFacts(row);
+    if (!facts.length) {
+      return {
+        kind: "answer", text: `No contact info on file for ${name}.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      };
+    }
+    const summary = [row.phone, row.email, row.service_address].filter(Boolean).join(" · ");
+    return {
+      kind: "answer", text: `${name} — ${summary}`,
+      facts, sources: [], confidence: 1,
+      verifiedCount: facts.length, unverifiedCount: 0, closest: [],
+    };
+  }
+
   const requestedValue = row[CUSTOMER_FIELD_KEY[field]];
 
   if (!requestedValue) {
@@ -319,6 +560,40 @@ export function buildAmbiguousContactAnswer(namePhrase, rows) {
       entityId: r.id, sources: [],
     })),
     sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): api/ask.js
+    // reads this to log a 'contact-lookup-ambiguous' row (api/_lib/
+    // missStore.js) — an extra field the client ignores, same as `cached`
+    // added elsewhere to an answer shape.
+    candidateCount: rows.length,
+  };
+}
+
+/** Pure: 2-5 customers share a street (STREET_ONLY_RE, above) — named and
+ *  asked which, the same "never guess" shape buildAmbiguousContactAnswer
+ *  uses for a name match, just worded around the street rather than the
+ *  typed name phrase. */
+export function buildStreetAmbiguousAnswer(streetLabel, rows) {
+  const names = rows.map((r) => r.customer_name || r.customer_number || "Unnamed customer");
+  return {
+    kind: "answer",
+    text: `I found ${rows.length} customers on ${streetLabel}: ${names.join(", ")} — which one?`,
+    facts: rows.map((r) => ({
+      label: r.customer_name || r.customer_number || "Unnamed customer",
+      value: r.service_address || "—",
+      entityId: r.id, sources: [],
+    })),
+    sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    candidateCount: rows.length,
+  };
+}
+
+/** Pure: zero customers matched the street — the honest fallback, never a
+ *  fabricated "nobody lives there" guess dressed up as certainty. */
+export function buildNoStreetMatchAnswer(streetLabel) {
+  return {
+    kind: "answer",
+    text: `No customers on ${streetLabel} on file.`,
+    facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
   };
 }
 
@@ -330,9 +605,18 @@ export function buildAmbiguousContactAnswer(namePhrase, rows) {
  * db.raw() escape-hatch queries (see recordsStore.js's own TENANT constant).
  */
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+// serial_number is not a customer-row column at all (it lives on the
+// customer's own equipment entity — see the 'serial' field's own doc comment
+// above FIELD_RE) — pulled via a correlated scalar subquery, same tenant
+// scope as the outer query, most-recent unit wins (ORDER BY ... DESC LIMIT
+// 1), the same idiom analytics.js's buildAnalyticsSQL already uses for its
+// own document/service-visit correlated lookups.
 const CUSTOMER_ROW_COLUMNS =
   "id, customer_number, data->>'customer_name' AS customer_name, " +
-  "data->>'service_address' AS service_address, data->>'phone' AS phone, data->>'email' AS email";
+  "data->>'service_address' AS service_address, data->>'phone' AS phone, data->>'email' AS email, " +
+  "(SELECT eq.data->>'serial_number' FROM entities eq " +
+  "   WHERE eq.customer_id = entities.id AND eq.entity_type = 'equipment' AND eq.merged_into IS NULL AND eq." + TENANT_SQL +
+  "   ORDER BY eq.updated_at DESC LIMIT 1) AS serial_number";
 
 // A fuzzy fallback scan reads every customer name on the tenant (there is no
 // SQL index for "last token within edit distance 1 of this"), so it's capped
@@ -373,6 +657,26 @@ export async function resolveContactCandidates(db, namePhrase) {
   return all.filter((r) => fuzzyNameMatches(r.customer_name, searchTokens));
 }
 
+// Parameterized (never string-concatenated) and capped at 5, per this
+// shape's own spec — a street name is a far broader match than a customer
+// name (many households can share one), so this intentionally returns fewer
+// rows than the name-based resolver's LIMIT 10 above; 2-5 is the ambiguous
+// range buildStreetAmbiguousAnswer names, 6+ is treated as "too broad to be
+// useful" the same way (only the first 5 are ever fetched at all).
+export async function resolveStreetCandidates(db, street) {
+  const cleaned = String(street ?? "").trim();
+  if (!cleaned) return [];
+  const { rows } = await db.raw(
+    `SELECT ${CUSTOMER_ROW_COLUMNS}
+       FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND data->>'service_address' ILIKE $1
+      LIMIT 5`,
+    [`%${cleaned}%`]
+  );
+  return rows;
+}
+
 /**
  * Full orchestration for one question: shape detection -> DB resolution ->
  * answer building. Returns null (never throws for a shape/resolution miss)
@@ -388,6 +692,20 @@ export async function resolveContactCandidates(db, namePhrase) {
 export async function runContactLookup(db, question) {
   const parsed = parseContactLookupQuestion(question);
   if (!parsed) return null;
+
+  // Street-only shape (no customer name at all — see STREET_ONLY_RE's own
+  // doc comment): unlike a name miss, this DOES answer honestly at 0 matches
+  // instead of falling through to fastPath/analytics/retrieval, because
+  // there is no other handler in the pipeline that could make sense of "the
+  // guy on Greenfield Road" either — deferring here would just reach
+  // retrieval with nothing to cite, the exact "Nothing in your records
+  // answers that" gap this whole file exists to close.
+  if (parsed.isStreet) {
+    const candidates = await resolveStreetCandidates(db, parsed.street);
+    if (candidates.length === 0) return buildNoStreetMatchAnswer(parsed.streetLabel);
+    if (candidates.length > 1) return buildStreetAmbiguousAnswer(parsed.streetLabel, candidates);
+    return buildContactAnswer("full", candidates[0]);
+  }
 
   const candidates = await resolveContactCandidates(db, parsed.namePhrase);
   if (candidates.length === 0) return null;
