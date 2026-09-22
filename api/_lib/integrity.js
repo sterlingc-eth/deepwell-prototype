@@ -697,12 +697,26 @@ function customerNumberOrdinal(customerNumber) {
  *  defaultKeepId): the fuller name wins ("Ray & Linda Castillo" beats
  *  "Castillo"); a tie goes to the lower customer_number. Nightly auto-merge
  *  and "Fix everything" go through this function with no human in the loop,
- *  so it must pick the same survivor a human would by default. */
-function pickKeepDrop(a, b) {
+ *  so it must pick the same survivor a human would by default. Exported so
+ *  routes/customers.js's planPossibleDuplicates (owner defect report
+ *  2026-09-22, "different name, same address" pairs) picks the same default
+ *  keep/drop a real duplicate merge would, for its own suggested Merge. */
+export function pickKeepDrop(a, b) {
   const ta = nameTokenCount(a?.name);
   const tb = nameTokenCount(b?.name);
   if (ta !== tb) return ta > tb ? [a, b] : [b, a];
   return customerNumberOrdinal(a?.customerNumber) <= customerNumberOrdinal(b?.customerNumber) ? [a, b] : [b, a];
+}
+
+/**
+ * Stable, order-independent key for an unordered pair of customer ids —
+ * shared by routes/customers.js's planPossibleDuplicates (which pair to
+ * exclude) and reviewStore.js's keepCustomersSeparate (which pair to record),
+ * so a "Keep separate" decision written by one always matches the exclusion
+ * check the other applies, however the two ids were passed in.
+ */
+export function possibleDuplicatePairKey(aId, bId) {
+  return [String(aId ?? ''), String(bId ?? '')].sort().join('::');
 }
 
 /**

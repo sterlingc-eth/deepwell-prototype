@@ -18,6 +18,7 @@ import { withTenant as withRecordsTenant, linkDocumentToCustomer, linkDocumentTo
 import { mergeCustomers, ReviewError, isUuid, applyShopInternalClassification, wasClassifiedByHuman, shouldClassifyAsShopInternal } from '../reviewStore.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
 import { isShopInternalDocument, toCompletenessFields } from '../documentTypes.js';
+import { planPossibleDuplicates, loadKeepSeparatePairs } from './customers.js';
 import {
   findDuplicateCustomerPairs, isUnlinkedDocument,
   isEquipmentMissingCustomer, multiUnitUnderLinked, CUSTOMER_MATCH_THRESHOLD,
@@ -765,7 +766,7 @@ async function loadAmbiguousNameOnlyLinks(db, customers) {
 
 export async function integrityScan(ctx) {
   return withRecordsTenant(ctx, async (db) => {
-    const [customers, docCandidates, equipCandidates, multiUnitCandidates, orphanEquipment, shopContext, mismatchedNameLinks, splitLinkDocuments, extraContactRows] = await Promise.all([
+    const [customers, docCandidates, equipCandidates, multiUnitCandidates, orphanEquipment, shopContext, mismatchedNameLinks, splitLinkDocuments, extraContactRows, keepSeparatePairs] = await Promise.all([
       loadCustomersForScan(db),
       loadUnlinkedCandidates(db),
       loadEquipmentMissingCustomer(db),
@@ -775,7 +776,13 @@ export async function integrityScan(ctx) {
       loadMismatchedDirectLinks(db),
       loadSplitLinkDocuments(db),
       loadContactExtractionEvidence(db),
+      loadKeepSeparatePairs(db),
     ]);
+    // Owner defect report (2026-09-22): same-address, different-name pairs —
+    // never proposed for auto-merge, never counted by findDuplicateCustomerPairs
+    // below (see planPossibleDuplicates's own doc comment, routes/customers.js)
+    // — surfaced separately so the Inbox "Duplicates" chip stops showing 0.
+    const possibleDuplicates = planPossibleDuplicates(customers, { keepSeparatePairs });
     const suspectedShopAddresses = await loadSuspectedShopAddresses(db, shopContext);
 
     // Limit-test defect A (2026-09-20): a phone/email shared as a likely shop
@@ -833,6 +840,7 @@ export async function integrityScan(ctx) {
 
     return {
       duplicateCustomers,
+      possibleDuplicates,
       unlinkedDocuments,
       equipmentWithoutCustomer: equipWithoutCustomer,
       multiUnitDocsUnderLinked,
@@ -845,6 +853,7 @@ export async function integrityScan(ctx) {
       shopRecordsNotFiled,
       counts: {
         duplicateCustomers: duplicateCustomers.length,
+        possibleDuplicates: possibleDuplicates.length,
         unlinkedDocuments: unlinkedDocuments.length,
         equipmentWithoutCustomer: equipWithoutCustomer.length,
         multiUnitDocsUnderLinked: multiUnitDocsUnderLinked.length,

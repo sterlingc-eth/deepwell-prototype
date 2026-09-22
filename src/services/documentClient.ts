@@ -71,7 +71,27 @@ export async function deleteDocuments(ids: string[]): Promise<{ deleted: number 
   return { deleted };
 }
 
+// API_PERF_2026-09-22: the owner's browser timing showed /api/upload-url
+// fired 3x on one /app open. This call (mode: 'get', presigning a document's
+// original bytes) is the one caller of UPLOAD_URL_URL outside the ingest
+// flow, and DocumentPreview.tsx's own fetch effect can legitimately re-run
+// for the same documentId (React StrictMode's dev-only double-invoke, or two
+// mounted previews for the same id) — each call is otherwise indistinguishable
+// from the last. Deduped here, at the client-call-scheduling layer, rather
+// than trying to fix every possible caller: concurrent calls for the SAME
+// documentId share one in-flight request instead of each firing their own;
+// the entry is dropped the moment it settles, so this is not a cache (a
+// presigned URL has its own short server-side expiry and must never be
+// served stale) — only a same-tick de-duplication.
+const inFlightOriginalUrl = new Map<string, Promise<OriginalUrl>>();
+
 /** A short-lived, tenant-scoped presigned GET for a document's own original bytes. */
 export function getOriginalUrl(id: string): Promise<OriginalUrl> {
-  return postJson<OriginalUrl>(UPLOAD_URL_URL, { mode: 'get', documentId: id });
+  const existing = inFlightOriginalUrl.get(id);
+  if (existing) return existing;
+  const request = postJson<OriginalUrl>(UPLOAD_URL_URL, { mode: 'get', documentId: id }).finally(() => {
+    inFlightOriginalUrl.delete(id);
+  });
+  inFlightOriginalUrl.set(id, request);
+  return request;
 }

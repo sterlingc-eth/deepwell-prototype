@@ -24,9 +24,16 @@ import {
   ReviewError,
   aiVerifyDocument,
   reclassifyDocuments,
+  extractReminders,
+  normalizeFieldsForReminder,
+  findExistingByAddress,
 } from '../api/_lib/reviewStore.js';
+import { normalizeAddressKey } from '../api/_lib/integrity.js';
 import { isShopInternalDocument } from '../api/_lib/documentTypes.js';
+import { normalizeReminderTrigger } from '../api/_lib/extractFields.js';
 import { APPLY_ACTIONS, ADMIN_ONLY_ACTIONS } from '../api/_lib/routes/integrity.js';
+import { resolveOpenReminders, shapeReminderRow, listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from '../api/_lib/reminders.js';
+import { findCustomerNameCandidates, findCustomerByReminderName } from '../api/_lib/recordsStore.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -254,6 +261,202 @@ check('reclassifyDocuments is exported as a function', typeof reclassifyDocument
   check('reclassifyDocuments does not throw when the budget check has no database (fails open)', threw === null, threw?.message);
   eq('a non-empty id list with no reachable database yields no changes, nothing left pending',
     result, { changes: [], remaining: 0 });
+}
+
+/* ========================================================= CUSTOMER REMINDERS
+ * Build 2026-09-22. Pure checks only, per the build brief: field parsing/
+ * normalization, trigger parsing, the open/done resolution against a fake
+ * db, and that a memo naming nobody never creates a customer.
+ * ========================================================================= */
+
+/* ---------------------------------------------------- normalizeReminderTrigger */
+eq('reminder trigger "next_visit" passes through', normalizeReminderTrigger('next_visit'), 'next_visit');
+eq('reminder trigger "Next Visit" (case/spacing) normalizes to next_visit', normalizeReminderTrigger('Next Visit'), 'next_visit');
+eq('reminder trigger "next-visit" normalizes to next_visit', normalizeReminderTrigger('next-visit'), 'next_visit');
+eq('reminder trigger "11/15/2026" normalizes to YYYY-MM-DD', normalizeReminderTrigger('11/15/2026'), '2026-11-15');
+eq('reminder trigger "2026-11-15" passes through', normalizeReminderTrigger('2026-11-15'), '2026-11-15');
+eq('reminder trigger month-only "11/2026" is refused (not a usable trigger)', normalizeReminderTrigger('11/2026'), null);
+eq('reminder trigger empty/garbage -> null', normalizeReminderTrigger('sometime soon'), null);
+eq('reminder trigger null/undefined -> null', normalizeReminderTrigger(undefined), null);
+
+/* --------------------------------------------------- normalizeFieldsForReminder */
+{
+  const r = normalizeFieldsForReminder({
+    reminder_text: 'confirm filter size on next visit',
+    reminder_customer_name: 'Karen Abernathy',
+    reminder_trigger: 'next_visit',
+  });
+  eq('normalizeFieldsForReminder keeps a well-formed reminder', r.fields, {
+    reminder_text: 'confirm filter size on next visit',
+    reminder_customer_name: 'Karen Abernathy',
+    reminder_trigger: 'next_visit',
+  });
+}
+{
+  const longText = 'x'.repeat(300);
+  const r = normalizeFieldsForReminder({ reminder_text: longText });
+  eq('normalizeFieldsForReminder caps reminder_text at 200 chars', r.fields.reminder_text.length, 200);
+}
+{
+  const r = normalizeFieldsForReminder({ reminder_trigger: 'next_visit' });
+  eq('normalizeFieldsForReminder drops trigger with no reminder_text (meaningless alone)', r.fields, {
+    reminder_text: null, reminder_customer_name: null, reminder_trigger: null,
+  });
+}
+{
+  const r = normalizeFieldsForReminder({});
+  eq('normalizeFieldsForReminder on an empty tool call keeps nothing', r.fields, {
+    reminder_text: null, reminder_customer_name: null, reminder_trigger: null,
+  });
+}
+
+/* --------------------------------------------------------- resolveOpenReminders */
+{
+  const rows = [
+    { documentId: 'd1', reminderText: 'confirm filter size' },
+    { documentId: 'd2', reminderText: 'check capacitor' },
+  ];
+  eq('resolveOpenReminders: no done rows -> everything stays open', resolveOpenReminders(rows, []), rows);
+  eq('resolveOpenReminders: one done id drops just that reminder',
+    resolveOpenReminders(rows, ['d1']), [rows[1]]);
+  eq('resolveOpenReminders: a done id for a document with no reminder is simply ignored',
+    resolveOpenReminders(rows, ['not-a-reminder-doc']), rows);
+  eq('resolveOpenReminders: every reminder done -> empty', resolveOpenReminders(rows, ['d1', 'd2']), []);
+  eq('resolveOpenReminders: empty/undefined input is safe', resolveOpenReminders(undefined, undefined), []);
+}
+
+/* -------------------------------------------------------------- shapeReminderRow */
+{
+  const shaped = shapeReminderRow({
+    document_id: 'd1', reminder_text: 'confirm filter size', reminder_trigger: 'next_visit',
+    reminder_customer_name: 'Karen Abernathy', created_at: '2026-09-20', original_filename: '054-other-c10.pdf',
+    document_type: 'other', customer_id: 'c1', customer_name: 'Karen Abernathy',
+  });
+  eq('shapeReminderRow maps a raw SQL row to the client shape', shaped, {
+    documentId: 'd1', reminderText: 'confirm filter size', reminderTrigger: 'next_visit',
+    reminderCustomerName: 'Karen Abernathy', createdAt: '2026-09-20', filename: '054-other-c10.pdf',
+    documentType: 'other', customerId: 'c1', customerName: 'Karen Abernathy',
+  });
+}
+
+/* -------------------------------------------------- listOpenReminders (fake db) */
+{
+  const reminderRow = {
+    document_id: 'd1', reminder_text: 'confirm filter size', reminder_trigger: 'next_visit',
+    reminder_customer_name: 'Karen Abernathy', created_at: '2026-09-20', original_filename: 'memo.pdf',
+    document_type: 'other', customer_id: null, customer_name: null,
+  };
+  const calls = [];
+  const fakeDb = {
+    raw: async (sql) => {
+      calls.push(sql);
+      if (/FROM extractions rt/.test(sql)) return { rows: [reminderRow] };
+      if (/FROM audit_log/.test(sql)) return { rows: [{ resource_id: 'd1' }] }; // this one is done
+      return { rows: [] };
+    },
+  };
+  const open = await listOpenReminders(fakeDb, { limit: 10 });
+  eq('listOpenReminders drops a reminder whose document has a reminder.done row', open, []);
+  check('listOpenReminders reads both the reminder query and the done-audit query', calls.length === 2);
+}
+{
+  const reminderRow = {
+    document_id: 'd2', reminder_text: 'check capacitor', reminder_trigger: null,
+    reminder_customer_name: null, created_at: '2026-09-21', original_filename: 'dispatch.pdf',
+    document_type: 'dispatch-note', customer_id: null, customer_name: null,
+  };
+  const fakeDb = {
+    raw: async (sql) => (/FROM extractions rt/.test(sql) ? { rows: [reminderRow] } : { rows: [] }),
+  };
+  const open = await listOpenReminders(fakeDb, {});
+  eq('listOpenReminders keeps a reminder with no matching done row', open.map((r) => r.documentId), ['d2']);
+}
+
+check('REMINDER_ELIGIBLE_DOCUMENT_TYPES covers the four memo-like types',
+  ['correspondence', 'dispatch-note', 'other', 'internal'].every((t) => REMINDER_ELIGIBLE_DOCUMENT_TYPES.has(t)));
+check('REMINDER_ELIGIBLE_DOCUMENT_TYPES excludes an ordinary form type',
+  !REMINDER_ELIGIBLE_DOCUMENT_TYPES.has('invoice') && !REMINDER_ELIGIBLE_DOCUMENT_TYPES.has('work-order'));
+
+/* -------------------------- a memo naming nobody never creates a customer */
+{
+  const calls = [];
+  const fakeDb = {
+    raw: async (sql, _params) => {
+      calls.push(sql);
+      return { rows: [] }; // no existing customer looks anything like this
+    },
+  };
+  const match = await findCustomerByReminderName(fakeDb, '');
+  eq('findCustomerByReminderName on an empty/no name never even queries', match, null);
+  eq('...and issues no SQL at all for an empty name', calls.length, 0);
+}
+{
+  const calls = [];
+  const fakeDb = {
+    raw: async (sql, _params) => { calls.push(sql); return { rows: [] }; },
+  };
+  const match = await findCustomerByReminderName(fakeDb, 'Karen Abernathy');
+  eq('findCustomerByReminderName with zero matches returns null (never guesses, never creates)', match, null);
+  check('findCustomerByReminderName issues only SELECTs, never a write',
+    calls.length > 0 && calls.every((sql) => /^\s*SELECT/i.test(sql)),
+    calls.join('\n'));
+}
+{
+  // Two same-surname customers with no first-name agreement -> ambiguous,
+  // still never auto-picked (findCustomerNameCandidates returns both; the
+  // "never guess" call is the CALLER's, same contract findOrCreateCustomer's
+  // own selectCustomerMatch documents).
+  const rows = [
+    { id: 'c1', customer_name: 'Karen Abernathy', service_address: null },
+    { id: 'c2', customer_name: 'John Abernathy', service_address: null },
+  ];
+  const fakeDb = { raw: async () => ({ rows }) };
+  const candidates = await findCustomerNameCandidates(fakeDb, 'Abernathy');
+  check('findCustomerNameCandidates surfaces both ambiguous matches rather than picking one',
+    candidates.length === 2, JSON.stringify(candidates));
+  const resolved = await findCustomerByReminderName(fakeDb, 'Abernathy');
+  eq('findCustomerByReminderName refuses to guess between 2+ candidates', resolved, null);
+}
+
+check('extractReminders is exported as a function', typeof extractReminders === 'function');
+{
+  const result = await extractReminders({ tenantKey: 'unused' }, { documentIds: [] });
+  eq('extractReminders no-ops on an empty id list without a db call', result, { changes: [], remaining: 0 });
+}
+{
+  let threw = null;
+  let result;
+  try {
+    result = await extractReminders({ tenantKey: 'unused' }, {
+      documentIds: ['3fa85f64-5717-4562-b3fc-2c963f66afa6'],
+    });
+  } catch (err) {
+    threw = err;
+  }
+  check('extractReminders does not throw when the database is unreachable (fails open, per-document)', threw === null, threw?.message);
+  eq('a non-empty id list with no reachable database yields no changes, nothing left pending',
+    result, { changes: [], remaining: 0 });
+}
+
+/* ---------------------------------------------------- findExistingByAddress
+ * Owner defect report (2026-09-22): the manual "Add customer" form must
+ * check the normalized address BEFORE creating, and offer "Open it" / "Add
+ * anyway" — this is the search createCustomer's pre-check runs, pinned
+ * against a plain array so it's checkable with no database. */
+{
+  const rows = [
+    { id: 'c1', customer_number: 'C-00010', name: 'Donna Thornton', address: '174 N College Ave, Mesa, AZ' },
+    { id: 'c2', customer_number: 'C-00020', name: 'Desert Ridge Dental', address: '880 S Dobson Rd Suite 110, Chandler, AZ' },
+  ];
+  eq('finds the existing customer at a matching normalized address (city/state/zip and casing ignored)',
+    findExistingByAddress(rows, normalizeAddressKey('174 N COLLEGE AVE'))?.id, 'c1');
+  eq('a unit/suite marker on the new address does not stop it matching the same building',
+    findExistingByAddress(rows, normalizeAddressKey('880 S Dobson Rd Suite 220, Chandler, AZ'))?.id, 'c2');
+  eq('no match at an unrelated address -> null',
+    findExistingByAddress(rows, normalizeAddressKey('1 Nowhere Ln, Tempe, AZ')), null);
+  eq('an empty/unparseable address key never "matches" -> null', findExistingByAddress(rows, ''), null);
+  eq('empty rows -> null', findExistingByAddress([], normalizeAddressKey('174 N College Ave, Mesa, AZ')), null);
+  eq('null/undefined rows are safe -> null', findExistingByAddress(null, normalizeAddressKey('174 N College Ave, Mesa, AZ')), null);
 }
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);

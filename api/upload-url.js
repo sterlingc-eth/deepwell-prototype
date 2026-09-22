@@ -4,7 +4,9 @@ import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { denyAuth } from "./_lib/auth.js";
 import { limit } from "./_lib/rateLimit.js";
-import { gateUpload } from "./_lib/plan.js";
+import { gateUpload, getCachedBillingRow } from "./_lib/plan.js";
+import { logStage } from "./_lib/perf.js";
+import { startTimer } from "./_lib/timing.js";
 
 const MS_PER_MONTH = 30 * 24 * 60 * 60 * 1000;
 
@@ -31,14 +33,21 @@ export async function checkUploadGate(auth) {
 }
 
 async function checkUploadGateInner(auth) {
-  return withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (db) => {
-    const { rows } = await db.raw(
-      `SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1`,
-      [db.tenantId]
-    );
-    const documentsStored = await db.countDocuments();
-    const pagesThisMonth = await db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString());
-    return gateUpload(rows[0] ?? {}, { documentsStored, pagesThisMonth });
+  const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+  // API_PERF_2026-09-22: the billing row is now the shared, cached lookup
+  // (plan.js's getCachedBillingRow — same cache assertActiveBilling reads),
+  // run OUTSIDE this withTenant transaction. Only the two usage counts below
+  // — which must be fresh on every call, never cached, since the whole point
+  // of the gate is catching the moment a tenant crosses its cap — still need
+  // a real per-request round trip.
+  const billingRowPromise = getCachedBillingRow(ctx);
+  return withTenant(ctx, async (db) => {
+    const [billingRow, documentsStored, pagesThisMonth] = await Promise.all([
+      billingRowPromise,
+      db.countDocuments(),
+      db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString()),
+    ]);
+    return gateUpload(billingRow, { documentsStored, pagesThisMonth });
   });
 }
 
@@ -391,28 +400,42 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  let auth;
+  // API_PERF_2026-09-22 (DW_TIMING=1 only — see handoffs/API_PERF_2026-09-22.md):
+  // one JSON line per request covering auth, rate limit, billing gate, and the
+  // handler body, so the four stages the owner's browser timing flagged as
+  // slow are each visible without a profiler. logged in a `finally` so a
+  // thrown error still gets a timing line.
+  const timer = startTimer();
+  const mode = req.body && req.body.mode === "get" ? "get" : Array.isArray(req.body?.files) ? "batch" : "single";
+  let statusSent = 0;
   try {
-    auth = await requireAuthOrKey(req);
-    assertScope(auth, "ingest");
-  } catch (err) {
-    return denyAuth(res, err);
-  }
+    let auth;
+    try {
+      auth = await timer.time("auth", () => requireAuthOrKey(req));
+      assertScope(auth, "ingest");
+    } catch (err) {
+      statusSent = err?.status ?? 401;
+      return denyAuth(res, err);
+    }
 
-  // A 50-file batch presign is 50 units of ingest, not one request.
-  const batchCost = Array.isArray(req.body?.files) ? Math.max(1, req.body.files.length) : 1;
-  if (!(await limit(req, res, auth, "ingest", undefined, batchCost))) return; // 429 already written
+    // A 50-file batch presign is 50 units of ingest, not one request.
+    const batchCost = Array.isArray(req.body?.files) ? Math.max(1, req.body.files.length) : 1;
+    if (!(await timer.time("limit", () => limit(req, res, auth, "ingest", undefined, batchCost)))) {
+      statusSent = 429;
+      return; // 429 already written
+    }
 
-  try {
     // OPEN ORIGINAL: { mode: 'get', documentId } -> presigned GET. Checked
     // first and does not touch the PUT/batch paths below at all.
     if (req.body && req.body.mode === "get") {
-      const result = await getOriginalUrl(auth, req.body.documentId);
+      const result = await timer.time("handler", () => getOriginalUrl(auth, req.body.documentId));
+      statusSent = 200;
       return handleCors(res, req).status(200).json(result);
     }
 
-    const gate = await checkUploadGate(auth);
+    const gate = await timer.time("gate", () => checkUploadGate(auth));
     if (!gate.allowed) {
+      statusSent = gate.status;
       return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
     }
 
@@ -420,15 +443,20 @@ export default async function handler(req, res) {
     // rate-limit charge and one usage_counters increment cover the whole
     // batch today — see the daily-cap note in HANDOFF-C.md for the tradeoff.
     if (req.body && Array.isArray(req.body.files)) {
-      const results = await createUploadUrls(auth, req.body.files);
+      const results = await timer.time("handler", () => createUploadUrls(auth, req.body.files));
+      statusSent = 200;
       return handleCors(res, req).status(200).json({ results });
     }
-    const result = await createUploadUrl(auth, req.body);
+    const result = await timer.time("handler", () => createUploadUrl(auth, req.body));
+    statusSent = 200;
     return handleCors(res, req).status(200).json(result);
   } catch (error) {
+    statusSent = error?.status ?? 500;
     if (error?.name === "DocumentGetError") {
       return handleCors(res, req).status(error.status).json({ error: error.message });
     }
     return respondUploadError(res, req, error);
+  } finally {
+    logStage({ t: "request", route: "upload-url", mode, status: statusSent, ...timer.snapshot() });
   }
 }

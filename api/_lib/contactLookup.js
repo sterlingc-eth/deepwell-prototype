@@ -32,6 +32,7 @@ import { ENTITY_SYNONYMS, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./ana
 import { documentTypeLabel } from "./documentTypes.js";
 import { significantAddressTokens, formatDateHuman } from "./fastPath.js";
 import { alertTier, BRAND_RULES } from "./warrantyRules.js";
+import { listOpenReminders } from "./reminders.js";
 
 /* ============================================================ shape detection */
 
@@ -306,6 +307,20 @@ const LAST_TIME_AT_RE =
 const HOW_MANY_TIMES_RE =
   /^how\s+many\s+times\s+have\s+we\s+been\s+(?:to|out\s+to)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,3})\s*\??$/i;
 
+// CUSTOMER REMINDERS build (2026-09-22): "any notes/reminders for Abernathy",
+// "reminders for 322 N Greenfield", "what should I check at Ellison's" — an
+// open reminder logged against a customer (api/_lib/reminders.js) is exactly
+// the kind of deterministic, no-page-to-cite fact this file already answers
+// phone/email/address/serial questions from. `field: 'reminders'` is its own
+// branch in runContactLookup (below), answered from reminders.js's
+// listOpenReminders rather than from the customer row itself. The captured
+// phrase can be a name OR a street (digit-first, same convention as Shape 3c/
+// 4 above); stripPossessive handles "Ellison's".
+const REMINDER_FOR_RE =
+  /^(?:any\s+)?(?:notes?|reminders?)(?:\s*(?:\/|or|and)\s*reminders?)?\s+(?:for|on|at)\s+(?:the\s+)?([A-Za-z0-9][A-Za-z0-9',.-]*(?:\s+[A-Za-z0-9',.-]+){0,6})\s*\??\s*$/i;
+const WHAT_SHOULD_I_CHECK_RE =
+  /^what\s+should\s+i\s+check\s+(?:at|for|on)\s+(?:the\s+)?([A-Za-z0-9][A-Za-z0-9',.-]*(?:\s+[A-Za-z0-9',.-]+){0,6})\s*\??\s*$/i;
+
 // Live 100-question persona sample (2026-09-22), cluster "named-unit
 // attribute questions": "Is the Salazar unit still under warranty?" / "what
 // model is the Prentiss system" / "how old is the Bracken unit" — a customer
@@ -572,6 +587,23 @@ export function parseContactLookupQuestion(question, opts = {}) {
     }
   }
 
+  // Shape 6: reminder lookup — "any notes/reminders for Abernathy", "what
+  // should I check at Ellison's", "reminders for 322 N Greenfield" (Customer
+  // Reminders build, 2026-09-22). Tried last, against both `q` and the
+  // quantifier/filler-stripped `stripped`, same as Shapes 3c/4 above.
+  for (const candidate of [q, stripped]) {
+    for (const re of [REMINDER_FOR_RE, WHAT_SHOULD_I_CHECK_RE]) {
+      const m = candidate.match(re);
+      if (!m) continue;
+      const captured = stripPossessive(m[1].trim());
+      if (!captured) continue;
+      if (/^\d/.test(captured)) {
+        return { field: 'reminders', namePhrase: captured, isStreet: true, street: captured, streetLabel: titleCase(captured) };
+      }
+      if (isRealNamePhrase(captured)) return { field: 'reminders', namePhrase: captured };
+    }
+  }
+
   return null;
 }
 
@@ -788,6 +820,30 @@ export function buildNoStreetMatchAnswer(streetLabel) {
   };
 }
 
+/** Pure: build the answer for a reminder lookup (field 'reminders', above)
+ *  once a resolved customer's open reminders are in hand. An honest zero
+ *  ("No open reminders for X.") rather than a generic no-answer — the same
+ *  contract every other branch in this file follows. */
+export function buildReminderAnswer(reminders, name) {
+  if (!reminders?.length) {
+    return {
+      kind: 'answer', text: `No open reminders for ${name}.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
+  const facts = reminders.map((r) => ({
+    label: r.reminderTrigger === 'next_visit' ? 'Next visit' : r.reminderTrigger ? `By ${r.reminderTrigger}` : 'Reminder',
+    value: r.reminderText,
+    sources: r.documentId ? [{ documentId: r.documentId, location: {} }] : [],
+  }));
+  const summary = reminders.map((r) => r.reminderText).join('; ');
+  return {
+    kind: 'answer',
+    text: `${reminders.length} open reminder${reminders.length === 1 ? '' : 's'} for ${name}: ${summary}`,
+    facts, sources: [], confidence: 1, verifiedCount: reminders.length, unverifiedCount: 0, closest: [],
+  };
+}
+
 /* ============================================================ DB resolution
  * The only two functions in this file that touch `db` (a recordsStore.js
  * store, called from inside a withTenant transaction — same calling
@@ -954,6 +1010,24 @@ export async function runContactLookup(db, question, opts = {}) {
   const today = opts?.today ?? null;
   const parsed = parseContactLookupQuestion(question, { overlay });
   if (!parsed) return null;
+
+  // CUSTOMER REMINDERS build (2026-09-22): resolved from reminders.js's
+  // listOpenReminders, not buildResolvedAnswer's customer-row shape below —
+  // handled first, ahead of the generic isStreet/name branches that follow.
+  if (parsed.field === "reminders") {
+    if (parsed.isStreet) {
+      const candidates = await resolveStreetCandidates(db, parsed.street);
+      if (candidates.length === 0) return buildNoStreetMatchAnswer(parsed.streetLabel);
+      if (candidates.length > 1) return buildStreetAmbiguousAnswer(parsed.streetLabel, candidates);
+      const reminders = await listOpenReminders(db, { customerId: candidates[0].id });
+      return buildReminderAnswer(reminders, candidates[0].customer_name || parsed.streetLabel);
+    }
+    const candidates = await resolveContactCandidates(db, parsed.namePhrase);
+    if (candidates.length === 0) return null;
+    if (candidates.length > 1) return buildAmbiguousContactAnswer(parsed.namePhrase, candidates);
+    const reminders = await listOpenReminders(db, { customerId: candidates[0].id });
+    return buildReminderAnswer(reminders, candidates[0].customer_name || parsed.namePhrase);
+  }
 
   // Street-only shape (no customer name at all — see STREET_ONLY_RE's own
   // doc comment): unlike a name miss, this DOES answer honestly at 0 matches

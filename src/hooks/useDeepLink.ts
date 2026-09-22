@@ -13,7 +13,7 @@ import { useGraph } from '../core/entityGraph';
 import { isValidPlanId, type BillingInterval } from '../services/billingClient';
 import type { WorkFilterChoice } from '../core/workFilter';
 
-const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team', 'outreach'];
+const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team', 'outreach', 'expenses'];
 
 function isScreen(value: string): value is Screen {
   return (SCREENS as readonly string[]).includes(value);
@@ -323,6 +323,7 @@ export function useDeepLink(ready: boolean): void {
   const openCustomer = useAppStore((s) => s.openCustomer);
   const openOutreach = useAppStore((s) => s.openOutreach);
   const setPendingWorkFilter = useAppStore((s) => s.setPendingWorkFilter);
+  const setInboxCustomerScope = useAppStore((s) => s.setInboxCustomerScope);
   const handledRef = useRef(false);
 
   // Only once the app is actually ready to render the target screen (no more
@@ -370,11 +371,24 @@ export function useDeepLink(ready: boolean): void {
       return;
     }
 
-    // ?customer= needs nothing from the graph — CustomerProfileScreen fetches
-    // its own data straight from the API (customerClient), unlike ?entity=/
-    // ?doc= which wait on the locally-synced entity graph below. Applied
-    // immediately, same as a bare ?screen=.
-    if (params.customerRef) {
+    // `?screen=inbox&customer=<id>[&doc=<id>]` — a customer profile's "Open
+    // in Inbox" link (owner defect report 2026-09-22): scope the Inbox's
+    // document queue to this customer instead of opening their profile. Set
+    // immediately; a co-present `doc` still needs the graph-wait logic below
+    // (it falls through rather than returning here) so the document itself
+    // opens once it's loaded, same as any other `?doc=` link.
+    if (params.customerRef && params.screen === 'review') {
+      setInboxCustomerScope(params.customerRef);
+      if (!params.docId) {
+        setCurrentScreen('review');
+        cleanUrl();
+        return;
+      }
+    } else if (params.customerRef) {
+      // ?customer= needs nothing from the graph — CustomerProfileScreen
+      // fetches its own data straight from the API (customerClient), unlike
+      // ?entity=/?doc= which wait on the locally-synced entity graph below.
+      // Applied immediately, same as a bare ?screen=.
       openCustomer(params.customerRef);
       cleanUrl();
       return;

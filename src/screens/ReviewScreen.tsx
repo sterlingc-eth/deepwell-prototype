@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, AlertTriangle, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
+import { Check, AlertTriangle, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { conflictDocs, entitiesOfType, gapDocs, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
@@ -8,15 +8,36 @@ import { targetFor } from '../domains/hvac/intake';
 import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
 import { groupExtractionsByUnit } from '../domains/hvac/units';
 import { normalize, str } from '../core/answer';
-import { customerForDocument } from '../core/customer';
+import { customerForDocument, matchesCustomerScope } from '../core/customer';
+import { shopRecordTechnician } from '../core/shopRecords';
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
-import { customerClient, type CustomerSummary } from '../services/customerClient';
+import { reviewClient } from '../services/reviewClient';
+import { customerClient, type CustomerSummary, type CustomerDuplicatePair, type CustomerPossibleDuplicatePair } from '../services/customerClient';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
 import { useWorkFilter } from '../hooks/useWorkFilter';
 import { WorkFilterControl } from '../components/WorkFilterControl';
 
 const CURRENT_USER = 'You';
+
+// "Hide shop records" (owner defect report 2026-09-22, item 4): a per-user,
+// per-browser preference — deliberately localStorage, not a server setting,
+// since it's about one person's own Inbox clutter, not a tenant policy.
+const HIDE_SHOP_RECORDS_KEY = 'deepwell.hideShopRecords';
+function safeGetHideShopRecords(): boolean {
+  try {
+    return localStorage.getItem(HIDE_SHOP_RECORDS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function safeSetHideShopRecords(v: boolean) {
+  try {
+    localStorage.setItem(HIDE_SHOP_RECORDS_KEY, v ? '1' : '0');
+  } catch {
+    /* private window / blocked storage — the toggle still works this visit, just won't be remembered */
+  }
+}
 
 // Correcting a field, classifying, linking and approving now persist for a
 // real account (see src/core/entityGraph.ts, api/review.js) — the only mode
@@ -132,7 +153,7 @@ function entityLabel(e: Entity): string {
  * Disabled in demo mode — there is no backend customer API to call there
  * (same gate DashboardScreen's warranty-attention fetch uses).
  */
-function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: Doc; current: Entity | null; isDemo: boolean; suggestedName: string | null }) {
+function LinkedCustomerSection({ doc, current, isDemo, suggestedName, reminderCustomerName }: { doc: Doc; current: Entity | null; isDemo: boolean; suggestedName: string | null; reminderCustomerName: string | null }) {
   const hasCustomerFacts = doc.extracted.some(
     (f) => (f.name === 'customer_name' || f.name === 'service_address') && (f.correctedValue ?? f.value).trim()
   );
@@ -217,6 +238,33 @@ function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: D
     }
   };
 
+  /** One-click "Create customer <name> and attach" (CUSTOMER REMINDERS build,
+   *  2026-09-22): a memo naming someone only in its reminder text, with no
+   *  customer_name extraction for the suggestion above to key off. Reuses
+   *  createCustomerAndAttachReminder's own fuzzy match — see its doc comment
+   *  — so this never creates a duplicate; an ambiguous match reopens the
+   *  search box prefilled instead of guessing. */
+  const [reminderCreateBusy, setReminderCreateBusy] = useState(false);
+  const createAndAttachReminder = async () => {
+    if (!reminderCustomerName) return;
+    setReminderCreateBusy(true);
+    setErr(null);
+    try {
+      const result = await customerClient.createAndAttachReminder(doc.id, reminderCustomerName);
+      if (result.ambiguous) {
+        setQuery(reminderCustomerName);
+        setOpen(true);
+        setErr(`Found ${result.candidates?.length ?? 0} possible matches for "${reminderCustomerName}" — pick one below.`);
+      } else {
+        await loadGraphFromServer();
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not create that customer.');
+    } finally {
+      setReminderCreateBusy(false);
+    }
+  };
+
   return (
     <section className="p-5 space-y-3">
       <h3 className="flex items-center gap-2 text-h4"><UserCog className="w-4 h-4" aria-hidden="true" /> Customer</h3>
@@ -239,6 +287,11 @@ function LinkedCustomerSection({ doc, current, isDemo, suggestedName }: { doc: D
       {!isDemo && !open && !current && suggestedName && (
         <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" disabled={suggestBusy} onClick={() => void linkToSuggested()}>
           {suggestBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <UserCog className="w-4 h-4" aria-hidden="true" />} Link to {suggestedName}
+        </button>
+      )}
+      {!isDemo && !open && !current && !suggestedName && reminderCustomerName && (
+        <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" disabled={reminderCreateBusy} onClick={() => void createAndAttachReminder()}>
+          {reminderCreateBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />} Create customer {reminderCustomerName} and attach
         </button>
       )}
       {isDemo ? (
@@ -310,9 +363,79 @@ export function ReviewBody() {
   const askQuestion = useAppStore((s) => s.askQuestion);
   const pendingReviewFilter = useAppStore((s) => s.pendingReviewFilter);
   const clearPendingReviewFilter = useAppStore((s) => s.clearPendingReviewFilter);
+  const inboxCustomerScope = useAppStore((s) => s.inboxCustomerScope);
+  const setInboxCustomerScope = useAppStore((s) => s.setInboxCustomerScope);
+  const openCustomer = useAppStore((s) => s.openCustomer);
 
   const [filter, setFilter] = useState<Filter>('attention');
   const [preview, setPreview] = useState<SourceRef | null>(null);
+
+  // "Hide shop records" + technician filter (owner defect report 2026-09-22,
+  // item 4). Hiding applies everywhere EXCEPT the "Shop records" tab itself
+  // — that tab is where you go looking for them on purpose, toggle or not.
+  const [hideShopRecords, setHideShopRecords] = useState(false);
+  useEffect(() => { setHideShopRecords(safeGetHideShopRecords()); }, []);
+  const toggleHideShopRecords = () => {
+    setHideShopRecords((v) => {
+      safeSetHideShopRecords(!v);
+      return !v;
+    });
+  };
+  const [shopTechFilter, setShopTechFilter] = useState<string | null>(null);
+
+  // Customer-level duplicates (owner defect report 2026-09-22): a separate
+  // signal from doc.issues' document-level 'duplicate' (two uploads of the
+  // same file) below — these are customer RECORDS that look like the same
+  // household/business, GET /api/v1/customers' `duplicates` (real, mergeable
+  // pairs) and `possibleDuplicates` (same address, different name — never
+  // auto-merged; see api/_lib/routes/customers.js's planPossibleDuplicates).
+  // Loaded once and refreshed after a Merge or Keep separate action.
+  const [customerDuplicates, setCustomerDuplicates] = useState<CustomerDuplicatePair[]>([]);
+  const [customerPossibleDuplicates, setCustomerPossibleDuplicates] = useState<CustomerPossibleDuplicatePair[]>([]);
+  const [customerRowsById, setCustomerRowsById] = useState<Map<string, CustomerSummary>>(new Map());
+  const [customerDupErr, setCustomerDupErr] = useState<string | null>(null);
+  const [customerDupBusyKey, setCustomerDupBusyKey] = useState<string | null>(null);
+  const loadCustomerDuplicates = () => {
+    if (REVIEW_IS_DEMO_ONLY) return;
+    void customerClient
+      .listFull({ sort: 'recent', limit: 200 })
+      .then((data) => {
+        setCustomerDuplicates(data.duplicates ?? []);
+        setCustomerPossibleDuplicates(data.possibleDuplicates ?? []);
+        setCustomerRowsById(new Map(data.customers.map((c) => [c.id, c])));
+      })
+      .catch((e) => setCustomerDupErr(e instanceof Error ? e.message : 'Could not load duplicate customers.'));
+  };
+  useEffect(() => {
+    loadCustomerDuplicates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const customerDupCount = customerDuplicates.length + customerPossibleDuplicates.length;
+
+  const mergeCustomerDup = async (keepId: string, dropId: string, key: string) => {
+    setCustomerDupBusyKey(key);
+    setCustomerDupErr(null);
+    try {
+      await customerClient.merge(keepId, dropId);
+      loadCustomerDuplicates();
+    } catch (e) {
+      setCustomerDupErr(e instanceof Error ? e.message : 'Could not merge those customers.');
+    } finally {
+      setCustomerDupBusyKey(null);
+    }
+  };
+  const keepCustomerDupSeparate = async (aId: string, bId: string, key: string) => {
+    setCustomerDupBusyKey(key);
+    setCustomerDupErr(null);
+    try {
+      await customerClient.keepSeparate(aId, bId);
+      setCustomerPossibleDuplicates((rows) => rows.filter((r) => !(r.aId === aId && r.bId === bId)));
+    } catch (e) {
+      setCustomerDupErr(e instanceof Error ? e.message : 'Could not save that.');
+    } finally {
+      setCustomerDupBusyKey(null);
+    }
+  };
 
   // A caller (Dashboard's data-health tiles) can ask this tab to open
   // already filtered — e.g. the "Needs linking" tile jumps here with
@@ -340,16 +463,72 @@ export function ReviewBody() {
   const work = useWorkFilter(allDocsList);
   const inWorkScope = (d: Doc) => work.choice === 'everyone' || work.isMine(d);
 
+  // Customer scope (owner defect report 2026-09-22): arriving here from a
+  // customer's profile ("Open in Inbox") used to drop you into the unscoped
+  // "All" filter, 239 documents deep, with no trace of which customer you
+  // came from. Set by CustomerProfileScreen's openInInbox via
+  // setInboxCustomerScope; cleared by the chip's × or "Everyone's inbox".
+  const scopedCustomer = inboxCustomerScope ? graph.entities[inboxCustomerScope] ?? null : null;
+  const scopedCustomerName = scopedCustomer ? (str(scopedCustomer, 'customer_name') || str(scopedCustomer, 'name') || 'Unnamed') : null;
+  const inCustomerScope = (d: Doc) => matchesCustomerScope(d, graph.entities, inboxCustomerScope);
+  // Hiding never applies to the "Shop records" tab itself (see the state
+  // comment above) — everywhere else, an internal document is excluded
+  // while the toggle is on.
+  const notHiddenShop = (d: Doc, f: Filter) => f === 'shop-records' || !hideShopRecords || d.typeId !== 'internal';
+  const matchesTechFilter = (d: Doc, f: Filter) => f !== 'shop-records' || !shopTechFilter || shopRecordTechnician(d) === shopTechFilter;
+
   const queue = useMemo(
-    () => Object.values(graph.docs).filter((d) => matches(d, filter, sets) && inWorkScope(d)).sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime()),
+    () => Object.values(graph.docs)
+      .filter((d) => matches(d, filter, sets) && inWorkScope(d) && inCustomerScope(d) && notHiddenShop(d, filter) && matchesTechFilter(d, filter))
+      .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [graph.docs, filter, sets, work.choice, work.isMine],
+    [graph.docs, filter, sets, work.choice, work.isMine, inboxCustomerScope, hideShopRecords, shopTechFilter],
   );
-  const counts = useMemo(
-    () => Object.fromEntries(FILTERS.map((f) => [f.id, Object.values(graph.docs).filter((d) => matches(d, f.id, sets) && inWorkScope(d)).length])) as Record<Filter, number>,
+  const counts = useMemo(() => {
+    const base = Object.fromEntries(
+      FILTERS.map((f) => [f.id, Object.values(graph.docs).filter((d) => matches(d, f.id, sets) && inWorkScope(d) && inCustomerScope(d) && notHiddenShop(d, f.id)).length])
+    ) as Record<Filter, number>;
+    // The "Duplicates" chip counts customer-record duplicates too (owner
+    // defect report 2026-09-22) — see customerDupCount above.
+    return { ...base, duplicates: base.duplicates + customerDupCount };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [graph.docs, sets, work.choice, work.isMine],
-  );
+  }, [graph.docs, sets, work.choice, work.isMine, customerDupCount, inboxCustomerScope, hideShopRecords]);
+
+  // Distinct technicians named across this tenant's shop records (owner
+  // defect report 2026-09-22, item 4) — the chip row above the Shop records
+  // list, and what `shopTechFilter` filters by.
+  const shopTechnicians = useMemo(() => {
+    const names = new Set<string>();
+    for (const d of Object.values(graph.docs)) {
+      const t = shopRecordTechnician(d);
+      if (t) names.add(t);
+    }
+    return [...names].sort();
+  }, [graph.docs]);
+
+  // "Find reminders" (CUSTOMER REMINDERS build, 2026-09-22): backfill for
+  // documents extracted before reminder_text existed — runs on up to 20 of
+  // the current queue's own documents (reviewClient.extractReminders is
+  // itself capped there; the daily model budget still applies server-side).
+  const [findRemindersBusy, setFindRemindersBusy] = useState(false);
+  const [findRemindersMsg, setFindRemindersMsg] = useState<string | null>(null);
+  const runFindReminders = async () => {
+    const ids = queue.slice(0, 20).map((d) => d.id);
+    if (!ids.length) return;
+    setFindRemindersBusy(true);
+    setFindRemindersMsg(null);
+    try {
+      const { changes } = await reviewClient.extractReminders(ids);
+      await loadGraphFromServer();
+      setFindRemindersMsg(
+        changes.length ? `Found ${changes.length} reminder${changes.length === 1 ? '' : 's'}.` : 'No reminders found in these documents.'
+      );
+    } catch (e) {
+      setFindRemindersMsg(e instanceof Error ? e.message : 'Could not check for reminders.');
+    } finally {
+      setFindRemindersBusy(false);
+    }
+  };
 
   const doc = selectedDocumentId ? graph.docs[selectedDocumentId] : undefined;
   useEffect(() => {
@@ -397,6 +576,11 @@ export function ReviewBody() {
 
         {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
 
+        <label className="inline-flex items-center gap-2 text-caption text-ink-2">
+          <input type="checkbox" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide shop records" />
+          Hide shop records
+        </label>
+
         <div role="tablist" aria-label="Queue filters" className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
             <button
@@ -411,11 +595,99 @@ export function ReviewBody() {
           ))}
         </div>
 
+        {inboxCustomerScope && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="dw-pill-info inline-flex items-center gap-1.5">
+              Customer: {scopedCustomerName ?? 'Unknown'}
+              <button type="button" onClick={() => setInboxCustomerScope(null)} aria-label="Clear customer filter" className="hover:opacity-70">×</button>
+            </span>
+            <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 text-caption" onClick={() => openCustomer(inboxCustomerScope)}>
+              Back to {scopedCustomerName ?? 'customer'}
+            </button>
+          </div>
+        )}
+
+        {filter === 'duplicates' && (customerDuplicates.length > 0 || customerPossibleDuplicates.length > 0) && (
+          <div className="dw-card p-4 space-y-3 border-warn/40">
+            <h3 className="flex items-center gap-2 text-h4"><Copy className="w-4 h-4 text-warn" aria-hidden="true" /> Duplicate customers</h3>
+            {customerDupErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{customerDupErr}</p>}
+            <ul className="space-y-2">
+              {customerDuplicates.map((p) => {
+                const key = `dup-${p.keepId}-${p.dropId}`;
+                const keep = customerRowsById.get(p.keepId);
+                const drop = customerRowsById.get(p.dropId);
+                return (
+                  <li key={key} className="border border-line rounded-lg p-3 space-y-2">
+                    <p className="text-body text-ink">{keep?.name ?? 'Unnamed'} <span className="text-ink-3">and</span> {drop?.name ?? 'Unnamed'}</p>
+                    <p className="text-caption text-ink-3">{p.reason} · {Math.round(p.score * 100)}% match{p.tier === 'suggest' ? ' — needs your review' : ''}</p>
+                    <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={customerDupBusyKey === key} onClick={() => void mergeCustomerDup(p.keepId, p.dropId, key)}>
+                      {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge into {keep?.name ?? 'kept record'}
+                    </button>
+                  </li>
+                );
+              })}
+              {customerPossibleDuplicates.map((p) => {
+                const key = `possible-${p.aId}-${p.bId}`;
+                const keep = customerRowsById.get(p.keepId);
+                const drop = customerRowsById.get(p.dropId);
+                return (
+                  <li key={key} className="border border-line rounded-lg p-3 space-y-2">
+                    <p className="text-body text-ink">{keep?.name ?? 'Unnamed'} <span className="text-ink-3">and</span> {drop?.name ?? 'Unnamed'}</p>
+                    <p className="text-caption text-ink-3">{keep?.serviceAddress ?? drop?.serviceAddress ?? '—'} · {p.reason}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={customerDupBusyKey === key} onClick={() => void mergeCustomerDup(p.keepId, p.dropId, key)}>
+                        {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge
+                      </button>
+                      <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" disabled={customerDupBusyKey === key} onClick={() => void keepCustomerDupSeparate(p.aId, p.bId, key)}>
+                        {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : 'Keep separate'}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {filter === 'shop-records' && shopTechnicians.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-caption text-ink-3">Technician:</span>
+            {shopTechnicians.map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={shopTechFilter === name}
+                onClick={() => setShopTechFilter((cur) => (cur === name ? null : name))}
+                className={['dw-btn !min-h-[32px] !py-1 !px-2.5 text-caption', shopTechFilter === name ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
+              >
+                {name}
+              </button>
+            ))}
+            {shopTechFilter && (
+              <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 text-caption" onClick={() => setShopTechFilter(null)}>Clear</button>
+            )}
+          </div>
+        )}
+
+        {filter === 'unlinked' && queue.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5" disabled={findRemindersBusy} onClick={() => void runFindReminders()}>
+              {findRemindersBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Bell className="w-4 h-4" aria-hidden="true" />} Find reminders
+            </button>
+            {findRemindersMsg && <span className="text-caption text-ink-3">{findRemindersMsg}</span>}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start">
           <ul className="min-w-0 divide-y divide-line border border-line rounded-lg bg-surface" aria-label="Documents in queue">
             {queue.map((d) => {
               const typeLabel = graph.schema.documentTypes.find((t) => t.id === d.typeId)?.label ?? 'Unclassified';
               const active = d.id === doc?.id;
+              // CUSTOMER REMINDERS build (2026-09-22): a lightweight chip so a
+              // reminder-bearing document stands out in this list without
+              // having to open it first.
+              const hasReminder = d.extracted.some((f) => f.name === 'reminder_text' && (f.correctedValue ?? f.value).trim());
+              const technician = shopRecordTechnician(d);
               return (
                 <li key={d.id}>
                   <button type="button" onClick={() => openDocument(d.id)} aria-current={active ? 'true' : undefined} className={['w-full text-left flex items-center gap-3 px-4 py-3 min-h-touch transition-colors duration-quick', active ? 'bg-forest-50 dark:bg-forest-800' : 'hover:bg-surface-2'].join(' ')}>
@@ -424,11 +696,21 @@ export function ReviewBody() {
                       <span className="block font-mono text-data text-ink truncate">{d.filename}</span>
                       <span className="block text-body text-ink-3">{typeLabel}</span>
                     </span>
-                    {work.choice === 'everyone' && work.hasShop && (
+                    {/* Owner defect report (2026-09-22): this used to also
+                        require work.choice === 'everyone', so switching to
+                        "My work" hid the uploader chip entirely — visible in
+                        both modes now. */}
+                    {work.hasShop && (
                       <span className="dw-pill-muted shrink-0 text-caption">
                         {(d.uploadedBy && work.nameByUserId.get(d.uploadedBy)) || 'Teammate'}
                       </span>
                     )}
+                    {hasReminder && (
+                      <span className="dw-pill-muted shrink-0 text-caption flex items-center gap-1" title="Has a reminder">
+                        <Bell className="w-3 h-3" aria-hidden="true" />
+                      </span>
+                    )}
+                    {technician && <span className="dw-pill-muted shrink-0 text-caption">{technician}</span>}
                     {d.issues.length > 0 && <span className="dw-pill-warn shrink-0">{d.issues.length}</span>}
                   </button>
                 </li>
@@ -597,6 +879,12 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const customerNameField = doc.extracted.find((f) => f.name === 'customer_name');
   const suggestedCustomerName = customerNameField ? (customerNameField.correctedValue ?? customerNameField.value).trim() || null : null;
 
+  // CUSTOMER REMINDERS build (2026-09-22): a memo that names someone only in
+  // its reminder text (no customer_name field at all) gets its own one-click
+  // "Create customer <name> and attach" instead — see LinkedCustomerSection.
+  const reminderCustomerField = doc.extracted.find((f) => f.name === 'reminder_customer_name');
+  const reminderCustomerName = reminderCustomerField ? (reminderCustomerField.correctedValue ?? reminderCustomerField.value).trim() || null : null;
+
   const grouped = useMemo(() => groupExtractionsByUnit(doc.extracted), [doc.extracted]);
   const currentCustomer = customerForDocument(doc, graph.entities);
   const customerStatusLine = currentCustomer
@@ -761,7 +1049,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       {/* Customer link — search/create, independent of the equipment/property
           link below (a document can name a customer with no serial at all). */}
       {!duplicate && doc.typeId && missing.length === 0 && (
-        <LinkedCustomerSection doc={doc} current={currentCustomer} isDemo={REVIEW_IS_DEMO_ONLY} suggestedName={suggestedCustomerName} />
+        <LinkedCustomerSection doc={doc} current={currentCustomer} isDemo={REVIEW_IS_DEMO_ONLY} suggestedName={suggestedCustomerName} reminderCustomerName={reminderCustomerName} />
       )}
 
       {/* Link */}

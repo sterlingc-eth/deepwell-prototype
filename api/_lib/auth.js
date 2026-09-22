@@ -47,6 +47,7 @@
  */
 import { verifyToken } from "@clerk/backend";
 import { upsertMember } from "./members.js";
+import { TTLCache, logStage } from "./perf.js";
 
 /** Origins whose tokens this API will accept. */
 const AUTHORIZED_PARTIES = [
@@ -177,7 +178,35 @@ export function requireRole(auth, role) {
  * @returns {Promise<{userId: string, orgId: string|null, orgRole: 'admin'|'member'|null, tenantId: string, email?: string}>}
  * @throws {AuthError}
  */
+/**
+ * API_PERF_2026-09-22: requireAuth() used to run upsertMember() — its own
+ * resolve_tenant() + SET LOCAL + INSERT...ON CONFLICT UPDATE, three more
+ * sequential round trips — on EVERY single authenticated request from a shop
+ * tenant, unconditionally, every time. The row it writes changes only when
+ * the member's email or role changes (both rare — a role change is an admin
+ * action, an email change is a Clerk account edit), so this cache skips the
+ * write whenever the last successful upsert for this exact (orgId, userId,
+ * orgRole, email) combination is still fresh. A role/email change is picked
+ * up as soon as the NEXT token carrying it arrives (Clerk session tokens are
+ * short-lived and reissued constantly), and worst case — this cache's own
+ * TTL — is a few minutes' staleness on a denormalized directory row that
+ * nothing security-relevant reads (requireRole() checks auth.orgRole straight
+ * off the verified JWT claims, never this table).
+ */
+const MEMBER_UPSERT_TTL_MS = 5 * 60_000;
+const memberUpsertCache = new TTLCache(MEMBER_UPSERT_TTL_MS, 1000);
+
+function memberUpsertCacheKey(auth) {
+  return `${auth.orgId}:${auth.userId}:${auth.orgRole ?? ""}:${auth.email ?? ""}`;
+}
+
+/** Test-only: clear the member-upsert cache between fixtures. */
+export function _resetMemberUpsertCache() {
+  memberUpsertCache.map.clear();
+}
+
 export async function requireAuth(req, { verify = verifyToken } = {}) {
+  const timerStart = Date.now();
   const header = req?.headers?.authorization ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : null;
   if (!token) throw new AuthError("Sign in required");
@@ -190,6 +219,7 @@ export async function requireAuth(req, { verify = verifyToken } = {}) {
   }
 
   let claims;
+  const verifyStart = Date.now();
   try {
     claims = await verify(token, {
       secretKey,
@@ -201,6 +231,7 @@ export async function requireAuth(req, { verify = verifyToken } = {}) {
     console.error("Token verification failed:", err?.message);
     throw new AuthError("Session is invalid or has expired");
   }
+  const verifyMs = Date.now() - verifyStart;
 
   const auth = deriveAuth(claims);
   if (!auth) throw new AuthError("Session is invalid or has expired");
@@ -213,14 +244,25 @@ export async function requireAuth(req, { verify = verifyToken } = {}) {
   // trade-off this accepts. Never allowed to fail the request: a hiccup
   // writing a membership row must not take down every authenticated
   // endpoint in the product.
+  let upsertMs = 0;
+  let upsertSkipped = false;
   if (hasShop(auth)) {
-    try {
-      await upsertMember(auth);
-    } catch (err) {
-      console.error("upsertMember failed (non-fatal):", err?.message);
+    const cacheKey = memberUpsertCacheKey(auth);
+    if (memberUpsertCache.get(cacheKey)) {
+      upsertSkipped = true;
+    } else {
+      const upsertStart = Date.now();
+      try {
+        await upsertMember(auth);
+        memberUpsertCache.set(cacheKey, true);
+      } catch (err) {
+        console.error("upsertMember failed (non-fatal):", err?.message);
+      }
+      upsertMs = Date.now() - upsertStart;
     }
   }
 
+  logStage({ t: "auth", ms: Date.now() - timerStart, verifyMs, upsertMs, upsertSkipped, hasShop: hasShop(auth) });
   return auth;
 }
 

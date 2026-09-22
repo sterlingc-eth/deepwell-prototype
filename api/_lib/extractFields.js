@@ -61,6 +61,19 @@ export const FIELD_SPECS = [
   { key: 'status',           kind: 'text', desc: 'Completed, Pending, In Progress.', example: 'A checkbox next to "Completed" is marked -> value "Completed".' },
   { key: 'notes',            kind: 'text', desc: 'A short observation the technician recorded that does not fit another field.', example: 'Handwritten "customer requested callback next week" -> value "customer requested callback next week".' },
   { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.', example: 'Printed "Permit No: BP-2024-08841" -> value "BP-2024-08841".' },
+  // CUSTOMER REMINDERS (2026-09-22): an internal memo, dispatch note or piece
+  // of correspondence sometimes carries a forward-looking instruction for
+  // whoever visits a customer next — "Reminder logged for Karen Abernathy's
+  // account: confirm filter size on next visit." These three are only ever
+  // meaningful together (reminder_customer_name/reminder_trigger without a
+  // reminder_text is not a reminder at all) and are only kept, downstream, on
+  // memo-like document types — see reminders.js's REMINDER_ELIGIBLE_DOCUMENT_TYPES
+  // and extractDocument.js's own gate. `reminder_trigger`'s kind is not a
+  // plain date: normalizeFields (below) validates it against 'next_visit' or
+  // a real YYYY-MM-DD, never a bare month/year.
+  { key: 'reminder_text',            kind: 'text', desc: 'An actionable reminder for whoever visits this customer next, if this document states one — in the words of the document, 200 characters or fewer. Never invent one from an ordinary work-performed line or invoice item; only a real, forward-looking instruction counts.', example: 'Printed "Reminder logged for Karen Abernathy\'s account: confirm filter size on next visit." -> value "confirm filter size on next visit."' },
+  { key: 'reminder_customer_name',   kind: 'text', desc: 'The customer named in reminder_text, if the document names one. Leave out if reminder_text is empty, or if it names no customer at all (e.g. a shop-wide memo about stock, not one customer).', example: 'The same memo naming "Karen Abernathy\'s account" -> value "Karen Abernathy".' },
+  { key: 'reminder_trigger',         kind: 'reminder_trigger', desc: 'When the reminder should fire: "next_visit" if it should happen the next time anyone visits this customer (the common case), or a specific date as YYYY-MM-DD if the document names one. Leave out entirely if reminder_text is empty.', example: 'Printed "...confirm filter size on next visit" -> value "next_visit". Printed "...follow up by 11/15/2026" -> value "2026-11-15".' },
 ];
 
 const SPEC_BY_KEY = new Map(FIELD_SPECS.map((s) => [s.key, s]));
@@ -166,7 +179,8 @@ Rules:
 - Do not merge two technicians' names into one field. If a document names more than one, return the one who signed or is listed first as technician and mention the others in notes.
 - A document with more than one dollar figure that are line items, not a total and its components (e.g. several separate service calls listed on one recap sheet), is not this rule's "subtotal vs total" case — return each amount you can attribute to a distinct cost with its own page_no rather than guessing which one is "the" total.
 - work_performed and part_number are repeatable: return one field per distinct item rather than joining them ("replaced capacitor, cleared drain" is two fields, not one). Every other field is single-valued per unit (or per document, for fields that are not unit-scoped) — if the same field appears to have two different values with no unit_index to separate them, return the one you are most confident in and note the conflict.
-- A field's confidence should reflect how legible and unambiguous the specific value was, not the page as a whole — a page that is mostly clean but has one smudged digit in the serial number gets a high-confidence customer_name and a lower-confidence serial_number, not one blended score for both.`;
+- A field's confidence should reflect how legible and unambiguous the specific value was, not the page as a whole — a page that is mostly clean but has one smudged digit in the serial number gets a high-confidence customer_name and a lower-confidence serial_number, not one blended score for both.
+- reminder_text/reminder_customer_name/reminder_trigger are for a genuine forward-looking instruction in an internal memo, dispatch note, or piece of correspondence — e.g. "confirm filter size on next visit" or "check capacitor on next visit". Never invent one from a work order's own work_performed list, an invoice line, or routine service notes describing what was ALREADY done. If nothing in the text reads as an instruction for a FUTURE visit, leave all three out.`;
 }
 
 /* ---------------------------------------------------------------- normalize */
@@ -357,6 +371,27 @@ export function stripControlChars(s) {
 
 const MAX_VALUE_CHARS = 500;
 
+/** reminder_text's own tighter cap (spec: "the actionable instruction, ≤200
+ *  chars") — everything else keeps the general MAX_VALUE_CHARS above. Kept as
+ *  a per-key override map rather than a second kind, since every other
+ *  behavior of a 'text' field (trim, control-char strip) is identical. */
+const FIELD_MAX_CHARS = { reminder_text: 200 };
+
+/**
+ * Pure: reminder_trigger -> 'next_visit' | a real YYYY-MM-DD date | null.
+ * Deliberately narrower than normalizeDate: a bare month/year ("11/2026") is
+ * not a usable trigger for "did this reminder come due yet", so it is
+ * dropped rather than kept as a fact nothing can act on. Exported so the
+ * shape is testable with no database (scripts/verify-review.mjs).
+ */
+export function normalizeReminderTrigger(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+  if (/^next[\s_-]?visit$/i.test(s)) return 'next_visit';
+  const d = normalizeDate(s);
+  return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+}
+
 /**
  * Turn whatever the model returned into rows we are willing to store.
  *
@@ -383,11 +418,15 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
       dropped.push({ key, reason: `non-string value (${typeof rawValue})` });
       continue;
     }
-    let value = stripControlChars(String(rawValue)).trim().slice(0, MAX_VALUE_CHARS);
+    let value = stripControlChars(String(rawValue)).trim().slice(0, FIELD_MAX_CHARS[key] ?? MAX_VALUE_CHARS);
     if (!value) { dropped.push({ key, reason: 'empty' }); continue; }
 
     let dateFlags;
-    if (spec.kind === 'date') {
+    if (spec.kind === 'reminder_trigger') {
+      const t = normalizeReminderTrigger(value);
+      if (!t) { dropped.push({ key, reason: `unparseable reminder_trigger "${value}"` }); continue; }
+      value = t;
+    } else if (spec.kind === 'date') {
       const d = normalizeDate(value);
       if (!d) { dropped.push({ key, reason: `unparseable date "${value}"` }); continue; }
       // A record of something that already happened cannot be dated far in

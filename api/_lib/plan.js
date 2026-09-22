@@ -10,8 +10,9 @@
  * rules this file implements are written out in handoffs/BILLING_RULES.md;
  * keep the two in sync.
  */
-import { withTenant } from './recordsStore.js';
+import { getTenantContext } from './recordsStore.js';
 import { resetsOnLabel } from './usage.js';
+import { TTLCache, memoAsync, logStage, registerTenantCache } from './perf.js';
 
 /** Per-plan caps, written to tenants.limits by billing_apply() on every
  * subscription create/update webhook. Exported so api/_lib/billing.js's
@@ -204,6 +205,86 @@ export function gateAsk(tenantRow, usage, now = new Date()) {
 }
 
 /**
+ * API_PERF_2026-09-22: billing-gate row cache, DELIBERATELY separate from
+ * recordsStore.js's 5-minute getTenantContext cache (getCachedBillingRow
+ * reads THROUGH that cache below, but re-keys its own, shorter-lived entry
+ * on top of it). requireActiveBilling's whole job is noticing a subscription
+ * has gone 'none'/'canceled', so this cache cannot use a 5-minute blind spot
+ * — that would mean a tenant who cancels keeps full access for up to five
+ * more minutes. 2 minutes for every other state (trialing/active/past_due);
+ * 30 seconds once the cached state IS 'none' or 'canceled' — long enough to
+ * spare the database under load, short enough that reactivating a plan (or a
+ * fixed payment method putting it back to 'active') takes effect within half
+ * a minute rather than five.
+ *
+ * Shared by assertActiveBilling (below) and upload-url.js's checkUploadGate —
+ * see each call site — so two gates checking the same tenant in the same
+ * request never run this lookup twice.
+ */
+export const BILLING_ROW_TTL_MS = 2 * 60_000;
+export const BILLING_ROW_BLOCKED_TTL_MS = 30_000;
+const billingRowCache = new TTLCache(BILLING_ROW_TTL_MS, 1000);
+registerTenantCache(billingRowCache);
+
+async function fetchBillingRow(ctx) {
+  const t = await getTenantContext(ctx.tenantKey, ctx.tenantName ?? ctx.tenantKey);
+  return { plan: t.plan, billing_status: t.billingStatus, trial_ends_at: t.trialEndsAt, current_period_end: t.currentPeriodEnd };
+}
+
+/**
+ * Pure: which TTL a just-fetched billing row should be cached under. Split
+ * out from getCachedBillingRow so scripts/verify-perf.mjs can assert the
+ * 'none'/'canceled' -> short-TTL rule directly, with no database and no
+ * cache object involved.
+ * @param {{billing_status?: string|null, trial_ends_at?: *}} row
+ * @param {Date} [now]
+ */
+export function billingCacheTtlFor(row, now = new Date()) {
+  const state = planStateFor(row, now);
+  return state === 'none' || state === 'canceled' ? BILLING_ROW_BLOCKED_TTL_MS : BILLING_ROW_TTL_MS;
+}
+
+/**
+ * @param {{tenantKey: string, tenantName?: string}} ctx
+ * @returns {Promise<{plan?: string|null, billing_status?: string|null, trial_ends_at?: *, current_period_end?: *}>}
+ */
+export async function getCachedBillingRow(ctx) {
+  const tenantKey = ctx?.tenantKey;
+  if (!tenantKey) return {};
+  const start = Date.now();
+  const hit = billingRowCache.get(tenantKey) !== undefined;
+  const row = await memoAsync(billingRowCache, tenantKey, () => fetchBillingRow(ctx), BILLING_ROW_TTL_MS);
+  if (!hit) {
+    // A freshly-fetched BLOCKED state is re-capped to the short TTL right
+    // away, rather than left to expire on the normal 2-minute schedule — see
+    // this cache's own doc comment for why 'none'/'canceled' can't wait that
+    // long.
+    const ttl = billingCacheTtlFor(row);
+    if (ttl === BILLING_ROW_BLOCKED_TTL_MS) billingRowCache.set(tenantKey, row, ttl);
+  }
+  logStage({ t: 'billing_gate_row', ms: Date.now() - start, cacheHit: hit });
+  return row;
+}
+
+/** Test-only: clear the billing row cache between fixtures. */
+export function _resetBillingRowCache() {
+  billingRowCache.map.clear();
+}
+
+/** Test-only: seed a row directly, bypassing getTenantContext/the database —
+ *  scripts/verify-perf.mjs uses this to exercise the cache-bust path without
+ *  a live Postgres connection. */
+export function _seedBillingRowForTest(tenantKey, row, ttlMs = BILLING_ROW_TTL_MS) {
+  billingRowCache.set(tenantKey, row, ttlMs);
+}
+
+/** Test-only: read a tenant's raw cache entry (undefined if absent/expired),
+ *  with no fetch-on-miss — the read side of _seedBillingRowForTest. */
+export function _peekBillingRowForTest(tenantKey) {
+  return billingRowCache.get(tenantKey);
+}
+
+/**
  * DB-touching sibling of requireActiveBilling(), for routes that have no
  * bespoke gate wrapper of their own: read-document.js, extract.js, and
  * review.js's model-calling actions (reclassify). upload-url.js and ask.js
@@ -232,13 +313,14 @@ export function gateAsk(tenantRow, usage, now = new Date()) {
  */
 export async function assertActiveBilling(ctx, now = new Date()) {
   try {
-    return await withTenant({ tenantKey: ctx.tenantKey, tenantName: ctx.tenantName ?? ctx.tenantKey }, async (db) => {
-      const { rows } = await db.raw(
-        `SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1`,
-        [db.tenantId]
-      );
-      return requireActiveBilling(rows[0] ?? {}, now);
-    });
+    // API_PERF_2026-09-22: used to open its OWN withTenant transaction just to
+    // run this one SELECT — a full BEGIN/resolve_tenant/SET LOCAL/COMMIT round
+    // trip for a single read. getCachedBillingRow shares its cache (and TTL
+    // rule — see the cache's own doc comment) with upload-url.js's
+    // checkUploadGate, so two routes gating the same request no longer each
+    // pay for this lookup, and a warm cache hit costs nothing at all.
+    const row = await getCachedBillingRow(ctx);
+    return requireActiveBilling(row, now);
   } catch (err) {
     console.error('billing gate failed CLOSED (assertActiveBilling):', err?.message);
     return { allowed: false, status: 503, error: 'Billing check unavailable, try again' };

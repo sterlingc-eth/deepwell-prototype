@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { withTenant, linkDocumentToCustomer, linkDocumentToEntity, linkedByForMatchBasis } from "./recordsStore.js";
+import {
+  withTenant, linkDocumentToCustomer, linkDocumentToEntity, linkedByForMatchBasis, findCustomerByReminderName,
+} from "./recordsStore.js";
+import { REMINDER_ELIGIBLE_DOCUMENT_TYPES } from "./reminders.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import {
   EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages,
@@ -175,7 +178,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
-  const { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage });
+  let { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage });
 
   // A document that states nothing extractable is a real answer, not a failure.
   // The write still happens, so an empty result replaces stale rows from an
@@ -213,6 +216,15 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const existingIsDecided = classification.source !== 'explicit'
     && doc.document_type && !isLegacyOrUnknownType(doc.document_type);
   const resolvedType = existingIsDecided ? doc.document_type : classification.documentType;
+
+  // CUSTOMER REMINDERS (2026-09-22): reminder_text/reminder_customer_name/
+  // reminder_trigger only mean anything on a memo-like document — see
+  // reminders.js's own doc comment. Filtered by the RESOLVED type, not the
+  // model's raw guess, so a work order the model briefly mis-tagged never
+  // keeps a stale reminder fact once its real type is known.
+  if (!REMINDER_ELIGIBLE_DOCUMENT_TYPES.has(resolvedType)) {
+    fields = fields.filter((f) => !f.field_key.startsWith('reminder_'));
+  }
 
   const isInstallShaped = resolvedType === 'startup-sheet'
     || (resolvedType === 'invoice' && !!facts.installation_date);
@@ -390,6 +402,25 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       });
     }
 
+    // CUSTOMER REMINDERS (2026-09-22): a memo naming nobody in customer_name
+    // at all can still name someone in its reminder text — "Reminder logged
+    // for Karen Abernathy's account". Tried only when the ordinary resolution
+    // above found no customer, and only on reminder-eligible types (the
+    // `fields` filter above already dropped reminder_* facts on any other
+    // type, so `facts.reminder_customer_name` is simply absent there). Same
+    // exact/fuzzy-surname match contactLookup.js uses; never creates a
+    // customer — an unmatched name stays unlinked and surfaces in Needs
+    // linking, where Fix this document offers a one-click create.
+    let documentReminderLinked = false;
+    if (!customer?.id && facts.reminder_customer_name) {
+      const reminderCustomer = await findCustomerByReminderName(db, facts.reminder_customer_name);
+      if (reminderCustomer?.id) {
+        documentReminderLinked = await linkDocumentToCustomer(db, {
+          documentId, customerId: reminderCustomer.id, confidence: 0.6, linkedBy: 'ai:reminder',
+        });
+      }
+    }
+
     // AI self-verification: every required field for this type is present at
     // AI_VERIFY_MIN_CONFIDENCE or better, and the document is actually linked
     // to a record. verifyByAi (recordsStore.js) re-checks the link itself in
@@ -427,6 +458,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         // above being non-null with customer_linked false.
         customer_linked: linked > 0,
         document_customer_linked: documentCustomerLinked,
+        reminder_text: facts.reminder_text ?? null,
+        reminder_customer_linked: documentReminderLinked,
         document_type: resolvedType,
         document_type_confidence: classification.confidence,
         document_type_source: classification.source,

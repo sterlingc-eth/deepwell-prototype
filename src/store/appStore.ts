@@ -17,7 +17,8 @@ export type Screen =
   | 'warranty-export'
   | 'billing'
   | 'team'
-  | 'outreach';
+  | 'outreach'
+  | 'expenses';
 
 /** `?plan=&interval=` deep link, held until Billing opens and preselects it. */
 export interface PendingPlan {
@@ -121,6 +122,16 @@ interface AppState {
   /** Jump straight to Inbox's "Needs a person" tab, optionally pre-selecting
    *  one of its queue filters (e.g. "unlinked", "gaps", "conflicts"). */
   openInboxNeedsPerson: (filter?: PendingReviewFilter) => void;
+
+  // Owner defect report (2026-09-22): a document opened from a customer
+  // profile's "Open in Inbox" link (`?screen=inbox&customer=<id>&doc=<id>`)
+  // used to land on the unscoped "All" filter (239 docs), losing which
+  // customer it came from. This scopes the Inbox's document queue to one
+  // customer's documents until cleared — set by useDeepLink.ts and by
+  // CustomerProfileScreen's own "Open in Inbox" link, read by
+  // ReviewScreen.tsx's queue filter and its "Customer: X ×" chip.
+  inboxCustomerScope: string | null;
+  setInboxCustomerScope: (customerId: string | null) => void;
 
   // `?screen=inbox&work=mine` deep link (a Follow-up message's own link,
   // api/_lib/followups.js's FOLLOWUP_INBOX_LINK) — which "My work / Everyone"
@@ -241,6 +252,16 @@ interface AppState {
   setPendingPlan: (plan: PendingPlan | null) => void;
   clearPendingPlan: () => void;
 
+  // Owners-only expense tracker (handoffs/EXPENSES_2026-09-22.md): whether
+  // the signed-in caller is a DeepWell platform operator, fetched once by
+  // App.tsx (expensesClient.fetchExpensesOperatorStatus) the same way
+  // billingStatus is — never guessed client-side, always the server's own
+  // gate. Drives AppShell's "Expenses" nav item; null means "not checked
+  // yet" (nav item stays hidden, same fail-closed default as isAdmin's own
+  // absence).
+  isPlatformOperator: boolean;
+  setIsPlatformOperator: (value: boolean) => void;
+
   // HARD GATE (2026-09-21): true while App.tsx is polling for the webhook
   // to land after a Stripe Checkout redirect (?billing=success) — drives
   // BillingScreen's "Confirming your subscription…" state. See App.tsx's
@@ -273,6 +294,9 @@ export const useAppStore = create<AppState>((set) => ({
   pendingReviewFilter: null,
   clearPendingReviewFilter: () => set({ pendingReviewFilter: null }),
   openInboxNeedsPerson: (filter) => set({ currentScreen: 'ingest', inboxTab: 'needs-person', pendingReviewFilter: filter ?? null }),
+
+  inboxCustomerScope: null,
+  setInboxCustomerScope: (customerId) => set({ inboxCustomerScope: customerId }),
 
   pendingWorkFilter: null,
   setPendingWorkFilter: (choice) => set({ pendingWorkFilter: choice }),
@@ -377,6 +401,9 @@ export const useAppStore = create<AppState>((set) => ({
   pendingPlan: null,
   setPendingPlan: (plan) => set({ pendingPlan: plan }),
   clearPendingPlan: () => set({ pendingPlan: null }),
+
+  isPlatformOperator: false,
+  setIsPlatformOperator: (value) => set({ isPlatformOperator: value }),
 
   billingConfirming: false,
   setBillingConfirming: (confirming) => set({ billingConfirming: confirming }),

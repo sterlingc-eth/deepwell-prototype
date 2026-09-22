@@ -88,6 +88,12 @@ export interface ReclassifyChange {
   to: string;
 }
 
+/** One document extractReminders (below) actually found a reminder on. */
+export interface ReminderExtractChange {
+  documentId: string;
+  reminderText: string;
+}
+
 export interface ReviewEntity {
   id: string;
   entity_type: string;
@@ -141,9 +147,19 @@ export interface IntegritySplitLinkDocument { documentId: string; directCustomer
  *  name alone, whose surname now matches 2+ non-merged customers — needs a
  *  person, never auto-fixed. */
 export interface IntegrityAmbiguousNameOnlyLink { documentId: string; customerId: string; candidates: string[] }
+/** Owner defect report (2026-09-22): a same-normalized-address, different-
+ *  name pair (api/_lib/routes/customers.js's planPossibleDuplicates) — never
+ *  proposed for auto-merge, so it carries no `tier`/`score` the way
+ *  IntegrityDuplicateCustomer does. `reason` is 'same address, different
+ *  name' or 'likely typo' (a Damerau <=1 surname match, e.g. Sorensen/
+ *  Sorenson). `keepId`/`dropId` are only the default suggestion for the
+ *  Merge action's fuller-name pick — either side can still be merged into
+ *  the other. */
+export interface IntegrityPossibleDuplicate { aId: string; bId: string; keepId: string; dropId: string; reason: 'same address, different name' | 'likely typo' }
 
 export interface IntegrityScanResult {
   duplicateCustomers: IntegrityDuplicateCustomer[];
+  possibleDuplicates: IntegrityPossibleDuplicate[];
   unlinkedDocuments: IntegrityUnlinkedDocument[];
   equipmentWithoutCustomer: IntegrityEquipmentWithoutCustomer[];
   multiUnitDocsUnderLinked: IntegrityMultiUnitUnderLinked[];
@@ -155,6 +171,7 @@ export interface IntegrityScanResult {
   ambiguousNameOnlyLinks: IntegrityAmbiguousNameOnlyLink[];
   counts: {
     duplicateCustomers: number;
+    possibleDuplicates: number;
     unlinkedDocuments: number;
     equipmentWithoutCustomer: number;
     multiUnitDocsUnderLinked: number;
@@ -470,6 +487,18 @@ export const reviewClient = {
   reclassify(documentIds: string[]) {
     if (!documentIds.length) return Promise.resolve<{ changes: ReclassifyChange[]; remaining: number }>({ changes: [], remaining: 0 });
     return postJson<{ changes: ReclassifyChange[]; remaining: number }>({ action: 'reclassify', documentIds });
+  },
+
+  /** Backfill for documents extracted before the CUSTOMER REMINDERS build
+   *  (2026-09-22): one Haiku call per eligible document (≤20 per batch,
+   *  billing-gated server-side), reading reminder_text/reminder_customer_name/
+   *  reminder_trigger off its already-read page text with no re-extraction of
+   *  anything else. `remaining` is how many of these ids still need another
+   *  pass, same "loop, resubmitting only what's left, until it hits 0"
+   *  contract as reclassify above. */
+  extractReminders(documentIds: string[]) {
+    if (!documentIds.length) return Promise.resolve<{ changes: ReminderExtractChange[]; remaining: number }>({ changes: [], remaining: 0 });
+    return postJson<{ changes: ReminderExtractChange[]; remaining: number }>({ action: 'extractReminders', documentIds });
   },
 
   /** "Check records" — duplicate customers, unlinked documents, equipment

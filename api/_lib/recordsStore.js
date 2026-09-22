@@ -26,6 +26,7 @@ import {
   normalizePhoneKey, normalizeEmailKey, compareNamesStrict, chooseUpgradedCustomerName,
   extractNameMention, matchNameMention,
 } from './integrity.js';
+import { TTLCache, memoAsync, logStage, registerTenantCache, bustTenantCaches } from './perf.js';
 
 let pool;
 
@@ -51,24 +52,207 @@ let pool;
  * of those old call sites able to check out a connection without waiting on
  * each other. Still well under Neon's pooler limits for a single instance.
  */
+/**
+ * API_PERF_2026-09-22: warn ONCE per warm instance if NEON_CONNECTION_STRING
+ * doesn't look like Neon's pooled (PgBouncer, "-pooler") endpoint. Reads only
+ * whether the env var's hostname CONTAINS "-pooler" — never logs the value
+ * itself (host, credentials, or otherwise). A direct (non-pooled) endpoint
+ * caps out around 100 concurrent Postgres connections per Neon's own docs;
+ * the pooled endpoint multiplexes thousands, which matters far more under
+ * Fluid compute (many concurrent invocations per warm instance, each wanting
+ * a connection from this one pool) than the pool's own `max` does. This is a
+ * warning, not an enforcement — a self-hosted/non-Neon Postgres URL would
+ * never match "-pooler" and should not be treated as misconfigured.
+ */
+function warnIfNotPooledHost(connectionString) {
+  try {
+    const host = new URL(connectionString).hostname;
+    if (host && !host.includes('-pooler')) {
+      console.warn(
+        'recordsStore: NEON_CONNECTION_STRING does not look like Neon\'s pooled endpoint ' +
+        '(hostname has no "-pooler" segment). See handoffs/API_PERF_2026-09-22.md — pasting ' +
+        "Neon's pooled connection string (same dashboard page as the direct one) usually cuts " +
+        'connection setup latency under serverless load. Not logged: the value itself.'
+      );
+    }
+  } catch {
+    /* not a parseable URL (e.g. a non-standard DSN) — nothing to warn about */
+  }
+}
+
 export function getPool() {
   if (!pool) {
     const connectionString = process.env.NEON_CONNECTION_STRING;
     if (!connectionString) throw new Error('NEON_CONNECTION_STRING is not set');
+    warnIfNotPooledHost(connectionString);
     pool = new pg.Pool({
       connectionString,
-      // 10 (was 5) — Fluid compute funnels many concurrent requests through
-      // one instance; 5 exhausted under a single user's UI polling + one Ask
-      // (2026-09-20: "timeout exceeded when trying to connect"). Neon's
-      // pooled endpoint (-pooler host) multiplexes thousands of clients, and
-      // even the direct endpoint at 0.25 CU allows ~100. Override with
-      // PG_POOL_MAX if a bigger instance needs it.
-      max: Number(process.env.PG_POOL_MAX) || 10,
+      // 3 (Reviewer NO-GO, 2026-09-22 — was 10, and 5 before that). CAUTION,
+      // read before changing again: this was raised to 10 on 2026-09-20
+      // after 5 was exhausted under one user's UI polling + one Ask under
+      // Fluid compute, which funnels MANY concurrent requests through a
+      // single warm instance — that incident is real and this file's history
+      // says so. Lowered back down now on the reasoning that this same
+      // 2026-09-22 change cut the sequential-query count (and therefore the
+      // time each request holds a connection) on every endpoint it touched —
+      // see handoffs/API_PERF_2026-09-22.md — so 3 concurrent connections go
+      // further than they used to. If "timeout exceeded when trying to
+      // connect" reappears in Vercel logs, that reasoning was wrong for this
+      // traffic pattern; raise PG_POOL_MAX (env override, no code change)
+      // before assuming anything else is broken.
+      max: Number(process.env.PG_POOL_MAX) || 3,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 8_000,
+      // API_PERF_2026-09-22: reuse TCP connections across requests on a warm
+      // instance instead of renegotiating (and re-TLS-handshaking) one per
+      // checkout. Cheap and safe — pg/node's default is `false`.
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 5_000,
     });
   }
   return pool;
+}
+
+/**
+ * API_PERF_2026-09-22: tenant identity + billing/plan lookup, cached per
+ * warm instance so the request path that used to run resolve_tenant() (in
+ * withTenant, below) AND get_tenant_limits() (rateLimit.js) AND a raw
+ * `tenants` row SELECT (plan.js, upload-url.js) as three-plus separate
+ * round trips now runs at most one query, and typically zero once warm.
+ *
+ * 5-minute TTL: a tenant's uuid never changes once minted, so that part is
+ * safe to cache indefinitely, but this same entry also carries plan/limits,
+ * which DO change (a Stripe webhook can flip them at any moment) — 5 minutes
+ * bounds that staleness for plan/limits. Billing-STATUS-driven gating
+ * ('none'/'canceled' must flip fast) is deliberately NOT read from this
+ * cache — see plan.js's own, shorter-TTL cache for that decision.
+ *
+ * Falls back to the pre-existing three-query path (resolve_tenant, then a
+ * plain SELECT, then get_tenant_limits) when M3-config/27-request-context.sql
+ * has not been pasted yet (function undefined, Postgres error 42883) — same
+ * "degrade, don't break" contract as documentsHaveUpdatedAt/
+ * extractionsHaveUnitIndex above.
+ */
+export const TENANT_CONTEXT_TTL_MS = 5 * 60_000;
+const tenantContextCache = new TTLCache(TENANT_CONTEXT_TTL_MS, 1000);
+registerTenantCache(tenantContextCache);
+
+/**
+ * uuid -> tenantKey, populated every time fetchRequestContextRow resolves a
+ * tenant (below). Exists ONLY so bustTenantCache() can translate the uuid a
+ * Stripe webhook has (billing_tenant_by_customer() returns a uuid, never a
+ * tenantKey) into the string every per-tenant cache is actually keyed by. Same
+ * TTL/bound as tenantContextCache itself — a mapping this instance never
+ * learned, or has forgotten, simply means there is nothing on this instance
+ * to bust, which is a correct no-op (see bustTenantCache's own comment).
+ */
+const uuidToTenantKey = new TTLCache(TENANT_CONTEXT_TTL_MS, 1000);
+
+/** Pure: is this the Postgres "undefined_function" error — i.e. is
+ *  M3-config/27-request-context.sql simply not pasted into this database yet,
+ *  as opposed to a real failure get_request_context() should surface? Split
+ *  out so scripts/verify-perf.mjs can assert the exact fallback condition
+ *  with a fabricated error object, no database required. */
+export function isUndefinedFunctionError(err) {
+  return err?.code === '42883';
+}
+
+/** null = not yet probed; true/false once known. Same memoization pattern as documentsHaveUpdatedAt. */
+let requestContextFnExists = null;
+
+async function fetchRequestContextRow(tenantKey, tenantName) {
+  if (requestContextFnExists !== false) {
+    try {
+      const { rows } = await getPool().query('SELECT * FROM get_request_context($1, $2)', [tenantKey, tenantName]);
+      requestContextFnExists = true;
+      const row = rows[0];
+      return {
+        id: row.tenant_id,
+        plan: row.plan ?? null,
+        billingStatus: row.billing_status ?? null,
+        trialEndsAt: row.trial_ends_at ?? null,
+        currentPeriodEnd: row.current_period_end ?? null,
+        limits: row.limits ?? {},
+      };
+    } catch (err) {
+      if (isUndefinedFunctionError(err)) {
+        // undefined_function — migration 27 not pasted yet. Fall through to
+        // the old multi-query path below, and stop trying the fast path
+        // until the next cold start (re-probing every call would cost a
+        // failed round trip every time, forever, on a database that never
+        // gets the migration).
+        requestContextFnExists = false;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // Fallback: the exact three calls this replaces, run in sequence.
+  const { rows: idRows } = await getPool().query('SELECT resolve_tenant($1, $2) AS id', [tenantKey, tenantName]);
+  const id = idRows[0].id;
+  const [{ rows: tRows }, { rows: lRows }] = await Promise.all([
+    getPool().query('SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1', [id]),
+    getPool().query('SELECT get_tenant_limits($1) AS limits', [id]),
+  ]);
+  const t = tRows[0] ?? {};
+  return {
+    id,
+    plan: t.plan ?? null,
+    billingStatus: t.billing_status ?? null,
+    trialEndsAt: t.trial_ends_at ?? null,
+    currentPeriodEnd: t.current_period_end ?? null,
+    limits: lRows[0]?.limits ?? {},
+  };
+}
+
+/**
+ * Cached tenant context for a request. Exported for rateLimit.js and
+ * plan.js, so all three files share ONE cache entry (and one cache miss
+ * query) per tenant instead of three separate caches disagreeing about
+ * freshness.
+ * @param {string} tenantKey
+ * @param {string} [tenantName]
+ * @returns {Promise<{id: string, plan: string|null, billingStatus: string|null, trialEndsAt: *, currentPeriodEnd: *, limits: object}>}
+ */
+export async function getTenantContext(tenantKey, tenantName) {
+  const start = Date.now();
+  const cacheKeyBefore = tenantContextCache.get(tenantKey) !== undefined;
+  const result = await memoAsync(
+    tenantContextCache,
+    tenantKey,
+    () => fetchRequestContextRow(tenantKey, tenantName ?? tenantKey),
+    TENANT_CONTEXT_TTL_MS
+  );
+  // Learn the uuid<->tenantKey mapping every time — see uuidToTenantKey's own
+  // comment above — so a later bustTenantCache(uuid) on this instance can
+  // find the tenantKey every OTHER cache is actually keyed by.
+  if (result?.id) uuidToTenantKey.set(result.id, tenantKey);
+  logStage({ t: 'tenant_context', ms: Date.now() - start, cacheHit: cacheKeyBefore });
+  return result;
+}
+
+/**
+ * Clear one tenant's entry out of EVERY registered per-tenant cache
+ * (tenantContextCache here, plan.js's billingRowCache, and any future one)
+ * on THIS warm instance. Call this the moment a tenant's billing/plan state
+ * changes server-side — today, api/billing.js's webhook handler, right after
+ * `billing_apply()` commits. See perf.js's bustTenantCaches for the
+ * same-instance-only scope and why that's still correct.
+ * @param {string|null|undefined} tenantKeyOrUuid  either the tenantKey
+ *   (Clerk org id / `user_<id>`) or the tenant's uuid — whichever the caller
+ *   has on hand. A webhook only ever has the uuid; everything else in this
+ *   codebase has the tenantKey.
+ */
+export function bustTenantCache(tenantKeyOrUuid) {
+  bustTenantCaches(tenantKeyOrUuid, uuidToTenantKey);
+}
+
+/** Test-only: clear the tenant context cache between fixtures. */
+export function _resetTenantContextCache() {
+  tenantContextCache.map.clear();
+  uuidToTenantKey.map.clear();
+  requestContextFnExists = null;
 }
 
 const TENANT = 'tenant_id = (current_setting(\'app.tenant_id\', true))::uuid';
@@ -334,6 +518,62 @@ export async function linkDocumentToEntity(db, { documentId, entityId, confidenc
   return r.rowCount > 0;
 }
 
+/**
+ * CUSTOMER REMINDERS (2026-09-22): every existing customer whose name
+ * plausibly matches `name` — exact/subset first (matchNameMention, the same
+ * strict bar findOrCreateCustomer's own bare-mention path uses), else same
+ * surname (exact, or one edit apart — compareNamesStrict's own
+ * 'surname'/'surname-fuzzy' categories, the same ones selectCustomerMatch
+ * above already treats as a real candidate elsewhere in this file). Pure DB
+ * read: never creates or links anything, so a caller can safely use "zero",
+ * "one", or "many" candidates for whatever its own purpose needs (auto-link
+ * on exactly one, offer a pick on many, offer "create new" on zero). Capped
+ * at 200 same-surname rows, same ceiling findOrCreateCustomer's own
+ * surname-ILIKE scan uses.
+ */
+export async function findCustomerNameCandidates(db, name) {
+  const normalized = normalizeMatchText(name);
+  if (!normalized) return [];
+  const surname = normalizeSurname(normalized).replace(/[%_]/g, '\\$&');
+  if (!surname) return [];
+
+  const { rows } = await db.raw(
+    `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address, customer_number
+       FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+        AND lower(data->>'customer_name') LIKE '%' || $1 || '%' ESCAPE '\\'
+      ORDER BY created_at LIMIT 200`,
+    [surname]
+  );
+  if (!rows.length) return [];
+
+  // 'equal'/'subset' first (a real name match — "Karen Abernathy" against
+  // itself, or against a surname-only search); if that's ambiguous (2+ rows
+  // legitimately satisfy it — e.g. a bare surname search against BOTH "Karen
+  // Abernathy" and "John Abernathy", each a 'subset' match on their own),
+  // return all of them rather than silently narrowing to one. Only when
+  // NOTHING matches at that strict bar does the looser same-surname fallback
+  // ('surname'/'surname-fuzzy') get a look.
+  const relation = (r) => compareNamesStrict(normalized, r.customer_name);
+  const strong = rows.filter((r) => { const rel = relation(r); return rel === 'equal' || rel === 'subset'; });
+  if (strong.length) return strong;
+
+  return rows.filter((r) => { const rel = relation(r); return rel === 'surname' || rel === 'surname-fuzzy'; });
+}
+
+/**
+ * Resolve a customer named only in a document's reminder text — see
+ * extractFields.js's reminder_customer_name and extractDocument.js's own
+ * caller. Same "don't know, don't guess" rule as findOrCreateCustomer: 0 or
+ * 2+ candidates both return null rather than picking one. Never creates a
+ * customer — an unmatched name stays unlinked; reviewStore.js's
+ * createCustomerAndAttachReminder is the human's one-click fix for that case.
+ */
+export async function findCustomerByReminderName(db, name) {
+  const candidates = await findCustomerNameCandidates(db, name);
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
 /** Words too common to identify a page on their own; skipped by the plain-text fallback in searchPassages. */
 const STOPWORDS = new Set(['what','when','where','which','whose','does','did','the','this','that','these','those','with','from','have','has','had','was','were','will','still','under','about','there','their','them','they','into','onto','over','last','next','much','many','more','most','some','any','how','why','who','and','for','are','not','but','can','could','should','would','been','being','than','then','also','just','ever','every','each','tell','show','find','give','need','want','know','like','make','made','get','got','all','one','two','our','your','you','we','us','it','its','is','an','on','at','to','of','in','by','or','if','so','do','a','i','me','my','be','as','up','no','yes','year','years','month','months','week','weeks','day','days','ago','summer','winter','spring','fall','back','call','called','called','unit','units','system','job','work']);
 
@@ -343,14 +583,20 @@ const STOPWORDS = new Set(['what','when','where','which','whose','does','did','t
  * @param {(store: ReturnType<typeof makeStore>) => Promise<any>} fn
  */
 export async function withTenant(ctx, fn) {
+  // API_PERF_2026-09-22: resolve the tenant id from the shared, cached
+  // context (see getTenantContext above) instead of always running
+  // resolve_tenant() as this transaction's first statement. Cache hit ->
+  // this connection's very first query is the caller's own work, not a
+  // lookup. A cache MISS still calls resolve_tenant() (via
+  // fetchRequestContextRow), just on a separate connection borrowed briefly
+  // from the same pool — resolve_tenant() is SECURITY DEFINER and
+  // idempotent (it upserts), so running it outside this transaction changes
+  // nothing about its result or its one-row-per-org guarantee.
+  const tenantId = (await getTenantContext(ctx.tenantKey, ctx.tenantName)).id;
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
-    const { rows } = await client.query('SELECT resolve_tenant($1, $2) AS id', [
-      ctx.tenantKey,
-      ctx.tenantName ?? ctx.tenantKey,
-    ]);
-    const tenantId = rows[0].id;
     // `true` = SET LOCAL: reverts on COMMIT/ROLLBACK, never outlives the request.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
 
@@ -2120,7 +2366,11 @@ function makeStore(db, tenantId) {
                 COALESCE(ea.n, 0)::int         AS equipment_count,
                 GREATEST(da.last_doc, sa.last_service::timestamptz, ea.last_equip_update) AS last_activity,
                 COALESCE(
-                  (SELECT jsonb_agg(eq.warranty) FROM equip eq WHERE eq.customer_id = c.id AND eq.warranty IS NOT NULL),
+                  -- 'id' merged onto each warranty object (owner defect
+                  -- report 2026-09-22, item 2a) so a dismissal can be keyed
+                  -- per unit, not just per tier — see routes/customers.js's
+                  -- tallyWarrantyAlerts/dismissedAlertKey.
+                  (SELECT jsonb_agg(jsonb_build_object('id', eq.id) || eq.warranty) FROM equip eq WHERE eq.customer_id = c.id AND eq.warranty IS NOT NULL),
                   '[]'::jsonb
                 ) AS warranties
            FROM c

@@ -79,11 +79,14 @@
  *                       already-canonical value.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, documentsHaveUpdatedAt, linkedByForMatchBasis } from './recordsStore.js';
+import {
+  getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, documentsHaveUpdatedAt, linkedByForMatchBasis,
+  findCustomerNameCandidates,
+} from './recordsStore.js';
 import { getApiKey, withBackoff } from './claude.js';
 import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
-import { coalesceEntityData, normalizePhoneKey, normalizeEmailKey } from './integrity.js';
+import { coalesceEntityData, normalizePhoneKey, normalizeEmailKey, normalizeAddressKey, possibleDuplicatePairKey } from './integrity.js';
 import {
   normalizeDocumentType,
   inferDocumentType,
@@ -96,15 +99,23 @@ import {
   DOCUMENT_TYPE_DEFINITIONS,
   DOCUMENT_TYPE_IDS,
 } from './documentTypes.js';
+import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
+import { normalizeReminderTrigger } from './extractFields.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
-/** Thrown for both bad input (400) and a refused state transition (409). */
+/** Thrown for both bad input (400) and a refused state transition (409).
+ *  `details` (optional): structured data a caller can act on beyond the
+ *  message string — e.g. createCustomer's address-duplicate refusal carries
+ *  the existing customer's id/name so the client can offer "Open it" without
+ *  a second round trip. api/review.js spreads it into the JSON error body
+ *  when present. */
 export class ReviewError extends Error {
-  constructor(message, status = 400) {
+  constructor(message, status = 400, details = null) {
     super(message);
     this.name = 'ReviewError';
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -951,13 +962,64 @@ export function chooseSurvivorNumber(keepNumber, dropNumber) {
     : { survivorNumber: keepNumber, retiredNumber: dropNumber };
 }
 
-/** `createCustomer {name, serviceAddress?, phone?, email?, notes?}` — a
- *  human creating a customer record directly, distinct from
- *  findOrCreateCustomer's document-driven inference (recordsStore.js): here
- *  the human IS the source of truth, so there is no name/address matching to
- *  do, only a fresh row and a fresh number. */
-export async function createCustomer(ctx, { name, serviceAddress, phone, email, notes } = {}, actorClerkId) {
+/**
+ * `createCustomer {name, serviceAddress?, phone?, email?, notes?,
+ * confirmDuplicate?}` — a human creating a customer record directly, distinct
+ * from findOrCreateCustomer's document-driven inference (recordsStore.js):
+ * here the human IS the source of truth, so there is no name/address
+ * matching to do, only a fresh row and a fresh number.
+ *
+ * Owner defect report (2026-09-22): the manual "Add customer" form used to
+ * create a second record outright when an address already had one on file
+ * (this is exactly how "Sorensen" ended up alongside "Donna Thornton" at 174
+ * N College Ave) — no different-name-same-address duplicates were CAUSED by
+ * this path alone, but nothing stopped it from causing more. When
+ * `serviceAddress` is given and matches an EXISTING non-merged customer's
+ * address (normalizeAddressKey — same identity rule the integrity scan
+ * uses), this refuses with a 409 and `details: {existingCustomerId,
+ * existingCustomerName}` so the client can offer "Open it" / "Add anyway"
+ * (the CustomersScreen create form's job, not this function's). Passing
+ * `confirmDuplicate: true` is exactly "Add anyway" — creates the record
+ * regardless, same as if no address had matched at all. A customer with NO
+ * address given never has anything to check against.
+ */
+/** Pure: which (if any) of `rows` ([{id, customer_number, name, address}])
+ *  already sits at `addrKey` (a normalizeAddressKey() result) — the exact
+ *  search createCustomer's address-conflict check runs, split out so it's
+ *  checkable against a plain array, no database. Exported for
+ *  scripts/verify-review.mjs. */
+export function findExistingByAddress(rows, addrKey) {
+  if (!addrKey) return null;
+  return (rows ?? []).find((r) => normalizeAddressKey(r.address) === addrKey) ?? null;
+}
+
+export async function createCustomer(ctx, { name, serviceAddress, phone, email, notes, confirmDuplicate } = {}, actorClerkId) {
   assertNonEmptyString('name', name);
+
+  const trimmedAddress = isNonEmptyString(serviceAddress) ? serviceAddress.trim() : '';
+  if (trimmedAddress && !confirmDuplicate) {
+    const addrKey = normalizeAddressKey(trimmedAddress);
+    if (addrKey) {
+      const existing = await withRecordsTenant(ctx, async (db) => {
+        const rows = await db.raw(
+          `SELECT id, customer_number, data->>'customer_name' AS name, data->>'service_address' AS address
+             FROM entities
+            WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+              AND data->>'service_address' IS NOT NULL AND data->>'service_address' <> ''
+            LIMIT 2000`,
+          []
+        );
+        return findExistingByAddress(rows.rows, addrKey);
+      });
+      if (existing) {
+        throw new ReviewError(
+          `A customer already exists at this address: ${existing.name || existing.customer_number || 'Unnamed'}`,
+          409,
+          { existingCustomerId: existing.id, existingCustomerName: existing.name ?? null, existingCustomerNumber: existing.customer_number ?? null }
+        );
+      }
+    }
+  }
 
   return withTenant(ctx, async (client, tenantId) => {
     const data = { customer_name: name.trim() };
@@ -1173,6 +1235,87 @@ export async function mergeCustomers(ctx, { keepId, dropId }, actorClerkId) {
   return { ...merged, keep: kept };
 }
 
+/**
+ * `keepCustomersSeparate {aId, bId}` — the flip side of mergeCustomers for a
+ * possible-duplicate pair (routes/customers.js's planPossibleDuplicates): a
+ * person looked at "Donna Thornton" / "Sorensen" sharing an address and
+ * confirmed they are genuinely two different customers. Writes a durable
+ * audit_log row (no DDL — same everything-lives-in-existing-tables pattern as
+ * reminders.js) keyed by the pair's order-independent
+ * possibleDuplicatePairKey, so planPossibleDuplicates (and the customer
+ * profile's own duplicate list) can exclude it forever without a schema
+ * change. Any signed-in tenant member may decide this — unlike a merge, it
+ * is not destructive and has nothing to undo, so it gets no admin gate.
+ */
+export async function keepCustomersSeparate(ctx, { aId, bId } = {}, actorClerkId) {
+  assertUuid('aId', aId);
+  assertUuid('bId', bId);
+  if (aId === bId) throw new ReviewError('aId and bId must differ');
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const rows = (await client.query(
+      `SELECT id FROM entities WHERE id = ANY($1::uuid[]) AND entity_type = 'customer' AND ${TENANT}`,
+      [[aId, bId]]
+    )).rows;
+    if (rows.length < 2) throw new ReviewError('Both customers must exist in this tenant', 404);
+
+    const pairKey = possibleDuplicatePairKey(aId, bId);
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'customers.keep_separate',
+      resourceType: 'entity',
+      resourceId: aId,
+      changes: { pairKey, aId, bId },
+    });
+    return { ok: true, pairKey };
+  });
+}
+
+/** The alert tiers a dismissal can ever be recorded against — the same set
+ *  api/_lib/warrantyRules.js's `alertTier` can bucket a unit into. Kept as a
+ *  plain array (not imported from warrantyRules.js) so this file's only
+ *  coupling to that module stays "the string happens to match", the same
+ *  arm's-length relationship reviewStore.js already keeps with every other
+ *  pure-rules file it writes audit_log rows about. */
+const DISMISSIBLE_ALERT_TIERS = new Set([
+  'expired', 'expiring-30', 'expiring-90', 'expiring-365', 'unregistered-window-closing',
+]);
+
+/**
+ * `dismissAlert {equipmentId, tier, dismissed}` (owner defect report
+ * 2026-09-22, item 2a): Dismiss (dismissed: true, the default) or Undo
+ * (dismissed: false) one unit's alert at one tier. An ordinary audit_log row
+ * (action 'alert.dismissed', resource_type 'equipment') — routes/
+ * customers.js's resolveDismissedAlertKeys takes the LATEST row per
+ * {equipmentId, tier} as the current state, so Undo never has to delete
+ * anything and a NEW tier (expiring-90 -> expired) always re-alerts, since
+ * it is a different key. No admin gate: dismissing an alert is reversible
+ * and affects nobody's data, only what this tenant's alert lists show.
+ */
+export async function dismissAlert(ctx, { equipmentId, tier, dismissed = true } = {}, actorClerkId) {
+  assertUuid('equipmentId', equipmentId);
+  if (!DISMISSIBLE_ALERT_TIERS.has(tier)) {
+    throw new ReviewError(`tier must be one of: ${[...DISMISSIBLE_ALERT_TIERS].join(', ')}`);
+  }
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const rows = (await client.query(
+      `SELECT id FROM entities WHERE id = $1 AND entity_type = 'equipment' AND ${TENANT}`,
+      [equipmentId]
+    )).rows;
+    if (rows.length < 1) throw new ReviewError('Equipment not found', 404);
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'alert.dismissed',
+      resourceType: 'equipment',
+      resourceId: equipmentId,
+      changes: { tier, dismissed: !!dismissed },
+    });
+    return { ok: true };
+  });
+}
+
 /** Every corrected field for a set of documents, in one query. Only rows with
  *  a correction on file — a document with none costs one empty array entry
  *  in the caller's map, not a row here. */
@@ -1190,4 +1333,290 @@ export async function listCorrections(ctx, { documentIds }) {
     )).rows;
     return { corrections: rows };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Customer reminders (build 2026-09-22). State lives entirely in existing
+// tables — see reminders.js's own module comment — so nothing here is a new
+// state machine, just three thin actions over it: list the open ones, mark
+// one done, and the "Fix this document" one-click that creates (or reuses) a
+// customer for a reminder that named someone extraction never linked.
+// ---------------------------------------------------------------------------
+
+/** `remindersList {customerId?, limit?}` — every open reminder on file,
+ *  optionally scoped to one customer. Tenant-scoped; any member may read it
+ *  (same as listLinks/listCorrections above — no admin gate). */
+export async function remindersList(ctx, { customerId, limit } = {}) {
+  if (customerId != null) assertUuid('customerId', customerId);
+  return withTenant(ctx, async (client) => {
+    const reminders = await listOpenReminders({ raw: (sql, params) => client.query(sql, params) }, { customerId, limit });
+    return { reminders };
+  });
+}
+
+/** `reminderDone {documentId}` — marks a reminder resolved by writing an
+ *  audit_log row (action 'reminder.done'); reminders.js's
+ *  resolveOpenReminders reads it back out. Any member may do this. */
+export async function reminderDone(ctx, { documentId } = {}, actorClerkId) {
+  assertUuid('documentId', documentId);
+  return withTenant(ctx, async (client, tenantId) => {
+    const doc = (await client.query(`SELECT id FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
+    if (!doc) throw new ReviewError('Document not found', 404);
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'reminder.done',
+      resourceType: 'document',
+      resourceId: documentId,
+      changes: {},
+    });
+    return { ok: true, documentId };
+  });
+}
+
+/**
+ * `createCustomerAndAttachReminder {documentId, name}` — the "Fix this
+ * document" one-click for a reminder that named a customer extraction could
+ * not find (see extractDocument.js's own reminder-linking step). Reuses
+ * findCustomerNameCandidates (recordsStore.js — the same exact/fuzzy-surname
+ * match findOrCreateCustomer and contactLookup.js both use) so this can never
+ * create a duplicate of a customer that already exists:
+ *   - exactly one candidate  -> attach to it (no new row)
+ *   - 2+ candidates          -> refuse to guess; return them for the person
+ *                               to pick (the client then calls
+ *                               assignDocumentCustomer with the chosen id)
+ *   - zero candidates        -> create a fresh customer, then attach
+ */
+export async function createCustomerAndAttachReminder(ctx, { documentId, name } = {}, actorClerkId) {
+  assertUuid('documentId', documentId);
+  assertNonEmptyString('name', name);
+  const trimmedName = name.trim();
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const doc = (await client.query(`SELECT id FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
+    if (!doc) throw new ReviewError('Document not found', 404);
+
+    const raw = (sql, params) => client.query(sql, params);
+    const candidates = await findCustomerNameCandidates({ raw }, trimmedName);
+    if (candidates.length > 1) {
+      return {
+        usedExisting: false,
+        ambiguous: true,
+        candidates: candidates.map((c) => ({ id: c.id, name: c.customer_name, address: c.service_address })),
+      };
+    }
+
+    let customerRow = candidates[0] ?? null;
+    const usedExisting = !!customerRow;
+    if (!customerRow) {
+      const numRow = await client.query('SELECT next_customer_number($1) AS num', [tenantId]);
+      const created = await client.query(
+        `INSERT INTO entities (tenant_id, entity_type, data, customer_number, created_at, updated_at)
+         VALUES ($1,'customer',$2,$3,NOW(),NOW()) RETURNING *`,
+        [tenantId, { customer_name: trimmedName }, numRow.rows[0]?.num ?? null]
+      );
+      customerRow = created.rows[0];
+      await logAction(client, tenantId, {
+        clerkUserId: actorClerkId,
+        action: 'review.customer_created',
+        resourceType: 'entity',
+        resourceId: customerRow.id,
+        changes: { name: trimmedName, customerNumber: customerRow.customer_number, source: 'reminder' },
+      });
+    }
+
+    await client.query(
+      `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
+       VALUES ($1,$2,$3,1.0,'ai:reminder',NOW())
+       ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
+      [tenantId, documentId, customerRow.id]
+    );
+    await client.query(
+      `UPDATE documents SET stage = 'linked' WHERE id = $1 AND ${TENANT} AND stage IN ('received','read','mapped')`,
+      [documentId]
+    );
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'review.document_customer_assigned',
+      resourceType: 'document',
+      resourceId: documentId,
+      changes: { customerId: customerRow.id, usedExisting, source: 'reminder' },
+    });
+
+    const documentRow = (await client.query(`SELECT * FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
+    return { usedExisting, ambiguous: false, customer: customerRow, document: documentRow };
+  });
+}
+
+const REMINDER_EXTRACT_MODEL = process.env.EXTRACT_MODEL || 'claude-haiku-4-5';
+const MAX_REMINDER_MODEL_CALLS = 20;
+const REMINDER_SOURCE_TEXT_CHARS = 4000;
+
+const REMINDER_TOOL = {
+  name: 'extract_reminder',
+  description: 'Pull one actionable reminder for a customer\'s next visit out of this HVAC shop document, if it states one.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reminder_text: { type: 'string', description: 'The actionable instruction, in the words of the document, 200 characters or fewer. Omit entirely if the document states no forward-looking reminder.' },
+      reminder_customer_name: { type: 'string', description: 'The customer the reminder is about, if the document names one. Omit if reminder_text is omitted, or names no customer.' },
+      reminder_trigger: { type: 'string', description: '"next_visit" if the reminder should happen on the customer\'s next visit, or a specific date as YYYY-MM-DD. Omit if reminder_text is omitted.' },
+    },
+  },
+};
+
+const REMINDER_SYSTEM_PROMPT = `Some HVAC shop documents (internal memos, dispatch notes, correspondence) carry a reminder for whoever visits a customer next — e.g. "Reminder logged for Karen Abernathy's account: confirm filter size on next visit." Read the text and report one with the extract_reminder tool, if there is one. Never invent one from a routine work-performed line describing what was already done. If the document states no forward-looking reminder, call the tool with no fields set.`;
+
+/** One cheap Haiku call, same bounded-timeout/never-throws contract as
+ *  reclassifyDocuments' own classifyByModel. Returns the tool's raw input
+ *  object (still needs extractFields.js's normalizers applied), or null. */
+async function extractReminderByModel(client, { filename, text, timeoutMs }) {
+  try {
+    const dynamicPrompt = `Filename: ${filename || '(none)'}\n\nText:\n${text}`;
+    const response = await withBackoff(() => client.messages.create({
+      model: REMINDER_EXTRACT_MODEL,
+      max_tokens: 300,
+      system: [withCache({ type: 'text', text: REMINDER_SYSTEM_PROMPT }, REMINDER_EXTRACT_MODEL)],
+      tools: [withCache(REMINDER_TOOL, REMINDER_EXTRACT_MODEL)],
+      tool_choice: { type: 'tool', name: REMINDER_TOOL.name },
+      messages: [{ role: 'user', content: dynamicPrompt }],
+    }, { timeout: timeoutMs }), { deadlineAt: Date.now() + timeoutMs });
+    return response.content.find((b) => b.type === 'tool_use')?.input ?? null;
+  } catch (err) {
+    console.error('extractReminders model call failed:', err?.message);
+    return null;
+  }
+}
+
+/**
+ * `extractReminders {documentIds}` — the backfill admin action (build brief
+ * item 5): a document extracted BEFORE this build only ever gets a
+ * reminder_text if this is run on it explicitly. Modeled directly on
+ * reclassifyDocuments above (same per-document transaction, same
+ * modelCallBudget wall-clock/call-count ceiling, same "never throws, a failed
+ * document is skipped not fatal") — billing-gated the same way in
+ * api/review.js (MODEL_BILLED_ACTIONS).
+ *
+ * Deliberately does NOT use recordsStore.js's replaceDocumentFields: that
+ * function REPLACES every extraction on the document, which would silently
+ * erase every field a prior extraction pass already wrote. A plain INSERT
+ * (no facet — same "add one that was never extracted" shape correctField
+ * above already uses) is additive instead.
+ */
+export async function extractReminders(ctx, { documentIds } = {}, actorClerkId) {
+  const ids = [...new Set((documentIds ?? []).filter(isUuid))].slice(0, 100);
+  if (!ids.length) return { changes: [], remaining: 0 };
+
+  const deadlineAt = Date.now() + RECLASSIFY_DEADLINE_MS;
+  let modelCalls = 0;
+  let client = null;
+  const changes = [];
+  let remaining = 0;
+  const budgetStatus = await getDailyModelBudgetStatus(ctx);
+
+  for (const id of ids) {
+    try {
+      const change = await withTenant(ctx, async (pgClient, tenantId) => {
+        const doc = (await pgClient.query(
+          `SELECT id, document_type, original_filename FROM documents WHERE id = $1 AND ${TENANT}`,
+          [id]
+        )).rows[0];
+        if (!doc) return null;
+        if (!REMINDER_ELIGIBLE_DOCUMENT_TYPES.has(normalizeDocumentType(doc.document_type))) return null;
+
+        const already = (await pgClient.query(
+          `SELECT 1 FROM extractions WHERE document_id = $1 AND field_key = 'reminder_text' AND ${TENANT} LIMIT 1`,
+          [id]
+        )).rowCount > 0;
+        if (already) return null; // never re-extract a reminder already on file
+
+        const budget = modelCalls < MAX_REMINDER_MODEL_CALLS && !budgetStatus.exceeded
+          ? modelCallBudget(deadlineAt - Date.now())
+          : null;
+        if (budget == null) { remaining++; return null; }
+
+        const pages = (await pgClient.query(
+          `SELECT text FROM document_pages WHERE document_id = $1 AND ${TENANT} ORDER BY page_no`,
+          [id]
+        )).rows;
+        const text = pages.map((p) => p.text).filter(Boolean).join('\n').slice(0, REMINDER_SOURCE_TEXT_CHARS).trim();
+        if (!text) return null;
+
+        modelCalls++;
+        client ??= new Anthropic({ apiKey: getApiKey(), timeout: MODEL_CALL_MAX_TIMEOUT_MS, maxRetries: 0 });
+        const result = await extractReminderByModel(client, { filename: doc.original_filename, text, timeoutMs: budget });
+
+        const { fields: normalized } = normalizeFieldsForReminder(result);
+        const reminderText = normalized.reminder_text ?? null;
+        if (!reminderText) return null;
+
+        for (const [fieldKey, value] of Object.entries(normalized)) {
+          if (!value) continue;
+          await pgClient.query(
+            `INSERT INTO extractions (tenant_id, document_id, field_key, value, confidence, created_at)
+             VALUES ($1,$2,$3,$4,0.7,NOW())`,
+            [tenantId, id, fieldKey, value]
+          );
+        }
+
+        // Link to the named customer if we can — same exact/fuzzy-surname
+        // match extractDocument.js's own pipeline uses; never creates one.
+        let linked = false;
+        if (normalized.reminder_customer_name) {
+          const raw = (sql, params) => pgClient.query(sql, params);
+          const candidates = await findCustomerNameCandidates({ raw }, normalized.reminder_customer_name);
+          if (candidates.length === 1) {
+            const inserted = await pgClient.query(
+              `INSERT INTO document_entity_links (tenant_id, document_id, entity_id, confidence, linked_by, created_at)
+               VALUES ($1,$2,$3,0.6,'ai:reminder',NOW())
+               ON CONFLICT (tenant_id, document_id, entity_id) DO NOTHING`,
+              [tenantId, id, candidates[0].id]
+            );
+            linked = inserted.rowCount > 0;
+            if (linked) {
+              await pgClient.query(
+                `UPDATE documents SET stage = 'linked' WHERE id = $1 AND ${TENANT} AND stage IN ('received','read','mapped')`,
+                [id]
+              );
+            }
+          }
+        }
+
+        await logAction(pgClient, tenantId, {
+          clerkUserId: actorClerkId,
+          action: 'review.reminder_extracted',
+          resourceType: 'document',
+          resourceId: id,
+          changes: { reminderText, reminderCustomerName: normalized.reminder_customer_name ?? null, reminderTrigger: normalized.reminder_trigger ?? null, linked },
+        });
+
+        return { documentId: id, reminderText };
+      });
+      if (change) changes.push(change);
+    } catch (err) {
+      console.error('extractReminders: document failed, continuing:', id, err?.message);
+    }
+  }
+
+  return { changes, remaining };
+}
+
+/** Pure: apply extractFields.js's own reminder normalization rules
+ *  (200-char cap, reminder_trigger validation) to one model tool-call result,
+ *  without going through normalizeFields' full array shape (this is always
+ *  exactly the three reminder keys, never a mixed batch). Exported so the
+ *  rule is testable with no database. */
+export function normalizeFieldsForReminder(raw) {
+  const text = typeof raw?.reminder_text === 'string' ? raw.reminder_text.trim().slice(0, 200) : '';
+  const customerName = typeof raw?.reminder_customer_name === 'string' ? raw.reminder_customer_name.trim().slice(0, 500) : '';
+  const trigger = normalizeReminderTrigger(raw?.reminder_trigger);
+  return {
+    fields: {
+      reminder_text: text || null,
+      reminder_customer_name: customerName || null,
+      // A trigger with no reminder_text at all is meaningless — never stored.
+      reminder_trigger: text ? trigger : null,
+    },
+  };
 }

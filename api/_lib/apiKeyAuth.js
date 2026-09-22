@@ -80,6 +80,7 @@
 import crypto from "node:crypto";
 import { getPool } from "./recordsStore.js";
 import { requireAuth, AuthError } from "./auth.js";
+import { logStage } from "./perf.js";
 
 export const KEY_PREFIX = "dw_live_";
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -135,6 +136,7 @@ function extractBearer(req) {
  * @throws {AuthError}
  */
 export async function verifyApiKey(rawKey) {
+  const start = Date.now();
   if (!HEX64.test(rawKey.slice(KEY_PREFIX.length))) {
     // Right prefix, wrong shape — refuse before touching the database rather
     // than sending an obviously-malformed value into a query parameter.
@@ -142,12 +144,18 @@ export async function verifyApiKey(rawKey) {
   }
   const keyHash = hashKey(rawKey);
 
+  // NOT cached, deliberately (API_PERF_2026-09-22): a revoked key must stop
+  // working on its very next request, not up to a cache TTL later. This is
+  // already a single indexed round trip (resolve_api_key is SECURITY DEFINER,
+  // one query), so there is no redundant work here to remove.
   let rows;
   try {
     ({ rows } = await getAuxPool().query("SELECT * FROM resolve_api_key($1)", [keyHash]));
   } catch (err) {
     console.error("API key lookup failed:", err?.message);
     throw new AuthError("Server is not configured for authentication", 500);
+  } finally {
+    logStage({ t: "auth_key", ms: Date.now() - start });
   }
 
   const row = rows[0];

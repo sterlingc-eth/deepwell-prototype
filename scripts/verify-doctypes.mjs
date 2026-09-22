@@ -19,6 +19,7 @@ import {
   completenessFor,
   toCompletenessFields,
   isShopInternalDocument,
+  extractTechnicianFromNotes,
 } from '../api/_lib/documentTypes.js';
 
 let failures = 0;
@@ -314,6 +315,18 @@ eq('toCompletenessFields is safe on undefined', toCompletenessFields(undefined),
   check('"internal" is a canonical document type', DOCUMENT_TYPE_IDS.has('internal'));
   eq('the "internal" type has no required fields (always AI-verifiable)', REQUIRED_FIELDS.internal, []);
 }
+
+/* -------------------------------------------------- extractTechnicianFromNotes
+ * Owner defect report (2026-09-22), item 4: "Truck #4 due for oil change …
+ * Tech: Kevin Pratt" — a chip/filter source, independent of the
+ * classification-disqualifying `technician` field_key above. */
+
+eq('the owner\'s own example', extractTechnicianFromNotes('Truck #4 due for oil change, see shop manager. Tech: Kevin Pratt'), 'Kevin Pratt');
+eq('"Technician:" also matches', extractTechnicianFromNotes('Technician: Maria Alvarez completed the inventory count.'), 'Maria Alvarez');
+eq('case-insensitive', extractTechnicianFromNotes('TECH: Dan Ostrowski'), 'Dan Ostrowski');
+eq('stops at a trailing sentence, not just any comma-adjacent word', extractTechnicianFromNotes('Tech: Kevin Pratt. Parts ordered separately.'), 'Kevin Pratt');
+eq('no "Tech:" phrasing at all -> null', extractTechnicianFromNotes('Counted 40 capacitors in stock this week.'), null);
+eq('empty/missing notes -> null', extractTechnicianFromNotes('') === null && extractTechnicianFromNotes(null) === null && extractTechnicianFromNotes(undefined) === null, true);
 
 /* -------------------------------------------------------------- FIELD_LABELS */
 

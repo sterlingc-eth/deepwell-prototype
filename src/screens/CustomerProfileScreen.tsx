@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, Check, FileText, GitMerge, Link2, Loader2, MessageSquareText, Pencil, Search, Wrench, X,
+  AlertTriangle, ArrowLeft, Bell, Check, ExternalLink, FileText, GitMerge, Link2, Loader2, MessageSquareText, Pencil, Search, Wrench, X,
 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { DocumentPreview } from '../components/DocumentPreview';
 import { WarrantyStatusBadge, type AlertTier } from '../components/WarrantyStatusBadge';
 import { formatYmd, normalize } from '../core/answer';
 import { useGraph } from '../core/entityGraph';
@@ -10,6 +11,7 @@ import {
   customerClient,
   type CustomerDetail,
   type CustomerPatch,
+  type CustomerReminder,
   type CustomerTimelineEntry,
 } from '../services/customerClient';
 import { useAppStore } from '../store/appStore';
@@ -32,6 +34,19 @@ export function sortTimelineDesc(entries: CustomerTimelineEntry[]): CustomerTime
 const STAGE_TEXT: Record<string, string> = {
   received: 'Uploaded', read: 'Read', mapped: 'Sorted', linked: 'Matched', verified: 'Checked',
 };
+
+/** Plain-English warranty status for one unit (owner defect report
+ *  2026-09-22, item 2b): this is a STATUS, not an alert — it belongs on
+ *  every unit whether or not it needs attention, phrased the way the owner
+ *  asked for ("Warranty expired Jan 1, 2019" / "Under warranty until …" /
+ *  "Expires in 40 days"), not the Alerts list's generic tier label. */
+function warrantyStatusLine(tier: AlertTier, expires: string | null, daysLeft: number | null): string {
+  if (tier === 'unknown' || !expires) return 'No warranty on file';
+  if (tier === 'expired') return `Warranty expired ${formatYmd(expires)}`;
+  if (tier === 'ok' || tier === 'expiring-365') return `Under warranty until ${formatYmd(expires)}`;
+  if (daysLeft != null) return `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+  return `Under warranty until ${formatYmd(expires)}`;
+}
 
 function viaLabel(via: string): string {
   if (via === 'direct') return 'Linked directly';
@@ -142,12 +157,25 @@ export function CustomerProfileScreen() {
   const prefillQuestion = useAppStore((s) => s.prefillQuestion);
   const openDocument = useAppStore((s) => s.openDocument);
   const openEntity = useAppStore((s) => s.openEntity);
+  const setInboxCustomerScope = useAppStore((s) => s.setInboxCustomerScope);
   const docs = useGraph((s) => s.docs);
 
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('documents');
+
+  // Owner defect report (2026-09-22): a document click here used to navigate
+  // straight to the Inbox's unscoped "All" filter, losing which customer it
+  // came from. Now it opens in place; "Open in Inbox" (below) is the
+  // explicit, customer-scoped way to leave this screen for a document.
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  const openInInbox = (documentId: string) => {
+    if (!detail) return;
+    setInboxCustomerScope(detail.customer.id);
+    openDocument(documentId);
+    setCurrentScreen('review');
+  };
 
   const reload = useMemo(
     () => async (r: string) => {
@@ -170,6 +198,34 @@ export function CustomerProfileScreen() {
     if (ref) void reload(ref);
     else { setDetail(null); setLoadError(null); }
   }, [ref, reload]);
+
+  // Open reminders strip (CUSTOMER REMINDERS build, 2026-09-22) — a separate
+  // load from `detail` since it comes off POST /api/review, not GET
+  // /api/v1/customer. Best-effort: a failed load just shows no strip rather
+  // than blocking the rest of the page.
+  const [reminders, setReminders] = useState<CustomerReminder[]>([]);
+  const [reminderBusy, setReminderBusy] = useState<string | null>(null);
+  useEffect(() => {
+    const customerId = detail?.customer.id;
+    if (!customerId) return;
+    let cancelled = false;
+    customerClient.reminders(customerId)
+      .then((r) => { if (!cancelled) setReminders(r.reminders); })
+      .catch(() => { if (!cancelled) setReminders([]); });
+    return () => { cancelled = true; };
+  }, [detail?.customer.id]);
+
+  const markReminderDone = async (documentId: string) => {
+    setReminderBusy(documentId);
+    try {
+      await customerClient.reminderDone(documentId);
+      setReminders((rs) => rs.filter((r) => r.documentId !== documentId));
+    } catch {
+      /* leave it in the list — the Done button stays clickable for a retry */
+    } finally {
+      setReminderBusy(null);
+    }
+  };
 
   const saveField = (key: keyof CustomerPatch) => async (value: string) => {
     if (!detail) return;
@@ -244,6 +300,26 @@ export function CustomerProfileScreen() {
     }
   };
 
+  // "Keep separate" (owner defect report 2026-09-22): the other half of the
+  // duplicates panel — confirms two records sharing an address (or name) are
+  // genuinely different customers, durably (never shows again on either
+  // profile or the Inbox's Duplicates chip) — see reviewStore.js's
+  // keepCustomersSeparate.
+  const [keepSeparateBusy, setKeepSeparateBusy] = useState<string | null>(null);
+  const runKeepSeparate = async (otherId: string) => {
+    if (!detail) return;
+    setKeepSeparateBusy(otherId);
+    setMergeErr(null);
+    try {
+      await customerClient.keepSeparate(detail.customer.id, otherId);
+      setDetail((d) => (d ? { ...d, duplicates: d.duplicates.filter((dup) => dup.id !== otherId) } : d));
+    } catch (e) {
+      setMergeErr(e instanceof Error ? e.message : 'Could not save that.');
+    } finally {
+      setKeepSeparateBusy(null);
+    }
+  };
+
   if (!ref) {
     return (
       <AppShell width="ask">
@@ -274,7 +350,7 @@ export function CustomerProfileScreen() {
     );
   }
 
-  const { customer, equipment, documents, duplicates } = detail;
+  const { customer, equipment, documents, duplicates, alertCount } = detail;
   const timeline = sortTimelineDesc(detail.timeline);
   const nextExpiry = equipment
     .map((u) => u.warranty.expires)
@@ -345,31 +421,76 @@ export function CustomerProfileScreen() {
         {duplicates.length > 0 && (
           <div className="dw-card p-4 space-y-3 border-warn/40">
             <h3 className="flex items-center gap-2 text-h4"><AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Possible duplicate customers</h3>
-            <p className="text-body text-ink-2">These look like the same person. Merging keeps this record and moves everything from the other one into it — nothing is double-counted.</p>
+            <p className="text-body text-ink-2">Merging keeps this record and moves everything from the other one into it — nothing is double-counted. A different name at the same address is never merged automatically — decide for yourself below.</p>
             {mergeErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{mergeErr}</p>}
             <ul className="divide-y divide-line border border-line rounded-lg">
               {duplicates.map((dup) => (
                 <li key={dup.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
                   <span className="min-w-0">
                     <span className="font-mono text-data mr-2">{dup.customerNumber ?? '—'}</span>
-                    <span className="text-ink">{dup.name ?? 'Unnamed'}</span>
+                    <span className="text-ink">Possible duplicate of {dup.name ?? 'Unnamed'}</span>
                     <span className="block text-caption text-ink-3">{dup.serviceAddress ?? '—'} · {dup.reason}</span>
                   </span>
-                  <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1 shrink-0" disabled={mergeBusy === dup.id} onClick={() => void runMerge(dup.id)}>
-                    {mergeBusy === dup.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />}
-                    Merge into this customer
-                  </button>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={mergeBusy === dup.id || keepSeparateBusy === dup.id} onClick={() => void runMerge(dup.id)}>
+                      {mergeBusy === dup.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />}
+                      Merge into this customer
+                    </button>
+                    <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" disabled={mergeBusy === dup.id || keepSeparateBusy === dup.id} onClick={() => void runKeepSeparate(dup.id)}>
+                      {keepSeparateBusy === dup.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : 'Keep separate'}
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <section aria-label="Overview" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {reminders.length > 0 && (
+          <section aria-label="Open reminders" className="dw-card p-4 space-y-3 border-brass-300/50">
+            <h3 className="flex items-center gap-2 text-h4"><Bell className="w-4 h-4 text-brass-400" aria-hidden="true" /> Open reminders</h3>
+            <ul className="divide-y divide-line">
+              {reminders.map((r) => (
+                <li key={r.documentId} className="flex flex-wrap items-start justify-between gap-3 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-body text-ink">{r.reminderText}</span>
+                    <span className="block text-caption text-ink-3">
+                      {r.reminderTrigger === 'next_visit' ? 'On next visit' : r.reminderTrigger ? `By ${formatYmd(r.reminderTrigger)}` : 'No trigger set'}
+                      {' · '}
+                      <button
+                        type="button"
+                        className="underline hover:text-ink"
+                        onClick={() => setPreviewDocId(r.documentId)}
+                      >
+                        {r.filename ?? 'source document'}
+                      </button>
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="dw-btn-tertiary !min-h-[36px] !py-1 shrink-0"
+                    disabled={reminderBusy === r.documentId}
+                    onClick={() => void markReminderDone(r.documentId)}
+                  >
+                    {reminderBusy === r.documentId ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Check className="w-3.5 h-3.5" aria-hidden="true" />}
+                    Done
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section aria-label="Overview" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Documents', value: documents.length },
             { label: 'Equipment', value: equipment.length },
             { label: 'Next warranty expiry', value: nextExpiry ? formatYmd(nextExpiry) : 'None on file' },
+            // Undismissed only (owner defect report 2026-09-22, item 2b) —
+            // the per-unit status line on the Equipment tab shows every
+            // unit's warranty status regardless; this header count is the
+            // one place dismissal actually hides something.
+            { label: 'Open alerts', value: alertCount },
           ].map((tile) => (
             <div key={tile.label} className="dw-card p-4">
               <p className="text-caption text-ink-3">{tile.label}</p>
@@ -395,11 +516,11 @@ export function CustomerProfileScreen() {
         {tab === 'documents' && (
           <ul className="divide-y divide-line border border-line rounded-lg bg-surface" aria-label="Documents">
             {documents.map((d) => (
-              <li key={d.id}>
+              <li key={d.id} className="flex items-center">
                 <button
                   type="button"
-                  onClick={() => { openDocument(d.id); setCurrentScreen('review'); }}
-                  className="w-full text-left flex flex-wrap items-center gap-3 px-4 py-3 min-h-touch hover:bg-surface-2 transition-colors duration-quick"
+                  onClick={() => setPreviewDocId(d.id)}
+                  className="flex-1 text-left flex flex-wrap items-center gap-3 px-4 py-3 min-h-touch hover:bg-surface-2 transition-colors duration-quick"
                 >
                   <FileText className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
@@ -408,6 +529,14 @@ export function CustomerProfileScreen() {
                   </span>
                   <span className="dw-pill-muted shrink-0">{viaLabel(d.via)}</span>
                   <span className="text-body text-ink-3 shrink-0 whitespace-nowrap">{d.serviceDate ? formatYmd(d.serviceDate) : d.createdAt ? formatYmd(d.createdAt) : '—'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openInInbox(d.id)}
+                  className="dw-btn-tertiary !min-h-[36px] !py-1 mr-3 shrink-0"
+                  title="Open in Inbox"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Open in Inbox
                 </button>
               </li>
             ))}
@@ -429,8 +558,11 @@ export function CustomerProfileScreen() {
                   </div>
                   <p className="mt-2 text-caption text-ink-3">
                     {u.installDate ? `Installed ${formatYmd(u.installDate)}` : 'No install date on file'}
-                    {u.warranty.expires ? ` · Warranty expires ${formatYmd(u.warranty.expires)}` : ''}
                   </p>
+                  {/* A plain status, not an alert (owner defect report
+                      2026-09-22, item 2b) — the alert count above only counts
+                      undismissed alerts; this line shows on every unit. */}
+                  <p className="mt-0.5 text-caption text-ink-2">{warrantyStatusLine(u.warranty.tier as AlertTier, u.warranty.expires, u.warranty.daysLeft)}</p>
                 </button>
               </li>
             ))}
@@ -443,11 +575,16 @@ export function CustomerProfileScreen() {
             {timeline.map((e, i) => (
               <li key={`${e.documentId ?? 'x'}-${i}`}>
                 {e.documentId ? (
-                  <button type="button" onClick={() => { openDocument(e.documentId as string); setCurrentScreen('review'); }} className="w-full text-left flex items-center gap-3 px-4 py-3 min-h-touch hover:bg-surface-2 transition-colors duration-quick">
-                    <span className="dw-pill-muted shrink-0 w-24 justify-center">{TIMELINE_LABEL[e.kind]}</span>
-                    <span className="min-w-0 flex-1 truncate">{e.title}</span>
-                    <span className="text-body text-ink-3 shrink-0 whitespace-nowrap">{formatYmd(e.date)}</span>
-                  </button>
+                  <div className="flex items-center">
+                    <button type="button" onClick={() => setPreviewDocId(e.documentId as string)} className="flex-1 text-left flex items-center gap-3 px-4 py-3 min-h-touch hover:bg-surface-2 transition-colors duration-quick">
+                      <span className="dw-pill-muted shrink-0 w-24 justify-center">{TIMELINE_LABEL[e.kind]}</span>
+                      <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                      <span className="text-body text-ink-3 shrink-0 whitespace-nowrap">{formatYmd(e.date)}</span>
+                    </button>
+                    <button type="button" onClick={() => openInInbox(e.documentId as string)} className="dw-btn-tertiary !min-h-[32px] !py-1 mr-3 shrink-0" title="Open in Inbox">
+                      <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-3 px-4 py-3">
                     <span className="dw-pill-muted shrink-0 w-24 justify-center">{TIMELINE_LABEL[e.kind]}</span>
@@ -484,6 +621,7 @@ export function CustomerProfileScreen() {
           <p className="text-caption text-ink-3">Formerly {customer.formerNumbers.join(', ')} — merged into this record.</p>
         )}
       </div>
+      {previewDocId && <DocumentPreview documentId={previewDocId} onClose={() => setPreviewDocId(null)} />}
     </AppShell>
   );
 }

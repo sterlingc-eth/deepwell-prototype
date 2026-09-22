@@ -28,3 +28,13 @@ export function customerForDocument(doc: Doc, entities: Record<EntityId, Entity>
   }
   return null;
 }
+
+/** The customer-scope predicate the Inbox's "Customer: X ×" chip applies
+ *  (owner defect report 2026-09-22, item 3): a document is in scope when no
+ *  scope is set, or `customerForDocument` resolves it to that customer.
+ *  Kept alongside customerForDocument (not in ReviewScreen.tsx, a component
+ *  file — oxlint's react/only-export-components would flag it there) so
+ *  it's a plain, independently-testable function. */
+export function matchesCustomerScope(doc: Doc, entities: Record<EntityId, Entity>, scopeCustomerId: string | null): boolean {
+  return !scopeCustomerId || customerForDocument(doc, entities)?.id === scopeCustomerId;
+}

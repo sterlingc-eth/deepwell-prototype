@@ -25,6 +25,7 @@ import {
   attachEquipmentFacts,
   resolveAddressCandidates,
   buildUnitAttributeAnswer,
+  buildReminderAnswer,
 } from '../api/_lib/contactLookup.js';
 
 let failures = 0;
@@ -454,6 +455,84 @@ for (const q of NAMED_UNIT_NEGATIVES) {
   const mockDb = { raw: async () => ({ rows }), listCustomerEquipment: async () => units };
   const answer = await runContactLookup(mockDb, 'Is the Salazar unit still under warranty?', { today: '2026-09-22' });
   check('item 10 runContactLookup :: end-to-end warranty answer', Boolean(answer) && answer.text.includes('warranty expired'), answer?.text);
+}
+
+/* ======================================================================
+ * CUSTOMER REMINDERS build (2026-09-22): "any notes/reminders for Abernathy",
+ * "what should I check at Ellison's", "reminders for 322 N Greenfield" —
+ * question routing to reminders.js's listOpenReminders via contactLookup.js.
+ * ====================================================================== */
+
+const REMINDER_QUESTION_POSITIVES = [
+  ['any notes/reminders for Abernathy', 'abernathy', false],
+  ['reminders for Abernathy', 'abernathy', false],
+  ['what should I check at Ellison\'s', 'ellison', false],
+  ['reminders for 322 N Greenfield', '322 n greenfield', true],
+];
+for (const [q, expectedName, expectedIsStreet] of REMINDER_QUESTION_POSITIVES) {
+  const parsed = parseContactLookupQuestion(q);
+  check(`reminder shape :: "${q}" -> field 'reminders'`, parsed?.field === 'reminders', JSON.stringify(parsed));
+  eq(`reminder shape :: "${q}" -> namePhrase`, parsed?.namePhrase, expectedName);
+  eq(`reminder shape :: "${q}" -> isStreet`, Boolean(parsed?.isStreet), expectedIsStreet);
+}
+
+// Must never hijack an ordinary analytics/aggregate question that merely
+// contains "reminders" or "notes" as a word.
+const REMINDER_QUESTION_NEGATIVES = [
+  'how many reminders do we have open',
+  'list customers missing a phone number',
+];
+for (const q of REMINDER_QUESTION_NEGATIVES) {
+  const parsed = parseContactLookupQuestion(q);
+  check(`reminder shape must not hijack :: "${q}"`, parsed?.field !== 'reminders', JSON.stringify(parsed));
+}
+
+/* -------------------------------------------------------- buildReminderAnswer */
+eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernathy').text, 'No open reminders for Karen Abernathy.');
+{
+  const reminders = [{ documentId: 'd1', reminderText: 'confirm filter size on next visit', reminderTrigger: 'next_visit' }];
+  const ans = buildReminderAnswer(reminders, 'Karen Abernathy');
+  check('buildReminderAnswer :: names the reminder text', ans.text.includes('confirm filter size on next visit'), ans.text);
+  eq('buildReminderAnswer :: one fact per reminder', ans.facts.length, 1);
+}
+
+/* --------------------------------------------- runContactLookup end to end */
+{
+  const customerRow = { id: 'c1', customer_number: 'C-1', customer_name: 'Karen Abernathy', service_address: null, phone: null, email: null, serial_number: null };
+  const reminderRow = {
+    document_id: 'd1', reminder_text: 'confirm filter size on next visit', reminder_trigger: 'next_visit',
+    reminder_customer_name: 'Karen Abernathy', created_at: '2026-09-20', original_filename: '054-other-c10.pdf',
+    document_type: 'other', customer_id: 'c1', customer_name: 'Karen Abernathy',
+  };
+  const mockDb = {
+    raw: async (sql) => {
+      if (/FROM extractions rt/.test(sql)) return { rows: [reminderRow] };
+      if (/FROM audit_log/.test(sql)) return { rows: [] };
+      return { rows: [customerRow] }; // the two customer-candidate queries
+    },
+  };
+  const answer = await runContactLookup(mockDb, 'any reminders for Abernathy');
+  check('reminders :: runContactLookup end-to-end names the reminder', Boolean(answer) && answer.text.includes('confirm filter size on next visit'), answer?.text);
+}
+{
+  // Zero matching customer -> defer (null), same "don't know this customer"
+  // contract as every other contactLookup field, never a guess.
+  const mockDb = { raw: async () => ({ rows: [] }) };
+  const answer = await runContactLookup(mockDb, 'reminders for Nobody Real');
+  eq('reminders :: zero customer match defers to the rest of the pipeline (null)', answer, null);
+}
+{
+  // Resolved customer, but no open reminders -> honest zero, not a defer.
+  const customerRow = { id: 'c2', customer_number: 'C-2', customer_name: 'John Ellison', service_address: null, phone: null, email: null, serial_number: null };
+  const mockDb = {
+    raw: async (sql) => {
+      if (/FROM extractions rt/.test(sql)) return { rows: [] };
+      if (/FROM audit_log/.test(sql)) return { rows: [] };
+      return { rows: [customerRow] };
+    },
+  };
+  const answer = await runContactLookup(mockDb, "what should I check at Ellison's");
+  eq('reminders :: resolved customer with no open reminders -> honest zero', answer?.text, 'No open reminders for John Ellison.');
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

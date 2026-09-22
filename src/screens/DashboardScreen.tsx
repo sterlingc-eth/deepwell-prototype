@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
@@ -176,6 +176,37 @@ export function DashboardScreen() {
   // navigates on an exact (normalized) name match, since a fuzzy hit here
   // would send someone to the wrong customer's profile.
   const [customerLookup, setCustomerLookup] = useState<Record<string, 'loading' | 'notfound'>>({});
+
+  // Dismiss/Undo (owner defect report 2026-09-22, item 2a): dismissing hides
+  // this one unit+tier alert everywhere it's counted (this card, the
+  // Customers list, /api/warranty-attention) until a NEW tier applies.
+  // Optimistic: the row disappears immediately; a short "Dismissed — Undo"
+  // strip offers a client-side-instant reversal for a few seconds, backed by
+  // the same API call either way (dismissed:true then dismissed:false) so a
+  // refresh always reflects the true last decision even if Undo is missed.
+  const [justDismissed, setJustDismissed] = useState<AttentionItem | null>(null);
+  const dismissTimeout = useRef<number | null>(null);
+  const dismissAlert = (item: AttentionItem) => {
+    setAttention((a) => (a ? { ...a, items: a.items.filter((i) => i !== item) } : a));
+    setJustDismissed(item);
+    void customerClient.dismissAlert(item.entityId, item.tier, true).catch(() => {
+      // The dismiss didn't save — put the row back rather than silently
+      // hiding something the server never actually recorded.
+      setAttention((a) => (a ? { ...a, items: [...a.items, item] } : a));
+      setJustDismissed((j) => (j === item ? null : j));
+    });
+    if (dismissTimeout.current) window.clearTimeout(dismissTimeout.current);
+    dismissTimeout.current = window.setTimeout(() => setJustDismissed((j) => (j === item ? null : j)), 6000);
+  };
+  const undoDismiss = (item: AttentionItem) => {
+    if (dismissTimeout.current) window.clearTimeout(dismissTimeout.current);
+    setJustDismissed(null);
+    setAttention((a) => (a ? { ...a, items: [...a.items, item] } : a));
+    void customerClient.dismissAlert(item.entityId, item.tier, false).catch(() => {
+      /* best-effort — a stale dismissal is a much smaller problem than
+       * losing the record of the undo itself, so nothing to roll back here */
+    });
+  };
   const viewCustomer = async (item: AttentionItem) => {
     if (!item.customerName) return;
     setCustomerLookup((m) => ({ ...m, [item.entityId]: 'loading' }));
@@ -309,6 +340,12 @@ export function DashboardScreen() {
                 );
               })}
             </div>
+            {justDismissed && (
+              <div role="status" className="dw-card p-3 flex items-center justify-between gap-3">
+                <span className="text-body text-ink-2">Alert dismissed.</span>
+                <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" onClick={() => undoDismiss(justDismissed)}>Undo</button>
+              </div>
+            )}
             {openCard && (
               <ul className="space-y-2">
                 {itemsForCard(attention?.items ?? [], openCard).map((item) => (
@@ -355,6 +392,9 @@ export function DashboardScreen() {
                         </button>
                         <button type="button" onClick={() => openOutreach(item.entityId)} className="dw-btn-secondary !min-h-[36px] !py-1">
                           <Mail className="w-3.5 h-3.5" aria-hidden="true" /> Open in Outreach
+                        </button>
+                        <button type="button" onClick={() => dismissAlert(item)} className="dw-btn-tertiary !min-h-[36px] !py-1" title="Dismiss this alert">
+                          <X className="w-3.5 h-3.5" aria-hidden="true" /> Dismiss
                         </button>
                       </div>
                       {customerLookup[item.entityId] === 'notfound' && (

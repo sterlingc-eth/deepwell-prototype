@@ -24,6 +24,9 @@ import {
   countWarrantyAlerts,
   tallyWarrantyAlerts,
   CUSTOMER_NUMBER_RE,
+  planPossibleDuplicates,
+  dismissedAlertKey,
+  resolveDismissedAlertKeys,
 } from '../api/_lib/routes/customers.js';
 import {
   filterCustomerPatch,
@@ -31,6 +34,7 @@ import {
   chooseSurvivorNumber,
 } from '../api/_lib/reviewStore.js';
 import { extractCustomerNumber, classifyMetaQuestion } from '../api/ask.js';
+import { possibleDuplicatePairKey } from '../api/_lib/integrity.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -117,11 +121,11 @@ eq('name-match passes through', formatVia('name-match', null), 'name-match');
 
 eq('same name and address', duplicateReason('John Smith', '1 Main St', 'John Smith', '1 Main St'), 'same name and address');
 eq('same name only', duplicateReason('John Smith', '1 Main St', 'John Smith', '2 Oak Ave'), 'same name');
-eq('same address only', duplicateReason('John Smith', '1 Main St', 'Jane Doe', '1 Main St'), 'same address');
+eq('same address only', duplicateReason('John Smith', '1 Main St', 'Jane Doe', '1 Main St'), 'same address, different name');
 eq('neither matches -> null', duplicateReason('John Smith', '1 Main St', 'Jane Doe', '2 Oak Ave'), null);
 eq('case-insensitive name match', duplicateReason('john smith', '1 Main St', 'JOHN SMITH', '2 Oak Ave'), 'same name');
 eq('missing address on both sides never "matches"', duplicateReason('John Smith', '', 'John Smith', ''), 'same name');
-eq('empty name on both sides never "matches" as a name', duplicateReason('', '1 Main St', '', '1 Main St'), 'same address');
+eq('empty name on both sides never "matches" as a name', duplicateReason('', '1 Main St', '', '1 Main St'), 'same address, different name');
 
 /* ------------------------------------------------------------------------- deriveCity
  * Owner request 2026-09-20, item 1's exact four cases. */
@@ -202,6 +206,115 @@ eq('case-insensitive punctuation-tolerant', classifyMetaQuestion('Show everythin
   { kind: 'customer', number: 'C-00012' });
 eq('a per-entity question about a customer is NOT caught here (must still retrieve normally)',
   classifyMetaQuestion('show me everything about the Andersons'), null);
+
+/* -------------------------------------------------------------- planPossibleDuplicates
+ * Owner defect report (2026-09-22): two live customer pairs share an
+ * address under different names and never showed as duplicates because
+ * findDuplicateCustomerPairs scores a different-name/same-address pair at
+ * only 0.3, below CUSTOMER_SUGGEST_THRESHOLD (0.55). planPossibleDuplicates
+ * is the threshold-free, never-auto-merge sibling that catches exactly
+ * this shape. Policy: different name + same address is surfaced, NEVER
+ * auto-merged. */
+
+const donnaThornton = { id: 'cust-thornton', name: 'Donna Thornton', address: '174 N College Ave, Mesa, AZ', customerNumber: 'C-00010' };
+const donnaSorensen = { id: 'cust-sorensen', name: 'Sorensen', address: '174 N College Ave, Mesa, AZ', customerNumber: 'C-00020' };
+const desertRidgeDental = { id: 'cust-desert-ridge', name: 'Desert Ridge Dental', address: '880 S Dobson Rd Suite 110, Chandler, AZ', customerNumber: 'C-00030' };
+const plazaDentalGroup = { id: 'cust-plaza-dental', name: 'Plaza Dental Group', address: '880 S Dobson Rd Suite 110, Chandler, AZ', customerNumber: 'C-00040' };
+const unrelated = { id: 'cust-unrelated', name: 'Bob Jenkins', address: '9 Elm St, Tempe, AZ', customerNumber: 'C-00050' };
+const livePairs = [donnaThornton, donnaSorensen, desertRidgeDental, plazaDentalGroup, unrelated];
+
+{
+  const out = planPossibleDuplicates(livePairs, {});
+  check('Donna Thornton / Sorensen (same address) is reported',
+    out.some((p) => [p.aId, p.bId].includes('cust-thornton') && [p.aId, p.bId].includes('cust-sorensen')),
+    JSON.stringify(out));
+  check('Desert Ridge Dental / Plaza Dental Group (same address) is reported',
+    out.some((p) => [p.aId, p.bId].includes('cust-desert-ridge') && [p.aId, p.bId].includes('cust-plaza-dental')),
+    JSON.stringify(out));
+  check('the unrelated customer is not paired with anyone',
+    !out.some((p) => p.aId === 'cust-unrelated' || p.bId === 'cust-unrelated'));
+  check('auto-merge is never proposed for a different-name pair (no score/tier/auto anywhere in the output)',
+    !out.some((p) => 'score' in p || 'tier' in p || p.reason === 'auto'));
+  eq('exactly the two live pairs, nothing else', out.length, 2);
+}
+
+{
+  // A "Keep separate" decision (audit_log row, loaded by loadKeepSeparatePairs)
+  // must exclude that pair from ever showing again.
+  const keepSeparatePairs = new Set([possibleDuplicatePairKey('cust-thornton', 'cust-sorensen')]);
+  const out = planPossibleDuplicates(livePairs, { keepSeparatePairs });
+  check('a keep-separate pair is excluded from the scan',
+    !out.some((p) => [p.aId, p.bId].includes('cust-thornton') && [p.aId, p.bId].includes('cust-sorensen')),
+    JSON.stringify(out));
+  check('the other live pair still shows',
+    out.some((p) => [p.aId, p.bId].includes('cust-desert-ridge') && [p.aId, p.bId].includes('cust-plaza-dental')));
+}
+
+{
+  // Same name at the same address is a REAL duplicate (equal/subset name
+  // relation) — findDuplicateCustomerPairs already covers that; planPossibleDuplicates
+  // must not also propose it a second time as merely "possible".
+  const sameName = { id: 'cust-same-a', name: 'John Smith', address: '1 Main St, Mesa, AZ', customerNumber: 'C-00060' };
+  const sameNameDup = { id: 'cust-same-b', name: 'John Smith', address: '1 Main St, Mesa, AZ', customerNumber: 'C-00061' };
+  check('exact name+address match is left to findDuplicateCustomerPairs, not duplicated here',
+    planPossibleDuplicates([sameName, sameNameDup]).length === 0);
+
+  // A placeholder/unknown-name address entry (e.g. address-only stub) must
+  // not be proposed either — that's planAddressPlaceholderAbsorptions' job.
+  const placeholder = { id: 'cust-placeholder', name: '', address: '1 Main St, Mesa, AZ', customerNumber: null };
+  const realCustomer = { id: 'cust-real', name: 'Jane Real', address: '1 Main St, Mesa, AZ', customerNumber: 'C-00062' };
+  check('an unnamed placeholder at the same address is not proposed as a possible duplicate',
+    planPossibleDuplicates([placeholder, realCustomer]).length === 0);
+}
+
+{
+  // Fuzzy surname pairs (Damerau <= 1, both >= 5 chars) get "likely typo".
+  const sorensen = { id: 'cust-typo-a', name: 'Sorensen', address: '1 Elm St, Mesa, AZ', customerNumber: 'C-00070' };
+  const sorenson = { id: 'cust-typo-b', name: 'Sorenson', address: '1 Elm St, Mesa, AZ', customerNumber: 'C-00071' };
+  const out = planPossibleDuplicates([sorensen, sorenson]);
+  eq('Sorensen/Sorenson at the same address is flagged "likely typo"', out[0]?.reason, 'likely typo');
+}
+
+/* ---------------------------------------------------------- alert dismissal
+ * Owner defect report (2026-09-22), item 2a: Dismiss/Undo, latest-row-wins
+ * per {equipmentId, tier}, and a NEW tier always re-alerts. */
+
+eq('a single dismiss row -> dismissed', [...resolveDismissedAlertKeys([
+  { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: true }, created_at: '2026-09-20T00:00:00Z' },
+])], [dismissedAlertKey('eq-1', 'expired')]);
+
+eq('dismiss then undo (later) -> not dismissed', [...resolveDismissedAlertKeys([
+  { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: true }, created_at: '2026-09-20T00:00:00Z' },
+  { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: false }, created_at: '2026-09-21T00:00:00Z' },
+])], []);
+
+eq('dismiss, undo, dismiss again -> dismissed (latest wins, order in the array does not matter)',
+  [...resolveDismissedAlertKeys([
+    { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: false }, created_at: '2026-09-22T00:00:00Z' },
+    { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: true }, created_at: '2026-09-20T00:00:00Z' },
+    { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: false }, created_at: '2026-09-21T00:00:00Z' },
+  ])],
+  []); // the 09-22 undo is latest -> not dismissed
+
+check('a NEW tier on the same unit re-alerts even though an earlier tier was dismissed',
+  !resolveDismissedAlertKeys([
+    { resource_id: 'eq-1', changes: { tier: 'expiring-90', dismissed: true }, created_at: '2026-06-01T00:00:00Z' },
+  ]).has(dismissedAlertKey('eq-1', 'expired')));
+
+{
+  const dismissed = resolveDismissedAlertKeys([
+    { resource_id: 'eq-1', changes: { tier: 'expired', dismissed: true }, created_at: '2026-09-20T00:00:00Z' },
+  ]);
+  eq('tallyWarrantyAlerts excludes a dismissed unit+tier',
+    tallyWarrantyAlerts([{ id: 'eq-1', expires: '2020-01-01', expiresBasis: 'printed' }], '2026-09-22', dismissed),
+    { expiring: 0, expired: 0 });
+  eq('tallyWarrantyAlerts still counts a DIFFERENT unit at the same tier',
+    tallyWarrantyAlerts([{ id: 'eq-2', expires: '2020-01-01', expiresBasis: 'printed' }], '2026-09-22', dismissed),
+    { expiring: 0, expired: 1 });
+  eq('countWarrantyAlerts (no dismissedKeys passed) is unaffected — backward compatible',
+    countWarrantyAlerts([{ id: 'eq-1', expires: '2020-01-01', expiresBasis: 'printed' }], '2026-09-22'),
+    1);
+}
 
 console.log(`\n${failures === 0 ? 'All checks passed.' : `${failures} check(s) FAILED.`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -4,7 +4,11 @@ import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { withTenant, normalizeMatchText } from "../recordsStore.js";
 import { alertTier, daysBetween, isPlausibleToday } from "../warrantyRules.js";
-import { findDuplicateCustomerPairs } from "../integrity.js";
+import {
+  findDuplicateCustomerPairs, normalizeAddressKey, compareNamesStrict, pickKeepDrop,
+  possibleDuplicatePairKey, normalizeSurname, damerauLevenshteinDistance,
+  SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
+} from "../integrity.js";
 
 /**
  * GET /api/v1/customers?q=&sort=name|recent|docs&limit=200
@@ -106,8 +110,106 @@ export function duplicateReason(name, address, otherName, otherAddress) {
   const sameAddress = !!address && !!otherAddress && address.toLowerCase() === otherAddress.toLowerCase();
   if (sameName && sameAddress) return "same name and address";
   if (sameName) return "same name";
-  if (sameAddress) return "same address";
+  if (sameAddress) {
+    // Owner defect report (2026-09-22): two unrelated households/businesses
+    // sharing one address ("Donna Thornton" / "Sorensen" at 174 N College
+    // Ave; "Desert Ridge Dental" / "Plaza Dental Group" at 880 S Dobson Rd)
+    // were invisible everywhere — this reason string is what both customer
+    // profiles show ("Possible duplicate of X — same address, different
+    // name"). Policy stays: a different name never auto-merges (this is
+    // still only ever a 'reason' string, never a merge tier) — surfacing it
+    // is the fix, not merging it. A likely misspelling of the SAME surname
+    // (Damerau <=1, both names long enough to trust — same bar
+    // compareNamesStrict's 'surname-fuzzy' relation uses) gets its own,
+    // more specific reason.
+    return isLikelySurnameTypo(name, otherName) ? "likely typo" : "same address, different name";
+  }
   return null;
+}
+
+/** Pure: are `name`/`otherName` a likely misspelling of the SAME surname
+ *  (e.g. "Sorensen"/"Sorenson") rather than two different people's names?
+ *  Same bar as integrity.js's compareNamesStrict 'surname-fuzzy' relation,
+ *  applied directly to raw names here since duplicateReason's callers pass
+ *  already-normalizeMatchText'd strings, not the {name, address} shape
+ *  compareNamesStrict expects. */
+function isLikelySurnameTypo(name, otherName) {
+  const sa = normalizeSurname(name);
+  const sb = normalizeSurname(otherName);
+  if (!sa || !sb || sa === sb) return false;
+  if (sa.length < SURNAME_FUZZY_MIN_LENGTH || sb.length < SURNAME_FUZZY_MIN_LENGTH) return false;
+  return damerauLevenshteinDistance(sa, sb) <= SURNAME_FUZZY_MAX_DISTANCE;
+}
+
+const KEEP_SEPARATE_ACTION = "customers.keep_separate";
+
+/**
+ * Pairs a person has already decided are NOT duplicates (reviewStore.js's
+ * keepCustomersSeparate) — permanently excluded from planPossibleDuplicates
+ * below, so a dismissed pair never comes back. Read via the generic `db.raw`
+ * every store object exposes (same as routes/integrity.js's scan queries),
+ * scoped to the current tenant by RLS + the explicit predicate, same as
+ * everywhere else in this file.
+ */
+export async function loadKeepSeparatePairs(db) {
+  const rows = await db.raw(
+    `SELECT changes->>'pairKey' AS pair_key FROM audit_log
+      WHERE action = $1 AND tenant_id = (current_setting('app.tenant_id', true))::uuid`,
+    [KEEP_SEPARATE_ACTION]
+  );
+  return new Set(rows.rows.map((r) => r.pair_key).filter(Boolean));
+}
+
+/**
+ * Same-normalized-address, DIFFERENT-name customer pairs — the shape
+ * findDuplicateCustomerPairs (integrity.js) deliberately never surfaces: its
+ * score for "same street, unrelated names" is 0.3, below
+ * CUSTOMER_SUGGEST_THRESHOLD (0.55), because that threshold is tuned for
+ * "worth proposing a merge review", not "worth a person's attention at all".
+ * Owner defect report (2026-09-22): the two live pairs this exists for
+ * ("Donna Thornton"/"Sorensen"; "Desert Ridge Dental"/"Plaza Dental Group")
+ * showed a Duplicates count of 0 everywhere as a result.
+ *
+ * Policy, unchanged: a different name at the same address is NEVER proposed
+ * for auto-merge — every entry here is `tier`-less on purpose (the caller's
+ * existing admin-gated Merge action is still what a person clicks; this list
+ * only makes the pair visible). `keepSeparatePairs`: a Set of
+ * possibleDuplicatePairKey(...) values already decided "not the same" —
+ * permanently excluded, so dismissing a pair once is durable.
+ *
+ * `customers`: [{id, name, address, customerNumber}] — same shape
+ * findDuplicateCustomerPairs takes. A pair whose name relation is 'equal' or
+ * 'subset' is skipped (that's a REAL duplicate, already surfaced by
+ * findDuplicateCustomerPairs); 'unknown' (no usable name on one/both sides —
+ * an address-only placeholder) is also skipped, since that shape is already
+ * handled by the address-placeholder-absorption heal step, not this one.
+ */
+export function planPossibleDuplicates(customers, { keepSeparatePairs } = {}) {
+  const skip = keepSeparatePairs ?? new Set();
+  const list = Array.isArray(customers) ? customers : [];
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i];
+      const b = list[j];
+      if (!a?.id || !b?.id || a.id === b.id) continue;
+      const addrKey = normalizeAddressKey(a.address);
+      if (!addrKey || addrKey !== normalizeAddressKey(b.address)) continue;
+      const nameRel = compareNamesStrict(a.name, b.name);
+      if (nameRel === "equal" || nameRel === "subset" || nameRel === "unknown") continue;
+      const key = possibleDuplicatePairKey(a.id, b.id);
+      if (skip.has(key)) continue;
+      const [keep, drop] = pickKeepDrop(a, b);
+      out.push({
+        aId: a.id,
+        bId: b.id,
+        keepId: keep.id,
+        dropId: drop.id,
+        reason: nameRel === "surname-fuzzy" ? "likely typo" : "same address, different name",
+      });
+    }
+  }
+  return out;
 }
 
 /** Best-effort city out of a free-text service address ("123 Main St,
@@ -151,22 +253,80 @@ export function deriveCity(address) {
  *  units that most needed it). 'expiring-365'/'ok'/'unknown'/
  *  'unregistered-window-closing' are not alerts here; the last is its own
  *  separate signal surfaced via /api/warranty-attention, not this badge. */
-export function tallyWarrantyAlerts(warranties, today) {
+/** `dismissedKeys` is an optional Set of `dismissedAlertKey(equipmentId,
+ *  tier)` strings (see below) — a unit+tier pair a person has dismissed is
+ *  excluded from the count. `warranties` entries carry their own `id` (the
+ *  equipment id, merged in by recordsStore.js's listCustomersSummary) so
+ *  this can key the check per unit, not just per tier. */
+export function tallyWarrantyAlerts(warranties, today, dismissedKeys) {
   let expiring = 0;
   let expired = 0;
   for (const w of warranties ?? []) {
     if (!w) continue;
     const tier = alertTier(w, today);
+    if (tier !== "expired" && tier !== "expiring-30" && tier !== "expiring-90") continue;
+    if (dismissedKeys?.has(dismissedAlertKey(w.id, tier))) continue;
     if (tier === "expired") expired++;
-    else if (tier === "expiring-30" || tier === "expiring-90") expiring++;
+    else expiring++;
   }
   return { expiring, expired };
 }
 
 /** Combined count, for the table's single-number badge column. */
-export function countWarrantyAlerts(warranties, today) {
-  const { expiring, expired } = tallyWarrantyAlerts(warranties, today);
+export function countWarrantyAlerts(warranties, today, dismissedKeys) {
+  const { expiring, expired } = tallyWarrantyAlerts(warranties, today, dismissedKeys);
   return expiring + expired;
+}
+
+/* ------------------------------------------------------------- alert dismissal --
+ * Owner defect report (2026-09-22), item 2a: dismissable warranty alerts,
+ * with Undo, and a NEW tier re-alerts even if an earlier tier was dismissed
+ * on the same unit. No DDL: an ordinary audit_log row per decision (action
+ * 'alert.dismissed', resource_type 'equipment', resource_id = the equipment
+ * id, changes {tier, dismissed}) — same append-only pattern as
+ * reminders.js's 'reminder.done'. Undo is simply a second row with
+ * dismissed:false; the LATEST row for a given {resource_id, tier} wins, so
+ * a dismiss/undo/dismiss sequence always resolves to its last action. */
+export const ALERT_DISMISS_ACTION = "alert.dismissed";
+
+/** Stable key for one unit's one alert tier — shared by tallyWarrantyAlerts
+ *  (list badge), the warranty-attention endpoint, and reviewStore.js's
+ *  dismissAlert (what it writes), so all three always agree on identity. */
+export function dismissedAlertKey(equipmentId, tier) {
+  return `${equipmentId ?? ""}::${tier ?? ""}`;
+}
+
+/** Pure: turn raw audit_log rows (oldest first) into the Set of currently-
+ *  dismissed {equipmentId, tier} keys — exported so this rule is checkable
+ *  against plain arrays, no database. Rows out of order are tolerated (each
+ *  key resolves to whichever row has the latest `created_at`, not just the
+ *  last one seen). */
+export function resolveDismissedAlertKeys(rows) {
+  const latest = new Map(); // key -> { dismissed, createdAt }
+  for (const r of rows ?? []) {
+    if (!r?.resource_id) continue;
+    const key = dismissedAlertKey(r.resource_id, r.changes?.tier);
+    const createdAt = r.created_at ?? "";
+    const prev = latest.get(key);
+    if (!prev || createdAt >= prev.createdAt) {
+      latest.set(key, { dismissed: !!r.changes?.dismissed, createdAt });
+    }
+  }
+  const out = new Set();
+  for (const [key, v] of latest) if (v.dismissed) out.add(key);
+  return out;
+}
+
+/** All currently-dismissed alert keys for this tenant. */
+export async function loadDismissedAlertKeys(db) {
+  const { rows } = await db.raw(
+    `SELECT resource_id, changes, created_at FROM audit_log
+       WHERE action = $1 AND resource_type = 'equipment'
+         AND tenant_id = (current_setting('app.tenant_id', true))::uuid
+       ORDER BY created_at ASC`,
+    [ALERT_DISMISS_ACTION]
+  );
+  return resolveDismissedAlertKeys(rows);
 }
 
 const clampLimit = (v, fallback, max) => {
@@ -202,9 +362,13 @@ export async function customers(req, res) {
     const lim = clampLimit(query.limit, 200, 200);
     const today = new Date().toISOString().slice(0, 10);
 
-    const rows = await withTenant(
+    const [rows, keepSeparatePairs, dismissedAlertKeys] = await withTenant(
       { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-      (db) => db.listCustomersSummary({ like: q ? `%${q}%` : null, sort, limit: lim })
+      async (db) => [
+        await db.listCustomersSummary({ like: q ? `%${q}%` : null, sort, limit: lim }),
+        await loadKeepSeparatePairs(db),
+        await loadDismissedAlertKeys(db),
+      ]
     );
 
     const data = rows.map((r) => ({
@@ -218,8 +382,11 @@ export async function customers(req, res) {
       documentCount: r.doc_count,
       equipmentCount: r.equipment_count,
       lastActivity: r.last_activity ? new Date(r.last_activity).toISOString() : null,
-      alerts: tallyWarrantyAlerts(r.warranties, today),
-      warrantyAlerts: countWarrantyAlerts(r.warranties, today),
+      // Dismissed alerts (owner defect report 2026-09-22, item 2a) are
+      // excluded here — this count feeds the table's badge column, the
+      // "has alerts" filter, and (summed client-side) the Dashboard total.
+      alerts: tallyWarrantyAlerts(r.warranties, today, dismissedAlertKeys),
+      warrantyAlerts: countWarrantyAlerts(r.warranties, today, dismissedAlertKeys),
       mergedInto: null,
     }));
 
@@ -232,14 +399,18 @@ export async function customers(req, res) {
     // nested under `customers` plus this new field, kept backward-compatible
     // in name only (frontend reads `.customers` going forward — see the
     // handoff).
-    const duplicates = findDuplicateCustomerPairs(
-      rows.map((r) => ({
-        id: r.id, customerNumber: r.customer_number, name: r.data?.customer_name,
-        address: r.data?.service_address, phone: r.data?.phone, email: r.data?.email,
-      }))
-    );
+    const customersForPairs = rows.map((r) => ({
+      id: r.id, customerNumber: r.customer_number, name: r.data?.customer_name,
+      address: r.data?.service_address, phone: r.data?.phone, email: r.data?.email,
+    }));
+    const duplicates = findDuplicateCustomerPairs(customersForPairs);
+    // Owner defect report (2026-09-22): different-name-same-address pairs,
+    // never proposed for auto-merge and never counted in `duplicates` above
+    // (see planPossibleDuplicates's own doc comment) — the Inbox "Duplicates"
+    // chip and both customer profiles read this field to stop showing 0.
+    const possibleDuplicates = planPossibleDuplicates(customersForPairs, { keepSeparatePairs });
 
-    return handleCors(res, req).status(200).json({ customers: data, duplicates });
+    return handleCors(res, req).status(200).json({ customers: data, duplicates, possibleDuplicates });
   } catch (error) {
     return handleError(res, error, req);
   }
@@ -277,11 +448,13 @@ export async function customer(req, res) {
         const name = normalizeMatchText(row.data?.customer_name);
         const address = normalizeMatchText(row.data?.service_address);
 
-        const [equipmentRows, linkRows, nameMatchRows, duplicateRows] = await Promise.all([
+        const [equipmentRows, linkRows, nameMatchRows, duplicateRows, keepSeparatePairs, dismissedAlertKeys] = await Promise.all([
           db.listCustomerEquipment(row.id),
           db.listCustomerDocumentLinks(row.id),
           db.listNameMatchedDocuments(name, address),
           db.listDuplicateCustomers(row.id, name, address),
+          loadKeepSeparatePairs(db),
+          loadDismissedAlertKeys(db),
         ]);
 
         const via = mergeDocumentVia([
@@ -290,12 +463,12 @@ export async function customer(req, res) {
         ]);
         const documentDetails = await db.listDocumentDetails(via.map((v) => v.documentId));
 
-        return { row, equipmentRows, via, documentDetails, duplicateRows, name, address };
+        return { row, equipmentRows, via, documentDetails, duplicateRows, keepSeparatePairs, dismissedAlertKeys, name, address };
       }
     );
 
     if (!result) throw new CustomerLookupError("Customer not found", 404);
-    const { row, equipmentRows, via, documentDetails, duplicateRows } = result;
+    const { row, equipmentRows, via, documentDetails, duplicateRows, keepSeparatePairs, dismissedAlertKeys } = result;
 
     const equipment = equipmentRows.map((u) => {
       const w = u.warranty ?? {};
@@ -309,6 +482,15 @@ export async function customer(req, res) {
         warranty: { tier: alertTier(w, today), expires: w.expires ?? null, daysLeft },
       };
     });
+
+    // Header alert count (owner defect report 2026-09-22, item 2b): counts
+    // undismissed alerts only — the per-unit status line above is shown
+    // regardless, since that's a status, not an alert.
+    const alertCount = countWarrantyAlerts(
+      equipmentRows.map((u) => ({ ...(u.warranty ?? {}), id: u.id })),
+      today,
+      dismissedAlertKeys
+    );
 
     const detailById = new Map(documentDetails.map((d) => [d.id, d]));
     const documents = via
@@ -349,6 +531,10 @@ export async function customer(req, res) {
     timeline.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
     const duplicates = duplicateRows
+      // "Keep separate" (owner defect report 2026-09-22): a pair a person has
+      // already confirmed is not the same customer must never show up again
+      // on either profile — see reviewStore.js's keepCustomersSeparate.
+      .filter((r) => !keepSeparatePairs.has(possibleDuplicatePairKey(row.id, r.id)))
       .map((r) => {
         const reason = duplicateReason(
           result.name, result.address,
@@ -375,6 +561,7 @@ export async function customer(req, res) {
       documents,
       timeline,
       duplicates,
+      alertCount,
     });
   } catch (error) {
     if (error?.name === "CustomerLookupError") {

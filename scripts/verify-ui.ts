@@ -41,6 +41,8 @@ import { isAdminRole, seatStatus } from '../src/services/teamClient';
 import { unreadBadgeLabel, parseNotificationLink } from '../src/services/notifyClient';
 import { sentThisMonth, type OutreachMessage } from '../src/services/outreachClient';
 import { docsMatchingFilter } from '../src/screens/ReviewScreen';
+import { matchesCustomerScope } from '../src/core/customer';
+import { technicianFromNotes, shopRecordTechnician } from '../src/core/shopRecords';
 import { selectIngestProgress } from '../src/store/appStore';
 import type { IngestProgress } from '../src/services/ingestClient';
 import {
@@ -1144,6 +1146,84 @@ function listFilesRecursive(dir: string): string[] {
     check('groupExtractionsByUnit: a unit with no linked extraction reports no equipment entity id', g.units[1]?.equipmentEntityId === null);
     eq('groupExtractionsByUnit: a corrected value wins over the raw one in the label', groupExtractionsByUnit([f('equipment_id', 'x', { unitIndex: 1 }), f('serial_number', 'raw', { unitIndex: 1, correctedValue: 'fixed' })]).units[0]?.label, 'Unit 1 · x · serial fixed');
   }
+}
+
+/* ------------------------------------------------- shopRecordTechnician
+ * Owner defect report (2026-09-22), item 4: mirrors
+ * api/_lib/documentTypes.js's extractTechnicianFromNotes exactly (src/
+ * cannot import api/) — the Shop records list's technician chip/filter. */
+{
+  eq('technicianFromNotes: the owner\'s own example', technicianFromNotes('Truck #4 due for oil change. Tech: Kevin Pratt'), 'Kevin Pratt');
+  eq('technicianFromNotes: no match -> null', technicianFromNotes('Counted 40 capacitors in stock.'), null);
+
+  const baseDoc = (overrides: Partial<Doc> = {}): Doc => ({
+    id: 'doc-shop-1',
+    filename: 'shop-note.pdf',
+    fileType: 'pdf',
+    pages: 1,
+    batchId: 'b1',
+    source: 'drive',
+    receivedAt: new Date('2026-01-01'),
+    typeId: null,
+    stage: 'verified',
+    extracted: [],
+    linkedEntityIds: [],
+    linkConfidence: 0,
+    issues: [],
+    preview: '',
+    ...overrides,
+  });
+  const notesField = (value: string) => ({ name: 'notes', value, confidence: 0.95, location: {} });
+
+  const shopDoc = baseDoc({ typeId: 'internal', extracted: [notesField('Truck #4 due for oil change. Tech: Kevin Pratt')] });
+  eq('shopRecordTechnician: reads an internal document\'s own notes', shopRecordTechnician(shopDoc), 'Kevin Pratt');
+
+  const nonShopDoc = baseDoc({ typeId: 'service-ticket', extracted: [notesField('Tech: Kevin Pratt')] });
+  eq('shopRecordTechnician: null for any type other than "internal" (a different signal for real jobs)', shopRecordTechnician(nonShopDoc), null);
+
+  const shopDocNoNotes = baseDoc({ typeId: 'internal', extracted: [] });
+  eq('shopRecordTechnician: null with no notes field at all', shopRecordTechnician(shopDocNoNotes), null);
+}
+
+/* ------------------------------------------------- matchesCustomerScope
+ * Owner defect report (2026-09-22), item 3: opening a document from a
+ * customer's profile used to drop you into the unscoped Inbox "All" filter
+ * (239 documents), losing which customer it came from. The "Customer: X ×"
+ * chip's filtering rule, pinned with a plain fixture — no store, no render. */
+{
+  const custA: Entity = { id: 'cust-a', type: 'customer', fields: { customer_name: 'Plaza Dental Group' } };
+  const custB: Entity = { id: 'cust-b', type: 'customer', fields: { customer_name: 'Desert Ridge Dental' } };
+  const equip: Entity = { id: 'eq-1', type: 'equipment', fields: { customerId: 'cust-a' } };
+  const entities: Record<string, Entity> = { 'cust-a': custA, 'cust-b': custB, 'eq-1': equip };
+
+  const baseDoc = (overrides: Partial<Doc> = {}): Doc => ({
+    id: 'doc-scope-1',
+    filename: 'x.pdf',
+    fileType: 'pdf',
+    pages: 1,
+    batchId: 'b1',
+    source: 'drive',
+    receivedAt: new Date('2026-01-01'),
+    typeId: null,
+    stage: 'received',
+    extracted: [],
+    linkedEntityIds: [],
+    linkConfidence: 0,
+    issues: [],
+    preview: '',
+    ...overrides,
+  });
+
+  const linkedDirect = baseDoc({ linkedEntityIds: ['cust-a'] });
+  const linkedViaEquipment = baseDoc({ linkedEntityIds: ['eq-1'] }); // no direct customer link, only its unit
+  const linkedOther = baseDoc({ linkedEntityIds: ['cust-b'] });
+  const unlinked = baseDoc({ linkedEntityIds: [] });
+
+  check('no scope set -> every document is in scope', matchesCustomerScope(linkedOther, entities, null));
+  check('directly linked to the scoped customer -> in scope', matchesCustomerScope(linkedDirect, entities, 'cust-a'));
+  check('linked only via its equipment\'s customer -> still in scope (the exact "Margaret Henderson" case)', matchesCustomerScope(linkedViaEquipment, entities, 'cust-a'));
+  check('linked to a DIFFERENT customer -> out of scope', !matchesCustomerScope(linkedOther, entities, 'cust-a'));
+  check('not linked to any customer at all -> out of scope once a scope is set', !matchesCustomerScope(unlinked, entities, 'cust-a'));
 }
 
 /* ------------------------------------------------------------------ done */

@@ -6,6 +6,7 @@ import mergeTenant from "./_lib/routes/merge-tenant.js";
 import notifications from "./_lib/routes/notifications.js";
 import outreach from "./_lib/routes/outreach.js";
 import followups from "./_lib/routes/followups.js";
+import expenses from "./_lib/routes/expenses.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -18,13 +19,14 @@ import followups from "./_lib/routes/followups.js";
  *   GET/POST notifications    -> ?action=notifications (bell icon list, mark read, digest toggle)
  *   POST outreach             -> ?action=outreach (warranty-upsell email drafts, settings, send)
  *   POST followups            -> ?action=followups (missing-info technician follow-ups, settings, run)
+ *   POST expenses             -> ?action=expenses (DeepWell's own business expenses; platform-operator only)
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 60 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

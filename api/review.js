@@ -66,7 +66,7 @@ const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide'
 // (reviewStore.reclassifyDocuments) does, as a Haiku fallback when its
 // deterministic heuristic can't place a document — see RECLASSIFY_MODEL in
 // reviewStore.js.
-const MODEL_BILLED_ACTIONS = new Set(['reclassify']);
+const MODEL_BILLED_ACTIONS = new Set(['reclassify', 'extractReminders']);
 
 // Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
 // renumbers/retires customer or equipment records, so on a Clerk org tenant
@@ -120,6 +120,12 @@ const ACTIONS = new Set([
   'updateCustomer',
   'assignDocumentCustomer',
   'mergeCustomers',
+  'keepCustomersSeparate',
+  'dismissAlert',
+  'remindersList',
+  'reminderDone',
+  'createCustomerAndAttachReminder',
+  'extractReminders',
   'integrityScan',
   'integrityFix',
   'missReport',
@@ -230,6 +236,24 @@ export default async (req, res) => {
         requireAdminForMerge(auth);
         result = await reviewStore.mergeCustomers(ctx, payload, auth.userId);
         break;
+      case 'keepCustomersSeparate':
+        result = await reviewStore.keepCustomersSeparate(ctx, payload, auth.userId);
+        break;
+      case 'dismissAlert':
+        result = await reviewStore.dismissAlert(ctx, payload, auth.userId);
+        break;
+      case 'remindersList':
+        result = await reviewStore.remindersList(ctx, payload);
+        break;
+      case 'reminderDone':
+        result = await reviewStore.reminderDone(ctx, payload, auth.userId);
+        break;
+      case 'createCustomerAndAttachReminder':
+        result = await reviewStore.createCustomerAndAttachReminder(ctx, payload, auth.userId);
+        break;
+      case 'extractReminders':
+        result = await reviewStore.extractReminders(ctx, payload, auth.userId);
+        break;
       case 'integrityScan':
         result = await integrityScan(ctx);
         break;
@@ -336,7 +360,7 @@ export default async (req, res) => {
     return res.json(result ?? null);
   } catch (err) {
     if (err instanceof reviewStore.ReviewError) {
-      return res.status(err.status).json({ error: err.message });
+      return res.status(err.status).json({ error: err.message, ...(err.details ? { details: err.details } : {}) });
     }
     // Log the detail, return none of it — same reasoning as api/records.ts.
     console.error('review API error:', err);

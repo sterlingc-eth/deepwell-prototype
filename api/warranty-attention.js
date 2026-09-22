@@ -4,6 +4,7 @@ import { withTenant } from "./_lib/recordsStore.js";
 import { describeWarranty, addDays, ruleCoverage, isPlausibleToday, alertTier, upsell, daysBetween } from "./_lib/warrantyRules.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit } from "./_lib/rateLimit.js";
+import { loadDismissedAlertKeys, dismissedAlertKey } from "./_lib/routes/customers.js";
 
 /**
  * POST /api/warranty-attention
@@ -83,10 +84,10 @@ export async function getWarrantyAttention(auth, params) {
   const EXPIRED_LOOKBACK_DAYS = 730;
   const fetchExpiringWithin = Math.max(expiringWithin, ALERT_TIER_HORIZON_DAYS);
 
-  const rows = await withTenant(
+  const { rows, dismissedAlertKeys } = await withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-    (db) =>
-      db.listWarrantyAttention({
+    async (db) => ({
+      rows: await db.listWarrantyAttention({
         registerFrom: addDays(today, -registerLookback),
         registerTo: addDays(today, registerWithin),
         // Include units that expired within the last two years: an expired
@@ -94,7 +95,12 @@ export async function getWarrantyAttention(auth, params) {
         // upsell signal there is, and the 'expired' alert tier needs them.
         expiringFrom: addDays(today, -EXPIRED_LOOKBACK_DAYS),
         expiringTo: addDays(today, fetchExpiringWithin),
-      })
+      }),
+      // Dismissed alerts (owner defect report 2026-09-22, item 2a) are
+      // dropped below, before counts/summary are computed, so the Dashboard
+      // count and this endpoint's own `summary` never include them.
+      dismissedAlertKeys: await loadDismissedAlertKeys(db),
+    })
   );
 
   const items = rows
@@ -129,8 +135,9 @@ export async function getWarrantyAttention(auth, params) {
     })
     // A row is kept if the legacy urgency logic names an action OR it lands
     // in one of the new fixed alert tiers (the two horizons can disagree —
-    // see ALERT_TIER_HORIZON_DAYS above).
-    .filter((i) => i.action || (i.tier !== 'ok' && i.tier !== 'unknown'));
+    // see ALERT_TIER_HORIZON_DAYS above). A dismissed {equipmentId, tier}
+    // pair is dropped here too, before urgency/tier counts are computed.
+    .filter((i) => (i.action || (i.tier !== 'ok' && i.tier !== 'unknown')) && !dismissedAlertKeys.has(dismissedAlertKey(i.entityId, i.tier)));
 
   const order = { register_urgent: 0, register_soon: 1, register_missed: 2, expiring: 3, expired: 4 };
   items.sort((a, b) => (order[a.urgency] ?? 9) - (order[b.urgency] ?? 9));

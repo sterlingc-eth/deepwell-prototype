@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { authHeader, setAuthTokenProvider } from './services/authToken';
 import { fetchDocumentStatus, isProcessingTerminal, pollDocumentStatusChunked } from './services/ingestClient';
 import { billingClient } from './services/billingClient';
+import { fetchExpensesOperatorStatus } from './services/expensesClient';
 import { useAppStore } from './store/appStore';
 import { DEFAULT_CUSTOMER_FILTERS } from './core/customerFilters';
 import { usePostgresSync } from './hooks/usePostgresSync';
@@ -17,6 +18,8 @@ import './index.css';
 const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen').then((m) => ({ default: m.WarrantyExportScreen })));
 // Reached from the Dashboard or a deep link only (not primary nav) — lazy same as WarrantyExportScreen.
 const OutreachScreen = lazy(() => import('./screens/OutreachScreen').then((m) => ({ default: m.OutreachScreen })));
+// Owners-only, operator-gated — most sessions never open it, so it's lazy too.
+const ExpensesScreen = lazy(() => import('./screens/ExpensesScreen').then((m) => ({ default: m.ExpensesScreen })));
 
 // Same flag main.tsx reads to decide whether to bootstrap the HVAC fixture.
 // In demo mode the fixture IS the data — real sync stays off so it can never
@@ -193,6 +196,27 @@ function App() {
       cancelled = true;
     };
   }, [isSignedIn, orgId, setBillingStatus]);
+
+  // Owners-only expense tracker (handoffs/EXPENSES_2026-09-22.md): fetched
+  // once here, same idiom as billingStatus above — cheap (no DB work at
+  // all, see api/_lib/routes/expenses.js's operatorStatus op), and never
+  // guessed client-side. A failed fetch just leaves it false (AppShell's
+  // nav item stays hidden), same fail-closed default as isAdmin's absence.
+  const setIsPlatformOperator = useAppStore((s) => s.setIsPlatformOperator);
+  useEffect(() => {
+    if (DEMO_MODE || !isSignedIn || !orgId) return;
+    let cancelled = false;
+    void fetchExpensesOperatorStatus()
+      .then((r) => {
+        if (!cancelled) setIsPlatformOperator(r.isOperator);
+      })
+      .catch(() => {
+        /* best effort — fail closed (nav item stays hidden) */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, orgId, setIsPlatformOperator]);
 
   // Reviewer NO-GO (2026-09-21), belt-and-suspenders alongside useDeepLink's
   // TTL and its own ready-gated clear: once billing status itself confirms
@@ -399,6 +423,12 @@ function App() {
         return (
           <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
             <OutreachScreen />
+          </Suspense>
+        );
+      case 'expenses':
+        return (
+          <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
+            <ExpensesScreen />
           </Suspense>
         );
       default:

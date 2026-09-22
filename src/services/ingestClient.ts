@@ -163,9 +163,25 @@ export interface PresignResultItem {
   status?: number;
 }
 
+// API_PERF_2026-09-22: same in-flight de-duplication as documentClient.ts's
+// getOriginalUrl, applied to the single-file presign call. Keyed on sha256 —
+// the value that makes two presign requests for the SAME file idempotent
+// server-side anyway (see api/upload-url.js's dedupe-by-hash) — so two
+// concurrent callers presigning the same bytes share one request instead of
+// firing two. Not a cache: the entry is removed as soon as the request
+// settles, so a later, genuinely new presign for the same file always hits
+// the network.
+const inFlightPresign = new Map<string, Promise<PresignResultItem>>();
+
 /** Presign one file. Thin wrapper so single-file and bulk-fallback paths share it. */
 export async function requestUploadUrl(body: PresignRequestItem, signal?: AbortSignal): Promise<PresignResultItem> {
-  return postJson<PresignResultItem>('/api/upload-url', body, signal);
+  const existing = inFlightPresign.get(body.sha256);
+  if (existing) return existing;
+  const request = postJson<PresignResultItem>('/api/upload-url', body, signal).finally(() => {
+    inFlightPresign.delete(body.sha256);
+  });
+  inFlightPresign.set(body.sha256, request);
+  return request;
 }
 
 /** Presign up to 50 files in one request — the batch path bulk import uses. */

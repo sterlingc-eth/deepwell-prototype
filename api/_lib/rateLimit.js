@@ -35,6 +35,8 @@
  */
 import { getAuxPool } from "./apiKeyAuth.js";
 import { PLAN_LIMITS } from "./plan.js";
+import { getTenantContext } from "./recordsStore.js";
+import { logStage } from "./perf.js";
 
 /**
  * bucket -> defaults. Overridable per tenant via tenants.limits (see below).
@@ -163,55 +165,54 @@ export function scaleDailyLimitForPlan(bucket, baseDaily, tenantLimits) {
   return Math.round(baseDaily * (PLAN_INGEST_MULTIPLIER[tier] ?? 1));
 }
 
-async function resolveLimits(tenantUuid, bucket, overrides) {
+/**
+ * Pure: given a tenant's already-fetched `limits` jsonb (get_tenant_limits()'s
+ * shape — see M3-config/24), work out perMinute/perDay for `bucket`. Split out
+ * from the old resolveLimits() (API_PERF_2026-09-22) so the DB round trip that
+ * used to happen HERE now happens once, cached, in recordsStore.js's
+ * getTenantContext() instead — this function itself makes no DB call and
+ * never fails, so it needs no try/catch of its own.
+ */
+export function limitsFromTenantContext(tenantLimits, bucket, overrides) {
   const base = envLimits(bucket);
-  if (!tenantUuid) return base;
-  try {
-    // get_tenant_limits() (M3-config/24) folds tenants.plan into the JSON it
-    // returns, so planTierFromLimits sees the subscription tier even when no
-    // per-tenant override was ever written. Before 24 is pasted the JSON has
-    // no plan and every tenant gets the conservative Solo-sized daily cap
-    // (live 2026-09-21: the Fleet founder account hit "Daily limit of 900").
-    const { rows } = await getAuxPool().query("SELECT get_tenant_limits($1) AS limits", [tenantUuid]);
-    const tenantLimits = rows[0]?.limits ?? {};
-    const tenantOverride = tenantLimits?.[bucket] ?? {};
-    const callerOverride = overrides ?? {};
-    // Plan-sized daily ceilings — see PLAN_DAILY_ASKS above. An explicit
-    // `limits.<bucket>.perDay` override on the tenant still wins.
-    const scaled = scaleDailyLimitForPlan(bucket, base.perDay, tenantLimits);
-    return {
-      perMinute: Number.isFinite(callerOverride.perMinute)
-        ? callerOverride.perMinute
-        : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : base.perMinute,
-      perDay: Number.isFinite(callerOverride.perDay)
-        ? callerOverride.perDay
-        : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : scaled,
-    };
-  } catch (err) {
-    // A limits lookup failing must never be the reason a legitimate request
-    // is refused, and must never be the reason a limit silently stops
-    // applying either — fall back to the safe, conservative default rather
-    // than an unlimited one.
-    console.error("rateLimit: could not read tenant limits, using defaults:", err?.message);
-    return base;
-  }
+  const tenantOverride = tenantLimits?.[bucket] ?? {};
+  const callerOverride = overrides ?? {};
+  // Plan-sized daily ceilings — see PLAN_DAILY_ASKS above. An explicit
+  // `limits.<bucket>.perDay` override on the tenant still wins.
+  const scaled = scaleDailyLimitForPlan(bucket, base.perDay, tenantLimits);
+  return {
+    perMinute: Number.isFinite(callerOverride.perMinute)
+      ? callerOverride.perMinute
+      : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : base.perMinute,
+    perDay: Number.isFinite(callerOverride.perDay)
+      ? callerOverride.perDay
+      : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : scaled,
+  };
 }
 
 /**
  * Resolve a tenantKey (Clerk org id, or `user_${id}` — see auth.js /
- * apiKeyAuth.js) to the tenant uuid, via the same resolve_tenant() every
- * withTenant() call already uses. Safe to call repeatedly: idempotent, and
- * every authenticated route already triggers it once per request through
- * withTenant() — this adds one more indexed lookup, not a new kind of write.
+ * apiKeyAuth.js) to {tenantUuid, limits} in ONE call — API_PERF_2026-09-22:
+ * this used to be two separate round trips (resolve_tenant, then
+ * get_tenant_limits), each its own try/catch. Both now come from
+ * recordsStore.js's getTenantContext(), which is itself cached 5 minutes per
+ * warm instance (see its own doc comment) and shared with withTenant() and
+ * plan.js, so the common case — a tenant this instance has already seen in
+ * the last 5 minutes — costs zero DB round trips here.
+ *
+ * FAILS OPEN, same contract the two functions this replaces both had: a
+ * lookup failure must never be the reason a legitimate request is refused,
+ * and must never be the reason a limit silently stops applying either.
  */
-async function resolveTenantUuid(tenantKey) {
-  if (!tenantKey) return null;
+async function resolveTenantAndLimits(tenantKey, bucket, overrides) {
+  const base = envLimits(bucket);
+  if (!tenantKey) return { tenantUuid: null, limits: base };
   try {
-    const { rows } = await getAuxPool().query("SELECT resolve_tenant($1, $2) AS id", [tenantKey, tenantKey]);
-    return rows[0]?.id ?? null;
+    const ctx = await getTenantContext(tenantKey, tenantKey);
+    return { tenantUuid: ctx.id, limits: limitsFromTenantContext(ctx.limits, bucket, overrides) };
   } catch (err) {
-    console.error("rateLimit: could not resolve tenant:", err?.message);
-    return null;
+    console.error("rateLimit: could not resolve tenant/limits, using defaults:", err?.message);
+    return { tenantUuid: null, limits: base };
   }
 }
 
@@ -274,9 +275,10 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
   const tenantKey = auth?.tenantId;
   const now = Date.now();
   const units = Number.isFinite(cost) && cost > 0 ? Math.trunc(cost) : 1;
+  const stageStart = now;
 
-  const tenantUuid = await resolveTenantUuid(tenantKey);
-  const limits = await resolveLimits(tenantUuid, bucket, overrides);
+  const { tenantUuid, limits } = await resolveTenantAndLimits(tenantKey, bucket, overrides);
+  logStage({ t: "ratelimit_resolve", bucket, ms: Date.now() - stageStart });
 
   // A tenant that could not be resolved (a transient DB error — resolve_tenant
   // itself upserts a row on first sight, so this is not the ordinary case)
@@ -330,6 +332,7 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
     }
   }
 
+  logStage({ t: "ratelimit", bucket, ms: Date.now() - stageStart });
   return true;
 }
 

@@ -83,8 +83,39 @@ export const REQUIRED_FIELDS = {
 
 /** Facts a shop-internal document is allowed to carry (see
  *  isShopInternalDocument below) — its own letterhead facts plus a free-text
- *  note or status, and nothing that ties it to any customer, unit or job. */
+ *  note or status, and nothing that ties it to any customer, unit or job.
+ *  `technician` deliberately still disqualifies (see verify-doctypes.mjs):
+ *  a NAMED technician tied to actual customer work is a job worth linking,
+ *  not shop chatter. A truck-maintenance note's "Tech: Kevin Pratt" is
+ *  pulled separately, from `notes`, by extractTechnicianFromNotes below —
+ *  that never touches classification, only the Shop records chip/filter. */
 const SHOP_INTERNAL_ALLOWED_FIELDS = new Set(['shop_address', 'shop_phone', 'shop_email', 'notes', 'status']);
+
+/**
+ * Best-effort technician name off an internal document's free-text `notes`
+ * (owner defect report 2026-09-22, item 4) — "Truck #4 due for oil change,
+ * see shop manager. Tech: Kevin Pratt" -> "Kevin Pratt". Deliberately NOT
+ * the same signal as the `technician` field_key (which names whoever did
+ * CUSTOMER work and rightly disqualifies isShopInternalDocument above) —
+ * this only ever reads a shop-internal document's own notes, purely for
+ * display: a chip on the Shop records list and something to filter it by.
+ * Pure, no model call: internal notes are short and this one phrasing
+ * ("Tech:" / "Technician:") is what the shop's own dispatch notes use.
+ */
+export function extractTechnicianFromNotes(notes) {
+  const s = String(notes ?? '');
+  // Prefix ("Tech:"/"Technician:", any case) located first; the name itself
+  // is then read case-SENSITIVELY (each word must start with a capital) so
+  // it stops at the next ordinary lowercase word ("Tech: Maria Alvarez
+  // completed the count" -> "Maria Alvarez", not swallowing "completed").
+  const prefixMatch = s.match(/\btech(?:nician)?s?\s*[:-]\s*/i);
+  if (!prefixMatch) return null;
+  const rest = s.slice(prefixMatch.index + prefixMatch[0].length);
+  const nameMatch = rest.match(/^([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,2})/);
+  if (!nameMatch) return null;
+  const name = nameMatch[1].replace(/\s+/g, ' ').trim();
+  return name || null;
+}
 
 /**
  * True when a document's only non-empty extracted facts are its own shop_*
@@ -140,6 +171,9 @@ export const FIELD_LABELS = {
   permit_number: 'Permit number',
   agreement_term: 'Agreement term',
   vendor: 'Vendor',
+  reminder_text: 'Reminder',
+  reminder_customer_name: 'Reminder — customer',
+  reminder_trigger: 'Reminder trigger',
 };
 
 export function fieldLabel(fieldKey) {

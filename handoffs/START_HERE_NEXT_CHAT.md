@@ -157,3 +157,26 @@ one implementation agent + one reviewer per round; avoid re-reading big files.
   run Customers → Check records → Fix everything, then merge.
 - Rate limits: migration 24 makes daily caps plan-sized; 99 lifts the founder
   tenant's caps for testing.
+
+## 2026-09-22 (evening) — owner-found defects, reminders, perf, expenses (deploy-0922f..j)
+- Shop records: reclassify + integrity `classifyShopRecords` file customer-less memos
+  (parts counts, truck notes) as 'internal', SQL-guarded so a linked doc can't be.
+- Customers: sortable column headers; alert tooltip; possible-duplicate pairs
+  (same address, different name) now surfaced with Merge / Keep separate, never
+  auto-merged; add-customer warns at an existing address; alerts dismissable with
+  undo (audit_log alert.dismissed) and profile shows plain warranty status;
+  clicking a document on a customer opens in place; Inbox customer scope chip;
+  uploader chip always visible; shop records tech chip + hide toggle.
+- Reminders (handoffs/REMINDERS_2026-09-22.md): memo/dispatch reminder fields,
+  link by named customer, open/done via audit_log, profile strip, "Find reminders"
+  backfill (≤20 model calls), Donovan "any reminders for X".
+- API perf (handoffs/API_PERF_2026-09-22.md): tenant-context/billing/limits caches
+  with webhook bust, pooled keepAlive, batched notifications, client dedupe;
+  optional M3-config/27-request-context.sql. Owner: use Neon pooled host + keep
+  compute awake (paid tier) for the last 1–2 s.
+- Expenses (handoffs/EXPENSES_2026-09-22.md): owners-only screen (operator gate),
+  M3-config/28-expenses.sql, receipt extract, CSV export, seed button with the
+  three Anthropic receipts. public/expense-tracker.html now redirects.
+- PROCESS CHANGE: every UI round gets a live click-through of the real app before
+  it's called done (owner found a navigation bug code review missed).
+- Neon paste list still open for the owner: 25 (corrected), 26, 27, 28.

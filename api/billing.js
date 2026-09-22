@@ -1,6 +1,6 @@
 import { requireAuth, denyAuth, hasShop, requireRole } from "./_lib/auth.js";
 import { handleCors, handleError } from "./_lib/claude.js";
-import { withTenant, getPool } from "./_lib/recordsStore.js";
+import { withTenant, getPool, bustTenantCache } from "./_lib/recordsStore.js";
 import {
   getStripe,
   createCheckoutSession,
@@ -211,6 +211,14 @@ async function handleWebhook(req, res) {
       return res.status(200).json({ received: true, handled: false, reason: "duplicate" });
     }
     await pool.query("SELECT billing_apply($1, $2::jsonb)", [tenantId, JSON.stringify(mapped.patch)]);
+    // Reviewer NO-GO (2026-09-22): billing_apply() just changed this tenant's
+    // plan/billing_status, but api/_lib/plan.js's and recordsStore.js's
+    // in-process caches (see handoffs/API_PERF_2026-09-22.md) don't know that
+    // yet. Bust them on THIS instance immediately — same-instance only; the
+    // caches' own short TTLs (30s for a gated 'none'/'canceled' row, 2 min
+    // otherwise) are what bound staleness on every OTHER instance, since a
+    // webhook has no way to reach them from here.
+    bustTenantCache(tenantId);
     return res.status(200).json({ received: true, handled: true });
   } catch (err) {
     console.error("billing webhook: apply failed:", err?.message);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Download, GitMerge, Loader2, Plus, Search, Users2, X } from 'lucide-react';
 import { formatYmd } from '../core/answer';
-import { customerClient, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSummary } from '../services/customerClient';
+import { customerClient, CustomerAddressConflictError, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSummary } from '../services/customerClient';
 import {
   ACTIVITY_OPTIONS,
   ALERTS_OPTIONS,
@@ -107,23 +107,34 @@ export function CustomersScreen() {
   const [draft, setDraft] = useState<CreateCustomerInput>({ name: '' });
   const [createErr, setCreateErr] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
+  // Owner defect report (2026-09-22): "Add customer" used to create a second
+  // record outright at an address that already had one on file — this is the
+  // "A customer already exists at this address: <name> — Open it / Add
+  // anyway" prompt (api/_lib/reviewStore.js's createCustomer 409).
+  const [addressConflict, setAddressConflict] = useState<{ id: string; name: string | null } | null>(null);
 
-  const runCreate = async () => {
+  const runCreate = async (confirmDuplicate = false) => {
     if (!draft.name.trim()) return;
     setCreateBusy(true);
     setCreateErr(null);
+    setAddressConflict(null);
     try {
       const { customer } = await customerClient.create({
         name: draft.name.trim(),
         serviceAddress: draft.serviceAddress?.trim() || undefined,
         phone: draft.phone?.trim() || undefined,
         email: draft.email?.trim() || undefined,
+        confirmDuplicate,
       });
       setCreating(false);
       setDraft({ name: '' });
       openCustomer(customer.id);
     } catch (e) {
-      setCreateErr(e instanceof Error ? e.message : 'Could not create that customer.');
+      if (e instanceof CustomerAddressConflictError) {
+        setAddressConflict({ id: e.existingCustomerId, name: e.existingCustomerName });
+      } else {
+        setCreateErr(e instanceof Error ? e.message : 'Could not create that customer.');
+      }
     } finally {
       setCreateBusy(false);
     }
@@ -280,6 +291,21 @@ export function CustomersScreen() {
         <div className="dw-card p-4 space-y-3">
           <h3 className="text-h4">New customer</h3>
           {createErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">{createErr}</p>}
+          {addressConflict && (
+            <div role="alert" className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 space-y-2">
+              <p className="text-caption text-warn-ink dark:text-brass-200">
+                A customer already exists at this address: {addressConflict.name || 'Unnamed'}.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" onClick={() => { const id = addressConflict.id; setCreating(false); setAddressConflict(null); openCustomer(id); }}>
+                  Open it
+                </button>
+                <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" disabled={createBusy} onClick={() => void runCreate(true)}>
+                  Add anyway
+                </button>
+              </div>
+            </div>
+          )}
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="dw-label" htmlFor="new-cust-name">Name</label>
@@ -299,10 +325,10 @@ export function CustomersScreen() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" className="dw-btn-primary" disabled={!draft.name.trim() || createBusy} onClick={() => void runCreate()}>
+            <button type="button" className="dw-btn-primary" disabled={!draft.name.trim() || createBusy} onClick={() => void runCreate(false)}>
               {createBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />} Create
             </button>
-            <button type="button" className="dw-btn-tertiary" onClick={() => { setCreating(false); setCreateErr(null); }}>
+            <button type="button" className="dw-btn-tertiary" onClick={() => { setCreating(false); setCreateErr(null); setAddressConflict(null); }}>
               <X className="w-4 h-4" aria-hidden="true" /> Cancel
             </button>
           </div>

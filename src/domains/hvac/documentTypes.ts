@@ -89,6 +89,9 @@ export const FIELD_LABELS: Record<string, string> = {
   permit_number: 'Permit number',
   agreement_term: 'Agreement term',
   vendor: 'Vendor',
+  reminder_text: 'Reminder',
+  reminder_customer_name: 'Reminder — customer',
+  reminder_trigger: 'Reminder trigger',
 };
 
 export function fieldLabel(fieldKey: string): string {

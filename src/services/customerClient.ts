@@ -78,6 +78,27 @@ async function postAction<T>(action: string, payload: Record<string, unknown>): 
   return res.json() as Promise<T>;
 }
 
+/** Separate from postAction only so a 409 can be re-thrown as the typed
+ *  CustomerAddressConflictError the "Open it / Add anyway" prompt needs
+ *  (details.existingCustomerId/existingCustomerName) — every other action
+ *  above never needs structured error data, just the message string. */
+async function postCreateCustomer(input: CreateCustomerInput): Promise<{ customer: CustomerRecord & Record<string, unknown> }> {
+  const res = await fetch(REVIEW_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify({ action: 'createCustomer', ...input }),
+  });
+  if (!res.ok) {
+    const { message, body } = await parseErrorBody(res);
+    const details = (body as { details?: { existingCustomerId?: string; existingCustomerName?: string | null } } | null)?.details;
+    if (res.status === 409 && details?.existingCustomerId) {
+      throw new CustomerAddressConflictError(message, details.existingCustomerId, details.existingCustomerName ?? null);
+    }
+    throw new Error(message);
+  }
+  return res.json() as Promise<{ customer: CustomerRecord & Record<string, unknown> }>;
+}
+
 /* ------------------------------------------------------------------ types */
 
 export interface CustomerSummary {
@@ -125,9 +146,24 @@ export interface CustomerDuplicatePair {
   reason: string;
 }
 
+/** Owner defect report (2026-09-22): a same-address, DIFFERENT-name pair
+ *  (api/_lib/routes/customers.js's planPossibleDuplicates) — never proposed
+ *  for auto-merge, so unlike CustomerDuplicatePair it carries no
+ *  score/tier/evidence. `keepId`/`dropId` are only the default fuller-name
+ *  suggestion for the Merge action; `aId`/`bId` are the pair's actual
+ *  identity for "Keep separate" (order doesn't matter there). */
+export interface CustomerPossibleDuplicatePair {
+  aId: string;
+  bId: string;
+  keepId: string;
+  dropId: string;
+  reason: 'same address, different name' | 'likely typo';
+}
+
 interface CustomersResponse {
   customers: CustomerSummary[];
   duplicates?: CustomerDuplicatePair[];
+  possibleDuplicates?: CustomerPossibleDuplicatePair[];
 }
 
 export interface CustomerEquipment {
@@ -184,6 +220,10 @@ export interface CustomerDetail {
   documents: CustomerDocument[];
   timeline: CustomerTimelineEntry[];
   duplicates: CustomerDuplicate[];
+  /** Undismissed warranty alerts across this customer's units (owner defect
+   *  report 2026-09-22, item 2b) — the per-unit status line shows
+   *  regardless of dismissal; only this header count excludes them. */
+  alertCount: number;
 }
 
 export interface CustomerPatch {
@@ -200,6 +240,49 @@ export interface CreateCustomerInput {
   phone?: string;
   email?: string;
   notes?: string;
+  /** "Add anyway" — skip the same-address duplicate check below. */
+  confirmDuplicate?: boolean;
+}
+
+/**
+ * Thrown by `create` when `serviceAddress` matches a customer already on
+ * file (api/_lib/reviewStore.js's createCustomer, owner defect report
+ * 2026-09-22) — carries what the "Open it / Add anyway" prompt needs so the
+ * caller never has to re-fetch or re-parse anything.
+ */
+export class CustomerAddressConflictError extends Error {
+  existingCustomerId: string;
+  existingCustomerName: string | null;
+  constructor(message: string, existingCustomerId: string, existingCustomerName: string | null) {
+    super(message);
+    this.name = 'CustomerAddressConflictError';
+    this.existingCustomerId = existingCustomerId;
+    this.existingCustomerName = existingCustomerName;
+  }
+}
+
+/** One open reminder (CUSTOMER REMINDERS build, 2026-09-22) — see
+ *  api/_lib/reminders.js's listOpenReminders, the shape this mirrors
+ *  one-for-one. */
+export interface CustomerReminder {
+  documentId: string;
+  reminderText: string | null;
+  /** 'next_visit', a YYYY-MM-DD date, or null. */
+  reminderTrigger: string | null;
+  reminderCustomerName: string | null;
+  createdAt: string | null;
+  filename: string | null;
+  documentType: string | null;
+  customerId: string | null;
+  customerName: string | null;
+}
+
+export interface CreateCustomerAndAttachResult {
+  usedExisting: boolean;
+  ambiguous: boolean;
+  candidates?: { id: string; name: string | null; address: string | null }[];
+  customer?: Record<string, unknown>;
+  document?: Record<string, unknown>;
 }
 
 /* --------------------------------------------------------------- reading */
@@ -218,7 +301,9 @@ function buildQuery(params: Record<string, string | number | undefined | null>):
  *  `.duplicates` list (handoffs/DATA_INTEGRITY_2026-09-20.md); a bare array
  *  is accepted too so this survives a partial rollout either direction. */
 function normalizeCustomersResponse(data: CustomersResponse | CustomerSummary[]): CustomersResponse {
-  return Array.isArray(data) ? { customers: data, duplicates: [] } : { customers: data.customers, duplicates: data.duplicates ?? [] };
+  return Array.isArray(data)
+    ? { customers: data, duplicates: [], possibleDuplicates: [] }
+    : { customers: data.customers, duplicates: data.duplicates ?? [], possibleDuplicates: data.possibleDuplicates ?? [] };
 }
 
 export const customerClient = {
@@ -253,7 +338,15 @@ export const customerClient = {
   /* --------------------------------------------------------------- writing */
 
   create(input: CreateCustomerInput): Promise<{ customer: CustomerRecord & Record<string, unknown> }> {
-    return postAction('createCustomer', { ...input });
+    return postCreateCustomer(input);
+  },
+
+  /** "Not the same" made durable (owner defect report 2026-09-22): records
+   *  that `aId`/`bId` are two genuinely different customers so neither the
+   *  Inbox "Duplicates" chip nor either profile ever suggests the pair again
+   *  — see api/_lib/reviewStore.js's keepCustomersSeparate. */
+  keepSeparate(aId: string, bId: string): Promise<{ ok: boolean; pairKey: string }> {
+    return postAction('keepCustomersSeparate', { aId, bId });
   },
 
   update(customerId: string, patch: CustomerPatch): Promise<{ customer: CustomerRecord & Record<string, unknown> }> {
@@ -266,5 +359,32 @@ export const customerClient = {
 
   merge(keepId: string, dropId: string): Promise<{ keep: Record<string, unknown>; dropped: Record<string, unknown> }> {
     return postAction('mergeCustomers', { keepId, dropId });
+  },
+
+  /** Dismiss (or undo dismissing) one unit's alert at one tier (owner defect
+   *  report 2026-09-22, item 2a) — an ordinary audit_log row
+   *  (action 'alert.dismissed'), latest-wins per {equipmentId, tier}, so
+   *  Undo is just dismissed:false and a NEW tier (expiring-90 -> expired)
+   *  always re-alerts. See api/_lib/reviewStore.js's dismissAlert. */
+  dismissAlert(equipmentId: string, tier: string, dismissed = true): Promise<{ ok: boolean }> {
+    return postAction('dismissAlert', { equipmentId, tier, dismissed });
+  },
+
+  /* ---------------------------------------------------------- reminders */
+
+  reminders(customerId: string): Promise<{ reminders: CustomerReminder[] }> {
+    return postAction('remindersList', { customerId });
+  },
+
+  reminderDone(documentId: string): Promise<{ ok: boolean; documentId: string }> {
+    return postAction('reminderDone', { documentId });
+  },
+
+  /** The "Fix this document" one-click: create (or reuse an existing fuzzy
+   *  match for) a customer named only in a document's reminder text, and
+   *  attach the document to it. See reviewStore.js's
+   *  createCustomerAndAttachReminder for the "never duplicate a match" rule. */
+  createAndAttachReminder(documentId: string, name: string): Promise<CreateCustomerAndAttachResult> {
+    return postAction('createCustomerAndAttachReminder', { documentId, name });
   },
 };
