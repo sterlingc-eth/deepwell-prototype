@@ -28,8 +28,10 @@
  * runContactLookup are the only functions here that touch `db`.
  */
 import { normalizeQuestion } from "./nlNormalize.js";
-import { ENTITY_SYNONYMS } from "./analytics.js";
+import { ENTITY_SYNONYMS, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
 import { documentTypeLabel } from "./documentTypes.js";
+import { significantAddressTokens, formatDateHuman } from "./fastPath.js";
+import { alertTier, BRAND_RULES } from "./warrantyRules.js";
 
 /* ============================================================ shape detection */
 
@@ -304,6 +306,104 @@ const LAST_TIME_AT_RE =
 const HOW_MANY_TIMES_RE =
   /^how\s+many\s+times\s+have\s+we\s+been\s+(?:to|out\s+to)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,3})\s*\??$/i;
 
+// Live 100-question persona sample (2026-09-22), cluster "named-unit
+// attribute questions": "Is the Salazar unit still under warranty?" / "what
+// model is the Prentiss system" / "how old is the Bracken unit" — a customer
+// named only by their equipment ("the <Name> unit/system/...") asking about
+// ONE attribute of it, in word orders none of shapes 1-3b above cover (the
+// attribute word can come before OR after the name, and "is"/"how old is"
+// isn't a field trigger FIELD_RE recognizes). Not anchored to the whole
+// string on purpose — unlike shapes 1-3b, the attribute word can sit
+// anywhere else in the sentence ("still under warranty?", "how old is...").
+//
+// "must not hijack an address form" (brief): NAME_UNIT_RE requires at least
+// one real word between "the" and the unit noun, so "the unit at 123 Main
+// St" — zero words there — never matches at all (the unit noun itself would
+// have to double as the name, then nothing is left to satisfy the mandatory
+// trailing noun literal): that question stays on the existing address path.
+// "must not hijack analytics" (brief): "how many units are under warranty"
+// has no "the <name>" immediately before the (plural, unmatched) unit noun,
+// so it never reaches here either — see isRealNamePhrase's own aggregate-word
+// guard for the belt-and-braces case where a name-shaped capture happens to
+// be one of analytics.js's own entity nouns.
+const NAMED_UNIT_NOUN_ALT = "unit|system|equipment|ac|air conditioner|furnace|heat pump";
+const NAMED_UNIT_RE = new RegExp(
+  `\\bthe\\s+([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z][A-Za-z'.-]*){0,2})\\s+(?:${NAMED_UNIT_NOUN_ALT})\\b`,
+  "i"
+);
+// Checked in this order (most specific first) against the WHOLE question —
+// warranty before serial/model, since "still under warranty" never also
+// contains a serial/model word, so order only matters for the (never
+// observed) case of a question naming two attributes at once, where the
+// first-listed one wins deterministically rather than by regex-engine luck.
+const UNIT_ATTRIBUTE_RE = {
+  warranty: /\bwarrant(?:y|ies)\b/i,
+  serial: /\bserial(?:\s*number)?\b/i,
+  model: /\bmodel(?:\s*number)?\b/i,
+  brand: /\bbrand\b|\bmanufacturer\b/i,
+  age: /\bhow\s+old\b|\bage\b/i,
+  installed: /\binstalled\b|\binstallation\s+date\b/i,
+  tonnage: /\btonnage\b|\bhow\s+many\s+tons\b/i,
+};
+const UNIT_ATTRIBUTE_ORDER = ["warranty", "serial", "model", "brand", "age", "installed", "tonnage"];
+// Distinct field ids (never collide with FIELD_ORDER's own 'serial' etc.,
+// which resolve against the CUSTOMER row, not the equipment list) so
+// buildResolvedAnswer (below) can tell "phone/email/address/serial [on the
+// customer row]" apart from "warranty/serial/model/... [on a named unit]"
+// without re-matching text.
+const UNIT_ATTRIBUTE_FIELD = {
+  warranty: "unitWarranty", serial: "unitSerial", model: "unitModel",
+  brand: "unitBrand", age: "unitAge", installed: "unitInstalled", tonnage: "unitTonnage",
+};
+export const NAMED_UNIT_FIELDS = new Set(Object.values(UNIT_ATTRIBUTE_FIELD));
+
+// Reviewer NO-GO (2026-09-22): "is the Trane unit under warranty" / "is the
+// new unit under warranty" both satisfy NAMED_UNIT_RE's shape (a word,
+// then "unit"), but "Trane"/"new" were never a customer's NAME — they're a
+// brand ("the Trane unit" means "whichever unit is a Trane", the existing
+// brand/equipment path's own territory) or a generic descriptor ("the new
+// unit" names no one at all). Treating either as a surname would then let
+// resolveContactCandidates' own fuzzy fallback scan (fuzzyNameMatches)
+// match some UNRELATED customer whose surname happens to be one edit away
+// from "Trane"/"New" — a wrong-customer answer with high confidence. Closed
+// lists, not a heuristic: a real brand this codebase has warranty rules
+// for (BRAND_RULES, every key/label/alias, so "the American Standard unit"
+// is excluded as a whole two-word phrase too), a small set of generic
+// unit descriptors no one is ever actually named, any known city name, and
+// a street-suffix word (the ON_THE_NAME_UNIT_RE style "the unit on Elm"
+// misparse guard). Checked at BOTH parse time (this shape returns null) and
+// again at resolution time in runContactLookup (belt-and-braces: whatever
+// reaches resolveContactCandidates/fuzzyNameMatches for THIS shape has
+// already passed this same gate).
+const NAMED_UNIT_BRAND_WORDS = new Set(
+  Object.entries(BRAND_RULES).flatMap(([key, b]) => [key, b.label?.toLowerCase(), ...(b.aliases ?? [])].filter(Boolean))
+);
+const NAMED_UNIT_GENERIC_WORD_RE = /^(?:new|old|main|upstairs|downstairs|rooftop|second|other|back|front)$/i;
+const NAMED_UNIT_STREET_SUFFIX_RE = new RegExp(`^(?:${STREET_SUFFIX_ALT})$`, "i");
+const NAMED_UNIT_CITY_NAMES = new Set(
+  [...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].map((c) => c.toLowerCase())
+);
+
+/** Pure: true when `namePhrase` (NAMED_UNIT_RE's own capture) is a known
+ *  brand, a generic non-name descriptor, a city, or a street-suffix word —
+ *  never a real customer name, so this shape must defer instead of guessing
+ *  one. Checks the WHOLE phrase (multi-word brands like "American Standard")
+ *  and, for a single word, every closed list above. */
+function isExcludedNamedUnitPhrase(namePhrase) {
+  const whole = String(namePhrase ?? "").trim().toLowerCase();
+  if (!whole) return true;
+  if (NAMED_UNIT_BRAND_WORDS.has(whole)) return true;
+  const tokens = whole.split(/\s+/);
+  if (tokens.length !== 1) return false;
+  const t = tokens[0];
+  return (
+    NAMED_UNIT_BRAND_WORDS.has(t) ||
+    NAMED_UNIT_GENERIC_WORD_RE.test(t) ||
+    NAMED_UNIT_STREET_SUFFIX_RE.test(t) ||
+    NAMED_UNIT_CITY_NAMES.has(t)
+  );
+}
+
 function stripPossessive(s) {
   return String(s ?? "").replace(/'s$/i, "");
 }
@@ -450,6 +550,26 @@ export function parseContactLookupQuestion(question, opts = {}) {
     if (!street || NAME_STOPWORD_RE.test(street.split(/\s+/)[0])) continue;
     const streetLabel = titleCase(street) + (m[2] ? " " + titleCase(m[2]) : "");
     return { field: "full", namePhrase: street, isStreet: true, street, streetLabel };
+  }
+
+  // Shape 5: named-unit attribute question (see NAMED_UNIT_RE's own doc
+  // comment) — "Is the Salazar unit still under warranty?", "what model is
+  // the Prentiss system", "how old is the Bracken unit". Tried last, against
+  // the raw normalized `q` only (never `stripped`): every phrasing in this
+  // cluster already starts with a real word ("is"/"what"/"how"), never a
+  // quantifier this file strips, so there is nothing for `stripped` to add.
+  {
+    const m = q.match(NAMED_UNIT_RE);
+    if (m) {
+      const namePhrase = m[1].trim();
+      if (namePhrase && isRealNamePhrase(namePhrase) && !isExcludedNamedUnitPhrase(namePhrase)) {
+        for (const attr of UNIT_ATTRIBUTE_ORDER) {
+          if (UNIT_ATTRIBUTE_RE[attr].test(q)) {
+            return { field: UNIT_ATTRIBUTE_FIELD[attr], namePhrase };
+          }
+        }
+      }
+    }
   }
 
   return null;
@@ -749,6 +869,75 @@ export async function resolveStreetCandidates(db, street) {
 }
 
 /**
+ * Live 100-question persona sample (2026-09-22), doc-lookup cluster: "Show
+ * me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201" /
+ * "did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701" came back
+ * "I couldn't find a customer at <address>" even though that exact customer
+ * exists — docLookup.js's own resolveCandidates was calling
+ * resolveStreetCandidates (above) with the WHOLE captured phrase, including
+ * the trailing city/state/zip. A whole-string ILIKE requires that entire
+ * span to appear verbatim, so it breaks on the smallest formatting
+ * difference: normalizeQuestion expands "AZ" to "Arizona" before this ever
+ * runs, "Rd" vs "Road" never matches either spelling, and an "Apt 101" or
+ * stray punctuation shifts everything after it out of alignment. None of
+ * that has anything to do with WHICH customer is meant — the house number
+ * plus the street's own name already pins that down uniquely in practice.
+ *
+ * Resolves the way fastPath/fastPathQuery.js already does for its own
+ * address subject (significantAddressTokens + ILIKE ALL, see
+ * resolveFastPathSubject in fastPathQuery.js) rather than inventing a third
+ * address matcher: keeps only the house number and the first significant
+ * (non-stopword, non-numeric) street-name token — see
+ * significantAddressTokens' own doc comment for exactly which words that
+ * drops (directionals, street-suffix words, apt/suite/unit). Everything
+ * after that — a trailing "Apt 101", city, state (abbreviated or spelled
+ * out), zip, or a comma/period anywhere in the phrase — is simply never
+ * required to match, which is what makes this tolerant of all of them at
+ * once rather than needing a special case per format. Tenant-scoped,
+ * parameterized, capped at 5 — same shape resolveStreetCandidates above
+ * already uses for its own (street-only, no house number) case.
+ *
+ * Reviewer NO-GO (2026-09-22): a bare `%100%` house-number pattern matches
+ * "1100 E Main St" just as happily as "100 E Main St", and "%1%" matches
+ * both those AND "100" AND every other address with a "1" anywhere in it —
+ * a substring match is never safe for a house number, only for the street
+ * name that follows it. The house-number predicate is anchored to the
+ * START of the stored address instead (`'<number> %'`, no leading `%`), so
+ * it only ever matches a number followed by a real word boundary (a space)
+ * — "1 Main St" can no longer match "100 E Main St", nor "100 E Main St"
+ * match "1100 E Main St". The street-name predicate stays a plain
+ * substring (a street's own name can appear anywhere after the number,
+ * behind a direction like "E"/"N"). Both %/_ (the two ILIKE metacharacters)
+ * are escaped out of the user-supplied text first — Postgres's default LIKE
+ * escape character is backslash, so no ESCAPE clause is needed for this to
+ * take effect.
+ */
+function escapeLikeText(s) {
+  return String(s ?? '').replace(/[\\%_]/g, '\\$&');
+}
+
+export async function resolveAddressCandidates(db, addressPhrase) {
+  const tokens = significantAddressTokens(addressPhrase);
+  if (!tokens.length) return [];
+  const houseNumber = tokens.find((t) => /^\d+$/.test(t));
+  const streetWord = tokens.find((t) => !/^\d+$/.test(t));
+  const patterns = [
+    houseNumber ? `${escapeLikeText(houseNumber)} %` : null,
+    streetWord ? `%${escapeLikeText(streetWord)}%` : null,
+  ].filter(Boolean);
+  if (!patterns.length) return [];
+  const { rows } = await db.raw(
+    `SELECT ${CUSTOMER_ROW_COLUMNS}
+       FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND data->>'service_address' ILIKE ALL($1::text[])
+      LIMIT 5`,
+    [patterns]
+  );
+  return rows;
+}
+
+/**
  * Full orchestration for one question: shape detection -> DB resolution ->
  * answer building. Returns null (never throws for a shape/resolution miss)
  * whenever this isn't confidently a contact lookup, or the name resolves to
@@ -762,6 +951,7 @@ export async function resolveStreetCandidates(db, street) {
  */
 export async function runContactLookup(db, question, opts = {}) {
   const overlay = opts?.overlay;
+  const today = opts?.today ?? null;
   const parsed = parseContactLookupQuestion(question, { overlay });
   if (!parsed) return null;
 
@@ -776,13 +966,21 @@ export async function runContactLookup(db, question, opts = {}) {
     const candidates = await resolveStreetCandidates(db, parsed.street);
     if (candidates.length === 0) return buildNoStreetMatchAnswer(parsed.streetLabel);
     if (candidates.length > 1) return buildStreetAmbiguousAnswer(parsed.streetLabel, candidates);
-    return buildResolvedAnswer(db, parsed.field === "lastVisit" || parsed.field === "visitCount" ? parsed.field : "full", candidates[0]);
+    return buildResolvedAnswer(db, parsed.field === "lastVisit" || parsed.field === "visitCount" ? parsed.field : "full", candidates[0], { namePhrase: parsed.namePhrase, today });
   }
+
+  // Belt-and-braces (see isExcludedNamedUnitPhrase's own doc comment): the
+  // named-unit shape already refuses to produce a brand/generic/city
+  // namePhrase at parse time, but this is the one call site that would ever
+  // hand such a phrase to resolveContactCandidates' fuzzy surname fallback
+  // (fuzzyNameMatches) for THIS shape — checked again here so neither can
+  // drift out of sync with the other.
+  if (NAMED_UNIT_FIELDS.has(parsed.field) && isExcludedNamedUnitPhrase(parsed.namePhrase)) return null;
 
   const candidates = await resolveContactCandidates(db, parsed.namePhrase);
   if (candidates.length === 0) return null;
   if (candidates.length > 1) return buildAmbiguousContactAnswer(parsed.namePhrase, candidates);
-  return buildResolvedAnswer(db, parsed.field, candidates[0]);
+  return buildResolvedAnswer(db, parsed.field, candidates[0], { namePhrase: parsed.namePhrase, today });
 }
 
 /* ============================================================ item 2: last
@@ -905,18 +1103,140 @@ export function attachEquipmentFacts(answer, equipmentRows) {
     value: equipmentFactValue(u),
     sources: [],
   }));
-  return { ...answer, facts: [...answer.facts, ...facts], verifiedCount: answer.verifiedCount + facts.length };
+  // The answer text names the unit(s) too, so a "bracken serial" reply reads
+  // as an answer even where only the text is shown (chat preview, voice).
+  const unitLine = equipmentRows.length === 1
+    ? `Unit: ${equipmentFactValue(equipmentRows[0])}`
+    : `${equipmentRows.length} units: ${equipmentRows.map(equipmentFactValue).join(" | ")}`;
+  const text = answer.text ? `${answer.text}\n${unitLine}` : unitLine;
+  return { ...answer, text, facts: [...answer.facts, ...facts], verifiedCount: answer.verifiedCount + facts.length };
 }
 
 const EQUIPMENT_ATTACHED_FIELDS = new Set(["serial", "full"]);
 
+/** Pure: how many whole years between an install date and today — used only
+ *  by the 'age' attribute below. Month precision only (day-of-month is never
+ *  reliable across this codebase's own date sources — see warrantyRules.js's
+ *  own normalizeDate). Returns null rather than guessing when either date is
+ *  missing/unparseable. */
+function ageInYears(installDate, today) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(installDate ?? ""));
+  const t = /^(\d{4})-(\d{2})/.exec(String(today ?? ""));
+  if (!m || !t) return null;
+  let years = Number(t[1]) - Number(m[1]);
+  if (Number(t[2]) < Number(m[2])) years -= 1;
+  return years >= 0 ? years : null;
+}
+
+/** Pure: one unit's warranty state in words — reuses alertTier
+ *  (warrantyRules.js), the exact same tier math fastPathQuery.js's own
+ *  runWarranty/buildWarrantyAnswer use for a plain warranty_status/
+ *  warranty_expires intent, so this can never disagree with that answer for
+ *  the same unit. `today` missing/invalid -> alertTier's own 'unknown' tier
+ *  -> the honest "no warranty date" line, never a guessed status. */
+function unitWarrantyPhrase(u, today) {
+  const w = u?.warranty;
+  if (!w || !w.expires) return "no warranty date on file";
+  const tier = alertTier(w, today);
+  if (tier === "unknown") return "no warranty date on file";
+  const dateHuman = formatDateHuman(w.expires);
+  return tier === "expired" ? `warranty expired ${dateHuman}` : `under warranty until ${dateHuman}`;
+}
+
+/** Pure: one unit's value for one named-unit attribute, always a sentence
+ *  fragment ("serial number M100017", "no model on file") never a bare
+ *  scalar — see buildUnitAttributeAnswer's own doc comment for why. Never
+ *  guesses a value that isn't on the row; a missing fact is named honestly,
+ *  the same "No X on file" rule every other field lookup in this file
+ *  follows. */
+function unitAttributeValueText(attribute, u, today) {
+  switch (attribute) {
+    case "serial":
+      return u.serial_number ? `serial number ${u.serial_number}` : "no serial number on file";
+    case "model": {
+      const brandModel = [u.manufacturer, u.model].filter(Boolean).join(" ");
+      return brandModel ? `a ${brandModel}` : "no model on file";
+    }
+    case "brand":
+      return u.manufacturer ? u.manufacturer : "no manufacturer on file";
+    case "installed":
+      return u.installation_date ? `installed ${formatDateHuman(u.installation_date)}` : "no installation date on file";
+    case "age": {
+      if (!u.installation_date) return "no installation date on file";
+      const years = ageInYears(u.installation_date, today);
+      return years == null
+        ? `installed ${formatDateHuman(u.installation_date)}`
+        : `about ${years} year${years === 1 ? "" : "s"} old (installed ${formatDateHuman(u.installation_date)})`;
+    }
+    case "tonnage":
+      // No backing column at all (listCustomerEquipment/recordsStore.js never
+      // selects one) — always the honest zero, same "closed vocabulary, never
+      // a guess" rule CUSTOMER_FIELD_KEY's own missing 'lastVisit' entry
+      // follows elsewhere in this file.
+      return u.tonnage ? `${u.tonnage} tons` : "no tonnage on file";
+    case "warranty":
+      return unitWarrantyPhrase(u, today);
+    default:
+      return "no details on file";
+  }
+}
+
+/**
+ * Item 2 (100-question persona sample, live miss cluster "named-unit
+ * attribute questions", 2026-09-22): "Is the Salazar unit still under
+ * warranty?" / "what's the serial on the Wyckoff unit" / "what model is the
+ * Prentiss system" / "how old is the Bracken unit" — resolved to a customer
+ * by name, this answers the ONE attribute asked about from their equipment
+ * list (db.listCustomerEquipment's own shape). Honest zero when the customer
+ * has no equipment on file at all; more than one unit gets a line/fact each,
+ * never guessed down to "the" unit. `label` is the typed name phrase
+ * (title-cased), not the full customer name, so the answer echoes back
+ * exactly what was asked about ("The Salazar unit...", not "The John
+ * Salazar unit...").
+ */
+export function buildUnitAttributeAnswer(attribute, label, row, equipmentRows, today) {
+  const name = row?.customer_name || row?.customer_number || label;
+  if (!equipmentRows?.length) {
+    return {
+      kind: "answer", text: `No equipment on file for ${name}.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
+  const multiple = equipmentRows.length > 1;
+  const lines = [];
+  const facts = [];
+  equipmentRows.forEach((u, i) => {
+    const unitLabel = multiple ? `The ${label} unit ${i + 1}` : `The ${label} unit`;
+    const value = unitAttributeValueText(attribute, u, today);
+    lines.push(`${unitLabel} — ${value}.`);
+    facts.push({ label: multiple ? `Unit ${i + 1}` : "Unit", value, sources: [] });
+  });
+  return {
+    kind: "answer",
+    text: lines.join(" "),
+    facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
+  };
+}
+
 /** Resolves one candidate row to its final answer, dispatching on `field` —
  *  the one place runContactLookup needs `db` beyond the name/street
- *  resolution it already does. */
-async function buildResolvedAnswer(db, field, row) {
+ *  resolution it already does. `opts.namePhrase`/`opts.today` are only used
+ *  by the named-unit-attribute branch below. */
+async function buildResolvedAnswer(db, field, row, opts = {}) {
   if (field === "lastVisit" || field === "visitCount") {
     const visits = await computeVisitHistory(db, row.id);
     return buildVisitAnswer(field, row, visits);
+  }
+  if (NAMED_UNIT_FIELDS.has(field)) {
+    const attribute = Object.keys(UNIT_ATTRIBUTE_FIELD).find((k) => UNIT_ATTRIBUTE_FIELD[k] === field);
+    const label = titleCase(opts.namePhrase || row.customer_name || row.customer_number || "this");
+    let equipmentRows = [];
+    try {
+      equipmentRows = await db.listCustomerEquipment(row.id);
+    } catch (err) {
+      console.error("buildUnitAttributeAnswer: listCustomerEquipment failed, treating as no equipment on file:", err?.message);
+    }
+    return buildUnitAttributeAnswer(attribute, label, row, equipmentRows, opts.today);
   }
   const answer = buildContactAnswer(field, row);
   if (EQUIPMENT_ATTACHED_FIELDS.has(field)) {

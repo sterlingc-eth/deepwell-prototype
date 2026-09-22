@@ -24,7 +24,7 @@ import { normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
 import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from "./documentTypes.js";
 import { mergeDocumentVia } from "./routes/customers.js";
-import { resolveContactCandidates, resolveStreetCandidates, nameTokens } from "./contactLookup.js";
+import { resolveContactCandidates, resolveAddressCandidates, nameTokens } from "./contactLookup.js";
 
 /* ============================================================ shape detection */
 
@@ -209,7 +209,16 @@ const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const MAX_DOCS = 10;
 
 async function resolveCandidates(db, namePhrase, isAddress) {
-  return isAddress ? resolveStreetCandidates(db, namePhrase) : resolveContactCandidates(db, namePhrase);
+  // Reviewer NO-GO (2026-09-22, live 100-question sample): this used to call
+  // resolveStreetCandidates, which ILIKEs the WHOLE captured phrase —
+  // correct for the street-ONLY shape it was built for ("the guy on
+  // Greenfield Road"), but wrong here, where namePhrase is a FULL address
+  // that routinely carries a trailing city/state/zip a whole-string ILIKE
+  // requires verbatim (see resolveAddressCandidates' own doc comment for why
+  // that broke "322 N Greenfield Rd, Mesa, AZ 85201" even though that exact
+  // customer exists). resolveAddressCandidates resolves on the house number
+  // + street name alone instead, tolerant of everything after it.
+  return isAddress ? resolveAddressCandidates(db, namePhrase) : resolveContactCandidates(db, namePhrase);
 }
 
 /** Every document id reachable for a customer — same three paths ask.js's
@@ -374,7 +383,7 @@ export async function resolveHonestZeroContext(db, question) {
   const raw = String(question ?? "");
   const addrMatch = raw.match(STREET_ADDRESS_RE);
   if (addrMatch) {
-    const rows = await resolveStreetCandidates(db, addrMatch[0]);
+    const rows = await resolveAddressCandidates(db, addrMatch[0]);
     if (rows.length === 1) {
       return { name: rows[0].customer_name || "this customer", address: rows[0].service_address || addrMatch[0], topic: topicWords(raw, addrMatch[0]) };
     }

@@ -1806,7 +1806,7 @@ export function reconcileTimeRange(rawTimeRange, question, today) {
  * this regex is written to not depend on either behavior).
  */
 const SERVICE_VISITS_OVERRIDE_RE =
-  /\b(?:had|got|were|received)\s+service(?:d)?\b|\b(?:did|do)\s+we\s+service\b|\bwe\s+service(?:d)?\b|\bservice\s+calls?\b/i;
+  /\b(?:had|got|were|received)\s+service(?:d|s)?\b|\b(?:did|do)\s+we\s+service\b|\bwe\s+service(?:d)?\b|\bservice\s+calls?\b/i;
 
 /** True for any question this session's live-miss cluster named — exported
  *  so scripts/verify-analytics.mjs can pin the exact shapes down directly. */

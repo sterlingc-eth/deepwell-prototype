@@ -1,8 +1,11 @@
 /**
  * Unit checks for the 100-question persona sample's doc-lookup cluster
- * (2026-09-22): items 1, 2, 3 and 8. Pure shape-detection tests need no
- * database; the DB-touching orchestration functions (runDocLookup,
- * computeVisitHistory, resolveHonestZeroContext) are exercised against small
+ * (2026-09-22): items 1, 2, 3 and 8, plus the two remaining live-sample
+ * clusters fixed after the Tier 3 deploy (2026-09-22b): address resolution
+ * (item 9) and named-unit attribute questions (item 10). Pure shape-detection
+ * tests need no database; the DB-touching orchestration functions
+ * (runDocLookup, computeVisitHistory, resolveHonestZeroContext,
+ * resolveAddressCandidates, runContactLookup) are exercised against small
  * mock `db` objects, same convention as scripts/verify-analytics.mjs's own
  * contact-lookup section. No network, no model call, ever.
  *
@@ -20,6 +23,8 @@ import {
   computeVisitHistory,
   buildVisitAnswer,
   attachEquipmentFacts,
+  resolveAddressCandidates,
+  buildUnitAttributeAnswer,
 } from '../api/_lib/contactLookup.js';
 
 let failures = 0;
@@ -226,6 +231,229 @@ for (const [q, namePhrase] of [
   const mockDb = { raw: async () => ({ rows: [] }) };
   const ctx = await resolveHonestZeroContext(mockDb, 'what is the warranty policy in general');
   eq('item 8 resolveHonestZeroContext (negative) :: no signal -> null', ctx, null);
+}
+
+/* ======================================================================
+ * Item 9 (post-Tier-3-deploy live 100-question sample, 2026-09-22): address
+ * resolution — house number + street's first significant token, tolerant of
+ * trailing city/state/zip, "Apt N", punctuation, and street-suffix
+ * abbreviations. Reviewer NO-GO: this used to be a whole-string ILIKE (via
+ * resolveStreetCandidates), which broke on exactly this cluster — see
+ * resolveAddressCandidates' own doc comment in contactLookup.js.
+ * ====================================================================== */
+
+/** A real SQL LIKE/ILIKE pattern -> an equivalent JS RegExp, matched against
+ *  the WHOLE string (LIKE always implicitly anchors both ends; `%` is "any
+ *  run of characters", `_` is "any one character", a backslash escapes the
+ *  next character literally — Postgres's own default LIKE escape). Used to
+ *  actually exercise resolveAddressCandidates' anchoring behavior (a
+ *  no-leading-`%` house-number pattern must NOT match a longer number that
+ *  merely starts the same way), not just a loose substring stand-in. */
+function likeToRegExp(pattern) {
+  let out = '^';
+  const s = String(pattern);
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '\\' && i + 1 < s.length) {
+      out += s[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    } else if (c === '%') {
+      out += '.*';
+    } else if (c === '_') {
+      out += '.';
+    } else {
+      out += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+  }
+  return new RegExp(out + '$', 'is');
+}
+
+/** A tiny in-process ILIKE ALL simulator: `addresses` is every customer's
+ *  stored service_address; returns the rows resolveAddressCandidates' own
+ *  query would, given the (never string-concatenated) pattern array it
+ *  builds. Exercises the real SQL shape, not just a canned mock return. */
+function mockAddressDb(addresses) {
+  return {
+    raw: async (sql, params) => {
+      check('item 9 :: query is tenant-scoped', /tenant_id = \(current_setting/.test(sql));
+      check('item 9 :: query is parameterized (patterns via $1, never concatenated)', /ILIKE ALL\(\$1::text\[\]\)/.test(sql));
+      check('item 9 :: query caps at LIMIT 5', /LIMIT 5\b/.test(sql));
+      const patterns = (params?.[0] ?? []).map(likeToRegExp);
+      const rows = addresses
+        .map((a, i) => ({ id: `c${i}`, customer_number: `C-${i}`, customer_name: `Customer ${i}`, service_address: a }))
+        .filter((r) => patterns.every((re) => re.test(r.service_address)));
+      return { rows };
+    },
+  };
+}
+
+const ADDRESS_RESOLUTION_POSITIVES = [
+  // Exact stored address, with trailing city/state/zip — the literal live
+  // miss: "I couldn't find a customer at 322 N Greenfield Rd..." even though
+  // this exact customer exists.
+  ['322 N Greenfield Rd, Mesa, AZ 85201', '322 N Greenfield Rd, Mesa, AZ 85201'],
+  // normalizeQuestion expands "AZ" -> "Arizona" upstream (docLookup.js's own
+  // SHAPES capture runs the NORMALIZED text) — must still resolve against a
+  // stored address that only ever says "AZ".
+  ['840 S Ellsworth Rd, Tucson, Arizona 85701', '840 S Ellsworth Rd, Tucson, AZ 85701'],
+  // Street-suffix abbreviation mismatch (Rd vs Road) must not block a match.
+  ['174 N College Rd', '174 N College Road'],
+  // A trailing "Apt 101" (or any unit number) must never be REQUIRED to
+  // match — the stored address here has no unit at all.
+  ['322 N Greenfield Rd, Apt 101, Mesa, AZ 85201', '322 N Greenfield Rd, Mesa, AZ 85201'],
+  // Stray punctuation (a period after the abbreviated suffix) tolerated.
+  ['840 S Ellsworth Rd., Tucson', '840 S Ellsworth Rd, Tucson, AZ 85701'],
+];
+for (const [queryAddress, storedAddress] of ADDRESS_RESOLUTION_POSITIVES) {
+  const rows = await resolveAddressCandidates(mockAddressDb([storedAddress]), queryAddress);
+  check(`item 9 (positive) :: "${queryAddress}" resolves against stored "${storedAddress}"`, rows.length === 1 && rows[0].service_address === storedAddress, JSON.stringify(rows));
+}
+
+// Negatives: must not resolve to the WRONG customer, and must not treat "no
+// tokens at all" as "match everything".
+{
+  const rows = await resolveAddressCandidates(mockAddressDb(['840 S Ellsworth Rd, Tucson, AZ 85701']), '322 N Greenfield Rd, Mesa, AZ 85201');
+  eq('item 9 (negative) :: different house number+street -> no match', rows.length, 0);
+}
+{
+  // Same house number, different street — the street token still has to agree.
+  const rows = await resolveAddressCandidates(mockAddressDb(['322 N Main St, Mesa, AZ 85201']), '322 N Greenfield Rd, Mesa, AZ 85201');
+  eq('item 9 (negative) :: same house number, different street -> no match', rows.length, 0);
+}
+{
+  // Reviewer NO-GO (2026-09-22): a house-number pattern must be anchored to
+  // the START of the stored address, not a bare substring — "1 Main St"
+  // must never match a stored "100 E Main St" just because "1" appears
+  // inside "100".
+  const rows = await resolveAddressCandidates(mockAddressDb(['100 E Main St']), '1 Main St');
+  eq('item 9 (negative) :: "1 Main St" does not match "100 E Main St"', rows.length, 0);
+}
+{
+  // Same anchoring requirement the other direction: "100 E Main St" must
+  // never match a stored "1100 E Main St".
+  const rows = await resolveAddressCandidates(mockAddressDb(['1100 E Main St']), '100 E Main St');
+  eq('item 9 (negative) :: "100 E Main St" does not match "1100 E Main St"', rows.length, 0);
+}
+{
+  // Empty/garbage input -> empty candidates, never a "match everything" scan.
+  const mockDb = { raw: async () => { throw new Error('must never query with zero tokens'); } };
+  eq('item 9 (negative) :: no usable tokens -> empty, no query issued', await resolveAddressCandidates(mockDb, ''), []);
+}
+
+{
+  // End to end: runDocLookup against the exact reported live-miss phrasing.
+  const storedAddress = '322 N Greenfield Rd, Mesa, AZ 85201';
+  const customerRow = { id: 'c1', customer_number: 'C-1', customer_name: 'Sandra Wyckoff', service_address: storedAddress };
+  const mockDb = {
+    raw: async (sql, params) => {
+      if (/FROM entities/i.test(sql)) {
+        const patterns = (params?.[0] ?? []).map(likeToRegExp);
+        return { rows: patterns.every((re) => re.test(storedAddress)) ? [customerRow] : [] };
+      }
+      return { rows: [] };
+    },
+    listCustomerDocumentLinks: async () => [],
+    listNameMatchedDocuments: async () => [],
+  };
+  const answer = await runDocLookup(mockDb, 'did we pull a permit for 322 N Greenfield Rd, Mesa, AZ 85201');
+  check('item 9 end-to-end :: no longer "I couldn\'t find a customer"', Boolean(answer) && !answer.text.startsWith("I couldn't find"), answer?.text);
+  check('item 9 end-to-end :: names the resolved customer', Boolean(answer) && answer.text.includes('Sandra Wyckoff'), answer?.text);
+}
+
+/* ======================================================================
+ * Item 10 (post-Tier-3-deploy live 100-question sample, 2026-09-22):
+ * named-unit attribute questions — "Is the Salazar unit still under
+ * warranty?" / "what's the serial on the Wyckoff unit" / "what model is the
+ * Prentiss system" / "how old is the Bracken unit" routed deterministically
+ * through contactLookup.js's equipment path instead of falling through to
+ * retrieval's "Nothing in your records answers that."
+ * ====================================================================== */
+
+const NAMED_UNIT_POSITIVES = [
+  ['Is the Salazar unit still under warranty?', 'unitWarranty', 'salazar'],
+  ['Is the Chavez unit under warranty', 'unitWarranty', 'chavez'],
+  ["what's the serial on the Wyckoff unit", 'serial', 'wyckoff'], // pre-existing shape 3b still wins
+  ['what model is the Prentiss system', 'unitModel', 'prentiss'],
+  ['how old is the Bracken unit', 'unitAge', 'bracken'],
+];
+for (const [q, field, namePhrase] of NAMED_UNIT_POSITIVES) {
+  const parsed = parseContactLookupQuestion(q);
+  check(`item 10 (positive) :: "${q}" detected`, Boolean(parsed), JSON.stringify(parsed));
+  if (parsed) {
+    eq(`item 10 (positive) :: "${q}" field`, parsed.field, field);
+    eq(`item 10 (positive) :: "${q}" namePhrase`, parsed.namePhrase.toLowerCase(), namePhrase);
+  }
+}
+
+// Must NOT hijack an address form or an analytics question.
+const NAMED_UNIT_NEGATIVES = [
+  'the unit at 123 Main St is still under warranty',
+  'how many units are under warranty',
+  'which units have expired warranties',
+  // Reviewer NO-GO (2026-09-22): a brand or a generic descriptor is never a
+  // customer's name — must defer to the existing brand/equipment path or
+  // retrieval instead of guessing (and never fuzzy-match some unrelated
+  // customer's surname).
+  'is the Trane unit under warranty',
+  'is the new unit under warranty',
+];
+for (const q of NAMED_UNIT_NEGATIVES) {
+  const parsed = parseContactLookupQuestion(q);
+  const hijacked = Boolean(parsed?.field) && parsed.field.startsWith('unit');
+  check(`item 10 (negative) :: "${q}" not hijacked as a named-unit question`, !hijacked, JSON.stringify(parsed));
+}
+
+{
+  // buildUnitAttributeAnswer: warranty, expired.
+  const row = { customer_name: 'Maria Salazar' };
+  const units = [{ manufacturer: 'Trane', model: '4TTR6', serial_number: 'M900123', installation_date: '2009-01-15', warranty: { expires: '2019-01-01' } }];
+  const ans = buildUnitAttributeAnswer('warranty', 'Salazar', row, units, '2026-09-22');
+  check('item 10 buildUnitAttributeAnswer :: expired warranty', ans.text.includes('warranty expired') && ans.text.includes('Salazar'), ans.text);
+}
+{
+  // buildUnitAttributeAnswer: warranty, active.
+  const units = [{ manufacturer: 'Carrier', model: '24ABC6', warranty: { expires: '2030-01-01' } }];
+  const ans = buildUnitAttributeAnswer('warranty', 'Chavez', { customer_name: 'Brian Chavez' }, units, '2026-09-22');
+  check('item 10 buildUnitAttributeAnswer :: active warranty', ans.text.includes('under warranty until'), ans.text);
+}
+{
+  // buildUnitAttributeAnswer: no warranty date on file -> honest, never a guess.
+  const units = [{ manufacturer: 'Lennox', model: 'XC16' }];
+  const ans = buildUnitAttributeAnswer('warranty', 'Prentiss', { customer_name: 'Jane Prentiss' }, units, '2026-09-22');
+  check('item 10 buildUnitAttributeAnswer :: no warranty date on file', ans.text.includes('no warranty date on file'), ans.text);
+}
+{
+  // buildUnitAttributeAnswer: model.
+  const units = [{ manufacturer: 'Lennox', model: 'XC16' }];
+  const ans = buildUnitAttributeAnswer('model', 'Prentiss', { customer_name: 'Jane Prentiss' }, units, '2026-09-22');
+  eq('item 10 buildUnitAttributeAnswer :: model text', ans.text, 'The Prentiss unit — a Lennox XC16.');
+}
+{
+  // buildUnitAttributeAnswer: age.
+  const units = [{ installation_date: '2016-09-01' }];
+  const ans = buildUnitAttributeAnswer('age', 'Bracken', { customer_name: 'Bracken' }, units, '2026-09-22');
+  check('item 10 buildUnitAttributeAnswer :: age names years old', ans.text.includes('10 years old'), ans.text);
+}
+{
+  // Honest zero: no equipment on file at all.
+  const ans = buildUnitAttributeAnswer('serial', 'Nobody', { customer_name: 'Nobody Real' }, [], '2026-09-22');
+  eq('item 10 buildUnitAttributeAnswer (zero) :: no equipment on file', ans.text, 'No equipment on file for Nobody Real.');
+  eq('item 10 buildUnitAttributeAnswer (zero) :: no facts', ans.facts.length, 0);
+}
+{
+  // Multiple units -> one line/fact per unit, never guessed down to one.
+  const units = [{ serial_number: 'A1' }, { serial_number: 'B2' }];
+  const ans = buildUnitAttributeAnswer('serial', 'Mercer', { customer_name: 'Thomas Mercer' }, units, '2026-09-22');
+  check('item 10 buildUnitAttributeAnswer (multiple) :: names both units', ans.text.includes('unit 1') && ans.text.includes('unit 2') && ans.text.includes('A1') && ans.text.includes('B2'), ans.text);
+  eq('item 10 buildUnitAttributeAnswer (multiple) :: one fact per unit', ans.facts.length, 2);
+}
+{
+  // runContactLookup end to end: resolves the customer, fetches equipment,
+  // answers the attribute — the exact live-miss phrasing.
+  const rows = [{ id: 'c1', customer_number: 'C-1', customer_name: 'Maria Salazar', service_address: '10 Main St' }];
+  const units = [{ manufacturer: 'Trane', model: '4TTR6', installation_date: '2009-01-15', warranty: { expires: '2019-01-01' } }];
+  const mockDb = { raw: async () => ({ rows }), listCustomerEquipment: async () => units };
+  const answer = await runContactLookup(mockDb, 'Is the Salazar unit still under warranty?', { today: '2026-09-22' });
+  check('item 10 runContactLookup :: end-to-end warranty answer', Boolean(answer) && answer.text.includes('warranty expired'), answer?.text);
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

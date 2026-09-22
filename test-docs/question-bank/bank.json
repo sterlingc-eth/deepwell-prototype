@@ -73304,6 +73304,838 @@
     }
   },
   {
+    "id": "live-misses-2026-09-22b-0001-abbreviated",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "show me the nameplate photo for 322 n greenfield rd, mesa, az 85201",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-canonical",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-filler-prefix",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "i need to know show me the nameplate photo for 322 n greenfield rd, mesa, az 85201",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-lowercase-no-punct",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "show me the nameplate photo for 322 n greenfield rd mesa az 85201",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-statement-form",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "list show me the nameplate photo for 322 n greenfield rd, mesa, az 85201",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-trailing-context",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201, thanks",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-typo",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "show me the nameplaate photo for 322 n greenfield rd, mesa, az 85201",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0001-voice-style",
+    "base": "Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201",
+    "text": "show me the nameplate photo for 322 n greenfield rd, mesa, az 85201",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-abbreviated",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "did we pull a permit for 840 s ellsworth rd, tucson, az 85701",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-canonical",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-filler-prefix",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "can you tell me did we pull a permit for 840 s ellsworth rd, tucson, az 85701",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-lowercase-no-punct",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "did we pull a permit for 840 s ellsworth rd tucson az 85701",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-statement-form",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "pull up did we pull a permit for 840 s ellsworth rd, tucson, az 85701",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-trailing-context",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701 so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-typo",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "did we pull a pesmit for 840 s ellsworth rd, tucson, az 85701",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0002-voice-style",
+    "base": "Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701",
+    "text": "did we pull a permit for 840 s ellsworth rd, tucson, az 85701",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-abbreviated",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "has this unit had a compressor replaced? 174 n college ave, mesa, az",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-canonical",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-filler-prefix",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "hey has this unit had a compressor replaced? 174 n college ave, mesa, az",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-lowercase-no-punct",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "has this unit had a compressor replaced? 174 n college ave mesa az",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-statement-form",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "show me has this unit had a compressor replaced? 174 n college ave, mesa, az",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-trailing-context",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-typo",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "has this unit had a comprestor replaced? 174 n college ave, mesa, az",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0003-voice-style",
+    "base": "Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ",
+    "text": "has this unit had a compressor replaced? 174 n college ave, mesa, az",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-abbreviated",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "is the salazar unit still under warranty",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-canonical",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "Is the Salazar unit still under warranty?",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-filler-prefix",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "quick question, is the salazar unit still under warranty",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-lowercase-no-punct",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "is the salazar unit still under warranty",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-statement-form",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "need the is the salazar unit still under warranty",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-trailing-context",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "Is the Salazar unit still under warranty for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-typo",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "is the salazar unit still under warranty",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0004-voice-style",
+    "base": "Is the Salazar unit still under warranty?",
+    "text": "is the salazar unit still under warranty",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-abbreviated",
+    "base": "Is the Chavez unit under warranty",
+    "text": "is the chavez unit under warranty",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-canonical",
+    "base": "Is the Chavez unit under warranty",
+    "text": "Is the Chavez unit under warranty",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-filler-prefix",
+    "base": "Is the Chavez unit under warranty",
+    "text": "real quick, is the chavez unit under warranty",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-lowercase-no-punct",
+    "base": "Is the Chavez unit under warranty",
+    "text": "is the chavez unit under warranty",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-statement-form",
+    "base": "Is the Chavez unit under warranty",
+    "text": "list is the chavez unit under warranty",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-trailing-context",
+    "base": "Is the Chavez unit under warranty",
+    "text": "Is the Chavez unit under warranty so I can call them",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-typo",
+    "base": "Is the Chavez unit under warranty",
+    "text": "is the chavez unit undre warranty",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0005-voice-style",
+    "base": "Is the Chavez unit under warranty",
+    "text": "is the chavez unit under warranty",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-abbreviated",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "what's the serial on the wyckoff unit",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-canonical",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "what's the serial on the Wyckoff unit",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-filler-prefix",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "quick question, what's the serial on the wyckoff unit",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-lowercase-no-punct",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "what's the serial on the wyckoff unit",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-statement-form",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "pull up what's the serial on the wyckoff unit",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-trailing-context",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "what's the serial on the Wyckoff unit, thanks",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-typo",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "what's the terial on the wyckoff unit",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0006-voice-style",
+    "base": "what's the serial on the Wyckoff unit",
+    "text": "whats the serial on the wyckoff unit",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-abbreviated",
+    "base": "what model is the Prentiss system",
+    "text": "what model is the prentiss system",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-canonical",
+    "base": "what model is the Prentiss system",
+    "text": "what model is the Prentiss system",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-filler-prefix",
+    "base": "what model is the Prentiss system",
+    "text": "hey what model is the prentiss system",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-lowercase-no-punct",
+    "base": "what model is the Prentiss system",
+    "text": "what model is the prentiss system",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-statement-form",
+    "base": "what model is the Prentiss system",
+    "text": "show me what model is the prentiss system",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-trailing-context",
+    "base": "what model is the Prentiss system",
+    "text": "what model is the Prentiss system before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-typo",
+    "base": "what model is the Prentiss system",
+    "text": "what model is the pentiss system",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0007-voice-style",
+    "base": "what model is the Prentiss system",
+    "text": "what model is the prentiss system",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-abbreviated",
+    "base": "how old is the Bracken unit",
+    "text": "how old is the bracken unit",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-canonical",
+    "base": "how old is the Bracken unit",
+    "text": "how old is the Bracken unit",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-filler-prefix",
+    "base": "how old is the Bracken unit",
+    "text": "could you how old is the bracken unit",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-lowercase-no-punct",
+    "base": "how old is the Bracken unit",
+    "text": "how old is the bracken unit",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-statement-form",
+    "base": "how old is the Bracken unit",
+    "text": "need the how old is the bracken unit",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-trailing-context",
+    "base": "how old is the Bracken unit",
+    "text": "how old is the Bracken unit before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-typo",
+    "base": "how old is the Bracken unit",
+    "text": "how old is the brackne unit",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0008-voice-style",
+    "base": "how old is the Bracken unit",
+    "text": "how old is the bracken unit",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-abbreviated",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "the unit at 123 main st is still under warranty",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-canonical",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "the unit at 123 Main St is still under warranty",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-filler-prefix",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "hey the unit at 123 main st is still under warranty",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-lowercase-no-punct",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "the unit at 123 main st is still under warranty",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-statement-form",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "list the unit at 123 main st is still under warranty",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-trailing-context",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "the unit at 123 Main St is still under warranty before end of day",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-typo",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "the unit at 123 main st is stiill under warranty",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0009-voice-style",
+    "base": "the unit at 123 Main St is still under warranty",
+    "text": "the unit at 123 main st is still under warranty",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "lookup",
+      "singleRecord": true
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-abbreviated",
+    "base": "how many units are under warranty",
+    "text": "how many units are under warranty",
+    "variant": "abbreviated",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-canonical",
+    "base": "how many units are under warranty",
+    "text": "how many units are under warranty",
+    "variant": "canonical",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-filler-prefix",
+    "base": "how many units are under warranty",
+    "text": "real quick, how many units are under warranty",
+    "variant": "filler-prefix",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-lowercase-no-punct",
+    "base": "how many units are under warranty",
+    "text": "how many units are under warranty",
+    "variant": "lowercase-no-punct",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-statement-form",
+    "base": "how many units are under warranty",
+    "text": "show me how many units are under warranty",
+    "variant": "statement-form",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-trailing-context",
+    "base": "how many units are under warranty",
+    "text": "how many units are under warranty for the file",
+    "variant": "trailing-context",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-typo",
+    "base": "how many units are under warranty",
+    "text": "how many uunits are under warranty",
+    "variant": "typo",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
+    "id": "live-misses-2026-09-22b-0010-voice-style",
+    "base": "how many units are under warranty",
+    "text": "how many units are under warranty",
+    "variant": "voice-style",
+    "category": "live-misses-2026-09-22b",
+    "expect": {
+      "route": "analytics"
+    }
+  },
+  {
     "id": "lookups-0001-abbreviated",
     "base": "What's the serial number of the unit at 100 E Main St, Mesa, AZ 85201?",
     "text": "what's the serial number of the unit at 100 e main st, mesa, az 85201",

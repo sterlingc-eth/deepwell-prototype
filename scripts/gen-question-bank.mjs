@@ -601,6 +601,47 @@ for (const { q, expect } of LIVE_MISSES_2026_09_22) {
   add('live-misses-2026-09-22', q, expect);
 }
 
+/* ---- live 100-question sample, post-Tier-3-deploy (2026-09-22b) --------
+ * Two remaining code clusters:
+ *   9. address resolution — a full "number + street, city, state zip"
+ *      address that resolves fine as a shape (docLookup.js's own SHAPES)
+ *      but used to fail DB resolution (resolveStreetCandidates' whole-string
+ *      ILIKE) even though the customer exists. Fixed with
+ *      resolveAddressCandidates (contactLookup.js) — house number + street's
+ *      first significant token, same as fastPath's own address resolution.
+ *      The DB-backed fix itself is unit-tested in verify-doclookup.mjs
+ *      (item 9); this script has no database, so only the shape/route stays
+ *      correct here.
+ *   10. named-unit attribute questions — "Is the Salazar unit still under
+ *      warranty?" / "what model is the Prentiss system" / "how old is the
+ *      Bracken unit" now route through contactLookup.js's own equipment
+ *      path (parseContactLookupQuestion's new named-unit shape) instead of
+ *      falling through to retrieval. Verified end-to-end (parse + resolve +
+ *      answer) in verify-doclookup.mjs (item 10).
+ */
+const LIVE_MISSES_2026_09_22b = [
+  // 9. address resolution — trailing city/state/zip, "Apt N", abbreviation
+  // and punctuation variance must not break the address shape/route.
+  { q: 'Show me the nameplate photo for 322 N Greenfield Rd, Mesa, AZ 85201', expect: { route: 'lookup', singleRecord: true } },
+  { q: 'Did we pull a permit for 840 S Ellsworth Rd, Tucson, AZ 85701', expect: { route: 'lookup', singleRecord: true } },
+  { q: 'Has this unit had a compressor replaced? 174 N College Ave, Mesa, AZ', expect: { route: 'lookup', singleRecord: true } },
+
+  // 10. named-unit attribute questions — must resolve as a contact lookup,
+  // never fall through to analytics/retrieval with nothing to cite.
+  { q: 'Is the Salazar unit still under warranty?', expect: { route: 'lookup' } },
+  { q: 'Is the Chavez unit under warranty', expect: { route: 'lookup' } },
+  { q: "what's the serial on the Wyckoff unit", expect: { route: 'lookup' } },
+  { q: 'what model is the Prentiss system', expect: { route: 'lookup' } },
+  { q: 'how old is the Bracken unit', expect: { route: 'lookup' } },
+
+  // must NOT hijack — address form and analytics stay exactly as before.
+  { q: 'the unit at 123 Main St is still under warranty', expect: { route: 'lookup', singleRecord: true } },
+  { q: 'how many units are under warranty', expect: { route: 'analytics' } },
+];
+for (const { q, expect } of LIVE_MISSES_2026_09_22b) {
+  add('live-misses-2026-09-22b', q, expect);
+}
+
 /* ============================================================ expand into the bank */
 
 const catSlug = (c) => c.replace(/[^a-z0-9]+/gi, '-').toLowerCase();

@@ -757,7 +757,7 @@ export default async function handler(req, res) {
       let contactData = null;
       try {
         contactData = await timer.time("contact", () =>
-          withTenant(ctxArg, (db) => runContactLookup(db, question, { overlay }))
+          withTenant(ctxArg, (db) => runContactLookup(db, question, { overlay, today: todayResolved }))
         );
       } catch (err) {
         console.error("Contact lookup failed, falling through to retrieval+model:", err?.message);
