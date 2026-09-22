@@ -17,6 +17,7 @@ import {
   canVerify,
   nextStageAfterCorrection,
   wasClassifiedByHuman,
+  shouldClassifyAsShopInternal,
   modelCallBudget,
   MODEL_CALL_MIN_BUDGET_MS,
   MODEL_CALL_MAX_TIMEOUT_MS,
@@ -24,6 +25,8 @@ import {
   aiVerifyDocument,
   reclassifyDocuments,
 } from '../api/_lib/reviewStore.js';
+import { isShopInternalDocument } from '../api/_lib/documentTypes.js';
+import { APPLY_ACTIONS, ADMIN_ONLY_ACTIONS } from '../api/_lib/routes/integrity.js';
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -135,6 +138,67 @@ eq(
 );
 eq('a row with no changes payload is safe', wasClassifiedByHuman('other', [{}]), false);
 eq('a null row in the list is safe', wasClassifiedByHuman('other', [null]), false);
+
+/* ---------------------------------------------- shop-internal reclassification
+ * Round 5 (2026-09-22): live founder-account documents ingested before the
+ * 'internal' type existed — "143-dispatch-note-shop-truck.txt" and
+ * "144-other-parts-count.pdf" — typed as canonical (dispatch-note,
+ * correspondence), naming no customer, stuck in Needs Linking forever.
+ * isShopInternalDocument's own exhaustive field-shape tests live in
+ * verify-doctypes.mjs; these two pin the exact live shapes by name. */
+const f = (key, value) => ({ field_key: key, value });
+
+check(
+  '143-dispatch-note-shop-truck.txt shape (shop_address/shop_phone + a free-text note) is shop-internal',
+  isShopInternalDocument([f('shop_address', '2210 E Main St, Mesa AZ'), f('shop_phone', '(480) 555-0199'), f('notes', 'Truck 3 dispatched for parts run')])
+);
+check(
+  '144-other-parts-count.pdf shape (shop_address/shop_phone + free text, no customer) is shop-internal',
+  isShopInternalDocument([f('shop_address', '2210 E Main St, Mesa AZ'), f('shop_phone', '(480) 555-0199'), f('notes', 'Counted 40 capacitors in stock')])
+);
+check(
+  'a dispatch note that NAMES A CUSTOMER is not shop-internal, even with shop_* fields present',
+  !isShopInternalDocument([f('shop_address', '2210 E Main St, Mesa AZ'), f('customer_name', 'Plaza Dental'), f('service_date', '2026-09-10')])
+);
+
+/* ------------------------------------------------ shouldClassifyAsShopInternal
+ * Pure combination of the three guards reclassifyDocuments/classifyShopRecords
+ * apply: no customer link, never human-classified, and the shop-internal
+ * shape itself. Each guard is checked independently, then all three together. */
+eq(
+  'all three conditions met -> classify',
+  shouldClassifyAsShopInternal({ humanClassified: false, hasCustomerLink: false, isShopInternal: true }),
+  true
+);
+eq(
+  'human-classified guard: a human decision blocks it even though it looks shop-internal',
+  shouldClassifyAsShopInternal({ humanClassified: true, hasCustomerLink: false, isShopInternal: true }),
+  false
+);
+eq(
+  'no-customer guard: an existing direct customer link blocks it even though it looks shop-internal',
+  shouldClassifyAsShopInternal({ humanClassified: false, hasCustomerLink: true, isShopInternal: true }),
+  false
+);
+eq(
+  'not shop-internal-shaped at all -> never classify, regardless of the other two guards',
+  shouldClassifyAsShopInternal({ humanClassified: false, hasCustomerLink: false, isShopInternal: false }),
+  false
+);
+eq(
+  'every guard failing at once -> classify is still refused (not merely one wrong reason)',
+  shouldClassifyAsShopInternal({ humanClassified: true, hasCustomerLink: true, isShopInternal: false }),
+  false
+);
+
+/* ------------------------------------------------------- classifyShopRecords
+ * routes/integrity.js's APPLY_ACTIONS/ADMIN_ONLY_ACTIONS membership — pins
+ * "classifyShopRecords is a fixable action, gated the same plain
+ * effectiveDryRun way as healSplitUnits/refillCustomerContacts, not the
+ * admin-only ask-twice gate mergeDuplicates/retireShopCustomers use." */
+check('classifyShopRecords is an applyable integrity fix', APPLY_ACTIONS.has('classifyShopRecords'));
+check('classifyShopRecords is NOT admin-gated (plain effectiveDryRun default, like every other additive fix)',
+  !ADMIN_ONLY_ACTIONS.has('classifyShopRecords'));
 
 /* ------------------------------------------------------------ modelCallBudget */
 // The fix for the NO-GO blocker: 20 sequential model calls must never be able

@@ -117,6 +117,12 @@ export default async function handler(req, res) {
     // repairs already-damaged state (a placeholder that should have matched
     // an existing named customer) from before the write-path fix existed.
     integrityAddressPlaceholdersAbsorbed: 0,
+    // Round 5 (2026-09-22): classifyShopRecords, same safe-to-auto-apply
+    // reasoning — a document that names no customer, unit or job at all
+    // (isShopInternalDocument) can never acquire the link the nightly sweep's
+    // other repairs are all trying to create, so it needs its own fix rather
+    // than eventually resolving via linkDocuments/linkEquipmentCustomers.
+    integrityShopRecordsClassified: 0,
     // Review fix (2026-09-20): relinkMismatchedNames runs dry-run only from
     // cron (see below) — this is how many documents it WOULD relink, not how
     // many it did. An admin applies them from the Customers-tab panel.
@@ -243,6 +249,7 @@ export default async function handler(req, res) {
           apply: [
             'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
             'stripShopContact', 'healSplitUnits', 'refillCustomerContacts', 'absorbAddressPlaceholders',
+            'classifyShopRecords',
           ],
           minMergeScore: 0.95,
           dryRun: false,
@@ -254,6 +261,7 @@ export default async function handler(req, res) {
         summary.integritySplitUnitsHealed += fixed.splitUnitsHealed?.length ?? 0;
         summary.integrityContactsFilled += fixed.customerContactsFilled?.length ?? 0;
         summary.integrityAddressPlaceholdersAbsorbed += fixed.addressPlaceholdersAbsorbed?.length ?? 0;
+        summary.integrityShopRecordsClassified += fixed.shopRecordsClassified?.length ?? 0;
 
         const relinkPreview = await integrityFixTenant(ctx, { apply: ['relinkMismatchedNames'], dryRun: true });
         summary.integrityNamesRelinkable += relinkPreview.mismatchedNamesRelinked?.length ?? 0;

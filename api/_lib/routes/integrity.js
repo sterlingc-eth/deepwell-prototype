@@ -15,8 +15,9 @@
  * the second time.
  */
 import { withTenant as withRecordsTenant, linkDocumentToCustomer, linkDocumentToEntity, extractionsHaveUnitIndex, linkedByForMatchBasis } from '../recordsStore.js';
-import { mergeCustomers, ReviewError, isUuid } from '../reviewStore.js';
+import { mergeCustomers, ReviewError, isUuid, applyShopInternalClassification, wasClassifiedByHuman, shouldClassifyAsShopInternal } from '../reviewStore.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
+import { isShopInternalDocument, toCompletenessFields } from '../documentTypes.js';
 import {
   findDuplicateCustomerPairs, isUnlinkedDocument,
   isEquipmentMissingCustomer, multiUnitUnderLinked, CUSTOMER_MATCH_THRESHOLD,
@@ -40,8 +41,11 @@ const SPLIT_UNIT_ROW_LIMIT = 5000;
 // relinkMismatchedNames (limit-test defects A/C, 2026-09-20) join this list:
 // both rewrite/repoint an existing customer's data rather than only adding a
 // link or filling a blank, so they get the same admin gate as mergeDuplicates.
-const ADMIN_ONLY_ACTIONS = new Set(['mergeDuplicates', 'retireShopCustomers', 'stripShopContact', 'relinkMismatchedNames']);
-const APPLY_ACTIONS = new Set([
+// Exported so scripts/verify-review.mjs can pin "classifyShopRecords is an
+// applyable, non-admin-gated fix" with no database — both are otherwise
+// module-private, checked only from inside applyIntegrityFix/integrityFix.
+export const ADMIN_ONLY_ACTIONS = new Set(['mergeDuplicates', 'retireShopCustomers', 'stripShopContact', 'relinkMismatchedNames']);
+export const APPLY_ACTIONS = new Set([
   'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
   'retireShopCustomers', 'stripShopContact', 'relinkMismatchedNames',
   // Round 4 (2026-09-21): both additive/fill-only, like healMergedSurvivors —
@@ -53,6 +57,10 @@ const APPLY_ACTIONS = new Set([
   // placeholder INTO an unambiguously-matched named customer (see
   // planAddressPlaceholderAbsorptions's own doc comment in integrity.js).
   'absorbAddressPlaceholders',
+  // Round 5 (2026-09-22): also additive/fill-only — only ever classifies a
+  // document that names no customer, unit or job (isShopInternalDocument)
+  // and was never human-classified; never repoints or removes anything.
+  'classifyShopRecords',
 ]);
 
 // ------------------------------------------------------------------ reads --
@@ -231,6 +239,55 @@ async function loadUnlinkedCandidates(db, documentId = null) {
     customerName: r.customer_name,
     serviceAddress: r.service_address,
   }));
+}
+
+/**
+ * Round 5 (2026-09-22): documents that may be shop-internal records
+ * (isShopInternalDocument, api/_lib/documentTypes.js) ingested before that
+ * type existed. Unlike loadUnlinkedCandidates above, this does NOT require
+ * a customer_name/service_address/serial_number extraction — a shop-internal
+ * document has none of those by definition, so it would never appear there
+ * at all. Cast a wide net here (any document still short of 'verified', not
+ * yet directly linked to a customer) and let the caller run
+ * isShopInternalDocument/wasClassifiedByHuman per candidate, the same way
+ * loadUnlinkedCandidates's own callers filter with isUnlinkedDocument.
+ */
+async function loadShopRecordCandidates(db) {
+  const rows = await db.raw(
+    `SELECT d.id AS document_id, d.document_type
+       FROM documents d
+      WHERE d.${TENANT} AND d.stage IN ('read', 'mapped', 'linked')
+        AND NOT EXISTS (
+          SELECT 1 FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+           WHERE l.document_id = d.id AND e.entity_type = 'customer' AND l.${TENANT}
+        )
+      LIMIT ${DOCUMENT_SCAN_LIMIT}`,
+    []
+  );
+  return rows.rows.map((r) => ({ documentId: r.document_id, documentType: r.document_type }));
+}
+
+/**
+ * Per-candidate verdict for loadShopRecordCandidates: does this document's
+ * OWN extraction rows satisfy isShopInternalDocument, and was it never
+ * human-classified? Both checks need a per-document query (extractions,
+ * audit_log), so this is where loadShopRecordCandidates' broad SQL net gets
+ * narrowed to the exact set classifyShopRecords may touch. Shared by the
+ * scan count and the fix itself so they never disagree on what qualifies.
+ */
+async function planShopRecordClassification(db, candidate) {
+  const auditRows = await db.getAuditLog({
+    action: 'review.document_classified', resource_type: 'document', resource_id: candidate.documentId,
+  });
+  const humanClassified = wasClassifiedByHuman(candidate.documentType, auditRows);
+  const rows = await db.listExtractionsByDocument(candidate.documentId);
+  const isShopInternal = isShopInternalDocument(toCompletenessFields(rows));
+  // loadShopRecordCandidates' own SQL already excludes anything with a direct
+  // customer link (its NOT EXISTS clause) — hasCustomerLink is always false
+  // for a row that reaches this function, but the shared predicate is used
+  // anyway so scan and fix can never disagree with reclassifyDocuments about
+  // what qualifies.
+  return shouldClassifyAsShopInternal({ humanClassified, hasCustomerLink: false, isShopInternal });
 }
 
 /** Equipment entities that carry a customer_name/service_address of their
@@ -762,6 +819,18 @@ export async function integrityScan(ctx) {
       .filter(multiUnitUnderLinked)
       .map((r) => ({ documentId: r.documentId, unitsExtracted: new Set(r.serialValues).size, unitsLinked: r.linkedEquipmentCount }));
 
+    // Round 5 (2026-09-22): "shop records not yet filed" — documents that
+    // look shop-internal (isShopInternalDocument) but predate the 'internal'
+    // type and so are still sitting unlinked/unverified. loadShopRecordCandidates
+    // casts a wide net (any not-yet-verified, not-directly-linked document);
+    // planShopRecordClassification narrows it to the exact set
+    // classifyShopRecords below would actually touch.
+    const shopRecordCandidates = await loadShopRecordCandidates(db);
+    const shopRecordsNotFiled = [];
+    for (const candidate of shopRecordCandidates) {
+      if (await planShopRecordClassification(db, candidate)) shopRecordsNotFiled.push(candidate.documentId);
+    }
+
     return {
       duplicateCustomers,
       unlinkedDocuments,
@@ -773,6 +842,7 @@ export async function integrityScan(ctx) {
       mismatchedNameLinks,
       splitLinkDocuments,
       ambiguousNameOnlyLinks,
+      shopRecordsNotFiled,
       counts: {
         duplicateCustomers: duplicateCustomers.length,
         unlinkedDocuments: unlinkedDocuments.length,
@@ -784,6 +854,7 @@ export async function integrityScan(ctx) {
         mismatchedNameLinks: mismatchedNameLinks.length,
         splitLinkDocuments: splitLinkDocuments.length,
         ambiguousNameOnlyLinks: ambiguousNameOnlyLinks.length,
+        shopRecordsNotFiled: shopRecordsNotFiled.length,
       },
     };
   });
@@ -1130,7 +1201,8 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
   const result = {
     dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [],
     survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [],
-    unitsMovedByGroup: [], splitUnitsHealed: [], customerContactsFilled: [], addressPlaceholdersAbsorbed: [], skipped: [],
+    unitsMovedByGroup: [], splitUnitsHealed: [], customerContactsFilled: [], addressPlaceholdersAbsorbed: [],
+    shopRecordsClassified: [], skipped: [],
   };
 
   if (applySet.has('mergeDuplicates')) {
@@ -1367,6 +1439,36 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     }
   }
 
+  if (applySet.has('classifyShopRecords')) {
+    // Round 5 (2026-09-22), safe/additive like healMergedSurvivors above:
+    // isShopInternalDocument only ever fires on a document that names no
+    // customer, unit or job at all, and wasClassifiedByHuman is checked
+    // first — never overrides a human's own decision — so this gets the
+    // plain effectiveDryRun gate, not the admin-only "ask twice" gate.
+    // applyShopInternalClassification (reviewStore.js) does the actual
+    // write: document_type -> 'internal', AI-verified, `no_customer: true`
+    // on its own per-document audit entry.
+    const candidates = await withRecordsTenant(ctx, loadShopRecordCandidates);
+    for (const candidate of candidates) {
+      const eligible = await withRecordsTenant(ctx, (db) => planShopRecordClassification(db, candidate));
+      if (!eligible) continue;
+      if (effectiveDryRun) {
+        result.shopRecordsClassified.push({ documentId: candidate.documentId, from: candidate.documentType, to: 'internal' });
+        continue;
+      }
+      const change = await withRecordsTenant(ctx, (db) => applyShopInternalClassification(db, {
+        documentId: candidate.documentId, fromType: candidate.documentType, actorClerkId,
+      }));
+      if (change) result.shopRecordsClassified.push(change); // null: a customer link appeared, skipped
+    }
+    if (result.shopRecordsClassified.length && !effectiveDryRun) {
+      await withRecordsTenant(ctx, (db) => db.logAction({
+        clerk_user_id: actorClerkId, action: 'integrity.classify_shop_records', resource_type: 'tenant',
+        changes: { count: result.shopRecordsClassified.length },
+      }));
+    }
+  }
+
   if (applySet.has('retireShopCustomers')) {
     // Stricter default than every other action here: anything other than
     // the EXPLICIT boolean `dryRun: false` previews only. An admin who wants
@@ -1508,9 +1610,9 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
  * retiring unlinks documents from a placeholder a person would otherwise
  * have to notice went missing. The other actions (linkDocuments,
  * linkEquipmentCustomers, createMissingUnits, healMergedSurvivors,
- * healSplitUnits, refillCustomerContacts) only ADD links or fill blanks —
- * never destructive, ON CONFLICT DO NOTHING/fill-only throughout — so the
- * owner's 2026-09-20 request explicitly does not gate those on admin: any
+ * healSplitUnits, refillCustomerContacts, classifyShopRecords) only ADD
+ * links or fill blanks — never destructive, ON CONFLICT DO NOTHING/fill-only
+ * throughout — so the owner's 2026-09-20 request explicitly does not gate those on admin: any
  * signed-in user (and the Inbox-load auto-fix, usePostgresSync.ts) can run
  * them. A solo tenant is its own admin either way. healSplitUnits (round 4,
  * 2026-09-21) is the one exception to "fill blanks only" — it can overwrite

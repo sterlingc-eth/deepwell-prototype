@@ -88,6 +88,7 @@ import {
   normalizeDocumentType,
   inferDocumentType,
   isReclassifiable,
+  isShopInternalDocument,
   completenessFor,
   toCompletenessFields,
   AI_VERIFY_MIN_CONFIDENCE,
@@ -537,6 +538,95 @@ export async function listLinks(ctx, { documentIds }) {
  * (getDocument/listExtractionsByDocument/verifyByAi) rather than this file's
  * own raw-client withTenant — nothing here is a bespoke transition.
  */
+/**
+ * Does this document already carry a DIRECT customer link (a
+ * document_entity_links row pointed at a 'customer' entity) — not merely an
+ * equipment link whose entity happens to have a customer_id? Pulled out of
+ * aiVerifyDocument (below) so reclassifyDocuments and routes/integrity.js's
+ * classifyShopRecords fix can ask the same "no customer link" question a
+ * shop-internal document is defined by, without re-deriving the JOIN.
+ * Tenant-scoped like every other query in this file.
+ */
+export async function hasDirectCustomerLink(db, documentId) {
+  const r = await db.raw(
+    `SELECT 1 FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+      WHERE l.document_id = $1 AND e.entity_type = 'customer'
+        AND l.${TENANT}
+      LIMIT 1`,
+    [documentId]
+  );
+  return r.rowCount > 0;
+}
+
+/**
+ * Pure decision for the shop-internal reclassification branch shared by
+ * reclassifyDocuments and routes/integrity.js's classifyShopRecords: should
+ * THIS document be classified 'internal' and marked AI-verified? All three
+ * inputs are resolved by the caller (isShopInternalDocument is itself pure;
+ * hasCustomerLink/humanClassified each need a query) so the RULE — no
+ * customer link, never human-classified, and the shop-internal shape itself
+ * — is pinned as a plain function scripts/verify-review.mjs can test with no
+ * database, same idiom as this file's other pure state-machine helpers
+ * (canVerify, wasClassifiedByHuman).
+ */
+export function shouldClassifyAsShopInternal({ humanClassified, hasCustomerLink, isShopInternal }) {
+  return !humanClassified && !hasCustomerLink && !!isShopInternal;
+}
+
+/**
+ * Classify a document with no customer link, not human-classified, whose
+ * extraction rows satisfy isShopInternalDocument, as 'internal' and mark it
+ * AI-verified — the same outcome extractDocument.js gives a freshly-ingested
+ * shop-internal document (source 'shop-internal': document_type 'internal',
+ * `no_customer: true` on its audit entry), for a document that was extracted
+ * before the 'internal' type existed (round 5, 2026-09-22).
+ *
+ * The verify step is guarded on `document_type = 'internal'` rather than
+ * recordsStore.js's verifyByAi's own link-or-entity guard: a shop-internal
+ * document names no customer, unit or job (isShopInternalDocument's whole
+ * definition) and so will NEVER acquire the link verifyByAi requires —
+ * reusing it verbatim would classify the document and then leave it stuck
+ * unverified forever, the exact fate this fix exists to end. Otherwise the
+ * same idiom as verifyByAi: forward-only ('read'/'mapped'/'linked' ->
+ * 'verified'), and never re-stamps a document already verified.
+ *
+ * Shared by reclassifyDocuments (per-id, human-triggered) and
+ * routes/integrity.js's classifyShopRecords (tenant-wide sweep) so the
+ * classify+verify+audit sequence is defined exactly once.
+ */
+export async function applyShopInternalClassification(db, { documentId, fromType, actorClerkId }) {
+  // Defense in depth (reviewer, 2026-09-22): the "no customer link" rule is
+  // re-derived HERE in SQL, not only in the caller's JS guard, so a link
+  // created between the caller's check and this write — or any future caller
+  // that skips shouldClassifyAsShopInternal — can never relabel a customer's
+  // document as a shop record. NOT EXISTS mirrors hasDirectCustomerLink.
+  const NO_CUSTOMER_LINK = `NOT EXISTS (
+        SELECT 1 FROM document_entity_links l
+        JOIN entities e ON e.id = l.entity_id AND e.entity_type = 'customer' AND e.tenant_id = documents.tenant_id
+       WHERE l.document_id = documents.id AND l.tenant_id = documents.tenant_id)`;
+  const typed = await db.raw(
+    `UPDATE documents SET document_type = 'internal'
+      WHERE id = $1 AND ${TENANT} AND ${NO_CUSTOMER_LINK}`,
+    [documentId]
+  );
+  if (!(typed.rowCount > 0)) return null; // a customer link appeared — leave the document alone
+  const verifiedResult = await db.raw(
+    `UPDATE documents SET stage = 'verified', verified_by = 'ai', verified_at = NOW()
+      WHERE id = $1 AND ${TENANT} AND stage IN ('read','mapped','linked') AND document_type = 'internal'
+        AND ${NO_CUSTOMER_LINK}`,
+    [documentId]
+  );
+  const verified = verifiedResult.rowCount > 0;
+  await db.logAction({
+    clerk_user_id: actorClerkId,
+    action: 'review.shop_record_classified',
+    resource_type: 'document',
+    resource_id: documentId,
+    changes: { from: fromType ?? null, to: 'internal', source: 'shop-internal', no_customer: true, verified },
+  });
+  return { documentId, from: fromType ?? null, to: 'internal' };
+}
+
 export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
   assertUuid('documentId', documentId);
 
@@ -561,14 +651,7 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     // customer not, and this repair never even looked because an equipment
     // link already existed. Gated on the actual thing that matters instead:
     // does a DIRECT customer link exist yet.
-    const hasDirectCustomerLink = (await db.raw(
-      `SELECT 1 FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
-        WHERE l.document_id = $1 AND e.entity_type = 'customer'
-          AND l.tenant_id = (current_setting('app.tenant_id', true))::uuid
-        LIMIT 1`,
-      [documentId]
-    )).rowCount > 0;
-    if (!hasDirectCustomerLink) {
+    if (!(await hasDirectCustomerLink(db, documentId))) {
       const facts = Object.fromEntries(completenessFields.map((f) => [f.field_key, f.value]));
       const customer = await db.findOrCreateCustomer(facts);
       if (customer?.id) {
@@ -704,6 +787,11 @@ async function classifyByModel(client, { filename, text, timeoutMs }) {
  * — `remaining` tells the caller how many documents still need another pass.
  * Capped at 100 ids per call.
  *
+ * Round 5 (2026-09-22): a shop-internal check (isShopInternalDocument) runs
+ * FIRST for every requested id, regardless of isReclassifiable — see the
+ * comment at that check below for why a canonical-but-wrong pre-'internal'
+ * type would otherwise never be touched.
+ *
  * ONE TRANSACTION PER DOCUMENT, not one for the whole batch: up to 20 model
  * calls plus their DB round-trips can approach api/review.js's 60s function
  * ceiling, and a single all-or-nothing transaction would roll back every
@@ -739,17 +827,37 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
       const change = await withRecordsTenant(ctx, async (db) => {
         const doc = await db.getDocument(id);
         if (!doc) return null;
-        if (!isReclassifiable(doc.document_type)) return null;
 
         const classificationRows = await db.getAuditLog({
           action: 'review.document_classified', resource_type: 'document', resource_id: id,
         });
-        if (wasClassifiedByHuman(doc.document_type, classificationRows)) return null;
+        const humanClassified = wasClassifiedByHuman(doc.document_type, classificationRows);
 
         const rows = await db.listExtractionsByDocument(id);
-        const facts = Object.fromEntries(
-          toCompletenessFields(rows).map((f) => [f.field_key, f.value])
-        );
+        const completenessFields = toCompletenessFields(rows);
+
+        // Round 5 (2026-09-22, live founder-account defect): a document
+        // ingested BEFORE the 'internal' type existed — typed 'dispatch-note'
+        // or 'correspondence' by the old heuristic, naming no customer at
+        // all — is a canonical type, so isReclassifiable below says "someone
+        // already decided this" and leaves it alone forever. Checked for
+        // EVERY requested id, ahead of that gate: isShopInternalDocument is a
+        // stronger, purely factual signal (same precedence extractDocument.js
+        // gives it over the model's own guess), and a document meeting it can
+        // never acquire a customer link no matter how many times it's
+        // reclassified — the very reason it's stuck in "Needs linking".
+        const isShopInternal = isShopInternalDocument(completenessFields);
+        if (!humanClassified && isShopInternal) {
+          const hasCustomerLink = await hasDirectCustomerLink(db, id);
+          if (shouldClassifyAsShopInternal({ humanClassified, hasCustomerLink, isShopInternal })) {
+            return applyShopInternalClassification(db, { documentId: id, fromType: doc.document_type, actorClerkId });
+          }
+        }
+
+        if (!isReclassifiable(doc.document_type)) return null;
+        if (humanClassified) return null;
+
+        const facts = Object.fromEntries(completenessFields.map((f) => [f.field_key, f.value]));
         let resolved = doc.document_type ? normalizeDocumentType(doc.document_type, facts) : 'other';
         if (resolved === 'other') resolved = inferDocumentType(facts, doc.original_filename);
 
