@@ -30,6 +30,9 @@ import { assertActiveBilling } from './_lib/plan.js';
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): owner/admin-only
 // read of the ask_misses table missStore.js writes from api/ask.js.
 import { missReport, exportMisses } from './_lib/missStore.js';
+// Miss digest, Tier 1 of the self-learning loop (api/_lib/missDigest.js):
+// platform-operator-only, cross-tenant — a normal tenant admin never sees this.
+import { buildMissDigest, sendMissDigest, isPlatformOperator } from './_lib/missDigest.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -38,7 +41,10 @@ import { missReport, exportMisses } from './_lib/missStore.js';
 // back to DEFAULT_LIMITS.read (120/min, 5000/day) for an unrecognized
 // bucket, which is what this gets — tracked under its own (tenantId,
 // 'write') counters, not shared with the 'read' bucket's own traffic.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix']);
+// missDigest joins this bucket too: it's not a billed model call, but it's a
+// cross-tenant scan (list_ask_misses_window, capped at 5000 rows per window,
+// run twice) that an operator's dashboard could otherwise poll without limit.
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -66,6 +72,16 @@ function requireAdminForMerge(auth) {
 // (owner/admin only; a solo tenant with no shop is its own admin, same as
 // every other admin-gated action in this file).
 const requireAdmin = requireAdminForMerge;
+
+// STRICTEST gate in this file: not a tenant role at all, but a platform
+// operator — the founder tenant or a Clerk user id on the DEEPWELL_OPERATOR_
+// USER_IDS allowlist (see api/_lib/missDigest.js's isPlatformOperator). A
+// tenant's own admin, even the founder shop's non-founder admins, gets 403.
+function requireOperator(auth) {
+  if (!isPlatformOperator(auth)) {
+    throw new reviewStore.ReviewError('This action is restricted to DeepWell platform operators.', 403);
+  }
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
@@ -96,6 +112,7 @@ const ACTIONS = new Set([
   'integrityFix',
   'missReport',
   'exportMisses',
+  'missDigest',
 ]);
 
 export default async (req, res) => {
@@ -197,11 +214,20 @@ export default async (req, res) => {
         break;
       case 'missReport':
         requireAdmin(auth);
-        result = await missReport(ctx, { days: payload.days });
+        // `isOperator` tells the client (DonovanMissesCard) whether to show
+        // the "Send digest now" button — the client never hardcodes ids, it
+        // just trusts what the server already knows about this caller.
+        result = { ...(await missReport(ctx, { days: payload.days })), isOperator: isPlatformOperator(auth) };
         break;
       case 'exportMisses':
         requireAdmin(auth);
         result = await exportMisses(ctx);
+        break;
+      case 'missDigest':
+        requireOperator(auth);
+        result = payload.send === true
+          ? await sendMissDigest({ since: payload.since })
+          : { digest: await buildMissDigest({ since: payload.since }) };
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

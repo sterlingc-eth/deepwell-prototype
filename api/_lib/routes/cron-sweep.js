@@ -7,6 +7,7 @@ import { runWarrantyNotificationSweep } from "../notify.js";
 import { runOutreachSweep } from "./outreach.js";
 import { runFollowupsSweep } from "./followups.js";
 import { integrityFixTenant } from "./integrity.js";
+import { runMissDigestSweepStep } from "../missDigest.js";
 
 /**
  * GET /api/cron-sweep
@@ -299,6 +300,17 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "followups" });
   }
 
+  // Donovan miss digest, Tier 1 of the self-learning loop
+  // (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md, api/_lib/missDigest.js):
+  // platform-owner-only, cross-tenant, guarded to at most once per UTC day
+  // internally — never allowed to fail the rest of this sweep.
+  try {
+    summary.missDigest = await runMissDigestSweepStep();
+  } catch (err) {
+    summary.missDigest = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "miss-digest" });
+  }
+
   summary.billingGatedTenants = billingGatedTenantKeys.size;
 
   await captureMessage(
@@ -318,7 +330,8 @@ export default async function handler(req, res) {
       `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
-      `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped).`,
+      `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +
+      `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}.`,
     { route: "/api/cron-sweep" }
   );
 

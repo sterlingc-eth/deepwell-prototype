@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Clipboard, ListChecks, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clipboard, ListChecks, Loader2, Send } from 'lucide-react';
 import { reviewClient, type MissReport } from '../services/reviewClient';
 
 /**
@@ -37,6 +37,8 @@ export function DonovanMissesCard() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [sendingDigest, setSendingDigest] = useState(false);
+  const [digestStatus, setDigestStatus] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -54,6 +56,32 @@ export function DonovanMissesCard() {
   }, [open]);
 
   const totalCount = report?.groups.reduce((sum, g) => sum + g.count, 0) ?? 0;
+
+  // Platform-operator-only (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md,
+  // Tier 1 self-learning loop) — the server tells us via `report.isOperator`
+  // whether the signed-in caller may call this; nothing here is hardcoded to
+  // an id. A 403 (a non-operator somehow reaching this button) surfaces as an
+  // ordinary error message like any other failed call.
+  const sendDigestNow = async () => {
+    setSendingDigest(true);
+    setDigestStatus(null);
+    setError(null);
+    try {
+      const result = await reviewClient.missDigest({ send: true });
+      if (result.skippedReason === 'no-misses') {
+        setDigestStatus('No misses in the last 24h — nothing sent.');
+      } else {
+        const parts = [`${result.digest.totals.totalMisses} miss(es)`, `${result.digest.totals.newQuestionsCount} new`];
+        if (result.emailed) parts.push('emailed');
+        if (result.notified) parts.push('in-app notified');
+        setDigestStatus(`Digest sent — ${parts.join(', ')}.`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send the digest.');
+    } finally {
+      setSendingDigest(false);
+    }
+  };
 
   const copyForReview = async () => {
     if (!report) return;
@@ -102,6 +130,28 @@ export function DonovanMissesCard() {
 
           {report && report.groups.length === 0 && (
             <p className="text-body text-ink-3">No misses logged yet — Donovan is answering everything it's tried.</p>
+          )}
+
+          {/* Platform-operator-only, independent of THIS tenant's own miss
+              count — the digest is cross-tenant, so an operator whose own
+              shop has zero misses can still send today's platform digest. */}
+          {report?.isOperator && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void sendDigestNow()}
+                disabled={sendingDigest}
+                className="dw-btn-tertiary !min-h-[32px] !py-0.5"
+              >
+                {sendingDigest ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" aria-hidden="true" />
+                )}
+                Send digest now
+              </button>
+              {digestStatus && <span className="text-caption text-ink-3">{digestStatus}</span>}
+            </div>
           )}
 
           {report && report.groups.length > 0 && (

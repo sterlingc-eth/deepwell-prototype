@@ -259,6 +259,51 @@ export interface MissReportGroup {
 export interface MissReport {
   total: number;
   groups: MissReportGroup[];
+  /** True when the signed-in caller is a DeepWell platform operator (the
+   *  founder tenant, or a Clerk user id on the operator allowlist) — never
+   *  hardcoded client-side, always trusted from the server's own gate. Drives
+   *  whether DonovanMissesCard shows "Send digest now". */
+  isOperator: boolean;
+}
+
+/** One question in a miss-digest group or its overall top-25 list — see
+ *  api/_lib/missDigest.js's buildDigestFromRows. */
+export interface MissDigestQuestion {
+  question: string;
+  outcome?: string;
+  count: number;
+  tenantCount: number;
+  isNew: boolean;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface MissDigestGroup {
+  outcome: string;
+  count: number;
+  questions: MissDigestQuestion[];
+}
+
+/** Cross-tenant platform digest (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md,
+ *  Tier 1 self-learning loop) — operator-only, never a tenant-facing shape. */
+export interface MissDigest {
+  since: string;
+  now: string;
+  totals: {
+    totalMisses: number;
+    totalTenants: number;
+    totalQuestions: number;
+    newQuestionsCount: number;
+  };
+  groups: MissDigestGroup[];
+  topQuestions: MissDigestQuestion[];
+}
+
+export interface MissDigestResult {
+  digest: MissDigest;
+  emailed?: boolean;
+  notified?: boolean;
+  skippedReason?: string;
 }
 
 /** One row of scripts/miss-review.mjs's / the question bank's export shape. */
@@ -386,5 +431,14 @@ export const reviewClient = {
    *  review card: {text, suggestedRoute} per distinct normalized question. */
   exportMisses() {
     return postJson<{ items: MissExportItem[] }>({ action: 'exportMisses' });
+  },
+
+  /** Platform-operator-only: the cross-tenant miss digest (Tier 1 of the
+   *  self-learning loop). `send: true` also emails/notifies the DeepWell
+   *  owners; omitted (or false), it just returns the digest to look at. The
+   *  server 403s anyone who isn't a platform operator — DonovanMissesCard
+   *  only shows the button when MissReport.isOperator says so. */
+  missDigest(opts?: { since?: string; send?: boolean }) {
+    return postJson<MissDigestResult>({ action: 'missDigest', since: opts?.since, send: opts?.send });
   },
 };
