@@ -11,7 +11,7 @@ export default async function handler(req: Request) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
-  const sql = neon(process.env.DATABASE_URL!);
+  const sql = neon(process.env.NEON_CONN_N_STRING!);
   const method = req.method;
 
   try {
