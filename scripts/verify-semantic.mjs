@@ -120,7 +120,7 @@ const noSleep = () => Promise.resolve();
   const off = embed.embedConfig({});
   check('config: with no VOYAGE_API_KEY semantic search is off', off.enabled === false && embed.semanticEnabled({}) === false);
   const on = embed.embedConfig({ VOYAGE_API_KEY: 'k' });
-  eq('config: with a key it is on, defaulting to voyage-3.5-lite / 1024 dims, no output_dimension sent', [on.enabled, on.model, on.dim, on.sendDim], [true, 'voyage-3.5-lite', 1024, false]);
+  eq('config: with a key it is on, defaulting to voyage-4-lite / 1024 dims, no output_dimension sent', [on.enabled, on.model, on.dim, on.sendDim], [true, 'voyage-4-lite', 1024, false]);
   check('config: DONOVAN_SEMANTIC=0 switches it off even with a key', embed.embedConfig({ VOYAGE_API_KEY: 'k', DONOVAN_SEMANTIC: '0' }).enabled === false);
   const custom = embed.embedConfig({ VOYAGE_API_KEY: 'k', DONOVAN_EMBED_MODEL: 'voyage-4-lite', DONOVAN_EMBED_DIM: '512' });
   eq('config: model and dimension are configurable (dimension is then sent to Voyage)', [custom.model, custom.dim, custom.sendDim], ['voyage-4-lite', 512, true]);
@@ -332,7 +332,7 @@ process.env.DONOVAN_EMBED_QUERY_TIMEOUT_MS = '250';
   const r1 = await store.embedDocumentPages(ctxA, D.svc);
   eq('ingest hook: embeds the document\'s two pages', [r1.status, r1.pages], ['done', 2]);
   const rows = (await lite.query('SELECT page_no, chunk_no, model, page_hash, length(text) AS len FROM page_chunks WHERE document_id = $1 ORDER BY page_no, chunk_no', [D.svc])).rows;
-  eq('ingest hook: one chunk per page, cited to its page, model recorded', rows.map((r) => [r.page_no, r.chunk_no, r.model]), [[1, 0, 'voyage-3.5-lite'], [2, 0, 'voyage-3.5-lite']]);
+  eq('ingest hook: one chunk per page, cited to its page, model recorded', rows.map((r) => [r.page_no, r.chunk_no, r.model]), [[1, 0, 'voyage-4-lite'], [2, 0, 'voyage-4-lite']]);
   const md5s = (await lite.query('SELECT p.page_no, c.page_hash = md5(p.text) AS same FROM document_pages p JOIN page_chunks c USING (document_id, page_no) WHERE p.document_id = $1', [D.svc])).rows;
   check('ingest hook: page_hash is the md5 of the page text', md5s.length === 2 && md5s.every((r) => r.same));
   check('ingest hook: document embeddings are requested as input_type "document"', fake.embedCalls.every((c) => c.input_type === 'document'));
@@ -484,7 +484,7 @@ process.env.DONOVAN_EMBED_QUERY_TIMEOUT_MS = '250';
   // A REAL Postgres error inside the vector step (wrong-dimension vector) must not poison the surrounding transaction.
   const survived = await store.withTenantRaw(ctxA, async (db) => {
     let threw = false;
-    try { await store.nearestChunks(db, { vector: [0.1, 0.2, 0.3], model: 'voyage-3.5-lite', k: 5, minSim: 0 }); } catch { threw = true; }
+    try { await store.nearestChunks(db, { vector: [0.1, 0.2, 0.3], model: 'voyage-4-lite', k: 5, minSim: 0 }); } catch { threw = true; }
     const still = await db.query('SELECT 1 AS ok');
     return { threw, ok: still.rows[0].ok === 1 };
   });
@@ -494,8 +494,8 @@ process.env.DONOVAN_EMBED_QUERY_TIMEOUT_MS = '250';
   {
     let seen = 0;
     hooks.beforeQuery = (sql) => { if (sql.includes('hnsw.iterative_scan')) { seen++; throw new Error('unrecognized configuration parameter "hnsw.iterative_scan"'); } };
-    const rows = await store.withTenantRaw(ctxA, (db) => store.nearestChunks(db, { vector: fakeVec('noise complaint loud'), model: 'voyage-3.5-lite', k: 5, minSim: 0.25 }));
-    const rows2 = await store.withTenantRaw(ctxA, (db) => store.nearestChunks(db, { vector: fakeVec('noise complaint loud'), model: 'voyage-3.5-lite', k: 5, minSim: 0.25 }));
+    const rows = await store.withTenantRaw(ctxA, (db) => store.nearestChunks(db, { vector: fakeVec('noise complaint loud'), model: 'voyage-4-lite', k: 5, minSim: 0.25 }));
+    const rows2 = await store.withTenantRaw(ctxA, (db) => store.nearestChunks(db, { vector: fakeVec('noise complaint loud'), model: 'voyage-4-lite', k: 5, minSim: 0.25 }));
     hooks.beforeQuery = null;
     store._resetIterativeScan();
     check('older pgvector: no iterative_scan -> retried once without it, result still correct, and the failure is remembered (tried once)', seen === 1 && rows.length > 0 && rows2.length === rows.length && rows[0].document_id === D.svc, `seen ${seen}`);

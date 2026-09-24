@@ -29,7 +29,7 @@
 import { createHash } from 'node:crypto';
 
 export const VOYAGE_BASE_URL = 'https://api.voyageai.com/v1';
-export const DEFAULT_EMBED_MODEL = 'voyage-3.5-lite';
+export const DEFAULT_EMBED_MODEL = 'voyage-4-lite'; // same $0.02/M + 1024 dims as 3.5-lite, but 200M free tokens per account (3.5-lite has none)
 export const DEFAULT_EMBED_DIM = 1024;
 /** Texts per embeddings request. Voyage allows 1000; 96 keeps each call quick and each retry cheap. */
 export const EMBED_BATCH_TEXTS = 96;

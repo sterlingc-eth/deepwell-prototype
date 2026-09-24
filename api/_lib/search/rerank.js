@@ -1,7 +1,7 @@
 /**
  * Optional cross-encoder rerank (Voyage /v1/rerank) over the fused candidates.
  *
- * OFF unless BOTH VOYAGE_API_KEY and DONOVAN_RERANK_MODEL (e.g. "rerank-2.5-lite")
+ * OFF unless BOTH VOYAGE_API_KEY and DONOVAN_RERANK_MODEL (e.g. "rerank-3-lite": $0.02/M with 200M free tokens)
  * are set. Time-boxed and best-effort: on timeout or any error the caller keeps
  * its reciprocal-rank-fusion order. Never throws.
  */
