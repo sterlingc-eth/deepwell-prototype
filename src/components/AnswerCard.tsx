@@ -2,6 +2,7 @@ import { ShieldCheck, ShieldQuestion } from 'lucide-react';
 import type { Answer, SourceRef } from '../core/types';
 import { FactGrid } from './FactGrid';
 import { SourceList } from './SourceList';
+import { AnswerFeedback } from './AnswerFeedback';
 
 export interface AnswerCardProps {
   answer: Answer;
@@ -77,6 +78,7 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
             <SourceList sources={answer.sources} onOpen={onOpenSource} />
           </>
         )}
+        <AnswerFeedback key={`${question}|${answer.text}`} question={question} />
       </div>
     </article>
   );

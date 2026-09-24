@@ -22,7 +22,8 @@ import { buildAllowed, shapeAnswer, NO_ANSWER_TEXT } from "../answer.js";
 
 const NONE_FOUND_TEXT = "Nothing in your records matches that.";
 const STATUSES = new Set(["ok", "warn", "bad", "info", "muted"]);
-const MAX_FACTS = 25;
+/** A list answer returns every row up to this cap (live defect: a 13-customer list was cut to 5). */
+export const MAX_FACTS = 40;
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
@@ -74,9 +75,10 @@ export function shapeAgentAnswer(raw, ledger, { question = "", today = "" } = {}
   const evidenceNoComma = evidence.replace(/,/g, "");
 
   const allowed = buildAllowed(ledger.allowedInput());
-  const rawFacts = (Array.isArray(input.facts) ? input.facts : [])
-    .filter((f) => f && typeof f === "object" && typeof f.label === "string" && typeof f.value === "string" && f.label.trim() && f.value.trim())
-    .slice(0, MAX_FACTS);
+  const validRawFacts = (Array.isArray(input.facts) ? input.facts : [])
+    .filter((f) => f && typeof f === "object" && typeof f.label === "string" && typeof f.value === "string" && f.label.trim() && f.value.trim());
+  const rawFacts = validRawFacts.slice(0, MAX_FACTS);
+  const overflow = Math.max(0, validRawFacts.length - MAX_FACTS);
 
   const sourcedIn = [];
   const unsourcedOk = [];
@@ -147,7 +149,18 @@ export function shapeAgentAnswer(raw, ledger, { question = "", today = "" } = {}
     dropped.textRewritten = true;
     text = facts.length <= 3
       ? facts.map((f) => `${f.label}: ${f.value}`).join("; ") + "."
-      : `${facts.length} results.`;
+      : `Found ${facts.length} matching records; the full list is below.`;
+  }
+  // Completeness is never implied: the true total is always in the sentence, and a list that could
+  // not be shown whole (more rows than fit / more facts than the cap) says exactly how much is shown.
+  const lq = ledger.lastQuery;
+  const rowsCut = lq && lq.shown < lq.rowCount && facts.length >= 2 ? lq.rowCount : 0;
+  const totalRows = Math.max(rowsCut, facts.length + overflow);
+  if (rowsCut || overflow) {
+    text = `${text.replace(/[.\s]+$/, "")}. Showing ${facts.length} of ${totalRows}; ask me to narrow it down for the rest.`;
+    dropped.truncated = true;
+  } else if (facts.length >= 4 && !digitTokens(text).includes(String(facts.length))) {
+    text = `${text.replace(/[.\s]+$/, "")}. ${facts.length} in all.`;
   }
 
   const citedDocIds = new Set(facts.flatMap((f) => f.sources.map((s) => s.documentId)));

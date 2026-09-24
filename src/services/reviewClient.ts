@@ -270,7 +270,17 @@ export function isIntegrityFixDebounced(result: IntegrityFixResult): result is I
 export interface MissReportGroup {
   outcome: string;
   count: number;
-  topQuestions: { text: string; count: number }[];
+  topQuestions: { text: string; count: number; replay?: MissReplay }[];
+}
+
+/** What happened when Donovan re-ran a miss (api/_lib/learning/replay.js): answered now (with the
+ *  answer it gave) or still failing (with why). Absent = never replayed. */
+export interface MissReplay {
+  outcome: 'answered_now' | 'still_failing';
+  reason: string | null;
+  answer: { text?: string; facts?: { label: string; value: string }[] } | null;
+  note: string | null;
+  replayedAt: string;
 }
 
 export interface MissReport {
@@ -281,6 +291,8 @@ export interface MissReport {
    *  hardcoded client-side, always trusted from the server's own gate. Drives
    *  whether DonovanMissesCard shows "Send digest now". */
   isOperator: boolean;
+  /** Distinct missed questions by replay status (server-computed). */
+  replaySummary?: { answeredNow: number; stillFailing: number; notReplayed: number };
 }
 
 /** One question in a miss-digest group or its overall top-25 list — see
@@ -336,7 +348,7 @@ export interface MissExportItem {
  * api/_lib/learning/proposals.js's PROPOSAL_KINDS for `kind`, and
  * M3-config/26-donovan-learning.sql for the `status` lifecycle. */
 
-export type LearningProposalKind = 'abbreviation' | 'typo' | 'synonym' | 'few_shot' | 'capability_gap';
+export type LearningProposalKind = 'abbreviation' | 'typo' | 'synonym' | 'few_shot' | 'capability_gap' | 'recipe';
 export type LearningProposalStatus = 'pending' | 'approved' | 'rejected' | 'auto_rejected' | 'auto_approved';
 
 /** api/_lib/learning/verify.js's verifyProposal/verifyProposalLive result,
@@ -357,13 +369,35 @@ export interface LearningProposal {
   id: string;
   kind: LearningProposalKind;
   payload: Record<string, unknown>;
-  evidence: { questions?: string[]; count?: number; tenantCount?: number };
+  evidence: { questions?: string[]; count?: number; tenantCount?: number; seen?: number; thumbsUp?: number };
   verification: LearningVerification;
   status: LearningProposalStatus;
   reason: string | null;
   created_at: string;
   decided_at: string | null;
   decided_by: string | null;
+  /** capability_gap only: the replay outcome of its example question, when one exists. */
+  replay?: MissReplay;
+}
+
+/** api/_lib/learning/replay.js's replayMisses() summary. */
+export interface ReplaySummary {
+  attempted: number;
+  answeredNow: number;
+  stillFailing: number;
+  remaining: number;
+  costUsd: number;
+  stopped: string | null;
+  recipes: { pending: number; live: number; notEligible: number };
+  items: { question: string; outcome: 'answered_now' | 'still_failing'; reason?: string; recipe?: string; answer?: MissReplay['answer'] }[];
+}
+
+/** The honest counts the Learning card leads with. */
+export interface LearningSummary {
+  recipesActive: number;
+  answeredNow: number;
+  stillFailing: number;
+  notReplayed: number;
 }
 
 export interface LearningRunSummary {
@@ -374,6 +408,7 @@ export interface LearningRunSummary {
   byKind?: Record<string, number>;
   skipped?: string;
   error?: string;
+  replay?: Partial<ReplaySummary> & { skipped?: string; error?: string };
 }
 
 /** One row of donovan_learned (M3-config/26-donovan-learning.sql) — an
@@ -542,7 +577,7 @@ export const reviewClient = {
    *  currently-active learned items, in one round trip. `status` omitted
    *  returns every proposal status; the server caps `limit` at 1000. */
   learningList(opts?: { status?: LearningProposalStatus; limit?: number }) {
-    return postJson<{ items: LearningProposal[]; activeLearned: LearningLearnedItem[] }>({
+    return postJson<{ items: LearningProposal[]; activeLearned: LearningLearnedItem[]; summary?: LearningSummary }>({
       action: 'learningList',
       status: opts?.status,
       limit: opts?.limit,
@@ -554,7 +589,11 @@ export const reviewClient = {
    *  proposal (something changed since it was proposed) comes back as a 409,
    *  not a silently-applied learned row. */
   learningDecide(id: string, decision: 'approved' | 'rejected') {
-    return postJson<{ ok: boolean; status: LearningProposalStatus; verification?: LearningVerification }>({
+    return postJson<{
+      ok: boolean; status: LearningProposalStatus; verification?: LearningVerification;
+      /** Approving a "Can't do yet" note replays its example question; this is what came back. */
+      replay?: { replayed: boolean; outcome?: 'answered_now' | 'still_failing'; reason?: string; answer?: MissReplay['answer']; recipe?: string; stopped?: string };
+    }>({
       action: 'learningDecide',
       id,
       decision,
@@ -575,6 +614,21 @@ export const reviewClient = {
     return postJson<LearningRunSummary>({ action: 'learningRunNow' });
   },
 
+  /** Operator: re-run this shop's open misses through Donovan now (up to 15 per call; call again while
+   *  `remaining` > 0). Records answered-now / still-failing per miss and creates recipe proposals. */
+  learningReplay(opts?: { questions?: string[]; force?: boolean }) {
+    return postJson<ReplaySummary>({ action: 'learningReplay', questions: opts?.questions, force: opts?.force });
+  },
+
+  /** Thumbs on an answer. Up confirms the recipe behind it; down records a correction miss, retires any
+   *  live shortcut for that question and re-asks Donovan once, with the note as a hint. */
+  askFeedback(question: string, rating: 'up' | 'down', note?: string) {
+    return postJson<{
+      ok: boolean; status?: string; retired?: boolean; budget?: boolean;
+      replay?: { outcome: 'answered_now' | 'still_failing'; reason: string | null; answer: MissReplay['answer'] } | null;
+    }>({ action: 'askFeedback', question, rating, note });
+  },
+
   /** approved + auto_approved items as JSON, for folding into the repo's
    *  vocab/bank by the weekly Claude Code session (handoffs/
    *  DONOVAN_SELF_LEARNING_2026-09-22.md's "weekly repo-sync step"). */
@@ -582,3 +636,24 @@ export const reviewClient = {
     return postJson<{ items: LearningExportItem[] }>({ action: 'learningExport' });
   },
 };
+
+/** Replays every open miss (operator only): calls learningReplay until nothing is left, a budget/cost stop
+ *  is reported, or `maxRounds` is hit. `onProgress` gets the running totals after each round. */
+export async function replayAllMisses(
+  onProgress?: (totals: { attempted: number; answeredNow: number; stillFailing: number; remaining: number; stopped: string | null }) => void,
+  maxRounds = 4,
+) {
+  const totals = { attempted: 0, answeredNow: 0, stillFailing: 0, remaining: 0, stopped: null as string | null, recipesLive: 0 };
+  for (let round = 0; round < maxRounds; round++) {
+    const r = await reviewClient.learningReplay();
+    totals.attempted += r.attempted;
+    totals.answeredNow += r.answeredNow;
+    totals.stillFailing += r.stillFailing;
+    totals.remaining = r.remaining;
+    totals.stopped = r.stopped;
+    totals.recipesLive += r.recipes?.live ?? 0;
+    onProgress?.(totals);
+    if (r.stopped === 'model-budget' || r.stopped === 'cost-ceiling' || r.stopped === 'agent-disabled' || r.remaining <= 0 || r.attempted === 0) break;
+  }
+  return totals;
+}

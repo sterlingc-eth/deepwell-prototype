@@ -25,6 +25,7 @@ import { proposeFixesForMisses } from './proposer.js';
 import { verifyProposalLive } from './verify.js';
 import { decidePolicyStatus } from './policy.js';
 import * as store from './store.js';
+import { replayMisses } from './replay.js';
 
 const TASK_KEY = 'donovan-learning';
 
@@ -119,9 +120,24 @@ async function persistOne(p, status, reason, verification) {
  * wrappers still each carry their own try/catch, since this can still throw
  * on something neither wrapper anticipated — e.g. a store/proposer bug).
  */
-export async function runLearningCore() {
+export async function runLearningCore({ ctxArg, callModel } = {}) {
   const digest = await buildMissDigest();
   const missGroups = flattenMissGroups(digest);
+
+  // MISS REPLAY (the loop-closing step): re-run the shop's open misses through the Donovan agent and
+  // record answered-now / still-failing per miss; grounded answers become recipe proposals. Uses the
+  // founder/operator tenant's OWN data and misses (never another shop's), respects the daily model
+  // budget and its own cost ceiling. Runs even on a night with no new miss groups.
+  const replayCtx = ctxArg ?? (process.env.DEEPWELL_FOUNDER_TENANT_ID ? { tenantKey: process.env.DEEPWELL_FOUNDER_TENANT_ID, tenantName: process.env.DEEPWELL_FOUNDER_TENANT_ID } : null);
+  let replay = { skipped: 'no-founder-tenant' };
+  if (replayCtx) {
+    try {
+      replay = await replayMisses({ ctxArg: replayCtx, source: ctxArg ? 'run-now' : 'nightly', callModel });
+    } catch (err) {
+      console.error('donovan-learning: replay failed (non-fatal):', err?.name);
+      replay = { error: 'replay-failed' };
+    }
+  }
 
   const summary = {
     totalMissGroups: missGroups.length,
@@ -130,6 +146,7 @@ export async function runLearningCore() {
     byStatus: {},
     byKind: {},
   };
+  summary.replay = replay;
   if (!missGroups.length) return { ...summary, skipped: 'no-new-misses' };
 
   const maxModelCalls = Number(process.env.DONOVAN_LEARN_MAX_CALLS) || 20;
@@ -175,10 +192,10 @@ export async function runLearningCore() {
 
 /** Operator-triggered ("Run learning now") — same work, no once-per-day
  *  guard, still skipped when the migration isn't applied. Never throws. */
-export async function runLearningNow() {
+export async function runLearningNow(ctxArg) {
   if (!(await migrationApplied())) return { skipped: 'migration-not-applied' };
   try {
-    return await runLearningCore();
+    return await runLearningCore({ ctxArg });
   } catch (err) {
     console.error('donovan-learning: runLearningNow failed (non-fatal):', err?.message);
     return { error: err?.message };

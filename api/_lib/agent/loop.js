@@ -3,7 +3,8 @@
  * pre-routers and the closed-vocabulary analytics planner could not.
  *
  * Bounds (all enforced in code, none left to the model):
- *   - at most MAX_TURNS (6) model calls; the last is forced to the `answer` tool;
+ *   - at most MAX_TURNS (4) model calls; the last is forced to the `answer` tool (the shop's
+ *     catalogue is already in the cached system prompt, so exploration rarely needs more);
  *   - a hard cap on cumulative INPUT tokens (default 40k, cache reads/writes
  *     included): past 75% the next call is forced to `answer`, past 100% the run
  *     stops with reason 'token-cap' and yields no answer;
@@ -28,9 +29,10 @@ import { recordModelCall, totalInputTokens, estimateCostUsd } from "../usage.js"
 import { ANALYTICS_MODEL } from "../routes/analytics.js";
 import { ALL_TOOL_DEFS, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./tools.js";
 import { shapeAgentAnswer } from "./shape.js";
+import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
 
 export const AGENT_MODEL = process.env.DONOVAN_AGENT_MODEL || ANALYTICS_MODEL;
-export const MAX_TURNS = 6;
+export const MAX_TURNS = 4;
 export const DEFAULT_INPUT_TOKEN_CAP = 40_000;
 const MAX_TOOLS_PER_TURN = 4;
 const MAX_OUTPUT_TOKENS = 1200;
@@ -43,7 +45,10 @@ export function isAgentEnabled(env = process.env) {
 
 export const AGENT_SYSTEM_PROMPT = `You are Donovan, the records assistant for an HVAC shop. Answer the dispatcher's or owner's question ONLY from tool results in this conversation.
 - Never invent a name, date, number, model, serial, address or document. Every number and name in your answer must appear in a tool result.
-- Prefer run_query for counts, lists and "who all / which / how many" questions (one well-formed query beats many small ones). Use search_documents for what documents SAY (permit or PO numbers, work performed, notes). Use find_customers then get_customer for one customer or address. Call describe_data first if you are unsure which fields or document types exist.
+- Prefer run_query for counts, lists and "who all / which / how many" questions (one well-formed query beats many small ones). Use search_documents for what documents SAY (permit or PO numbers, work performed, notes). Use find_customers then get_customer for one customer or address. A catalogue of this shop's records (entity counts, document types, field keys with examples, service-date range) follows the tools; call describe_data only if it is missing.
+- History questions about one customer or address ("has this unit had a compressor replaced", "what was done last visit"): find_customers, then search_documents with that customerId and the key words (compressor, replaced, ...). Answer with the quoted excerpt as a fact citing its documentId and page. If a customer-scoped search returns nothing, use none_found and say what was searched ("No document on file for that address mentions a compressor replacement").
+- Lists: one fact per row for EVERY row (up to 40), never a partial list phrased as complete; the total must be in text. If a result says truncated, narrow the query or select fewer columns and run it again.
+- If a question could mean two things (documents of a brand: linked to that brand's units, or belonging to customers who own that brand) pick the most natural one and SAY which in text.
 - If a query errors, read the error, fix the SQL and retry. Keep tool calls few.
 - Warranty status comes from the equipment view's warranty_status / warranty_current columns; never work it out yourself.
 - Finish by calling the answer tool exactly once. Lists: one fact per row (label = customer or item, value = the detail), entityId = the customer_id/equipment_id returned. A fact taken from a document cites it in sources. Pure counts and lists from run_query need no sources.
@@ -65,6 +70,21 @@ export const AGENT_PROMPT_VERSION = createHash("sha256")
 export function agentQuestionHash(question) {
   const n = String(question ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/[?!.]+$/, "");
   return createHash("sha256").update(`agent:${n}`).digest("hex");
+}
+
+/** Per-tenant catalogue text for the cached system prompt (10-minute window). */
+const CATALOGUE_TTL_MS = 10 * 60 * 1000;
+const catalogueCache = new Map();
+export function resetCatalogueCacheForTests() { catalogueCache.clear(); }
+
+async function loadCatalogue(toolbox, ctxArg) {
+  const key = String(ctxArg?.tenantKey ?? "");
+  const hit = catalogueCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) return hit.text;
+  const text = await toolbox.catalogueText();
+  if (catalogueCache.size > 200) catalogueCache.clear();
+  catalogueCache.set(key, { text, expiresAt: Date.now() + CATALOGUE_TTL_MS });
+  return text;
 }
 
 async function defaultCallModel(req, { deadlineAt }) {
@@ -91,7 +111,9 @@ function usageOf(resp) {
  * @param {{tenantKey: string, tenantName?: string}} p.ctxArg
  * @param {string} p.question
  * @param {string} p.today  YYYY-MM-DD
- * @param {object} [p.overlay]  accepted for call-site symmetry with the other routers; unused today
+ * @param {object} [p.overlay]  the active learned overlay; its `recipes` (approved worked examples) are injected
+ *   into the user message, top 3 by question similarity
+ * @param {string} [p.hint]  a reviewer's note about a previous wrong answer (thumbs-down), <= 300 chars
  * @param {Function} [p.callModel]  (request, {deadlineAt}) => Anthropic-shaped response. Injectable for tests.
  * @param {number} [p.deadlineAt]  epoch ms
  * @param {{maxTurns?: number, inputTokenCap?: number}} [p.limits]
@@ -99,8 +121,7 @@ function usageOf(resp) {
  *   inputTokens: number, outputTokens: number, cacheReadInputTokens: number, cacheCreationInputTokens: number,
  *   costUsd: number, steps: object[], dropped: object|null, error?: string}>}
  */
-export async function runDonovanAgent({ withTenant, ctxArg, question, today, overlay, callModel = defaultCallModel, deadlineAt, limits = {} }) {
-  void overlay;
+export async function runDonovanAgent({ withTenant, ctxArg, question, today, overlay, hint, callModel = defaultCallModel, deadlineAt, limits = {} }) {
   // Same daily spend budget every other model call respects. Throws ModelBudgetExceededError.
   await assertModelBudget(ctxArg);
 
@@ -116,15 +137,25 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
   let finalInput = null;
   let error;
 
+  // The shop's catalogue rides in the cached system prompt (per-tenant, 10-minute window) instead of a
+  // model round that calls describe_data. A failure here only costs the shortcut, never the run.
+  let catalogue = "";
+  try { catalogue = await loadCatalogue(toolbox, ctxArg); } catch { catalogue = ""; }
+  const systemBlocks = [{ block: { type: "text", text: AGENT_SYSTEM_PROMPT }, breakpoint: true }];
+  if (catalogue) systemBlocks.push({ block: { type: "text", text: `CATALOGUE of this shop's records (JSON, refreshed every few minutes):\n${catalogue}` }, breakpoint: true });
   const { tools, system } = planCacheBreakpoints(
     {
       tools: ALL_TOOL_DEFS.map((block, i) => ({ block, breakpoint: i === ALL_TOOL_DEFS.length - 1 })),
-      system: [{ block: { type: "text", text: AGENT_SYSTEM_PROMPT }, breakpoint: true }],
+      system: systemBlocks,
     },
     AGENT_MODEL
   );
 
-  const messages = [{ role: "user", content: [{ type: "text", text: `Today's date: ${today}\n\nQUESTION: ${question}` }] }];
+  const examples = formatWorkedExamples(selectWorkedExamples(overlay?.recipes, question, 3));
+  const note = typeof hint === "string" && hint.trim()
+    ? `\n\nREVIEWER NOTE (the previous answer to this question was marked wrong; take this into account, but every fact must still come from tool results): ${hint.trim().slice(0, 300)}`
+    : "";
+  const messages = [{ role: "user", content: [{ type: "text", text: `Today's date: ${today}\n\n${examples}QUESTION: ${question}${note}` }] }];
 
   try {
     let nudged = false;
@@ -209,6 +240,8 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
     ...totals,
     costUsd,
     steps,
+    queries: toolbox.queries,
+    examplesInjected: examples ? examples.split("\nQ: ").length - 1 : 0,
     dropped: shaped?.dropped ?? null,
     ...(error ? { error } : {}),
   };
@@ -219,6 +252,8 @@ export function agentDebugTrace(result) {
   return {
     steps: (result.steps ?? []).map((s) => ({ tool: s.tool, inputSummary: s.inputSummary, rowCount: s.rowCount, ms: s.ms })),
     modelCalls: result.modelCalls,
+    ...(result.examplesInjected ? { examplesInjected: result.examplesInjected } : {}),
+    ...(result.fastReplay ? { fastReplay: true } : {}),
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     costUsd: result.costUsd,

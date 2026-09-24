@@ -114,3 +114,29 @@ export async function deactivateLearned(learnedId) {
     return false;
   }
 }
+
+/* ------------------------------------------------------------------ recipes
+ * M3-config/29-donovan-recipes.sql (OPTIONAL): 'recipe' proposals/learned rows. Without that
+ * migration these return empty/false and Donovan simply keeps its old behaviour. */
+
+/** Every recipe proposal (any status) for one normalized question, newest first. */
+export async function findRecipes(question) {
+  try {
+    const { rows } = await getPool().query('SELECT * FROM learning_find_recipes($1)', [String(question ?? '')]);
+    return rows;
+  } catch (err) {
+    warnOnce('learning_find_recipes', err);
+    return [];
+  }
+}
+
+/** Replaces a still-PENDING recipe proposal's payload/evidence (a re-observation). */
+export async function updateRecipeProposal(id, payload, evidence) {
+  try {
+    const { rows } = await getPool().query('SELECT learning_update_proposal($1,$2,$3) AS ok', [id, JSON.stringify(payload ?? {}), JSON.stringify(evidence ?? {})]);
+    return Boolean(rows[0]?.ok);
+  } catch (err) {
+    warnOnce('learning_update_proposal', err);
+    return false;
+  }
+}

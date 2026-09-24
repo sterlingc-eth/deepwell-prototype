@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  Check, ChevronDown, ChevronUp, Clipboard, GraduationCap, Loader2, Play, Power, X,
+  Check, ChevronDown, ChevronUp, Clipboard, GraduationCap, Loader2, Play, Power, RefreshCw, X,
 } from 'lucide-react';
-import { reviewClient, type LearningLearnedItem, type LearningProposal } from '../services/reviewClient';
+import { reviewClient, replayAllMisses, type LearningLearnedItem, type LearningProposal, type LearningSummary } from '../services/reviewClient';
 
 /**
  * Platform-operator-only "Donovan learning" card (Tier 2 Part B,
@@ -23,6 +23,7 @@ const KIND_LABEL: Record<string, string> = {
   synonym: 'New synonym',
   few_shot: 'Example (few-shot)',
   capability_gap: "Can't do yet",
+  recipe: 'Learned shortcut',
 };
 
 function kindLabel(kind: string): string {
@@ -40,6 +41,8 @@ function payloadSummary(kind: string, payload: Record<string, unknown>): string 
       return `"${payload.question}"`;
     case 'capability_gap':
       return String(payload.title ?? '');
+    case 'recipe':
+      return `"${payload.question}"`;
     default:
       return JSON.stringify(payload);
   }
@@ -65,6 +68,9 @@ export function DonovanLearningCard() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [runningNow, setRunningNow] = useState(false);
   const [runStatus, setRunStatus] = useState<string | null>(null);
+  const [summary, setSummary] = useState<LearningSummary | null>(null);
+  const [replaying, setReplaying] = useState(false);
+  const [decisionNote, setDecisionNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
 
@@ -76,6 +82,7 @@ export function DonovanLearningCard() {
       .then((r) => {
         setProposals(r.items);
         setActiveLearned(r.activeLearned);
+        setSummary(r.summary ?? null);
       })
       .catch((e) => {
         const message = e instanceof Error ? e.message : 'Could not load Donovan learning.';
@@ -104,8 +111,15 @@ export function DonovanLearningCard() {
   const decide = async (id: string, decision: 'approved' | 'rejected') => {
     setDecidingId(id);
     setError(null);
+    setDecisionNote(null);
     try {
-      await reviewClient.learningDecide(id, decision);
+      const r = await reviewClient.learningDecide(id, decision);
+      // Approving a "Can't do yet" note re-runs its example question - say what really happened.
+      if (r.replay) {
+        if (!r.replay.replayed) setDecisionNote(`Approved, but nothing was replayed${r.replay.reason ? ` (${r.replay.reason})` : ''}.`);
+        else if (r.replay.outcome === 'answered_now') setDecisionNote(`Replayed: answered now ✓ — ${r.replay.answer?.text ?? ''}${r.replay.recipe === 'approved' ? ' The shortcut is now live.' : ''}`);
+        else setDecisionNote(`Replayed: still failing — ${r.replay.reason ?? 'no reason given'}.`);
+      }
       setProposals((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
       if (decision === 'approved') load(); // pick up the new active-learned row
     } catch (e) {
@@ -140,13 +154,30 @@ export function DonovanLearningCard() {
         setRunStatus(`Failed: ${summary.error}`);
       } else {
         const byStatus = Object.entries(summary.byStatus ?? {}).map(([k, n]) => `${n} ${k}`).join(', ') || 'no proposals';
-        setRunStatus(`${summary.totalMissGroups ?? 0} miss group(s), ${summary.modelCallsMade ?? 0} model call(s) — ${byStatus}.`);
+        const rp = summary.replay;
+        const replayNote = rp && !rp.skipped && !rp.error ? ` Re-ran ${rp.attempted ?? 0} miss(es): ${rp.answeredNow ?? 0} answered now, ${rp.stillFailing ?? 0} still failing.` : '';
+        setRunStatus(`${summary.totalMissGroups ?? 0} miss group(s), ${summary.modelCallsMade ?? 0} model call(s) — ${byStatus}.${replayNote}`);
       }
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not run learning now.');
     } finally {
       setRunningNow(false);
+    }
+  };
+
+  const replayAll = async () => {
+    setReplaying(true);
+    setRunStatus(null);
+    setError(null);
+    try {
+      const t = await replayAllMisses((p) => setRunStatus(`Re-running… ${p.attempted} done, ${p.remaining} left.`));
+      setRunStatus(`Re-ran ${t.attempted}: ${t.answeredNow} answered now, ${t.stillFailing} still failing${t.recipesLive ? `, ${t.recipesLive} shortcut(s) now live` : ''}${t.stopped ? ` (stopped: ${t.stopped})` : ''}.`);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not replay the misses.');
+    } finally {
+      setReplaying(false);
     }
   };
 
@@ -181,11 +212,17 @@ export function DonovanLearningCard() {
       {open && (
         <div className="space-y-4 pt-1">
           <p className="text-caption text-ink-3">
-            Every night Donovan looks at what it answered honestly instead of correctly and proposes fixes — a typo
-            or abbreviation to learn, a new word for something it already tracks, or a worked example. Nothing here
-            ever changes how Donovan answers until you approve it (or the fix is a routine typo/abbreviation the
-            policy already trusts).
+            Every night Donovan re-runs what it missed. When it now answers with a grounded result it keeps that as a
+            learned shortcut — a worked example for similar questions, and a no-model replay for the identical one —
+            which goes live once the same question gives the same result twice, or you (or a thumbs-up) confirm it.
+            It also proposes typo, abbreviation and vocabulary fixes. Nothing changes how Donovan answers until it is
+            confirmed here or by that rule.
           </p>
+          {summary && (
+            <p className="text-caption text-ink-2">
+              {summary.recipesActive} shortcut(s) active · {summary.answeredNow} missed question(s) answered now · {summary.stillFailing} still failing · {summary.notReplayed} not re-run yet
+            </p>
+          )}
 
           {error && <p role="alert" className="text-caption text-bad-ink">{error}</p>}
 
@@ -193,6 +230,10 @@ export function DonovanLearningCard() {
             <button type="button" onClick={() => void runNow()} disabled={runningNow} className="dw-btn-tertiary !min-h-[32px] !py-0.5">
               {runningNow ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Play className="w-3.5 h-3.5" aria-hidden="true" />}
               Run learning now
+            </button>
+            <button type="button" onClick={() => void replayAll()} disabled={replaying || runningNow} className="dw-btn-tertiary !min-h-[32px] !py-0.5">
+              {replaying ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
+              Replay all now
             </button>
             <button type="button" onClick={() => void exportApproved()} disabled={exporting} className="dw-btn-tertiary !min-h-[32px] !py-0.5">
               {exported ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Clipboard className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -203,6 +244,7 @@ export function DonovanLearningCard() {
             </button>
             {runStatus && <span className="text-caption text-ink-3">{runStatus}</span>}
           </div>
+          {decisionNote && <p role="status" className="text-caption text-ink-2">{decisionNote}</p>}
 
           {loading && proposals === null && (
             <p className="text-body text-ink-3 flex items-center gap-2">
@@ -234,7 +276,7 @@ export function DonovanLearningCard() {
                             className="dw-btn-tertiary !min-h-[28px] !py-0"
                           >
                             {decidingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Check className="w-3.5 h-3.5" aria-hidden="true" />}
-                            Approve
+                            {p.kind === 'capability_gap' ? 'Approve & replay' : 'Approve'}
                           </button>
                           <button
                             type="button"
@@ -249,8 +291,15 @@ export function DonovanLearningCard() {
                       </div>
                       <p className="text-caption text-ink-3">
                         Seen {p.evidence?.count ?? 0}x across {p.evidence?.tenantCount ?? 0} shop(s)
-                        {v ? ` · bank ${v.bankPass}/${v.bankTotal} · miss fixed ${v.missFixed?.fixed ?? 0}/${v.missFixed?.total ?? 0} · negatives ${v.negativesPass ? 'clean' : 'FAILED'}` : ''}
+                        {p.kind === 'recipe'
+                          ? ` · same result seen ${Number(p.evidence?.seen ?? 1)}x${p.evidence?.thumbsUp ? ' · thumbs-up' : ''}`
+                          : v && v.bankTotal != null ? ` · bank ${v.bankPass}/${v.bankTotal} · miss fixed ${v.missFixed?.fixed ?? 0}/${v.missFixed?.total ?? 0} · negatives ${v.negativesPass ? 'clean' : 'FAILED'}` : ''}
                       </p>
+                      {p.kind === 'capability_gap' && p.replay && (
+                        <p className="text-caption text-ink-2">
+                          {p.replay.outcome === 'answered_now' ? 'Its example is answered now ✓' : `Its example is still failing — ${p.replay.reason ?? 'no reason given'}`}
+                        </p>
+                      )}
                     </li>
                   );
                 })}

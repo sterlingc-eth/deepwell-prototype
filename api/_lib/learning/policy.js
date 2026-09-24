@@ -85,3 +85,27 @@ export function decidePolicyStatus({ kind, tenantCount = 0, count = 0 } = {}, ve
   // it upstream) — fail toward the safest option, a human decides.
   return { status: 'pending', reason: null };
 }
+
+/**
+ * RECIPE policy (learning/recipes.js). A recipe is real behaviour (worked examples in the prompt, an
+ * exact-match no-model replay), so it never goes live on one unconfirmed sighting:
+ *   - an operator's explicit approval (Approve button, or a thumbs-up from an operator) - always, if it verifies;
+ *   - the same normalized question produced the same result signature twice (`seen >= 2`);
+ *   - a user's thumbs-up on top of one grounded run (`thumbsUp >= 1 && seen >= 1`).
+ * DONOVAN_AUTO_LEARN=off disables both automatic routes (only an operator can activate a recipe).
+ * A recipe that failed verification is never activated, whatever the counts.
+ * @param {{seen?: number, thumbsUp?: number, operatorApproved?: boolean}} evidence
+ * @param {{ok: boolean, reasons?: string[]}} verification
+ * @returns {{status: 'approved'|'auto_approved'|'auto_rejected'|'pending', reason: string|null}}
+ */
+export function decideRecipeStatus({ seen = 0, thumbsUp = 0, operatorApproved = false } = {}, verification, autoLearnRaw) {
+  if (!verification || verification.ok !== true) {
+    const reasons = Array.isArray(verification?.reasons) && verification.reasons.length ? verification.reasons.join('; ') : 'verification failed';
+    return { status: 'auto_rejected', reason: reasons };
+  }
+  if (operatorApproved) return { status: 'approved', reason: null };
+  const policy = parseAutoLearnPolicy(autoLearnRaw !== undefined ? autoLearnRaw : process.env.DONOVAN_AUTO_LEARN);
+  if (policy === 'off') return { status: 'pending', reason: null };
+  if (seen >= 2 || (thumbsUp >= 1 && seen >= 1)) return { status: 'auto_approved', reason: null };
+  return { status: 'pending', reason: null };
+}

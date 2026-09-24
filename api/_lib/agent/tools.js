@@ -24,6 +24,9 @@ const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
 
 export const RESULT_CHAR_CAP = 6000;
+/** run_query results may be larger: a "who all" list of 40 customers must reach the model whole
+ *  (a list silently cut at ~5 rows and phrased as complete was a live defect). */
+export const QUERY_RESULT_CHAR_CAP = 10000;
 export const MAX_QUERY_ROWS = 100;
 const QUERY_TIMEOUT_MS = () => Math.max(200, Number(process.env.DONOVAN_AGENT_QUERY_TIMEOUT_MS) || 3000);
 const DERIVED_ROW_CAP = 20000;
@@ -114,7 +117,11 @@ export const VIEW_DOCS = `VIEWS available to run_query (PostgreSQL; one SELECT; 
 - documents_v(id, document_id, filename, document_type, stage, created_at, service_date, technician, customer_id, customer_name) — one row per uploaded document. service_date is the job date as 'YYYY-MM-DD' text (NULL if none). document_type is one of: work-order, invoice, warranty-registration, startup-sheet, permit, nameplate-photo, maintenance-agreement, service-ticket, dispatch-note, proposal-quote, inspection-report, purchase-order, equipment-record, correspondence, internal, other. A service visit = a document with a service_date.
 - facts(document_id, entity_id, field_key, value, unit_index, page_no, confidence, created_at) — extracted fields (corrected values already applied). field_key examples: customer_name, service_address, serial_number, model, manufacturer, permit_number, invoice_number, service_type, work_performed, part_number, technician, agreement_term, cost. Call describe_data to see which exist.
 - doc_links(document_id, entity_id, entity_type, customer_id, via) — which customer each document belongs to (directly or through a unit).
-SQL rules: SELECT/WITH only, no semicolons, no comments, no double-quoted identifiers, plain functions only. Dates are text: compare like service_date >= '2026-01-01' and use left(service_date, 7) for months. Always select the ids you will cite (customer_id, document_id). Count with count(*) or count(DISTINCT customer_id) instead of counting rows yourself. Max 100 rows come back.`;
+SQL rules: SELECT/WITH only, no semicolons, no comments, no double-quoted identifiers, plain functions only. Dates are text: compare like service_date >= '2026-01-01' and use left(service_date, 7) for months. Always select the ids you will cite (customer_id, document_id). Count with count(*) or count(DISTINCT customer_id) instead of counting rows yourself. Max 100 rows come back; if a result says truncated, select fewer columns or narrow the query and run it again - never answer from a truncated list as if it were complete.
+Common shapes (adapt, do not copy values):
+- customers with a current warranty: SELECT c.customer_id, c.name, e.model, e.warranty_status, e.warranty_expires FROM equipment e JOIN customers c ON c.customer_id = e.customer_id WHERE e.warranty_current ORDER BY c.name
+- newest / oldest unit installed: SELECT e.equipment_id, e.manufacturer, e.model, e.serial_number, e.installation_date, e.address FROM equipment e WHERE e.installation_date IS NOT NULL ORDER BY e.installation_date DESC LIMIT 5 (installation_date is text: if the top rows are not YYYY-MM-DD, say the ordering may be unreliable).
+- documents of a brand: a document belongs to a brand when it is linked to a unit of that brand or to a customer who owns one. SELECT count(DISTINCT dl.document_id) FROM doc_links dl WHERE dl.customer_id IN (SELECT customer_id FROM equipment WHERE lower(manufacturer) = 'trane'). State that definition in your answer text.`;
 
 /* ----------------------------------------------------------- tool schemas */
 
@@ -123,7 +130,7 @@ export const ANSWER_TOOL_NAME = "answer";
 export const ANSWER_TOOL_DEF = {
   name: ANSWER_TOOL_NAME,
   description:
-    "Give the final answer. Call exactly once, after you have what you need. status 'answered' needs facts backed by tool results; 'none_found' = the data was searched and legitimately has nothing; 'cannot_answer' = these records cannot answer (say what is missing in `missing`).",
+    "Give the final answer. Call exactly once, after you have what you need. For a list question include EVERY row as a fact (up to 40) and state the true total in text; never a partial list phrased as complete. status 'answered' needs facts backed by tool results; 'none_found' = the data was searched and legitimately has nothing; 'cannot_answer' = these records cannot answer (say what is missing in `missing`).",
   input_schema: {
     type: "object",
     properties: {
@@ -131,7 +138,7 @@ export const ANSWER_TOOL_DEF = {
       text: { type: "string", description: "1-2 plain sentences a dispatcher would say. Only numbers/names that appear in tool results." },
       facts: {
         type: "array",
-        maxItems: 25,
+        maxItems: 40,
         items: {
           type: "object",
           properties: {
@@ -177,6 +184,7 @@ export const TOOL_DEFS = [
       properties: {
         query: { type: "string" },
         documentType: { type: "string", description: "Optional document_type filter, e.g. permit." },
+        customerId: { type: "string", description: "Optional customer_id: search only the documents linked to that customer (use for 'has this unit had X replaced' and other history questions about one customer/address)." },
         limit: { type: "number", description: "Max 10." },
       },
       required: ["query"],
@@ -227,6 +235,7 @@ export class EvidenceLedger {
     this.corpusParts = []; // the exact text shown to the model
     this.dataCalls = 0; // successful data-returning tool calls
     this.emptyResults = 0; // successful calls that legitimately found nothing
+    this.lastQuery = null; // {rowCount, shown, capped} of the most recent successful run_query (list completeness)
   }
 
   addShown(text) {
@@ -291,7 +300,12 @@ export function renderRows(columns, rows, cap = RESULT_CHAR_CAP) {
     shown.push(r);
     len += s.length + 1;
   }
-  const text = `{"rowCount":${rows.length},"shown":${shown.length},"columns":${JSON.stringify(columns)},"rows":[${parts.join(",")}]}`;
+  const cut = shown.length < rows.length;
+  const capped = rows.length >= MAX_QUERY_ROWS;
+  const note = cut
+    ? `,"truncated":true,"note":"only ${shown.length} of ${rows.length} rows fit - select fewer columns or narrow the query and run it again; do not present these ${shown.length} as the whole list"`
+    : capped ? `,"capped":true,"note":"the ${MAX_QUERY_ROWS}-row cap was reached, so there may be more rows than this"` : "";
+  const text = `{"rowCount":${rows.length},"shown":${shown.length},"columns":${JSON.stringify(columns)},"rows":[${parts.join(",")}]${note}}`;
   return { text, shown };
 }
 
@@ -322,6 +336,8 @@ function isoDay(v) {
 export function createToolbox({ withTenant, ctxArg, today }) {
   const ledger = new EvidenceLedger();
   const cache = { describe: null, derivedC: null, derivedE: null };
+  /** Every successful run_query of this run (sql, columns, rows) - what a recipe is built from. */
+  const queries = [];
 
   async function loadDerived(db, needC, needE) {
     if (needC && !cache.derivedC) {
@@ -394,7 +410,10 @@ export function createToolbox({ withTenant, ctxArg, today }) {
       catalogue.fields = catalogue.fields.slice(0, 30).map((f) => ({ key: f.key, count: f.count }));
       text = JSON.stringify(catalogue);
     }
-    cache.describe = { text, rowCount: out.ents.length + out.docs.length + out.fields.length };
+    const stable = { ...catalogue, today: undefined };
+    let stableText = JSON.stringify(stable);
+    if (stableText.length > RESULT_CHAR_CAP) { stable.fields = (stable.fields ?? []).slice(0, 30).map((f) => ({ key: f.key, count: f.count })); stableText = JSON.stringify(stable); }
+    cache.describe = { text, stableText, rowCount: out.ents.length + out.docs.length + out.fields.length };
     return cache.describe;
   }
 
@@ -404,8 +423,19 @@ export function createToolbox({ withTenant, ctxArg, today }) {
     if (!query) return fail("query is required", "search");
     const limit = Math.max(1, Math.min(10, Math.trunc(Number(input.limit)) || 8));
     const docType = typeof input.documentType === "string" && input.documentType.trim() ? input.documentType.trim().toLowerCase() : null;
+    const scopeCustomer = typeof input.customerId === "string" && UUID_RE.test(input.customerId.trim()) ? input.customerId.trim() : null;
+    if (typeof input.customerId === "string" && input.customerId.trim() && !scopeCustomer) return fail("customerId must be a customer_id returned by another tool", "search");
     const found = await withTenant(ctxArg, async (db) => {
-      let rows = await db.searchPassages(query, docType ? 40 : limit + 4);
+      let scopeIds = null;
+      if (scopeCustomer) {
+        const { rows: cr } = await db.raw(
+          `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address
+             FROM entities WHERE id = $1 AND entity_type = 'customer' AND merged_into IS NULL AND ${t("entities")}`, [scopeCustomer]);
+        if (!cr[0]) return [];
+        scopeIds = await customerDocumentIds(db, cr[0]);
+        if (!scopeIds.length) return [];
+      }
+      let rows = await db.searchPassages(query, scopeIds ? 40 : docType ? 40 : limit + 4, scopeIds ? { documentIds: scopeIds } : {});
       if (docType) rows = rows.filter((r) => String(r.document_type ?? "").toLowerCase() === docType);
       rows = rows.slice(0, limit);
       const ids = [...new Set(rows.map((r) => r.document_id))];
@@ -433,7 +463,7 @@ export function createToolbox({ withTenant, ctxArg, today }) {
     }
     const text = `{"resultCount":${found.length},"results":[${parts.join(",")}]}`;
     for (const r of shown) ledger.addPassage(r.documentId, r.page, r.stage, r.filename);
-    return { ok: true, content: text, rowCount: found.length, inputSummary: `search${docType ? `:${docType}` : ""}` };
+    return { ok: true, content: text, rowCount: found.length, inputSummary: `search${docType ? `:${docType}` : ""}${scopeCustomer ? ":customer" : ""}` };
   }
 
   /* ---- find_customers ---- */
@@ -532,7 +562,7 @@ export function createToolbox({ withTenant, ctxArg, today }) {
    * statement_timeout, SAVEPOINT. `skipGuard` exists ONLY so scripts/verify-agent.mjs can prove
    * RLS + read-only hold even if the guard were bypassed; nothing in production passes it.
    */
-  async function runQuery(input, { skipGuard = false, timeoutMs } = {}) {
+  async function runQuery(input, { skipGuard = false, timeoutMs, registerAll = false } = {}) {
     const purpose = typeof input?.purpose === "string" ? input.purpose.slice(0, 60) : "";
     let wrapped;
     let names = new Set();
@@ -584,8 +614,12 @@ export function createToolbox({ withTenant, ctxArg, today }) {
     const rows = result.res.rows ?? [];
     const columns = (result.res.fields ?? []).map((f) => f.name);
     const cols = columns.length ? columns : rows[0] ? Object.keys(rows[0]) : [];
-    const { text, shown } = renderRows(cols, rows);
+    // registerAll (recipe fast replay only): code, not a model, composes the answer from every row, so
+    // every row is evidence; the model-facing renderer keeps its char cap.
+    const { text, shown } = registerAll ? renderRows(cols, rows, Number.MAX_SAFE_INTEGER) : renderRows(cols, rows, QUERY_RESULT_CHAR_CAP);
     ledger.addShown(text);
+    ledger.lastQuery = { rowCount: rows.length, shown: shown.length, capped: rows.length >= MAX_QUERY_ROWS };
+    if (typeof input?.sql === "string") queries.push({ sql: input.sql.trim(), purpose, columns: cols, rowCount: rows.length, rows: rows.slice(0, MAX_QUERY_ROWS) });
     const info = new Map((result.docInfo ?? []).map((d) => [String(d.id).toLowerCase(), d]));
     for (const r of shown) {
       const d = info.get(String(r.document_id ?? r.documentId ?? "").toLowerCase());
@@ -593,7 +627,7 @@ export function createToolbox({ withTenant, ctxArg, today }) {
     }
     registerRows(ledger, shown);
     const empty = rows.length === 0 || (rows.length === 1 && cols.every((c) => isZeroish(rows[0][c])));
-    return { ok: true, content: text, rowCount: rows.length, inputSummary: `query:${purpose}`, empty, rows };
+    return { ok: true, content: text, rowCount: rows.length, inputSummary: `query:${purpose}`, empty, rows, columns: cols };
   }
 
   async function execute(name, input) {
@@ -619,7 +653,21 @@ export function createToolbox({ withTenant, ctxArg, today }) {
     return { ...r, tool: name, ms: Date.now() - started };
   }
 
-  return { ledger, execute, _runQueryForTests: runQuery, VIEW_NAMES };
+  /** Compact catalogue text for the cached system prompt (no `today`, so it is stable for the cache). */
+  async function catalogueText() {
+    const d = await describeData();
+    ledger.addShown(d.text);
+    return d.stableText;
+  }
+
+  /** Re-run one recipe query fresh through the SAME guard + tenant transaction as any model query. */
+  const runRecipeQuery = async (sql) => {
+    const r = await runQuery({ sql, purpose: "recipe" }, { registerAll: true });
+    if (r.ok) { ledger.dataCalls++; if (r.rowCount === 0 || r.empty) ledger.emptyResults++; }
+    return r;
+  };
+
+  return { ledger, execute, queries, catalogueText, runRecipeQuery, _runQueryForTests: runQuery, VIEW_NAMES };
 }
 
 function pickGeo(g) {

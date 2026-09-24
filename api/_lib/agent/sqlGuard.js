@@ -40,7 +40,7 @@ export const REAL_TABLES = Object.freeze([
   "extractions", "entities", "audit_log", "document_entity_links", "tenant_deletions", "api_keys",
   "usage_counters", "rate_limit_windows", "billing_events", "notifications_sent", "notifications",
   "ask_answer_cache", "tenant_outreach_settings", "outreach_messages", "ask_misses",
-  "donovan_proposals", "donovan_learned", "platform_expenses",
+  "donovan_proposals", "donovan_learned", "platform_expenses", "ask_miss_replays",
 ]);
 
 const DENY_TOKENS = new Set([

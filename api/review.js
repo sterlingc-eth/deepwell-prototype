@@ -40,6 +40,11 @@ import { buildMissDigest, sendMissDigest, isPlatformOperator } from './_lib/miss
 import * as learningStore from './_lib/learning/store.js';
 import { verifyProposalLive } from './_lib/learning/verify.js';
 import { runLearningNow } from './_lib/learning/sweep.js';
+// Donovan learning loop (miss replay, recipes, thumbs feedback): api/_lib/learning/replay.js.
+import { replayMisses, replayCapabilityGap, applyThumbsUp, applyThumbsDown, missKey } from './_lib/learning/replay.js';
+import { listReplays, listOpenMisses } from './_lib/learning/replayStore.js';
+import { verifyRecipe, RECIPE_KIND } from './_lib/learning/recipes.js';
+import { invalidateActiveOverlayCache } from './_lib/learning/overlay.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -55,8 +60,9 @@ import { runLearningNow } from './_lib/learning/sweep.js';
 // model call (up to DONOVAN_LEARN_MAX_CALLS Haiku calls per invocation, see
 // api/_lib/learning/proposer.js) — all the more reason a runaway client tab
 // must not be able to poll it without limit.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport']);
+// learningReplay / askFeedback are billed model calls too (the Donovan agent re-runs a question), so they share it.
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -136,6 +142,8 @@ const ACTIONS = new Set([
   'learningDeactivate',
   'learningRunNow',
   'learningExport',
+  'learningReplay',
+  'askFeedback',
 ]);
 
 export default async (req, res) => {
@@ -175,7 +183,9 @@ export default async (req, res) => {
     if (!(await limit(req, res, auth, 'write'))) return; // 429 already written
   }
 
-  if (MODEL_BILLED_ACTIONS.has(action)) {
+  // A thumbs-down re-runs the question through the agent (a real model call), so it takes the same
+  // billing gate; a thumbs-up costs nothing.
+  if (MODEL_BILLED_ACTIONS.has(action) || (action === 'askFeedback' && payload.rating === 'down')) {
     // Fails CLOSED — see assertActiveBilling's own doc comment.
     const billingGate = await assertActiveBilling(ctx);
     if (!billingGate.allowed) {
@@ -266,6 +276,24 @@ export default async (req, res) => {
         // the "Send digest now" button — the client never hardcodes ids, it
         // just trusts what the server already knows about this caller.
         result = { ...(await missReport(ctx, { days: payload.days })), isOperator: isPlatformOperator(auth) };
+        // Honest status per miss: what happened when Donovan re-ran it (learning/replay.js). Tenant-scoped.
+        {
+          const keys = result.groups.flatMap((g) => g.topQuestions.map((q) => q.text));
+          const replays = await listReplays(ctx, keys);
+          let answeredNow = 0;
+          let stillFailing = 0;
+          for (const g of result.groups) {
+            for (const q of g.topQuestions) {
+              const r = replays.get(q.text);
+              if (r) {
+                q.replay = r;
+                if (r.outcome === 'answered_now') answeredNow++; else stillFailing++;
+              }
+            }
+          }
+          const distinct = new Set(keys).size;
+          result.replaySummary = { answeredNow, stillFailing, notReplayed: Math.max(0, distinct - answeredNow - stillFailing) };
+        }
         break;
       case 'exportMisses':
         requireAdmin(auth);
@@ -288,7 +316,20 @@ export default async (req, res) => {
           learningStore.listProposals({ status: payload.status ?? null, limit: payload.limit }),
           learningStore.listActiveLearned(),
         ]);
-        result = { items, activeLearned };
+        const open = await listOpenMisses(ctx, { limit: 200 });
+        const gapKeys = items.filter((p) => p.kind === 'capability_gap' && p.payload?.example).map((p) => missKey(p.payload.example));
+        const gapReplays = await listReplays(ctx, gapKeys);
+        result = {
+          items: items.map((p) => (p.kind === 'capability_gap' && p.payload?.example && gapReplays.has(missKey(p.payload.example))
+            ? { ...p, replay: gapReplays.get(missKey(p.payload.example)) } : p)),
+          activeLearned,
+          summary: {
+            recipesActive: activeLearned.filter((r) => r.kind === RECIPE_KIND).length,
+            answeredNow: open.filter((m) => m.replay?.outcome === 'answered_now').length,
+            stillFailing: open.filter((m) => m.replay?.outcome === 'still_failing').length,
+            notReplayed: open.filter((m) => !m.replay).length,
+          },
+        };
         break;
       }
       case 'learningDecide': {
@@ -313,10 +354,12 @@ export default async (req, res) => {
         // operator clicking Approve (see learning/policy.js's own doc
         // comment) — so a proposal that verified clean last night but would
         // no longer pass today is refused rather than silently applied.
-        const verification = verifyProposalLive(
-          { kind: proposal.kind, payload: proposal.payload },
-          { missQuestions: proposal.evidence?.questions ?? [] }
-        );
+        const verification = proposal.kind === RECIPE_KIND
+          ? verifyRecipe(proposal.payload)
+          : verifyProposalLive(
+            { kind: proposal.kind, payload: proposal.payload },
+            { missQuestions: proposal.evidence?.questions ?? [] }
+          );
         if (!verification.ok) {
           throw new reviewStore.ReviewError(
             `This proposal no longer verifies cleanly and cannot be approved: ${verification.reasons.join('; ')}`,
@@ -325,7 +368,13 @@ export default async (req, res) => {
         }
         const ok = await learningStore.decideProposal(id, 'approved', auth.userId);
         if (!ok) throw new reviewStore.ReviewError('Could not approve this proposal.', 409);
+        if (proposal.kind === RECIPE_KIND) invalidateActiveOverlayCache();
         result = { ok: true, status: 'approved', verification };
+        // Approving a "Can't do yet" note must DO something: replay its example question now and, on a
+        // grounded answer, create + activate its recipe. The outcome comes back for the card to show.
+        if (proposal.kind === 'capability_gap') {
+          result.replay = await replayCapabilityGap({ ctxArg: ctx, proposal, decidedBy: auth.userId });
+        }
         break;
       }
       case 'learningDeactivate': {
@@ -340,6 +389,27 @@ export default async (req, res) => {
         requireOperator(auth);
         result = await runLearningNow();
         break;
+      case 'learningReplay': {
+        requireOperator(auth);
+        const questions = Array.isArray(payload.questions)
+          ? payload.questions.filter((q) => typeof q === 'string').slice(0, 15).map((q) => q.slice(0, 300))
+          : undefined;
+        result = await replayMisses({ ctxArg: ctx, questions, force: payload.force === true, source: 'operator' });
+        break;
+      }
+      case 'askFeedback': {
+        const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 300) : '';
+        if (!question || (payload.rating !== 'up' && payload.rating !== 'down')) {
+          throw new reviewStore.ReviewError('askFeedback requires a question and a rating of "up" or "down".', 400);
+        }
+        if (payload.rating === 'up') {
+          result = { ok: true, ...(await applyThumbsUp({ ctxArg: ctx, question, isOperator: isPlatformOperator(auth), decidedBy: auth.userId })) };
+        } else {
+          const note = typeof payload.note === 'string' ? payload.note.trim().slice(0, 300) : '';
+          result = { ok: true, ...(await applyThumbsDown({ ctxArg: ctx, question, note })) };
+        }
+        break;
+      }
       case 'learningExport':
         requireOperator(auth);
         {

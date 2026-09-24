@@ -50,6 +50,11 @@ import { getActiveOverlay } from "./_lib/learning/overlay.js";
 // Donovan agent fallback (api/_lib/agent/): a bounded read-only tool-use loop tried when every
 // pre-router / the analytics planner / retrieval+model could not answer. DONOVAN_AGENT=0 disables it.
 import { runDonovanAgent, isAgentEnabled, agentQuestionHash, AGENT_PROMPT_VERSION, agentDebugTrace } from "./_lib/agent/loop.js";
+import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion } from "./_lib/agent/intents.js";
+import { runRecipeFastPath } from "./_lib/agent/fastReplay.js";
+// Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
+import { findExactRecipe } from "./_lib/learning/recipes.js";
+import { submitRecipe } from "./_lib/learning/replay.js";
 import { isPlatformOperator } from "./_lib/missDigest.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
@@ -617,6 +622,9 @@ export default async function handler(req, res) {
     const analyticsCandidate =
       !meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !moneyQuestion && isAnalyticsEnabled() &&
       !looksLikeSingleRecordReference(question) &&
+      // "newest/oldest unit": ranking the whole fleet needs an ORDER BY, which the closed-vocabulary planner
+      // does not have (it would list every unit) - the agent answers these (agent-first, below).
+      !(isAgentEnabled() && isUnitRankingQuestion(question)) &&
       preClassifyAnalytics(normalizedForAnalytics, { overlay });
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
@@ -640,7 +648,7 @@ export default async function handler(req, res) {
     const agentDebug = agentOn && req.body?.debug === true && isPlatformOperator(auth);
     const requestStartedAt = Date.now();
     let agentTried = false;
-    const tryAgent = async ({ extraUsage = null, budgetMs = 50_000 } = {}) => {
+    const tryAgent = async ({ extraUsage = null, budgetMs = 50_000, recordMiss = true } = {}) => {
       if (!agentOn || agentTried) return false;
       agentTried = true;
       const qHash = agentQuestionHash(question);
@@ -674,16 +682,28 @@ export default async function handler(req, res) {
             console.error("Agent cache probe failed:", err?.message);
           }
         }
-        result = await timer.time("agent", () =>
-          runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt: requestStartedAt + budgetMs })
-        );
+        // Exact-match recipe (an ACTIVE, approved/confirmed recipe for this very question): re-run its
+        // SQL fresh through the same guard and answer from the rows - no model call. Anything that
+        // differs falls through to the normal agent below.
+        const recipe = findExactRecipe(overlay?.recipes, question);
+        if (recipe) {
+          const fast = await timer.time("recipe", () => runRecipeFastPath({ withTenant, ctxArg, recipe, question, today: todayResolved }));
+          if (fast.handled) result = fast;
+        }
+        if (!result) {
+          result = await timer.time("agent", () =>
+            runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt: requestStartedAt + budgetMs })
+          );
+        }
       } catch (err) {
         // Includes ModelBudgetExceededError: the standard fallback below decides what a
         // budget-exhausted tenant sees, exactly as it did before the agent existed.
         console.error("Donovan agent failed, using the standard fallback:", err?.name === "ModelBudgetExceededError" ? "model budget" : err?.message);
       }
       if (!result?.handled) {
-        recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.AGENT_NO_ANSWER }).catch(() => {});
+        // recordMiss:false for the agent-first probe: retrieval still gets its turn, and whatever it
+        // ends with is what gets logged as the miss (or not).
+        if (recordMiss) recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.AGENT_NO_ANSWER }).catch(() => {});
         return false;
       }
       const data = result.data;
@@ -699,7 +719,8 @@ export default async function handler(req, res) {
             } catch (err) {
               console.error("Failed to write document.queried audit row (agent):", err?.message);
             }
-            if (isCountableAskSource("agent")) await incrementAsksThisMonth(db);
+            // A recipe replay made no model call: it never counts against the allowance.
+            if (!result.fastReplay && isCountableAskSource("agent")) await incrementAsksThisMonth(db);
             if (ASK_CACHE_ENABLED && corpusStamp && shouldCache(data.kind, 0, 0)) {
               await db.raw("SAVEPOINT agent_cache_upsert", []);
               try {
@@ -715,6 +736,9 @@ export default async function handler(req, res) {
           console.error("Agent bookkeeping transaction failed:", err?.message);
         }
         if (extraUsage) await recordModelCall(ctxArg, extraUsage).catch(() => {});
+        // A fresh grounded agent answer teaches a recipe proposal (goes live only once confirmed:
+        // same result twice, or an operator/thumbs-up approves it - learning/policy.js). Never throws.
+        if (!result.fastReplay) await submitRecipe({ ctxArg, question, run: result });
       });
       return true;
     };
@@ -1224,6 +1248,12 @@ export default async function handler(req, res) {
     // just consults the result at the same point in the flow it always was.
     await budgetPromise;
 
+    // Enumerations ("who all has ...", "list every ...") and repair-history questions ("has this unit had a
+    // compressor replaced?") go to the agent BEFORE the retrieval model: retrieval answers from the top few
+    // pages and caps a reply at 5 facts, which silently truncated a 13-customer list. Falls through to
+    // retrieval when the agent cannot answer (its budget leaves room for the retrieval call inside maxDuration).
+    if (isAgentFirstQuestion(question) && (await tryAgent({ budgetMs: 20_000, recordMiss: false }))) return;
+
     // ---- 2. ask ------------------------------------------------------------
     // Three separate blocks, not one flat prompt string, so an Anthropic
     // cache breakpoint can land after the stable ones. See answer.js's
@@ -1317,6 +1347,12 @@ export default async function handler(req, res) {
         cacheReadInputTokens: response.usage?.cache_read_input_tokens, cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
       },
     }))) return;
+
+    // Retrieval caps a reply at 5 facts. When an enumeration question still ends up here (the agent
+    // could not answer it) and hit that cap, never let 5 read as the whole list.
+    if (data.kind === "answer" && data.facts.length >= 5 && isEnumerationQuestion(question)) {
+      data.text = `${String(data.text ?? "").replace(/[.\s]+$/, "")}. These are the 5 closest matches, not necessarily every one.`;
+    }
 
     // One structured line per call, no PII and no question text (see
     // hashQuestion's doc comment above for why questions never get logged

@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { getPool } from '../recordsStore.js';
 
 const CACHE_MS = 10 * 60 * 1000;
-const EMPTY_OVERLAY = Object.freeze({ abbreviations: {}, typos: {}, vocab: [], synonyms: {}, fewShot: [] });
+const EMPTY_OVERLAY = Object.freeze({ abbreviations: {}, typos: {}, vocab: [], synonyms: {}, fewShot: [], recipes: [] });
 
 let cached = null; // { overlay, expiresAt }
 let warnedMissing = false;
@@ -34,10 +34,11 @@ function warnOnce(err) {
 /** donovan_learned rows -> the overlay shape nlNormalize.js/analytics.js
  *  expect. One row per learned item: {kind, key, value}. `capability_gap`
  *  rows never reach donovan_learned at all (learning_decide only inserts
- *  abbreviation/typo/synonym/few_shot — see M3-config/26) but an unknown
- *  kind here is still ignored defensively rather than throwing. */
-function rowsToOverlay(rows) {
-  const overlay = { abbreviations: {}, typos: {}, vocab: [], synonyms: {}, fewShot: [] };
+ *  abbreviation/typo/synonym/few_shot, plus 'recipe' once migration 29 is
+ *  applied) but an unknown kind here is still ignored defensively rather
+ *  than throwing. Exported for scripts/verify-learning-loop.mjs. */
+export function rowsToOverlay(rows) {
+  const overlay = { abbreviations: {}, typos: {}, vocab: [], synonyms: {}, fewShot: [], recipes: [] };
   const vocabSet = new Set();
   for (const row of rows ?? []) {
     const value = row?.value;
@@ -57,6 +58,11 @@ function rowsToOverlay(rows) {
         break;
       case 'few_shot':
         if (value?.question && value?.plan) overlay.fewShot.push({ question: value.question, plan: value.plan });
+        break;
+      case 'recipe':
+        // Active worked examples for the Donovan agent (learning/recipes.js). Only ever ACTIVE rows
+        // (learning_list_active) - an unapproved recipe is a pending proposal and never reaches here.
+        if (value?.question && Array.isArray(value?.sqls)) overlay.recipes.push(value);
         break;
       default:
         break;
@@ -91,6 +97,12 @@ export async function getActiveOverlay() {
     cached = { overlay: EMPTY_OVERLAY, expiresAt: now + CACHE_MS };
     return EMPTY_OVERLAY;
   }
+}
+
+/** Drops the cache so the very next request sees a just-approved (or just-retired) item
+ *  instead of waiting out the 10-minute window. Called by every learning write path. */
+export function invalidateActiveOverlayCache() {
+  cached = null;
 }
 
 /** Test-only: drops the process cache so the next getActiveOverlay() call

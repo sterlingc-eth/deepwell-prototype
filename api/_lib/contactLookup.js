@@ -172,8 +172,13 @@ const AGGREGATE_WORD_RE = new RegExp(
   "i"
 );
 
+// A ranking word is never (part of) a person or company name: "what's the newest unit we've installed"
+// parsed as field=unitInstalled, name="newest", fuzzy-matched a real customer and answered with the
+// wrong unit (live defect). Such questions are aggregate/superlative asks for the analytics + agent path.
+const RANKING_WORD_RE = /\b(?:newest|oldest|latest|earliest|newer|older|biggest|largest|smallest|most recent)\b/i;
+
 function isRealNamePhrase(namePhrase) {
-  return !firstWordIsStopword(namePhrase) && !AGGREGATE_WORD_RE.test(namePhrase);
+  return !firstWordIsStopword(namePhrase) && !AGGREGATE_WORD_RE.test(namePhrase) && !RANKING_WORD_RE.test(namePhrase);
 }
 
 // Reviewer NO-GO (2026-09-21, round 6, item 2): "what's the phne number on

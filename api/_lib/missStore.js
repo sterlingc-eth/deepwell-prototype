@@ -45,6 +45,8 @@ export const MISS_OUTCOMES = {
   // ALSO could not answer. `outcome` is a plain TEXT column (23-ask-misses.sql
   // has no CHECK on it), so a new code needs no DDL.
   AGENT_NO_ANSWER: 'agent-no-answer',
+  // A user's thumbs-down on an answer (api/review.js askFeedback): a correction miss.
+  USER_MARKED_WRONG: 'user-marked-wrong',
 };
 
 const MAX_QUESTION_CHARS = 300;
