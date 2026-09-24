@@ -41,6 +41,10 @@ export const MISS_OUTCOMES = {
   // doc-lookup pre-router and analytics.js's parseCrossDocCondition.
   DOC_LOOKUP_ZERO: 'doc-lookup-zero',
   CROSS_DOC_UNSUPPORTED: 'cross-doc-unsupported',
+  // Donovan agent fallback (api/_lib/agent/): the bounded tool-use loop ran and
+  // ALSO could not answer. `outcome` is a plain TEXT column (23-ask-misses.sql
+  // has no CHECK on it), so a new code needs no DDL.
+  AGENT_NO_ANSWER: 'agent-no-answer',
 };
 
 const MAX_QUESTION_CHARS = 300;

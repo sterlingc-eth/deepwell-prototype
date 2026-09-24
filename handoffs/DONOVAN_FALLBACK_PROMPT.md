@@ -1,0 +1,44 @@
+# DeepWell: fix "Donovan" (fallback prompt for a fresh chat)
+
+You are picking up a stalled effort. You have NO memory of earlier sessions. The DeepWell Claude Project is attached (read `claude/START_HERE_NEXT_SESSION.md`, `claude/DONOVAN_SELF_LEARNING_2026-09-22.md`, `claude/FINANCIALS_DESIGN_2026-09-21.md` only if needed; use project_search, not full reads). GitHub and Vercel connectors are available. A linked desktop may have the repo at `C:\Users\chapman\Desktop\GitHub\deepwell-prototype`.
+
+## Owner rules (non-negotiable)
+- Owner is Sterling (founder). Use the cheapest model everywhere (Haiku for product runtime; cheapest capable model for sub-agents). Be efficient: no wasted actions, no re-reading, no long reports.
+- NEVER run git in the owner's local repo. Write files to the device repo, verify with md5, and the owner commits/pushes in GitHub Desktop. The cloud session cannot push.
+- NEVER read or print secrets (env values, keys, connection strings).
+- NEVER run DDL on Neon. If a migration is needed, write `M3-config/NN-*.sql` and the owner pastes it into Neon.
+- Every build gets an independent reviewer GO/NO-GO. Every UI round gets a live click-through.
+
+## Product
+DeepWell Technology: cloud document management plus AI Q&A ("Donovan") for HVAC and small shops. Stack: Vercel (Hobby plan: exactly 12 files directly under `api/`; helpers go in `api/_lib/`), Neon Postgres with FORCE ROW LEVEL SECURITY (every query must run inside `withTenant()`, which SET LOCAL `app.tenant_id` per transaction), Clerk auth, Haiku for all model calls. Prod: deepwelltechnology.com/app. Vercel project `prj_xrQFuka9TJ9lX8vFcVfeaanTsPkq`, team `team_YnXrhfXC2dQ1HojFnfr7TJyq`. GitHub: `sterlingc-eth/deepwell-prototype`.
+
+## Problem (2026-09-23/24)
+Donovan fails basic questions: "who all has current warranties", "which units had service this month", "which zip has the most customers", and money / permit / PO / serial lookups (65 misses in 7 days). Diagnosis: `/api/ask` (`api/ask.js`, ~1460 lines) is a chain of regex pre-routers, in order: 0 meta, 0.5 fastPath, 0.6 contactLookup, 0.62 docLookup, 0.65 money gate, 0.7 analytics planner (one Haiku tool-use call over a closed vocabulary of analytics ops), then 1 top-12 keyword retrieval and 2 model answer, 3 sourcing enforcement, 4 bookkeeping. The self-learning loop only learns typos/synonyms, so it can never add capabilities. Each new question shape needs new code.
+
+## Fix attempted: bounded agent loop (verify it exists and is deployed before rebuilding)
+Files (in `api/_lib/agent/`, plus `scripts/verify-agent.mjs`, wired into `api/ask.js` near line 631 as `tryAgent`, a fallback tried only when everything above could not answer):
+- `loop.js`: `runDonovanAgent`. Max 6 model calls (the last forced to the `answer` tool); cumulative input-token cap 40k (forced to answer past 75%, stop past 100%); wall-clock deadline (`requestStartedAt + 50s`); temperature 0; max 1200 output tokens; max 4 tool executions per turn; `assertModelBudget()` first; usage recorded via `recordModelCall`. Model defaults to the analytics model (Haiku). Env: `DONOVAN_AGENT=0` disables it (default on), `DONOVAN_AGENT_MODEL`, `DONOVAN_AGENT_MAX_INPUT_TOKENS`, `DONOVAN_AGENT_QUERY_TIMEOUT_MS`. Never logs question text or row values. Agent answers are cached (keyed by `agentQuestionHash` and `AGENT_PROMPT_VERSION`), and count toward asks/month (`COUNTABLE_ASK_SOURCES` includes "agent"). No-answer records a miss with `MISS_OUTCOMES.AGENT_NO_ANSWER`.
+- `tools.js`: tools `describe_data`, `search_documents`, `find_customers`, `get_customer`, `run_query`, plus the terminal `answer` tool. Each executor runs in its own short `withTenant` transaction and never writes. `run_query` runs SQL against read-only virtual views prepended as a WITH clause: `customers`, `equipment` (with app-computed `warranty_status`, `warranty_current`, `warranty_expires`; never recompute warranty in SQL), `documents_v` (service_date text, document_type), `facts` (field_key/value with corrections applied), `doc_links`. Max 100 rows, 6000-char result cap.
+- `sqlGuard.js`: layer 1 of 4. One SELECT/WITH only; no `;`, comments, `$`, quoted identifiers, backslash/E''/U&'' strings, non-ASCII; denylist (pg_*, set_config, current_setting, information_schema, etc.); real table names denied (views only); function allowlist. Layers 2-4: `withTenant` plus FORCE RLS as the NOBYPASSRLS role, READ ONLY transaction, 3s statement_timeout inside a SAVEPOINT.
+- `shape.js`: grounding. Document-cited facts go through `answer.js` `buildAllowed`/`shapeAnswer` (citations must have been returned by a tool this run). Unsourced aggregate/list facts survive only if every number-bearing token literally appears in tool output; `text` is rewritten from facts if it contains unbacked numbers; otherwise the honest no-answer (`NO_ANSWER_TEXT`). It returns the same response shape the UI already renders (`answer`/`no-answer`, facts[], sources[]).
+- Operator debug: POST body `debug: true` as a platform operator returns `data.debug` (agent trace).
+- Tests: `npm run verify:agent` (`scripts/verify-agent.mjs`, PGlite with the real M3-config migrations as the RLS role, scripted model; covers the SQL guard, cross-tenant isolation, read-only, timeout, loop caps, budget, grounding, and real miss questions). It is part of `npm run verify:all`. Also relevant: `verify:analytics`, `verify:fastpath`, `verify:doclookup`, `verify:question-bank`, `verify:learning`, `typecheck:api`.
+
+If those files are missing from the repo or from the deployed commit, rebuild to this spec (about 1,300 lines total), keeping the guard layers and the grounding rules.
+
+## PLAN
+1. **Confirm state.** Vercel MCP: `list_deployments` (is the agent commit live and READY?), `get_runtime_errors`, `get_runtime_logs` for `/api/ask`. Check whether `DONOVAN_AGENT` is set or off (names only, never values). Read the device repo `api/_lib/agent/` and confirm md5 matches what was intended. Delivery = files to the device repo plus owner pushes; then re-check deployments.
+2. **Live test loop.** Use the owner's signed-in Chrome (Claude in Chrome) on deepwelltechnology.com/app. Run the real miss list above plus a 30-60 item question bank (`verify:question-bank` has seeds; add money/permit/PO/serial/who-all/this-month/most-X cases). Build an oracle from `export?kind=customers|equipment` CSVs and score each answer against it. For failures, ask with `debug: true` (operator) and record the trace: which tool calls, SQL, errors, and which grounding step dropped the result. Fix in priority order: (a) wrong/failed SQL, so fix `VIEW_DOCS` and the prompt with worked examples; (b) grounding dropping correct facts, so fix `shape.js`; (c) pre-routers answering wrongly before the agent gets a turn, so narrow or delete them; (d) missing views/columns. Re-test after each round.
+3. **Success criteria.** At least 90% correct on the persona/miss set. Honest zero ("nothing matches") is never fabricated and never replaced by invented numbers. Average cost per agent run under about 2 cents. p95 latency under about 12s. No regression in `verify:all`.
+4. **Guardrails.** Keep all four SQL layers; never add real tables or tenant/user tables to views; no cross-tenant data (test with two tenants); no fabricated numbers (grounding must stay); money questions stay gated until the financials layer exists; no logging of question text or row values; keep the 12-files-under-`api/` limit.
+5. **Phase 2 ideas.** Embeddings/semantic search (needs a pgvector migration the owner pastes); financials layer (see project doc `FINANCIALS_DESIGN_2026-09-21.md`); promote frequent agent trajectories into free deterministic shortcuts (log tool sequence hashes, not content); operator-only Preview gating so unproven features are visible only to operators until they pass the bank.
+
+## How to instruct sub-agents
+- Brief each like a colleague with zero context: goal, exact files/paths, constraints (owner rules above), what "done" looks like, what NOT to touch. Paste the relevant rules; do not assume they inherit them.
+- Cap report length (for example "under 200 words, paths plus pass/fail"). Ask for findings, not narration. Use the cheapest capable model.
+- One owner per file at a time; builders write, they do not deploy.
+- The reviewer must be independent: a fresh agent that did not write the code, given the diff and the success criteria, and told to try to break it (SQL bypass, cross-tenant read, fabricated number, cost blow-up). It returns GO or NO-GO with reasons; a NO-GO blocks handoff to the owner.
+- Never let a sub-agent read or print secrets, run git locally, or run DDL.
+
+## Final handoff to Sterling
+Give: files changed (device paths), md5s, `verify:all` result, live test score table, any SQL for him to paste in Neon, and the exact GitHub Desktop commit message to use. Keep it under 150 words.

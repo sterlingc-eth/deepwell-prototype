@@ -25,6 +25,7 @@ const OUTCOME_LABEL: Record<string, string> = {
   'contact-lookup-zero': 'Contact lookup — no match',
   'contact-lookup-ambiguous': 'Contact lookup — more than one match',
   'analytics-fallthrough': 'Analytics plan rejected',
+  'agent-no-answer': 'Agent could not answer',
 };
 
 function outcomeLabel(outcome: string): string {

@@ -232,7 +232,7 @@ export function resetsOnLabel(now = new Date()) {
  * so the rule itself — not just its call sites — is unit tested (see
  * scripts/verify-scale.mjs).
  */
-export const COUNTABLE_ASK_SOURCES = Object.freeze(["model", "analytics-model"]);
+export const COUNTABLE_ASK_SOURCES = Object.freeze(["model", "analytics-model", "agent"]);
 export function isCountableAskSource(source) {
   return COUNTABLE_ASK_SOURCES.includes(source);
 }

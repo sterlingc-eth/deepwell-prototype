@@ -92,8 +92,14 @@ function normalizeAnswer(a: Partial<Answer>, g: GraphSnapshot): Answer {
   // The trust boundary (does a citation match what retrieval returned) is
   // enforced server-side in shapeAnswer(); see the file comment above for
   // why this used to re-check against the demo graph and why that was wrong.
+  // A server-vouched `kind: 'answer'` (analytics / meta / agent aggregates and lists, see
+  // api/_lib/analytics.js and api/_lib/agent/shape.js) legitimately carries facts with no
+  // document sources — shapeAnswer() never returns kind 'answer' without sourced facts, so
+  // the sourceless case only ever comes from those deterministic paths. Anything else is
+  // held to the original "every fact cites a source" rule.
+  const serverAnswer = a.kind === 'answer';
   const facts: Fact[] = (Array.isArray(a.facts) ? a.facts : []).filter(
-    (f) => !!f && Array.isArray(f.sources) && f.sources.length > 0
+    (f) => !!f && Array.isArray(f.sources) && (f.sources.length > 0 || serverAnswer)
   );
   const sources = facts.flatMap((f) => f.sources);
   const docIds = new Set(sources.map((s) => s.documentId));
@@ -104,8 +110,8 @@ function normalizeAnswer(a: Partial<Answer>, g: GraphSnapshot): Answer {
   // 2026-09-19 bug (a confident narrative with `sources: []`), guarded here
   // too so the client alone still fails safe.
   const out: Answer = {
-    kind: facts.length ? 'answer' : 'no-answer',
-    text: facts.length ? (a.text ?? '') : 'Nothing in your records answers that.',
+    kind: facts.length || (serverAnswer && !!a.text) ? 'answer' : 'no-answer',
+    text: facts.length || (serverAnswer && a.text) ? (a.text ?? '') : 'Nothing in your records answers that.',
     facts,
     sources,
     confidence: a.confidence ?? (facts.length ? 0.8 : 0),

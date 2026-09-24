@@ -47,6 +47,10 @@ import { normalizeQuestion as normalizeQuestionForAnalytics } from "./_lib/nlNor
 // migration 26 not applied yet). Threaded explicitly into every overlay-aware
 // call below rather than read again by each one.
 import { getActiveOverlay } from "./_lib/learning/overlay.js";
+// Donovan agent fallback (api/_lib/agent/): a bounded read-only tool-use loop tried when every
+// pre-router / the analytics planner / retrieval+model could not answer. DONOVAN_AGENT=0 disables it.
+import { runDonovanAgent, isAgentEnabled, agentQuestionHash, AGENT_PROMPT_VERSION, agentDebugTrace } from "./_lib/agent/loop.js";
+import { isPlatformOperator } from "./_lib/missDigest.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -624,6 +628,97 @@ export default async function handler(req, res) {
     // share a cache entry — same normalization the meta-router already uses.
     const questionHash = hashQuestion(normalizeQuestion(question));
 
+    // ---- Donovan agent fallback (DONOVAN_AGENT, default on) ----------------
+    // Tried at most once per request, from three places below: an honest analytics fallback / an
+    // unhandled analytics candidate, retrieval finding nothing, and the retrieval+model path
+    // shaping a no-answer. Answers are cached under their own namespaced hash + prompt version
+    // (never shared with retrieval or analytics rows) and count ONCE against the monthly allowance
+    // (usage.js "agent"). Any agent error / timeout / no-answer returns false and the caller
+    // continues with exactly today's behaviour. The operator-only `data.debug` trace needs both an
+    // operator caller AND body.debug === true. Returns true iff it already sent the response.
+    const agentOn = isAgentEnabled();
+    const agentDebug = agentOn && req.body?.debug === true && isPlatformOperator(auth);
+    const requestStartedAt = Date.now();
+    let agentTried = false;
+    const tryAgent = async ({ extraUsage = null, budgetMs = 50_000 } = {}) => {
+      if (!agentOn || agentTried) return false;
+      agentTried = true;
+      const qHash = agentQuestionHash(question);
+      let corpusStamp = null;
+      let result = null;
+      try {
+        if (ASK_CACHE_ENABLED) {
+          try {
+            const probe = await withTenant(ctxArg, (db) => getCacheEntry(db, { questionHash: qHash, today: todayResolved, promptVersion: AGENT_PROMPT_VERSION }));
+            corpusStamp = probe.corpusStamp;
+            if (isCacheHit(probe.row, probe.corpusStamp)) {
+              const cachedData = { ...probe.row.answer, cached: true };
+              send(200, { success: true, data: cachedData });
+              await timer.time("bookkeeping", async () => {
+                try {
+                  await withTenant(ctxArg, async (db) => {
+                    await db.logAction({
+                      action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+                      changes: { question_hash: hashQuestion(question), documents: [...new Set((cachedData.sources ?? []).map((x) => x.documentId))], passages: 0, agent: true, cached: true },
+                    });
+                    if (extraUsage && isCountableAskSource("model")) await incrementAsksThisMonth(db);
+                  });
+                } catch (err) {
+                  console.error("Agent cache-hit bookkeeping failed:", err?.message);
+                }
+                if (extraUsage) await recordModelCall(ctxArg, extraUsage).catch(() => {});
+              });
+              return true;
+            }
+          } catch (err) {
+            console.error("Agent cache probe failed:", err?.message);
+          }
+        }
+        result = await timer.time("agent", () =>
+          runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt: requestStartedAt + budgetMs })
+        );
+      } catch (err) {
+        // Includes ModelBudgetExceededError: the standard fallback below decides what a
+        // budget-exhausted tenant sees, exactly as it did before the agent existed.
+        console.error("Donovan agent failed, using the standard fallback:", err?.name === "ModelBudgetExceededError" ? "model budget" : err?.message);
+      }
+      if (!result?.handled) {
+        recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.AGENT_NO_ANSWER }).catch(() => {});
+        return false;
+      }
+      const data = result.data;
+      send(200, { success: true, data: agentDebug ? { ...data, debug: agentDebugTrace(result) } : data });
+      await timer.time("bookkeeping", async () => {
+        try {
+          await withTenant(ctxArg, async (db) => {
+            try {
+              await db.logAction({
+                action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+                changes: { question_hash: hashQuestion(question), documents: [...new Set((data.sources ?? []).map((x) => x.documentId))], passages: 0, agent: true },
+              });
+            } catch (err) {
+              console.error("Failed to write document.queried audit row (agent):", err?.message);
+            }
+            if (isCountableAskSource("agent")) await incrementAsksThisMonth(db);
+            if (ASK_CACHE_ENABLED && corpusStamp && shouldCache(data.kind, 0, 0)) {
+              await db.raw("SAVEPOINT agent_cache_upsert", []);
+              try {
+                await upsertCacheEntry(db, { questionHash: qHash, corpusStamp, today: todayResolved, answer: data });
+                await db.raw("RELEASE SAVEPOINT agent_cache_upsert", []);
+              } catch (err) {
+                console.error("Failed to upsert agent cache row:", err?.message);
+                await db.raw("ROLLBACK TO SAVEPOINT agent_cache_upsert", []).catch(() => {});
+              }
+            }
+          });
+        } catch (err) {
+          console.error("Agent bookkeeping transaction failed:", err?.message);
+        }
+        if (extraUsage) await recordModelCall(ctxArg, extraUsage).catch(() => {});
+      });
+      return true;
+    };
+
     // ---- overlap, not a chain (handoffs/ASK_LATENCY_2026-09-20.md) --------
     // Three independent reads that used to run one after another. `limit`
     // above stays first (it writes the 429 itself and must do so before
@@ -937,6 +1032,9 @@ export default async function handler(req, res) {
         })
       );
       if (analyticsResult?.handled) {
+        // An honest analytics fallback (maintenance / unsupported condition / cross-doc) gets one
+        // shot at the agent first. The money gate is deliberately left alone (financials phase).
+        if (analyticsResult.missOutcome && analyticsResult.missOutcome !== MISS_OUTCOMES.MONEY_FALLBACK && (await tryAgent())) return;
         const data = analyticsResult.cacheHit ? { ...analyticsResult.data, cached: true } : analyticsResult.data;
         send(200, { success: true, data });
         await timer.time("bookkeeping", async () => {
@@ -1017,6 +1115,8 @@ export default async function handler(req, res) {
       // reviewing regardless of what retrieval manages next — fired with no
       // await (nothing else here is awaited yet either), never delaying the
       // retrieval fallback.
+      // "Analytics plan rejected" (live miss cluster): the agent gets a shot before retrieval.
+      if (await tryAgent({ budgetMs: 18_000 }) /* retrieval + model (35s) still follows on a miss: stay inside maxDuration 60 */) return;
       recordAskMiss(ctxArg, {
         question, questionNormalized: normalizedForAnalytics,
         outcome: MISS_OUTCOMES.ANALYTICS_FALLTHROUGH,
@@ -1050,6 +1150,7 @@ export default async function handler(req, res) {
     }
 
     if (passages.length === 0 && extractions.length === 0) {
+      if (await tryAgent()) return;
       // Miss loop: fired with no await — nothing else on this path is
       // awaited before the response either, and this must never delay it.
       recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER }).catch(() => {});
@@ -1208,6 +1309,14 @@ export default async function handler(req, res) {
       ...mappedExtractions.map((x) => ({ documentId: x.documentId })),
     ];
     const data = shapeAnswer(toolUse?.input, allowed, { candidates });
+    // Retrieval+model shaped an honest no-answer: the agent gets one shot (its own answer is
+    // counted once, and this call's usage is recorded with it).
+    if (data.kind === "no-answer" && (await tryAgent({
+      extraUsage: {
+        inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens,
+        cacheReadInputTokens: response.usage?.cache_read_input_tokens, cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+      },
+    }))) return;
 
     // One structured line per call, no PII and no question text (see
     // hashQuestion's doc comment above for why questions never get logged
