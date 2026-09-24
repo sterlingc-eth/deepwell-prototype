@@ -4,6 +4,10 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "env": {},
+  "functions": {
+    "api/review.js": { "includeFiles": "test-docs/scorecard/exam.json" },
+    "api/account.js": { "includeFiles": "test-docs/scorecard/exam.json" }
+  },
   "rewrites": [
     {
       "source": "/app",

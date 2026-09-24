@@ -7,6 +7,7 @@ import notifications from "./_lib/routes/notifications.js";
 import outreach from "./_lib/routes/outreach.js";
 import followups from "./_lib/routes/followups.js";
 import expenses from "./_lib/routes/expenses.js";
+import financials from "./_lib/routes/financials.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -26,7 +27,7 @@ import expenses from "./_lib/routes/expenses.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 60 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

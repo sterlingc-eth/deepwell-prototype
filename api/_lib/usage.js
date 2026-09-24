@@ -10,6 +10,7 @@
  * call site rather than a new subsystem someone has to design under time
  * pressure later.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 import { getAuxPool } from "./apiKeyAuth.js";
 
 /**
@@ -49,8 +50,12 @@ export function totalInputTokens({ inputTokens = 0, cacheReadInputTokens = 0, ca
  */
 export async function recordModelCall(
   ctx,
-  { inputTokens = 0, outputTokens = 0, cacheReadInputTokens = 0, cacheCreationInputTokens = 0 } = {}
+  { inputTokens = 0, outputTokens = 0, cacheReadInputTokens = 0, cacheCreationInputTokens = 0, model } = {}
 ) {
+  // Scorecard / cost tracing: when a usage meter is active (runWithUsageMeter below) this call's tokens
+  // are also added to it, whatever code path made the call. No effect when no meter is active.
+  const meter = meterStore.getStore();
+  if (meter) meter.add(model, { inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens });
   const tenantKey = ctx?.tenantKey;
   if (!tenantKey) return; // nothing to attribute this call to
 
@@ -94,6 +99,64 @@ export const MODEL_PRICE_PER_MTOK = {
     output: Number(process.env.AI_COST_SONNET_OUTPUT_PER_MTOK ?? 15),
   },
 };
+
+/**
+ * Which price family a model id bills at. Anything that is not a Sonnet id (claude-sonnet-*) is priced as
+ * Haiku, this codebase's default: the two families are the only ones it calls.
+ */
+export function modelFamily(model) {
+  return /sonnet/i.test(String(model ?? "")) ? "sonnet" : "haiku";
+}
+
+/**
+ * Exact-model cost estimate for ONE call (or a sum of calls on one model), from that call's own usage
+ * object. Unlike estimateCostUsd below (a blended estimate of tokens that no longer carry a model), this
+ * knows the model and prices prompt-cache traffic the way Anthropic bills it: a cache read at 0.1x the input
+ * rate and a cache write at 1.25x. `inputTokens` here is the UNCACHED input only (Anthropic's
+ * usage.input_tokens), not the folded total totalInputTokens() produces.
+ */
+export function estimateModelCostUsd(model, { inputTokens = 0, outputTokens = 0, cacheReadInputTokens = 0, cacheCreationInputTokens = 0 } = {}) {
+  const price = MODEL_PRICE_PER_MTOK[modelFamily(model)];
+  const n = (v) => Math.max(0, Number(v) || 0);
+  const usd =
+    (n(inputTokens) * price.input + n(cacheReadInputTokens) * price.input * 0.1 + n(cacheCreationInputTokens) * price.input * 1.25 + n(outputTokens) * price.output) /
+    1_000_000;
+  return Math.round(usd * 1_000_000) / 1_000_000;
+}
+
+/**
+ * A per-run usage meter. runWithUsageMeter(meter, fn) makes every recordModelCall made while `fn` runs
+ * (including fire-and-forget calls it starts) add its usage to `meter` - so the scorecard can report the true
+ * model spend of one question whichever pipeline stage (planner, retrieval answer, agent) made the calls,
+ * without any of those call sites knowing about it.
+ */
+const meterStore = new AsyncLocalStorage();
+export function createUsageMeter() {
+  const meter = {
+    calls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUsd: 0,
+    models: new Set(),
+    add(model, usage) {
+      const m = model || "unattributed";
+      meter.calls += 1;
+      meter.inputTokens += Math.max(0, Number(usage.inputTokens) || 0);
+      meter.outputTokens += Math.max(0, Number(usage.outputTokens) || 0);
+      meter.cacheReadInputTokens += Math.max(0, Number(usage.cacheReadInputTokens) || 0);
+      meter.cacheCreationInputTokens += Math.max(0, Number(usage.cacheCreationInputTokens) || 0);
+      meter.costUsd += estimateModelCostUsd(m, usage);
+      meter.models.add(m);
+    },
+    snapshot() {
+      return {
+        modelCalls: meter.calls, inputTokens: meter.inputTokens, outputTokens: meter.outputTokens,
+        costUsd: Math.round(meter.costUsd * 1_000_000) / 1_000_000, models: [...meter.models],
+      };
+    },
+  };
+  return meter;
+}
+export function runWithUsageMeter(meter, fn) {
+  return meterStore.run(meter, fn);
+}
 
 /**
  * What fraction of a tenant's billed tokens are Haiku vs. Sonnet, for

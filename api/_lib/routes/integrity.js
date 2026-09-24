@@ -18,6 +18,7 @@ import { withTenant as withRecordsTenant, linkDocumentToCustomer, linkDocumentTo
 import { mergeCustomers, ReviewError, isUuid, applyShopInternalClassification, wasClassifiedByHuman, shouldClassifyAsShopInternal } from '../reviewStore.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
 import { isShopInternalDocument, toCompletenessFields } from '../documentTypes.js';
+import { applyBodyNameLinks, planBodyNameLinks } from '../bodyNameLink.js';
 import { planPossibleDuplicates, loadKeepSeparatePairs } from './customers.js';
 import {
   findDuplicateCustomerPairs, isUnlinkedDocument,
@@ -62,6 +63,9 @@ export const APPLY_ACTIONS = new Set([
   // document that names no customer, unit or job (isShopInternalDocument)
   // and was never human-classified; never repoints or removes anything.
   'classifyShopRecords',
+  // 2026-09-23: additive/fill-only and deterministic — links a memo/correspondence whose BODY names exactly one
+  // existing customer (bodyNameLink.js); ambiguous/partial matches are only ever reported for review.
+  'linkBodyNames',
 ]);
 
 // ------------------------------------------------------------------ reads --
@@ -838,7 +842,12 @@ export async function integrityScan(ctx) {
       if (await planShopRecordClassification(db, candidate)) shopRecordsNotFiled.push(candidate.documentId);
     }
 
+    // 2026-09-23: memos/correspondence whose body names an existing customer (read-only preview of linkBodyNames).
+    const bodyNamePlan = await planBodyNameLinks(db, { dryRun: true });
+
     return {
+      bodyNameLinks: bodyNamePlan.linked,
+      bodyNameReview: bodyNamePlan.review,
       duplicateCustomers,
       possibleDuplicates,
       unlinkedDocuments,
@@ -864,6 +873,8 @@ export async function integrityScan(ctx) {
         splitLinkDocuments: splitLinkDocuments.length,
         ambiguousNameOnlyLinks: ambiguousNameOnlyLinks.length,
         shopRecordsNotFiled: shopRecordsNotFiled.length,
+        bodyNameLinks: bodyNamePlan.linked.length,
+        bodyNameReview: bodyNamePlan.review.length,
       },
     };
   });
@@ -1211,7 +1222,7 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
     dryRun: !!effectiveDryRun, merged: [], documentsLinked: [], equipmentLinked: [], unitsCreated: [],
     survivorsHealed: [], shopCustomersRetired: [], shopContactStripped: [], mismatchedNamesRelinked: [],
     unitsMovedByGroup: [], splitUnitsHealed: [], customerContactsFilled: [], addressPlaceholdersAbsorbed: [],
-    shopRecordsClassified: [], skipped: [],
+    shopRecordsClassified: [], bodyNamesLinked: [], bodyNamesForReview: [], skipped: [],
   };
 
   if (applySet.has('mergeDuplicates')) {
@@ -1235,6 +1246,14 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
         }
       }
     }
+  }
+
+  if (applySet.has('linkBodyNames')) {
+    // Before linkDocuments/classifyShopRecords so a memo that names a customer in its body is linked (not filed as
+    // shop-internal, not given an address placeholder). Strict: only a single unambiguous match is linked.
+    const { linked, review } = await applyBodyNameLinks(ctx, { dryRun: !!effectiveDryRun });
+    result.bodyNamesLinked.push(...linked);
+    result.bodyNamesForReview.push(...review);
   }
 
   if (applySet.has('linkDocuments')) {

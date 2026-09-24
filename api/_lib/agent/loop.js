@@ -25,11 +25,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "../claude.js";
 import { assertModelBudget } from "../rateLimit.js";
 import { planCacheBreakpoints } from "../promptCache.js";
-import { recordModelCall, totalInputTokens, estimateCostUsd } from "../usage.js";
+import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usage.js";
 import { ANALYTICS_MODEL } from "../routes/analytics.js";
 import { ALL_TOOL_DEFS, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./tools.js";
 import { shapeAgentAnswer } from "./shape.js";
 import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
+// Sonnet escalation for hard questions / failed Haiku runs (escalation.js) and the page-image tool's prompt text.
+import { escalationModel, classifyQuestionDifficulty, needsEscalation, sonnetAllowed, recordSonnetSpend, MIN_ESCALATION_MS, isEscalationEnabled } from "./escalation.js";
+import { VIEW_PAGE_DOCS } from "./viewPage.js";
 
 export const AGENT_MODEL = process.env.DONOVAN_AGENT_MODEL || ANALYTICS_MODEL;
 export const MAX_TURNS = 4;
@@ -52,11 +55,13 @@ export const AGENT_SYSTEM_PROMPT = `You are Donovan, the records assistant for a
 - If a query errors, read the error, fix the SQL and retry. Keep tool calls few.
 - Warranty status comes from the equipment view's warranty_status / warranty_current columns; never work it out yourself.
 - Finish by calling the answer tool exactly once. Lists: one fact per row (label = customer or item, value = the detail), entityId = the customer_id/equipment_id returned. A fact taken from a document cites it in sources. Pure counts and lists from run_query need no sources.
-- Money: never total, sum, or estimate dollar amounts (invoices, billing, revenue, cost). Use cannot_answer and say dollar totals are not available yet; you may quote a single amount printed on one cited document.
+- Money: dollar totals may come ONLY from the financials view (see MONEY RULES below), summed by SQL in run_query, never added up by you. State how many documents the total sums and what was excluded (no printed total, no date), and cite the invoice documents as sources. If financials has no matching rows, use cannot_answer and say no invoice totals were captured; never estimate a dollar amount, and never total from facts/cost or search excerpts.
 - If the records cannot answer (a needed field is not captured at all), use status cannot_answer and say plainly what is missing. If the data was searched and there is genuinely nothing, use none_found. Never pad, never guess.
 - text is 1-2 plain sentences a dispatcher would say out loud.
 
-${VIEW_DOCS}`;
+${VIEW_DOCS}
+
+${VIEW_PAGE_DOCS}`;
 
 /** Any change to the model, prompt or tool schemas invalidates cached agent answers. */
 export const AGENT_PROMPT_VERSION = createHash("sha256")
@@ -117,11 +122,13 @@ function usageOf(resp) {
  * @param {Function} [p.callModel]  (request, {deadlineAt}) => Anthropic-shaped response. Injectable for tests.
  * @param {number} [p.deadlineAt]  epoch ms
  * @param {{maxTurns?: number, inputTokenCap?: number}} [p.limits]
+ * @param {string} [p.model]  the model this ONE run uses (runDonovanAgent picks Haiku or the escalation model)
+ * @param {Function} [p.fetchObject]  (key) => Buffer, the R2 fetch view_document_page uses. Injectable for tests.
  * @returns {Promise<{handled: boolean, data: object|null, reason: string, modelCalls: number,
  *   inputTokens: number, outputTokens: number, cacheReadInputTokens: number, cacheCreationInputTokens: number,
  *   costUsd: number, steps: object[], dropped: object|null, error?: string}>}
  */
-export async function runDonovanAgent({ withTenant, ctxArg, question, today, overlay, hint, callModel = defaultCallModel, deadlineAt, limits = {} }) {
+async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint, callModel = defaultCallModel, deadlineAt, limits = {}, model = AGENT_MODEL, fetchObject }) {
   // Same daily spend budget every other model call respects. Throws ModelBudgetExceededError.
   await assertModelBudget(ctxArg);
 
@@ -129,8 +136,9 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
   const inputCap = limits.inputTokenCap ?? (Number(process.env.DONOVAN_AGENT_MAX_INPUT_TOKENS) || DEFAULT_INPUT_TOKEN_CAP);
   const deadline = deadlineAt ?? Date.now() + 30_000;
 
-  const toolbox = createToolbox({ withTenant, ctxArg, today });
+  const toolbox = createToolbox({ withTenant, ctxArg, today, deadlineAt: deadline, ...(fetchObject ? { fetchObject } : {}) });
   const totals = { modelCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+  let costUsd = 0;
   const steps = [];
   const records = [];
   let reason = "";
@@ -148,7 +156,7 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
       tools: ALL_TOOL_DEFS.map((block, i) => ({ block, breakpoint: i === ALL_TOOL_DEFS.length - 1 })),
       system: systemBlocks,
     },
-    AGENT_MODEL
+    model
   );
 
   const examples = formatWorkedExamples(selectWorkedExamples(overlay?.recipes, question, 3));
@@ -166,7 +174,7 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
       const forceAnswer = turn === maxTurns || totals.inputTokens >= inputCap * 0.75 || nudged;
       const resp = await callModel(
         {
-          model: AGENT_MODEL,
+          model,
           max_tokens: MAX_OUTPUT_TOKENS,
           temperature: 0,
           system,
@@ -182,7 +190,8 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
       totals.outputTokens += u.outputTokens;
       totals.cacheReadInputTokens += u.cacheReadInputTokens;
       totals.cacheCreationInputTokens += u.cacheCreationInputTokens;
-      records.push(recordModelCall(ctxArg, u));
+      costUsd += estimateModelCostUsd(model, u);
+      records.push(recordModelCall(ctxArg, { ...u, model }));
 
       const content = Array.isArray(resp?.content) ? resp.content : [];
       const uses = content.filter((b) => b?.type === "tool_use");
@@ -221,12 +230,12 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
 
   let shaped = null;
   if (finalInput) shaped = shapeAgentAnswer(finalInput, toolbox.ledger, { question, today });
-  const costUsd = estimateCostUsd({ inputTokens: totals.inputTokens, outputTokens: totals.outputTokens });
+  costUsd = Math.round(costUsd * 1_000_000) / 1_000_000;
   const handled = Boolean(shaped?.answered);
 
   console.log(
     JSON.stringify({
-      route: "ask", agent: true, model: AGENT_MODEL, reason, handled,
+      route: "ask", agent: true, model, reason, handled,
       model_calls: totals.modelCalls, input_tokens: totals.inputTokens, output_tokens: totals.outputTokens,
       cache_read: totals.cacheReadInputTokens, tool_steps: steps.length,
       dropped_facts: shaped?.dropped.facts ?? 0, dropped_sources: shaped?.dropped.sources ?? 0,
@@ -237,6 +246,7 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
     handled,
     data: handled ? shaped.data : null,
     reason,
+    model,
     ...totals,
     costUsd,
     steps,
@@ -247,11 +257,91 @@ export async function runDonovanAgent({ withTenant, ctxArg, question, today, ove
   };
 }
 
+/** Sum two runs' usage into one result (the escalated ask is ONE ask: one allowance unit, one answer). */
+function mergeRuns(first, second) {
+  const sum = (k) => (first[k] ?? 0) + (second[k] ?? 0);
+  return {
+    ...second,
+    modelCalls: sum("modelCalls"), inputTokens: sum("inputTokens"), outputTokens: sum("outputTokens"),
+    cacheReadInputTokens: sum("cacheReadInputTokens"), cacheCreationInputTokens: sum("cacheCreationInputTokens"),
+    costUsd: Math.round((first.costUsd + second.costUsd) * 1_000_000) / 1_000_000,
+    steps: [...(first.steps ?? []).map((s) => ({ ...s, model: first.model })), ...(second.steps ?? []).map((s) => ({ ...s, model: second.model }))],
+  };
+}
+
+/**
+ * The agent, with Sonnet escalation (see escalation.js for the rules). Haiku is the default; the run moves to
+ * the escalation model up front when the caller forces it (`escalate`) or the question classifies as hard, and
+ * a Haiku run that ends badly is retried once on Sonnet with whatever deadline is left. Everything runs
+ * through runAgentOnce, so budget, token caps, grounding and usage recording are identical for both models.
+ * Result additions: `model` (the model that produced the returned answer), `escalation`
+ * ({from, to, reason, outcome?} or {skipped: why}) and `models` (every model that ran).
+ *
+ * @param {object} p  same as runAgentOnce, plus `escalate` (force the escalation model: thumbs-down replay,
+ *   scorecard retry).
+ */
+export async function runDonovanAgent(p) {
+  const { withTenant, ctxArg, question, escalate = false, env = process.env } = p;
+  const deadline = p.deadlineAt ?? Date.now() + 30_000;
+  const args = { ...p, deadlineAt: deadline };
+  const sonnet = escalationModel(env);
+  const canEscalate = isEscalationEnabled(env) && sonnet !== AGENT_MODEL;
+
+  let firstReason = null;
+  if (canEscalate) {
+    if (escalate) firstReason = "forced";
+    else if (classifyQuestionDifficulty(question).hard) firstReason = "hard-question";
+  }
+  // The daily-cap read is a DB round trip: only made when an escalation is actually being considered.
+  let gate;
+  const getGate = async () => (gate ??= await sonnetAllowed(withTenant, ctxArg, env));
+  const startOnSonnet = Boolean(firstReason) && (await getGate()).allowed;
+
+  const first = await runAgentOnce({ ...args, model: startOnSonnet ? sonnet : AGENT_MODEL });
+  let result = first;
+  let escalation = null;
+  let second = null;
+  let sonnetCostUsd = startOnSonnet ? first.costUsd : 0;
+  if (startOnSonnet) escalation = { from: AGENT_MODEL, to: sonnet, reason: firstReason };
+  else if (firstReason) escalation = { skipped: gate?.why ?? "unavailable", wanted: firstReason };
+
+  const why = !startOnSonnet && canEscalate && !firstReason ? needsEscalation(first) : null;
+  if (why) {
+    const g = await getGate();
+    if (!g.allowed) escalation = { skipped: g.why, wanted: why };
+    else if (deadline - Date.now() < MIN_ESCALATION_MS) escalation = { skipped: "no-time", wanted: why };
+    else {
+      try {
+        second = await runAgentOnce({ ...args, model: sonnet, deadlineAt: deadline });
+        sonnetCostUsd += second.costUsd;
+        const better = second.handled && (!first.handled || (second.dropped?.facts ?? 0) < (first.dropped?.facts ?? 0));
+        const merged = mergeRuns(first, second);
+        result = better ? merged : { ...first, modelCalls: merged.modelCalls, inputTokens: merged.inputTokens, outputTokens: merged.outputTokens,
+          cacheReadInputTokens: merged.cacheReadInputTokens, cacheCreationInputTokens: merged.cacheCreationInputTokens, costUsd: merged.costUsd, steps: merged.steps };
+        escalation = { from: AGENT_MODEL, to: sonnet, reason: why, outcome: better ? "sonnet-answer-used" : "haiku-answer-kept" };
+      } catch (err) {
+        // A spent daily budget must not turn an answer we already have into an error: keep the Haiku run.
+        if (err?.name !== "ModelBudgetExceededError") console.warn("donovan-agent: escalation run failed (kept the first result):", err?.name ?? "error");
+        escalation = { from: AGENT_MODEL, to: sonnet, reason: why, outcome: "failed" };
+      }
+    }
+  }
+
+  // Meter the Sonnet share of today's spend (best-effort): what is left of the cap is what the next ask may use.
+  if (sonnetCostUsd > 0) await recordSonnetSpend(withTenant, ctxArg, sonnetCostUsd);
+
+  const models = [...new Set([first.model, ...(second ? [second.model] : [])])];
+  return { ...result, models, ...(escalation ? { escalation } : {}) };
+}
+
 /** The operator-only trace attached as data.debug (never for a normal tenant). */
 export function agentDebugTrace(result) {
   return {
     steps: (result.steps ?? []).map((s) => ({ tool: s.tool, inputSummary: s.inputSummary, rowCount: s.rowCount, ms: s.ms })),
     modelCalls: result.modelCalls,
+    model: result.model ?? AGENT_MODEL,
+    ...(result.models?.length > 1 ? { models: result.models } : {}),
+    ...(result.escalation ? { escalation: result.escalation } : {}),
     ...(result.examplesInjected ? { examplesInjected: result.examplesInjected } : {}),
     ...(result.fastReplay ? { fastReplay: true } : {}),
     inputTokens: result.inputTokens,

@@ -30,8 +30,10 @@
  *     and resolve_tenant() are unreachable).
  */
 
+import { FINANCE_VIEW_NAMES, FINANCE_REAL_TABLES } from "./financeViews.js";
+
 /** The virtual views tools.js prepends as a WITH clause. */
-export const VIEW_NAMES = Object.freeze(["customers", "equipment", "documents_v", "facts", "doc_links"]);
+export const VIEW_NAMES = Object.freeze(["customers", "equipment", "documents_v", "facts", "doc_links", ...FINANCE_VIEW_NAMES]);
 
 /** Every real table in M3-config (scripts/verify-agent.mjs cross-checks this
  *  against the migrations, so a new table cannot be forgotten). */
@@ -41,6 +43,9 @@ export const REAL_TABLES = Object.freeze([
   "usage_counters", "rate_limit_windows", "billing_events", "notifications_sent", "notifications",
   "ask_answer_cache", "tenant_outreach_settings", "outreach_messages", "ask_misses",
   "donovan_proposals", "donovan_learned", "platform_expenses", "ask_miss_replays",
+  "donovan_scorecard_runs", "donovan_scorecard_results", // M3-config/30-donovan-scorecard.sql
+  ...FINANCE_REAL_TABLES, // document_financials, document_financial_lines (M3-config/22)
+  "page_chunks", "embedding_usage", // M3-config/31 (search by meaning)
 ]);
 
 const DENY_TOKENS = new Set([

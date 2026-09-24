@@ -602,7 +602,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
  *                    stays easy to call from ask.js without a second import
  *                    cycle back through recordsStore.
  */
-export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today, overlay }) {
+export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today, overlay, noCache = false }) {
   const EMPTY = { handled: false, data: null, cacheHit: false, modelCalled: false, writes: [] };
   // Day 1 training-plan normalization layer (nlNormalize.js): both the plan
   // and every cache key below key off the NORMALIZED text (more cache hits,
@@ -674,7 +674,8 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
 
     // ---- Tier 1: exact question text, checked BEFORE the Haiku call -------
     const qHash = analyticsQuestionHash(question_n);
-    const qProbe = await withTenant(ctxArg, (db) =>
+    // noCache: Donovan Scorecard calls (api/_lib/scorecard) always exercise the live planner, never a stored answer.
+    const qProbe = noCache ? { row: null, corpusStamp: null } : await withTenant(ctxArg, (db) =>
       getCacheEntry(db, { questionHash: qHash, today, promptVersion })
     );
     if (isCacheHit(qProbe.row, qProbe.corpusStamp)) {
@@ -742,7 +743,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // question needing a condition override never shares a cache row with
     // one that didn't.
     const pHash = analyticsPlanHash(planWithOverrides);
-    const pProbe = await withTenant(ctxArg, (db) =>
+    const pProbe = noCache ? { row: null, corpusStamp: null } : await withTenant(ctxArg, (db) =>
       getCacheEntry(db, { questionHash: pHash, today, promptVersion })
     );
     // Item 5: the extended windows' own label ("in Q2 2026", "year to date",

@@ -9,6 +9,7 @@ import { runFollowupsSweep } from "./followups.js";
 import { integrityFixTenant } from "./integrity.js";
 import { runMissDigestSweepStep } from "../missDigest.js";
 import { runLearningSweepStep } from "../learning/sweep.js";
+import { runScorecardSweepStep } from "./scorecard.js";
 
 /**
  * GET /api/cron-sweep
@@ -123,6 +124,7 @@ export default async function handler(req, res) {
     // other repairs are all trying to create, so it needs its own fix rather
     // than eventually resolving via linkDocuments/linkEquipmentCustomers.
     integrityShopRecordsClassified: 0,
+    integrityBodyNamesLinked: 0,
     // Review fix (2026-09-20): relinkMismatchedNames runs dry-run only from
     // cron (see below) — this is how many documents it WOULD relink, not how
     // many it did. An admin applies them from the Customers-tab panel.
@@ -249,7 +251,7 @@ export default async function handler(req, res) {
           apply: [
             'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
             'stripShopContact', 'healSplitUnits', 'refillCustomerContacts', 'absorbAddressPlaceholders',
-            'classifyShopRecords',
+            'classifyShopRecords', 'linkBodyNames',
           ],
           minMergeScore: 0.95,
           dryRun: false,
@@ -262,6 +264,7 @@ export default async function handler(req, res) {
         summary.integrityContactsFilled += fixed.customerContactsFilled?.length ?? 0;
         summary.integrityAddressPlaceholdersAbsorbed += fixed.addressPlaceholdersAbsorbed?.length ?? 0;
         summary.integrityShopRecordsClassified += fixed.shopRecordsClassified?.length ?? 0;
+        summary.integrityBodyNamesLinked += fixed.bodyNamesLinked?.length ?? 0;
 
         const relinkPreview = await integrityFixTenant(ctx, { apply: ['relinkMismatchedNames'], dryRun: true });
         summary.integrityNamesRelinkable += relinkPreview.mismatchedNamesRelinked?.length ?? 0;
@@ -333,6 +336,16 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "learning" });
   }
 
+  // Donovan Scorecard (api/_lib/scorecard): a rotating ~40-question slice of the golden exam against the
+  // founder tenant, LAST on purpose - it only uses the time and money left after every customer-facing step
+  // above, is claimed once per UTC day, and failures feed the learning loop. Never fails the sweep.
+  try {
+    summary.scorecard = await runScorecardSweepStep({ deadlineAt });
+  } catch (err) {
+    summary.scorecard = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "scorecard" });
+  }
+
   summary.billingGatedTenants = billingGatedTenantKeys.size;
 
   await captureMessage(
@@ -354,7 +367,8 @@ export default async function handler(req, res) {
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
       `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +
       `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}; ` +
-      `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}.`,
+      `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}; ` +
+      `scorecard: ${summary.scorecard?.skipped ?? summary.scorecard?.error ?? `${summary.scorecard?.passed ?? 0}/${summary.scorecard?.answered ?? 0} passed`}.`,
     { route: "/api/cron-sweep" }
   );
 

@@ -1,5 +1,7 @@
 import { ingestDocument, recordIngestFailure } from "./readDocument.js";
 import { extractDocumentFields } from "./extractDocument.js";
+// FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): best-effort money extraction, its own step, never throws.
+import { extractFinancialsBestEffort } from "./financials/hook.js";
 import { getDailyModelBudgetStatus } from "./rateLimit.js";
 import { assertActiveBilling } from "./plan.js";
 
@@ -408,7 +410,7 @@ function buildFunctions(inngest, NonRetriableError) {
         throw new NonRetriableError("billing-gated");
       }
 
-      return step.run("extract", async () => {
+      const extracted = await step.run("extract", async () => {
         try {
           // H2: attempts=1 — under the queue, Inngest's own `retries: RETRIES`
           // above already re-runs this whole step on failure. Leaving
@@ -434,6 +436,10 @@ function buildFunctions(inngest, NonRetriableError) {
           throw err;
         }
       });
+      // FINANCIALS: invoice / quote / PO / maintenance-agreement documents also get their money read (own step, own
+      // model call, swallows every failure - the document's main extraction above already succeeded).
+      await step.run("extract-financials", () => extractFinancialsBestEffort(ctx, documentId, { modelAttempts: 1 }));
+      return extracted;
     }
   );
 

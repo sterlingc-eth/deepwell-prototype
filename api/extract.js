@@ -4,6 +4,7 @@ import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } fro
 import { denyAuth } from "./_lib/auth.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extractFields.js";
 import { extractDocumentFields, EXTRACT_MODEL, splitExtractPrompt } from "./_lib/extractDocument.js";
+import { extractFinancialsBestEffort } from "./_lib/financials/hook.js"; // FINANCIALS layer: money read for invoice-like documents
 import { sniffMagicBytes } from "./_lib/readDocument.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
@@ -77,11 +78,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "documentId must be a uuid" });
     }
 
+    const extractStartedAt = Date.now();
     const result = await extractDocumentFields(
       { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
       documentId,
       { userId: auth.userId, documentType }
     );
+    // FINANCIALS: best-effort, never throws, never delays the response by more than one model call.
+    // Only when the main extraction left room for one more model call inside the 60 s function (the backfill / queue retry the rest).
+    if (Date.now() - extractStartedAt < 20_000) await extractFinancialsBestEffort({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, documentId, { documentType: result.documentType, modelAttempts: 1 });
     return handleCors(res, req).status(200).json(result);
   } catch (error) {
     // B1 (2026-09-19 adversarial audit): checked before the generic handler

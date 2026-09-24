@@ -6,6 +6,8 @@ import { captureException } from "./telemetry.js";
 import { recordModelCall } from "./usage.js";
 import { withCache } from "./promptCache.js";
 import { FIELD_SPECS } from "./extractFields.js";
+// Search by meaning: embed a document's pages once they are stored (api/_lib/search/*).
+import { embedDocumentPages } from "./search/store.js";
 
 /**
  * The ingestion pipeline itself, with no HTTP in it.
@@ -525,6 +527,12 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     });
     return n;
   });
+
+  // SEMANTIC SEARCH HOOK: embed the stored pages so "loud" finds "noise". NON-FATAL by contract
+  // (embedDocumentPages never throws; the document is already readable) and inert without
+  // VOYAGE_API_KEY. Skipped when the model read already used most of this call's time budget —
+  // the backfill (POST /api/review semanticBackfill) picks up anything missed.
+  if (Date.now() - startedAt < 35_000) await embedDocumentPages(ctx, documentId);
 
   return { documentId, pages: written, method };
 }

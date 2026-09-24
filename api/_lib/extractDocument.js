@@ -22,6 +22,7 @@ import {
   AI_VERIFY_MIN_CONFIDENCE,
 } from "./documentTypes.js";
 import { integrityFixDocument } from "./routes/integrity.js";
+import { applyBodyNameLinks } from "./bodyNameLink.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -495,6 +496,9 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // the nightly sweep (handoffs/DATA_INTEGRITY_2026-09-20.md). Best-effort —
   // integrityFixDocument never throws.
   await integrityFixDocument(ctx, documentId);
+  // Memo/correspondence whose BODY names exactly one existing customer: link it (deterministic, no model; ambiguous or
+  // partial matches are left for review). Never throws. See bodyNameLink.js.
+  await applyBodyNameLinks(ctx, { documentId });
 
   return {
     documentId,

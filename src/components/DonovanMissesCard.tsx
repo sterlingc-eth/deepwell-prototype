@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Clipboard, ListChecks, Loader2, RefreshCw, Send } from 'lucide-react';
 import { reviewClient, replayAllMisses, type MissReport, type MissReplay } from '../services/reviewClient';
+import { DonovanScorecardStrip } from './DonovanScorecardStrip';
 
 /**
  * Admin-only "Donovan misses" card (Day 2 training plan,
@@ -30,6 +31,7 @@ const OUTCOME_LABEL: Record<string, string> = {
   'analytics-fallthrough': 'Analytics plan rejected',
   'agent-no-answer': 'Agent could not answer',
   'user-marked-wrong': 'Marked wrong by a user',
+  'scorecard-fail': 'Failed the accuracy scorecard',
 };
 
 const TOP_SHOWN = 5;
@@ -179,6 +181,9 @@ export function DonovanMissesCard() {
           </p>
 
           {error && <p role="alert" className="text-caption text-bad-ink">{error}</p>}
+
+          {/* Operator-only accuracy scorecard: golden exam, score trend, per-category bars, failing questions. */}
+          {report?.isOperator && <DonovanScorecardStrip />}
 
           {loading && !report && (
             <p className="text-body text-ink-3 flex items-center gap-2">

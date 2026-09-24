@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
+import { FinancialsCard } from '../components/FinancialsCard';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
 import { docCountsByStage, entitiesOfType, useGraph } from '../core/entityGraph';
 import { dateOf, formatYmd, normalize, str } from '../core/answer';
@@ -300,6 +301,7 @@ export function DashboardScreen() {
         </header>
 
         <DataHealthStrip />
+        {!DEMO_MODE && <FinancialsCard />}
 
         {!DEMO_MODE && total === 0 ? (
           <section aria-labelledby="alerts-heading" className="space-y-3">

@@ -43,6 +43,8 @@ const FAIL_REASON = {
   "agent-disabled": "the agent is switched off",
 };
 
+const SCORECARD_HINT = "An automated accuracy check found the previous answer to this question was wrong; re-check it carefully against the records.";
+
 const todayUtc = () => new Date().toISOString().slice(0, 10);
 
 /** The key ask_misses / ask_miss_replays use for a question (ask.js: overlay-aware normalize). */
@@ -144,9 +146,14 @@ function traceOf(run) {
  * @returns {Promise<{question: string, outcome: 'answered_now'|'still_failing', reason?: string, answer?: object,
  *   costUsd: number, recipe?: object}>}
  */
-export async function replayOne({ ctxArg, item, overlay, hint, callModel, today, source, confirm, spendLeft, operatorApproved = false, decidedBy }) {
+export async function replayOne({ ctxArg, item, overlay, hint: hintArg, callModel, today, source, confirm, spendLeft, operatorApproved = false, decidedBy }) {
+  // A scorecard failure means the previous answer was WRONG (not merely missing): replay it with a hint so it is
+  // never turned into a recipe (recipes are only built from un-hinted runs), and on the escalation model.
+  const hint = hintArg ?? (item.outcome === MISS_OUTCOMES.SCORECARD_FAIL ? SCORECARD_HINT : undefined);
   const runOnce = () => runDonovanAgent({
     withTenant, ctxArg, question: item.question, today, overlay, hint, callModel, deadlineAt: Date.now() + PER_RUN_MS,
+    // A hinted replay (thumbs-down, scorecard failure) starts on the escalation model (agent/escalation.js, trigger c).
+    escalate: Boolean(hint),
   });
   let cost = 0;
   let run;

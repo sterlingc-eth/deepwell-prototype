@@ -47,6 +47,8 @@ export const MISS_OUTCOMES = {
   AGENT_NO_ANSWER: 'agent-no-answer',
   // A user's thumbs-down on an answer (api/review.js askFeedback): a correction miss.
   USER_MARKED_WRONG: 'user-marked-wrong',
+  // The Donovan Scorecard (api/_lib/scorecard) asked a golden-exam question and the answer did not match its oracle.
+  SCORECARD_FAIL: 'scorecard-fail',
 };
 
 const MAX_QUESTION_CHARS = 300;

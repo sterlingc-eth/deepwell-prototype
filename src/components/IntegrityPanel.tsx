@@ -20,6 +20,8 @@ const SUMMARY_ROWS: { key: keyof IntegrityScanResult['counts']; label: string }[
   { key: 'mismatchedNameLinks', label: 'Wrong-name links' },
   { key: 'splitLinkDocuments', label: 'Split customer links' },
   { key: 'ambiguousNameOnlyLinks', label: 'Ambiguous name-only links' },
+  { key: 'bodyNameLinks', label: 'Memos naming a customer' },
+  { key: 'bodyNameReview', label: 'Memos needing your review' },
 ];
 
 /**
@@ -186,7 +188,8 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                       const recovered = fixResult.shopContactStripped.filter((l) => l.rederivedTo).length;
                       return recovered > 0 ? `, recovering the customer's real number/email for ${recovered} of them` : '';
                     })()} · healed {fixResult.splitUnitsHealed.length} split unit{fixResult.splitUnitsHealed.length === 1 ? '' : 's'} ·
-                    filled {fixResult.customerContactsFilled.length} customer contact field{fixResult.customerContactsFilled.length === 1 ? '' : 's'}.
+                    filled {fixResult.customerContactsFilled.length} customer contact field{fixResult.customerContactsFilled.length === 1 ? '' : 's'} ·
+                    linked {fixResult.bodyNamesLinked?.length ?? 0} memo{(fixResult.bodyNamesLinked?.length ?? 0) === 1 ? '' : 's'} by the customer named inside.
                   </p>
                 )}
                 {mismatchedCount > 0 && (

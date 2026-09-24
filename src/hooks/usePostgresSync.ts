@@ -207,6 +207,7 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
     linkedEntityIds: [...new Set([...linkedFromExtractions, ...linkedFromLinks])],
     linkConfidence: linkedFromExtractions.length > 0 || linkedFromLinks.length > 0 ? 1 : 0,
     issues: [],
+    linkedFromBodyName: links.find((l) => l.linked_by === 'name-in-body')?.entity_id,
     verifiedBy: row.verified_by ?? undefined,
     verifiedAt: toDateOrNull(row.verified_at) ?? undefined,
     // POST /api/document-status's completeness (required fields → present/missing

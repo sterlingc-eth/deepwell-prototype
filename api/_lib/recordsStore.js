@@ -27,6 +27,8 @@ import {
   extractNameMention, matchNameMention,
 } from './integrity.js';
 import { TTLCache, memoAsync, logStage, registerTenantCache, bustTenantCaches } from './perf.js';
+// Search by meaning (api/_lib/search/*): inert unless VOYAGE_API_KEY is set and M3-config/31 has run.
+import { startSemantic, keywordCandidateLimit, finishHybrid } from './search/hybrid.js';
 
 let pool;
 
@@ -1442,6 +1444,10 @@ function makeStore(db, tenantId) {
         for (const r of list) if (!rows.has(r.id)) rows.set(r.id, { ...r, matched_by: source });
       };
       if (documentIds && documentIds.length === 0) return [];
+      // SEMANTIC HYBRID (api/_lib/search/hybrid.js): null when off. Otherwise the question's embedding is
+      // requested NOW so the Voyage round trip overlaps the keyword queries below instead of following them.
+      const sem = startSemantic(question);
+      const identifierPageIds = new Set(); // pages an identifier/serial token matched (kept on top by the hybrid step)
       const scopeSql = documentIds ? ' AND p.document_id = ANY($__ids__::uuid[])' : '';
       const withIds = (params) => documentIds ? [...params, documentIds] : params;
       // The scoped queries below append documentIds as their LAST bind param;
@@ -1475,7 +1481,7 @@ function makeStore(db, tenantId) {
          WHERE p.${TENANT} AND q.tsq IS NOT NULL AND p.tsv @@ q.tsq __SCOPE__
          ORDER BY rank DESC
          LIMIT $2`;
-      push((await scoped(ftsSql, [question, limit])).rows, 'text');
+      push((await scoped(ftsSql, [question, keywordCandidateLimit(limit, sem)])).rows, 'text');
 
       // Belt and braces: if full-text search found nothing (an empty or
       // stale tsv column did exactly this in production once), fall back to
@@ -1524,9 +1530,15 @@ function makeStore(db, tenantId) {
           [like, token]
         );
         push(r.rows, `identifier:${token}`);
+        for (const x of r.rows) identifierPageIds.add(x.id);
       }
 
-      return [...rows.values()].sort((a, b) => b.rank - a.rank).slice(0, limit);
+      // SEMANTIC HYBRID: with `sem` null this is exactly the old keyword-only
+      // `.sort(...).slice(0, limit)`; otherwise fuse in the vector hits (RRF), identifiers pinned.
+      return finishHybrid(db, sem, {
+        tenantId, question, limit, documentIds, identifierPageIds,
+        keywordRows: [...rows.values()].sort((a, b) => b.rank - a.rank),
+      });
     },
 
     /**

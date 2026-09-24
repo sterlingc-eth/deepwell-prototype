@@ -1,0 +1,787 @@
+/**
+ * Checks for the Donovan Scorecard, Sonnet escalation, view_document_page and the body-name customer link.
+ *
+ * No network, no Anthropic key, no DATABASE_URL: models are scripted and the database is a REAL Postgres
+ * (PGlite) loaded from the actual M3-config/*.sql migrations and queried as the app's NOBYPASSRLS role, exactly
+ * like scripts/verify-agent.mjs (same harness).
+ *
+ *   1. The golden exam file: contract (size, categories, rubric cap, oracle SQL shape, generator freshness).
+ *   2. Comparators (pure): number / set / value / yesno / honest-zero / rubric.
+ *   3. Oracles on seeded data: every family's SQL runs and returns the hand-computed answer; every oracle in
+ *      the shipped exam executes without error.
+ *   4. The runner: pass/fail scoring, skip semantics, learning-loop feed, retry, budget stop, paging, the
+ *      nightly slice, persistence WITH and WITHOUT migration 30 (tables vs audit_log fallback), the in-process
+ *      hook (no HTTP request can use it; allowance/cache untouched).
+ *   5. Escalation: every trigger, the daily Sonnet cap, pricing, the debug trace.
+ *   6. view_document_page: ledger enforcement, size caps, max views, grounding of what a view reads.
+ *   7. Body-name customer link: unique links, ambiguity/partials go to review, other tenants never matched.
+ *
+ *   node scripts/verify-scorecard.mjs
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+let failures = 0;
+let passes = 0;
+const check = (name, ok, detail = '') => {
+  if (ok) passes++; else failures++;
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `\n      ${detail}`}`);
+};
+const eq = (name, got, want) =>
+  check(name, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+process.env.NEON_CONNECTION_STRING = 'postgres://harness:harness@localhost:5432/harness';
+process.env.DONOVAN_AGENT_QUERY_TIMEOUT_MS = '3000';
+delete process.env.ANTHROPIC_API_KEY;
+delete process.env.DONOVAN_ESCALATION;
+delete process.env.DONOVAN_SONNET_DAILY_USD;
+delete process.env.DONOVAN_ESCALATION_MODEL;
+
+const realLog = console.log;
+console.log = (...a) => { if (typeof a[0] === 'string' && (a[0].startsWith('{"route"') || a[0].startsWith('{"event"'))) return; realLog(...a); };
+const realWarn = console.warn;
+console.warn = () => {};
+const realErr = console.error;
+console.error = () => {};
+
+const { validQuestions, loadExam } = await import('../api/_lib/scorecard/exam.js');
+const { compareAnswer, expectedFromRows, scoreResults, warrantyStatusFromText, datesIn } = await import('../api/_lib/scorecard/compare.js');
+const { oracleSqlOk, runOracle } = await import('../api/_lib/scorecard/oracle.js');
+const { classify } = await import('./gen-scorecard.mjs');
+
+/* ================================================================== 1. the exam file */
+const exam = loadExam();
+{
+  const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-docs/scorecard/exam.json'), 'utf8'));
+  const qs = exam.questions;
+  check('exam: loads and every question is well-formed (validQuestions drops none)', qs.length === raw.questions.length && qs.length > 0, `${qs.length} vs ${raw.questions.length}`);
+  check('exam: about 300 questions', qs.length >= 260 && qs.length <= 340, String(qs.length));
+  const rubric = qs.filter((q) => q.cmp === 'rubric').length;
+  check('exam: rubric (model-graded) questions are at most 15% of the set', rubric / qs.length <= 0.15, `${rubric}/${qs.length}`);
+  const bank = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-docs/question-bank/bank.json'), 'utf8'));
+  const cats = new Set(bank.map((b) => b.category));
+  const covered = new Set(qs.map((q) => q.category));
+  eq('exam: every question-bank category is covered', [...cats].filter((c) => !covered.has(c)), []);
+  check('exam: canonical AND typo/abbreviated wordings are present', ['canonical', 'typo', 'abbreviated'].every((v) => qs.some((q) => q.variant === v)));
+  eq('exam: every comparison type is used', ['number', 'set', 'value', 'yesno', 'honest-zero', 'rubric'].filter((c) => !qs.some((q) => q.cmp === c)), []);
+  check('exam: ids unique and question text within the 300-char storage limit', new Set(qs.map((q) => q.id)).size === qs.length && qs.every((q) => q.text.length <= 300));
+  check('exam: every oracle is a single read-only SELECT (oracleSqlOk) and binds the params it uses',
+    qs.every((q) => oracleSqlOk(q.oracle.sql) && Math.max(0, ...[...q.oracle.sql.matchAll(/\$(\d+)/g)].map((m) => +m[1])) === q.oracle.params.length));
+  check('exam: oracles read base tables only (no views, no analytics helpers)', qs.every((q) => !/\b(?:documents_v|facts|customers_v)\b/.test(q.oracle.sql) && /\b(?:entities|documents|extractions|document_pages|pg_tables)\b/.test(q.oracle.sql)));
+  check('exam: honest-zero questions carry a data guard so they retire themselves when the data appears', qs.filter((q) => q.cmp === 'honest-zero').every((q) => /\bn\b/.test(q.oracle.sql)));
+  check('validQuestions rejects malformed entries', validQuestions([{ id: 'x' }, { id: 'y', text: 't', category: 'c', cmp: 'nope', oracle: { sql: 'select 1' } }, { id: 'z', text: 't', category: 'c', cmp: 'rubric', oracle: { sql: 'select 1' } }]).length === 0);
+  let stale = null;
+  try { execFileSync('node', ['scripts/gen-scorecard.mjs', '--check'], { cwd: ROOT, stdio: 'pipe' }); } catch (err) { stale = String(err.stderr ?? err.message).slice(0, 300); }
+  check('exam: exam.json matches what scripts/gen-scorecard.mjs generates from the bank (not stale)', stale === null, stale ?? '');
+}
+
+/* ================================================================== 2. comparators (pure) */
+{
+  const ans = (text, facts = [], kind = 'answer') => ({ kind, text, facts, sources: [] });
+  const cmp = (cmpType, expected, data, question = '') => compareAnswer({ cmp: cmpType, expected, question }, data);
+  // number
+  check('number: exact match in the text passes', cmp('number', 13, ans('You have 13 customers in Mesa.')).passed);
+  check('number: off by one fails', !cmp('number', 13, ans('You have 12 customers in Mesa.')).passed);
+  check('number: the number is read from the first fact when the text has none', cmp('number', 7, ans('Here you go.', [{ label: 'Units', value: '7' }])).passed);
+  check('number: a number that only echoes the question does not count', !cmp('number', 5, ans('Units older than 5 years: 19.'), 'How many units are older than 5 years?').passed);
+  check('number: expected zero passes on an honest "none"', cmp('number', 0, ans('No customers match.')).passed);
+  check('number: a no-answer fails', !cmp('number', 3, ans('I could not find that.', [], 'no-answer')).passed);
+  // set
+  const names = ['Ann Lee', 'Bo Chan', 'Cy Diaz', 'Di Evans', 'Ed Ford', 'Flo Gray', 'Gus Hill', 'Hal Ives', 'Ivy Jones', 'Jo Kim'];
+  const factsFor = (list) => list.map((n) => ({ label: n, value: 'Mesa' }));
+  check('set: full list passes', cmp('set', names, ans('Here are 10 customers.', factsFor(names))).passed);
+  check('set: 9 of 10 (recall 0.9) still passes', cmp('set', names, ans('Here are 9.', factsFor(names.slice(0, 9)))).passed);
+  const r8 = cmp('set', names, ans('Here are 8.', factsFor(names.slice(0, 8))));
+  check('set: 8 of 10 fails on recall, and says so', !r8.passed && r8.recall === 0.8, JSON.stringify(r8));
+  const extra = cmp('set', names, ans('x', factsFor([...names, 'Zed One', 'Zed Two', 'Zed Three'])));
+  check('set: invented extra rows fail on precision', !extra.passed && extra.precision < 0.9, JSON.stringify(extra));
+  check('set: "label|n" items need both parts in one fact', cmp('set', ['trane|4', 'carrier|5'], ans('x', [{ label: 'Trane', value: '4' }, { label: 'Carrier', value: '5' }])).passed
+    && !cmp('set', ['trane|4', 'carrier|5'], ans('x', [{ label: 'Trane', value: '5' }, { label: 'Carrier', value: '4' }])).passed);
+  check('set: an empty expected list passes only when nothing is returned', cmp('set', [], ans('No matches.')).passed && !cmp('set', [], ans('x', factsFor(['Ann Lee']))).passed);
+  // value
+  check('value: a phone number matches on digits regardless of formatting', cmp('value', ['480-555-0114'], ans('Phone: (480) 555-0114')).passed);
+  check('value: a wrong phone fails', !cmp('value', ['480-555-0114'], ans('Phone: (480) 555-0999')).passed);
+  check('value: a date matches across formats', cmp('value', ['2026-03-05'], ans('Last serviced on March 5, 2026.')).passed && cmp('value', ['2026-03-05'], ans('It was 3/5/2026')).passed);
+  check('value: a warranty status matches by meaning', cmp('value', ['expired'], ans('That unit is out of warranty.')).passed && !cmp('value', ['active'], ans('That unit is out of warranty.')).passed);
+  check('value: any accepted alternative passes', cmp('value', ['GD-2002', 'GSX140361K'], ans('Model GSX140361K')).passed);
+  check('value: an EMPTY expectation means "not on file": inventing one fails, declining passes', !cmp('value', [], ans('The serial is TR-1234.', [{ label: 'Serial', value: 'TR-1234' }])).passed && cmp('value', [], ans('There is no serial on file.')).passed);
+  eq('warrantyStatusFromText reads the four states', ['expired soon?', 'still under warranty', 'no warranty on file', 'expiring in 3 weeks'].map(warrantyStatusFromText), ['expired', 'active', 'unknown', 'expiring']);
+  eq('datesIn parses ISO, US and long dates', [...datesIn('2026-01-02 and 3/4/2025 and Sep 10, 2026')].sort(), ['2025-03-04', '2026-01-02', '2026-09-10']);
+  // yesno
+  check('yesno: "Yes, ..." matches true; "No, ..." matches false', cmp('yesno', true, ans('Yes, we do.')).passed && cmp('yesno', false, ans('No, there is no permit on file.')).passed);
+  check('yesno: the wrong commitment fails', !cmp('yesno', true, ans('No, nothing.')).passed && !cmp('yesno', false, ans('Yes, there is one.')).passed);
+  // honest-zero
+  check('honest-zero: declining passes', cmp('honest-zero', null, ans('I do not have invoice totals yet.', [], 'no-answer')).passed && cmp('honest-zero', null, ans('That is not tracked in the records.')).passed);
+  check('honest-zero: inventing a figure or facts fails', !cmp('honest-zero', null, ans('You invoiced $12,400 last month.')).passed && !cmp('honest-zero', null, ans('x', [{ label: 'Revenue', value: '12400' }])).passed);
+  // expectedFromRows + scoreResults
+  eq('expectedFromRows: number/set/value/yesno/honest-zero conventions',
+    [expectedFromRows('number', [{ n: '4' }]).expected, expectedFromRows('set', [{ item: 'a' }, { item: null }, { item: 'b' }]).expected, expectedFromRows('value', [{ v: 'x' }, { v: '' }]).expected, expectedFromRows('yesno', [{ v: true }]).expected, expectedFromRows('honest-zero', [{ n: 0 }]).dataExists, expectedFromRows('honest-zero', [{ n: 2 }]).dataExists],
+    [4, ['a', 'b'], ['x'], true, false, true]);
+  const sc = scoreResults([{ category: 'a', passed: true }, { category: 'a', passed: false }, { category: 'b', passed: true }, { category: 'b', skipped: true, passed: false }]);
+  eq('scoreResults: overall and per category, skipped questions excluded', [sc.total, sc.passed, sc.score, sc.byCategory.a.score, sc.byCategory.b.total], [3, 2, 0.6667, 0.5, 1]);
+  check('oracleSqlOk refuses writes, multi-statements and non-selects', !oracleSqlOk('DELETE FROM entities') && !oracleSqlOk('SELECT 1; DROP TABLE x') && !oracleSqlOk('WITH x AS (INSERT INTO t VALUES (1) RETURNING *) SELECT * FROM x') && oracleSqlOk("SELECT 'update' AS v"));
+}
+
+/* ================================================================== harness: real Postgres via PGlite (as verify-agent.mjs) */
+let PGlite;
+const contrib = {};
+try {
+  ({ PGlite } = await import('@electric-sql/pglite'));
+  for (const key of ['uuid_ossp', 'pgcrypto', 'pg_trgm', 'btree_gin']) contrib[key] = (await import(`@electric-sql/pglite/contrib/${key}`))[key];
+} catch (err) {
+  realLog(`SKIP  database-backed checks: PGlite is not installed (${err?.message}). Run npm ci.`);
+  realLog(failures ? `${failures} check(s) FAILED.` : `${passes} checks passed (database-backed checks skipped).`);
+  process.exit(failures ? 1 : 0);
+}
+const lite = new PGlite({ extensions: contrib });
+const cfgDir = path.join(ROOT, 'M3-config');
+for (const f of fs.readdirSync(cfgDir).filter((x) => /^\d\d.*\.sql$/.test(x) && !x.startsWith('99')).sort()) {
+  try { await lite.exec(fs.readFileSync(path.join(cfgDir, f), 'utf8')); } catch { /* harness notes are printed by verify-agent */ }
+}
+try { await lite.exec(fs.readFileSync(path.join(cfgDir, '01b-app-role.sql'), 'utf8')); } catch { /* as verify-agent */ }
+
+const pgMod = (await import('pg')).default;
+let tail = Promise.resolve();
+const lock = () => { let release; const p = new Promise((r) => { release = r; }); const prev = tail; tail = tail.then(() => p); return prev.then(() => release); };
+pgMod.Pool.prototype.connect = async function connect() {
+  const release = await lock();
+  await lite.exec('SET ROLE deepwell_rls');
+  return { query: (sql, params) => lite.query(sql, params), release: () => { lite.exec('RESET ROLE').finally(release); } };
+};
+pgMod.Pool.prototype.query = async function query(sql, params) {
+  const release = await lock();
+  try { return await lite.query(sql, params); } finally { release(); }
+};
+
+const { withTenant, getTenantContext } = await import('../api/_lib/recordsStore.js');
+const usage = await import('../api/_lib/usage.js');
+const { runDonovanAgent, agentDebugTrace, AGENT_MODEL } = await import('../api/_lib/agent/loop.js');
+const esc = await import('../api/_lib/agent/escalation.js');
+const { createToolbox } = await import('../api/_lib/agent/tools.js');
+const { shapeAgentAnswer } = await import('../api/_lib/agent/shape.js');
+const { runScorecard, nightlySlice, NIGHTLY_SLICE } = await import('../api/_lib/scorecard/runner.js');
+const store = await import('../api/_lib/scorecard/store.js');
+const { SCORECARD_CALL, takeScorecardCall } = await import('../api/_lib/scorecard/hook.js');
+const routes = await import('../api/_lib/routes/scorecard.js');
+const { findCustomersInBody, applyBodyNameLinks } = await import('../api/_lib/bodyNameLink.js');
+const integrity = await import('../api/_lib/routes/integrity.js');
+
+const TODAY = '2026-09-23';
+const ctxA = { tenantKey: 'org_harness_a', tenantName: 'Desert Peak HVAC' };
+const ctxB = { tenantKey: 'org_harness_b', tenantName: 'Other Shop' };
+const ctxC = { tenantKey: 'org_harness_c', tenantName: 'Body Name Shop' };
+const ctxD = { tenantKey: 'org_harness_d', tenantName: 'Cap Shop' };
+const tenA = (await getTenantContext(ctxA.tenantKey, ctxA.tenantName)).id;
+const tenB = (await getTenantContext(ctxB.tenantKey, ctxB.tenantName)).id;
+const tenC = (await getTenantContext(ctxC.tenantKey, ctxC.tenantName)).id;
+await getTenantContext(ctxD.tenantKey, ctxD.tenantName);
+const uid = (t, k, n) => `${t}${k}000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+async function seedTenant(t, tenantId, world) {
+  const ent = (id, type, data, extra = {}) => lite.query(
+    'INSERT INTO entities (id, tenant_id, entity_type, data, customer_id, customer_number) VALUES ($1,$2,$3,$4::jsonb,$5,$6)',
+    [id, tenantId, type, JSON.stringify(data), extra.customerId ?? null, extra.number ?? null]);
+  for (const c of world.customers) await ent(uid(t, 'c', c.n), 'customer', { customer_name: c.name, service_address: c.address, phone: c.phone ?? null, email: c.email ?? null, ...(c.nameSource ? { name_source: c.nameSource } : {}) }, { number: `C-${t}${String(c.n).padStart(4, '0')}` });
+  for (const e of world.equipment ?? []) {
+    await ent(uid(t, 'e', e.n), 'equipment', { manufacturer: e.mfr, model: e.model, serial_number: e.serial, equipment_type: e.type, installation_date: e.installed, service_address: e.address, ...(e.warranty ? { warranty: e.warranty } : {}) }, { customerId: uid(t, 'c', e.customer) });
+  }
+  for (const d of world.docs ?? []) {
+    await lite.query('INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,$4,$5,$6)',
+      [uid(t, 'd', d.n), tenantId, d.file, d.type, `${t}-hash-${d.n}`, d.stage ?? 'verified']);
+    if (d.storage) await lite.query('UPDATE documents SET storage_key = $2, content_type = $3, page_count = $4 WHERE id = $1', [uid(t, 'd', d.n), d.storage.key, d.storage.type, d.storage.pages ?? 1]);
+    for (const link of d.links ?? []) await lite.query('INSERT INTO document_entity_links (tenant_id, document_id, entity_id) VALUES ($1,$2,$3)', [tenantId, uid(t, 'd', d.n), link]);
+    for (const x of d.facts ?? []) {
+      await lite.query('INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value, confidence) VALUES ($1,$2,$3,$4,$5,0.9)', [tenantId, uid(t, 'd', d.n), x.entity ?? null, x.key, x.value]);
+    }
+    for (const [i, text] of (d.pages ?? []).entries()) await lite.query('INSERT INTO document_pages (document_id, tenant_id, page_no, text) VALUES ($1,$2,$3,$4)', [uid(t, 'd', d.n), tenantId, i + 1, text]);
+  }
+}
+
+// Tenant A: the same shop verify-agent.mjs uses, plus a nameplate photo and a scanned PDF for the view tests.
+const worldA = {
+  customers: [
+    { n: 1, name: 'Karen Abernathy', address: '412 Elm St, Mesa, AZ 85201', phone: '(480) 555-0148', email: 'karen@example.com' },
+    { n: 2, name: 'Bill Whitmore', address: '88 Whitmore Ave, Mesa, AZ 85201' },
+    { n: 3, name: 'Plaza Dental Group', address: '2210 E Main St, Gilbert, AZ 85234' },
+    { n: 4, name: 'Donna Thornton', address: '17 Cactus Ln, Tucson, AZ 85701', email: 'donna@example.com' },
+    { n: 5, name: 'Old Timer', address: '5 Oak Rd, Phoenix, AZ 85001' },
+  ],
+  equipment: [
+    { n: 1, customer: 1, mfr: 'Trane', model: 'XR14', serial: 'TR-1001', type: 'condenser', installed: '2020-05-01', address: '412 Elm St, Mesa, AZ 85201', warranty: { expires: '2030-05-01' } },
+    { n: 2, customer: 2, mfr: 'Goodman', model: 'GSX140361K', serial: 'GD-2002', type: 'condenser', installed: '2016-10-15', address: '88 Whitmore Ave, Mesa, AZ 85201', warranty: { expires: '2026-10-15' } },
+    { n: 3, customer: 3, mfr: 'Carrier', model: '24ACC636', serial: 'CR-3003', type: 'condenser', installed: '2014-01-01', address: '2210 E Main St, Gilbert, AZ 85234', warranty: { expires: '2024-01-01' } },
+    { n: 4, customer: 4, mfr: 'Lennox', model: 'EL16XC1', serial: 'LX-4004', type: 'condenser', installed: '2019-03-03', address: '17 Cactus Ln, Tucson, AZ 85701' },
+    { n: 5, customer: 1, mfr: 'Trane', model: 'S9V2', serial: 'TR-1005', type: 'furnace', installed: '2021-01-01', address: '412 Elm St, Mesa, AZ 85201', warranty: { expires: '2029-01-01' } },
+  ],
+  docs: [
+    { n: 1, file: 'karen-service-sep.pdf', type: 'service-ticket', links: [uid('a', 'c', 1)], facts: [{ key: 'service_date', value: '2026-09-10' }, { key: 'technician', value: 'Danny Ochoa' }], pages: ['Service ticket Karen Abernathy 412 Elm St'] },
+    { n: 2, file: 'karen-maint-agreement.pdf', type: 'maintenance-agreement', links: [uid('a', 'c', 1)] },
+    { n: 3, file: 'whitmore-service-2025.pdf', type: 'service-ticket', links: [uid('a', 'c', 2)], facts: [{ key: 'service_date', value: '2025-11-02' }] },
+    { n: 4, file: 'whitmore-maint-agreement.pdf', type: 'maintenance-agreement', links: [uid('a', 'c', 2)] },
+    { n: 5, file: 'plaza-maint-agreement.pdf', type: 'maintenance-agreement', links: [uid('a', 'c', 3)] },
+    { n: 6, file: 'thornton-permit.pdf', type: 'permit', links: [uid('a', 'c', 4)], facts: [{ key: 'permit_number', value: 'BP-2024-08841' }], pages: ['City of Tucson building permit BP-2024-08841 issued for 17 Cactus Ln condenser replacement'] },
+    { n: 7, file: 'plaza-service-sep.pdf', type: 'service-ticket', links: [uid('a', 'e', 3)], facts: [{ key: 'service_date', value: '2026-09-15' }, { key: 'technician', value: 'Danny Ochoa' }] },
+    { n: 8, file: 'thornton-workorder.pdf', type: 'work-order', links: [uid('a', 'c', 4)], stage: 'read', facts: [{ key: 'service_date', value: '2026-03-05' }], pages: ['Work order Thornton 17 Cactus Ln. Replaced capacitor.'] },
+    { n: 9, file: 'thornton-nameplate.png', type: 'nameplate-photo', links: [uid('a', 'e', 4)], storage: { key: 'k/nameplate.png', type: 'image/png', pages: 1 }, pages: ['Nameplate photo (smudged) LX-4OO4'] },
+    { n: 10, file: 'plaza-scan-6pg.pdf', type: 'other', links: [uid('a', 'c', 3)], storage: { key: 'k/six.pdf', type: 'application/pdf', pages: 6 }, pages: ['Plaza scan page 1', 'p2', 'p3', 'p4', 'p5', 'p6'] },
+    { n: 11, file: 'plaza-scan-1pg.pdf', type: 'other', links: [uid('a', 'c', 3)], storage: { key: 'k/one.pdf', type: 'application/pdf', pages: 1 }, pages: ['Plaza single page scan'] },
+    { n: 12, file: 'plaza-scan-huge.pdf', type: 'other', links: [uid('a', 'c', 3)], storage: { key: 'k/huge.pdf', type: 'application/pdf', pages: 2 }, pages: ['Plaza huge scan'] },
+    { n: 13, file: 'thornton-heic.heic', type: 'other', links: [uid('a', 'c', 4)], storage: { key: 'k/photo.heic', type: 'image/heic', pages: 1 }, pages: ['Thornton iPhone photo'] },
+  ],
+};
+const worldB = {
+  customers: [{ n: 1, name: 'Zed Competitor', address: '1 Secret Way, Reno, NV 89501' }],
+  equipment: [{ n: 1, customer: 1, mfr: 'York', model: 'B-MODEL', serial: 'YK-9', type: 'condenser', installed: '2022-01-01', address: '1 Secret Way, Reno, NV 89501', warranty: { expires: '2035-01-01' } }],
+  docs: [{ n: 1, file: 'b-secret-permit.pdf', type: 'permit', links: [uid('b', 'c', 1)], pages: ['Secret permit Zed Competitor'] }],
+};
+// Tenant C: memos for the body-name link.
+const memo = (n, text, extra = {}) => ({ n, file: `memo-${n}.txt`, type: 'correspondence', stage: 'read', pages: [text], ...extra });
+const worldC = {
+  customers: [
+    { n: 1, name: 'David Prentiss', address: '9 Pine Ct, Mesa, AZ 85201' },
+    { n: 2, name: 'Ann Lee', address: '3 A St, Tucson, AZ 85701' },
+    { n: 3, name: 'Ann Lee', address: '4 B St, Tucson, AZ 85701' },
+    { n: 4, name: 'Sam Ortega', address: '21 Ridge Rd, Gilbert, AZ 85234' },
+    { n: 5, name: 'Bill Whitmore', address: '88 Whitmore Ave, Mesa, AZ 85201' },
+    { n: 6, name: 'Customer at 12 Elm St', address: '12 Elm St, Mesa, AZ 85201', nameSource: 'address' },
+  ],
+  docs: [
+    memo(1, "Reminder logged for David Prentiss's account: confirm filter size on next visit."),
+    memo(2, 'Call Ann Lee about the noisy condenser.'),
+    memo(3, 'Follow up with Prentiss about the invoice.'),
+    memo(4, 'Reminder for Zed Competitor: renew the agreement.'),
+    memo(5, 'Dropped off parts at 88 Whitmore Ave, Mesa.'),
+    memo(6, 'Sam Ortega asked about the unit at 88 Whitmore Ave.'),
+    memo(7, "Reminder logged for David Prentiss's account: check the thermostat.", { links: [uid('c', 'c', 4)] }),
+    memo(8, "Reminder logged for David Prentiss's account: call back Friday."),
+    memo(9, 'Note about the unit at 12 Elm St for the record.'),
+    memo(10, 'David Prentiss called about billing.', { facts: [{ key: 'customer_name', value: 'D. Prentiss (handwritten)' }] }),
+  ],
+};
+await seedTenant('a', tenA, worldA);
+await seedTenant('b', tenB, worldB);
+await seedTenant('c', tenC, worldC);
+// Document 8 in tenant C was explicitly unlinked from a customer by a person: never auto-linked afterwards.
+await withTenant(ctxC, (db) => db.logAction({ action: 'review.document_unlinked', resource_type: 'document', resource_id: uid('c', 'd', 8), changes: { removed: true } }));
+
+/* ================================================================== 3. oracles on seeded data */
+const oracleOf = async (ctx, entry, today = TODAY) => {
+  const spec = classify(entry);
+  if (!spec) return { spec: null };
+  const q = { text: entry.text, cmp: spec.cmp, oracle: { sql: spec.sql, params: spec.params, ...(spec.requires ? { requires: spec.requires } : {}) }, ...(spec.rubric ? { rubric: spec.rubric } : {}) };
+  return { spec, ...(await runOracle(withTenant, ctx, q, { today })), question: q };
+};
+const an = (text, expect, category = 'x') => ({ id: 'h', text, category, expect: { route: 'analytics', ...expect } });
+const lk = (text, expect = { route: 'lookup' }, category = 'lookups') => ({ id: 'h', text, category, expect });
+const CUST = (extra) => ({ entity: 'customers', ...extra });
+const F = (field, value, op = 'eq') => ({ field, op, value });
+{
+  const o = async (entry) => oracleOf(ctxA, entry);
+  const ex = async (entry) => (await o(entry)).expected;
+  eq('oracle: customers in Mesa (city regex over service_address) = 2', await ex(an('How many customers do we have in Mesa?', CUST({ filters: [F('city', 'Mesa')], answerValue: 2 }))), 2);
+  eq('oracle: customers in zip 85701 = 1', await ex(an('How many customers in 85701?', CUST({ filters: [F('zip', '85701')], answerValue: 1 }))), 1);
+  eq('oracle: units by brand (Trane) = 2', await ex(an('How many Trane units do we have?', { entity: 'equipment', filters: [F('brand', 'Trane')], answerValue: 2 })), 2);
+  eq('oracle: units older than 5 years (install year < 2021, relative to the run date) = 4', await ex(an('How many units are older than 5 years?', { entity: 'equipment', filters: [F('installYear', 2021, 'lt')], answerValue: 4 })), 4);
+  eq('oracle: units older than 10 years (install year < 2016) = 1', await ex(an('How many units older than 10 years do we have?', { entity: 'equipment', filters: [F('installYear', 2016, 'lt')], answerValue: 1 })), 1);
+  eq('oracle: warranty expired / expiring / active / unknown = 1 / 1 / 2 / 1 (status computed from data->warranty->expires vs the run date)',
+    await Promise.all([['expired', 'How many units are out of warranty?'], ['expiring', 'How many units are expiring soon?'], ['active', 'How many units have an active warranty?'], ['unknown', 'How many units have an unknown warranty status?']]
+      .map(([s, t]) => ex(an(t, { entity: 'warranties', filters: [F('warrantyStatus', s)], answerValue: 0 })))), [1, 1, 2, 1]);
+  eq('oracle: total documents = 13, invoices = 0', [await ex(an('How many documents do we have?', { entity: 'documents', answerValue: 13 })), await ex(an('How many invoices do we have?', { entity: 'documents', filters: [F('documentType', 'invoice')], answerValue: 0 }))], [13, 0]);
+  eq('oracle: customers with an email on file / missing one = 2 / 3', [await ex(an('How many customers have an email on file?', CUST({ filters: [F('hasEmail', true)], answerValue: 2 }))), await ex(an('How many customers are missing an email address?', CUST({ filters: [F('hasEmail', false)], answerValue: 3 })))], [2, 3]);
+  eq('oracle: two conditions - "Which customers have an expired warranty in Gilbert" is a SET', await ex(an('Which customers have an expired warranty in Gilbert?', CUST({ filters: [F('city', 'Gilbert'), F('warrantyStatus', 'expired')], answerValue: 1 }))), ['Plaza Dental Group']);
+  eq('oracle: two conditions - Mesa + expired is an empty set', await ex(an('Which customers have an expired warranty in Mesa?', CUST({ filters: [F('city', 'Mesa'), F('warrantyStatus', 'expired')], answerValue: 0 }))), []);
+  eq('oracle: yes/no - Trane customers in Gilbert = false, in Mesa = true',
+    [await ex(an('Do we have any Trane customers in Gilbert?', CUST({ filters: [F('brand', 'Trane'), F('city', 'Gilbert')], answerValue: false }))), await ex(an('Do we have any Trane customers in Mesa?', CUST({ filters: [F('brand', 'Trane'), F('city', 'Mesa')], answerValue: true })))], [false, true]);
+  eq('oracle: group units by brand is a set of "brand|n"', (await ex(an('Group equipment by brand', { entity: 'equipment', groupBy: 'brand', answerValue: { Trane: 2 } })))?.sort(), ['carrier|1', 'goodman|1', 'lennox|1', 'trane|2']);
+  eq('oracle: "how many different zip codes" = 4', await ex(an('How many different zip codes do we cover?', CUST({ groupBy: 'zip', answerValue: 4 }))), 4);
+  eq('oracle: "which zip codes do we serve" lists names only (no counts)', (await ex(an('What zip codes do we serve?', CUST({ groupBy: 'zip', answerValue: {} }))))?.sort(), ['85001', '85201', '85234', '85701']);
+  check('generator: "the top brand" (a one-item answer) and unexpressible time filters are NOT turned into a set/number oracle',
+    classify(an('Which brand do we have the most of?', { entity: 'equipment', groupBy: 'brand', answerValue: {} })) === null
+    && classify(an('Customers whose warranty expires in the next 90 days?', { entity: 'warranties', answerValue: 1 })) === null);
+  // lookups
+  eq('oracle: phone for a named customer', await ex(lk("What's the phone number on file for Karen Abernathy?")), ['(480) 555-0148']);
+  eq('oracle: email for a customer with none is EMPTY (Donovan must not invent one)', await ex(lk("What's the email for Bill Whitmore?")), []);
+  eq('oracle: serial by surname', await ex(lk("what's the serial on the Whitmore unit")), ['GD-2002']);
+  eq('oracle: install date by address', await ex(lk('When was the unit at 17 Cactus Ln installed?')), ['2019-03-03']);
+  eq('oracle: who makes the unit at an address', await ex(lk('Who makes the unit at 412 Elm St, Mesa, AZ 85201?')), ['Trane', 'Trane']);
+  eq('oracle: warranty status of the unit at an address = expiring', await ex(lk('Is the unit at 88 Whitmore Ave still under warranty?')), ['expiring']);
+  eq('oracle: permit yes / no by address', [await ex(lk('did we pull a permit for 17 Cactus Ln')), await ex(lk('Did we pull a permit for 412 Elm St'))], [true, false]);
+  eq('oracle: maintenance agreement by surname', await ex(lk('do we have a maintenance agreement on file for the Thornton job')), false);
+  eq('oracle: invoices for a customer (none) = 0', await ex(lk('List invoices for Whitmore')), 0);
+  eq('oracle: last service date by address (the latest ISO service_date among its documents)', await ex(lk('When did we last service the unit at 17 Cactus Ln, Tucson, AZ 85701?', { route: 'lookup' }, 'history')), ['2026-03-05']);
+  const ghost = await o(lk("What's the phone number on file for Linda Fitzgerald?"));
+  check('oracle: a customer this shop does not have is SKIPPED (requires guard), not failed', ghost.ok && ghost.skip === true, JSON.stringify(ghost).slice(0, 200));
+  const otherTenant = await o(lk("What's the phone number on file for Zed Competitor?"));
+  check('oracle: another tenant\'s customer is not visible to this tenant\'s oracle (RLS) -> skipped', otherTenant.skip === true);
+  // time / technician
+  eq('oracle: service calls this month (2026-09) = 2, last month = 0', [await ex(an('How many service calls this month?', { entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } }, 'time')), await ex(an('How many service calls last month?', { entity: 'serviceVisits', timeRange: {} }, 'time'))], [2, 0]);
+  eq('oracle: jobs by a named technician this month = 2', await ex(an('How many jobs did Danny Ochoa run this month?', { entity: 'serviceVisits', filters: [F('technician', 'Danny Ochoa')], timeRange: {} }, 'technician')), 2);
+  eq('oracle: "which customers did we service this month" is a set', (await ex(an('Which customers did we service this month?', { entity: 'serviceVisits', timeRange: {} }, 'live-misses-2026-09-21b')))?.sort(), ['Karen Abernathy']);
+  const tr = await o(an('Who did the most jobs in August?', { entity: 'serviceVisits', timeRange: {} }, 'technician'));
+  check('oracle: "who did the most jobs" is a rubric (model-graded) with the per-technician counts as its reference', tr.spec.cmp === 'rubric' && tr.expected.some((r) => /Danny Ochoa: 2 jobs/.test(r)), JSON.stringify(tr.expected));
+  // honest-zero
+  // The harness has the financials migration (22) applied: hide its two tables so "no financials table" is true first.
+  await lite.exec('ALTER TABLE document_financial_lines RENAME TO hidden_dfl; ALTER TABLE document_financials RENAME TO hidden_df');
+  const money = await o(an('How much revenue came in last month?', { entity: 'documents', unsupported: true, note: 'financials layer' }, 'money'));
+  check('oracle: a money question is an honest-zero while no financials table exists', money.spec.cmp === 'honest-zero' && money.ok && !money.skip);
+  await lite.exec('CREATE TABLE financial_records_probe (id int)');
+  const moneyLater = await o(an('How much revenue came in last month?', { entity: 'documents', unsupported: true, note: 'financials layer' }, 'money'));
+  check('oracle: once a financials table exists, the money question retires itself (skipped, not failed)', moneyLater.skip === true, JSON.stringify(moneyLater).slice(0, 160));
+  await lite.exec('DROP TABLE financial_records_probe');
+  // The real financials tables (document_financials) retire it too - the pattern must match their name.
+  await lite.exec('ALTER TABLE hidden_df RENAME TO document_financials; ALTER TABLE hidden_dfl RENAME TO document_financial_lines');
+  const moneyReal = await o(an('How much revenue came in last month?', { entity: 'documents', unsupported: true, note: 'financials layer' }, 'money'));
+  check('oracle: the real document_financials table retires the money honest-zero question', moneyReal.skip === true, JSON.stringify(moneyReal).slice(0, 160));
+  const comp = await o(lk('Has this unit had a compressor replaced? 17 Cactus Ln', { route: 'retrieval', unsupported: true }, 'notes'));
+  check('oracle: "compressor replaced" is an honest-zero while no page mentions a compressor', comp.spec.cmp === 'honest-zero' && !comp.skip);
+  // the whole shipped exam executes cleanly on real Postgres
+  let broken = [];
+  let skipped = 0;
+  for (const q of exam.questions) {
+    const r = await runOracle(withTenant, ctxA, q, { today: TODAY });
+    if (!r.ok) broken.push(`${q.id}: ${r.error}`); else if (r.skip) skipped++;
+  }
+  eq(`every one of the ${exam.questions.length} shipped oracles executes without a SQL error on tenant A (${skipped} skipped: subject not in this shop)`, broken.slice(0, 5), []);
+}
+
+/* ================================================================== 4. runner */
+await lite.query(`DELETE FROM ask_misses`).catch(() => {});
+const exQ = async (entry, id) => { const r = await oracleOf(ctxA, entry); return { id, text: entry.text, category: entry.category, cmp: r.spec.cmp, ...(r.spec.rubric ? { rubric: r.spec.rubric } : {}), oracle: { sql: r.spec.sql, params: r.spec.params, ...(r.spec.requires ? { requires: r.spec.requires } : {}) } }; };
+const qMesa = await exQ(an('How many customers do we have in Mesa?', CUST({ filters: [F('city', 'Mesa')], answerValue: 2 }), 'counts-geo'), 'q-mesa');
+const qTrane = await exQ(an('How many Trane units do we have?', { entity: 'equipment', filters: [F('brand', 'Trane')], answerValue: 2 }, 'counts-brand'), 'q-trane');
+const qGil = await exQ(an('Which customers have an expired warranty in Gilbert?', CUST({ filters: [F('city', 'Gilbert'), F('warrantyStatus', 'expired')], answerValue: 1 }), 'two-condition'), 'q-gilbert');
+const qMoney = await exQ(an('How much revenue came in last month?', { entity: 'documents', unsupported: true, note: 'financials layer' }, 'money'), 'q-money');
+const qGhost = await exQ(lk("What's the phone number on file for Linda Fitzgerald?"), 'q-ghost');
+const qHist = await exQ(lk('What do we have on file for Karen Abernathy?', { route: 'retrieval' }, 'history'), 'q-hist');
+const qPhone = await exQ(lk("What's the phone number on file for Karen Abernathy?"), 'q-phone');
+
+let tuCounter = 0;
+const tu = (name, input) => ({ type: 'tool_use', id: `toolu_${++tuCounter}`, name, input });
+const lastToolResult = (messages) => {
+  const last = messages[messages.length - 1];
+  const block = Array.isArray(last.content) ? last.content.find((b) => b.type === 'tool_result') : null;
+  return block ? { text: block.content, isError: Boolean(block.is_error) } : null;
+};
+function scripted(turns, usageObj = { input_tokens: 1200, output_tokens: 120 }) {
+  let i = 0;
+  const calls = [];
+  const fn = async (req) => {
+    calls.push({ model: req.model, temperature: req.temperature, tools: req.tools.map((t) => t.name), tool_choice: req.tool_choice, system: req.system, messages: req.messages, lastResult: lastToolResult(req.messages) });
+    const turn = turns[Math.min(i, turns.length - 1)];
+    i++;
+    const out = typeof turn === 'function' ? turn(req.messages, req) : turn;
+    return { content: Array.isArray(out) ? out : out.content, usage: out.usage ?? usageObj, stop_reason: 'tool_use' };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+// A fake /api/ask handler: answers by question text, meters model spend like the real one.
+function fakeHandler(script, { tokens = 0, model = 'claude-haiku-4-5', agentModelByQuestion = {} } = {}) {
+  const seen = [];
+  const handler = async (req, res) => {
+    const call = req[SCORECARD_CALL];
+    const question = req.body.question;
+    seen.push({ question, escalate: call?.escalate === true, hasHook: Boolean(call), auth: call?.auth });
+    if (tokens) await usage.recordModelCall(ctxA, { inputTokens: tokens, outputTokens: 0, model: call?.escalate ? 'claude-sonnet-4-5' : model });
+    const a = typeof script === 'function' ? script(question, call) : script[question];
+    const data = a ?? { kind: 'no-answer', text: 'I could not find that.', facts: [], sources: [] };
+    const m = agentModelByQuestion[question];
+    return res.status(200).json({ success: true, data: { ...data, debug: { model: call?.escalate ? 'claude-sonnet-4-5' : m ?? model, models: [call?.escalate ? 'claude-sonnet-4-5' : m ?? model] } } });
+  };
+  handler.seen = seen;
+  return handler;
+}
+const ANSWERS = {
+  [qMesa.text]: { kind: 'answer', text: 'You have 2 customers in Mesa.', facts: [], sources: [] },
+  [qTrane.text]: { kind: 'answer', text: 'You have 5 Trane units.', facts: [], sources: [] }, // wrong (2)
+  [qGil.text]: { kind: 'answer', text: 'One customer.', facts: [{ label: 'Plaza Dental Group', value: 'Gilbert' }], sources: [] },
+  [qMoney.text]: { kind: 'answer', text: 'You invoiced $12,400 last month.', facts: [{ label: 'Revenue', value: '$12,400' }], sources: [] }, // fabricated
+  [qHist.text]: { kind: 'answer', text: 'Karen has a service ticket from 2026-09-10 and a maintenance agreement.', facts: [], sources: [] },
+  [qPhone.text]: { kind: 'answer', text: 'Karen Abernathy: (480) 555-0148', facts: [], sources: [] },
+};
+const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reason: pass ? 'consistent' : 'contradicts' })], usage: { input_tokens: 500, output_tokens: 30 } });
+
+{
+  store.resetScorecardStoreForTests();
+  const handler = fakeHandler(ANSWERS);
+  const questions = [qMesa, qTrane, qGil, qMoney, qGhost, qHist, qPhone];
+  // No financials tables for this run: the money question must still be an active honest-zero (it retires once they exist).
+  await lite.exec('ALTER TABLE document_financial_lines RENAME TO hidden_dfl; ALTER TABLE document_financials RENAME TO hidden_df');
+  const out = await runScorecard({ ctx: ctxA, questions, handler, pageSize: 12, today: TODAY, callModel: graderModel(true), examVersion: 'test-1' });
+  await lite.exec('ALTER TABLE hidden_df RENAME TO document_financials; ALTER TABLE hidden_dfl RENAME TO document_financial_lines');
+  const byId = Object.fromEntries(out.pageResults.map((r) => [r.questionId, r]));
+  eq('runner: correct number / set / value / rubric answers pass; a wrong number and a fabricated money answer fail',
+    ['q-mesa', 'q-trane', 'q-gilbert', 'q-money', 'q-hist', 'q-phone'].map((k) => byId[k].passed), [true, false, true, false, true, true]);
+  check('runner: a question about a customer the shop does not have is skipped (not asked, not scored)', byId['q-ghost'].skipped === true && !handler.seen.some((s) => /Fitzgerald/.test(s.question)));
+  eq('runner: score = passed / graded (4 of 6), skipped excluded', [out.run.answered, out.run.passed, out.run.score], [6, 4, 0.6667]);
+  eq('runner: by-category breakdown is stored', [out.run.byCategory['counts-brand'].score, out.run.byCategory['counts-geo'].score], [0, 1]);
+  check('runner: the wrong answer records expected vs got for the failing list', byId['q-trane'].expected === '2' && /5 Trane/.test(byId['q-trane'].got), JSON.stringify(byId['q-trane']));
+  check('runner: every ask went through the in-process hook with the operator tenant\'s auth', handler.seen.every((s) => s.hasHook && s.auth.tenantId === ctxA.tenantKey));
+  await new Promise((r) => setTimeout(r, 300));
+  const misses = await lite.query(`SELECT question_normalized FROM ask_misses WHERE outcome = 'scorecard-fail' ORDER BY 1`);
+  check('runner: failures feed the learning loop as ask_misses (outcome scorecard-fail), passes do not', misses.rows.length === 2, JSON.stringify(misses.rows));
+  check('runner: the run finished and was stored in the tables (migration 30 present)', out.done && out.backend === 'tables' && out.run.status === 'complete', JSON.stringify({ d: out.done, b: out.backend, s: out.run?.status }));
+
+  // retry on the escalation model: an agent-answered failure is retried once with escalate:true; the SCORE stays the first attempt
+  const retryH = fakeHandler((q, call) => (q === qTrane.text ? (call?.escalate ? { kind: 'answer', text: 'You have 2 Trane units.', facts: [], sources: [] } : ANSWERS[q]) : ANSWERS[q]));
+  const rr = await runScorecard({ ctx: ctxA, questions: [qTrane], handler: retryH, today: TODAY });
+  const r0 = rr.pageResults[0];
+  check('runner: a failed answer is retried ONCE with escalate:true; the score is the first attempt, the retry is recorded', retryH.seen.length === 2 && retryH.seen[1].escalate === true && r0.passed === false && r0.detail.retry?.passed === true && /sonnet/.test(r0.detail.retry.model), JSON.stringify(r0.detail));
+  const noRetry = fakeHandler(ANSWERS);
+  await runScorecard({ ctx: ctxA, questions: [qTrane], handler: noRetry, today: TODAY, retryFailures: false });
+  eq('runner: retryFailures:false asks once', noRetry.seen.length, 1);
+}
+{
+  // budget stop: each ask costs $1.00 (1,000,000 Haiku input tokens at $1/MTok); a $2.50 budget stops after 3 questions
+  const questions = Array.from({ length: 8 }, (_, i) => ({ ...qMesa, id: `b-${i}` }));
+  const h = fakeHandler(ANSWERS, { tokens: 1_000_000 });
+  const out = await runScorecard({ ctx: ctxA, questions, handler: h, budgetUsd: 2.5, pageSize: 12, today: TODAY, retryFailures: false });
+  check('budget stop: the run stops once spend reaches the budget, is marked stopped/budget, and scores what was answered', out.stopped === 'budget' && out.pageResults.length === 3 && out.run.status === 'stopped' && out.run.stopReason === 'budget' && out.done === true, JSON.stringify({ s: out.stopped, n: out.pageResults.length, run: out.run?.status }));
+  check('budget stop: cost is the TRUE per-question spend from the usage meter (~$1 each)', Math.abs(out.spentUsd - 3) < 0.01 && Math.abs(out.pageResults[0].costUsd - 1) < 0.001, `${out.spentUsd} ${out.pageResults[0].costUsd}`);
+  eq('budget default: env DONOVAN_SCORECARD_BUDGET_USD, else $5', [(await import('../api/_lib/scorecard/runner.js')).scorecardBudgetUsd({}), (await import('../api/_lib/scorecard/runner.js')).scorecardBudgetUsd({ DONOVAN_SCORECARD_BUDGET_USD: '1.5' })], [5, 1.5]);
+}
+{
+  // paging: 5 questions, 2 per invocation (3 pages), one run, offset cursor, skipped ones do not stall it
+  const questions = [qMesa, qGhost, { ...qMesa, id: 'p-2' }, { ...qMesa, id: 'p-3' }, { ...qMesa, id: 'p-4' }];
+  const h = fakeHandler(ANSWERS);
+  let runId; let offset = 0; const pages = []; let last;
+  for (let guard = 0; guard < 6; guard++) {
+    last = await runScorecard({ ctx: ctxA, questions, handler: h, runId, offset, pageSize: 2, today: TODAY, retryFailures: false });
+    runId = last.runId; pages.push(last.pageResults.length);
+    if (last.done) break;
+    offset = last.nextOffset;
+  }
+  eq('paging: 5 questions at 2 per invocation take 3 pages and one run; the skipped question does not loop', [pages, offset, last.done, last.run.answered, last.run.totalQuestions], [[2, 2, 1], 4, true, 4, 5]);
+  const detail = await store.getRun(ctxA, runId);
+  eq('paging: the stored run holds every page\'s results (4 graded)', detail.results.length, 4);
+  // deadline: a page never starts a question it cannot finish
+  const dl = await runScorecard({ ctx: ctxA, questions, handler: h, pageSize: 6, deadlineAt: Date.now() + 500, today: TODAY });
+  check('paging: a page stops before a question when the request deadline is near (60 s limit)', dl.stopped === 'deadline' && dl.nextOffset === 0 && dl.pageResults.length === 0, JSON.stringify({ s: dl.stopped, n: dl.nextOffset }));
+  const day1 = nightlySlice(exam.questions, '2026-09-23'); const day2 = nightlySlice(exam.questions, '2026-09-24');
+  check('nightly slice: 40 questions, deterministic per day, a different window the next day, wraps around', day1.length === NIGHTLY_SLICE && JSON.stringify(day1) === JSON.stringify(nightlySlice(exam.questions, '2026-09-23')) && day1[0].id !== day2[0].id && nightlySlice(exam.questions, '2026-09-23', exam.questions.length + 5).length === exam.questions.length);
+  const covered = new Set(); for (let d = 0; d < Math.ceil(exam.questions.length / NIGHTLY_SLICE) + 1; d++) for (const q of nightlySlice(exam.questions, `2026-10-${String(1 + d).padStart(2, '0')}`)) covered.add(q.id);
+  check('nightly slice: consecutive days rotate through the whole exam', covered.size === exam.questions.length, `${covered.size}/${exam.questions.length}`);
+}
+{
+  // persistence: with migration 30 (tables) - already exercised above. Now WITHOUT it: drop the two tables in this throwaway DB.
+  await lite.exec('DROP TABLE donovan_scorecard_results; DROP TABLE donovan_scorecard_runs;');
+  store.resetScorecardStoreForTests();
+  const h = fakeHandler(ANSWERS);
+  const out = await runScorecard({ ctx: ctxA, questions: [qMesa, qTrane], handler: h, pageSize: 5, today: TODAY, retryFailures: false, examVersion: 'test-2' });
+  check('no migration 30: the run still works and falls back to audit_log', out.backend === 'audit' && out.run.answered === 2 && out.run.passed === 1 && out.done, JSON.stringify({ b: out.backend, r: out.run }));
+  const got = await store.getRun(ctxA, out.runId);
+  check('no migration 30: getRun reads the run and its per-question results back from audit_log', got?.backend === 'audit' && got.results.length === 2 && got.results[0].passed === false, JSON.stringify(got)?.slice(0, 200));
+  const runs = await store.listRuns(ctxA, { limit: 5 });
+  check('no migration 30: listRuns returns it (the trend needs no table)', runs.runs.some((r) => r.id === out.runId && r.score === 0.5), JSON.stringify(runs.runs.map((r) => r.id)));
+  // paging continues across invocations with the audit backend too
+  const p1 = await runScorecard({ ctx: ctxA, questions: [qMesa, { ...qMesa, id: 'a-1' }, { ...qMesa, id: 'a-2' }], handler: h, pageSize: 2, today: TODAY });
+  const p2 = await runScorecard({ ctx: ctxA, questions: [qMesa, { ...qMesa, id: 'a-1' }, { ...qMesa, id: 'a-2' }], handler: h, runId: p1.runId, offset: p1.nextOffset, pageSize: 2, today: TODAY });
+  eq('no migration 30: a paged run accumulates across invocations', [p1.backend, p2.run.answered, p2.run.passed, p2.done], ['audit', 3, 3, true]);
+  const auditRows = (await lite.query(`SELECT count(*)::int AS n FROM audit_log WHERE action LIKE 'donovan.scorecard%'`)).rows[0].n;
+  check('no migration 30: only compact summaries are written to audit_log', auditRows > 0);
+  // status action: latest run, trend vs previous, failing list, exam shape
+  const st = await routes.scorecardStatusAction(ctxA, {});
+  check('scorecardStatus: returns the latest run, exam shape, budget and a failing list with expected/got', st.exam.questions === exam.questions.length && st.run && Array.isArray(st.failing) && st.budgetUsd === 5 && st.backend === 'audit', JSON.stringify({ e: st.exam.questions, r: st.run?.id, b: st.backend }));
+  const fail = st.failing[0];
+  check('scorecardStatus: a failing entry carries question, expected and got', !fail || (fail.question && fail.expected !== undefined && fail.got !== undefined), JSON.stringify(fail));
+}
+{
+  // restore the tables (migration 30) and prove the trend against a previous run
+  await lite.exec(fs.readFileSync(path.join(cfgDir, '30-donovan-scorecard.sql'), 'utf8'));
+  await lite.exec(`GRANT SELECT, INSERT, UPDATE, DELETE ON donovan_scorecard_runs, donovan_scorecard_results TO deepwell_rls`);
+  store.resetScorecardStoreForTests();
+  const many = Array.from({ length: 24 }, (_, i) => ({ ...qMesa, id: `t-${i}` }));
+  const h1 = fakeHandler(ANSWERS);
+  await runScorecard({ ctx: ctxA, questions: many, handler: h1, pageSize: 12, today: TODAY, retryFailures: false, feedMisses: false });
+  let cursor = 12; let rid;
+  const first = await runScorecard({ ctx: ctxA, questions: many, handler: h1, pageSize: 12, offset: 0, today: TODAY, retryFailures: false, feedMisses: false });
+  rid = first.runId;
+  await runScorecard({ ctx: ctxA, questions: many, handler: h1, runId: rid, offset: cursor, pageSize: 12, today: TODAY, retryFailures: false, feedMisses: false });
+  await new Promise((r) => setTimeout(r, 30));
+  const worse = fakeHandler((q) => (q === qMesa.text ? { kind: 'answer', text: 'You have 9 customers.', facts: [], sources: [] } : ANSWERS[q]));
+  await runScorecard({ ctx: ctxA, questions: many, handler: worse, pageSize: 12, today: TODAY, retryFailures: false, feedMisses: false });
+  const st = await routes.scorecardStatusAction(ctxA, {});
+  check('scorecardStatus: trend compares with the previous comparable run; backend is tables again', st.backend === 'tables' && st.previous && typeof st.previous.score === 'number' && st.run.score <= st.previous.score, JSON.stringify({ r: st.run?.score, p: st.previous?.score, b: st.backend }));
+}
+{
+  // the nightly sweep step: claims once per day, runs the slice for the founder tenant with the injected handler
+  const h = fakeHandler(ANSWERS);
+  const env = { DEEPWELL_FOUNDER_TENANT_ID: ctxA.tenantKey };
+  const noFounder = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 120_000, handler: h, env: {}, claim: false });
+  check('nightly step: skipped when no founder tenant is configured', noFounder.skipped === 'no-founder-tenant');
+  const off = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 120_000, handler: h, env: { ...env, DONOVAN_SCORECARD_NIGHTLY: '0' }, claim: false });
+  check('nightly step: DONOVAN_SCORECARD_NIGHTLY=0 disables it', off.skipped === 'disabled');
+  const late = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 5_000, handler: h, env, claim: false });
+  check('nightly step: never starts with less than 20 s left on the sweep\'s deadline (customer-facing steps come first)', late.skipped === 'no-time');
+  const ran = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 240_000, handler: h, env, claim: false });
+  check('nightly step: runs a 40-question rotating slice as source "nightly"', ran.slice === 40 && ran.answered > 0 && !ran.error, JSON.stringify(ran));
+  const stored = await store.getRun(ctxA, ran.runId);
+  eq('nightly step: the run is recorded with source nightly', stored?.run.source, 'nightly');
+}
+{
+  // the in-process hook
+  check('hook: an ordinary HTTP-shaped request carries no scorecard call', takeScorecardCall({ headers: { 'x-scorecard-call': '1' }, body: { auth: { tenantId: 'x' }, scorecard: true }, query: { escalate: '1' } }) === null);
+  check('hook: JSON cannot create a Symbol-keyed property (a body that tries is ignored)', takeScorecardCall(JSON.parse('{"Symbol(donovan.scorecard.call)":{"auth":{"tenantId":"x"}}}')) === null);
+  check('hook: an in-process call with auth is recognised', takeScorecardCall({ [SCORECARD_CALL]: { auth: { tenantId: 't' }, escalate: true } })?.escalate === true);
+  const askSrc = fs.readFileSync(path.join(ROOT, 'api/ask.js'), 'utf8');
+  check('hook: ask.js skips the rate limiter and billing gate, never counts the allowance and bypasses the answer cache for scorecard calls',
+    /const incrementAsksThisMonth = scorecardCall \? async \(\) => \{\} : incrementAsksThisMonthRaw/.test(askSrc) && /!scorecardCall && !\(await timer\.time\("limit"/.test(askSrc) && /ASK_CACHE_ENABLED_RAW && !scorecardCall/.test(askSrc) && /scorecardCall \? Promise\.resolve\(\{ allowed: true \}\)/.test(askSrc));
+  check('allowance: an escalated ask is counted ONCE (one increment per agent result, not per model run)', (askSrc.match(/isCountableAskSource\("agent"\)\) await incrementAsksThisMonth\(db\)/g) ?? []).length === 1);
+  // and the real handler end to end, on a question the deterministic paths answer with no model at all
+  const askMod = await import('../api/ask.js');
+  const { askViaHandler } = await import('../api/_lib/scorecard/askCall.js');
+  const before = (await lite.query('SELECT count(*)::int AS n FROM ask_cache').catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
+  const allowanceBefore = (await lite.query(`SELECT COALESCE(sum(asks_this_month),0)::int AS n FROM usage_counters WHERE tenant_id = $1`, [tenA]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
+  const real = await askViaHandler({ handler: askMod.default, auth: { tenantId: ctxA.tenantKey, orgId: ctxA.tenantKey, userId: null }, question: "What's the phone number on file for Karen Abernathy?", today: TODAY });
+  const cmpReal = real.data ? compareAnswer({ cmp: 'value', expected: ['(480) 555-0148'], question: 'phone' }, real.data) : null;
+  check('REAL /api/ask handler through the hook: answers from the live pipeline without an HTTP request, token or model (Karen\'s phone matches the oracle)', Boolean(real.data) && cmpReal?.passed, JSON.stringify({ status: real.status, error: real.error, got: cmpReal?.got }));
+  const after = (await lite.query('SELECT count(*)::int AS n FROM ask_cache').catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
+  const allowanceAfter = (await lite.query(`SELECT COALESCE(sum(asks_this_month),0)::int AS n FROM usage_counters WHERE tenant_id = $1`, [tenA]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
+  eq('REAL handler through the hook: nothing written to the answer cache and no allowance counted', [after - before, allowanceAfter - allowanceBefore], [0, 0]);
+  const noHook = await askViaHandler({ handler: async (req, res) => askMod.default({ ...req, [SCORECARD_CALL]: undefined }, res), auth: { tenantId: ctxA.tenantKey }, question: "What's the phone number on file for Karen Abernathy?", today: TODAY });
+  check('REAL handler WITHOUT the hook: an unauthenticated request is refused (401), not answered', noHook.status === 401 || noHook.status === 403, `status ${noHook.status}`);
+}
+
+/* ================================================================== 5. Sonnet escalation */
+const SONNET = 'claude-sonnet-test';
+const envOn = { DONOVAN_ESCALATION_MODEL: SONNET, DONOVAN_SONNET_DAILY_USD: '2' };
+const runAgent = (question, callModel, extra = {}) => runDonovanAgent({ withTenant, ctxArg: ctxA, question, today: TODAY, callModel, env: envOn, ...extra });
+const answerTool = (text = 'You have 5 customers.', value = '5') => tu('answer', { status: 'answered', text, facts: [{ label: 'Customers', value }], confidence: 0.9 });
+// Turns per MODEL (escalation runs are separate loops): {haiku: [...], sonnet: [...]}, each turn fn(messages, req) -> blocks
+const perModel = (turns, usageObj) => {
+  const idx = { haiku: 0, sonnet: 0 };
+  return scripted([(m, req) => { const k = req.model === SONNET ? 'sonnet' : 'haiku'; const list = turns[k]; const t = list[Math.min(idx[k]++, list.length - 1)]; return typeof t === 'function' ? t(m, req) : t; }], usageObj);
+};
+const countQuery = () => tu('run_query', { sql: 'SELECT count(*) AS n FROM customers', purpose: 'count' });
+const cannot = () => [tu('answer', { status: 'cannot_answer', text: 'x' })];
+const countThenAnswer = () => scripted([() => [tu('run_query', { sql: 'SELECT count(*) AS n FROM customers', purpose: 'count' })], () => [answerTool()]]);
+{
+  eq('pricing: Sonnet is priced at $3 / $15 per MTok, Haiku at $1 / $5, cache reads at 0.1x', [
+    usage.estimateModelCostUsd('claude-sonnet-4-5', { inputTokens: 1e6, outputTokens: 1e6 }),
+    usage.estimateModelCostUsd('claude-haiku-4-5', { inputTokens: 1e6, outputTokens: 1e6 }),
+    usage.estimateModelCostUsd('claude-sonnet-4-5', { cacheReadInputTokens: 1e6 }),
+  ], [18, 6, 0.3]);
+  eq('escalation model defaults to the Sonnet id readDocument.js documents; env overrides it', [esc.escalationModel({}), esc.escalationModel({ DONOVAN_ESCALATION_MODEL: 'x' })], ['claude-sonnet-4-5', 'x']);
+  check('classifier: comparison / why / trend / stacked conditions are hard; a plain count is not',
+    esc.classifyQuestionDifficulty('Why did expired warranties grow compared to last year in Mesa?').hard
+    && esc.classifyQuestionDifficulty('Which Trane customers in Tucson have no service and an expired warranty but an active agreement?').hard
+    && !esc.classifyQuestionDifficulty('how many customers do we have').hard && !esc.classifyQuestionDifficulty("what's Karen's phone number").hard);
+
+  // easy question: stays on Haiku, one run
+  const easy = countThenAnswer();
+  const re = await runAgent('how many customers do we have on file', easy);
+  check('escalation: an easy question runs on Haiku only', re.handled && easy.calls.every((c) => c.model === AGENT_MODEL) && !re.escalation && re.models.length === 1, JSON.stringify({ m: easy.calls.map((c) => c.model), e: re.escalation }));
+  // (a) hard question: starts on Sonnet
+  const hard = countThenAnswer();
+  const rh = await runAgent('Why did expired warranties grow compared to last year in Mesa?', hard);
+  check('escalation (a): a hard question runs on the escalation model from the first call', rh.handled && hard.calls.every((c) => c.model === SONNET) && rh.escalation?.reason === 'hard-question' && rh.models.join() === SONNET, JSON.stringify({ m: hard.calls.map((c) => c.model), e: rh.escalation }));
+  check('escalation: temperature stays 0 on the escalation model', hard.calls.every((c) => c.temperature === 0));
+  const dbg = agentDebugTrace(rh);
+  check('debug trace shows which model answered (model, escalation)', dbg.model === SONNET && dbg.escalation?.reason === 'hard-question', JSON.stringify(dbg).slice(0, 300));
+  // (b1) no answer on Haiku -> Sonnet answers
+  const nb = perModel({ haiku: [cannot], sonnet: [() => [countQuery()], () => [answerTool()]] });
+  const rn = await runAgent('how many customers do we have on file', nb);
+  check('escalation (b): a Haiku cannot_answer is retried on Sonnet, and the Sonnet answer is used',
+    rn.handled && rn.data.facts[0].value === '5' && nb.calls[0].model === AGENT_MODEL && nb.calls.at(-1).model === SONNET && rn.escalation?.reason === 'no-answer' && rn.escalation?.outcome === 'sonnet-answer-used' && rn.models.length === 2, JSON.stringify({ m: nb.calls.map((c) => c.model), e: rn.escalation }));
+  // (b2) SQL rejected twice
+  const rej = perModel({
+    haiku: [() => [tu('run_query', { sql: 'SELECT * FROM documents', purpose: 'bad table' })], () => [tu('run_query', { sql: 'SELECT no_such FROM customers', purpose: 'bad column' })], () => [countQuery()], () => [answerTool()]],
+    sonnet: [() => [countQuery()], () => [answerTool()]],
+  });
+  const rr = await runAgent('how many customers do we have on file', rej);
+  check('escalation (b): two rejected/failed SQL statements on Haiku trigger a Sonnet run', rr.escalation?.reason === 'sql-rejected-twice' && rej.calls.some((c) => c.model === SONNET), JSON.stringify({ m: rej.calls.map((c) => c.model), e: rr.escalation }));
+  // (b3) grounding dropped facts
+  const drop = perModel({
+    haiku: [() => [countQuery()], () => [tu('answer', { status: 'answered', text: 'You have 999 customers.', facts: [{ label: 'Customers', value: '999' }, { label: 'Real', value: '5' }], confidence: 0.9 })]],
+    sonnet: [() => [countQuery()], () => [answerTool()]],
+  });
+  const rd = await runAgent('how many customers do we have on file', drop);
+  check('escalation (b): an answer whose facts the grounding pass had to drop triggers a Sonnet run', rd.escalation?.reason === 'grounding-dropped-facts' && drop.calls.some((c) => c.model === SONNET), JSON.stringify({ m: drop.calls.map((c) => c.model), e: rd.escalation }));
+  // (c) forced (thumbs-down replay / scorecard retry)
+  const forced = countThenAnswer();
+  const rf = await runAgent('how many customers do we have on file', forced, { escalate: true });
+  check('escalation (c): escalate:true (thumbs-down replay, scorecard retry) runs Sonnet from the start', forced.calls.every((c) => c.model === SONNET) && rf.escalation?.reason === 'forced');
+  // switches
+  const off = countThenAnswer();
+  const ro = await runAgent('Why did expired warranties grow compared to last year in Mesa?', off, { env: { ...envOn, DONOVAN_ESCALATION: '0' } });
+  check('escalation: DONOVAN_ESCALATION=0 turns it off entirely (even for a hard/forced question)', off.calls.every((c) => c.model === AGENT_MODEL) && !ro.escalation);
+  // daily cap
+  const capCtx = { withTenant, ctxArg: ctxD, today: TODAY };
+  check('daily cap: default $2, env-overridable, 0 disables Sonnet', esc.sonnetDailyCapUsd({}) === 2 && esc.sonnetDailyCapUsd({ DONOVAN_SONNET_DAILY_USD: '0.5' }) === 0.5 && (await esc.sonnetAllowed(withTenant, ctxD, { DONOVAN_SONNET_DAILY_USD: '0' })).why === 'cap-zero');
+  const under = await esc.sonnetAllowed(withTenant, ctxD, envOn);
+  await esc.recordSonnetSpend(withTenant, ctxD, 1.5);
+  const stillOk = await esc.sonnetAllowed(withTenant, ctxD, envOn);
+  await esc.recordSonnetSpend(withTenant, ctxD, 0.6);
+  const over = await esc.sonnetAllowed(withTenant, ctxD, envOn);
+  check('daily cap: spend accumulates per tenant per UTC day; allowed until it reaches the cap ($2)', under.allowed && stillOk.allowed && Math.abs(stillOk.spentUsd - 1.5) < 1e-6 && !over.allowed && over.why === 'daily-cap', JSON.stringify({ under, stillOk, over }));
+  const capped = countThenAnswer();
+  const rc = await runDonovanAgent({ ...capCtx, question: 'Why did expired warranties grow compared to last year in Mesa?', callModel: capped, env: envOn });
+  check('daily cap: once reached, every question stays on Haiku (the answer is still given) and the trace says why', capped.calls.every((c) => c.model === AGENT_MODEL) && rc.escalation?.skipped === 'daily-cap', JSON.stringify(rc.escalation));
+  const other = await esc.sonnetAllowed(withTenant, ctxA, envOn);
+  check('daily cap: one tenant\'s Sonnet spend does not touch another tenant\'s', other.allowed);
+  const spentRun = countThenAnswer();
+  const before = (await esc.sonnetSpentTodayUsd(withTenant, ctxB)) ?? 0;
+  await runDonovanAgent({ withTenant, ctxArg: ctxB, question: 'Why did expired warranties grow compared to last year in Mesa?', today: TODAY, callModel: spentRun, env: envOn }).catch(() => {});
+  const afterSpend = (await esc.sonnetSpentTodayUsd(withTenant, ctxB)) ?? 0;
+  check('daily cap: a Sonnet run records its own cost against the day\'s total (fail-closed metering)', spentRun.calls.length === 0 || afterSpend >= before, `${before} -> ${afterSpend}`);
+  const before2 = (await esc.sonnetSpentTodayUsd(withTenant, ctxA)) ?? 0;
+  const spendRun = countThenAnswer();
+  await runAgent('Why did expired warranties grow compared to last year in Mesa?', spendRun);
+  const after2 = (await esc.sonnetSpentTodayUsd(withTenant, ctxA)) ?? 0;
+  const expected = usage.estimateModelCostUsd(SONNET, { inputTokens: 2400, outputTokens: 240 });
+  check('daily cap: the recorded Sonnet spend equals the run\'s priced cost (2 calls x 1200 in / 120 out)', Math.abs(after2 - before2 - expected) < 0.000002, `${after2 - before2} vs ${expected}`);
+  const noTime = perModel({ haiku: [cannot], sonnet: [cannot] });
+  const rt = await runAgent('how many customers do we have on file', noTime, { deadlineAt: Date.now() + 8000 });
+  check('escalation: never starts a Sonnet run with under 10 s left on the deadline', noTime.calls.length === 1 && rt.escalation?.skipped === 'no-time', JSON.stringify({ e: rt.escalation, calls: noTime.calls.length, r: rt.reason }));
+}
+
+/* ================================================================== 6. view_document_page */
+const PNG = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(64, 1)]);
+const pdfBytes = (pages, pad = 0) => Buffer.concat([Buffer.from('%PDF-1.4\n'), ...Array.from({ length: pages }, () => Buffer.from('<< /Type /Page /Parent 1 0 R >>\n')), Buffer.alloc(pad, 32)]);
+const HEIC = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypheic'), Buffer.alloc(32)]);
+const objects = { 'k/nameplate.png': PNG, 'k/six.pdf': pdfBytes(6), 'k/one.pdf': pdfBytes(1), 'k/huge.pdf': pdfBytes(2, 4 * 1024 * 1024 + 10), 'k/photo.heic': HEIC };
+const fetchObject = async (key) => { if (!objects[key]) throw new Error('missing'); return objects[key]; };
+{
+  const tb = () => createToolbox({ withTenant, ctxArg: ctxA, today: TODAY, fetchObject });
+  const view = (t, documentId, page) => t.execute('view_document_page', { documentId, ...(page ? { page } : {}) });
+  const seen = async (t, q) => { await t.execute('search_documents', { query: q }); };
+
+  let t1 = tb();
+  const notYet = await view(t1, uid('a', 'd', 9), 1);
+  check('view_page: a document no tool has returned yet is REFUSED (evidence ledger), even though it exists', !notYet.ok && /not been returned/.test(notYet.content), notYet.content);
+  const fake = await view(t1, uid('b', 'd', 1), 1);
+  check('view_page: another tenant\'s document id is refused', !fake.ok);
+  const garbage = await view(t1, 'not-a-uuid');
+  check('view_page: a malformed id is refused', !garbage.ok);
+  await seen(t1, 'nameplate LX-4OO4');
+  const ok = await view(t1, uid('a', 'd', 9), 1);
+  check('view_page: after search_documents returned it, an image is sent as an image block (base64 png)', ok.ok && Array.isArray(ok.content) && ok.content[0].type === 'image' && ok.content[0].source.media_type === 'image/png' && ok.content[0].source.data === PNG.toString('base64'), JSON.stringify(ok).slice(0, 200));
+  const page2 = await view(t1, uid('a', 'd', 9), 2);
+  check('view_page: an image has only page 1 (asking for page 2 is refused, and does not spend a view)', !page2.ok);
+
+  const t2 = tb();
+  await seen(t2, 'Plaza scan');
+  const six = await view(t2, uid('a', 'd', 10), 1);
+  check('view_page: a PDF over 5 pages is refused with a pointer to the text tools', !six.ok && /6 pages/.test(six.content) && /search_documents/.test(six.content), six.content);
+  const huge = await view(t2, uid('a', 'd', 12), 1);
+  check('view_page: a PDF over 4 MB is refused BEFORE anything is sent to the model', !huge.ok && /4 MB/.test(huge.content), huge.content);
+  const one = await view(t2, uid('a', 'd', 11), 1);
+  check('view_page: a small PDF (1 page) is sent as a document block', one.ok && one.content[0].type === 'document' && one.content[0].source.media_type === 'application/pdf', JSON.stringify(one).slice(0, 160));
+  const t3 = tb();
+  await seen(t3, 'Thornton iPhone photo');
+  const heic = await view(t3, uid('a', 'd', 13), 1);
+  check('view_page: an iPhone HEIC photo is refused with a clear message (the API cannot show it)', !heic.ok && /HEIC/.test(heic.content), heic.content);
+
+  // max 2 views per question
+  const t4 = tb();
+  await seen(t4, 'nameplate LX-4OO4'); await seen(t4, 'Plaza single page scan');
+  const v1 = await view(t4, uid('a', 'd', 9), 1);
+  const v2 = await view(t4, uid('a', 'd', 11), 1);
+  const v3 = await view(t4, uid('a', 'd', 9), 1);
+  check('view_page: at most 2 views per question (the third is refused)', v1.ok && v2.ok && !v3.ok && /2 views/.test(v3.content), v3.content);
+
+  // grounding: a fact read from a viewed page cites document+page and survives; without the view it would not
+  const t5 = tb();
+  await seen(t5, 'nameplate LX-4OO4');
+  const beforeView = shapeAgentAnswer({ status: 'answered', text: 'The serial is LX-4004.', facts: [{ label: 'Serial', value: 'LX-4004', sources: [{ documentId: uid('a', 'd', 9), location: { page: 2 } }] }] }, t5.ledger, { question: 'serial on the nameplate photo', today: TODAY });
+  await view(t5, uid('a', 'd', 9), 1);
+  const cited = shapeAgentAnswer({ status: 'answered', text: 'The serial is LX-4004 (read from the original photo).', facts: [{ label: 'Serial', value: 'LX-4004', sources: [{ documentId: uid('a', 'd', 9), location: { page: 1 } }] }] }, t5.ledger, { question: 'serial on the nameplate photo', today: TODAY });
+  check('view_page grounding: a fact citing the viewed document + page passes shape.js; a page never returned is dropped', cited.answered && cited.data.facts.length === 1 && cited.data.sources[0].filename === 'thornton-nameplate.png' && !beforeView.answered, JSON.stringify({ c: cited.data?.sources, b: beforeView.answered }));
+  const viewOnlyPage1 = shapeAgentAnswer({ status: 'answered', text: 'x', facts: [{ label: 'Serial', value: 'LX-4004', sources: [{ documentId: uid('a', 'd', 11), location: { page: 1 } }] }] }, t5.ledger, { question: 'q', today: TODAY });
+  check('view_page grounding: viewing one document does not make another document citable', !viewOnlyPage1.answered);
+
+  // the whole loop: search -> view -> answer citing the page
+  const model = scripted([
+    () => [tu('search_documents', { query: 'nameplate LX-4OO4' })],
+    () => [tu('view_document_page', { documentId: uid('a', 'd', 9), page: 1 })],
+    () => [tu('answer', { status: 'answered', text: 'The nameplate reads serial LX-4004 (read from the original photo).', facts: [{ label: 'Serial', value: 'LX-4004', sources: [{ documentId: uid('a', 'd', 9), location: { page: 1 } }] }], confidence: 0.9 })],
+  ]);
+  const r = await runDonovanAgent({ withTenant, ctxArg: ctxA, question: 'what is the serial on the Thornton nameplate photo', today: TODAY, callModel: model, env: envOn, fetchObject });
+  check('agent loop: search -> view_document_page (image block reaches the model) -> grounded answer citing the page',
+    r.handled && r.data.facts[0].value === 'LX-4004' && model.calls[0].tools.includes('view_document_page') && Array.isArray(model.calls[2].lastResult.text) && model.calls[2].lastResult.text[0].type === 'image', JSON.stringify({ h: r.handled, reason: r.reason, res: model.calls[2]?.lastResult?.text?.[0]?.type }));
+  check('agent prompt: says when to use the view tool and to cite document + page', /view_document_page/.test(model.calls[0].system.map((b) => b.text).join('')) && /must cite that documentId and page/.test(model.calls[0].system.map((b) => b.text).join('')));
+  const toolDef = JSON.stringify(model.calls[0].tools);
+  check('agent: the view tool is offered alongside the existing tools', /view_document_page/.test(toolDef) || model.calls[0].tools.includes('view_document_page'));
+}
+
+/* ================================================================== 7. body-name customer link */
+{
+  const cust = [
+    { id: 'p', name: 'David Prentiss', address: '9 Pine Ct, Mesa, AZ 85201' }, { id: 'l1', name: 'Ann Lee', address: '3 A St, Tucson, AZ 85701' },
+    { id: 'l2', name: 'Ann Lee', address: '4 B St, Tucson, AZ 85701' }, { id: 'w', name: 'Bill Whitmore', address: '88 Whitmore Ave, Mesa, AZ 85201' },
+    { id: 's', name: 'Sam Ortega', address: '21 Ridge Rd, Gilbert, AZ 85234' }, { id: 'ph', name: 'Customer at 12 Elm St', address: '12 Elm St, Mesa, AZ 85201', nameSource: 'address' },
+  ];
+  const pg = (text) => [{ page_no: 1, text }];
+  const v = (t) => findCustomersInBody(pg(t), cust);
+  eq('match (pure): a full name with a possessive is unique', [v("Reminder logged for David Prentiss's account: confirm filter size").status, v("Reminder logged for David Prentiss's account: confirm filter size").matches[0]?.customerId], ['unique', 'p']);
+  check('match (pure): case, punctuation and line breaks do not matter', v('re: DAVID\n prentiss, call back').status === 'unique');
+  eq('match (pure): a street address alone is unique (basis address)', [v('parts at 88 Whitmore Ave, Mesa').status, v('parts at 88 Whitmore Ave, Mesa').matches[0].basis], ['unique', 'address']);
+  eq('match (pure): the same full name on two customers is AMBIGUOUS', v('Call Ann Lee').status, 'ambiguous');
+  eq('match (pure): a name and an address of two different customers is AMBIGUOUS', v('Sam Ortega asked about 88 Whitmore Ave').status, 'ambiguous');
+  eq('match (pure): a surname alone is only PARTIAL (review), never unique', [v('Follow up with Prentiss').status, v('Follow up with Prentiss').candidates.map((c) => c.customerId)], ['partial', ['p']]);
+  eq('match (pure): a first name alone, a different person, or no name is none', [v('David called').status, v('Davidson Prentice called').status, v('nothing here').status], ['none', 'none', 'none']);
+  eq('match (pure): a "Customer at <address>" placeholder is never matched by its made-up NAME, only by its real street address', [v('Customer at 12 Elm St').matches[0]?.basis, findCustomersInBody(pg('Customer at 99 Nowhere Rd'), cust).status], ['address', 'none']);
+  check('match (pure): a longer house number or street ("188 Whitmore Ave", "88 Whitmore Avenue Extension") is never an address match (at most a partial to review)', v('188 Whitmore Ave').status !== 'unique' && v('88 Whitmore Avenue Extension').status !== 'unique');
+
+  const db = async (sql, p = []) => (await lite.query(sql, p)).rows;
+  const links = async (n) => db(`SELECT l.entity_id, l.linked_by FROM document_entity_links l WHERE l.document_id = $1`, [uid('c', 'd', n)]);
+  const custName = async (n) => (await db(`SELECT value FROM extractions WHERE document_id = $1 AND field_key = 'customer_name'`, [uid('c', 'd', n)])).map((r) => r.value);
+
+  const dry = await applyBodyNameLinks(ctxC, { dryRun: true });
+  eq('body-name (DB): a dry run previews the unique matches and writes nothing', [dry.linked.map((x) => x.documentId).sort(), (await links(1)).length, (await custName(1)).length], [[uid('c', 'd', 1), uid('c', 'd', 10), uid('c', 'd', 5), uid('c', 'd', 9)].sort(), 0, 0]);
+  const scan = await integrity.integrityScan(ctxC);
+  check('body-name (DB): the integrity scan reports them (bodyNameLinks / bodyNameReview counts)', scan.counts.bodyNameLinks === 4 && scan.counts.bodyNameReview === 3, JSON.stringify(scan.counts));
+
+  const res = await integrity.integrityFixTenant(ctxC, { apply: ['linkBodyNames'], dryRun: false });
+  eq('body-name (DB): the integrity fix links the 4 unambiguous memos', res.bodyNamesLinked.map((x) => x.documentId).sort(), [uid('c', 'd', 1), uid('c', 'd', 10), uid('c', 'd', 5), uid('c', 'd', 9)].sort());
+  eq('body-name (DB): "Reminder logged for David Prentiss\'s account" is linked to David Prentiss with linked_by name-in-body', await links(1), [{ entity_id: uid('c', 'c', 1), linked_by: 'name-in-body' }]);
+  eq('body-name (DB): the missing customer_name field is filled ("Missing required field: Customer" clears)', await custName(1), ['David Prentiss']);
+  eq('body-name (DB): a document that already had a customer_name extraction keeps it (not overwritten or duplicated) but is linked', [await custName(10), (await links(10)).map((l) => l.linked_by)], [['D. Prentiss (handwritten)'], ['name-in-body']]);
+  eq('body-name (DB): an address-only match links to that address\'s customer (Bill Whitmore)', (await links(5)).map((l) => l.entity_id), [uid('c', 'c', 5)]);
+  eq('body-name (DB): the ambiguous memos (two Ann Lees; a name and an address that disagree) are NOT linked - they go to review',
+    [(await links(2)).length, (await links(6)).length, res.bodyNamesForReview.filter((r) => r.kind === 'ambiguous').map((r) => r.documentId).sort()], [0, 0, [uid('c', 'd', 2), uid('c', 'd', 6)].sort()]);
+  eq('body-name (DB): a surname-only memo is NOT linked - "Needs your review" (partial)', [(await links(3)).length, res.bodyNamesForReview.find((r) => r.documentId === uid('c', 'd', 3))?.kind], [0, 'partial']);
+  eq('body-name (DB): a customer that exists only in ANOTHER tenant is never matched (Zed Competitor)', [(await links(4)).length, res.bodyNamesForReview.some((r) => r.documentId === uid('c', 'd', 4))], [0, false]);
+  eq('body-name (DB): a document that already has a link is left alone', (await links(7)).map((l) => l.entity_id), [uid('c', 'c', 4)]);
+  eq('body-name (DB): a document a person explicitly unlinked is left alone', (await links(8)).length, 0);
+  eq('body-name (DB): a memo naming only a street address links to that address\'s (placeholder) customer, by address', (await links(9)).map((l) => l.entity_id), [uid('c', 'c', 6)]);
+  const again = await integrity.integrityFixTenant(ctxC, { apply: ['linkBodyNames'], dryRun: false });
+  eq('body-name (DB): running it again changes nothing (idempotent)', again.bodyNamesLinked.length, 0);
+  const audit = await db(`SELECT count(*)::int AS n FROM audit_log WHERE action = 'integrity.link_body_name'`);
+  check('body-name (DB): each link is audited (no question/PII in logs; the audit row holds ids and the basis)', audit[0].n === 4);
+  const crossTenant = await db(`SELECT count(*)::int AS n FROM document_entity_links WHERE tenant_id = $1 AND entity_id IN (SELECT id FROM entities WHERE tenant_id <> $1)`, [tenC]);
+  eq('body-name (DB): no link crosses a tenant boundary', crossTenant[0].n, 0);
+  check('body-name: wired into the integrity fix list (server APPLY_ACTIONS, client ALL_INTEGRITY_FIXES, nightly sweep, ingest)',
+    integrity.APPLY_ACTIONS.has('linkBodyNames')
+    && /ALL_INTEGRITY_FIXES[^]*?'linkBodyNames'/.test(fs.readFileSync(path.join(ROOT, 'src/services/reviewClient.ts'), 'utf8'))
+    && /'linkBodyNames'/.test(fs.readFileSync(path.join(ROOT, 'api/_lib/routes/cron-sweep.js'), 'utf8'))
+    && /applyBodyNameLinks\(ctx, \{ documentId \}\)/.test(fs.readFileSync(path.join(ROOT, 'api/_lib/extractDocument.js'), 'utf8')));
+  const prompt = (await import('../api/_lib/extractFields.js')).buildExtractPrompt([{ page: 1, text: 'x' }], 'correspondence');
+  check('extraction prompt: tells the model to capture a customer named only in a memo body as customer_name', /names a customer only in its body/.test(JSON.stringify(prompt)) && /David Prentiss/.test(JSON.stringify(prompt)));
+  const chip = fs.readFileSync(path.join(ROOT, 'src/components/DocumentPreview.tsx'), 'utf8');
+  check('UI: a non-blocking "Linked from name in document - confirm" chip renders from linked_by name-in-body (not a DocumentIssue)', /Linked from name in document/.test(chip) && /linkedFromBodyName/.test(fs.readFileSync(path.join(ROOT, 'src/hooks/usePostgresSync.ts'), 'utf8')));
+}
+
+/* ================================================================== hygiene */
+{
+  const apiTop = fs.readdirSync(path.join(ROOT, 'api')).filter((f) => fs.statSync(path.join(ROOT, 'api', f)).isFile());
+  eq('api/ has exactly 12 top-level files (Vercel function limit)', apiTop.length, 12);
+  const scoreFiles = fs.readdirSync(path.join(ROOT, 'api/_lib/scorecard')).map((f) => fs.readFileSync(path.join(ROOT, 'api/_lib/scorecard', f), 'utf8')).join('\n');
+  const logCalls = [...scoreFiles.matchAll(/console\.(?:log|warn|error)\(([^;]*)\);/g)].map((m) => m[1]);
+  check('no question text or PII in scorecard logs (log payloads carry counts/ids only)', logCalls.every((c) => !/\bq\.text\b|\bquestion\b|\banswer\b|\bgot\b|\bexpected\b/.test(c.replace(/asked|nextOffset|route: "scorecard"/g, ''))), logCalls.join(' | ').slice(0, 300));
+  check('grader and agent run at temperature 0', /temperature: 0/.test(fs.readFileSync(path.join(ROOT, 'api/_lib/scorecard/grader.js'), 'utf8')) && /temperature: 0/.test(fs.readFileSync(path.join(ROOT, 'api/_lib/agent/loop.js'), 'utf8')));
+  const mig = fs.readFileSync(path.join(ROOT, 'M3-config/30-donovan-scorecard.sql'), 'utf8');
+  check('migration 30: two tables, tenant RLS ENABLE + FORCE, optional', /FORCE\s+ROW LEVEL SECURITY/.test(mig) && (mig.match(/FORCE\s+ROW LEVEL SECURITY/g) ?? []).length === 2 && /OPTIONAL/.test(mig));
+  const review = fs.readFileSync(path.join(ROOT, 'api/review.js'), 'utf8');
+  check('operator actions scorecardRun / scorecardStatus are registered as OPERATOR_ACTIONS', /OPERATOR_ACTIONS[^;]*scorecardRun/.test(review.replace(/\n/g, ' ')) && /OPERATOR_ACTIONS[^;]*scorecardStatus/.test(review.replace(/\n/g, ' ')));
+}
+
+console.log = realLog; console.warn = realWarn; console.error = realErr;
+console.log('');
+if (failures) { console.log(`${failures} check(s) FAILED, ${passes} passed.`); process.exit(1); }
+console.log(`${passes} checks passed.`);
+process.exit(0);

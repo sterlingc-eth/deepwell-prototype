@@ -17,6 +17,8 @@ import { customerClient, type CustomerSummary, type CustomerDuplicatePair, type 
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
 import { useWorkFilter } from '../hooks/useWorkFilter';
 import { WorkFilterControl } from '../components/WorkFilterControl';
+import { FinancialStrip } from '../components/FinancialStrip';
+import { financialsClient } from '../services/financialsClient';
 
 const CURRENT_USER = 'You';
 
@@ -53,7 +55,7 @@ function safeSetHideShopRecords(v: boolean) {
 // reasoning).
 const REVIEW_IS_DEMO_ONLY = import.meta.env?.VITE_DEMO_MODE === 'true';
 
-type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'shop-records' | 'all';
+type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'shop-records' | 'money' | 'all';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'attention', label: 'Needs a person' },
   { id: 'gaps', label: 'Missing info' },
@@ -67,6 +69,8 @@ const FILTERS: { id: Filter; label: string }[] = [
   // under "Needs a person" (isAttention requires stage !== 'verified'). This
   // chip is the only place left to find them, rather than nowhere at all.
   { id: 'shop-records', label: 'Shop records' },
+  // Financials layer: invoices/quotes whose printed numbers don't add up (or were read with low confidence).
+  { id: 'money', label: 'Money to check' },
   { id: 'all', label: 'All' },
 ];
 const FILTER_IDS = FILTERS.map((f) => f.id);
@@ -89,6 +93,8 @@ interface QueueSets {
   unlinked: Set<string>;
   gaps: Set<string>;
   conflicts: Set<string>;
+  /** Documents with a financial mismatch / low-confidence amounts (server-side list; empty when the feature is off). */
+  money: Set<string>;
 }
 
 function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
@@ -100,6 +106,7 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
     case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate');
     case 'ready': return doc.stage === 'linked' && doc.issues.length === 0;
     case 'shop-records': return doc.typeId === 'internal';
+    case 'money': return sets.money.has(doc.id);
     case 'all': return true;
   }
 }
@@ -116,6 +123,7 @@ function queueSetsFor(graph: GraphSnapshot): QueueSets {
     unlinked: new Set(unlinkedDocs(graph).map((d) => d.id)),
     gaps: new Set(gapDocs(graph).map((d) => d.id)),
     conflicts: new Set(conflictDocs(graph).map((d) => d.id)),
+    money: new Set<string>(),
   };
 }
 
@@ -451,9 +459,17 @@ export function ReviewBody() {
   // Built from entityGraph.ts's own helpers — see the QueueSets comment on
   // `matches` above for why this (and not a doc.issues re-derivation here)
   // is what keeps this queue and DataHealthStrip's tile counts in agreement.
+  // Documents whose money numbers need a person (financials layer). Empty when the feature is off.
+  const [moneyIds, setMoneyIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (REVIEW_IS_DEMO_ONLY) return;
+    financialsClient.needsReview()
+      .then((r) => setMoneyIds(new Set(r.enabled ? r.items.map((i) => i.documentId) : [])))
+      .catch(() => setMoneyIds(new Set()));
+  }, []);
   const sets = useMemo<QueueSets>(
-    () => queueSetsFor(graph),
-    [graph],
+    () => ({ ...queueSetsFor(graph), money: moneyIds }),
+    [graph, moneyIds],
   );
 
   // "My work / Everyone" (owner brief 2026-09-21) — allDocs (not the queue
@@ -582,7 +598,7 @@ export function ReviewBody() {
         </label>
 
         <div role="tablist" aria-label="Queue filters" className="flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => (
+          {FILTERS.filter((f) => f.id !== 'money' || moneyIds.size > 0 || filter === 'money').map((f) => (
             <button
               key={f.id}
               role="tab"
@@ -959,6 +975,9 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
         {aiMsg && <p className="text-caption text-ink-3">{aiMsg}</p>}
         {deleteErr && <p role="alert" className="text-caption text-warn-ink dark:text-brass-200">Delete didn't go through: {deleteErr}</p>}
       </header>
+
+      {/* Financials layer: printed amounts with page evidence, corrections beside originals, mismatch flags. */}
+      <FinancialStrip documentId={doc.id} by={CURRENT_USER} />
 
       {/* Duplicate */}
       {duplicate && duplicate.kind === 'duplicate' && (

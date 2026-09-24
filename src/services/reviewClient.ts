@@ -169,6 +169,10 @@ export interface IntegrityScanResult {
   mismatchedNameLinks: IntegrityMismatchedNameLink[];
   splitLinkDocuments: IntegritySplitLinkDocument[];
   ambiguousNameOnlyLinks: IntegrityAmbiguousNameOnlyLink[];
+  /** 2026-09-23: memos/correspondence whose body names exactly one existing customer (would be linked by the
+   *  linkBodyNames fix) and those with an ambiguous/partial match (never automatic - "Needs your review"). */
+  bodyNameLinks?: { documentId: string; customerId: string; name: string; basis: string; page: number }[];
+  bodyNameReview?: { documentId: string; kind: 'ambiguous' | 'partial'; candidates: { customerId: string; name: string }[] }[];
   counts: {
     duplicateCustomers: number;
     possibleDuplicates: number;
@@ -181,13 +185,15 @@ export interface IntegrityScanResult {
     mismatchedNameLinks: number;
     splitLinkDocuments: number;
     ambiguousNameOnlyLinks: number;
+    bodyNameLinks: number;
+    bodyNameReview: number;
   };
 }
 
 export type IntegrityApplyAction =
   | 'mergeDuplicates' | 'linkDocuments' | 'linkEquipmentCustomers' | 'createMissingUnits'
   | 'healMergedSurvivors' | 'retireShopCustomers' | 'stripShopContact' | 'relinkMismatchedNames'
-  | 'healSplitUnits' | 'refillCustomerContacts' | 'absorbAddressPlaceholders';
+  | 'healSplitUnits' | 'refillCustomerContacts' | 'absorbAddressPlaceholders' | 'linkBodyNames';
 
 // Review fix (2026-09-20, reviewer NO-GO item 2): relinkMismatchedNames is
 // deliberately NOT in this list. It repoints a document from one customer to
@@ -210,6 +216,9 @@ export const ALL_INTEGRITY_FIXES: IntegrityApplyAction[] = [
   // placeholder into an UNAMBIGUOUSLY matched named customer at the same
   // address (see planAddressPlaceholderAbsorptions in api/_lib/integrity.js).
   'absorbAddressPlaceholders',
+  // 2026-09-23: deterministic, additive - links a memo whose BODY names exactly one existing customer
+  // (api/_lib/bodyNameLink.js); ambiguous/partial matches are only reported, never applied.
+  'linkBodyNames',
 ];
 
 /** The ordinary result of an integrityFix call. */
@@ -239,6 +248,10 @@ export interface IntegrityFixApplied {
    *  customer at the identical normalized address. keepId is the survivor
    *  (the named customer); dropId (the placeholder) ends up merged_into it. */
   addressPlaceholdersAbsorbed: { keepId: string; dropId: string }[];
+  /** 2026-09-23: linkBodyNames - documents linked because their body names one existing customer, and those left
+   *  for review (ambiguous/partial). */
+  bodyNamesLinked?: { documentId: string; customerId: string; name: string; basis: string; page: number }[];
+  bodyNamesForReview?: { documentId: string; kind: 'ambiguous' | 'partial'; candidates: { customerId: string; name: string }[] }[];
   skipped: { documentId: string | null; reason: string }[];
 }
 
@@ -261,6 +274,60 @@ export type IntegrityFixResult = IntegrityFixApplied | IntegrityFixDebounced;
  *  two different things in the two branches. */
 export function isIntegrityFixDebounced(result: IntegrityFixResult): result is IntegrityFixDebounced {
   return result.skipped === true;
+}
+
+/* ---- Donovan Scorecard (operator only; api/_lib/routes/scorecard.js) ------------------------------ */
+
+export interface ScorecardRun {
+  id: string;
+  source: 'operator' | 'nightly' | 'retry';
+  examVersion: string | null;
+  status: 'running' | 'complete' | 'stopped';
+  stopReason: string | null;
+  totalQuestions: number;
+  answered: number;
+  passed: number;
+  /** 0-1, null until something has been graded. */
+  score: number | null;
+  byCategory: Record<string, { passed: number; total: number; score: number }>;
+  costUsd: number;
+  models: string[];
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface ScorecardFailing {
+  questionId: string;
+  category: string;
+  question: string;
+  expected: string | null;
+  got: string | null;
+  models?: string[];
+  retry?: { model: string; passed: boolean; got?: string };
+  error?: string;
+}
+
+export interface ScorecardStatus {
+  backend: 'tables' | 'audit' | 'memory';
+  exam: { version: string; questions: number; categories: Record<string, number> };
+  budgetUsd: number;
+  run: ScorecardRun | null;
+  previous: { id: string; score: number; startedAt: string | null; answered: number } | null;
+  runs: { id: string; source: string; status: string; score: number | null; answered: number; startedAt: string | null; costUsd: number }[];
+  failing: ScorecardFailing[];
+}
+
+export interface ScorecardPage {
+  error?: string;
+  message?: string;
+  runId: string;
+  backend: string;
+  nextOffset: number | null;
+  done: boolean;
+  stopped: string | null;
+  total: number;
+  spentUsd: number;
+  run: ScorecardRun | null;
 }
 
 /** One outcome bucket in a miss report — see api/_lib/missStore.js's
@@ -431,7 +498,40 @@ export interface LearningExportItem {
   createdAt: string;
 }
 
+/** Search-by-meaning progress (api/_lib/search/store.js semanticStatus). */
+export interface SemanticStatus {
+  configured: boolean;
+  ready: boolean;
+  /** why it is not ready: no VOYAGE_API_KEY, or M3-config/31 not pasted yet */
+  reason?: 'not-configured' | 'migration-pending';
+  model: string;
+  rerank: boolean;
+  pagesTotal?: number;
+  pagesEmbedded?: number;
+  pagesRemaining?: number;
+  chunks?: number;
+  tokensToday?: number;
+  tokenBudget?: number;
+}
+export interface SemanticBackfillResult {
+  stoppedBy: 'done' | 'deadline' | 'budget' | 'off' | 'no-schema' | 'error';
+  pagesDone: number;
+  chunksDone: number;
+  tokens: number;
+  status: SemanticStatus;
+}
+
 export const reviewClient = {
+  /** Owner/admin: how many pages are searchable by meaning. */
+  semanticStatus() {
+    return postJson<SemanticStatus>({ action: 'semanticStatus' });
+  },
+
+  /** Owner/admin: embed existing pages for ~30 s; call again until stoppedBy is not 'deadline'. */
+  semanticBackfill() {
+    return postJson<SemanticBackfillResult>({ action: 'semanticBackfill' });
+  },
+
   /** Correct an extracted field, or add one that was never extracted. */
   correctField(documentId: string, fieldKey: string, value: string, by: string) {
     return postJson<{ document: ReviewDocument; extraction: ReviewExtraction }>({
@@ -620,6 +720,16 @@ export const reviewClient = {
     return postJson<ReplaySummary>({ action: 'learningReplay', questions: opts?.questions, force: opts?.force });
   },
 
+  /** Operator: latest Donovan Scorecard run, trend vs the previous one, per-category scores and the failing list. */
+  scorecardStatus(runId?: string) {
+    return postJson<ScorecardStatus>({ action: 'scorecardStatus', ...(runId ? { runId } : {}) });
+  },
+
+  /** Operator: ONE page (about 6 questions) of a scorecard run. Pass back `runId` + `nextOffset` for the next page. */
+  scorecardRun(payload: { scope?: 'full' | 'slice' | 'category' | 'ids'; runId?: string; offset?: number; retryOfRunId?: string; category?: string }) {
+    return postJson<ScorecardPage>({ action: 'scorecardRun', ...payload });
+  },
+
   /** Thumbs on an answer. Up confirms the recipe behind it; down records a correction miss, retires any
    *  live shortcut for that question and re-asks Donovan once, with the note as a hint. */
   askFeedback(question: string, rating: 'up' | 'down', note?: string) {
@@ -656,4 +766,26 @@ export async function replayAllMisses(
     if (r.stopped === 'model-budget' || r.stopped === 'cost-ceiling' || r.stopped === 'agent-disabled' || r.remaining <= 0 || r.attempted === 0) break;
   }
   return totals;
+}
+
+/** Runs a whole scorecard (operator only), one server page at a time, until the exam is done, the spend budget is
+ *  reached, or `maxPages` is hit. `onProgress` gets {answered, total} after each page. */
+export async function runScorecardAll(
+  opts: { scope?: 'full' | 'slice'; retryOfRunId?: string } = {},
+  onProgress?: (p: { offset: number; total: number; spentUsd: number }) => void,
+  maxPages = 80,
+): Promise<ScorecardPage> {
+  let runId: string | undefined;
+  let offset = 0;
+  let last: ScorecardPage | null = null;
+  for (let page = 0; page < maxPages; page++) {
+    last = await reviewClient.scorecardRun({ ...opts, ...(runId ? { runId } : {}), offset });
+    if (last.error) throw new Error(last.message ?? last.error);
+    runId = last.runId;
+    onProgress?.({ offset: last.nextOffset ?? last.total, total: last.total, spentUsd: last.spentUsd });
+    if (last.done || last.nextOffset == null) break;
+    offset = last.nextOffset;
+  }
+  if (!last) throw new Error('The scorecard did not start.');
+  return last;
 }

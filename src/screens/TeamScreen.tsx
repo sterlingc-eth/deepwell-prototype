@@ -9,6 +9,7 @@ import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { DonovanMissesCard } from '../components/DonovanMissesCard';
 import { DonovanLearningCard } from '../components/DonovanLearningCard';
+import { SemanticSearchCard } from '../components/SemanticSearchCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -151,6 +152,7 @@ export function TeamScreen() {
         {admin && <FollowupsCard />}
         {admin && <DonovanMissesCard />}
         {admin && <DonovanLearningCard />}
+        {admin && <SemanticSearchCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

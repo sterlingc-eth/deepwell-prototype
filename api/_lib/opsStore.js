@@ -254,6 +254,13 @@ export async function exportTenant(ctx) {
       truncated,
     };
     if (links) out.links = links.rows;
+    // FINANCIALS layer (M3-config/22): the owner's invoice/quote/PO/agreement numbers are their data too.
+    // Included only when the table exists, so an export before the migration is byte-for-byte what it was.
+    const { rows: finTable } = await client.query(`SELECT to_regclass('public.document_financials') IS NOT NULL AS ok`);
+    if (finTable[0]?.ok) {
+      out.financials = (await client.query(`SELECT * FROM document_financials WHERE ${TENANT} ORDER BY created_at LIMIT $1`, [EXPORT_ROW_CAP])).rows;
+      out.financial_lines = (await client.query(`SELECT * FROM document_financial_lines WHERE ${TENANT} ORDER BY financial_id, line_no LIMIT $1`, [EXPORT_ROW_CAP])).rows;
+    }
     return out;
   });
 }

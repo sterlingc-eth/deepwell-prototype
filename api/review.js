@@ -45,6 +45,10 @@ import { replayMisses, replayCapabilityGap, applyThumbsUp, applyThumbsDown, miss
 import { listReplays, listOpenMisses } from './_lib/learning/replayStore.js';
 import { verifyRecipe, RECIPE_KIND } from './_lib/learning/recipes.js';
 import { invalidateActiveOverlayCache } from './_lib/learning/overlay.js';
+// Donovan Scorecard (api/_lib/scorecard, routes/scorecard.js): the golden-exam runner + status, operator-only.
+import { scorecardRunAction, scorecardStatusAction } from './_lib/routes/scorecard.js';
+// Search by meaning: status + resumable backfill of embeddings for existing pages (api/_lib/search/store.js).
+import { semanticStatus, runBackfill } from './_lib/search/store.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -61,8 +65,8 @@ import { invalidateActiveOverlayCache } from './_lib/learning/overlay.js';
 // api/_lib/learning/proposer.js) — all the more reason a runaway client tab
 // must not be able to poll it without limit.
 // learningReplay / askFeedback are billed model calls too (the Donovan agent re-runs a question), so they share it.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback', 'scorecardRun', 'semanticBackfill']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'scorecardRun', 'scorecardStatus']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -72,7 +76,7 @@ const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide'
 // (reviewStore.reclassifyDocuments) does, as a Haiku fallback when its
 // deterministic heuristic can't place a document — see RECLASSIFY_MODEL in
 // reviewStore.js.
-const MODEL_BILLED_ACTIONS = new Set(['reclassify', 'extractReminders']);
+const MODEL_BILLED_ACTIONS = new Set(['reclassify', 'extractReminders', 'semanticBackfill']);
 
 // Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
 // renumbers/retires customer or equipment records, so on a Clerk org tenant
@@ -144,6 +148,10 @@ const ACTIONS = new Set([
   'learningExport',
   'learningReplay',
   'askFeedback',
+  'scorecardRun',
+  'scorecardStatus',
+  'semanticStatus',
+  'semanticBackfill',
 ]);
 
 export default async (req, res) => {
@@ -408,6 +416,27 @@ export default async (req, res) => {
           const note = typeof payload.note === 'string' ? payload.note.trim().slice(0, 300) : '';
           result = { ok: true, ...(await applyThumbsDown({ ctxArg: ctx, question, note })) };
         }
+        break;
+      }
+      case 'scorecardRun':
+        requireOperator(auth);
+        result = await scorecardRunAction(ctx, auth, payload);
+        break;
+      case 'scorecardStatus':
+        requireOperator(auth);
+        result = await scorecardStatusAction(ctx, payload);
+        break;
+      // Search by meaning. Owner/admin only; backfill is billing-gated + rate-limited above and capped by
+      // the tenant's daily embedding budget. Each call embeds what it can in ~30 s and reports progress; the
+      // Team-screen card calls it again until stoppedBy is 'done' (idempotent + resumable).
+      case 'semanticStatus':
+        requireAdmin(auth);
+        result = await semanticStatus(ctx);
+        break;
+      case 'semanticBackfill': {
+        requireAdmin(auth);
+        const run = await runBackfill(ctx);
+        result = { ...run, status: await semanticStatus(ctx) };
         break;
       }
       case 'learningExport':

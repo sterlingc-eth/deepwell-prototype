@@ -426,7 +426,8 @@ function scripted(turns, usage = { input_tokens: 1200, output_tokens: 120 }) {
   fn.calls = calls;
   return fn;
 }
-const run = (question, callModel, extra = {}) => runDonovanAgent({ withTenant, ctxArg: ctxA, question, today: TODAY, callModel, ...extra });
+// Escalation is off here: these checks pin the behaviour of ONE agent run (Sonnet escalation is covered by verify-scorecard.mjs).
+const run = (question, callModel, extra = {}) => runDonovanAgent({ withTenant, ctxArg: ctxA, question, today: TODAY, callModel, env: { DONOVAN_ESCALATION: '0' }, ...extra });
 const usageRow = async (tenantId) => (await lite.query('SELECT model_calls, model_input_tokens, model_output_tokens FROM usage_counters WHERE tenant_id = $1', [tenantId])).rows[0];
 
 {
@@ -769,7 +770,7 @@ void missBefore;
   const ask = fs.readFileSync(path.join(ROOT, 'api', 'ask.js'), 'utf8');
   const loop = fs.readFileSync(path.join(ROOT, 'api', '_lib', 'agent', 'loop.js'), 'utf8');
   check('ask.js: agent wiring is behind DONOVAN_AGENT via isAgentEnabled() (default on, "0" disables)', /isAgentEnabled\(\)/.test(ask) && /DONOVAN_AGENT !== "0"/.test(loop));
-  check('ask.js: the agent is tried from four places + agent-first (analytics fallback / unhandled, no retrieval, model no-answer, enumeration/history before retrieval)', (ask.match(/await tryAgent\(/g) ?? []).length === 5, String((ask.match(/await tryAgent\(/g) ?? []).length));
+  check('ask.js: the agent is tried from five places (incl. money gate) + agent-first (analytics fallback / unhandled, no retrieval, model no-answer, enumeration/history before retrieval)', (ask.match(/await tryAgent\(/g) ?? []).length === 6, String((ask.match(/await tryAgent\(/g) ?? []).length));
   check('ask.js: the money gate is left alone (money-fallback never goes to the agent)', /missOutcome !== MISS_OUTCOMES\.MONEY_FALLBACK/.test(ask));
   check('ask.js: data.debug needs an operator AND body.debug === true', /req\.body\?\.debug === true && isPlatformOperator\(auth\)/.test(ask));
   check('ask.js: agent answers are cached under their own hash + prompt version', /agentQuestionHash\(question\)/.test(ask) && /promptVersion: AGENT_PROMPT_VERSION/.test(ask));

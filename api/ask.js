@@ -16,14 +16,16 @@ import {
   selectPassagesForContext,
 } from "./_lib/answer.js";
 import { planCacheBreakpoints, modelCallLogLine } from "./_lib/promptCache.js";
-import { recordModelCall, incrementAsksThisMonth, isCountableAskSource, monthStartUtc } from "./_lib/usage.js";
+import { recordModelCall, incrementAsksThisMonth as incrementAsksThisMonthRaw, isCountableAskSource, monthStartUtc } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
-import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED } from "./_lib/askCache.js";
+import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED as ASK_CACHE_ENABLED_RAW } from "./_lib/askCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
+// FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): answers money questions from SQL over document_financials.
+import { answerMoneyQuestion, moneyNoMatchAnswer } from "./_lib/financials/moneyGate.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
 import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText } from "./_lib/docLookup.js";
@@ -56,6 +58,8 @@ import { runRecipeFastPath } from "./_lib/agent/fastReplay.js";
 import { findExactRecipe } from "./_lib/learning/recipes.js";
 import { submitRecipe } from "./_lib/learning/replay.js";
 import { isPlatformOperator } from "./_lib/missDigest.js";
+// Donovan Scorecard (api/_lib/scorecard/): in-process calls carry {auth, escalate} under a Symbol no HTTP request can set.
+import { takeScorecardCall } from "./_lib/scorecard/hook.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -438,7 +442,7 @@ async function runMetaQuestion(db, meta) {
 // regardless of which branch produced it.
 const EMPTY_RETRIEVAL = { passages: [], extractions: [], cacheHit: false, cachedAnswer: null, questionHash: null, corpusStamp: null };
 
-function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, questionHash }) {
+function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, questionHash, noCache = false }) {
   return timer.time("retrieve", async () => {
     try {
       return await withTenant(ctxArg, async (db) => {
@@ -462,6 +466,7 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, ques
         let corpusStamp = null;
         let cachedAnswer = null;
         await timer.time("cache", async () => {
+          if (noCache) return; // scorecard calls always run the live pipeline
           try {
             const entry = await getCacheEntry(db, { questionHash, today });
             corpusStamp = entry.corpusStamp;
@@ -509,20 +514,28 @@ export default async function handler(req, res) {
     return handleCors(res, req).status(status).json(body);
   };
 
+  // Scorecard call (hook.js): null for every real request. When set it supplies the auth, skips the rate
+  // limiter / billing gate, never counts against the monthly allowance and never touches the answer cache.
+  const scorecardCall = takeScorecardCall(req);
+  const incrementAsksThisMonth = scorecardCall ? async () => {} : incrementAsksThisMonthRaw;
+  const ASK_CACHE_ENABLED = ASK_CACHE_ENABLED_RAW && !scorecardCall;
+
   let auth;
   try {
-    auth = await timer.time("auth", async () => {
-      const a = await requireAuthOrKey(req);
-      assertScope(a, "ask");
-      return a;
-    });
+    auth = scorecardCall
+      ? scorecardCall.auth
+      : await timer.time("auth", async () => {
+          const a = await requireAuthOrKey(req);
+          assertScope(a, "ask");
+          return a;
+        });
   } catch (err) {
     return denyAuth(res, err);
   }
 
   // The single most rate-limit-relevant route in the codebase: every call is
   // a model call. 429 is already written when this returns false.
-  if (!(await timer.time("limit", () => limit(req, res, auth, "ask")))) return;
+  if (!scorecardCall && !(await timer.time("limit", () => limit(req, res, auth, "ask")))) return;
 
   try {
     let { question, today } = req.body ?? {};
@@ -645,7 +658,7 @@ export default async function handler(req, res) {
     // continues with exactly today's behaviour. The operator-only `data.debug` trace needs both an
     // operator caller AND body.debug === true. Returns true iff it already sent the response.
     const agentOn = isAgentEnabled();
-    const agentDebug = agentOn && req.body?.debug === true && isPlatformOperator(auth);
+    const agentDebug = agentOn && (Boolean(scorecardCall) || (req.body?.debug === true && isPlatformOperator(auth)));
     const requestStartedAt = Date.now();
     let agentTried = false;
     const tryAgent = async ({ extraUsage = null, budgetMs = 50_000, recordMiss = true } = {}) => {
@@ -692,7 +705,7 @@ export default async function handler(req, res) {
         }
         if (!result) {
           result = await timer.time("agent", () =>
-            runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt: requestStartedAt + budgetMs })
+            runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt: Math.min(requestStartedAt + budgetMs, scorecardCall?.deadlineAt ?? Infinity), escalate: scorecardCall?.escalate === true })
           );
         }
       } catch (err) {
@@ -764,7 +777,7 @@ export default async function handler(req, res) {
     //     inline below, same as the very first implementation.
     // Pool is max 5 (recordsStore.js) — cap this request at 2 concurrent
     // connections: gate→budget chained on one, retrieval on the other.
-    const gatePromise = timer.time("gate", () => checkAskGate(auth));
+    const gatePromise = scorecardCall ? Promise.resolve({ allowed: true }) : timer.time("gate", () => checkAskGate(auth));
     const budgetPromise = gatePromise.then(() => timer.time("budget", () => assertModelBudget(ctxArg)));
     budgetPromise.catch(() => {});
     // Neither a meta question nor a fast-path candidate needs retrieval fired
@@ -773,7 +786,7 @@ export default async function handler(req, res) {
     // retrieval inline below, same fallback shape as the meta-router's own.
     const retrievalPromise = meta || fastPathIntent || contactLookupIntent || docLookupIntent || moneyQuestion || analyticsCandidate
       ? null
-      : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
+      : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
     const gate = await gatePromise;
     if (!gate.allowed) {
@@ -995,7 +1008,22 @@ export default async function handler(req, res) {
     // here should ever be served back stale once financials ships) and not
     // counted against the monthly model allowance (no model call was made).
     if (moneyQuestion) {
-      const data = moneyFallbackAnswer();
+      // FINANCIALS hook: when M3-config/22 exists AND this tenant has financial rows, answer from real data
+      // (deterministic SQL first, then the Donovan agent over the `financials` view); otherwise `fin.hasData`
+      // is false and everything below is exactly the old honest refusal.
+      const fin = await timer.time("financials", () => answerMoneyQuestion({ withTenant, ctxArg, question, today: todayResolved }));
+      if (fin.handled) {
+        send(200, { success: true, data: fin.data });
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({
+            action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [...new Set((fin.data.sources ?? []).map((x) => x.documentId))], passages: 0, financials: fin.intent },
+          })).catch((err) => console.error("Failed to write document.queried audit row (financials):", err?.message))
+        );
+        return;
+      }
+      if (fin.hasData && (await tryAgent())) return;
+      const data = fin.hasData ? moneyNoMatchAnswer() : moneyFallbackAnswer();
       send(200, { success: true, data });
       await timer.time("bookkeeping", () =>
         withTenant(ctxArg, async (db) => {
@@ -1037,7 +1065,7 @@ export default async function handler(req, res) {
         // — or be shadowed by — a retrieval-cached row for the same question
         // text (2026-09-21 reviewer fix, handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md).
         analyticsResult = await timer.time("analytics_plan", () =>
-          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay })
+          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay, noCache: Boolean(scorecardCall) })
         );
       } catch (err) {
         // A tenant already over its daily model budget must not spend a
@@ -1151,7 +1179,7 @@ export default async function handler(req, res) {
     // ---- 1. retrieve (already in flight above unless meta, fast path, or analytics fell through) ---
     const { passages, extractions, cacheHit, cachedAnswer, corpusStamp } = retrievalPromise
       ? await retrievalPromise
-      : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash });
+      : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
     // ---- cache hit: no retrieval was even needed above, no model call -----
     if (cacheHit) {

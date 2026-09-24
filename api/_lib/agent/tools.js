@@ -19,6 +19,12 @@ import { customerDocumentIds } from "../docLookup.js";
 import { deriveGeo, warrantyStatusOf, normalizeStateValue } from "../analytics.js";
 import { alertTier } from "../warrantyRules.js";
 import { extractionsHaveUnitIndex } from "../recordsStore.js";
+// view_document_page (viewPage.js): the model may look at the original image/page of a document it already found.
+import { createPageViewer, VIEW_PAGE_TOOL_DEF, VIEW_TOOL_NAME } from "./viewPage.js";
+// FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): the `financials` / `invoice_lines` views live in
+// financeViews.js; the table probe + catalogue block live in financials/store.js. Hooked in below with small hunks.
+import { financeViewsSql, FINANCE_VIEW_DOCS } from "./financeViews.js";
+import { financialsTableExists, financialsCatalogue } from "../financials/store.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -42,7 +48,7 @@ const UUID_G = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
  * deterministic logic the analytics executor uses, computed in JS and joined in, so there is
  * no second copy of warranty semantics in SQL.
  */
-export function buildViewsSql({ hasUnitIndex = true } = {}) {
+export function buildViewsSql({ hasUnitIndex = true, hasFinancials = false } = {}) {
   const unit = hasUnitIndex ? "x.unit_index" : "NULL::smallint AS unit_index";
   return `
 customers AS (
@@ -107,7 +113,8 @@ facts AS (
     FROM extractions x
     LEFT JOIN facets f ON f.id = x.source_facet_id AND ${t("f")}
    WHERE ${t("x")}
-)`.trim();
+),
+${financeViewsSql({ hasFinancials })}`.trim();
 }
 
 /** What the model is told about the views (goes in the cached system prompt). */
@@ -117,6 +124,7 @@ export const VIEW_DOCS = `VIEWS available to run_query (PostgreSQL; one SELECT; 
 - documents_v(id, document_id, filename, document_type, stage, created_at, service_date, technician, customer_id, customer_name) — one row per uploaded document. service_date is the job date as 'YYYY-MM-DD' text (NULL if none). document_type is one of: work-order, invoice, warranty-registration, startup-sheet, permit, nameplate-photo, maintenance-agreement, service-ticket, dispatch-note, proposal-quote, inspection-report, purchase-order, equipment-record, correspondence, internal, other. A service visit = a document with a service_date.
 - facts(document_id, entity_id, field_key, value, unit_index, page_no, confidence, created_at) — extracted fields (corrected values already applied). field_key examples: customer_name, service_address, serial_number, model, manufacturer, permit_number, invoice_number, service_type, work_performed, part_number, technician, agreement_term, cost. Call describe_data to see which exist.
 - doc_links(document_id, entity_id, entity_type, customer_id, via) — which customer each document belongs to (directly or through a unit).
+${FINANCE_VIEW_DOCS}
 SQL rules: SELECT/WITH only, no semicolons, no comments, no double-quoted identifiers, plain functions only. Dates are text: compare like service_date >= '2026-01-01' and use left(service_date, 7) for months. Always select the ids you will cite (customer_id, document_id). Count with count(*) or count(DISTINCT customer_id) instead of counting rows yourself. Max 100 rows come back; if a result says truncated, select fewer columns or narrow the query and run it again - never answer from a truncated list as if it were complete.
 Common shapes (adapt, do not copy values):
 - customers with a current warranty: SELECT c.customer_id, c.name, e.model, e.warranty_status, e.warranty_expires FROM equipment e JOIN customers c ON c.customer_id = e.customer_id WHERE e.warranty_current ORDER BY c.name
@@ -217,7 +225,7 @@ export const TOOL_DEFS = [
   },
 ];
 
-export const ALL_TOOL_DEFS = [...TOOL_DEFS, ANSWER_TOOL_DEF];
+export const ALL_TOOL_DEFS = [...TOOL_DEFS, VIEW_PAGE_TOOL_DEF, ANSWER_TOOL_DEF];
 
 /* ----------------------------------------------------------------- ledger */
 
@@ -315,7 +323,9 @@ function registerRows(ledger, shown) {
     if (typeof docId === "string" && UUID_RE.test(docId)) {
       ledger.addDoc(docId, typeof r.stage === "string" ? r.stage : "", typeof r.filename === "string" ? r.filename : undefined);
       if (typeof r.field_key === "string" && r.field_key) ledger.addField(docId, r.field_key, typeof r.stage === "string" ? r.stage : "");
-      const pn = r.page_no == null ? null : Number(r.page_no);
+      // financials view rows: a returned money column can be cited as that field ({field:'total'}); total_page is its page.
+      for (const col of ["total", "subtotal", "tax", "amount_paid", "balance_due", "open_balance"]) if (r[col] != null) ledger.addField(docId, col, typeof r.stage === "string" ? r.stage : "");
+      const pn = (r.page_no ?? r.total_page) == null ? null : Number(r.page_no ?? r.total_page);
       if (pn != null && Number.isFinite(pn)) ledger.addPassage(docId, pn, typeof r.stage === "string" ? r.stage : "", undefined);
     }
   }
@@ -333,8 +343,9 @@ function isoDay(v) {
  * @returns an object with execute(name, input) -> {ok, content, rowCount, inputSummary}
  *   and .ledger. Never throws.
  */
-export function createToolbox({ withTenant, ctxArg, today }) {
+export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadlineAt }) {
   const ledger = new EvidenceLedger();
+  const viewDocumentPage = createPageViewer({ withTenant, ctxArg, ledger, ...(fetchObject ? { fetchObject } : {}), ...(deadlineAt ? { deadlineAt } : {}) });
   const cache = { describe: null, derivedC: null, derivedE: null };
   /** Every successful run_query of this run (sql, columns, rows) - what a recipe is built from. */
   const queries = [];
@@ -365,7 +376,7 @@ export function createToolbox({ withTenant, ctxArg, today }) {
   }
 
   async function views(db) {
-    return buildViewsSql({ hasUnitIndex: await extractionsHaveUnitIndex(db) });
+    return buildViewsSql({ hasUnitIndex: await extractionsHaveUnitIndex(db), hasFinancials: await financialsTableExists(db) });
   }
 
   const fail = (message, inputSummary) => ({ ok: false, content: `ERROR: ${message}`, rowCount: 0, inputSummary });
@@ -389,7 +400,8 @@ export function createToolbox({ withTenant, ctxArg, today }) {
            FROM (SELECT left(COALESCE(NULLIF(corrected_value, ''), value), 10) AS v FROM extractions
                   WHERE field_key = 'service_date' AND ${t("extractions")}) q
           WHERE v ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`, [])).rows[0];
-      return { ents, docs, fields, sd };
+      const fin = await financialsCatalogue(db); // null when the financials layer is off / empty
+      return { ents, docs, fields, sd, fin };
     });
     const catalogue = {
       today,
@@ -404,6 +416,7 @@ export function createToolbox({ withTenant, ctxArg, today }) {
         examples: /phone|email/.test(r.field_key) ? undefined : (Array.isArray(r.examples) ? r.examples : undefined),
       })),
       serviceDates: out.sd && out.sd.n ? { first: out.sd.first_service, last: out.sd.last_service, documents: out.sd.n } : null,
+      ...(out.fin ? { financials: out.fin } : {}),
     };
     let text = JSON.stringify(catalogue);
     if (text.length > RESULT_CHAR_CAP) {
@@ -642,6 +655,7 @@ export function createToolbox({ withTenant, ctxArg, today }) {
       else if (name === "find_customers") r = await findCustomers(input ?? {});
       else if (name === "get_customer") r = await getCustomer(input ?? {});
       else if (name === "run_query") r = await runQuery(input ?? {});
+      else if (name === VIEW_TOOL_NAME) r = await viewDocumentPage(input ?? {});
       else r = fail(`unknown tool ${String(name).slice(0, 40)}`, "unknown");
     } catch (err) {
       r = fail(String(err?.message ?? err).slice(0, 300), String(name));

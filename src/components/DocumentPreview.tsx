@@ -98,6 +98,9 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
   const lines = doc.preview.split('\n');
   const highlightField = location?.field?.toLowerCase();
 
+  const bodyCustomerRaw = doc.linkedFromBodyName ? entities[doc.linkedFromBodyName]?.fields?.customer_name : undefined;
+  const bodyCustomerName = typeof bodyCustomerRaw === 'string' ? bodyCustomerRaw : '';
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6" role="presentation">
       <button type="button" aria-label="Close preview" onClick={onClose} className="absolute inset-0 bg-stone-950/50 cursor-default" tabIndex={-1} />
@@ -139,6 +142,15 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
                 </li>
               ))}
             </ul>
+          )}
+
+          {doc.linkedFromBodyName && (
+            <p className="flex items-center gap-2 text-body text-ink-2" data-testid="body-name-chip">
+              <span className="inline-flex items-center rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-caption">
+                Linked from name in document — confirm
+              </span>
+              {bodyCustomerName && <span>{bodyCustomerName}</span>}
+            </p>
           )}
 
           {UUID_RE.test(documentId) && (

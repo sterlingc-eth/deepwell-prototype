@@ -155,6 +155,10 @@ export interface Doc {
   /** 0–1 confidence of the strongest link */
   linkConfidence: number;
   issues: DocumentIssue[];
+  /** Set when the document was linked to this customer because its BODY names them (server linked_by
+   *  'name-in-body', api/_lib/bodyNameLink.js). Drives the non-blocking "Linked from name in document - confirm"
+   *  chip in the preview; deliberately NOT a DocumentIssue so it never counts as needing attention. */
+  linkedFromBodyName?: EntityId;
   /** Display name of a human verifier, or the literal 'ai' for an automated
    *  AI verification (see the AI VERIFICATION CONTRACT in the team brief). */
   verifiedBy?: string;
