@@ -2,7 +2,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { resolve } from 'node:path'
 
-// Two pages: the marketing site at / and the app at /app/
+// Three pages: the marketing site at /, the app at /app/, and the standalone
+// founders' business-expense site at /expenses/ (not linked from the app)
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -10,6 +11,7 @@ export default defineConfig({
       input: {
         site: resolve(__dirname, 'index.html'),
         app: resolve(__dirname, 'app/index.html'),
+        expenses: resolve(__dirname, 'expenses/index.html'),
       },
     },
   },

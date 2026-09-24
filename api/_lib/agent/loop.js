@@ -29,6 +29,8 @@ import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usag
 import { ANALYTICS_MODEL } from "../routes/analytics.js";
 import { ALL_TOOL_DEFS, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./tools.js";
 import { shapeAgentAnswer } from "./shape.js";
+// TEAM C (citations everywhere): records + basis for every agent answer.
+import { citeAgentData } from "../citations/agent.js";
 import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
 // Sonnet escalation for hard questions / failed Haiku runs (escalation.js) and the page-image tool's prompt text.
 import { escalationModel, classifyQuestionDifficulty, needsEscalation, sonnetAllowed, recordSonnetSpend, MIN_ESCALATION_MS, isEscalationEnabled } from "./escalation.js";
@@ -50,6 +52,12 @@ export const AGENT_SYSTEM_PROMPT = `You are Donovan, the records assistant for a
 - Never invent a name, date, number, model, serial, address or document. Every number and name in your answer must appear in a tool result.
 - Prefer run_query for counts, lists and "who all / which / how many" questions (one well-formed query beats many small ones). Use search_documents for what documents SAY (permit or PO numbers, work performed, notes). Use find_customers then get_customer for one customer or address. A catalogue of this shop's records (entity counts, document types, field keys with examples, service-date range) follows the tools; call describe_data only if it is missing.
 - History questions about one customer or address ("has this unit had a compressor replaced", "what was done last visit"): find_customers, then search_documents with that customerId and the key words (compressor, replaced, ...). Answer with the quoted excerpt as a fact citing its documentId and page. If a customer-scoped search returns nothing, use none_found and say what was searched ("No document on file for that address mentions a compressor replacement").
+- TIME WORDS: "added / uploaded / received / scanned / filed" mean documents.created_at (documents_v upload date); "serviced / visited / job / work done / installed" mean the service_date / installation_date field. Say in text which date you used. A service_date later than today is a scheduled visit or a typo: never call it the last service or a completed job, exclude it and mention it.
+- SINGLE FIELDS (who installed it, when installed): answer only from a field or page that states it for THAT unit. Otherwise say it is not on file and give what is (a warranty registration date: "registered on X; the install date is not recorded"). A technician on a service ticket is not the installer.
+- ADDRESSES: one address may hold several units or apartments; answer for every match unless the question names a unit, and say so.
+- COMPARISONS ("more X or more Y"): run one query per side (or GROUP BY), state BOTH numbers and which is larger, one fact per side; a "breakdown by" lists every group. "Older/newer than N years": compare installation year against today's year minus N and say whether you counted customers or units.
+- MAINTENANCE due/overdue: last service_date + agreement cadence ("2 visits per year" = 6 months, otherwise 12); list each with its last visit date, citing the document.
+- "What do we have on file for <customer>": contact, units, document counts by type with latest dates, open reminders and warranty status, each cited.
 - Lists: one fact per row for EVERY row (up to 40), never a partial list phrased as complete; the total must be in text. If a result says truncated, narrow the query or select fewer columns and run it again.
 - If a question could mean two things (documents of a brand: linked to that brand's units, or belonging to customers who own that brand) pick the most natural one and SAY which in text.
 - If a query errors, read the error, fix the SQL and retry. Keep tool calls few.
@@ -230,6 +238,8 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
 
   let shaped = null;
   if (finalInput) shaped = shapeAgentAnswer(finalInput, toolbox.ledger, { question, today });
+  // TEAM C: the rows behind the answer (from the run_query that produced it), or what was searched / read.
+  if (shaped?.answered) shaped.data = await citeAgentData({ withTenant, ctxArg, data: shaped.data, ledger: toolbox.ledger, input: finalInput });
   costUsd = Math.round(costUsd * 1_000_000) / 1_000_000;
   const handled = Boolean(shaped?.answered);
 

@@ -779,6 +779,26 @@ void missBefore;
 }
 
 console.log('');
+
+/* ---- Team A (2026-09-24): time semantics + no-fabrication rules reach the agent; hard failures reach escalation ---- */
+{
+  const { AGENT_SYSTEM_PROMPT } = await import('../api/_lib/agent/loop.js');
+  const { classifyQuestionDifficulty } = await import('../api/_lib/agent/escalation.js');
+  const { isReasoningQuestion, isAgentFirstQuestion } = await import('../api/_lib/agent/intents.js');
+  const askSrc = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'api', 'ask.js'), 'utf8');
+  check('teamA agent prompt :: created_at vs service_date semantics', /created_at/.test(AGENT_SYSTEM_PROMPT) && /service_date/.test(AGENT_SYSTEM_PROMPT) && /uploaded/.test(AGENT_SYSTEM_PROMPT));
+  check('teamA agent prompt :: a future service_date is never the last service', /later than today/.test(AGENT_SYSTEM_PROMPT));
+  check('teamA agent prompt :: single fields never fabricated (not on file)', /not on file/.test(AGENT_SYSTEM_PROMPT) && /install date is not recorded/.test(AGENT_SYSTEM_PROMPT));
+  check('teamA agent prompt :: addresses answer for every match; comparisons state both numbers', /every match/.test(AGENT_SYSTEM_PROMPT) && /BOTH numbers/.test(AGENT_SYSTEM_PROMPT));
+  check('teamA agent prompt :: maintenance cadence + file summary rules', /2 visits per year/.test(AGENT_SYSTEM_PROMPT) && /on file for <customer>/.test(AGENT_SYSTEM_PROMPT));
+  check('teamA escalation :: "more X or more Y" is a hard question (Sonnet)', classifyQuestionDifficulty('do we have more invoices or more service tickets on file').hard);
+  check('teamA escalation :: a full-file request is a hard question (Sonnet)', classifyQuestionDifficulty('what do we have on file for Bracken').hard);
+  check('teamA intents :: comparison / why / trend go agent-first when unparsed', isReasoningQuestion('more invoices or more tickets') && isReasoningQuestion('why did jobs drop') && isAgentFirstQuestion('are jobs trending up'));
+  check('teamA intents :: plain counts stay on the analytics path', !isReasoningQuestion('how many customers are in mesa'));
+  check('teamA ask.js :: the analytics planner does not take reasoning questions', /!\(isAgentEnabled\(\) && isReasoningQuestion\(question\)\)/.test(askSrc));
+  check('teamA ask.js :: the deterministic history router runs before the fast path', askSrc.indexOf('classifyDeterministic') > 0 && askSrc.indexOf('runDeterministic') > 0);
+}
+
 if (failures) {
   console.log(`${failures} check(s) FAILED (${passes} passed).`);
   process.exit(1);

@@ -2,6 +2,7 @@ import type { Answer, AnswerProvider, Fact } from '../core/types';
 import { authHeader } from './authToken';
 import { messageFromResponse } from './httpError';
 import type { GraphSnapshot } from '../core/entityGraph';
+import { normalizeCitations } from '../core/citations';
 
 /**
  * Claude-backed provider. Sends only the question to /api/ask (a Vercel
@@ -121,5 +122,11 @@ function normalizeAnswer(a: Partial<Answer>, g: GraphSnapshot): Answer {
   };
   if (a.entityId && g.entities[a.entityId]) out.entityId = a.entityId;
   if (a.interpretation) out.interpretation = a.interpretation;
+  // Citation contract: the rows behind the answer + one sentence on how it was computed.
+  const cite = normalizeCitations(a);
+  if (cite.records) out.records = cite.records;
+  if (cite.recordsTotal != null) out.recordsTotal = cite.recordsTotal;
+  if (cite.recordsKind) out.recordsKind = cite.recordsKind;
+  if (cite.basis) out.basis = cite.basis;
   return out;
 }

@@ -47,6 +47,10 @@ const RULES = [
   { id: "why", points: 2, re: /\bwhy\b|\bhow come\b|\bwhat(?:'s| is) (?:causing|the reason)\b/i },
   { id: "trend", points: 2, re: /\b(?:trend(?:ing|s)?|over time|year[- ]over[- ]year|month[- ]over[- ]month|growing|grew|declin\w*|increas\w*|decreas\w*|dropp?ed|climb\w*|per month|by month|monthly|quarter over quarter)\b/i },
   { id: "comparison", points: 2, re: /\b(?:vs\.?|versus|compared? (?:to|with)|comparison|difference between|(?:more|less|fewer|greater|higher|lower|older|newer|bigger|smaller) than|best|worst|top \d+|bottom \d+)\b/i },
+  // Team A (2026-09-24): "more X or more Y" carries no "than", so the rule above missed it; a full-file request
+  // ("what do we have on file for X", "everything on X") needs several tools and a summary, not one lookup.
+  { id: "comparison", points: 2, re: /\b(?:more|fewer|less|greater)\s+[a-z][a-z /&-]{1,40}?\s+(?:or|vs\.?|versus)\s+/i },
+  { id: "file-summary", points: 2, re: /\b(?:what(?:'s| do we have| have we got| is there)?\s+on file (?:for|on|about)|everything (?:we have )?(?:on|about|for)|full (?:file|history|picture))\b/i },
   { id: "negation", points: 1, re: /\b(?:no|not|never|without|except|excluding|other than|haven'?t|hasn'?t|hadn'?t|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|missing|lack(?:s|ing)?)\b/i },
   { id: "ambiguous", points: 1, re: /^\s*(?:and |what about |how about |same for )?(?:them|those|these|that one|this one|it|the other one|the same)\b|\b(?:of those|of them|the ones)\b/i },
 ];

@@ -23,12 +23,18 @@ import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED as ASK_CACHE_ENABLED_RAW } from "./_lib/askCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
+// Team A (2026-09-24): deterministic history/comparison/maintenance router (no model call, cited answers).
+import { classifyDeterministic, runDeterministic } from "./_lib/deterministicRouter.js";
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): answers money questions from SQL over document_financials.
 import { answerMoneyQuestion, moneyNoMatchAnswer } from "./_lib/financials/moneyGate.js";
+// TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
+import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
+import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
+import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZeroCitations, searchedLibraryBasis } from "./_lib/citations/enrich.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
-import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText } from "./_lib/docLookup.js";
+import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -52,7 +58,7 @@ import { getActiveOverlay } from "./_lib/learning/overlay.js";
 // Donovan agent fallback (api/_lib/agent/): a bounded read-only tool-use loop tried when every
 // pre-router / the analytics planner / retrieval+model could not answer. DONOVAN_AGENT=0 disables it.
 import { runDonovanAgent, isAgentEnabled, agentQuestionHash, AGENT_PROMPT_VERSION, agentDebugTrace } from "./_lib/agent/loop.js";
-import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion } from "./_lib/agent/intents.js";
+import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion, isReasoningQuestion } from "./_lib/agent/intents.js";
 import { runRecipeFastPath } from "./_lib/agent/fastReplay.js";
 // Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
 import { findExactRecipe } from "./_lib/learning/recipes.js";
@@ -298,7 +304,10 @@ async function resolveCustomerDocumentIds(db, number) {
 async function showCustomerEverything(db, number) {
   const { row, documentIds, via } = await resolveCustomerDocumentIds(db, number);
   if (!row) {
-    return { kind: "no-answer", text: `No customer found for ${number}.`, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+    return attachCitations(
+      { kind: "no-answer", text: `No customer found for ${number}.`, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { records: [], total: 0, kind: "searched", basis: `Looked up customer number ${number} in your customer records; no customer has that number.` } // TEAM C
+    );
   }
   const [equipmentRows, documentDetails] = await Promise.all([
     db.listCustomerEquipment(row.id),
@@ -318,7 +327,16 @@ async function showCustomerEverything(db, number) {
   }
   const name = row.data?.customer_name ?? "Unnamed customer";
   const text = `${name} (${row.customer_number}) — ${documentDetails.length} document${documentDetails.length === 1 ? "" : "s"}, ${equipmentRows.length} piece${equipmentRows.length === 1 ? "" : "s"} of equipment.`;
-  return { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] };
+  // TEAM C: the records are the same documents + units the sentence counts.
+  const everything = [
+    ...documentDetails.map((d) => documentRecord(d, { label: `${documentTypeLabel(d.document_type)} · ${d.original_filename ?? d.id}` })),
+    ...equipmentRows.map((u) => unitRecord(u, { customerId: row.id })),
+  ];
+  return attachCitations(
+    { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] },
+    { records: everything, total: everything.length, claimedCount: documentDetails.length + equipmentRows.length,
+      basis: `Everything linked to ${name} (${row.customer_number}): documents linked directly, through their equipment, or by matching name and address, plus their equipment.` }
+  );
 }
 
 const META_LIST_LIMIT = 50;
@@ -358,44 +376,55 @@ async function countFor(db, target) {
 async function listDocuments(db, unverifiedOnly) {
   const filter = unverifiedOnly ? `stage <> 'verified' AND ${TENANT_SQL}` : TENANT_SQL;
   const total = (await db.raw(`SELECT COUNT(*)::int AS n FROM documents WHERE ${filter}`, [])).rows[0].n;
-  const { rows } = await db.raw(
-    `SELECT id FROM documents WHERE ${filter} ORDER BY created_at DESC LIMIT $1`,
-    [META_LIST_LIMIT]
+  // TEAM C: the citation records come from this same query (more columns, up to the record cap); the
+  // response `sources` keep their original first-META_LIST_LIMIT size.
+  const { rows: allRows } = await db.raw(
+    `SELECT id, document_type, original_filename, created_at FROM documents WHERE ${filter} ORDER BY created_at DESC LIMIT 200`,
+    []
   );
+  const rows = allRows.slice(0, META_LIST_LIMIT);
   const sources = rows.map((r) => ({ documentId: r.id, location: {} }));
   const noun = unverifiedOnly ? "unverified document" : "document";
   const text = total > sources.length
     ? `${total} ${noun}s — showing the first ${sources.length}.`
     : `${total} ${noun}${total === 1 ? "" : "s"}.`;
-  return { kind: "answer", text, facts: [], sources, confidence: 1, verifiedCount: sources.length, unverifiedCount: 0, closest: [] };
+  return attachCitations(
+    { kind: "answer", text, facts: [], sources, confidence: 1, verifiedCount: sources.length, unverifiedCount: 0, closest: [] },
+    { ...metaListCitations(unverifiedOnly ? "unverified" : "documents", allRows, total), basis: unverifiedOnly ? "Listed documents that have not been verified yet, newest upload first." : "Listed documents, newest upload first." }
+  );
 }
 
 async function listCustomers(db) {
   const total = (await db.raw(
     `SELECT COUNT(*)::int AS n FROM entities WHERE entity_type = 'customer' AND ${TENANT_SQL}`, []
   )).rows[0].n;
-  const { rows } = await db.raw(
-    `SELECT data->>'customer_name' AS name, data->>'service_address' AS address
+  // TEAM C: id column added so each listed customer is a clickable record (same rows, same order).
+  const { rows: allRows } = await db.raw(
+    `SELECT id, data->>'customer_name' AS name, data->>'service_address' AS address
        FROM entities WHERE entity_type = 'customer' AND ${TENANT_SQL}
-      ORDER BY updated_at DESC LIMIT $1`,
-    [META_LIST_LIMIT]
+      ORDER BY updated_at DESC LIMIT 200`,
+    []
   );
-  const facts = rows.map((r) => ({ label: r.name || "Unnamed customer", value: r.address || "—", sources: [] }));
+  const rows = allRows.slice(0, META_LIST_LIMIT);
+  const facts = rows.map((r) => ({ label: r.name || "Unnamed customer", value: r.address || "—", entityId: r.id, sources: [] }));
   const text = total > facts.length
     ? `${total} customers — showing the first ${facts.length}.`
     : `${total} customer${total === 1 ? "" : "s"}.`;
-  return { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] };
+  return attachCitations(
+    { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] },
+    metaListCitations("customers", allRows.map((r) => ({ ...r, customer_name: r.name, service_address: r.address })), total)
+  );
 }
 
 async function listDocumentTypes(db) {
-  const { rows } = await db.raw(
-    `SELECT document_type, COUNT(*)::int AS n FROM documents WHERE ${TENANT_SQL}
-      GROUP BY document_type ORDER BY n DESC`,
-    []
-  );
+  // TEAM C: same GROUP BY, now also carrying the documents in each group (records keep the type as their group key).
+  const { rows, citations } = await metaDocumentTypes(db);
   const facts = rows.map((r) => ({ label: documentTypeLabel(r.document_type), value: String(r.n), sources: [] }));
   const text = facts.length ? `${facts.length} document type${facts.length === 1 ? "" : "s"} in use.` : "No documents yet.";
-  return { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] };
+  return attachCitations(
+    { kind: "answer", text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [] },
+    citations
+  );
 }
 
 const IMPERATIVE_TEXT = {
@@ -405,17 +434,23 @@ const IMPERATIVE_TEXT = {
 
 async function runMetaQuestion(db, meta) {
   if (meta.kind === "imperative") {
-    return { kind: "no-answer", text: IMPERATIVE_TEXT[meta.action], facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+    return attachCitations(
+      { kind: "no-answer", text: IMPERATIVE_TEXT[meta.action], facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { records: [], total: 0, basis: "This is a how-to about the app, not something drawn from your records." } // TEAM C
+    );
   }
   if (meta.kind === "count") {
-    const n = await countFor(db, meta.target);
+    // TEAM C: ONE query yields the number AND the rows behind it (window COUNT), so they cannot disagree.
+    const counted = await metaCount(db, meta.target);
+    const n = counted ? counted.n : await countFor(db, meta.target);
     const label = COUNT_LABEL[meta.target];
-    return {
+    const answer = {
       kind: "answer",
       text: `You have ${n} ${label}.`,
       facts: [{ label: label[0].toUpperCase() + label.slice(1), value: String(n), sources: [] }],
       sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
     };
+    return counted ? attachCitations(answer, counted.citations) : answer;
   }
   if (meta.kind === "customer") return showCustomerEverything(db, meta.number);
   if (meta.target === "unverified-documents") return listDocuments(db, true);
@@ -506,6 +541,11 @@ export default async function handler(req, res) {
   // ASK_LATENCY_2026-09-20.md) — ms only, no PII, no question text.
   const timer = startTimer();
   const send = (status, body) => {
+    // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
+    // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
+    if (body?.data && typeof body.data === "object") {
+      try { finalizeCitations(body.data); } catch (err) { console.error("finalizeCitations failed, sending answer without it:", err?.message); }
+    }
     const header = formatServerTiming(timer.snapshot());
     if (header && !res.headersSent) res.setHeader("Server-Timing", header);
     if (process.env.ASK_DEBUG_TIMINGS === "1" && body?.data && typeof body.data === "object") {
@@ -591,6 +631,8 @@ export default async function handler(req, res) {
     // ASK_FAST_PATH=0. classifyFastPath is pure (no DB) so this costs nothing
     // when it returns null, which most non-meta questions still will.
     const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
+    // Team A: comparison / maintenance-due / address-history questions (pure shape detection, no DB) - see block 0.4.
+    const detIntent = !meta ? classifyDeterministic(question) : null;
     // Contact-lookup-by-name pre-router (live miss cluster 1, 2026-09-21):
     // "what's the phone number on file for donna thornton" — a lowercase
     // name with no HVAC anchor satisfies neither of fastPath's own gates
@@ -638,6 +680,9 @@ export default async function handler(req, res) {
       // "newest/oldest unit": ranking the whole fleet needs an ORDER BY, which the closed-vocabulary planner
       // does not have (it would list every unit) - the agent answers these (agent-first, below).
       !(isAgentEnabled() && isUnitRankingQuestion(question)) &&
+      // Team A: comparison / why / trend questions the deterministic router could not parse go to the agent (Sonnet-
+      // escalated by the hard-question classifier) instead of a planner that flattens them into one count.
+      !(isAgentEnabled() && isReasoningQuestion(question)) &&
       preClassifyAnalytics(normalizedForAnalytics, { overlay });
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
@@ -784,7 +829,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || fastPathIntent || contactLookupIntent || docLookupIntent || moneyQuestion || analyticsCandidate
+    const retrievalPromise = meta || detIntent || fastPathIntent || contactLookupIntent || docLookupIntent || moneyQuestion || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
@@ -827,6 +872,36 @@ export default async function handler(req, res) {
       }
     }
 
+    // ---- 0.4 deterministic history router (Team A, no model, DB only) ------
+    // "do we have more invoices or more service tickets", "who's overdue for maintenance", "when did we last service the
+    // unit at <address>", "who installed the Mitsubishi at <address>", "last 3 visits at Zimmerman's": date arithmetic and
+    // counts over the shop's own records, answered with a citation per fact (deterministicRouter.js). null = not
+    // confident -> the normal chain (fast path, lookups, analytics, agent, retrieval) carries on unchanged.
+    if (detIntent) {
+      let detData = null;
+      try {
+        detData = await timer.time("deterministic", () =>
+          withTenant(ctxArg, (db) => withCitations(db, runDeterministic(db, detIntent, { today: todayResolved }))) // TEAM C
+        );
+      } catch (err) {
+        console.error("Deterministic router failed, falling through:", err?.message);
+      }
+      console.log(JSON.stringify({ route: "ask", det_route: detIntent.route, det_kind: detIntent.kind ?? null, det_hit: Boolean(detData) }));
+      if (detData) {
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, (db) => db.logAction({
+              action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+              changes: { question_hash: hashQuestion(question), documents: [...new Set((detData.sources ?? []).map((x) => x.documentId))], passages: 0, deterministic: detIntent.route },
+            }));
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (deterministic):", err?.message);
+          }
+        });
+        return send(200, { success: true, data: detData });
+      }
+    }
+
     // ---- 0.5 fast-path pre-router (no model, DB only) ----------------------
     // Distinct from the meta-router above: meta answers deterministic
     // inventory questions ("how many documents"); this answers a specific
@@ -843,7 +918,7 @@ export default async function handler(req, res) {
       let fastData = null;
       try {
         fastData = await timer.time("fast", () =>
-          withTenant(ctxArg, (db) => runFastPath(db, fastPathIntent, { today: todayResolved }))
+          withTenant(ctxArg, (db) => withCitations(db, runFastPath(db, fastPathIntent, { today: todayResolved }))) // TEAM C
         );
       } catch (err) {
         console.error("Fast path failed, falling through to retrieval+model:", err?.message);
@@ -889,7 +964,7 @@ export default async function handler(req, res) {
       let contactData = null;
       try {
         contactData = await timer.time("contact", () =>
-          withTenant(ctxArg, (db) => runContactLookup(db, question, { overlay, today: todayResolved }))
+          withTenant(ctxArg, (db) => withCitations(db, runContactLookup(db, question, { overlay, today: todayResolved }))) // TEAM C
         );
       } catch (err) {
         console.error("Contact lookup failed, falling through to retrieval+model:", err?.message);
@@ -952,7 +1027,7 @@ export default async function handler(req, res) {
       let docData = null;
       try {
         docData = await timer.time("doclookup", () =>
-          withTenant(ctxArg, (db) => runDocLookup(db, question, { overlay }))
+          withTenant(ctxArg, (db) => withCitations(db, runDocLookup(db, question, { overlay }))) // TEAM C
         );
       } catch (err) {
         console.error("Doc lookup failed, falling through to retrieval+model:", err?.message);
@@ -1217,22 +1292,35 @@ export default async function handler(req, res) {
       // back to the generic line rather than risking a wrong/500 response on
       // an already-given-up path.
       let honestZeroText = null;
-      if (looksLikeSingleRecordReference(question)) {
-        try {
-          const ctx = await withTenant(ctxArg, (db) => resolveHonestZeroContext(db, question));
-          if (ctx) honestZeroText = buildHonestZeroText(ctx);
-        } catch (err) {
-          console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
-        }
+      // TEAM C: what was searched, from the same transaction (documents linked to the resolved customer, or the whole library).
+      let zeroCitations = null;
+      try {
+        zeroCitations = await withTenant(ctxArg, async (db) => {
+          let cites = null;
+          if (looksLikeSingleRecordReference(question)) {
+            try {
+              const ctx = await resolveHonestZeroContext(db, question);
+              if (ctx) {
+                honestZeroText = buildHonestZeroText(ctx);
+                cites = await honestZeroCitations(db, ctx, { documentIdsFor: customerDocumentIds });
+              }
+            } catch (err) {
+              console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
+            }
+          }
+          return cites ?? { records: [], total: 0, kind: "searched", basis: await searchedLibraryBasis(db) };
+        });
+      } catch (err) {
+        console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
       }
       return send(200, {
         success: true,
-        data: {
+        data: attachCitations({
           kind: "no-answer",
           text: honestZeroText ?? "Nothing in your records answers that yet. Your documents may still be processing.",
           facts: [], sources: [], confidence: 0,
           verifiedCount: 0, unverifiedCount: 0, closest: [],
-        },
+        }, zeroCitations ?? { records: [], total: 0, kind: "searched", basis: "Searched your documents; nothing matched." }),
       });
     }
 
@@ -1367,6 +1455,8 @@ export default async function handler(req, res) {
       ...mappedExtractions.map((x) => ({ documentId: x.documentId })),
     ];
     const data = shapeAnswer(toolUse?.input, allowed, { candidates });
+    // TEAM C: label the cited pages and say what the answer was selected from (a no-answer cites what was searched).
+    attachRetrievalCitations(data, { passages: mappedPassages, extractions: mappedExtractions });
     // Retrieval+model shaped an honest no-answer: the agent gets one shot (its own answer is
     // counted once, and this call's usage is recorded with it).
     if (data.kind === "no-answer" && (await tryAgent({

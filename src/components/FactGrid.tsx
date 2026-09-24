@@ -19,6 +19,10 @@ interface FactGridProps {
   /** Filename (or other label) for a source, shown as the chip's tooltip so
    *  "[2]" reads as "[2] 48-invoice-whitmore.pdf" on hover/long-press. */
   sourceLabel?: (ref: SourceRef) => string | undefined;
+  /** Breakdown keys that have records behind them (citation contract): their rows become filters. */
+  groupKeys?: ReadonlySet<string>;
+  activeGroup?: string | null;
+  onSelectGroup?: (label: string) => void;
 }
 
 /**
@@ -36,18 +40,43 @@ function isGroupLikeFact(f: Fact): boolean {
   return !f.status && f.sources.length === 0;
 }
 
-function GroupTable({ facts, onOpenEntity }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void }) {
+interface GroupSelect {
+  groupKeys?: ReadonlySet<string> | undefined;
+  activeGroup?: string | null | undefined;
+  onSelectGroup?: ((label: string) => void) | undefined;
+}
+
+function GroupTable({ facts, onOpenEntity, groupKeys, activeGroup, onSelectGroup }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void } & GroupSelect) {
   return (
     <dl className="border border-line rounded-lg bg-surface divide-y divide-line grid grid-cols-1 sm:grid-cols-2 max-h-[28rem] overflow-y-auto">
       {facts.map((f, i) => {
         const linkable = !!(f.entityId && onOpenEntity);
+        const filterable = !!(onSelectGroup && groupKeys?.has(f.label));
+        const active = filterable && activeGroup === f.label;
         return (
           <div
             key={`${f.label}-${i}`}
-            className="flex items-baseline justify-between gap-3 px-3 py-1.5 border-b border-line sm:border-b-0 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0"
+            className={[
+              'flex items-baseline justify-between gap-3 px-3 py-1.5 border-b border-line sm:border-b-0 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0',
+              active ? 'bg-surface-2' : '',
+            ].join(' ')}
           >
-            <dt className="text-body text-ink-2 truncate">{f.label}</dt>
-            {linkable ? (
+            {filterable ? (
+              // Breakdown row = a filter for the records list below: click / Enter / Space toggles it.
+              <button
+                type="button"
+                onClick={() => onSelectGroup?.(f.label)}
+                aria-pressed={active}
+                aria-label={`${f.label}: ${f.value}. Show these records`}
+                className="w-full flex items-baseline justify-between gap-3 text-left min-h-[28px] hover:text-ink"
+              >
+                <span className="text-body text-ink-2 truncate">{f.label}</span>
+                <span className="font-mono text-data text-ink underline decoration-line-2 underline-offset-4">{f.value}</span>
+              </button>
+            ) : (
+              <dt className="text-body text-ink-2 truncate">{f.label}</dt>
+            )}
+            {filterable ? null : linkable ? (
               <button
                 type="button"
                 onClick={() => f.entityId && onOpenEntity?.(f.entityId)}
@@ -70,7 +99,7 @@ function GroupTable({ facts, onOpenEntity }: { facts: Fact[]; onOpenEntity?: (en
  * as pills (with text — colour is never the only signal). Each row shows its
  * citation numbers; tapping one opens that document at the cited field.
  */
-export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLabel }: FactGridProps) {
+export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLabel, groupKeys, activeGroup, onSelectGroup }: FactGridProps) {
   const docs = useGraph((s) => s.docs);
   const schema = useGraph((s) => s.schema);
   if (!facts.length) return null;
@@ -83,7 +112,7 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLa
         <div className="mb-2">
           <h3 id="facts-heading" className="dw-label">Breakdown</h3>
         </div>
-        <GroupTable facts={facts} onOpenEntity={onOpenEntity} />
+        <GroupTable facts={facts} onOpenEntity={onOpenEntity} groupKeys={groupKeys} activeGroup={activeGroup} onSelectGroup={onSelectGroup} />
       </section>
     );
   }
@@ -119,6 +148,16 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLa
               <dd className="min-w-0 text-ink">
                 {f.status ? (
                   <span className={PILL[f.status]}>{f.value}</span>
+                ) : onSelectGroup && groupKeys?.has(f.label) ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectGroup(f.label)}
+                    aria-pressed={activeGroup === f.label}
+                    aria-label={`${f.label}: ${f.value}. Show these records`}
+                    className="inline-flex items-center gap-1 text-left underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 dark:hover:decoration-brass-300 min-h-[32px]"
+                  >
+                    {f.value}
+                  </button>
                 ) : linkable ? (
                   <button
                     type="button"

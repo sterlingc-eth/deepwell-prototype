@@ -289,7 +289,11 @@ export interface ScorecardRun {
   passed: number;
   /** 0-1, null until something has been graded. */
   score: number | null;
-  byCategory: Record<string, { passed: number; total: number; score: number }>;
+  /** 0-1 share whose VALUE was right, citations aside (the status action derives it from the per-question results). */
+  valueScore?: number | null;
+  /** Of the answers that needed a citation, how many carried one. */
+  citation?: { required: number; cited: number; coverage: number | null };
+  byCategory: Record<string, { passed: number; total: number; score: number; valueScore?: number; citationCoverage?: number | null }>;
   costUsd: number;
   models: string[];
   startedAt: string | null;
@@ -303,16 +307,23 @@ export interface ScorecardFailing {
   expected: string | null;
   got: string | null;
   models?: string[];
+  persona?: string;
+  /** false = the value itself was wrong; true with cited=false = right but no source. */
+  valueOk?: boolean;
+  cited?: boolean;
+  citationRequired?: boolean;
   retry?: { model: string; passed: boolean; got?: string };
   error?: string;
 }
 
 export interface ScorecardStatus {
   backend: 'tables' | 'audit' | 'memory';
-  exam: { version: string; questions: number; categories: Record<string, number> };
+  exam: { version: string; questions: number; categories: Record<string, number>; personas?: Record<string, number> };
   budgetUsd: number;
+  /** Why a failure here means Donovan was wrong (the answer key is audited; see test-docs/scorecard/ADJUDICATION.md). */
+  adjudicationNote?: string;
   run: ScorecardRun | null;
-  previous: { id: string; score: number; startedAt: string | null; answered: number } | null;
+  previous: { id: string; score: number; startedAt: string | null; answered: number; valueScore?: number | null; citationCoverage?: number | null } | null;
   runs: { id: string; source: string; status: string; score: number | null; answered: number; startedAt: string | null; costUsd: number }[];
   failing: ScorecardFailing[];
 }

@@ -1,5 +1,8 @@
+import { useMemo, useState } from 'react';
 import { ShieldCheck, ShieldQuestion } from 'lucide-react';
-import type { Answer, SourceRef } from '../core/types';
+import type { Answer, AnswerRecord, SourceRef } from '../core/types';
+import { recordGroups, showRecordsPanel } from '../core/citations';
+import { RecordsPanel } from './RecordsPanel';
 import { FactGrid } from './FactGrid';
 import { SourceList } from './SourceList';
 import { AnswerFeedback } from './AnswerFeedback';
@@ -11,6 +14,8 @@ export interface AnswerCardProps {
   onToggleUnverified: (on: boolean) => void;
   onOpenSource: (ref: SourceRef) => void;
   onOpenEntity?: (entityId: string) => void;
+  /** Open a record from the "Based on N records" list: customer profile, unit's customer, document at its cited page. */
+  onOpenRecord?: (record: AnswerRecord) => void;
 }
 
 /**
@@ -21,7 +26,29 @@ export interface AnswerCardProps {
  *
  * Embeddable: it depends only on the Answer object and three callbacks.
  */
-export function AnswerCard({ answer, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity }: AnswerCardProps) {
+export function AnswerCard({ answer, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity, onOpenRecord }: AnswerCardProps) {
+  // Citation contract: the drill-down list is collapsed until asked for; a breakdown row can filter it.
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [recordsGroup, setRecordsGroup] = useState<string | null>(null);
+  const records = useMemo(() => answer.records ?? [], [answer.records]);
+  const groupKeys = useMemo(() => new Set(recordGroups(records)), [records]);
+  const selectGroup = (label: string) => {
+    setRecordsGroup((cur) => (cur === label ? null : label));
+    setRecordsOpen(true);
+  };
+  const panel = showRecordsPanel(answer) && onOpenRecord ? (
+    <RecordsPanel
+      records={records}
+      total={answer.recordsTotal ?? records.length}
+      kind={answer.recordsKind ?? 'basis'}
+      open={recordsOpen}
+      onToggle={setRecordsOpen}
+      group={recordsGroup}
+      onGroupChange={setRecordsGroup}
+      onOpenRecord={onOpenRecord}
+    />
+  ) : null;
+
   const docOrder = new Map<string, number>();
   for (const s of answer.sources) if (!docOrder.has(s.documentId)) docOrder.set(s.documentId, docOrder.size + 1);
   const citation = (ref: SourceRef) => docOrder.get(ref.documentId) ?? 0;
@@ -44,6 +71,12 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
         <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] field:text-[30px] field:leading-[38px]'].join(' ')}>
           {answer.text}
         </p>
+        {/* How it was computed, one muted sentence: every answer states its basis (citation contract). */}
+        {answer.basis && (
+          <p className="mt-2 text-caption text-ink-3" data-testid="answer-basis">
+            {answer.basis}
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-body text-ink-2 field:text-body-lg">
           <span className="inline-flex items-center gap-1.5">
@@ -71,10 +104,18 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
 
       <div className="px-5 sm:px-6 py-5 space-y-6">
         {isEmpty ? (
-          <SourceList sources={answer.closest} onOpen={onOpenSource} title="Closest documents" emptyText="No documents look related. Try an address, a serial number, or a customer name." />
+          <>
+            <SourceList sources={answer.closest} onOpen={onOpenSource} title="Closest documents" emptyText="No documents look related. Try an address, a serial number, or a customer name." />
+            {panel}
+          </>
         ) : (
           <>
-            <FactGrid facts={answer.facts} citation={citation} onOpenSource={onOpenSource} sourceLabel={sourceLabel} {...(onOpenEntity ? { onOpenEntity } : {})} />
+            <FactGrid
+              facts={answer.facts} citation={citation} onOpenSource={onOpenSource} sourceLabel={sourceLabel}
+              {...(onOpenEntity ? { onOpenEntity } : {})}
+              {...(panel ? { groupKeys, activeGroup: recordsGroup, onSelectGroup: selectGroup } : {})}
+            />
+            {panel}
             <SourceList sources={answer.sources} onOpen={onOpenSource} />
           </>
         )}

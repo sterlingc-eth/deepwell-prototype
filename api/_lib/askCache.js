@@ -46,6 +46,8 @@ export const PROMPT_VERSION = createHash("sha256")
   .update(String(process.env.ASK_MODEL || "claude-haiku-4-5"))
   .update(SYSTEM_PROMPT)
   .update(JSON.stringify(ANSWER_TOOL))
+  // Cache epoch: bump to drop every cached answer (2026-09-24: answers now carry citation records; history/installer fixes).
+  .update("epoch-2026-09-24")
   .digest("hex")
   .slice(0, 12);
 

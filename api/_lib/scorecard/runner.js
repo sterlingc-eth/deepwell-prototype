@@ -25,7 +25,7 @@ import { getActiveOverlay } from "../learning/overlay.js";
 import { missKey } from "../learning/replay.js";
 import { escalationModel } from "../agent/escalation.js";
 import { runOracle } from "./oracle.js";
-import { compareAnswer, answerView, summarizeAnswer, summarizeExpected, scoreResults } from "./compare.js";
+import { compareAnswer, answerView, summarizeAnswer, summarizeExpected, scoreResults, withCitation } from "./compare.js";
 import { gradeRubric } from "./grader.js";
 import { askViaHandler } from "./askCall.js";
 import { createRun, saveResults, getRun } from "./store.js";
@@ -60,18 +60,21 @@ function labelModels(usage, debug) {
  * Grade one asked question. Returns {passed, score, got, expectedSummary, why, costUsd, skipped?}.
  * (Exported for tests.)
  */
-export async function gradeAnswer({ ctx, question, expected, data, callModel, deadlineAt }) {
+export async function gradeAnswer({ ctx, question, expected, data, alts, callModel, deadlineAt }) {
   if (question.cmp !== "rubric") {
-    const r = compareAnswer({ cmp: question.cmp, expected, question: question.text }, data);
+    const r = compareAnswer({ cmp: question.cmp, expected, question: question.text, citationRequired: question.citationRequired, alts, tolerance: question.tolerance, anyNumber: question.anyNumber }, data);
     return { ...r, costUsd: 0 };
   }
   const view = answerView(data);
+  const cite = question.citeWhat ? ` The answer must cite ${question.citeWhat}.` : "";
   const g = await gradeRubric({
-    ctxArg: ctx, question: question.text, rubric: question.rubric, reference: expected,
-    answerText: `${view.text}\n${view.facts.map((f) => `${f.label}: ${f.value}`).join("\n")}`, callModel, deadlineAt,
+    ctxArg: ctx, question: question.text, rubric: `${question.rubric}${cite}`, reference: expected,
+    answerText: `${view.text}\n${view.facts.map((f) => `${f.label}: ${f.value}`).join("\n")}\n[citations attached to the answer: ${view.citations}]`, callModel, deadlineAt,
   });
   if (g.error) return { passed: false, score: 0, skipped: true, got: summarizeAnswer(view), expectedSummary: summarizeExpected(question), why: `grader unavailable (${g.error})`, costUsd: g.costUsd };
-  return { passed: g.passed, score: g.passed ? 1 : 0, got: summarizeAnswer(view), expectedSummary: summarizeExpected(question), why: g.reason, costUsd: g.costUsd };
+  // A rubric answer is also held to the citation rule: the model grades the content, the citation check is deterministic.
+  const r = withCitation({ passed: g.passed, score: g.passed ? 1 : 0, got: summarizeAnswer(view), why: g.reason }, { ...question, cmp: "rubric", expected }, view);
+  return { ...r, costUsd: g.costUsd };
 }
 
 /**
@@ -152,7 +155,7 @@ export async function runScorecard({
       continue;
     }
 
-    let graded = await gradeAnswer({ ctx, question: q, expected: oracle.expected, data: asked.data, callModel, deadlineAt: deadline });
+    let graded = await gradeAnswer({ ctx, question: q, expected: oracle.expected, alts: oracle.alts, data: asked.data, callModel, deadlineAt: deadline });
     cost += graded.costUsd ?? 0;
     if (graded.skipped) { pageResults.push({ ...base, skipped: true, passed: false, error: graded.why, costUsd: cost }); spent += cost; continue; }
 
@@ -160,16 +163,21 @@ export async function runScorecard({
     if (asked.debug?.escalation) detail.escalation = asked.debug.escalation;
     if (typeof graded.precision === "number") { detail.precision = graded.precision; detail.recall = graded.recall; }
     if (graded.why) detail.why = graded.why;
+    if (graded.usedAlt) detail.usedAlt = graded.usedAlt;
+    detail.valueOk = graded.valueOk ?? Boolean(graded.passed);
+    detail.cited = Boolean(graded.cited);
+    detail.citationRequired = Boolean(graded.citationRequired);
+    if (q.persona) detail.persona = q.persona;
 
     // A failure the agent produced (or declined) is retried ONCE on the escalation model; the score stays the
     // first attempt so the number keeps meaning "what a customer got".
-    if (!graded.passed && retryFailures && worthRetry(asked, sonnet) && spent + cost < budget && deadline - Date.now() >= MIN_QUESTION_MS) {
+    if (!graded.passed && graded.valueOk !== true && retryFailures && worthRetry(asked, sonnet) && spent + cost < budget && deadline - Date.now() >= MIN_QUESTION_MS) {
       try {
         const again = await askViaHandler({ handler, auth: askAuth, question: q.text, today, escalate: true, deadlineAt: deadline });
         cost += again.usage.costUsd;
         models = [...new Set([...models, ...labelModels(again.usage, again.debug)])];
         if (again.data) {
-          const g2 = await gradeAnswer({ ctx, question: q, expected: oracle.expected, data: again.data, callModel, deadlineAt: deadline });
+          const g2 = await gradeAnswer({ ctx, question: q, expected: oracle.expected, alts: oracle.alts, data: again.data, callModel, deadlineAt: deadline });
           cost += g2.costUsd ?? 0;
           detail.retry = { model: again.debug?.model ?? sonnet, passed: Boolean(g2.passed), got: g2.got };
         }
@@ -180,6 +188,7 @@ export async function runScorecard({
 
     pageResults.push({
       ...base, passed: Boolean(graded.passed), score: graded.score, expected: graded.expectedSummary, got: graded.got,
+      valueOk: graded.valueOk ?? Boolean(graded.passed), cited: Boolean(graded.cited), citationRequired: Boolean(graded.citationRequired),
       detail, models, costUsd: cost, latencyMs: asked.latencyMs, error: null,
     });
     spent += cost;

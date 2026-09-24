@@ -13,7 +13,7 @@ import { useGraph } from '../core/entityGraph';
 import { isValidPlanId, type BillingInterval } from '../services/billingClient';
 import type { WorkFilterChoice } from '../core/workFilter';
 
-const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team', 'outreach', 'expenses'];
+const SCREENS: readonly Screen[] = ['ask', 'records', 'ingest', 'review', 'dashboard', 'browse', 'entity', 'customer', 'warranty-export', 'billing', 'team', 'outreach'];
 
 function isScreen(value: string): value is Screen {
   return (SCREENS as readonly string[]).includes(value);

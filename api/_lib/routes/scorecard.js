@@ -11,10 +11,14 @@ import { getPool } from "../recordsStore.js";
 import askHandler from "../../ask.js";
 import { loadExam } from "../scorecard/exam.js";
 import { runScorecard, scorecardBudgetUsd, nightlySlice, NIGHTLY_SLICE, DEFAULT_PAGE_SIZE } from "../scorecard/runner.js";
+import { scoreResults } from "../scorecard/compare.js";
 import { listRuns, getRun } from "../scorecard/store.js";
 
 const todayUtc = () => new Date().toISOString().slice(0, 10);
 const TASK_KEY = "donovan-scorecard";
+
+/** Shown next to every score: the exam is audited, and where the answer key was wrong it was fixed, not "gamed". */
+export const ADJUDICATION_NOTE = "Every failure is adjudicated: when the answer key (oracle) was wrong it is fixed and logged in test-docs/scorecard/ADJUDICATION.md, so a failing question here means Donovan was wrong under a documented definition. A pass needs the right value AND a citation.";
 
 /** Pure: the question list for a scope. */
 export function selectQuestions(exam, { scope = "full", today, category, ids } = {}) {
@@ -67,15 +71,26 @@ export async function scorecardStatusAction(ctx, payload = {}) {
   // Trend: compare with the newest OTHER run that answered at least half as many questions (a partial slice is not comparable).
   const previous = runs.find((r) => r.id !== run?.id && r.score != null && run && r.answered >= Math.min(20, (run.answered || 0) / 2) && Date.parse(r.startedAt) < Date.parse(run.startedAt)) ?? null;
   const categories = {};
-  for (const q of exam.questions) categories[q.category] = (categories[q.category] ?? 0) + 1;
+  const personas = {};
+  for (const q of exam.questions) { categories[q.category] = (categories[q.category] ?? 0) + 1; if (q.persona) personas[q.persona] = (personas[q.persona] ?? 0) + 1; }
+  // Value accuracy and citation coverage are derived from the per-question results (the run row only stores pass counts).
+  const results = detail?.results ?? [];
+  const agg = scoreResults(results);
+  const runOut = run ? { ...run, valueScore: agg.total ? agg.valueScore : null, citation: agg.citation, byCategory: agg.total ? agg.byCategory : run.byCategory } : null;
+  const prevDetail = previous ? await getRun(ctx, previous.id) : null;
+  const prevAgg = prevDetail ? scoreResults(prevDetail.results ?? []) : null;
   return {
     backend: detail?.backend ?? backend,
-    exam: { version: exam.version, questions: exam.questions.length, categories },
+    exam: { version: exam.version, questions: exam.questions.length, categories, personas },
     budgetUsd: scorecardBudgetUsd(),
-    run, previous: previous ? { id: previous.id, score: previous.score, startedAt: previous.startedAt, answered: previous.answered } : null,
+    adjudicationNote: ADJUDICATION_NOTE,
+    run: runOut,
+    previous: previous ? { id: previous.id, score: previous.score, startedAt: previous.startedAt, answered: previous.answered, valueScore: prevAgg?.valueScore ?? null, citationCoverage: prevAgg?.citation?.coverage ?? null } : null,
     runs: runs.map((r) => ({ id: r.id, source: r.source, status: r.status, score: r.score, answered: r.answered, startedAt: r.startedAt, costUsd: r.costUsd })),
-    failing: (detail?.results ?? []).filter((r) => !r.passed).slice(0, 80).map((r) => ({
+    failing: results.filter((r) => !r.passed).slice(0, 120).map((r) => ({
       questionId: r.questionId, category: r.category, question: r.question, expected: r.expected, got: r.got, models: r.models,
+      valueOk: r.valueOk !== false, cited: Boolean(r.cited), citationRequired: Boolean(r.citationRequired),
+      ...(r.detail?.persona ? { persona: r.detail.persona } : {}),
       ...(r.detail?.retry ? { retry: r.detail.retry } : {}), ...(r.error ? { error: r.error } : {}),
     })),
   };

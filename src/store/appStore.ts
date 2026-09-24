@@ -17,8 +17,7 @@ export type Screen =
   | 'warranty-export'
   | 'billing'
   | 'team'
-  | 'outreach'
-  | 'expenses';
+  | 'outreach';
 
 /** `?plan=&interval=` deep link, held until Billing opens and preselects it. */
 export interface PendingPlan {
@@ -252,16 +251,6 @@ interface AppState {
   setPendingPlan: (plan: PendingPlan | null) => void;
   clearPendingPlan: () => void;
 
-  // Owners-only expense tracker (handoffs/EXPENSES_2026-09-22.md): whether
-  // the signed-in caller is a DeepWell platform operator, fetched once by
-  // App.tsx (expensesClient.fetchExpensesOperatorStatus) the same way
-  // billingStatus is — never guessed client-side, always the server's own
-  // gate. Drives AppShell's "Expenses" nav item; null means "not checked
-  // yet" (nav item stays hidden, same fail-closed default as isAdmin's own
-  // absence).
-  isPlatformOperator: boolean;
-  setIsPlatformOperator: (value: boolean) => void;
-
   // HARD GATE (2026-09-21): true while App.tsx is polling for the webhook
   // to land after a Stripe Checkout redirect (?billing=success) — drives
   // BillingScreen's "Confirming your subscription…" state. See App.tsx's
@@ -402,8 +391,6 @@ export const useAppStore = create<AppState>((set) => ({
   setPendingPlan: (plan) => set({ pendingPlan: plan }),
   clearPendingPlan: () => set({ pendingPlan: null }),
 
-  isPlatformOperator: false,
-  setIsPlatformOperator: (value) => set({ isPlatformOperator: value }),
 
   billingConfirming: false,
   setBillingConfirming: (confirming) => set({ billingConfirming: confirming }),

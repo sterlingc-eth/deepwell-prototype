@@ -96,7 +96,7 @@ export function csvEscapeField(value) {
  *  typo or a parsing accident, never a real DeepWell expense. */
 export const MAX_EXPENSE_CENTS = 100_000_000;
 
-export const EXPENSE_CSV_HEADERS = Object.freeze(['Date', 'Vendor', 'Amount', 'Currency', 'Category', 'Note', 'Receipt Filename']);
+export const EXPENSE_CSV_HEADERS = Object.freeze(['Date', 'Vendor', 'Amount', 'Currency', 'Category', 'Note', 'Receipt Filename', 'receipt_on_file']);
 
 /**
  * expenses_list()'s row shape -> a CSV string (CRLF line endings, header
@@ -114,12 +114,89 @@ export function buildExpensesCsv(rows) {
         r.category ?? '',
         r.note ?? '',
         r.receipt_filename ?? '',
+        r.receipt_key ? 'yes' : 'no',
       ]
         .map(csvEscapeField)
         .join(',')
     );
   }
   return lines.join('\r\n') + '\r\n';
+}
+
+/** occurred_on comes back from node-postgres as a JS Date (local midnight);
+ *  tests/fixtures pass strings. Either -> 'YYYY-MM-DD'. Pure. */
+export function ymdOf(v) {
+  if (v instanceof Date) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
+  return String(v ?? '').slice(0, 10);
+}
+
+/** Row with occurred_on normalized to a plain date string. Pure. */
+export function normalizeExpenseRow(r) {
+  return { ...r, occurred_on: ymdOf(r.occurred_on) };
+}
+
+/** Every receipt lives under this prefix in R2 (route's receiptUploadUrl). */
+export const RECEIPT_KEY_PREFIX = 'platform/expenses/';
+
+/** A receipt key is viewable/attachable only if it is under our prefix and
+ *  has no path tricks. Pure. */
+export function isOwnedReceiptKey(key) {
+  return typeof key === 'string' && key.startsWith(RECEIPT_KEY_PREFIX) && key.length > RECEIPT_KEY_PREFIX.length && !key.includes('..');
+}
+
+/**
+ * Running monthly log: rows (any range) -> the months of `year`, newest
+ * first, each with total, count, top categories (highest first) and its
+ * rows (newest first). Pure. Months with no expenses are omitted.
+ * @param {object[]} rows expenses_list() rows
+ * @param {number|string} year
+ */
+export function aggregateMonthly(rows, year) {
+  const prefix = `${year}-`;
+  const months = new Map();
+  for (const raw of rows ?? []) {
+    const r = normalizeExpenseRow(raw);
+    if (!r.occurred_on.startsWith(prefix)) continue;
+    const month = r.occurred_on.slice(0, 7);
+    const m = months.get(month) ?? { month, totalCents: 0, count: 0, cats: new Map(), items: [] };
+    const cents = Number(r.amount_cents) || 0;
+    m.totalCents += cents;
+    m.count += 1;
+    m.cats.set(r.category, (m.cats.get(r.category) ?? 0) + cents);
+    m.items.push(r);
+    months.set(month, m);
+  }
+  const out = [...months.values()].map((m) => ({
+    month: m.month,
+    totalCents: m.totalCents,
+    count: m.count,
+    topCategories: [...m.cats.entries()]
+      .map(([category, totalCents]) => ({ category, totalCents }))
+      .sort((a, b) => b.totalCents - a.totalCents)
+      .slice(0, 3),
+    items: m.items.sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)),
+  }));
+  out.sort((a, b) => b.month.localeCompare(a.month));
+  return { year: Number(year), yearTotalCents: out.reduce((n, m) => n + m.totalCents, 0), yearCount: out.reduce((n, m) => n + m.count, 0), months: out };
+}
+
+/** 'YYYY-MM' -> {from,to} calendar-month bounds, or null if malformed. Pure. */
+export function monthRange(ym) {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(ym ?? ''));
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  return { from: `${m[1]}-${m[2]}-01`, to: `${m[1]}-${m[2]}-${pad2(last)}` };
+}
+
+/** Four-digit year -> {from,to}, or null if malformed. Pure. */
+export function yearRange(year) {
+  const y = String(year ?? '');
+  if (!/^\d{4}$/.test(y)) return null;
+  return { from: `${y}-01-01`, to: `${y}-12-31` };
 }
 
 /* --------------------------------------------------------- date ranges -- */
@@ -243,6 +320,14 @@ export async function listExpenses({ from, to } = {}) {
   } catch (err) {
     return rethrowOrPending('expenses_list', err);
   }
+}
+
+/** One live expense by id, or null. There is no get-by-id SECURITY DEFINER
+ *  function (no new DDL), so this scans expenses_list — a founders' tracker
+ *  is hundreds of rows, not millions. */
+export async function getExpenseById(id) {
+  const rows = await listExpenses({});
+  return rows.find((r) => r.id === id) ?? null;
 }
 
 export async function insertExpense({

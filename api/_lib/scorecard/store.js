@@ -53,6 +53,9 @@ function rowToResult(r) {
     questionId: r.question_id, category: r.category, comparison: r.comparison, question: r.question, passed: Boolean(r.passed),
     score: r.score == null ? null : Number(r.score), expected: r.expected ?? null, got: r.got ?? null, detail: r.detail ?? {},
     models: Array.isArray(r.models) ? r.models : [], costUsd: Number(r.cost_usd) || 0, latencyMs: r.latency_ms ?? null, error: r.error ?? null,
+    // citation scoring travels inside `detail` (no migration): results stored before it have no valueOk, so pass = value verdict
+    valueOk: r.detail?.valueOk === undefined ? Boolean(r.passed) : Boolean(r.detail.valueOk),
+    cited: Boolean(r.detail?.cited), citationRequired: Boolean(r.detail?.citationRequired),
   };
 }
 
@@ -104,8 +107,8 @@ export async function saveResults(ctxArg, runId, results, { source = "operator",
               JSON.stringify(r.detail ?? {}), JSON.stringify(r.models ?? []), Math.min(9999, num(r.costUsd) ?? 0), r.latencyMs ?? null, clip(r.error, 200)]);
         }
         const { rows } = await db.raw(
-          `SELECT category, passed, cost_usd, models FROM donovan_scorecard_results WHERE ${TENANT_SQL} AND run_id = $1`, [runId]);
-        const agg = scoreResults(rows.map((x) => ({ category: x.category, passed: x.passed })));
+          `SELECT category, passed, detail, cost_usd, models FROM donovan_scorecard_results WHERE ${TENANT_SQL} AND run_id = $1`, [runId]);
+        const agg = scoreResults(rows.map((x) => ({ category: x.category, passed: x.passed, valueOk: x.detail?.valueOk, cited: x.detail?.cited, citationRequired: x.detail?.citationRequired })));
         const cost = rows.reduce((n, x) => n + (Number(x.cost_usd) || 0), 0);
         const models = [...new Set(rows.flatMap((x) => (Array.isArray(x.models) ? x.models : [])))];
         const upd = await db.raw(
@@ -123,14 +126,14 @@ export async function saveResults(ctxArg, runId, results, { source = "operator",
 }
 
 function compactResult(r) {
-  return { questionId: r.questionId, category: r.category, comparison: r.comparison, question: clip(r.question, 300), passed: Boolean(r.passed), score: num(r.score), expected: clip(r.expected, 200), got: clip(r.got, 200), models: r.models ?? [], costUsd: num(r.costUsd) ?? 0, latencyMs: r.latencyMs ?? null, error: clip(r.error, 120) };
+  return { questionId: r.questionId, category: r.category, comparison: r.comparison, question: clip(r.question, 300), passed: Boolean(r.passed), valueOk: r.valueOk === undefined ? Boolean(r.passed) : Boolean(r.valueOk), cited: Boolean(r.cited), citationRequired: Boolean(r.citationRequired), score: num(r.score), expected: clip(r.expected, 200), got: clip(r.got, 200), models: r.models ?? [], costUsd: num(r.costUsd) ?? 0, latencyMs: r.latencyMs ?? null, error: clip(r.error, 120) };
 }
 
 async function readAuditRun(db, runId) {
   const runRows = (await db.raw(
     `SELECT changes, created_at FROM audit_log WHERE ${TENANT_SQL} AND action = $1 AND resource_id = $2 ORDER BY created_at DESC LIMIT 1`, [RUN_ACTION, runId])).rows;
   const pageRows = (await db.raw(
-    `SELECT changes FROM audit_log WHERE ${TENANT_SQL} AND action = $1 AND resource_id = $2 ORDER BY created_at ASC LIMIT 200`, [PAGE_ACTION, runId])).rows;
+    `SELECT changes FROM audit_log WHERE ${TENANT_SQL} AND action = $1 AND resource_id = $2 ORDER BY created_at ASC LIMIT 600`, [PAGE_ACTION, runId])).rows;
   const byId = new Map();
   for (const p of pageRows) for (const r of p.changes?.results ?? []) byId.set(r.questionId, r);
   return { last: runRows[0]?.changes?.run ?? null, results: [...byId.values()] };
@@ -206,7 +209,7 @@ export async function getRun(ctxArg, runId) {
         const run = (await db.raw(`SELECT * FROM donovan_scorecard_runs WHERE ${TENANT_SQL} AND id = $1`, [runId])).rows[0];
         if (!run) return null;
         const results = (await db.raw(
-          `SELECT * FROM donovan_scorecard_results WHERE ${TENANT_SQL} AND run_id = $1 ORDER BY passed ASC, category, question_id LIMIT 500`, [runId])).rows;
+          `SELECT * FROM donovan_scorecard_results WHERE ${TENANT_SQL} AND run_id = $1 ORDER BY passed ASC, category, question_id LIMIT 1500`, [runId])).rows;
         return { run: rowToRun(run), results: results.map(rowToResult) };
       });
       if (out) return { ...out, backend: "tables" };

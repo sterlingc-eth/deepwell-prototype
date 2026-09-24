@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe, Users, Receipt } from 'lucide-react';
+import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe, Users } from 'lucide-react';
 import { AskMark } from './AskMark';
 import { OrganizationSwitcher, useAuth, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
@@ -45,12 +45,6 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const { signOut } = useClerk();
   const { orgRole } = useAuth();
   const isAdmin = isAdminRole(orgRole ?? null);
-  // Owners-only expense tracker (handoffs/EXPENSES_2026-09-22.md): server-
-  // confirmed (App.tsx fetches this once via expensesClient.
-  // fetchExpensesOperatorStatus), never inferred from orgRole the way
-  // isAdmin is — a shop admin, even the founder shop's own non-founder
-  // admins, is not necessarily a DeepWell platform operator.
-  const isPlatformOperator = useAppStore((s) => s.isPlatformOperator);
 
   // HARD GATE (owner decision, 2026-09-21): a tenant App.tsx has routed into
   // the paywall (billingStatus 'none' or 'canceled') gets a stripped-down
@@ -165,23 +159,6 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             >
               <Users className="w-5 h-5" aria-hidden="true" />
               <span className="hidden md:inline text-body">Team</span>
-            </button>
-          )}
-
-          {/* Expenses (DeepWell's own business expenses) — platform-operator
-              only, server-confirmed (see isPlatformOperator above). Never
-              shown to a tenant, including the founder shop's own non-founder
-              admins — this is stricter than the Team button's isAdmin gate,
-              same distinction api/review.js's requireOperator draws. */}
-          {isPlatformOperator && (
-            <button
-              type="button"
-              onClick={() => setCurrentScreen('expenses')}
-              aria-current={currentScreen === 'expenses' ? 'page' : undefined}
-              className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
-            >
-              <Receipt className="w-5 h-5" aria-hidden="true" />
-              <span className="hidden md:inline text-body">Expenses</span>
             </button>
           )}
 

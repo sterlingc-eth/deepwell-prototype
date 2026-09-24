@@ -26,6 +26,8 @@ import { createHash } from 'node:crypto';
 import { deriveCity } from './routes/customers.js';
 import { alertTier, normalizeBrand } from './warrantyRules.js';
 import { DOCUMENT_TYPE_IDS, docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from './documentTypes.js';
+// Team A (2026-09-24): "added/uploaded" -> created_at vs "serviced/visited" -> service_date, decided from the wording.
+import { dateBasisPhrase } from './scope.js';
 
 // Plain readFileSync + JSON.parse rather than an import attribute (`with {
 // type: 'json' }`) — same idiom claude.js already uses for .env.local, and it
@@ -1524,7 +1526,7 @@ export function buildAnalyticsSystemPrompt({ extraFewShot } = {}) {
 // "has X but no Y" question answers — a plan or answer cached under the old
 // behavior must never be served again just because its own prompt text
 // happened not to change.
-export const ANALYTICS_VERSION = 'analytics-v8';
+export const ANALYTICS_VERSION = 'analytics-v9'; // v9 (Team A): dateBasis + code-side age filter + no future service visits
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
@@ -1571,6 +1573,8 @@ function canonicalPlanString(plan) {
     // round 4 item 1: a plain "list customers" and a "biggest customer"
     // sortBy plan must never share a cache row — they run different SQL.
     sortBy: plan?.sortBy ?? null,
+    // Team A: an "uploaded" count and a "by service date" count run different logic.
+    dateBasis: plan?.dateBasis ?? null,
   });
 }
 
@@ -1856,6 +1860,26 @@ export function resolveServiceVisitsOverride(question) {
   return { entity: 'serviceVisits', op };
 }
 
+/**
+ * "older than 10 years" / "newer than 5 years old" -> an installYear filter computed HERE from today's year, never by the
+ * model (Team A, 2026-09-24: "how many customers have a unit newer than 5 years old" answered 10 where the units
+ * installed since 2021 gave 18 — the planner did its own year arithmetic and disagreed with itself on the boundary).
+ *   older than N years  -> installYear <  (thisYear - N)      (a unit installed exactly N years ago is not "older than N")
+ *   newer than N years  -> installYear >= (thisYear - N)      (installed within the last N years, this year included)
+ * Returns {field, op, value} or null. Callers replace any installYear filter the model produced with this one.
+ */
+const AGE_THAN_RE = /\b(older|newer|younger)\s+than\s+(\d{1,2})\s*(?:years?|yrs?)(?:\s+old)?\b/i;
+export function resolveAgeFilter(question, today) {
+  const m = AGE_THAN_RE.exec(String(question ?? ''));
+  if (!m) return null;
+  const now = today ? new Date(today) : new Date();
+  if (Number.isNaN(now.getTime())) return null;
+  const cutoff = now.getUTCFullYear() - Number(m[2]);
+  return m[1].toLowerCase() === 'older'
+    ? { field: 'installYear', op: 'lt', value: cutoff }
+    : { field: 'installYear', op: 'gte', value: cutoff };
+}
+
 /** "August 2026" from a validated plan's {from: '2026-08', to: '2026-08'} —
  *  used to word a count answer as "N jobs in August 2026" (item 1) instead of
  *  a bare "You have N jobs.". Only fires for a single-month range (from ===
@@ -1981,7 +2005,10 @@ export function validatePlan(raw) {
     limit = Math.min(limit, TOP_CUSTOMERS_LIMIT);
   }
 
-  return { entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy };
+  // Team A: which date a documents time window is about — set by code from the question wording (never the model).
+  const dateBasis = p.dateBasis === 'uploaded' || p.dateBasis === 'service' ? p.dateBasis : undefined;
+
+  return { entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy, ...(dateBasis ? { dateBasis } : {}) };
 }
 
 /* =================================================================== geo */
@@ -2399,7 +2426,18 @@ function brandFactLabel(entity, filters) {
   return brand ? `${brand} units` : null;
 }
 
+/** Team A (2026-09-24): service visits dated after today (typos or scheduled visits) are excluded from "jobs we did" /
+ *  "last service" answers; say so instead of silently dropping them. */
 export function formatAnalyticsAnswer(plan, opts) {
+  const out = formatAnalyticsAnswerBase(plan, opts);
+  const n = Number(opts?.futureVisitCount) || 0;
+  if (plan.entity === 'serviceVisits' && n > 0 && out && typeof out.text === 'string') {
+    return { ...out, text: `${out.text} (${n} record${n === 1 ? '' : 's'} dated after today ${n === 1 ? 'was' : 'were'} left out - likely typos or scheduled visits.)` };
+  }
+  return out;
+}
+
+function formatAnalyticsAnswerBase(plan, opts) {
   const {
     total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null,
     mostRecentServiceVisit, timeRangeLabel = null,
@@ -2473,12 +2511,17 @@ export function formatAnalyticsAnswer(plan, opts) {
     // the serviceVisits zero-result branch above for why it's never
     // re-prefixed with "in " here.
     const monthLabel = monthRangeLabel(plan.timeRange);
+    // Team A: a documents time window says which date it counted by ("by upload date" / "by service date").
+    const basis = plan.entity === 'documents' && plan.dateBasis && plan.timeRange ? ` (${dateBasisPhrase(plan.dateBasis)})` : '';
     const scopedText = timeRangeLabel
-      ? `${total} ${noun} ${timeRangeLabel}${of}.`
+      ? `${total} ${noun} ${timeRangeLabel}${basis}${of}.`
       : monthLabel
-        ? `${total} ${noun} in ${monthLabel}${of}.`
+        ? `${total} ${noun} in ${monthLabel}${basis}${of}.`
         : null;
-    const text = scopedText ?? `You have ${total} ${noun}${of}.`;
+    // Team A: customers counted through their units ("customers with a unit newer than 5 years") also name the unit count.
+    const unitsNote = plan.entity === 'customers' && opts?.unitCount != null && opts.unitCount !== total
+      ? ` (${opts.unitCount} matching unit${opts.unitCount === 1 ? '' : 's'} across them)` : '';
+    const text = scopedText ?? `You have ${total} ${noun}${of}${unitsNote}.`;
     const label =
       customerContactFactLabel(plan.entity, plan.filters) ??
       brandFactLabel(plan.entity, plan.filters) ??

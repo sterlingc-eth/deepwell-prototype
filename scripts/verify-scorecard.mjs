@@ -15,6 +15,11 @@
  *   5. Escalation: every trigger, the daily Sonnet cap, pricing, the debug trace.
  *   6. view_document_page: ledger enforcement, size caps, max views, grounding of what a view reads.
  *   7. Body-name customer link: unique links, ambiguity/partials go to review, other tenants never matched.
+ *   8. Accuracy + breadth (Team B): the ADJUDICATED oracles (geography with odd address shapes, "no email", customers vs units,
+ *      last service, visits, technician breakdown, upload-vs-service date, ambiguous surnames), citation scoring, alternate
+ *      definitions that must be STATED, retirement when the financials tables/rows are absent, and every one of the 200+
+ *      breadth questions (financials, content, semantic, multi-hop, trends, rankings, tech, data-quality, existence,
+ *      explain, persona) run against a seeded shop with hand-computed answers.
  *
  *   node scripts/verify-scorecard.mjs
  */
@@ -48,7 +53,7 @@ const realErr = console.error;
 console.error = () => {};
 
 const { validQuestions, loadExam } = await import('../api/_lib/scorecard/exam.js');
-const { compareAnswer, expectedFromRows, scoreResults, warrantyStatusFromText, datesIn } = await import('../api/_lib/scorecard/compare.js');
+const { compareAnswer, expectedFromRows, scoreResults, warrantyStatusFromText, datesIn, countCitations, isSubstantive } = await import('../api/_lib/scorecard/compare.js');
 const { oracleSqlOk, runOracle } = await import('../api/_lib/scorecard/oracle.js');
 const { classify } = await import('./gen-scorecard.mjs');
 
@@ -58,21 +63,29 @@ const exam = loadExam();
   const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-docs/scorecard/exam.json'), 'utf8'));
   const qs = exam.questions;
   check('exam: loads and every question is well-formed (validQuestions drops none)', qs.length === raw.questions.length && qs.length > 0, `${qs.length} vs ${raw.questions.length}`);
-  check('exam: about 300 questions', qs.length >= 260 && qs.length <= 340, String(qs.length));
+  check('exam: 480-800 questions (the bank sample plus 200+ breadth questions)', qs.length >= 480 && qs.length <= 800, String(qs.length));
   const rubric = qs.filter((q) => q.cmp === 'rubric').length;
   check('exam: rubric (model-graded) questions are at most 15% of the set', rubric / qs.length <= 0.15, `${rubric}/${qs.length}`);
   const bank = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-docs/question-bank/bank.json'), 'utf8'));
   const cats = new Set(bank.map((b) => b.category));
   const covered = new Set(qs.map((q) => q.category));
-  eq('exam: every question-bank category is covered', [...cats].filter((c) => !covered.has(c)), []);
+  eq('exam: every question-bank category is covered (money moved to the financials breadth category)', [...cats].filter((c) => !covered.has(c) && c !== 'money'), []);
   check('exam: canonical AND typo/abbreviated wordings are present', ['canonical', 'typo', 'abbreviated'].every((v) => qs.some((q) => q.variant === v)));
   eq('exam: every comparison type is used', ['number', 'set', 'value', 'yesno', 'honest-zero', 'rubric'].filter((c) => !qs.some((q) => q.cmp === c)), []);
   check('exam: ids unique and question text within the 300-char storage limit', new Set(qs.map((q) => q.id)).size === qs.length && qs.every((q) => q.text.length <= 300));
   check('exam: every oracle is a single read-only SELECT (oracleSqlOk) and binds the params it uses',
     qs.every((q) => oracleSqlOk(q.oracle.sql) && Math.max(0, ...[...q.oracle.sql.matchAll(/\$(\d+)/g)].map((m) => +m[1])) === q.oracle.params.length));
-  check('exam: oracles read base tables only (no views, no analytics helpers)', qs.every((q) => !/\b(?:documents_v|facts|customers_v)\b/.test(q.oracle.sql) && /\b(?:entities|documents|extractions|document_pages|pg_tables)\b/.test(q.oracle.sql)));
+  check('exam: oracles read base tables only (no views, no analytics helpers)', qs.every((q) => !/\b(?:documents_v|facts|customers_v)\b/.test(q.oracle.sql) && /\b(?:entities|documents|extractions|document_pages|document_financials|pg_tables)\b/.test(q.oracle.sql)));
   check('exam: honest-zero questions carry a data guard so they retire themselves when the data appears', qs.filter((q) => q.cmp === 'honest-zero').every((q) => /\bn\b/.test(q.oracle.sql)));
   check('validQuestions rejects malformed entries', validQuestions([{ id: 'x' }, { id: 'y', text: 't', category: 'c', cmp: 'nope', oracle: { sql: 'select 1' } }, { id: 'z', text: 't', category: 'c', cmp: 'rubric', oracle: { sql: 'select 1' } }]).length === 0);
+  const breadth = qs.filter((q) => q.id.startsWith('breadth-'));
+  check('exam: at least 200 breadth questions', breadth.length >= 200, String(breadth.length));
+  eq('exam: every breadth category is present', ['financials', 'content', 'semantic', 'multi-hop', 'trends', 'rankings', 'tech-performance', 'data-quality', 'existence', 'explain', 'persona'].filter((c) => !breadth.some((q) => q.category === c)), []);
+  eq('exam: breadth questions cover all four personas', ['owner', 'office', 'tech', 'bookkeeper'].filter((p) => !breadth.some((q) => q.persona === p)), []);
+  check('exam: every breadth question carries a persona; rubric ones say what must be cited', breadth.every((q) => q.persona) && breadth.filter((q) => q.cmp === 'rubric').every((q) => typeof q.citeWhat === 'string' && q.citeWhat.length > 3), JSON.stringify(breadth.filter((q) => !q.persona || (q.cmp === 'rubric' && !q.citeWhat)).map((q) => q.id).slice(0, 5)));
+  check('exam: no breadth question opts out of citations except by an explicit citationRequired:false', breadth.every((q) => q.citationRequired === undefined || q.citationRequired === false));
+  check('exam: money breadth questions are graded as figures (tolerance + any number in the sentence)', breadth.filter((q) => q.category === 'financials' && q.cmp === 'number' && /\b(?:owed?|invoice|revenue|receivable|collected|paid|spent|quote|fee|bring)/i.test(q.text) && /coalesce\(sum|avg|max|min/i.test(q.oracle.sql)).every((q) => q.tolerance === 1 && q.anyNumber === true));
+  eq('exam: financials questions retire (skip) when the table is absent: each carries a document_financials guard', breadth.filter((q) => /document_financials/.test(q.oracle.sql) && !/document_financials/.test(q.oracle.requires?.sql ?? '')).map((q) => q.id), []);
   let stale = null;
   try { execFileSync('node', ['scripts/gen-scorecard.mjs', '--check'], { cwd: ROOT, stdio: 'pipe' }); } catch (err) { stale = String(err.stderr ?? err.message).slice(0, 300); }
   check('exam: exam.json matches what scripts/gen-scorecard.mjs generates from the bank (not stale)', stale === null, stale ?? '');
@@ -81,7 +94,7 @@ const exam = loadExam();
 /* ================================================================== 2. comparators (pure) */
 {
   const ans = (text, facts = [], kind = 'answer') => ({ kind, text, facts, sources: [] });
-  const cmp = (cmpType, expected, data, question = '') => compareAnswer({ cmp: cmpType, expected, question }, data);
+  const cmp = (cmpType, expected, data, question = '') => compareAnswer({ cmp: cmpType, expected, question, citationRequired: false }, data);
   // number
   check('number: exact match in the text passes', cmp('number', 13, ans('You have 13 customers in Mesa.')).passed);
   check('number: off by one fails', !cmp('number', 13, ans('You have 12 customers in Mesa.')).passed);
@@ -122,6 +135,45 @@ const exam = loadExam();
     [4, ['a', 'b'], ['x'], true, false, true]);
   const sc = scoreResults([{ category: 'a', passed: true }, { category: 'a', passed: false }, { category: 'b', passed: true }, { category: 'b', skipped: true, passed: false }]);
   eq('scoreResults: overall and per category, skipped questions excluded', [sc.total, sc.passed, sc.score, sc.byCategory.a.score, sc.byCategory.b.total], [3, 2, 0.6667, 0.5, 1]);
+  // ---- adjudicated grader behaviour
+  check('adjudication: "no warranty date on file" is the same answer as an oracle "unknown"', cmp('value', ['unknown'], ans('There is no warranty date on file for the Salazar unit.')).passed && cmp('value', ['unknown'], ans("The warranty date isn't on file.")).passed && !cmp('value', ['active'], ans('There is no warranty date on file.')).passed);
+  eq('warrantyStatusFromText: "no warranty date on file" / "warranty not recorded" read as unknown', ['No warranty date on file', 'Warranty expiration not recorded', 'no expiry listed'].map(warrantyStatusFromText), ['unknown', 'unknown', 'unknown']);
+  // ---- money figures: tolerance and any number in the sentence
+  check('money: the figure may be any number in the sentence, within a dollar', compareAnswer({ cmp: 'number', expected: 4700.5, question: 'How much have we invoiced?', tolerance: 1, anyNumber: true, citationRequired: false }, ans('You have 4 invoices totaling $4,700.50.')).passed
+    && compareAnswer({ cmp: 'number', expected: 4700.5, question: 'q', tolerance: 1, anyNumber: true, citationRequired: false }, ans('About $4,701 invoiced.')).passed
+    && !compareAnswer({ cmp: 'number', expected: 4700.5, question: 'q', tolerance: 1, anyNumber: true, citationRequired: false }, ans('You invoiced $4,200.')).passed);
+  // ---- alternate definitions count ONLY when the answer states which one it used
+  const altQ = { cmp: 'number', expected: 239, question: 'How many documents have we added year to date?', citationRequired: false, alts: [{ expected: 123, says: 're:(service|work) dates?|dated' }] };
+  check('alt definition: a number from the other reading passes only if the answer says which reading it used', compareAnswer(altQ, ans('123 documents by service date this year.')).passed && compareAnswer(altQ, ans('239 documents were uploaded this year.')).passed
+    && !compareAnswer(altQ, ans('You added 123 documents this year.')).passed && !compareAnswer(altQ, ans('You added 77 documents by service date.')).passed);
+  const said = compareAnswer(altQ, ans('123 documents by service date this year.'));
+  check('alt definition: the verdict records which alternate was accepted', /alternate/.test(said.why) && said.usedAlt, JSON.stringify(said));
+  // ---- CITATIONS: a right value with no source fails; the accepted shapes all count
+  const src = [{ documentId: 'd1', location: {} }];
+  const needs = (data, extra = {}) => compareAnswer({ cmp: 'number', expected: 13, question: 'How many customers in Mesa?', ...extra }, data);
+  const uncited = needs(ans('You have 13 customers in Mesa.'));
+  check('citation: the right number with NO source fails, and says why', !uncited.passed && uncited.valueOk === true && uncited.cited === false && uncited.citationRequired === true && /citation/.test(uncited.why), JSON.stringify(uncited));
+  check('citation: data.sources passes', needs({ ...ans('You have 13 customers in Mesa.'), sources: src }).passed);
+  check('citation: facts[].sources passes', needs(ans('You have 13 customers in Mesa.', [{ label: 'Mesa', value: '13', sources: src }])).passed);
+  check('citation: data.records (aggregate drill-down) passes', needs({ ...ans('You have 13 customers in Mesa.'), records: [{ id: 'c1', label: 'Karen Abernathy' }] }).passed);
+  check('citation: data.citations and facts[].documentId pass', needs({ ...ans('You have 13 customers in Mesa.'), citations: [{ documentId: 'd1' }] }).passed && needs(ans('You have 13 customers in Mesa.', [{ label: 'Mesa', value: '13', documentId: 'd1' }])).passed);
+  check('citation: an empty sources array does not count', !needs({ ...ans('You have 13 customers in Mesa.'), sources: [], records: [] }).passed);
+  eq('countCitations counts every accepted shape', countCitations({ sources: [1], citations: [1, 2], records: [1], facts: [{ sources: [1], documentId: 'd' }] }), 6);
+  check('citation: a WRONG value with a source still fails (value first)', !needs({ ...ans('You have 12 customers in Mesa.'), sources: src }).passed);
+  check('citation: citationRequired:false turns the check off for that question', needs(ans('You have 13 customers in Mesa.'), { citationRequired: false }).passed);
+  check('citation: nothing to cite when the right answer is none (zero / no / not on file / honest decline)',
+    compareAnswer({ cmp: 'number', expected: 0, question: 'q' }, ans('No customers match.')).passed && compareAnswer({ cmp: 'yesno', expected: false, question: 'q' }, ans('No, we have none.')).passed
+    && compareAnswer({ cmp: 'value', expected: [], question: 'q' }, ans('There is no serial on file.')).passed && compareAnswer({ cmp: 'honest-zero', expected: null, question: 'q' }, ans('That is not tracked.', [], 'no-answer')).passed
+    && compareAnswer({ cmp: 'set', expected: [], question: 'q' }, ans('No matches.')).passed);
+  check('citation: a right yes / a right list / a right value with no source fail', !compareAnswer({ cmp: 'yesno', expected: true, question: 'q' }, ans('Yes, we do.')).passed
+    && !compareAnswer({ cmp: 'set', expected: ['Ann Lee'], question: 'q' }, ans('x', [{ label: 'Ann Lee', value: 'Mesa' }])).passed && !compareAnswer({ cmp: 'value', expected: ['(480) 555-0114'], question: 'q' }, ans('Phone: (480) 555-0114')).passed);
+  check('isSubstantive: only an affirmative expected answer needs a source', isSubstantive({ cmp: 'number', expected: 3 }) && !isSubstantive({ cmp: 'number', expected: 0 }) && !isSubstantive({ cmp: 'yesno', expected: false }) && !isSubstantive({ cmp: 'honest-zero' }) && isSubstantive({ cmp: 'rubric', expected: ['x'] }) && !isSubstantive({ cmp: 'rubric', expected: [] }));
+  const scored = scoreResults([
+    { category: 'a', passed: true, valueOk: true, cited: true, citationRequired: true }, { category: 'a', passed: false, valueOk: true, cited: false, citationRequired: true },
+    { category: 'b', passed: false, valueOk: false, cited: true, citationRequired: true }, { category: 'b', passed: true, valueOk: true, cited: false, citationRequired: false },
+  ]);
+  eq('scoreResults: pass score, value-only score and citation coverage are reported separately', [scored.score, scored.valueScore, scored.citation, scored.byCategory.a.citationCoverage, scored.byCategory.b.valueScore], [0.5, 0.75, { required: 3, cited: 2, coverage: 0.6667 }, 0.5, 0.5]);
+  eq('scoreResults: results stored before citation scoring count their pass as the value verdict', scoreResults([{ category: 'a', passed: true }]).valueScore, 1);
   check('oracleSqlOk refuses writes, multi-statements and non-selects', !oracleSqlOk('DELETE FROM entities') && !oracleSqlOk('SELECT 1; DROP TABLE x') && !oracleSqlOk('WITH x AS (INSERT INTO t VALUES (1) RETURNING *) SELECT * FROM x') && oracleSqlOk("SELECT 'update' AS v"));
 }
 
@@ -271,7 +323,7 @@ await withTenant(ctxC, (db) => db.logAction({ action: 'review.document_unlinked'
 const oracleOf = async (ctx, entry, today = TODAY) => {
   const spec = classify(entry);
   if (!spec) return { spec: null };
-  const q = { text: entry.text, cmp: spec.cmp, oracle: { sql: spec.sql, params: spec.params, ...(spec.requires ? { requires: spec.requires } : {}) }, ...(spec.rubric ? { rubric: spec.rubric } : {}) };
+  const q = { text: entry.text, cmp: spec.cmp, oracle: { sql: spec.sql, params: spec.params, ...(spec.requires ? { requires: spec.requires } : {}), ...(spec.alt ? { alt: spec.alt } : {}) }, ...(spec.rubric ? { rubric: spec.rubric } : {}), ...(spec.maxItems ? { maxItems: spec.maxItems } : {}) };
   return { spec, ...(await runOracle(withTenant, ctx, q, { today })), question: q };
 };
 const an = (text, expect, category = 'x') => ({ id: 'h', text, category, expect: { route: 'analytics', ...expect } });
@@ -320,8 +372,8 @@ const F = (field, value, op = 'eq') => ({ field, op, value });
   eq('oracle: service calls this month (2026-09) = 2, last month = 0', [await ex(an('How many service calls this month?', { entity: 'serviceVisits', timeRange: { from: '2026-09', to: '2026-09' } }, 'time')), await ex(an('How many service calls last month?', { entity: 'serviceVisits', timeRange: {} }, 'time'))], [2, 0]);
   eq('oracle: jobs by a named technician this month = 2', await ex(an('How many jobs did Danny Ochoa run this month?', { entity: 'serviceVisits', filters: [F('technician', 'Danny Ochoa')], timeRange: {} }, 'technician')), 2);
   eq('oracle: "which customers did we service this month" is a set', (await ex(an('Which customers did we service this month?', { entity: 'serviceVisits', timeRange: {} }, 'live-misses-2026-09-21b')))?.sort(), ['Karen Abernathy']);
-  const tr = await o(an('Who did the most jobs in August?', { entity: 'serviceVisits', timeRange: {} }, 'technician'));
-  check('oracle: "who did the most jobs" is a rubric (model-graded) with the per-technician counts as its reference', tr.spec.cmp === 'rubric' && tr.expected.some((r) => /Danny Ochoa: 2 jobs/.test(r)), JSON.stringify(tr.expected));
+  const tr = await o(an('Who did the most jobs this month?', { entity: 'serviceVisits', timeRange: {} }, 'technician'));
+  check('oracle: "who did the most jobs" is a deterministic VALUE (the busiest technician), not a model-graded rubric', tr.spec.cmp === 'value' && tr.expected.includes('Danny Ochoa'), JSON.stringify(tr.expected));
   // honest-zero
   // The harness has the financials migration (22) applied: hide its two tables so "no financials table" is true first.
   await lite.exec('ALTER TABLE document_financial_lines RENAME TO hidden_dfl; ALTER TABLE document_financials RENAME TO hidden_df');
@@ -345,6 +397,181 @@ const F = (field, value, op = 'eq') => ({ field, op, value });
     if (!r.ok) broken.push(`${q.id}: ${r.error}`); else if (r.skip) skipped++;
   }
   eq(`every one of the ${exam.questions.length} shipped oracles executes without a SQL error on tenant A (${skipped} skipped: subject not in this shop)`, broken.slice(0, 5), []);
+}
+
+/* ================================================================== 3b. adjudicated oracles + breadth on a seeded shop */
+const ctxF = { tenantKey: 'org_harness_f', tenantName: 'Adjudication Shop' };
+const tenF = (await getTenantContext(ctxF.tenantKey, ctxF.tenantName)).id;
+const worldF = {
+  customers: [
+    { n: 1, name: 'Ann Alpha', address: '10 Main St, Mesa, AZ 85201', phone: '(480) 555-0101', email: 'ann@example.com' },
+    { n: 2, name: 'Bob Bravo', address: '20 Oak Ave, Tempe AZ 85281', phone: '(480) 555-0102', email: 'bob@example.com' }, // no comma before the state
+    { n: 3, name: 'Cy Charlie', address: '30 Elm Rd, Suite 110, Mesa, AZ 85202-1234', phone: '(480) 555-0103' }, // suite segment + ZIP+4
+    { n: 4, name: 'Di Delta', address: '40 Pine Ln, Gilbert, AZ' }, // no zip
+    { n: 5, name: 'Ed Echo', address: '50 Cedar Dr, Las Vegas, NV 89101', phone: '(702) 555-0105', email: 'ed@example.com' },
+    { n: 6, name: 'Fay Foxtrot', address: '60 Birch Ct, Mesa AZ 85203', phone: '(480) 555-0106' }, // no comma before the state
+    { n: 7, name: 'Gus Golf', address: '70 Palm Way, Tucson, AZ 85701' },
+    { n: 8, name: 'Ann Alpha', address: '11 Main St, Mesa, AZ 85201', phone: '(480) 555-0108' }, // a second customer with the same name
+  ],
+  equipment: [
+    { n: 1, customer: 1, mfr: 'Trane', model: 'XR14', serial: 'S1', type: 'condenser', installed: '2020-06-01', address: '10 Main St, Mesa, AZ 85201', warranty: { expires: '2030-06-01' } },
+    { n: 2, customer: 1, mfr: 'Carrier', model: 'C2', serial: 'S2', type: 'condenser', installed: '2012-01-01', address: '10 Main St, Mesa, AZ 85201', warranty: { expires: '2022-01-01' } },
+    { n: 3, customer: 2, mfr: 'Trane', model: 'XR14', serial: 'S3', type: 'condenser', installed: '2021-03-01', address: '20 Oak Ave, Tempe AZ 85281' },
+    { n: 4, customer: 3, mfr: 'Lennox', model: 'L4', serial: '', type: 'furnace', installed: '2005-05-05', address: '30 Elm Rd, Suite 110, Mesa, AZ 85202-1234' },
+    { n: 5, customer: 5, mfr: 'Trane', model: 'XR16', serial: 'S5', type: 'condenser', installed: '2024-01-01', address: '50 Cedar Dr, Las Vegas, NV 89101', warranty: { expires: '2034-01-01' } },
+    { n: 6, customer: 7, mfr: 'Goodman', model: 'G6', serial: '', type: 'condenser', installed: '2009-09-09', address: '70 Palm Way, Tucson, AZ 85701', warranty: { expires: '2019-09-09' } },
+    { n: 7, customer: 1, mfr: 'Lennox', model: 'L7', serial: 'S7', type: 'furnace', installed: '2022-02-02', address: '10 Main St, Mesa, AZ 85201' },
+    { n: 8, customer: 2, mfr: 'Rheem', model: 'R8', serial: 'S8', type: 'condenser', installed: '2023-03-03', address: '20 Oak Ave, Tempe AZ 85281' },
+    { n: 9, customer: 7, mfr: 'Trane', model: 'XR9', serial: 'S9', type: 'condenser', installed: '2010-10-10', address: '70 Palm Way, Tucson, AZ 85701' },
+  ],
+  docs: [
+    { n: 1, file: 'ann-sep.pdf', type: 'service-ticket', links: [uid('f', 'c', 1)], facts: [{ key: 'service_date', value: '2026-09-10' }, { key: 'technician', value: 'Danny Ochoa' }], pages: ['Replaced capacitor. Customer said the unit was loud.'] },
+    { n: 2, file: 'ann-scheduled.pdf', type: 'service-ticket', links: [uid('f', 'c', 1)], facts: [{ key: 'service_date', value: '2027-11-14' }, { key: 'technician', value: 'Danny Ochoa' }], pages: ['Scheduled follow-up visit.'] },
+    { n: 3, file: 'ann-agreement.pdf', type: 'maintenance-agreement', links: [uid('f', 'c', 1)], facts: [{ key: 'service_date', value: '2028-01-01' }], pages: ['Maintenance agreement term'] },
+    { n: 4, file: 'cy-2025.pdf', type: 'service-ticket', links: [uid('f', 'c', 3)], facts: [{ key: 'service_date', value: '2025-01-05' }, { key: 'technician', value: 'Marisol Vega' }], pages: ['Refrigerant recharge, R-410A added. Found a leak at the coil.'] },
+    { n: 5, file: 'cy-2025-wo.pdf', type: 'work-order', links: [uid('f', 'c', 3)], facts: [{ key: 'service_date', value: '2025-01-05' }, { key: 'technician', value: 'Marisol Vega' }], pages: ['Work order: coil sealed. Installed by Marisol Vega.'] },
+    { n: 6, file: 'cy-2024.pdf', type: 'service-ticket', links: [uid('f', 'c', 3)], facts: [{ key: 'service_date', value: '2024-03-01' }, { key: 'technician', value: 'Marisol Vega' }], pages: ['Filter change. Replaced air filter.'] },
+    { n: 7, file: 'cy-agreement.pdf', type: 'maintenance-agreement', links: [uid('f', 'c', 3)], pages: ['Agreement'] },
+    { n: 8, file: 'gus-inv.pdf', type: 'invoice', links: [uid('f', 'c', 7)], facts: [{ key: 'service_date', value: '2026-08-15' }], pages: ['Invoice Gus Golf'] },
+    { n: 9, file: 'ed-inv.pdf', type: 'invoice', links: [uid('f', 'c', 5)], facts: [{ key: 'service_date', value: '2026-07-01' }], pages: ['Invoice Ed Echo'] },
+    { n: 10, file: 'bob-inv.pdf', type: 'invoice', links: [uid('f', 'c', 2)], facts: [{ key: 'service_date', value: '2026-08-20' }], pages: ['Invoice Bob Bravo'] },
+    { n: 11, file: 'orphan.pdf', type: 'other' },
+    { n: 12, file: 'fay-permit.pdf', type: 'permit', links: [uid('f', 'c', 6)], pages: ['Permit'] },
+    { n: 13, file: 'ann-inv.pdf', type: 'invoice', links: [uid('f', 'c', 1)], facts: [{ key: 'service_date', value: '2026-09-01' }], pages: ['Invoice Ann Alpha'] },
+    { n: 14, file: 'ann-quote.pdf', type: 'proposal-quote', links: [uid('f', 'c', 1)], pages: ['Quote Ann Alpha'] },
+    { n: 15, file: 'vendor-po.pdf', type: 'purchase-order', pages: ['PO to a supplier'] },
+  ],
+};
+await seedTenant('f', tenF, worldF);
+{
+  const fin = (docN, kind, dir, date, due, total, paid, balance, status, corrections = {}) => lite.query(
+    `INSERT INTO document_financials (tenant_id, document_id, doc_kind, direction, invoice_date, due_date, total, amount_paid, balance_due, status, corrections) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)`,
+    [tenF, uid('f', 'd', docN), kind, dir, date, due, total, paid, balance, status, JSON.stringify(corrections)]);
+  await fin(8, 'invoice', 'receivable', '2026-08-15', '2026-09-14', 1000, 0, 1000, 'unpaid');
+  await fin(9, 'invoice', 'receivable', '2026-07-01', '2026-07-31', 2500.5, 2500.5, 0, 'paid');
+  await fin(10, 'invoice', 'receivable', '2026-08-20', '2026-10-01', 400, 100, 300, 'partial');
+  await fin(13, 'invoice', 'receivable', '2026-09-01', '2026-09-15', 750, 0, 750, 'unpaid', { total: '800.00' }); // the reviewed total wins
+  await fin(14, 'estimate', 'receivable', null, null, 5000, null, null, 'unknown');
+  await fin(15, 'po', 'payable', '2026-09-02', null, 320, 0, 320, 'unpaid');
+}
+const qText = (t) => exam.questions.find((q) => q.text === t);
+const ex2 = async (t, ctx = ctxF) => { const q = qText(t); if (!q) return { missing: t }; return runOracle(withTenant, ctx, q, { today: TODAY }); };
+const val = async (t) => { const r = await ex2(t); return r.skip ? `SKIP:${r.why}` : r.ok ? r.expected : `ERR:${r.error ?? r.missing}`; };
+{
+  const of = async (entry) => oracleOf(ctxF, entry);
+  const exF = async (entry) => (await of(entry)).expected;
+  // ---- geography: the shapes the first oracle dropped (Mesa 18 vs 19, AZ 44 vs 45)
+  eq('adjudicated geo: Mesa = 4 (comma and no-comma states, a Suite segment and ZIP+4 all count)', await exF(an('How many customers do we have in Mesa?', CUST({ filters: [F('city', 'Mesa')], answerValue: 4 }))), 4);
+  eq('adjudicated geo: AZ = 7 and NV = 1 (a state with no zip, or no comma before it, still counts)', [await exF(an('How many customers in AZ?', CUST({ filters: [F('state', 'AZ')], answerValue: 7 }))), await exF(an('How many customers in NV?', CUST({ filters: [F('state', 'NV')], answerValue: 1 })))], [7, 1]);
+  eq('adjudicated geo: the by-city breakdown loses no customer (its counts add up to all 8)', (await exF(an('Show me a breakdown of customers by city', CUST({ groupBy: 'city', answerValue: {} })))).map((x) => Number(x.split('|')[1])).reduce((a, b) => a + b, 0), 8);
+  eq('adjudicated geo: by-state breakdown is AZ 7, NV 1', (await exF(an('breakdown of customers by state', CUST({ groupBy: 'state', answerValue: {} })))).sort(), ['AZ|7', 'NV|1']);
+  eq('adjudicated geo: zip 85202 finds the ZIP+4 customer', await exF(an('How many customers in 85202?', CUST({ filters: [F('zip', '85202')], answerValue: 1 }))), 1);
+  // ---- "no email" is a count of customers WITHOUT one (46 vs 29), never the whole customer list
+  const noEmail = { id: 'h', text: 'how many customers have no email on file', category: 'live-misses-2026-09-22', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['email'] } };
+  eq('adjudicated: "how many customers have no email on file" counts the customers without one (5 of 8), not all 8', await exF(noEmail), 5);
+  eq('adjudicated: "which customers have a phone number on file" is the phone filter, not the whole list', (await exF({ ...noEmail, text: 'which customers have a phone number on file', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['phone'] } })).length, 6);
+  check('adjudicated: a conditionsOnly entry that cannot be derived is dropped, never graded as an unfiltered count', classify({ ...noEmail, text: 'how many customers do we have in stock', expect: { route: 'analytics', entity: 'customers', conditionsOnly: ['brand'] } }) === null);
+  // ---- customers vs units
+  eq('adjudicated: "customers with a unit newer than 5 years" counts CUSTOMERS (3), not units (4)', await exF(an('How many customers have a unit newer than 5 years old?', { entity: 'equipment', filters: [F('installYear', 2021, 'gte')], answerValue: 4 })), 3);
+  eq('adjudicated: "units newer than 5 years" still counts units (4)', await exF(an('How many units are newer than 5 years old?', { entity: 'equipment', filters: [F('installYear', 2021, 'gte')], answerValue: 4 })), 4);
+  // ---- last service: a completed visit, never a future or agreement date; apt aware
+  eq('adjudicated: last service = newest COMPLETED visit (2026-09-10); the 2027 scheduled visit and the 2028 agreement date are not "last service"', await exF(lk('When did we last service the unit at 10 Main St, Mesa, AZ 85201?', { route: 'lookup' }, 'history')), ['2026-09-10']);
+  eq('adjudicated: visits for Cy Charlie = 2 distinct service dates (3 documents)', [await exF(lk('how many times have we been to Charlie\'s', { route: 'retrieval' }, 'live-misses-2026-09-22')), (await of(lk('how many times have we been to Charlie\'s', { route: 'retrieval' }, 'live-misses-2026-09-22'))).rows.length], [2, 1]);
+  {
+    const q = (await of(lk("how many times have we been to Charlie's", { route: 'retrieval' }, 'live-misses-2026-09-22'))).question;
+    const r = await runOracle(withTenant, ctxF, q, { today: TODAY });
+    check('adjudicated: the visit count also accepts "3 service documents" - but only if the answer says documents', r.alts?.some((a) => a.expected === 3 && /documents/.test(a.says)), JSON.stringify(r.alts));
+    check('adjudicated: visit count grading - "2 visits" passes; "3 documents" passes; a bare "3 visits" fails',
+      compareAnswer({ cmp: 'number', expected: r.expected, alts: r.alts, question: q.text, citationRequired: false }, { kind: 'answer', text: '2 visits to Cy Charlie on file.', facts: [], sources: [] }).passed
+      && compareAnswer({ cmp: 'number', expected: r.expected, alts: r.alts, question: q.text, citationRequired: false }, { kind: 'answer', text: '3 service documents for Cy Charlie.', facts: [], sources: [] }).passed
+      && !compareAnswer({ cmp: 'number', expected: r.expected, alts: r.alts, question: q.text, citationRequired: false }, { kind: 'answer', text: '3 visits to Cy Charlie.', facts: [], sources: [] }).passed);
+  }
+  // ---- technician breakdown is a deterministic set of "tech|jobs"
+  eq('adjudicated: "breakdown by technician" is a SET of tech|jobs (Danny 2, Marisol 3), not a model-graded rubric', (await exF(an('Show me a breakdown by technician', { entity: 'serviceVisits' }, 'technician'))).sort(), ['Danny Ochoa|2', 'Marisol Vega|3']);
+  // ---- added vs serviced: both readings, the second only when stated
+  {
+    const r = await of(an('How many documents have we added year to date?', { entity: 'documents', timeRange: {} }, 'time'));
+    const rr = await runOracle(withTenant, ctxF, r.question, { today: TODAY });
+    check('adjudicated: "added year to date" = upload date (all 15 seeded today or earlier this year is data-dependent) and offers the work-date reading only if stated', typeof rr.expected === 'number' && rr.alts?.length === 1 && /service|work/.test(rr.alts[0].says), JSON.stringify(rr));
+  }
+  // ---- ambiguous surname: an answer about ONE customer is right if it names which
+  {
+    const q = (await of(lk('List invoices for Alpha', { route: 'lookup' }))).question;
+    const r = await runOracle(withTenant, ctxF, q, { today: TODAY });
+    check('adjudicated: "invoices for Alpha" (two Ann Alphas) = 1 in total, each customer\'s own count accepted when the answer names her', r.expected === 1 && r.alts?.length === 2 && r.alts.every((a) => /ann alpha/.test(a.says)), JSON.stringify(r));
+  }
+  // ---- installer: only what a document's own text says
+  eq('adjudicated: "who installed" reads the document text ("Installed by Marisol Vega"); nothing else counts', await exF(lk('Who installed the unit at 30 Elm Rd, Suite 110?', { route: 'lookup' }, 'history')), ['Marisol Vega']);
+  eq('adjudicated: a unit with no installer in any document has an EMPTY expectation (Donovan must not invent one)', await exF(lk('Who installed the unit at 70 Palm Way?', { route: 'lookup' }, 'history')), []);
+  // ---- apt-aware address: "Suite 110" is part of the subject
+  eq('adjudicated: an address with a Suite/Apt selects that unit only', await exF(lk('What is the serial of the unit at 30 Elm Rd, Suite 110?', { route: 'lookup' })), []);
+  // ---- comparisons: "more X or more Y" is a rubric over the two counts
+  const more = classify({ id: 'h', text: 'Do we have more invoices or more service tickets on file?', category: 'comparisons', expect: { route: 'analytics', entity: 'documents', groupBy: 'documentType' } });
+  check('adjudicated: "more invoices or more service tickets" compares the two types (rubric with both counts), not a 15-type list', more?.cmp === 'rubric' && more.params.flat().includes('invoice') && more.params.flat().includes('service-ticket'), JSON.stringify(more)?.slice(0, 200));
+  // ---- overdue maintenance: customers whose last completed visit is over a year old
+  const od = await of(an('Which customers are overdue for maintenance?', { entity: 'customers', unsupported: true, conditionsOnly: ['maintenance'] }, 'live-misses-2026-09-21'));
+  check('adjudicated: "overdue for maintenance" = last completed visit more than 12 months ago (Cy Charlie: 2025-01-05), never someone with a recent visit', od.spec.cmp === 'rubric' && od.expected.some((r) => /Cy Charlie \| last service 2025-01-05/.test(r)) && !od.expected.some((r) => /Ann Alpha/.test(r)), JSON.stringify(od.expected));
+}
+
+/* ---- the breadth questions, hand-computed on the seeded shop */
+{
+  eq('breadth financials: invoices on file = 4, unpaid/open = 3, paid = 1, partial = 1', [await val('How many invoices do we have on file?'), await val('How many invoices are still unpaid?'), await val('How many invoices have been paid?'), await val('How many invoices are partially paid?')], [4, 3, 1, 1]);
+  eq('breadth financials: overdue = 2 (due 09-14 and 09-15 vs today 09-23); more than 60 days = 0', [await val('How many invoices are overdue?'), await val('How many invoices are more than 60 days overdue?')], [2, 0]);
+  eq('breadth financials: total owed = 2050 (1000 + 300 partial balance + 750)', await val('How much are we owed in total?'), 2050);
+  eq('breadth financials: invoiced total = 4700.50 (the reviewed 800.00 correction beats the extracted 750)', Number(await val('How much have we invoiced in total?')), 4700.5);
+  eq('breadth financials: last month (August) = 1400, this month = 800, this year = 4700.50', [Number(await val('How much did we invoice last month?')), Number(await val('How much did we invoice this month?')), Number(await val('How much did we invoice this year?'))], [1400, 800, 4700.5]);
+  eq('breadth financials: collected = 2600.50, average invoice = 1175.125, largest = 2500.50, smallest = 400', [Number(await val('How much have we collected in total?')), Number(await val("What's our average invoice amount?")), Number(await val("What's the biggest invoice we've ever sent?")), Number(await val("What's our smallest invoice?"))], [2600.5, 1175.125, 2500.5, 400]);
+  eq('breadth financials: AR aging - past due 1750, over 30 days 0', [Number(await val('How much is past due?')), Number(await val("What's our AR aging: how much is more than 30 days past due?"))], [1750, 0]);
+  eq('breadth financials: biggest customer by revenue = Ed Echo; owes the most = Gus Golf', [await val("Who's our biggest customer by revenue?"), await val('Which customer owes us the most right now?')], [['Ed Echo'], ['Gus Golf']]);
+  eq('breadth financials: customers with unpaid invoices', (await val('Which customers have unpaid invoices?')).sort(), ['Ann Alpha', 'Bob Bravo', 'Gus Golf']);
+  eq('breadth financials: quotes = 1 worth 5000; purchase orders = 1 worth 320; owed to vendors = 320', [await val('How many quotes or estimates do we have on file?'), Number(await val("What's the total value of our quotes?")), await val('How many purchase orders do we have?'), Number(await val('How much do we owe vendors right now?'))], [1, 5000, 1, 320]);
+  eq('breadth financials: per-customer money ("Golf" owes 1000; invoiced Golf 1000)', [Number(await val('How much does Mercer owe us?')), await val('How much does Mercer owe us?')].slice(1), ['SKIP:subject or data not in this shop\'s records']);
+  eq('breadth financials: invoices with no due date / missing a total = 0', [await val('How many invoices have no due date?'), await val('How many invoices are missing a total?')], [0, 0]);
+  eq('breadth existence: any overdue invoices = yes; any unpaid = yes', [await val('Do we have any overdue invoices?'), await val('Are there any unpaid invoices?')], [true, true]);
+  eq('breadth trends: last-quarter vs prior-quarter service calls (both zero) = not more', await val('Did we do more service calls last quarter than the quarter before?'), false);
+  eq('breadth trends: invoiced more last month (1400) than the month before (July: 2500.50)? no', await val('Did we invoice more last month than the month before?'), false);
+  // content: text-only facts
+  eq('breadth content: which customers had a capacitor issue = Ann Alpha; refrigerant = Cy Charlie; leak = Cy Charlie', [await val('Which customers had a capacitor issue or repair on file?'), await val('Which customers had a refrigerant issue or repair on file?'), await val('Which customers had a leak issue or repair on file?')], [['Ann Alpha'], ['Cy Charlie'], ['Cy Charlie']]);
+  eq('breadth content: jobs mentioning a filter = 1; the air filter was replaced for Cy Charlie', [await val('How many jobs mention a filter?'), await val('Which customers had the air filter replaced?')], [1, ['Cy Charlie']]);
+  eq('breadth semantic: "the unit is loud" finds the noise complaint (Ann Alpha), and a leak paraphrase finds the coil leak (Cy Charlie)', [await val('Which customers complained the unit is loud?'), await val('Who called about a leak?')], [['Ann Alpha'], ['Cy Charlie']]);
+  eq('breadth content: nothing on file mentions a compressor replacement (an honest zero to hold Donovan to)', await val('How many jobs mention a compressor replacement?'), 0);
+  // multi-hop
+  eq('breadth multi-hop: Trane older than 10 years with no agreement = Gus Golf', await val('Which customers have a Trane unit older than 10 years and no maintenance agreement?'), ['Gus Golf']);
+  eq('breadth multi-hop: customers with more than one unit = 3 (Ann, Bob, Gus)', await val('How many customers have more than one unit?'), 3);
+  eq('breadth multi-hop: Mesa customers with no maintenance agreement = 2 (Fay and the second Ann; Ann #1 and Cy have one)', await val('How many customers in Mesa have no maintenance agreement?'), 2);
+  // rankings
+  eq('breadth rankings: most units = Ann Alpha (3); most common brand = trane; city with the most customers = Mesa', [await val('Which customer has the most units?'), await val("What's our most common brand?"), await val('Which city has the most customers?')], [['Ann Alpha'], ['trane'], ['Mesa']]);
+  eq('breadth rankings: document type with the most documents = invoice and service-ticket (tied at 4)', (await val('Which document type do we have the most of?')).sort(), ['invoice', 'service-ticket']);
+  // tech
+  eq('breadth tech: Danny 2 jobs, Marisol 3; Marisol worked for 1 customer; busiest this year = Danny', [await val('How many jobs has Danny Ochoa done in total?'), await val('How many jobs has Marisol Vega done in total?'), await val('How many different customers has Marisol Vega worked for?'), await val('Who\'s our busiest technician this year?')], [2, 3, 1, ['Danny Ochoa']]);
+  eq('breadth tech: a technician the shop does not have is skipped, not failed', await val('How many jobs has Wyatt Coburn done in total?'), "SKIP:subject or data not in this shop's records");
+  eq('breadth tech: Danny\'s most recent COMPLETED job is 2026-09-10 (the 2027 visit is scheduled)', await val("When was Danny Ochoa's most recent job?"), ['2026-09-10']);
+  // data quality
+  eq('breadth data-quality: 2 documents not linked to a customer; 2 customers with no documents; 2 units missing a serial', [await val("How many documents aren't linked to any customer?"), await val('How many customers have no documents on file?'), await val('How many units are missing a serial number?')], [2, 2, 2]);
+  eq('breadth data-quality: duplicate customers exist (Ann Alpha twice); one address is missing a zip', [await val('Do we have any duplicate customers?'), await val('How many customer addresses are missing a zip code?')], [true, 1]);
+  // existence
+  eq('breadth existence: Mitsubishi = no; Las Vegas customers = yes; Chandler = no; permits on file = yes', [await val('Do we have any Mitsubishi units?'), await val('Do we have any customers in Las Vegas?'), await val('Do we have any customers in Chandler?'), await val('Do we have any permits on file?')], [false, true, false, true]);
+  // explain: subjects the shop does not have are skipped
+  eq('breadth explain: a why-question about a customer the shop does not have is skipped', await val('Why is the Mercer unit flagged for a warranty alert?'), "SKIP:subject or data not in this shop's records");
+  // persona
+  eq('breadth persona: 2 Trane customers... in Mesa = 1 (Ann); how many customers = 8; units tracked = 9', [await val('Of our Trane customers, how many are in Mesa?'), await val('How many customers do we have in total?'), await val('How many units are we tracking?')], [1, 8, 9]);
+  // retirement: with the financials tables absent every money question is SKIPPED (never failed); rows absent -> skipped too
+  await lite.exec('ALTER TABLE document_financial_lines RENAME TO hidden_dfl2; ALTER TABLE document_financials RENAME TO hidden_df2');
+  const finQs = exam.questions.filter((q) => /document_financials/.test(q.oracle.sql));
+  const retired = [];
+  for (const q of finQs) { const r = await runOracle(withTenant, ctxF, q, { today: TODAY }); if (!(r.ok && r.skip)) retired.push(`${q.id}:${r.error ?? 'not skipped'}`); }
+  eq(`retire: all ${finQs.length} financials questions are skipped gracefully (not failed) while the table is absent`, retired.slice(0, 4), []);
+  await lite.exec('ALTER TABLE hidden_df2 RENAME TO document_financials; ALTER TABLE hidden_dfl2 RENAME TO document_financial_lines');
+  const emptyShop = await runOracle(withTenant, ctxB, qText('How many invoices do we have on file?'), { today: TODAY });
+  check('retire: a shop with the table but NO invoice rows skips the money questions (nothing to grade)', emptyShop.skip === true, JSON.stringify(emptyShop).slice(0, 160));
+  const tooLong = await runOracle(withTenant, ctxF, { ...qText('Which customers had a leak issue or repair on file?'), maxItems: 0 }, { today: TODAY });
+  check('retire: a set longer than maxItems is skipped ("too long to grade"), not failed', tooLong.skip === true && /too long/.test(tooLong.why), JSON.stringify(tooLong).slice(0, 160));
+  // EVERY shipped question executes on this shop and on tenant A with no SQL error
+  for (const [label, ctx] of [['seeded shop F', ctxF], ['tenant A', ctxA]]) {
+    const errs = []; let ran = 0; let skipped = 0;
+    for (const q of exam.questions) { const r = await runOracle(withTenant, ctx, q, { today: TODAY }); if (!r.ok) errs.push(`${q.id}: ${r.error}`); else if (r.skip) skipped++; else ran++; }
+    eq(`all ${exam.questions.length} shipped oracles (incl. breadth) execute without a SQL error on ${label} (${ran} ran, ${skipped} skipped)`, errs.slice(0, 5), []);
+  }
 }
 
 /* ================================================================== 4. runner */
@@ -395,13 +622,14 @@ function fakeHandler(script, { tokens = 0, model = 'claude-haiku-4-5', agentMode
   handler.seen = seen;
   return handler;
 }
+const SRC = [{ documentId: 'doc-1', location: {} }]; // an answer that carries a citation
 const ANSWERS = {
-  [qMesa.text]: { kind: 'answer', text: 'You have 2 customers in Mesa.', facts: [], sources: [] },
+  [qMesa.text]: { kind: 'answer', text: 'You have 2 customers in Mesa.', facts: [], sources: SRC },
   [qTrane.text]: { kind: 'answer', text: 'You have 5 Trane units.', facts: [], sources: [] }, // wrong (2)
-  [qGil.text]: { kind: 'answer', text: 'One customer.', facts: [{ label: 'Plaza Dental Group', value: 'Gilbert' }], sources: [] },
+  [qGil.text]: { kind: 'answer', text: 'One customer.', facts: [{ label: 'Plaza Dental Group', value: 'Gilbert', sources: SRC }], sources: [] },
   [qMoney.text]: { kind: 'answer', text: 'You invoiced $12,400 last month.', facts: [{ label: 'Revenue', value: '$12,400' }], sources: [] }, // fabricated
-  [qHist.text]: { kind: 'answer', text: 'Karen has a service ticket from 2026-09-10 and a maintenance agreement.', facts: [], sources: [] },
-  [qPhone.text]: { kind: 'answer', text: 'Karen Abernathy: (480) 555-0148', facts: [], sources: [] },
+  [qHist.text]: { kind: 'answer', text: 'Karen has a service ticket from 2026-09-10 and a maintenance agreement.', facts: [], sources: SRC },
+  [qPhone.text]: { kind: 'answer', text: 'Karen Abernathy: (480) 555-0148', facts: [], sources: SRC },
 };
 const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reason: pass ? 'consistent' : 'contradicts' })], usage: { input_tokens: 500, output_tokens: 30 } });
 
@@ -427,13 +655,31 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   check('runner: the run finished and was stored in the tables (migration 30 present)', out.done && out.backend === 'tables' && out.run.status === 'complete', JSON.stringify({ d: out.done, b: out.backend, s: out.run?.status }));
 
   // retry on the escalation model: an agent-answered failure is retried once with escalate:true; the SCORE stays the first attempt
-  const retryH = fakeHandler((q, call) => (q === qTrane.text ? (call?.escalate ? { kind: 'answer', text: 'You have 2 Trane units.', facts: [], sources: [] } : ANSWERS[q]) : ANSWERS[q]));
+  const retryH = fakeHandler((q, call) => (q === qTrane.text ? (call?.escalate ? { kind: 'answer', text: 'You have 2 Trane units.', facts: [], sources: SRC } : ANSWERS[q]) : ANSWERS[q]));
   const rr = await runScorecard({ ctx: ctxA, questions: [qTrane], handler: retryH, today: TODAY });
   const r0 = rr.pageResults[0];
   check('runner: a failed answer is retried ONCE with escalate:true; the score is the first attempt, the retry is recorded', retryH.seen.length === 2 && retryH.seen[1].escalate === true && r0.passed === false && r0.detail.retry?.passed === true && /sonnet/.test(r0.detail.retry.model), JSON.stringify(r0.detail));
   const noRetry = fakeHandler(ANSWERS);
   await runScorecard({ ctx: ctxA, questions: [qTrane], handler: noRetry, today: TODAY, retryFailures: false });
   eq('runner: retryFailures:false asks once', noRetry.seen.length, 1);
+  // CITATION scoring end to end: a right-but-uncited answer FAILS (and is not retried on Sonnet: more tokens will not add a source)
+  const uncitedH = fakeHandler({ [qMesa.text]: { kind: 'answer', text: 'You have 2 customers in Mesa.', facts: [], sources: [] }, [qPhone.text]: ANSWERS[qPhone.text] });
+  const uc = await runScorecard({ ctx: ctxA, questions: [qMesa, qPhone], handler: uncitedH, today: TODAY, feedMisses: false });
+  const ucMesa = uc.pageResults.find((r) => r.questionId === 'q-mesa');
+  check('runner: a right value with NO citation fails; the result records valueOk / cited / citationRequired', ucMesa.passed === false && ucMesa.valueOk === true && ucMesa.cited === false && ucMesa.citationRequired === true && /citation/.test(ucMesa.detail.why), JSON.stringify(ucMesa));
+  eq('runner: an uncited failure is not retried on the escalation model (only wrong VALUES are)', uncitedH.seen.filter((x) => x.question === qMesa.text).length, 1);
+  const ucScore = scoreResults(uc.pageResults);
+  eq('runner: the run reports pass score, value-only score and citation coverage separately', [ucScore.score, ucScore.valueScore, ucScore.citation.coverage], [0.5, 1, 0.5]);
+  const ucStored = await store.getRun(ctxA, uc.runId);
+  check('runner: citation fields survive persistence (tables backend)', ucStored.results.find((r) => r.questionId === 'q-mesa')?.valueOk === true && ucStored.results.find((r) => r.questionId === 'q-mesa')?.cited === false && ucStored.results.find((r) => r.questionId === 'q-phone')?.cited === true, JSON.stringify(ucStored.results.map((r) => [r.questionId, r.valueOk, r.cited])));
+  // a rubric answer is also held to the citation rule; the grader is told what must be cited
+  const rq = { id: 'q-rub', text: 'What was found or done on the Mercer job?', category: 'content', cmp: 'rubric', rubric: 'Reports the findings.', citeWhat: 'the service ticket', oracle: { sql: "SELECT 'Replaced capacitor' AS ref", params: [] } };
+  const seenRubric = [];
+  const rubricModel = async (req) => { seenRubric.push(req.messages[0].content[0].text); return { content: [tu('grade', { pass: true, reason: 'ok' })], usage: { input_tokens: 10, output_tokens: 5 } }; };
+  const rubUncited = await runScorecard({ ctx: ctxA, questions: [rq], handler: fakeHandler({ [rq.text]: { kind: 'answer', text: 'They replaced the capacitor.', facts: [], sources: [] } }), today: TODAY, callModel: rubricModel, feedMisses: false, retryFailures: false });
+  const rubCited = await runScorecard({ ctx: ctxA, questions: [rq], handler: fakeHandler({ [rq.text]: { kind: 'answer', text: 'They replaced the capacitor.', facts: [], sources: SRC } }), today: TODAY, callModel: rubricModel, feedMisses: false, retryFailures: false });
+  check('runner: a rubric answer the grader likes still fails without a citation, and passes with one', rubUncited.pageResults[0].passed === false && rubUncited.pageResults[0].valueOk === true && rubCited.pageResults[0].passed === true, JSON.stringify([rubUncited.pageResults[0].detail, rubCited.pageResults[0].passed]));
+  check('runner: the rubric grader is told what must be cited', /must cite the service ticket/.test(seenRubric[0]) && /citations attached to the answer: 0/.test(seenRubric[0]), seenRubric[0]);
 }
 {
   // budget stop: each ask costs $1.00 (1,000,000 Haiku input tokens at $1/MTok); a $2.50 budget stops after 3 questions
@@ -502,9 +748,12 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   rid = first.runId;
   await runScorecard({ ctx: ctxA, questions: many, handler: h1, runId: rid, offset: cursor, pageSize: 12, today: TODAY, retryFailures: false, feedMisses: false });
   await new Promise((r) => setTimeout(r, 30));
-  const worse = fakeHandler((q) => (q === qMesa.text ? { kind: 'answer', text: 'You have 9 customers.', facts: [], sources: [] } : ANSWERS[q]));
+  const worse = fakeHandler((q) => (q === qMesa.text ? { kind: 'answer', text: 'You have 9 customers.', facts: [], sources: SRC } : ANSWERS[q]));
   await runScorecard({ ctx: ctxA, questions: many, handler: worse, pageSize: 12, today: TODAY, retryFailures: false, feedMisses: false });
   const st = await routes.scorecardStatusAction(ctxA, {});
+  check('scorecardStatus: reports value accuracy and citation coverage separately, plus the adjudication note', typeof st.run.valueScore === 'number' && st.run.citation && st.run.citation.required > 0 && typeof st.run.citation.coverage === 'number' && /ADJUDICATION\.md/.test(st.adjudicationNote) && st.previous && 'valueScore' in st.previous && 'citationCoverage' in st.previous, JSON.stringify({ v: st.run?.valueScore, c: st.run?.citation, n: st.adjudicationNote?.slice(0, 40), p: st.previous }));
+  check('scorecardStatus: byCategory carries per-category value score and citation coverage; failing entries say whether the VALUE or only the citation was the problem', Object.values(st.run.byCategory).every((c) => 'valueScore' in c && 'citationCoverage' in c) && (st.failing.length === 0 || st.failing.every((f) => 'valueOk' in f && 'cited' in f && 'citationRequired' in f)), JSON.stringify(st.failing[0]));
+  check('scorecardStatus: exam shape includes the persona mix', st.exam.personas && st.exam.personas.owner > 0 && st.exam.personas.bookkeeper > 0, JSON.stringify(st.exam.personas));
   check('scorecardStatus: trend compares with the previous comparable run; backend is tables again', st.backend === 'tables' && st.previous && typeof st.previous.score === 'number' && st.run.score <= st.previous.score, JSON.stringify({ r: st.run?.score, p: st.previous?.score, b: st.backend }));
 }
 {
@@ -537,7 +786,7 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   const before = (await lite.query('SELECT count(*)::int AS n FROM ask_cache').catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
   const allowanceBefore = (await lite.query(`SELECT COALESCE(sum(asks_this_month),0)::int AS n FROM usage_counters WHERE tenant_id = $1`, [tenA]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
   const real = await askViaHandler({ handler: askMod.default, auth: { tenantId: ctxA.tenantKey, orgId: ctxA.tenantKey, userId: null }, question: "What's the phone number on file for Karen Abernathy?", today: TODAY });
-  const cmpReal = real.data ? compareAnswer({ cmp: 'value', expected: ['(480) 555-0148'], question: 'phone' }, real.data) : null;
+  const cmpReal = real.data ? compareAnswer({ cmp: 'value', expected: ['(480) 555-0148'], question: 'phone', citationRequired: false }, real.data) : null;
   check('REAL /api/ask handler through the hook: answers from the live pipeline without an HTTP request, token or model (Karen\'s phone matches the oracle)', Boolean(real.data) && cmpReal?.passed, JSON.stringify({ status: real.status, error: real.error, got: cmpReal?.got }));
   const after = (await lite.query('SELECT count(*)::int AS n FROM ask_cache').catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
   const allowanceAfter = (await lite.query(`SELECT COALESCE(sum(asks_this_month),0)::int AS n FROM usage_counters WHERE tenant_id = $1`, [tenA]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;

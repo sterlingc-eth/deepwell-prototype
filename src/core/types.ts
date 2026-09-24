@@ -230,6 +230,26 @@ export interface Fact {
   sources: SourceRef[];
 }
 
+/**
+ * One row an answer was computed from (or, for an honest zero, searched). Carried by EVERY /api/ask
+ * response (api/_lib/citations/records.js): the drill-down behind "You have 19 customers in Mesa".
+ */
+export type AnswerRecordType = 'customer' | 'unit' | 'document' | 'invoice';
+export interface AnswerRecord {
+  type: AnswerRecordType;
+  id: string;
+  label: string;
+  sublabel?: string;
+  /** document / invoice: the document to open (defaults to id) */
+  documentId?: string;
+  /** document / invoice: the cited page */
+  page?: number;
+  /** unit: the customer that owns it (opens their profile) */
+  customerId?: string;
+  /** breakdown answers: the group key (matches the breakdown row's label) */
+  group?: string;
+}
+
 export interface Answer {
   kind: 'answer' | 'no-answer';
   /** 1–3 plain-English sentences */
@@ -248,6 +268,14 @@ export interface Answer {
   closest: SourceRef[];
   /** How the question was interpreted — shown as a small caption */
   interpretation?: string;
+  /** Citation contract (api/_lib/citations): the exact rows behind the answer, capped server-side. */
+  records?: AnswerRecord[];
+  /** True number of rows behind the answer (>= records.length when the list was capped). */
+  recordsTotal?: number;
+  /** 'basis' = rows the answer is computed from; 'searched' = rows searched with no match (honest zero). */
+  recordsKind?: 'basis' | 'searched';
+  /** One short sentence: how the answer was computed. */
+  basis?: string;
 }
 
 export interface AskOptions {

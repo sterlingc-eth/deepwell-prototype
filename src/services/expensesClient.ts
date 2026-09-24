@@ -100,6 +100,24 @@ export interface ReceiptDraft {
   category: ExpenseCategory;
 }
 
+export interface ExpenseMonthLog {
+  month: string;
+  totalCents: number;
+  count: number;
+  topCategories: { category: string; totalCents: number }[];
+  items: ExpenseRow[];
+}
+
+export interface ExpenseMonthlyLog {
+  year: number;
+  yearTotalCents: number;
+  yearCount: number;
+  months: ExpenseMonthLog[];
+}
+
+/** Export scope: an explicit month ('YYYY-MM'), a whole year ('YYYY'), or a range toggle. */
+export type ExpenseExportScope = { month: string } | { year: string } | { range?: ExpenseRangeKind; from?: string; to?: string };
+
 async function handle<T>(res: Response): Promise<T> {
   if (res.headers.get('content-type')?.includes('text/csv')) {
     return (await res.blob()) as unknown as T;
@@ -172,14 +190,23 @@ export function extractReceipt(receiptKey: string, contentType: string): Promise
   return call({ op: 'receiptExtract', receiptKey, contentType });
 }
 
+/** Short-lived presigned URL for a saved receipt. */
+export function fetchReceiptViewUrl(id: string): Promise<{ url: string; filename: string | null; expiresIn: number }> {
+  return call({ op: 'receiptViewUrl', id });
+}
+
+export function fetchMonthlyLog(year: number): Promise<ExpenseMonthlyLog> {
+  return call({ op: 'monthly', year });
+}
+
 /** Triggers a browser download of the CSV — the response is a Blob (see
  *  `handle` above), not JSON. */
-export async function exportExpensesCsv(range: { range?: ExpenseRangeKind; from?: string; to?: string }): Promise<void> {
-  const blob = await call<Blob>({ op: 'exportCsv', ...range });
+export async function exportExpensesCsv(scope: ExpenseExportScope, filename = 'deepwell-expenses.csv'): Promise<void> {
+  const blob = await call<Blob>({ op: 'exportCsv', ...scope });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'deepwell-expenses.csv';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();

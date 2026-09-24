@@ -15,6 +15,7 @@
  */
 import { normalizeMatchText } from './recordsStore.js';
 import { documentTypeLabel } from './documentTypes.js';
+import { isoDate } from './scope.js';
 import {
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
@@ -243,8 +244,10 @@ async function fetchFieldRowsForResolution(db, resolution, fieldKey) {
 
 async function fetchInstaller(db, resolution) {
   const rows = await fetchFieldRowsForResolution(db, resolution, 'technician');
+  // Team A (2026-09-24): "who installed it" is answered ONLY from a document that records an install (a startup sheet or a
+  // work order). The old fallback to ANY technician on ANY document told owners a tech installed a unit he only serviced.
   const preferred = rows.filter((r) => r.document_type === 'work-order' || r.document_type === 'startup-sheet');
-  return pickBestExtraction(preferred.length ? preferred : rows);
+  return pickBestExtraction(preferred);
 }
 
 async function fetchLastServiceTech(db, resolution) {
@@ -253,9 +256,11 @@ async function fetchLastServiceTech(db, resolution) {
   return pickMostRecent(preferred.length ? preferred : rows);
 }
 
-async function fetchLastServiceDate(db, resolution) {
+async function fetchLastServiceDate(db, resolution, today) {
   const rows = await fetchFieldRowsForResolution(db, resolution, 'service_date');
-  return pickMostRecent(rows);
+  // Team A: a service_date after today is scheduled/a typo, not a visit that happened - never "the last service".
+  const t = isoDate(today) ?? new Date().toISOString().slice(0, 10);
+  return pickMostRecent(rows.filter((r) => { const d = isoDate(r.value); return !d || d <= t; }));
 }
 
 async function fetchInvoiceTotal(db, resolution) {
@@ -368,7 +373,7 @@ export async function runFastPath(db, fp, { today } = {}) {
   let row;
   if (intent === 'installer') row = await fetchInstaller(db, resolution);
   else if (intent === 'last_service_tech') row = await fetchLastServiceTech(db, resolution);
-  else if (intent === 'last_service_date') row = await fetchLastServiceDate(db, resolution);
+  else if (intent === 'last_service_date') row = await fetchLastServiceDate(db, resolution, today);
   else if (intent === 'invoice_total') row = await fetchInvoiceTotal(db, resolution);
   else row = pickBestExtraction(await fetchFieldRowsForResolution(db, resolution, fieldKey));
 

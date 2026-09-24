@@ -13,6 +13,15 @@
  *               invented figure)
  *   rubric      free text; graded by ONE cheap model call (grader.js) - the verdict comes from there
  *
+ * CITATIONS: every verdict also carries `cited` (did the answer bring at least one citation / source / drill-down
+ * record?) and `valueOk` (was the value itself right?). A question passes only when BOTH hold, unless it is tagged
+ * `citationRequired: false` or its expected answer is itself empty (zero / no / not on file / an honest decline):
+ * there is nothing to cite for "none". The run summary reports value accuracy and citation coverage separately.
+ *
+ * ALTERNATE DEFINITIONS: some questions have two defensible readings ("documents added" by upload date or by
+ * service date). `alts` = [{expected, says}] accepts the second reading ONLY when the answer STATES which one it
+ * used (`says`: a lowercase substring, or "re:<regex>"), so a lucky number that does not say what it counted fails.
+ *
  * Nothing here logs anything; the summaries it returns are short and go to the operator's own scorecard.
  */
 
@@ -35,7 +44,24 @@ export function answerView(data) {
     factText,
     haystack: norm([text, ...factText].join(" \n ")),
     sources: Array.isArray(d.sources) ? d.sources.length : 0,
+    citations: countCitations(d),
   };
+}
+
+/**
+ * How many citations an /api/ask payload carries. Accepted shapes (any one is enough):
+ *   data.sources[] | data.citations[] | data.records[] (drill-down list for aggregates) | data.drillDown / data.drilldown
+ *   facts[].sources[] | facts[].citations[] | facts[].records[] | facts[].documentId / facts[].entityId (a record the fact points at)
+ */
+export function countCitations(d) {
+  const arr = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined && x !== "").length : 0);
+  let n = arr(d.sources) + arr(d.citations) + arr(d.records) + arr(d.drillDown) + arr(d.drilldown) + arr(d.drill_down);
+  for (const f of Array.isArray(d.facts) ? d.facts : []) {
+    if (!f || typeof f !== "object") continue;
+    n += arr(f.sources) + arr(f.citations) + arr(f.records);
+    if (typeof f.documentId === "string" && f.documentId) n += 1;
+  }
+  return n;
 }
 
 /** Lowercase, drop punctuation, collapse whitespace. Dates and phone numbers are handled separately. */
@@ -95,7 +121,7 @@ const REFUSAL_RE = /\b(?:no|not|none|nothing|nobody|cannot|can't|cant|couldn't|u
 
 /* ------------------------------------------------------------------ comparators */
 
-function compareNumber(expected, view, question) {
+function compareNumber(expected, view, question, opts = {}) {
   const want = Number(expected);
   const qNums = new Set(numbersIn(question));
   if (view.kind === "no-answer") return { passed: false, score: 0, got: summarizeAnswer(view), why: "no answer" };
@@ -103,12 +129,35 @@ function compareNumber(expected, view, question) {
   const factNums = view.facts.length ? numbersIn(view.facts[0].value).filter((n) => !qNums.has(n)) : [];
   const word = (view.text.toLowerCase().match(/\b(zero|none|no|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/) ?? [])[1];
   const candidates = [textNums[0], factNums[0], word !== undefined ? NUMBER_WORDS[word] : undefined].filter((n) => n !== undefined);
-  let passed = candidates.includes(want);
+  // Money and other "the figure is one of several numbers in a sentence" questions: any number in the answer may be the figure.
+  if (opts.anyNumber) {
+    candidates.push(...textNums, ...view.facts.flatMap((f) => numbersIn(f.value).filter((n) => !qNums.has(n))));
+  }
+  const tol = Number.isFinite(opts.tolerance) ? Math.max(0, opts.tolerance) : 0;
+  let passed = candidates.some((n) => Math.abs(n - want) <= tol);
   // Zero: "nothing matches" with no facts is a correct zero.
   if (!passed && want === 0 && view.facts.length === 0 && (view.text === "" || REFUSAL_RE.test(view.text))) passed = true;
   // A list answer that returned exactly `want` facts is a correct count.
   if (!passed && view.facts.length === want && want > 1 && textNums.length === 0) passed = true;
-  return { passed, score: passed ? 1 : 0, got: summarizeAnswer(view), why: passed ? "" : `expected ${want}` };
+  let usedAlt = null;
+  // A second defensible definition counts only when the answer says it used it.
+  if (!passed) {
+    for (const alt of opts.alts ?? []) {
+      const a = Number(alt.expected);
+      if (candidates.some((n) => Math.abs(n - a) <= tol) || (a === 0 && view.facts.length === 0 && REFUSAL_RE.test(view.text)))
+        if (statesDefinition(view, alt.says)) { passed = true; usedAlt = String(alt.says ?? ""); break; }
+    }
+  }
+  return { passed, score: passed ? 1 : 0, got: summarizeAnswer(view), why: passed ? (usedAlt ? `accepted alternate definition (${usedAlt})` : "") : `expected ${want}`, ...(usedAlt ? { usedAlt } : {}) };
+}
+
+/** Does the answer state the definition an alternate reading needs? `says` is a lowercase substring, or "re:<regex>". No `says` = never. */
+export function statesDefinition(view, says) {
+  const s = String(says ?? "").trim();
+  if (!s) return false;
+  const hay = `${view.text} ${view.factText.join(" ")}`.toLowerCase();
+  if (s.startsWith("re:")) { try { return new RegExp(s.slice(3), "i").test(hay); } catch { return false; } }
+  return hay.includes(s.toLowerCase()) || norm(hay).includes(norm(s));
 }
 
 /** Does `item` ("name" or "label|n") appear in the answer? Parts of a "a|b" item must share one fact (or the text). */
@@ -160,7 +209,7 @@ export function warrantyStatusFromText(text) {
   if (!t) return null;
   if (/\b(?:expired|out of warranty|no longer (?:under|in|covered)|not (?:under|in) warranty|not covered|lapsed|past warranty|off warranty)\b/.test(t)) return "expired";
   if (/\b(?:expiring|expires soon|about to expire|expires in)\b/.test(t)) return "expiring";
-  if (/\b(?:unknown|no warranty (?:on file|information|record)|cannot tell|cant tell|no expiration|not on file)\b/.test(t)) return "unknown";
+  if (/\b(?:unknown|no warranty (?:\w+ ){0,2}(?:on file|information|info|record|recorded|data|details?|found)|no (?:warranty )?(?:expiration|expiry|end|coverage) (?:date )?(?:on file|recorded|found|listed)|warranty (?:\w+ ){0,2}(?:not|isnt|isn t) (?:on file|recorded|listed|available)|cannot tell|cant tell|can t tell|not able to tell|no expiration|not on file|not recorded|not listed|no record of (?:a )?warranty)\b/.test(t)) return "unknown";
   if (/\b(?:active|still (?:under|in) warranty|under warranty|in warranty|covered|current)\b/.test(t)) return "active";
   return null;
 }
@@ -210,28 +259,56 @@ function compareHonestZero(view, why = "the records cannot answer this") {
   return { passed: !fabricated, score: fabricated ? 0 : 1, got: summarizeAnswer(view), why: fabricated ? `fabricated an answer (${why})` : "" };
 }
 
+/** Is there anything for a citation to point at? "0", "no", "not on file", an empty list and an honest decline have no source. */
+export function isSubstantive(q) {
+  switch (q.cmp) {
+    case "number": return Number(q.expected) > 0;
+    case "set": return Array.isArray(q.expected) && q.expected.length > 0;
+    case "value": return (Array.isArray(q.expected) ? q.expected : [q.expected]).some((v) => v !== null && v !== undefined && String(v) !== "");
+    case "yesno": return q.expected === true || q.expected === "yes" || q.expected === "true";
+    case "rubric": return Array.isArray(q.expected) ? q.expected.length > 0 : Boolean(q.expected);
+    default: return false;
+  }
+}
+
+/** Does this question need a citation for a pass? (default yes, when the right answer is a substantive one) */
+export function citationRequiredFor(q) {
+  return q.citationRequired !== false && isSubstantive(q);
+}
+
 /**
- * @param {{cmp: 'number'|'set'|'value'|'yesno'|'honest-zero', expected: any, question?: string}} q
+ * @param {{cmp: 'number'|'set'|'value'|'yesno'|'honest-zero', expected: any, question?: string, citationRequired?: boolean,
+ *   alts?: {expected: any, says: string}[], tolerance?: number, anyNumber?: boolean}} q
  * @param {object} data  the /api/ask response `data`
- * @returns {{passed: boolean, score: number, got: string, expectedSummary: string, why: string, precision?: number, recall?: number}}
+ * @returns {{passed: boolean, valueOk: boolean, cited: boolean, citationRequired: boolean, score: number, got: string, expectedSummary: string, why: string, precision?: number, recall?: number}}
  */
 export function compareAnswer(q, data) {
   const view = answerView(data);
   let r;
   switch (q.cmp) {
-    case "number": r = compareNumber(q.expected, view, q.question); break;
+    case "number": r = compareNumber(q.expected, view, q.question, { alts: q.alts, tolerance: q.tolerance, anyNumber: q.anyNumber }); break;
     case "set": r = compareSet(q.expected, view); break;
     case "value": r = compareValue(q.expected, view); break;
     case "yesno": r = compareYesNo(q.expected, view); break;
     case "honest-zero": r = compareHonestZero(view); break;
     default: throw new Error(`compareAnswer: unsupported comparison ${String(q.cmp)}`);
   }
-  return { ...r, expectedSummary: summarizeExpected(q) };
+  return withCitation(r, q, view);
+}
+
+/** Fold the citation check into a value verdict: pass = value right AND (cited OR no citation needed). */
+export function withCitation(r, q, view) {
+  const valueOk = Boolean(r.passed);
+  const citationRequired = citationRequiredFor(q);
+  const cited = view.citations > 0;
+  const passed = valueOk && (!citationRequired || cited);
+  const why = valueOk && !passed ? "right value, but no citation or source" : r.why;
+  return { ...r, passed, valueOk, cited, citationRequired, why, expectedSummary: summarizeExpected(q) };
 }
 
 export function summarizeExpected(q) {
   switch (q.cmp) {
-    case "number": return String(q.expected);
+    case "number": return (q.alts ?? []).length ? clip(`${q.expected} (or ${q.alts.slice(0, 3).map((x) => `${x.expected} if it says "${String(x.says).replace(/^re:/, "")}"`).join("; ")})`) : String(q.expected);
     case "set": {
       const items = q.expected ?? [];
       return clip(`${items.length} item(s): ${items.slice(0, 6).join("; ")}${items.length > 6 ? "; …" : ""}`);
@@ -272,16 +349,35 @@ export function expectedFromRows(cmp, rows) {
   }
 }
 
-/** Pure: overall and per-category score from per-question results (skipped ones are excluded). */
+/**
+ * Pure: overall and per-category score from per-question results (skipped ones are excluded).
+ * `score` = share that passed (value right AND cited when a citation is required); `valueScore` = share whose
+ * value was right, citations aside; `citation` = of the answers that needed a citation, how many carried one.
+ */
 export function scoreResults(results) {
   const graded = (results ?? []).filter((r) => r && !r.skipped);
   const by = {};
+  const cite = { required: 0, cited: 0 };
+  let valueOk = 0;
   for (const r of graded) {
-    const c = (by[r.category] ??= { passed: 0, total: 0 });
+    const c = (by[r.category] ??= { passed: 0, total: 0, valueOk: 0, citeRequired: 0, cited: 0 });
     c.total += 1;
     if (r.passed) c.passed += 1;
+    // Results stored before citation scoring have no valueOk: their pass IS the value verdict.
+    const v = r.valueOk === undefined ? Boolean(r.passed) : Boolean(r.valueOk);
+    if (v) { c.valueOk += 1; valueOk += 1; }
+    if (r.citationRequired) { c.citeRequired += 1; cite.required += 1; if (r.cited) { c.cited += 1; cite.cited += 1; } }
   }
-  for (const c of Object.values(by)) c.score = c.total ? Math.round((c.passed / c.total) * 1000) / 1000 : 0;
+  for (const c of Object.values(by)) {
+    c.score = c.total ? Math.round((c.passed / c.total) * 1000) / 1000 : 0;
+    c.valueScore = c.total ? Math.round((c.valueOk / c.total) * 1000) / 1000 : 0;
+    c.citationCoverage = c.citeRequired ? Math.round((c.cited / c.citeRequired) * 1000) / 1000 : null;
+  }
   const passed = graded.filter((r) => r.passed).length;
-  return { total: graded.length, passed, score: graded.length ? Math.round((passed / graded.length) * 10000) / 10000 : null, byCategory: by };
+  return {
+    total: graded.length, passed, score: graded.length ? Math.round((passed / graded.length) * 10000) / 10000 : null,
+    valueScore: graded.length ? Math.round((valueOk / graded.length) * 10000) / 10000 : null,
+    citation: { required: cite.required, cited: cite.cited, coverage: cite.required ? Math.round((cite.cited / cite.required) * 10000) / 10000 : null },
+    byCategory: by,
+  };
 }

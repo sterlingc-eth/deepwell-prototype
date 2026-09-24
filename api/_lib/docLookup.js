@@ -24,7 +24,13 @@ import { normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
 import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from "./documentTypes.js";
 import { mergeDocumentVia } from "./routes/customers.js";
+// TEAM C (citations everywhere): every branch below states what it searched / read.
+import { attachCitations, customerRecord, documentRecord } from "./citations/records.js";
+import { documentRecordsFor } from "./citations/enrich.js";
 import { resolveContactCandidates, resolveAddressCandidates, nameTokens } from "./contactLookup.js";
+// Team A (2026-09-24): address/name scopes that include EVERY customer and unit at an address (apartments), the same
+// document union the customer profile uses, and legacy-tolerant document-type matching.
+import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitDesignator, docTypeAliases, typeSql } from "./scope.js";
 
 /* ============================================================ shape detection */
 
@@ -206,7 +212,7 @@ export function parseDocLookupQuestion(question, opts = {}) {
 /* ============================================================ DB resolution */
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
-const MAX_DOCS = 10;
+const MAX_DOCS = 40;
 
 async function resolveCandidates(db, namePhrase, isAddress) {
   // Reviewer NO-GO (2026-09-22, live 100-question sample): this used to call
@@ -264,82 +270,136 @@ function formatDateLabel(rawDate) {
  * COUNTABLE_ASK_SOURCES, so nothing here ever counts against the monthly ask
  * allowance (see api/ask.js's call site).
  */
+const MAX_AGGREGATE_CANDIDATES = 8;
+const YES_NO_SHAPE_RE = /^\s*(?:do|does|did|is there|are there|have we|has anyone)\b/i;
+
 export async function runDocLookup(db, question, opts = {}) {
   const parsed = parseDocLookupQuestion(question, opts);
   if (!parsed) return null;
   const { doctype, namePhrase, isAddress } = parsed;
-
-  const candidates = await resolveCandidates(db, namePhrase, isAddress);
-  if (candidates.length === 0) {
-    const label = titleCase(namePhrase);
-    return {
-      kind: "answer",
-      text: isAddress ? `I couldn't find a customer at ${label}.` : `I couldn't find a customer named ${label}.`,
-      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
-    };
-  }
-  if (candidates.length > 1) {
-    const names = candidates.map((r) => r.customer_name || r.customer_number || "Unnamed customer");
-    return {
-      kind: "answer",
-      text: `I found more than one match for "${namePhrase}": ${names.join(", ")}. Which one did you mean?`,
-      facts: candidates.map((r) => ({
-        label: r.customer_name || r.customer_number || "Unnamed customer",
-        value: r.service_address || "—", entityId: r.id, sources: [],
-      })),
-      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
-      candidateCount: candidates.length,
-    };
-  }
-
-  const row = candidates[0];
-  const name = row.customer_name || row.customer_number || "this customer";
-  const ids = await customerDocumentIds(db, row);
+  const yesNo = YES_NO_SHAPE_RE.test(String(question ?? ""));
   const docLabel = documentTypeLabel(doctype);
   const docLabelLower = docLabel.charAt(0).toLowerCase() + docLabel.slice(1);
 
-  if (!ids.length) {
-    return {
-      kind: "answer", text: `No ${docLabelLower} on file for ${name}.`,
+  // ---- resolve the scope: every customer/unit the phrase names -------------------------------------------------
+  let scope;
+  let subject;
+  let customers;
+  if (isAddress) {
+    // Team A: an address with several customers/units on it (an apartment complex) is answered FOR THE ADDRESS across
+    // all of them, never "which one did you mean" — unless the question names the unit ("Apt 104").
+    scope = await resolveAddressScope(db, namePhrase, { unit: extractUnitDesignator(question) });
+    customers = scope.customers;
+    if (!customers.length && !scope.equipment.length) {
+      // TEAM C: nothing matched - say what was searched (honest zero).
+      return attachCitations({
+        kind: "answer", text: `I couldn't find a customer at ${titleCase(namePhrase)}.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, { records: [], total: 0, kind: "searched", basis: `Searched your customer and equipment addresses for ${titleCase(namePhrase)}; no customer matches.` });
+    }
+    const firstAddr = String(customers[0]?.service_address ?? scope.equipment[0]?.service_address ?? namePhrase).split(",")[0].trim();
+    subject = firstAddr || titleCase(namePhrase);
+    const names = [...new Set(customers.map((c) => c.customer_name).filter(Boolean))];
+    if (names.length && names.length <= 3) subject += ` (${names.join(", ")})`;
+  } else {
+    const candidates = await resolveCandidates(db, namePhrase, false);
+    if (candidates.length === 0) {
+      return attachCitations({
+        kind: "answer", text: `I couldn't find a customer named ${titleCase(namePhrase)}.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, { records: [], total: 0, kind: "searched", basis: `Searched your customer names for ${titleCase(namePhrase)}; no customer matches.` });
+    }
+    if (candidates.length > MAX_AGGREGATE_CANDIDATES) {
+      const names = candidates.map((r) => r.customer_name || r.customer_number || "Unnamed customer");
+      return attachCitations({
+        kind: "answer",
+        text: `I found more than one match for "${namePhrase}": ${names.join(", ")}. Which one did you mean?`,
+        facts: candidates.map((r) => ({
+          label: r.customer_name || r.customer_number || "Unnamed customer",
+          value: r.service_address || "—", entityId: r.id, sources: [],
+        })),
+        sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+        candidateCount: candidates.length,
+      }, { records: candidates.map((r) => customerRecord(r)), total: candidates.length, claimedCount: candidates.length, basis: `${candidates.length} customers match "${namePhrase}"; pick one to see their ${docLabelLower}.` });
+    }
+    customers = candidates;
+    scope = await scopeFromCustomers(db, candidates);
+    subject = candidates.length === 1
+      ? (candidates[0].customer_name || candidates[0].customer_number || "this customer")
+      : `${candidates.length} customers matching "${namePhrase}" (${candidates.map((r) => r.customer_name).filter(Boolean).join(", ")})`;
+  }
+
+  // ---- every document reachable from the scope, then the ones of this type -----------------------------------
+  const idSet = new Set(await scopeDocumentIds(db, scope));
+  if (!isAddress) {
+    for (const row of customers) {
+      try {
+        const name = row?.customer_name ?? null;
+        const address = row?.service_address ?? null;
+        if (name && address) for (const r of await db.listNameMatchedDocuments(name, address)) idSet.add(r.document_id);
+      } catch { /* enrichment only */ }
+    }
+  }
+  const ids = [...idSet];
+  // TEAM C: an honest "none" cites what WAS searched - every document reachable from the scope (or, with no
+  // documents at all, the customers searched).
+  const none = async () => {
+    const data = {
+      kind: "answer",
+      text: yesNo ? `No — no ${docLabelLower} on file for ${subject}.` : `No ${docLabelLower} on file for ${subject}.`,
       facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     };
-  }
+    if (!ids.length) {
+      return attachCitations(data, {
+        records: customers.map((c) => customerRecord(c)), total: customers.length, kind: "searched",
+        basis: `No documents at all are linked to ${subject}, so there is no ${docLabelLower} to show.`,
+      });
+    }
+    return attachCitations(data, {
+      records: await documentRecordsFor(db, ids), total: ids.length, kind: "searched",
+      basis: `Searched all ${ids.length} document${ids.length === 1 ? "" : "s"} linked to ${subject}${customers.length > 1 ? ` (across ${customers.length} customers)` : ""}; none is a ${docLabelLower}.`,
+    });
+  };
+  if (!ids.length) return await none();
 
   const { rows } = await db.raw(
     `SELECT d.id, d.document_type, d.original_filename, d.created_at,
             (SELECT x.value FROM extractions x
               WHERE x.document_id = d.id AND x.field_key = 'service_date' AND x.${TENANT_SQL}
-              ORDER BY x.created_at DESC LIMIT 1) AS service_date
+              ORDER BY x.created_at DESC LIMIT 1) AS service_date,
+            (SELECT c.data->>'customer_name'
+               FROM document_entity_links l
+               JOIN entities en ON en.id = l.entity_id AND en.merged_into IS NULL AND en.${TENANT_SQL}
+               JOIN entities c ON c.id = CASE WHEN en.entity_type = 'customer' THEN en.id ELSE en.customer_id END
+                                AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+              WHERE l.document_id = d.id AND l.${TENANT_SQL} ORDER BY l.created_at DESC LIMIT 1) AS customer_name
        FROM documents d
-      WHERE d.id = ANY($1::uuid[]) AND d.document_type = $2 AND d.${TENANT_SQL}
+      WHERE d.id = ANY($1::uuid[]) AND ${typeSql("d.document_type")} = ANY($2::text[]) AND d.${TENANT_SQL}
       ORDER BY d.created_at DESC
       LIMIT ${MAX_DOCS}`,
-    [ids, doctype]
+    [ids, docTypeAliases(doctype)]
   );
+  if (!rows.length) return await none();
 
-  if (!rows.length) {
-    return {
-      kind: "answer", text: `No ${docLabelLower} on file for ${name}.`,
-      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
-    };
-  }
-
+  const multi = customers.length > 1;
   const plural = rows.length === 1 ? docLabelLower : `${docLabelLower}${docLabelLower.endsWith("s") ? "" : "s"}`;
-  const summaryList = rows
-    .slice(0, 3)
-    .map((r) => `${formatDateLabel(r.service_date ?? r.created_at)} · ${r.original_filename ?? r.id}`)
-    .join("; ");
+  const line = (r) => `${formatDateLabel(r.service_date ?? r.created_at)} · ${r.original_filename ?? r.id}${multi && r.customer_name ? ` · ${r.customer_name}` : ""}`;
+  const summaryList = rows.slice(0, 3).map(line).join("; ");
   const more = rows.length > 3 ? `, and ${rows.length - 3} more` : "";
-  return {
+  return attachCitations({
     kind: "answer",
-    text: `${rows.length} ${plural} on file for ${name}: ${summaryList}${more}.`,
+    text: `${yesNo ? "Yes — " : ""}${rows.length} ${plural} on file for ${subject}: ${summaryList}${more}.`,
     facts: rows.map((r) => ({
       label: docLabel,
-      value: `${formatDateLabel(r.service_date ?? r.created_at)} · ${r.original_filename ?? r.id}`,
+      value: line(r),
       sources: [{ documentId: r.id, location: {} }],
     })),
     sources: [], confidence: 1, verifiedCount: rows.length, unverifiedCount: 0, closest: [],
-  };
+  }, {
+    records: rows.map((r) => documentRecord(r, { label: `${docLabel} · ${r.original_filename ?? r.id}`, sublabel: `${formatDateLabel(r.service_date ?? r.created_at)}${multi && r.customer_name ? ` · ${r.customer_name}` : ""}` })),
+    total: rows.length, claimedCount: rows.length,
+    basis: `Looked through the ${ids.length} document${ids.length === 1 ? "" : "s"} linked to ${subject}${multi ? ` (${customers.length} customers)` : ""} for ${docLabelLower}; dates are service dates (upload date when none was extracted).`,
+  });
 }
 
 /* ============================================================ item 8: honest-
@@ -385,7 +445,7 @@ export async function resolveHonestZeroContext(db, question) {
   if (addrMatch) {
     const rows = await resolveAddressCandidates(db, addrMatch[0]);
     if (rows.length === 1) {
-      return { name: rows[0].customer_name || "this customer", address: rows[0].service_address || addrMatch[0], topic: topicWords(raw, addrMatch[0]) };
+      return { name: rows[0].customer_name || "this customer", address: rows[0].service_address || addrMatch[0], topic: topicWords(raw, addrMatch[0]), row: rows[0] /* TEAM C: citations name what was searched */ };
     }
     if (rows.length > 0) return null; // ambiguous — don't guess which one
   }
@@ -395,7 +455,7 @@ export async function resolveHonestZeroContext(db, question) {
     if (nameTokens(phrase).length && !AGGREGATE_WORD_RE.test(phrase)) {
       const rows = await resolveContactCandidates(db, phrase);
       if (rows.length === 1) {
-        return { name: rows[0].customer_name || phrase, address: rows[0].service_address || null, topic: topicWords(raw, phrase) };
+        return { name: rows[0].customer_name || phrase, address: rows[0].service_address || null, topic: topicWords(raw, phrase), row: rows[0] /* TEAM C */ };
       }
     }
   }

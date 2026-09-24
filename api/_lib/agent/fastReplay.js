@@ -13,6 +13,8 @@
 import { createToolbox } from "./tools.js";
 import { shapeAgentAnswer } from "./shape.js";
 import { composeFromRecipe } from "../learning/recipes.js";
+// TEAM C: the replayed query's rows are the citation records, same as a live agent run.
+import { citeAgentData } from "../citations/agent.js";
 
 /**
  * @returns {Promise<{handled: boolean, data: object|null, reason: string, fastReplay: true, steps: object[], modelCalls: 0,
@@ -31,7 +33,8 @@ export async function runRecipeFastPath({ withTenant, ctxArg, recipe, question, 
     if (!composed.ok) return miss(composed.reason);
     const shaped = shapeAgentAnswer(composed.input, toolbox.ledger, { question, today });
     if (!shaped.answered) return miss("not-grounded");
-    return { ...base, handled: true, data: shaped.data, reason: "recipe", queries: toolbox.queries };
+    const data = await citeAgentData({ withTenant, ctxArg, data: shaped.data, ledger: toolbox.ledger, input: composed.input });
+    return { ...base, handled: true, data, reason: "recipe", queries: toolbox.queries };
   } catch {
     return miss("error");
   }

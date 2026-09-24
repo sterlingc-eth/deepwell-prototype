@@ -18,7 +18,9 @@
  *   totals    { range?, from?, to? }        -> { range, grandTotalCents, byCategory, byMonth }
  *   receiptUploadUrl { filename, contentType } -> { receiptKey, uploadUrl }
  *   receiptExtract   { receiptKey, contentType } -> { draft: {vendor, occurredOn, amountCents, category} }
- *   exportCsv { range?, from?, to? }        -> text/csv response (not JSON)
+ *   receiptViewUrl   { id }                -> { url, filename, expiresIn } (short-lived presigned GET; 404 if the row has no receipt)
+ *   monthly   { year? }                     -> { year, yearTotalCents, yearCount, months:[{month,totalCents,count,topCategories,items}] } newest first
+ *   exportCsv { range?, from?, to?, month?: 'YYYY-MM', year?: 'YYYY' } -> text/csv response (not JSON)
  *   seedInitial                             -> { seeded, count } — only when the table is empty
  *
  * Storage: api/_lib/expensesStore.js (platform_expenses, SECURITY DEFINER
@@ -32,6 +34,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth, denyAuth } from '../auth.js';
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
 import { limit as rateLimit } from '../rateLimit.js';
+import { TTLCache } from '../perf.js';
 import { isPlatformOperator } from '../missDigest.js';
 import { presign, getObject } from '../r2.js';
 import {
@@ -42,6 +45,12 @@ import {
   buildExpensesCsv,
   resolveExpenseDateRange,
   shapeExpenseTotals,
+  isOwnedReceiptKey,
+  aggregateMonthly,
+  monthRange,
+  yearRange,
+  normalizeExpenseRow,
+  getExpenseById,
   listExpenses,
   insertExpense,
   updateExpense,
@@ -69,6 +78,17 @@ function isValidIsoDate(s) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function rangeFromBody(body) {
+  // A specific month ('YYYY-MM') or year ('YYYY') wins over `range`.
+  if (body?.month !== undefined && body?.month !== null) {
+    const r = monthRange(body.month);
+    if (!r) throw new ExpensesValidationError('month must be YYYY-MM');
+    return r;
+  }
+  if (body?.year !== undefined && body?.year !== null) {
+    const r = yearRange(body.year);
+    if (!r) throw new ExpensesValidationError('year must be a four-digit year');
+    return r;
+  }
   const range = typeof body?.range === 'string' ? body.range : null;
   if (range) return resolveExpenseDateRange(range, new Date(), { from: body?.from ?? null, to: body?.to ?? null });
   return { from: typeof body?.from === 'string' ? body.from : null, to: typeof body?.to === 'string' ? body.to : null };
@@ -102,7 +122,10 @@ export function validateExpenseFields(body) {
   }
 
   const note = typeof body?.note === 'string' ? body.note.slice(0, 2000) : null;
-  const receiptKey = typeof body?.receiptKey === 'string' ? body.receiptKey : null;
+  const receiptKey = typeof body?.receiptKey === 'string' && body.receiptKey ? body.receiptKey : null;
+  // Only keys this tracker minted (platform/expenses/...) may be attached —
+  // otherwise receiptViewUrl could be pointed at another tenant's object.
+  if (receiptKey && !isOwnedReceiptKey(receiptKey)) throw new ExpensesValidationError('receiptKey is not a valid expense receipt');
   const receiptFilename = typeof body?.receiptFilename === 'string' ? body.receiptFilename.slice(0, 300) : null;
   const source = body?.source === 'receipt' || body?.source === 'manual' ? body.source : (receiptKey ? 'receipt' : 'manual');
 
@@ -154,7 +177,7 @@ const RECEIPT_EXTRACT_TOOL = {
 
 async function handleReceiptExtract(body) {
   const receiptKey = body?.receiptKey;
-  if (typeof receiptKey !== 'string' || !receiptKey.startsWith('platform/expenses/')) {
+  if (!isOwnedReceiptKey(receiptKey)) {
     throw new ExpensesValidationError('receiptKey is required');
   }
   const contentType = typeof body?.contentType === 'string' && RECEIPT_TYPES.test(body.contentType) ? body.contentType : 'image/jpeg';
@@ -216,6 +239,29 @@ async function handleReceiptExtract(body) {
   };
 }
 
+/** Short-lived presigned GET for a saved receipt. Key comes from the DB row
+ *  (never the request) and must still be under platform/expenses/. */
+export async function handleReceiptViewUrl(body, deps = {}) {
+  const getExpense = deps.getExpense ?? getExpenseById;
+  const sign = deps.presign ?? presign;
+  const id = body?.id;
+  if (typeof id !== 'string' || !UUID_RE.test(id)) throw new ExpensesValidationError('id must be a uuid');
+  const row = await getExpense(id);
+  if (!row) throw new ExpensesValidationError('Expense not found', 404);
+  if (!row.receipt_key) throw new ExpensesValidationError('This expense has no receipt on file', 404);
+  if (!isOwnedReceiptKey(row.receipt_key)) throw new ExpensesValidationError('Receipt location is not valid', 400);
+  const expiresIn = 300;
+  let url;
+  try {
+    url = sign('GET', row.receipt_key, expiresIn);
+  } catch (err) {
+    const e = new ExpensesValidationError('File storage is not configured for this environment.', 503);
+    e.cause = err;
+    throw e;
+  }
+  return { url, filename: row.receipt_filename ?? null, expiresIn };
+}
+
 /* ------------------------------------------------------------------ CSV */
 
 function ymdRangeLabel({ from, to }) {
@@ -252,7 +298,58 @@ async function handleSeedInitial(auth) {
 
 /* ------------------------------------------------------------------ ops that need the rate limiter/DB */
 
-const DB_OPS = new Set(['list', 'add', 'update', 'delete', 'totals', 'receiptUploadUrl', 'receiptExtract', 'exportCsv', 'seedInitial']);
+/* ------------------------------------------- operator gate (this route only) */
+
+const FOUNDER_MEMBER_TTL_MS = 10 * 60_000;
+const FOUNDER_MEMBER_ERROR_TTL_MS = 30_000;
+const founderMemberCache = new TTLCache(FOUNDER_MEMBER_TTL_MS, 500);
+
+/** Test-only: clear the founder-membership cache between fixtures. */
+export function _resetFounderMemberCache() {
+  founderMemberCache.map.clear();
+}
+
+/** Org ids the user belongs to, straight from Clerk's Backend API (lazy import, same pattern as notify.js). */
+async function clerkMembershipOrgIds(userId) {
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) throw new Error('no clerk key');
+  const { createClerkClient } = await import('@clerk/backend');
+  const list = await createClerkClient({ secretKey }).users.getOrganizationMembershipList({ userId, limit: 500 });
+  const rows = Array.isArray(list) ? list : (list?.data ?? []);
+  return rows.map((m) => m?.organization?.id).filter((id) => typeof id === 'string');
+}
+
+/**
+ * Expenses-only operator check: isPlatformOperator(auth) (founder tenant
+ * ACTIVE, or allowlisted user id) OR the signed-in user is a MEMBER of the
+ * founder organization, whichever org is currently active — so the standalone
+ * site works without switching the shared Clerk session's active org.
+ *
+ * DEEPWELL_FOUNDER_TENANT_ID is a Clerk org id only when it starts with
+ * `org_`; the solo `user_<id>` form cannot be mapped to an org, so it falls
+ * back to the allowlist/active-tenant rule alone. Any lookup error fails
+ * closed. Results are cached per user for 10 minutes (errors: 30s); ids are
+ * never logged.
+ */
+export async function isExpensesOperator(auth, deps = {}) {
+  if (isPlatformOperator(auth)) return true;
+  const founder = process.env.DEEPWELL_FOUNDER_TENANT_ID;
+  if (!auth?.userId || !founder || !founder.startsWith('org_')) return false;
+  const key = `${founder}:${auth.userId}`;
+  const cached = founderMemberCache.get(key);
+  if (cached !== undefined) return cached;
+  try {
+    const orgIds = await (deps.membershipLookup ?? clerkMembershipOrgIds)(auth.userId);
+    const isMember = Array.isArray(orgIds) && orgIds.includes(founder);
+    founderMemberCache.set(key, isMember);
+    return isMember;
+  } catch {
+    founderMemberCache.set(key, false, FOUNDER_MEMBER_ERROR_TTL_MS);
+    return false;
+  }
+}
+
+const DB_OPS = new Set(['list', 'add', 'update', 'delete', 'totals', 'monthly', 'receiptUploadUrl', 'receiptExtract', 'receiptViewUrl', 'exportCsv', 'seedInitial']);
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return handleCors(res, req).status(204).end();
@@ -264,7 +361,13 @@ export default async function handler(req, res) {
   } catch (err) {
     return denyAuth(res, err);
   }
+  return dispatchExpenses(req, res, auth);
+}
 
+/** Everything after authentication — exported so scripts/verify-expenses.mjs
+ *  can drive the operator gate and ops with a fake auth and injected deps. */
+export async function dispatchExpenses(req, res, auth, deps = {}) {
+  const limiter = deps.rateLimit ?? rateLimit;
   const body = req.body ?? {};
   const op = typeof body.op === 'string' ? body.op : '';
 
@@ -272,13 +375,13 @@ export default async function handler(req, res) {
   // it cannot itself be gated by the answer it's about to give. It does no
   // DB work and needs no rate limit.
   if (op === 'operatorStatus') {
-    return handleCors(res, req).status(200).json({ isOperator: isPlatformOperator(auth) });
+    return handleCors(res, req).status(200).json({ isOperator: await isExpensesOperator(auth, deps) });
   }
 
   // STRICTEST gate in this route, checked BEFORE any DB or rate-limit work
   // (same ordering as api/review.js's OPERATOR_ACTIONS) — a tenant's own
-  // admin, even the founder shop's non-founder admins, gets 403 here.
-  if (!isPlatformOperator(auth)) {
+  // admin, even the founder shop's non-founder admins, gets 403 here (isExpensesOperator).
+  if (!(await isExpensesOperator(auth, deps))) {
     return res.status(403).json({ error: 'This action is restricted to DeepWell platform operators.' });
   }
 
@@ -286,12 +389,12 @@ export default async function handler(req, res) {
     return handleCors(res, req).status(400).json({ error: `Unknown op: ${op}` });
   }
 
-  if (!(await rateLimit(req, res, auth, 'write'))) return; // 429 already written
+  if (!(await limiter(req, res, auth, 'write'))) return; // 429 already written
 
   try {
     if (op === 'list') {
       const range = rangeFromBody(body);
-      const items = await listExpenses(range);
+      const items = (await (deps.listExpenses ?? listExpenses)(range)).map(normalizeExpenseRow);
       return handleCors(res, req).status(200).json({ items, range });
     }
 
@@ -329,6 +432,19 @@ export default async function handler(req, res) {
       return handleCors(res, req).status(200).json(result);
     }
 
+    if (op === 'receiptViewUrl') {
+      const result = await handleReceiptViewUrl(body, deps);
+      return handleCors(res, req).status(200).json(result);
+    }
+
+    if (op === 'monthly') {
+      const year = body?.year ?? new Date().getUTCFullYear();
+      const range = yearRange(year);
+      if (!range) throw new ExpensesValidationError('year must be a four-digit year');
+      const rows = await (deps.listExpenses ?? listExpenses)(range);
+      return handleCors(res, req).status(200).json(aggregateMonthly(rows, year));
+    }
+
     if (op === 'receiptExtract') {
       const result = await handleReceiptExtract(body);
       return handleCors(res, req).status(200).json(result);
@@ -336,7 +452,7 @@ export default async function handler(req, res) {
 
     if (op === 'exportCsv') {
       const range = rangeFromBody(body);
-      const items = await listExpenses(range);
+      const items = (await (deps.listExpenses ?? listExpenses)(range)).map(normalizeExpenseRow);
       const csv = buildExpensesCsv(items);
       handleCors(res, req);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { breadthQuestions } from "../test-docs/scorecard/breadth.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BANK = join(ROOT, "test-docs", "question-bank", "bank.json");
@@ -35,16 +36,23 @@ const QUOTA = {
   comparisons: 8, "counts-age": 5, "counts-brand": 8, "counts-docs": 12, "counts-geo": 12, "counts-warranty": 6,
   coverage: 5, "data-hygiene": 8, "follow-up": 4, history: 8, lists: 6,
   "live-misses-2026-09-21": 10, "live-misses-2026-09-21b": 4, "live-misses-2026-09-22": 12, "live-misses-2026-09-22b": 8,
-  lookups: 26, "maintenance-due": 5, money: 6, notes: 8, technician: 5, time: 6, "two-condition": 12, warranty: 12, "yes-no": 5,
+  lookups: 26, "maintenance-due": 5, notes: 8, technician: 5, time: 6, "two-condition": 12, warranty: 12, "yes-no": 5,
 };
 const VARIANT_EVERY = 3; // every 3rd selected base also gets its typo + abbreviated wording
 const RUBRIC_CAP = 0.15;
+const BREADTH_CATEGORIES = ["financials", "content", "semantic", "multi-hop", "trends", "rankings", "tech-performance", "data-quality", "existence", "explain", "persona"];
 
 /* ------------------------------------------------------------------ SQL building blocks */
 const ADDR = (col) => col;
-const CITY = (col) => `substring(${ADDR(col)} from ',[[:space:]]*([^,]+),[[:space:]]*[A-Z]{2}[[:space:]]+[0-9]{5}')`;
-const STATE = (col) => `substring(${ADDR(col)} from ',[[:space:]]*([A-Z]{2})[[:space:]]+[0-9]{5}')`;
-const ZIP = (col) => `substring(${ADDR(col)} from '([0-9]{5})(-[0-9]{4})?[[:space:]]*$')`;
+// GEOGRAPHY (adjudicated 2026-09-24, see test-docs/scorecard/ADJUDICATION.md): a customer's city / state / zip come from
+// the one free-text service address. The regexes tolerate the shapes real addresses have - "City, ST 85201",
+// "City ST 85201" (no comma before the state: the shape the first version silently dropped, losing one customer from
+// every "customers in Mesa / AZ" count), ZIP+4, "Suite/Apt" segments, and a state with no zip. A customer whose
+// address has no recognisable state/city is counted in NO bucket (never invented into one).
+const STATE_ZIP_TAIL = "(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$";
+const CITY = (col) => `(SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '${STATE_ZIP_TAIL}', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array(${ADDR(col)}, ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)`;
+const STATE = (col) => `COALESCE(upper(substring(${ADDR(col)} from '(?:^|[^A-Za-z])([A-Za-z]{2})[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$')), upper(substring(${ADDR(col)} from ',[[:space:]]*([A-Za-z]{2})[[:space:]]*$')), CASE WHEN ${ADDR(col)} ~* '\\marizona\\M' THEN 'AZ' END)`;
+const ZIP = (col) => `substring(${ADDR(col)} from '([0-9]{5})([[:space:]-]*[0-9]{4})?[[:space:]]*$')`;
 const GEO = { city: CITY, state: STATE, zip: ZIP };
 const ISO = (col) => `(CASE WHEN ${col} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(${col}, 1, 10)::date END)`;
 const DOCTYPE = (col) => `lower(replace(${col}, '_', '-'))`;
@@ -55,6 +63,13 @@ const DOCTYPE_ALIASES = {
   "inspection-report": ["inspection-report"], "startup-sheet": ["startup-sheet"], "purchase-order": ["purchase-order"],
   "nameplate-photo": ["nameplate-photo", "nameplate"], "equipment-record": ["equipment-record"], correspondence: ["correspondence"],
 };
+
+// A "service visit" document: work that was done on site. A maintenance agreement, permit, warranty card, quote,
+// PO or nameplate photo carries dates too (start, issue, expiry) but is not a visit, so those never answer
+// "when did we last service it" / "how many times have we been there" (adjudicated: a future agreement date was
+// being read as a "last service").
+const VISIT_TYPES = ["service-ticket", "service-report", "work-order", "dispatch-note", "inspection-report", "startup-sheet", "invoice"];
+const VISIT_SQL_ARR = (q) => `${q.p(VISIT_TYPES)}::text[]`;
 
 class Q {
   constructor() { this.params = []; this.todayIdx = 0; }
@@ -108,10 +123,32 @@ function customerPred(f, q, yearsAgo) {
 }
 
 /** Build the SQL for a structured analytics expectation. Returns {sql, params, cmp} or null when not expressible. */
+/** A bank entry that only NAMES its conditions (conditionsOnly, no filters) must still be graded on them: derive the filters from the wording or give up. */
+function deriveFilters(ex, text) {
+  const out = [];
+  const t = text.toLowerCase();
+  const negative = /\b(?:no|without|missing|lack|lacking|dont have|don'?t have|doesnt have|doesn'?t have|not have|have not|havent|haven'?t)\b/.test(t);
+  for (const cond of ex.conditionsOnly ?? []) {
+    if (cond === "email") out.push({ field: "hasEmail", op: "eq", value: !negative });
+    else if (cond === "phone") out.push({ field: "hasPhone", op: "eq", value: !negative });
+    else if (cond === "state") { const m = /\b(arizona|az|nevada|nv)\b/i.exec(text); if (m) out.push({ field: "state", op: "eq", value: /^(?:arizona|az)$/i.test(m[1]) ? "AZ" : "NV" }); else return null; }
+    else if (cond === "city") { const m = /\b(?:in|from)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s*\??$/.exec(text.trim()); if (m) out.push({ field: "city", op: "eq", value: m[1] }); else return null; }
+    else return null; // brand / county / month / maintenance / money: no derivation here (another family handles it, or it is skipped)
+  }
+  return out;
+}
+
 function buildAnalytics(entry, text) {
-  const ex = entry.expect ?? {};
+  let ex = entry.expect ?? {};
   if (ex.unsupported || !["customers", "equipment", "warranties", "documents"].includes(ex.entity)) return null;
-  const filters = ex.filters ?? [];
+  // "How many CUSTOMERS have a unit newer than 5 years" counts customers, not units (adjudicated: the bank filed these under `equipment`).
+  if ((ex.entity === "equipment" || ex.entity === "warranties") && !ex.groupBy && /\b(?:customers?|clients?|accounts?)\b/i.test(text) && !/\b(?:units?|systems?|equipment)\s+(?:do|does|per)\b/i.test(text)) ex = { ...ex, entity: "customers" };
+  let filters = ex.filters ?? [];
+  if (!filters.length && ex.conditionsOnly?.length) {
+    const d = deriveFilters(ex, text);
+    if (!d) return null;
+    filters = d;
+  }
   const yrs = (/\b(\d+)\s+years?\b/i.exec(text) ?? [])[1];
   const yearsAgo = yrs ? Number(yrs) : null;
   const wantsList = /^\s*(?:which|who|who's|whos|list|give me|show|name)\b/i.test(text) && !/\bhow many\b/i.test(text);
@@ -120,7 +157,7 @@ function buildAnalytics(entry, text) {
   // "the top brand", "the busiest zip" answer one item, not the whole grouping; an unfiltered question with a time or
   // expiry qualifier ("expires in the next 90 days") is not something these structured filters can express.
   if (/\b(?:most|top|biggest|largest|highest|least|fewest|best)\b/i.test(text)) return null;
-  if (!filters.length && !ex.groupBy && !(/\bhow many\b/i.test(text) && !/\b(?:next|this|last|since|days?|months?|years?|weeks?|quarter|expir|due|warrant|older|newer)\b/i.test(text))) return null;
+  if (!filters.length && !ex.groupBy && !(/\bhow many\b/i.test(text) && !/\b(?:next|this|last|since|days?|months?|years?|weeks?|quarter|expir|due|warrant|older|newer|e-?mail|phone|county|brand|arizona|nevada|(?:in|from)\s+[A-Z][a-z]+)\b/i.test(text))) return null;
 
   const preds = [];
   const ent = ex.entity;
@@ -152,8 +189,9 @@ function buildAnalytics(entry, text) {
     return { cmp: "set", sql: `SELECT ${withCounts ? "k || '|' || n" : "k"} AS item FROM (SELECT ${key} AS k, count(*) AS n FROM ${from}${where} GROUP BY 1) g WHERE k IS NOT NULL ORDER BY n DESC, k`, params: q.params };
   }
   if (isYesNo) return { cmp: "yesno", sql: `SELECT EXISTS (SELECT 1 FROM ${from}${where}) AS v`, params: q.params };
-  if (ent === "customers" && wantsList && typeof ex.answerValue === "number" && ex.answerValue <= 25) {
-    return { cmp: "set", sql: `SELECT c.data->>'customer_name' AS item FROM ${from}${where} ORDER BY 1`, params: q.params };
+  // "Which customers ..." is a list. A list the bank knows is long stays a count; one with no known size is graded as a list and skipped at run time if it is too long to chat.
+  if (ent === "customers" && wantsList && (typeof ex.answerValue === "number" ? ex.answerValue <= 25 : true)) {
+    return { cmp: "set", ...(typeof ex.answerValue === "number" ? {} : { maxItems: 25 }), sql: `SELECT c.data->>'customer_name' AS item FROM ${from}${where} ORDER BY 1`, params: q.params };
   }
   if (wantsList && ent !== "customers") return null;
   return { cmp: "number", sql: `SELECT count(*) AS n FROM ${from}${where}`, params: q.params };
@@ -164,8 +202,8 @@ const NOT_NAMES = new Set(["account", "unit", "job", "system", "customer", "the"
 const esc = (s) => String(s).replace(/[\\%_]/g, (m) => `\\${m}`);
 
 function subjectOf(text) {
-  const a = /\b(\d{1,5}\s+(?:[NSEW]\s+)?[A-Za-z0-9.]+(?:\s+[A-Za-z0-9.]+){0,2}?\s(?:St|Ave|Rd|Dr|Blvd|Ln|Way|Ct|Pkwy|Hwy|Cir|Pl)\b)/i.exec(text);
-  if (a) return { kind: "addr", value: a[1].replace(/\s+/g, " ").trim() };
+  const a = /\b(\d{1,5}\s+(?:[NSEW]\s+)?[A-Za-z0-9.]+(?:\s+[A-Za-z0-9.]+){0,2}?\s(?:St|Ave|Rd|Dr|Blvd|Ln|Way|Ct|Pkwy|Hwy|Cir|Pl)\b)(?:\.?,?\s*((?:Apt|Apartment|Suite|Ste|Unit|#)\.?\s*[A-Za-z0-9-]+))?/i.exec(text);
+  if (a) return { kind: "addr", value: a[1].replace(/\s+/g, " ").trim(), ...(a[2] ? { unit: a[2].replace(/\s+/g, " ").trim() } : {}) };
   const full = /\b(?:for|of|on file for|about)\s+(?:the\s+)?([A-Za-z][A-Za-z'.-]+\s+[A-Za-z][A-Za-z'.-]+)\s*\??$/i.exec(text.trim());
   if (full && !NOT_NAMES.has(full[1].split(" ")[1].toLowerCase()) && !NOT_NAMES.has(full[1].split(" ")[0].toLowerCase())) return { kind: "name", value: full[1] };
   const poss = /\b([A-Z][a-z]{2,})['’]s\b/.exec(text);
@@ -181,7 +219,8 @@ function subjectOf(text) {
 
 /** SQL fragments for a subject. Returns {req, docs, equip} with the shared ILIKE param already bound. */
 function subjectSql(s, q) {
-  const pat = s.kind === "addr" ? q.p(`${esc(s.value)}%`) : q.p(`%${esc(s.value)}%`);
+  // An address with an Apt/Suite/Unit means THAT unit: "3300 S Alma School Rd, Apt 104" must not fold in the other apartments of the complex.
+  const pat = s.kind === "addr" ? q.p(s.unit ? `${esc(s.value)}%${esc(s.unit)}%` : `${esc(s.value)}%`) : q.p(`%${esc(s.value)}%`);
   if (s.kind === "addr") {
     return {
       pat,
@@ -196,7 +235,9 @@ function subjectSql(s, q) {
   return {
     pat,
     req: `SELECT count(*) AS n FROM entities x WHERE x.entity_type = 'customer' AND x.merged_into IS NULL AND x.data->>'customer_name' ILIKE ${pat}`,
-    docs: `SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (${custs})`,
+    // documents ABOUT the customer: linked to the customer or to one of its units
+    docs: `SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (${custs})
+           UNION SELECT l.document_id FROM document_entity_links l JOIN entities e ON e.id = l.entity_id WHERE e.entity_type = 'equipment' AND e.customer_id IN (${custs})`,
     equip: `SELECT e.id FROM ${EQUIP} AND e.customer_id IN (${custs})`,
     cust: custs,
   };
@@ -244,7 +285,9 @@ function contactLookup(text) {
 function unitField(field, text) {
   const s = subjectOf(text); if (!s) return null;
   const q = new Q(); const sub = subjectSql(s, q);
-  return { cmp: "value", sql: `SELECT e.data->>'${field}' AS v FROM entities e WHERE e.id IN (${sub.equip}) AND coalesce(e.data->>'${field}', '') <> ''`, params: q.params, requires: requiresOf(sub, q) };
+  // An installation date printed on one of the customer's documents is "on file" too (adjudicated: the unit record alone was too narrow).
+  const fromDocs = field === "installation_date" ? ` UNION SELECT y.value AS v FROM extractions y WHERE y.field_key = 'installation_date' AND coalesce(y.value, '') <> '' AND y.document_id IN (${sub.docs})` : "";
+  return { cmp: "value", sql: `SELECT e.data->>'${field}' AS v FROM entities e WHERE e.id IN (${sub.equip}) AND coalesce(e.data->>'${field}', '') <> ''${fromDocs}`, params: q.params, requires: requiresOf(sub, q) };
 }
 function unitAge(text) {
   const s = subjectOf(text); if (!s) return null;
@@ -265,7 +308,13 @@ function unitWarranty(text) {
 function invoiceCount(text) {
   const s = subjectOf(text); if (!s) return null;
   const q = new Q(); const sub = subjectSql(s, q);
-  return { cmp: "number", sql: `SELECT count(*) AS n FROM documents d WHERE ${DOCTYPE("d.document_type")} = 'invoice' AND d.id IN (${sub.docs})`, params: q.params, requires: requiresOf(sub, q) };
+  const inv = `${DOCTYPE("d.document_type")} = 'invoice'`;
+  return {
+    cmp: "number", sql: `SELECT count(*) AS n FROM documents d WHERE ${inv} AND d.id IN (${sub.docs})`, params: q.params, requires: requiresOf(sub, q),
+    // A surname that matches several customers (two Delgados) is ambiguous: an answer about ONE of them is right if it names which.
+    alt: { sql: `SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities e ON e.id = l.entity_id
+      WHERE ${inv} AND (l.entity_id = c.id OR e.customer_id = c.id)) AS n, lower(c.data->>'customer_name') AS says FROM entities c WHERE c.id IN (${sub.cust})`, params: q.params },
+  };
 }
 function docExists(text) {
   const t = text.toLowerCase();
@@ -277,13 +326,33 @@ function docExists(text) {
 }
 function lastService(text) {
   const s = subjectOf(text); if (!s) return null;
-  const q = new Q(); const sub = subjectSql(s, q);
-  return { cmp: "value", sql: `SELECT max(${ISO("y.value")})::text AS v FROM extractions y WHERE y.field_key = 'service_date' AND y.document_id IN (${sub.docs})`, params: q.params, requires: requiresOf(sub, q) };
+  const q = new Q(); const sub = subjectSql(s, q); const T = q.today(); const vt = VISIT_SQL_ARR(q);
+  // last service = the newest COMPLETED visit (a service-type document dated on or before today); a future date is a scheduled visit, never "last".
+  return {
+    cmp: "value",
+    sql: `SELECT max(z.dt)::text AS v FROM (SELECT ${ISO("y.value")} AS dt FROM extractions y JOIN documents d ON d.id = y.document_id
+      WHERE y.field_key = 'service_date' AND ${DOCTYPE("d.document_type")} = ANY(${vt}) AND y.document_id IN (${sub.docs})) z WHERE z.dt <= ${T}`,
+    params: q.params, requires: requiresOf(sub, q),
+  };
+}
+/** "how many times have we been to X" - visits = distinct completed service dates; a per-document count is accepted only if the answer says it counted documents. */
+function visitCount(text) {
+  const s = subjectOf(text); if (!s) return null;
+  const q = new Q(); const sub = subjectSql(s, q); const T = q.today(); const vt = VISIT_SQL_ARR(q);
+  const base = (docs) => `FROM extractions y JOIN documents d ON d.id = y.document_id WHERE y.field_key = 'service_date' AND ${DOCTYPE("d.document_type")} = ANY(${vt}) AND ${ISO("y.value")} <= ${T} AND y.document_id IN (${docs})`;
+  const perCust = `SELECT count(DISTINCT ${ISO("y.value")}) AS n, lower(c.data->>'customer_name') AS says FROM entities c JOIN document_entity_links l ON l.entity_id = c.id JOIN extractions y ON y.document_id = l.document_id JOIN documents d ON d.id = y.document_id
+      WHERE c.id IN (${sub.cust}) AND y.field_key = 'service_date' AND ${DOCTYPE("d.document_type")} = ANY(${vt}) AND ${ISO("y.value")} <= ${T} GROUP BY c.id, c.data`;
+  return {
+    cmp: "number", sql: `SELECT count(DISTINCT ${ISO("y.value")}) AS n ${base(sub.docs)}`, params: q.params, requires: requiresOf(sub, q),
+    alt: { sql: `SELECT count(DISTINCT y.document_id) AS n, 're:(documents?|tickets?|work orders?|records?|reports?|invoices?)' AS says ${base(sub.docs)} UNION ALL ${perCust}`, params: q.params },
+  };
 }
 function installer(text) {
   const s = subjectOf(text); if (!s) return null;
   const q = new Q(); const sub = subjectSql(s, q);
-  return { cmp: "value", sql: `SELECT y.value AS v FROM extractions y WHERE y.field_key = 'installed_by' AND coalesce(y.value, '') <> '' AND y.document_id IN (${sub.docs})`, params: q.params, requires: requiresOf(sub, q) };
+  // No structured "installed by" field exists; the installer is on file only if a document's own text says who installed it.
+  return { cmp: "value", sql: `SELECT DISTINCT (regexp_match(p.text, '[Ii]nstall(?:ed|ation)?[[:space:]]+(?:was[[:space:]]+)?(?:performed[[:space:]]+|completed[[:space:]]+)?by:?[[:space:]]+([A-Z][a-z]+([[:space:]]+[A-Z][a-z]+)?)'))[1] AS v
+    FROM document_pages p WHERE p.document_id IN (${sub.docs}) AND p.text ~ '[Ii]nstall(ed|ation)?[[:space:]]+(was[[:space:]]+)?(performed[[:space:]]+|completed[[:space:]]+)?by'`, params: q.params, requires: requiresOf(sub, q) };
 }
 function historyRubric(text) {
   const s = subjectOf(text); if (!s) return null;
@@ -306,22 +375,34 @@ function techJobs(text) {
     params: q.params, requires: { sql: `SELECT count(*) AS n FROM extractions t WHERE t.field_key = 'technician' AND t.value ILIKE $1`, params: [`%${esc(nm[1])}%`] },
   };
 }
-function techRubric() {
-  return {
-    cmp: "rubric", rubric: "Gives per-technician job counts (or names the busiest technician) consistent with the reference, or honestly says the technician data is limited. A shorter period must not exceed the all-time reference totals.",
-    sql: `SELECT t.value || ': ' || count(DISTINCT t.document_id) || ' jobs on file' AS ref FROM extractions t WHERE t.field_key = 'technician' AND coalesce(t.value, '') <> '' GROUP BY t.value ORDER BY count(DISTINCT t.document_id) DESC LIMIT 12`, params: [],
-  };
+/** A completed job = a document with a service_date; its technician is the document's technician extraction. Per-tech counts are deterministic, so they are a SET ("Danny Ochoa|12"), not a model-graded rubric. */
+const TECH_JOBS = (w) => `FROM extractions t JOIN extractions y ON y.document_id = t.document_id AND y.field_key = 'service_date' WHERE t.field_key = 'technician' AND coalesce(t.value, '') <> ''${w ? ` AND ${ISO("y.value")} >= ${w.start} AND ${ISO("y.value")} < ${w.end}` : ""}`;
+function techBreakdown(text) {
+  const q = new Q(); const w = windowOf(text, q);
+  const t = text.toLowerCase();
+  if (/\b(?:most|fewest|least|busiest|top|best|highest|lowest)\b/.test(t)) {
+    const dir = /\b(?:fewest|least|lowest)\b/.test(t) ? "ASC" : "DESC";
+    return { cmp: "value", sql: `WITH g AS (SELECT t.value AS k, count(DISTINCT t.document_id) AS n ${TECH_JOBS(w)} GROUP BY t.value) SELECT k AS v FROM g WHERE n = (SELECT ${dir === "ASC" ? "min" : "max"}(n) FROM g)`, params: w ? q.params : [] };
+  }
+  return { cmp: "set", maxItems: 25, sql: `SELECT t.value || '|' || count(DISTINCT t.document_id) AS item ${TECH_JOBS(w)} GROUP BY t.value ORDER BY count(DISTINCT t.document_id) DESC, t.value`, params: w ? q.params : [] };
 }
 function timeCount(text) {
   const t = text.toLowerCase(); const q = new Q(); const w = windowOf(text, q);
   if (!w) return null;
   if (/\b(?:jobs?|service calls?|visits?)\b/.test(t)) {
-    return { cmp: "number", sql: `SELECT count(*) AS n FROM extractions y WHERE y.field_key = 'service_date' AND ${ISO("y.value")} >= ${w.start} AND ${ISO("y.value")} < ${w.end}`, params: q.params };
+    // a visit = one document + one service date (a duplicated extraction row is not a second visit)
+    return { cmp: "number", sql: `SELECT count(DISTINCT y.document_id || ${ISO("y.value")}::text) AS n FROM extractions y WHERE y.field_key = 'service_date' AND ${ISO("y.value")} >= ${w.start} AND ${ISO("y.value")} < ${w.end}`, params: q.params };
   }
   const type = /\binvoices?\b/.test(t) ? "invoice" : /\b(?:quotes?|proposals?)\b/.test(t) ? "proposal-quote" : null;
   const ty = type ? ` AND ${DOCTYPE("d.document_type")} = ANY(${q.p(DOCTYPE_ALIASES[type])}::text[])` : "";
-  const dateExpr = /\b(?:add|added|uploaded)\b/.test(t) ? "d.created_at::date" : DOC_DATE;
-  return { cmp: "number", sql: `SELECT count(*) AS n FROM documents d WHERE ${dateExpr} >= ${w.start} AND ${dateExpr} < ${w.end}${ty}`, params: q.params };
+  // "added / uploaded / received" = the day it entered the system (created_at); anything else = the work date. When the wording is
+  // ambiguous the OTHER reading is accepted, but only if the answer says which one it counted.
+  const upload = /\b(?:add|added|adds|uploaded|upload|received|scanned|imported)\b/.test(t);
+  const main = upload ? "d.created_at::date" : DOC_DATE;
+  const other = upload ? DOC_DATE : "d.created_at::date";
+  const count = (dateExpr) => `SELECT count(*) AS n FROM documents d WHERE ${dateExpr} >= ${w.start} AND ${dateExpr} < ${w.end}${ty}`;
+  const says = upload ? "re:(service|work|visit|document) dates?|dated|by date|serviced|work performed" : "re:(upload|uploaded|added|created|entered)";
+  return { cmp: "number", sql: count(main), params: q.params, alt: { sql: `${count(other).replace("SELECT count(*) AS n", `SELECT count(*) AS n, '${says}' AS says`)}`, params: q.params } };
 }
 function serviced(text) {
   const t = text.toLowerCase(); const q = new Q(); const w = windowOf(text, q);
@@ -334,10 +415,11 @@ function serviced(text) {
   return null;
 }
 function overdueRubric() {
-  const q = new Q();
+  const q = new Q(); const T = q.today(); const vt = VISIT_SQL_ARR(q);
   return {
-    cmp: "rubric", rubric: "Either lists customers whose most recent dated service is more than 12 months ago, consistent with the reference, or says plainly it cannot determine who is overdue. Must not invent customers or dates.",
-    sql: `SELECT c.data->>'customer_name' || ' | last service ' || coalesce(max(${ISO("y.value")})::text, 'never') AS ref FROM entities c LEFT JOIN document_entity_links l ON l.entity_id = c.id LEFT JOIN extractions y ON y.document_id = l.document_id AND y.field_key = 'service_date' WHERE c.entity_type = 'customer' AND c.merged_into IS NULL GROUP BY c.id, c.data HAVING max(${ISO("y.value")}) IS NULL OR max(${ISO("y.value")}) < ${q.today()} - 365 ORDER BY 1 LIMIT 15`,
+    cmp: "rubric", rubric: "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
+    sql: `SELECT c.data->>'customer_name' || ' | last service ' || max(v.dt)::text AS ref FROM entities c JOIN (SELECT l.entity_id, ${ISO("y.value")} AS dt FROM document_entity_links l JOIN documents d ON d.id = l.document_id JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date'
+      WHERE ${DOCTYPE("d.document_type")} = ANY(${vt})) v ON v.entity_id = c.id AND v.dt <= ${T} WHERE c.entity_type = 'customer' AND c.merged_into IS NULL GROUP BY c.id, c.data HAVING max(v.dt) < ${T} - 365 ORDER BY 1 LIMIT 15`,
     params: q.params,
   };
 }
@@ -361,6 +443,26 @@ function notesRubric(text) {
   };
 }
 
+/** "Do we have more invoices or more service tickets?" -> a small rubric over the two types' counts. */
+const MORE_TYPES = [
+  [/\binvoices?\b/, ["invoice"], ["invoice", "invoices"]], [/\b(?:service )?tickets?\b|\bservice (?:calls?|reports?)\b/, ["service-ticket", "service-report"], ["service ticket", "service tickets", "ticket", "tickets"]],
+  [/\bwork orders?\b/, ["work-order"], ["work order", "work orders"]], [/\bpermits?\b/, ["permit"], ["permit", "permits"]],
+  [/\b(?:quotes?|proposals?)\b/, ["proposal-quote", "proposal", "quote"], ["quote", "quotes", "proposal", "proposals"]], [/\b(?:maintenance )?agreements?\b|\bmaintenance plans?\b/, ["maintenance-agreement", "maintenance-plan"], ["agreement", "agreements", "maintenance agreement", "maintenance agreements"]],
+  [/\b(?:purchase orders?|pos)\b/, ["purchase-order"], ["purchase order", "purchase orders", "po", "pos"]], [/\bwarranty (?:registrations?|cards?)\b/, ["warranty-registration", "warranty"], ["warranty registration", "warranty registrations", "warranty"]],
+];
+function moreOf(text) {
+  const m = /\bmore\s+(.+?)\s+or\s+(?:more\s+)?(.+?)(?:\s+(?:on file|do we have|in the system))?\s*\??$/i.exec(text.trim());
+  if (!m) return null;
+  const side = (frag) => MORE_TYPES.find(([re]) => re.test(frag.toLowerCase()));
+  const a = side(m[1]); const b = side(m[2]);
+  if (!a || !b || a === b) return null;
+  const q = new Q(); const pa = q.p([...a[1], ...b[1]]);
+  return {
+    cmp: "rubric", rubric: "Says which of the two document types the shop has MORE of (or that they are tied), consistent with the reference counts. Naming the wrong one, or a non-answer, fails.",
+    sql: `SELECT k || ': ' || n || ' documents' AS ref FROM (SELECT ${DOCTYPE("d.document_type")} AS k, count(*) AS n FROM documents d WHERE ${DOCTYPE("d.document_type")} = ANY(${pa}::text[]) GROUP BY 1) g ORDER BY n DESC`, params: q.params,
+  };
+}
+
 /* ------------------------------------------------------------------ classification */
 const isMoney = (e, t) => e.category === "money" || e.expect?.conditionsOnly?.includes("money") || /financials layer|invoice totals/.test(e.expect?.note ?? "")
   || /\$|\b(?:revenue|owed?|unpaid|collected|billed|invoiced|dollar|ticket size|amount we)\b/i.test(t);
@@ -372,13 +474,14 @@ export function classify(entry) {
   const t = text.toLowerCase();
 
   if (isMoney(entry, text)) return FAM.money();
+  if (/\bmore\b.+\bor\b/.test(t) && ex.groupBy === "documentType") return moreOf(text);
   if (/compressor/.test(t) && /replac/.test(t)) return FAM.compressor();
   if (/filter size|filter change/.test(t) && ex.unsupported) return FAM.filterSize();
   if (/(overdue|due for|tune-?up|haven'?t had|not had service|next filter|fall maintenance)/.test(t) && !ex.filters) return overdueRubric();
 
   if (ex.route === "analytics" && ex.entity === "serviceVisits") {
     if (ex.filters?.some((f) => f.field === "technician")) return techJobs(text);
-    if (/\btech(?:nician)?s?\b/.test(t) || /\b(?:who|which)\b.*\b(?:most|fewest)\b/.test(t)) return techRubric();
+    if (/\btech(?:nician)?s?\b/.test(t) || /\b(?:who|which)\b.*\b(?:most|fewest)\b/.test(t)) return techBreakdown(text);
     return serviced(text) ?? timeCount(text);
   }
   if (ex.route === "analytics" && ex.entity === "documents" && ex.timeRange !== undefined && !ex.groupBy) {
@@ -406,6 +509,7 @@ export function classify(entry) {
   if (/\binvoices?\b/.test(t) && /\b(?:list|show|all|for)\b/.test(t) && !/\bdo we have\b/.test(t)) return invoiceCount(text);
   if (/\b(?:do we have|did we|does .+ have|is there|show me the)\b/.test(t) && /(maintenance (?:agreement|plan)|permit|\bpo\b|purchase order|nameplate|startup|warranty registration|proposal|quote)/.test(t)) return docExists(text);
   if (/\b(?:when did we last|last service|when were we last|last time we)\b/.test(t)) return lastService(text);
+  if (/\bhow many times (?:have|did) we (?:been|gone|visited|serviced)\b|\bhow many (?:visits|service calls|jobs) (?:have we|did we|at|to|for)\b/.test(t)) return visitCount(text);
   if (/\b(?:what do we have on file|last \d+ visits|last service ticket|how many times have we been|visits at|history)\b/.test(t)) return historyRubric(text);
   if (/\bnotes?\b/.test(t)) return notesRubric(text);
   return null;
@@ -454,16 +558,28 @@ function main() {
           oracle: { sql: c.spec.sql.replace(/\s+/g, " ").trim(), params: c.spec.params, ...(c.spec.requires ? { requires: { sql: c.spec.requires.sql.replace(/\s+/g, " ").trim(), params: c.spec.requires.params } } : {}) },
         };
         if (c.spec.rubric) q.rubric = c.spec.rubric;
+        if (c.spec.alt) q.oracle.alt = { sql: c.spec.alt.sql.replace(/\s+/g, " ").trim(), params: c.spec.alt.params };
+        if (c.spec.maxItems) q.maxItems = c.spec.maxItems;
+        if (entry.persona) q.persona = entry.persona;
         questions.push(q);
       }
     });
   }
 
+  // BREADTH: the hand-written categories the bank lacks (financials, document content, semantic paraphrase, multi-hop, trends,
+  // rankings, technician performance, data quality, existence, explain, personas). See test-docs/scorecard/breadth.mjs.
+  const kit = { Q, ISO, DOCTYPE, DOCTYPE_ALIASES, GEO, EQUIP, wstatus, installYear, esc, subjectSql, VISIT_TYPES, MONTHS };
+  const breadth = breadthQuestions(kit);
+  // a bank question with the same wording as a breadth one (the retiring "money" honest-zeros) yields to the real one
+  const breadthText = new Set(breadth.map((b) => b.text.trim().toLowerCase()));
+  for (let i = questions.length - 1; i >= 0; i--) if (breadthText.has(questions[i].text.trim().toLowerCase())) questions.splice(i, 1);
+  for (const b of breadth) questions.push(b);
+
   const rubric = questions.filter((q) => q.cmp === "rubric").length;
   const byCat = {}; const byCmp = {};
   for (const q of questions) { byCat[q.category] = (byCat[q.category] ?? 0) + 1; byCmp[q.cmp] = (byCmp[q.cmp] ?? 0) + 1; }
   const body = JSON.stringify(questions);
-  const version = `2026-09-23.${createHash("sha256").update(body).digest("hex").slice(0, 8)}`;
+  const version = `2026-09-24.${createHash("sha256").update(body).digest("hex").slice(0, 8)}`;
   const doc = {
     version,
     note: "GENERATED by scripts/gen-scorecard.mjs from test-docs/question-bank/bank.json - do not edit by hand. Each question's oracle is SQL over the base tables; see the generator header.",
@@ -473,7 +589,9 @@ function main() {
 
   // contract checks
   const problems = [];
-  if (questions.length < 260 || questions.length > 340) problems.push(`total ${questions.length} outside 260..340`);
+  if (questions.length < 480 || questions.length > 800) problems.push(`total ${questions.length} outside 480..800`);
+  if (breadth.length < 200) problems.push(`breadth questions ${breadth.length} < 200`);
+  for (const cat of BREADTH_CATEGORIES) if (!breadth.some((b) => b.category === cat)) problems.push(`breadth category with no questions: ${cat}`);
   if (rubric / questions.length > RUBRIC_CAP) problems.push(`rubric ${rubric}/${questions.length} exceeds ${RUBRIC_CAP * 100}%`);
   for (const cat of Object.keys(QUOTA)) if (!byCat[cat]) problems.push(`category with no questions: ${cat}`);
   if (new Set(questions.map((q) => q.id)).size !== questions.length) problems.push("duplicate ids");
@@ -481,6 +599,10 @@ function main() {
     if (!/^\s*(?:with|select)\b/i.test(q.oracle.sql)) problems.push(`${q.id}: oracle is not a SELECT`);
     const need = Math.max(0, ...[...q.oracle.sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
     if (need !== q.oracle.params.length) problems.push(`${q.id}: oracle uses ${need} params but binds ${q.oracle.params.length}`);
+    if (q.oracle.alt) {
+      const an = Math.max(0, ...[...q.oracle.alt.sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
+      if (an !== q.oracle.alt.params.length) problems.push(`${q.id}: alt uses ${an} params but binds ${q.oracle.alt.params.length}`);
+    }
     if (q.oracle.requires) {
       const rn = Math.max(0, ...[...q.oracle.requires.sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
       if (rn !== q.oracle.requires.params.length) problems.push(`${q.id}: requires uses ${rn} params but binds ${q.oracle.requires.params.length}`);

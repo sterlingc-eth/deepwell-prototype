@@ -41,7 +41,22 @@ export function isUnitRankingQuestion(question) {
   return RANK_WORD.test(q) && UNIT_WORD.test(q);
 }
 
+const REASONING_RES = [
+  /\b(?:more|fewer|less|greater)\s+(?!than\b)[a-z][a-z /&-]{1,40}?\s+(?:or|vs\.?|versus)\s+(?:more\s+|fewer\s+|less\s+)?[a-z]/i, // "more X or more Y"
+  /\b(?:compare|comparison of|difference between)\b/i,
+  /\bwhy\b|\bhow come\b/i,
+  /\b(?:trend(?:ing|s)?|over time|year[- ]over[- ]year|month[- ]over[- ]month|growing|declin\w+)\b/i,
+];
+
+/** Team A (2026-09-24): comparisons ("more invoices or more tickets"), "why" and trend questions. The closed-vocabulary
+ *  analytics planner cannot express them (it merged both sides of a comparison into one count), so an unparsed one goes
+ *  to the agent - which the hard-question classifier then runs on the escalation model (agent/escalation.js). */
+export function isReasoningQuestion(question) {
+  const q = String(question ?? "");
+  return q.length > 0 && REASONING_RES.some((re) => re.test(q));
+}
+
 /** True when the agent should get the first shot (ahead of retrieval + model). */
 export function isAgentFirstQuestion(question) {
-  return isEnumerationQuestion(question) || isRepairHistoryQuestion(question) || isUnitRankingQuestion(question);
+  return isEnumerationQuestion(question) || isRepairHistoryQuestion(question) || isUnitRankingQuestion(question) || isReasoningQuestion(question);
 }

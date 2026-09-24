@@ -25,6 +25,8 @@ import { createPageViewer, VIEW_PAGE_TOOL_DEF, VIEW_TOOL_NAME } from "./viewPage
 // financeViews.js; the table probe + catalogue block live in financials/store.js. Hooked in below with small hunks.
 import { financeViewsSql, FINANCE_VIEW_DOCS } from "./financeViews.js";
 import { financialsTableExists, financialsCatalogue } from "../financials/store.js";
+// TEAM C (citations everywhere): capture the customer / unit / document each run_query row IS, and what search_documents searched.
+import { collectQueryIdentities, noteQueryIdentities, noteSearch } from "../citations/agent.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -125,7 +127,7 @@ export const VIEW_DOCS = `VIEWS available to run_query (PostgreSQL; one SELECT; 
 - facts(document_id, entity_id, field_key, value, unit_index, page_no, confidence, created_at) — extracted fields (corrected values already applied). field_key examples: customer_name, service_address, serial_number, model, manufacturer, permit_number, invoice_number, service_type, work_performed, part_number, technician, agreement_term, cost. Call describe_data to see which exist.
 - doc_links(document_id, entity_id, entity_type, customer_id, via) — which customer each document belongs to (directly or through a unit).
 ${FINANCE_VIEW_DOCS}
-SQL rules: SELECT/WITH only, no semicolons, no comments, no double-quoted identifiers, plain functions only. Dates are text: compare like service_date >= '2026-01-01' and use left(service_date, 7) for months. Always select the ids you will cite (customer_id, document_id). Count with count(*) or count(DISTINCT customer_id) instead of counting rows yourself. Max 100 rows come back; if a result says truncated, select fewer columns or narrow the query and run it again - never answer from a truncated list as if it were complete.
+SQL rules: SELECT/WITH only, no semicolons, no comments, no double-quoted identifiers, plain functions only. Dates are text: compare like service_date >= '2026-01-01' and use left(service_date, 7) for months. Always select the ids you will cite (customer_id, equipment_id, document_id). CITATIONS: for every list, count or breakdown, ALSO select those id columns (one row per record, e.g. SELECT c.customer_id, c.name, count(*) OVER () AS total_count ... LIMIT 100) so the exact rows behind your number can be shown to the owner; for a breakdown add the group value as AS group_key. A bare count(*) with no ids leaves the number with nothing to click - only use it when the rows would exceed 100, and then say so. Count with count(*) or count(DISTINCT customer_id) instead of counting rows yourself. Max 100 rows come back; if a result says truncated, select fewer columns or narrow the query and run it again - never answer from a truncated list as if it were complete.
 Common shapes (adapt, do not copy values):
 - customers with a current warranty: SELECT c.customer_id, c.name, e.model, e.warranty_status, e.warranty_expires FROM equipment e JOIN customers c ON c.customer_id = e.customer_id WHERE e.warranty_current ORDER BY c.name
 - newest / oldest unit installed: SELECT e.equipment_id, e.manufacturer, e.model, e.serial_number, e.installation_date, e.address FROM equipment e WHERE e.installation_date IS NOT NULL ORDER BY e.installation_date DESC LIMIT 5 (installation_date is text: if the top rows are not YYYY-MM-DD, say the ordering may be unreliable).
@@ -172,6 +174,7 @@ export const ANSWER_TOOL_DEF = {
       },
       confidence: { type: "number" },
       interpretation: { type: "string", description: "One short clause: how you read the question." },
+      basis: { type: "string", description: "One short sentence saying how the answer was computed (what was counted or searched, and by what field). Only numbers that appear in tool results." },
       missing: { type: "string", description: "For cannot_answer: what data is missing." },
     },
     required: ["status", "text"],
@@ -438,6 +441,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     const docType = typeof input.documentType === "string" && input.documentType.trim() ? input.documentType.trim().toLowerCase() : null;
     const scopeCustomer = typeof input.customerId === "string" && UUID_RE.test(input.customerId.trim()) ? input.customerId.trim() : null;
     if (typeof input.customerId === "string" && input.customerId.trim() && !scopeCustomer) return fail("customerId must be a customer_id returned by another tool", "search");
+    let searchScope = null; // TEAM C: what this search covered, for an honest-zero citation
     const found = await withTenant(ctxArg, async (db) => {
       let scopeIds = null;
       if (scopeCustomer) {
@@ -446,6 +450,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
              FROM entities WHERE id = $1 AND entity_type = 'customer' AND merged_into IS NULL AND ${t("entities")}`, [scopeCustomer]);
         if (!cr[0]) return [];
         scopeIds = await customerDocumentIds(db, cr[0]);
+        searchScope = { name: cr[0].customer_name, docIds: scopeIds };
         if (!scopeIds.length) return [];
       }
       let rows = await db.searchPassages(query, scopeIds ? 40 : docType ? 40 : limit + 4, scopeIds ? { documentIds: scopeIds } : {});
@@ -476,6 +481,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     }
     const text = `{"resultCount":${found.length},"results":[${parts.join(",")}]}`;
     for (const r of shown) ledger.addPassage(r.documentId, r.page, r.stage, r.filename);
+    noteSearch(ledger, { query, scopeName: searchScope?.name, docIds: searchScope?.docIds, results: found.length }); // TEAM C
     return { ok: true, content: text, rowCount: found.length, inputSummary: `search${docType ? `:${docType}` : ""}${scopeCustomer ? ":customer" : ""}` };
   }
 
@@ -614,7 +620,11 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
           if (named.length) {
             docInfo = (await db.raw(`SELECT id, stage, original_filename FROM documents WHERE id = ANY($1::uuid[]) AND ${t("documents")}`, [named])).rows;
           }
-          return { ok: true, res, docInfo };
+          // TEAM C: the customer / unit / document each returned row IS (same rows as the number), labelled from
+          // this tenant's own rows inside this same transaction. Never allowed to fail the query.
+          let identities = null;
+          try { identities = await collectQueryIdentities(db, res.rows ?? [], { maxRows: MAX_QUERY_ROWS }); } catch { identities = null; }
+          return { ok: true, res, docInfo, identities };
         } catch (err) {
           await db.raw("ROLLBACK TO SAVEPOINT agent_query", []).catch(() => {});
           return { ok: false, message: String(err?.message ?? err).slice(0, 300) };
@@ -639,6 +649,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
       if (d) { if (typeof r.stage !== "string") r.stage = d.stage; if (typeof r.filename !== "string") r.filename = d.original_filename; }
     }
     registerRows(ledger, shown);
+    noteQueryIdentities(ledger, result.identities, { purpose, views: [...names], rowCount: rows.length }); // TEAM C
     const empty = rows.length === 0 || (rows.length === 1 && cols.every((c) => isZeroish(rows[0][c])));
     return { ok: true, content: text, rowCount: rows.length, inputSummary: `query:${purpose}`, empty, rows, columns: cols };
   }

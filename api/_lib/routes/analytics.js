@@ -23,8 +23,10 @@ import {
   suspiciousUnfilteredCustomerPlan,
   reconcileTimeRange,
   resolveServiceVisitsOverride,
+  resolveAgeFilter,
   resolveAnyTimeRange,
   withinTimeRange,
+  monthRangeLabel,
   missingConditions,
   detectedConditions,
   unsupportedConditionAnswer,
@@ -48,6 +50,10 @@ import {
   TOP_CUSTOMERS_LIMIT,
 } from '../analytics.js';
 import { normalizeQuestion } from '../nlNormalize.js';
+// TEAM C (citations everywhere): records/basis come from the SAME rows the number was computed from.
+import { withAnalyticsCitations } from '../citations/analytics.js';
+// Team A (2026-09-24): time semantics (uploaded vs service date) and future-dated service records.
+import { dateBasisOf, todayIso, splitFuture } from '../scope.js';
 // Tier 2 learning loop, Part A (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
 // overlayFewShotHash mixes the active overlay's few-shot items into this
 // file's own analytics cache promptVersion (see runAnalyticsQuestion below)
@@ -114,7 +120,16 @@ export async function planAnalyticsQuestion(question, { today, overlay } = {}) {
     // question itself actually wrote out (reconcileTimeRange, analytics.js) —
     // see that function's own doc comment for why the model's date math is
     // not trusted by default, and when it is trusted anyway.
-    const input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
+    let input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
+    // Team A (2026-09-24): "older/newer than N years" is year arithmetic done in code, not by the model; and a documents
+    // time window is decided by the wording - "added/uploaded/received/scanned/filed" -> upload date (created_at),
+    // "serviced/visited/job/work done" -> service date. Both override whatever the model guessed.
+    if (input) {
+      const age = resolveAgeFilter(question, today);
+      if (age) input = { ...input, filters: [...(input.filters ?? []).filter((f) => f?.field !== 'installYear'), age] };
+      const basis = dateBasisOf(question);
+      if (input.entity === 'documents' && basis) input = { ...input, dateBasis: basis };
+    }
     return validatePlan(input);
   } catch (err) {
     console.error('Analytics planner failed, falling through:', err?.message);
@@ -160,7 +175,7 @@ function shapeEquipmentRow(r, today) {
   };
 }
 
-function shapeDocumentRow(r) {
+function shapeDocumentRow(r, dateBasis) {
   // Item 1: month by the WORK date (extractions.service_date, left-joined in
   // buildAnalyticsSQL's documents branch), not the upload date — falls back
   // to created_at only for a document nothing was ever extracted as its
@@ -171,7 +186,9 @@ function shapeDocumentRow(r) {
   const fullDate = r.service_date && /^\d{4}-\d{2}-\d{2}/.test(String(r.service_date))
     ? String(r.service_date).slice(0, 10)
     : null;
-  const date = fullDate ?? (r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : null);
+  const uploadDate = r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : null;
+  // Team A: an "uploaded/added/received" question is about when the paper arrived (created_at), never the job date.
+  const date = dateBasis === 'uploaded' ? uploadDate : (fullDate ?? uploadDate);
   const month = date ? date.slice(0, 7) : r.service_date ? String(r.service_date).slice(0, 7) : null;
   return {
     id: r.id, label: documentTypeLabel(r.document_type), value: r.original_filename || r.id,
@@ -283,7 +300,7 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
   // closed — see matchesFilter's own null-actual -> false rule — rather than
   // silently ignored).
   const filtered = applyEntityFilters(unitRows, unitFilters);
-  if (!filtered.length) return { rows: [], unfilteredCustomerIds: [] };
+  if (!filtered.length) return { rows: [], unfilteredCustomerIds: [], unitCount: 0 };
 
   const customerIds = [...new Set(filtered.map((r) => r.customerId))];
   const { rows: custRaw } = await db.raw(
@@ -320,7 +337,7 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
       warrantyStatus: unit.warrantyStatus,
     });
   }
-  return { rows };
+  return { rows, unitCount: filtered.length };
 }
 
 /**
@@ -424,7 +441,8 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   // guarantees sortBy only ever appears with entity 'customers' + op 'list'.
   if (plan.sortBy) {
     const rows = await queryTopCustomers(db, plan.sortBy, plan.limit ?? TOP_CUSTOMERS_LIMIT);
-    return formatAnalyticsAnswer(plan, { total: rows.length, rows });
+    // TEAM C: citations from the same ranked rows.
+    return withAnalyticsCitations(formatAnalyticsAnswer(plan, { total: rows.length, rows }), plan, { rows, total: rows.length });
   }
 
   if (!filtersSupported(plan.entity, plan.filters)) return null;
@@ -447,6 +465,10 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   // formatAnalyticsAnswer's own doc comment for how this powers the honest
   // zero-result wording ("which units had service this month" live miss).
   let mostRecentServiceVisit;
+  // Team A: how many matching UNITS stand behind a customers-via-equipment count; how many service records are dated in
+  // the future (excluded from "jobs done"/"last service").
+  let unitCount = null;
+  let futureVisitCount = 0;
   if (hasDocTypeFilter) {
     ({ rows } = await queryCustomersByDocTypeCondition(db, plan));
   } else if (hasEquipmentJoinFilter) {
@@ -455,7 +477,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // applies every filter itself (equipment-level AND the geo ones a unit's
     // own address also carries), so `filtered` below is a no-op pass-through
     // (matchesAllFilters([], []) === true) rather than re-filtering.
-    ({ rows } = await queryCustomersByEquipmentFilter(db, plan, { today }));
+    ({ rows, unitCount } = await queryCustomersByEquipmentFilter(db, plan, { today }));
   } else if (plan.entity === 'customers') {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
@@ -467,7 +489,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   } else if (plan.entity === 'documents') {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
-    rows = raw.map((r) => shapeDocumentRow(r));
+    rows = raw.map((r) => shapeDocumentRow(r, plan.dateBasis));
     // Item 5 (100-question persona sample, 2026-09-22): withinTimeRange
     // compares on the row's own `date` (full YYYY-MM-DD) when plan.timeRange
     // is itself day-grain (the new "this week"/"last N days"/etc. windows —
@@ -513,8 +535,13 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // row (if any) is already the single most recent service visit on file,
     // regardless of what plan.timeRange narrows it to below — no second
     // query needed.
-    mostRecentServiceVisit = allServiceVisitRows.length
-      ? { date: allServiceVisitRows[0].date, customer: allServiceVisitRows[0].customerName || null }
+    // Team A: a service_date AFTER today is a scheduled visit or a typo - never "the most recent visit", never a job
+    // that was done. splitFuture separates them (newest-first past list); they are reported as a count instead.
+    const { past: pastVisitRows, future: futureVisitRows } = splitFuture(allServiceVisitRows, todayIso(today));
+    futureVisitCount = futureVisitRows.length;
+    const visitRowsToUse = pastVisitRows;
+    mostRecentServiceVisit = visitRowsToUse.length
+      ? { date: visitRowsToUse[0].date, customer: visitRowsToUse[0].customerName || null }
       : null;
     // Reviewer NO-GO (2026-09-21, "which units had service this month" live
     // miss): comparing the full YYYY-MM-DD date directly against a YYYY-MM
@@ -527,7 +554,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // bound of a different granularity.
     // Item 5: same withinTimeRange helper as the documents branch above — day
     // grain for the new extended windows, month grain (via r.month) otherwise.
-    rows = plan.timeRange ? allServiceVisitRows.filter((r) => withinTimeRange(r, plan.timeRange)) : allServiceVisitRows;
+    rows = plan.timeRange ? visitRowsToUse.filter((r) => withinTimeRange(r, plan.timeRange)) : visitRowsToUse;
   }
 
   // hasDocType/lacksDocType are already fully resolved by
@@ -575,8 +602,14 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     unfilteredTotal = rows.length;
   }
 
-  return formatAnalyticsAnswer(plan, {
+  // TEAM C: records + basis from the SAME `filtered` rows (and the same group keys) the answer counts.
+  return withAnalyticsCitations(formatAnalyticsAnswer(plan, {
     total, groups, rows: filtered, sum, unfilteredTotal, broaderGroups, mostRecentServiceVisit, timeRangeLabel,
+    unitCount, futureVisitCount,
+  }), plan, {
+    rows: filtered, total, groups, keyOf: plan.op === 'groupBy' ? keyOf(plan.groupBy) : null,
+    unfilteredRows: total === 0 ? rows : null, timeRangeLabel, monthLabel: timeRangeLabel ? null : monthRangeLabel(plan.timeRange),
+    futureVisitCount, // TEAM C: future-dated visits are mentioned in the basis, never cited as records
   });
 }
 

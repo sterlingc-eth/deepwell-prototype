@@ -21,6 +21,8 @@
  * for (seer, filter size) -> null, always.
  */
 import { describeWarranty, alertTier } from './warrantyRules.js';
+// TEAM C (citations everywhere): equipment / document lists cite the exact rows they list.
+import { attachCitations, unitRecord, documentRecord } from './citations/records.js';
 
 /* ============================================================ intent catalogue */
 
@@ -624,7 +626,7 @@ export function buildEquipmentListAnswer({ resolution, units, today }) {
       sources: [],
     };
   });
-  return {
+  return attachCitations({
     kind: 'answer',
     text: `${label} has ${units.length} piece${units.length === 1 ? '' : 's'} of equipment on file.`,
     facts,
@@ -635,7 +637,10 @@ export function buildEquipmentListAnswer({ resolution, units, today }) {
     unverifiedCount: 0,
     closest: [],
     fastIntent: 'equipment_list',
-  };
+  }, {
+    records: units.map((u) => unitRecord(u)), total: units.length, claimedCount: units.length,
+    basis: `Listed every piece of equipment on file for ${label}.`,
+  });
 }
 
 /** document_list_for_subject: `documents` is [{id, document_type, ...}], same
@@ -648,7 +653,7 @@ export function buildDocumentListAnswer({ resolution, documents, documentTypeLab
     value: d.original_filename ?? d.id,
     sources: [{ documentId: d.id, location: {} }],
   }));
-  return {
+  return attachCitations({
     kind: 'answer',
     text: `${label} has ${documents.length} document${documents.length === 1 ? '' : 's'} on file.`,
     facts,
@@ -659,5 +664,9 @@ export function buildDocumentListAnswer({ resolution, documents, documentTypeLab
     unverifiedCount: 0,
     closest: [],
     fastIntent: 'document_list_for_subject',
-  };
+  }, {
+    records: documents.map((d) => documentRecord(d, { label: `${documentTypeLabel ? documentTypeLabel(d.document_type) : (d.document_type ?? 'Document')} · ${d.original_filename ?? d.id}` })),
+    total: documents.length, claimedCount: documents.length,
+    basis: `Listed every document linked to ${label}.`,
+  });
 }

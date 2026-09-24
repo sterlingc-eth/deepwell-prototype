@@ -1857,6 +1857,17 @@ for (const q of ['how many active customers do we have', 'how many current custo
   check(`warranty condition negative :: "${q}"`, !detectedConditions(q).has('warranty'));
 }
 
+
+// Team A (2026-09-24): basis phrase, units-vs-customers note, future-dated visits excluded and mentioned.
+{
+  const docs = formatAnalyticsAnswer({ entity: 'documents', op: 'count', dateBasis: 'uploaded', timeRange: { from: '2026-08', to: '2026-08' }, filters: [] }, { total: 5, rows: [], groups: null, timeRangeLabel: 'August 2026' });
+  check('teamA analytics :: an upload-date count says it counted by upload date', /by upload date/.test(docs.text), docs.text);
+  const cust = formatAnalyticsAnswer({ entity: 'customers', op: 'count', filters: [{ field: 'installYear', op: 'lt', value: 2016 }] }, { total: 3, rows: [], unitCount: 5 });
+  check('teamA analytics :: customers-via-units states the unit count too', /3 customers/.test(cust.text) && /5 matching units/.test(cust.text), cust.text);
+  const vis = formatAnalyticsAnswer({ entity: 'serviceVisits', op: 'count', filters: [] }, { total: 3, rows: [], futureVisitCount: 2 });
+  check('teamA analytics :: future-dated visits are left out and mentioned', /2 records dated after today/.test(vis.text), vis.text);
+}
+
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {
   console.error(`${failures} FAILURE(S)`);

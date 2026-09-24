@@ -28,11 +28,17 @@
  * runContactLookup are the only functions here that touch `db`.
  */
 import { normalizeQuestion } from "./nlNormalize.js";
+// TEAM C (citations everywhere): each answer names the record(s) it was read from.
+import { attachCitations, customerRecord, unitRecord, documentRecord } from "./citations/records.js";
 import { ENTITY_SYNONYMS, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
 import { documentTypeLabel } from "./documentTypes.js";
 import { significantAddressTokens, formatDateHuman } from "./fastPath.js";
 import { alertTier, BRAND_RULES } from "./warrantyRules.js";
 import { listOpenReminders } from "./reminders.js";
+// Team A (2026-09-24): time-correct visit history (no future "last visit"), customer file summary, unit notes.
+import { fetchVisits, splitFuture, futureNote, todayIso, humanDate as humanVisitDate } from "./scope.js";
+import { fetchFileData, attachFileSummary, fetchNotes, buildNotesAnswer } from "./customerFile.js";
+import { citeNotes } from "./citations/history.js"; // TEAM C
 
 /* ============================================================ shape detection */
 
@@ -326,6 +332,10 @@ const REMINDER_FOR_RE =
 const WHAT_SHOULD_I_CHECK_RE =
   /^what\s+should\s+i\s+check\s+(?:at|for|on)\s+(?:the\s+)?([A-Za-z0-9][A-Za-z0-9',.-]*(?:\s+[A-Za-z0-9',.-]+){0,6})\s*\??\s*$/i;
 
+// Team A (2026-09-24): "any notes on the Rios unit", "notes on the Jennings system", "what notes do we have on the Rios unit".
+const UNIT_NOTES_RE =
+  /^(?:(?:any|what|show me|pull up|give me|list)\s+)?(?:(?:notes?|findings?|observations?|comments?)(?:\s+do we have)?)\s+(?:on|for|about|regarding)\s+(?:the\s+)?([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s+(?:unit|system|equipment|job|install|account|condenser|furnace|ac)s?\s*\??$/i;
+
 // Live 100-question persona sample (2026-09-22), cluster "named-unit
 // attribute questions": "Is the Salazar unit still under warranty?" / "what
 // model is the Prentiss system" / "how old is the Bracken unit" — a customer
@@ -592,6 +602,18 @@ export function parseContactLookupQuestion(question, opts = {}) {
     }
   }
 
+  // Shape 5b (Team A, 2026-09-24): "any notes on the Rios unit" / "notes on the Jennings system" — the notes and findings
+  // recorded in that customer's documents (fetchNotes), not a reminder lookup and not a serial number.
+  {
+    const m = UNIT_NOTES_RE.exec(q);
+    if (m) {
+      const namePhrase = stripPossessive(m[1].trim());
+      if (namePhrase && !isExcludedNamedUnitPhrase(namePhrase) && nameTokens(namePhrase).length && !AGGREGATE_WORD_RE.test(namePhrase)) {
+        return { field: "unitNotes", namePhrase, noteLabel: `${titleCase(namePhrase)} unit` };
+      }
+    }
+  }
+
   // Shape 6: reminder lookup — "any notes/reminders for Abernathy", "what
   // should I check at Ellison's", "reminders for 322 N Greenfield" (Customer
   // Reminders build, 2026-09-22). Tried last, against both `q` and the
@@ -719,6 +741,11 @@ const CUSTOMER_FIELD_KEY = { phone: "phone", email: "email", address: "service_a
  *  e.g. shapeCustomerRow/queryTopCustomers in routes/analytics.js) — the
  *  FactGrid component links a fact with an entityId to that customer's
  *  profile regardless of which endpoint produced it. */
+/** TEAM C: candidate customers of an ambiguous match, as records. */
+function citeCandidates(answer, rows, basis) {
+  return attachCitations(answer, { records: rows.map((r) => customerRecord(r)), total: rows.length, claimedCount: rows.length, basis });
+}
+
 function contactFacts(row) {
   const facts = [];
   if (row.phone) facts.push({ label: "Phone", value: row.phone, entityId: row.id, sources: [] });
@@ -778,6 +805,9 @@ export function buildContactAnswer(field, row) {
  *  pickUnique/"ambiguity never guessed through" follows). Each candidate is
  *  its own linkable fact so the client can offer them as choices. */
 export function buildAmbiguousContactAnswer(namePhrase, rows) {
+  return citeCandidates(buildAmbiguousContactAnswerCore(namePhrase, rows), rows, `Several customers match "${namePhrase}" by name; pick one to see their details.`);
+}
+function buildAmbiguousContactAnswerCore(namePhrase, rows) {
   const names = rows.map((r) => r.customer_name || r.customer_number || "Unnamed customer");
   return {
     kind: "answer",
@@ -801,6 +831,9 @@ export function buildAmbiguousContactAnswer(namePhrase, rows) {
  *  uses for a name match, just worded around the street rather than the
  *  typed name phrase. */
 export function buildStreetAmbiguousAnswer(streetLabel, rows) {
+  return citeCandidates(buildStreetAmbiguousAnswerCore(streetLabel, rows), rows, `Several customers have a service address on ${streetLabel}; pick one to see their details.`);
+}
+function buildStreetAmbiguousAnswerCore(streetLabel, rows) {
   const names = rows.map((r) => r.customer_name || r.customer_number || "Unnamed customer");
   return {
     kind: "answer",
@@ -818,11 +851,22 @@ export function buildStreetAmbiguousAnswer(streetLabel, rows) {
 /** Pure: zero customers matched the street — the honest fallback, never a
  *  fabricated "nobody lives there" guess dressed up as certainty. */
 export function buildNoStreetMatchAnswer(streetLabel) {
-  return {
+  return attachCitations({
     kind: "answer",
     text: `No customers on ${streetLabel} on file.`,
     facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
-  };
+  }, { records: [], total: 0, kind: "searched", basis: `Searched every customer's service address for ${streetLabel}; none match.` });
+}
+
+/** TEAM C: reminders cite the customer they belong to plus the documents each was noted on. */
+function citeReminders(answer, row, reminders) {
+  const docs = [...new Set((reminders ?? []).map((r) => r.documentId).filter(Boolean))];
+  const name = row.customer_name || row.customer_number || "this customer";
+  const records = [customerRecord(row), ...docs.map((id) => documentRecord({ id }, { label: "Document with a reminder" }))];
+  return attachCitations(answer, {
+    records, total: records.length,
+    basis: (reminders ?? []).length ? `Listed the open reminders recorded against ${name}.` : `Checked the open reminders recorded against ${name}; none are open.`,
+  });
 }
 
 /** Pure: build the answer for a reminder lookup (field 'reminders', above)
@@ -898,6 +942,17 @@ export async function resolveContactCandidates(db, namePhrase) {
   );
   if (exact.length) return exact;
 
+  // Team A (2026-09-24): a bare surname ("delgado") also names customers whose full name merely CONTAINS it
+  // ("Delgado Family Dental", "Barbara Delgado"). Contains-match on the whole phrase before the fuzzy typo scan, so
+  // "list invoices for delgado" reaches every Delgado instead of only the one the fuzzy surname pass happened to pick.
+  const { rows: contains } = await db.raw(
+    `SELECT ${CUSTOMER_ROW_COLUMNS}
+       FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND data->>'customer_name' ILIKE $1
+      LIMIT 10`,
+    [`%${escapeLikeText(namePhrase)}%`]
+  );
   const { rows: all } = await db.raw(
     `SELECT ${CUSTOMER_ROW_COLUMNS}
        FROM entities
@@ -906,7 +961,11 @@ export async function resolveContactCandidates(db, namePhrase) {
       LIMIT ${FUZZY_SCAN_LIMIT}`,
     []
   );
-  return all.filter((r) => fuzzyNameMatches(r.customer_name, searchTokens));
+  // Union: every customer whose name contains the phrase, plus the fuzzy (typo-tolerant) surname matches.
+  const merged = new Map();
+  for (const r of contains) merged.set(r.id, r);
+  for (const r of all) if (!merged.has(r.id) && fuzzyNameMatches(r.customer_name, searchTokens)) merged.set(r.id, r);
+  return [...merged.values()];
 }
 
 // Parameterized (never string-concatenated) and capped at 5, per this
@@ -1025,13 +1084,22 @@ export async function runContactLookup(db, question, opts = {}) {
       if (candidates.length === 0) return buildNoStreetMatchAnswer(parsed.streetLabel);
       if (candidates.length > 1) return buildStreetAmbiguousAnswer(parsed.streetLabel, candidates);
       const reminders = await listOpenReminders(db, { customerId: candidates[0].id });
-      return buildReminderAnswer(reminders, candidates[0].customer_name || parsed.streetLabel);
+      return citeReminders(buildReminderAnswer(reminders, candidates[0].customer_name || parsed.streetLabel), candidates[0], reminders); // TEAM C
     }
     const candidates = await resolveContactCandidates(db, parsed.namePhrase);
     if (candidates.length === 0) return null;
     if (candidates.length > 1) return buildAmbiguousContactAnswer(parsed.namePhrase, candidates);
     const reminders = await listOpenReminders(db, { customerId: candidates[0].id });
-    return buildReminderAnswer(reminders, candidates[0].customer_name || parsed.namePhrase);
+    return citeReminders(buildReminderAnswer(reminders, candidates[0].customer_name || parsed.namePhrase), candidates[0], reminders); // TEAM C
+  }
+
+  // Team A (2026-09-24): "any notes on the Rios unit" — every customer matching the name is in scope (two Riosses are
+  // both "the Rios unit"), notes gathered from their own documents.
+  if (parsed.field === "unitNotes") {
+    const noteCandidates = await resolveContactCandidates(db, parsed.namePhrase);
+    if (noteCandidates.length === 0) return null;
+    const noteData = await fetchNotes(db, noteCandidates);
+    return citeNotes(db, buildNotesAnswer(parsed.noteLabel, noteCandidates, noteData), parsed.noteLabel, noteData); // TEAM C
   }
 
   // Street-only shape (no customer name at all — see STREET_ONLY_RE's own
@@ -1069,7 +1137,6 @@ export async function runContactLookup(db, question, opts = {}) {
  * rather than in the pure buildContactAnswer above — that function's
  * existing behavior/signature is left untouched for its own callers/tests.
  */
-const TENANT_SQL_VISITS = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
 function formatVisitDateLabel(rawDate) {
   const s = String(rawDate ?? "").trim();
@@ -1092,61 +1159,63 @@ function formatVisitDateLabel(rawDate) {
  * file. Returns {mostRecent: null, count: 0} for a customer with no service
  * visits on file at all — never a guess, never a crash.
  */
-export async function computeVisitHistory(db, customerId) {
+export async function computeVisitHistory(db, customerId, today = null) {
   const linkRows = await db.listCustomerDocumentLinks(customerId);
   const ids = [...new Set(linkRows.map((r) => r.document_id))];
-  if (!ids.length) return { mostRecent: null, count: 0 };
+  if (!ids.length) return { mostRecent: null, count: 0, future: [], recent: [] };
 
-  const { rows } = await db.raw(
-    `SELECT x.document_id, x.value AS service_date, d.document_type,
-            (SELECT t.value FROM extractions t
-              WHERE t.document_id = x.document_id AND t.field_key = 'technician' AND t.${TENANT_SQL_VISITS}
-              ORDER BY t.created_at DESC LIMIT 1) AS technician
-       FROM extractions x
-       JOIN documents d ON d.id = x.document_id
-      WHERE x.field_key = 'service_date' AND x.document_id = ANY($1::uuid[]) AND x.${TENANT_SQL_VISITS}
-      ORDER BY x.value DESC`,
-    [ids]
-  );
-  if (!rows.length) return { mostRecent: null, count: 0 };
-  const count = new Set(rows.map((r) => r.document_id)).size;
-  const top = rows[0];
+  // Team A (2026-09-24): visit-type documents only, and a service_date AFTER today is a scheduled visit or a typo — it
+  // is reported separately (`future`), never as the last visit or counted as a visit that happened.
+  const visits = await fetchVisits(db, ids);
+  const { past, future } = splitFuture(visits, todayIso(today));
+  if (!past.length) return { mostRecent: null, count: 0, future, recent: [] };
+  const top = past[0];
   return {
-    mostRecent: { date: top.service_date, documentType: top.document_type, technician: top.technician ?? null },
-    count,
+    mostRecent: { date: top.date, documentType: top.documentType, technician: top.technician ?? null, documentId: top.documentId },
+    count: new Set(past.map((v) => v.documentId)).size,
+    future,
+    recent: past.slice(0, 5),
+    // TEAM C: every PAST visit document behind `count` (same rows; future-dated ones stay in `future`, which the answer mentions).
+    visits: [...new Map(past.map((v) => [v.documentId, { id: v.documentId, document_type: v.documentType, date: v.date }])).values()],
   };
 }
 
 /** Pure: {field, row-derived name, visit history} -> the final answer. Honest
  *  zero when the customer has no service visits on file at all — never a
  *  guess, matching every other honest-zero answer in this file. */
-export function buildVisitAnswer(field, row, visits) {
+export function buildVisitAnswer(field, row, visits, today = null) {
   const name = row.customer_name || row.customer_number || "This customer";
+  const t = todayIso(today);
+  const note = futureNote(visits?.future ?? [], t);
   if (!visits?.mostRecent) {
     return {
-      kind: "answer", text: `No service visits on file for ${name}.`,
+      kind: "answer", text: `No service visits on file for ${name}.${note}`,
       facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     };
   }
   const n = visits.count;
+  const cite = (v) => ({ documentId: v.documentId, location: { field: "service_date" } });
+  const recent = visits.recent ?? [];
   if (field === "visitCount") {
+    const sources = recent.map(cite);
     return {
-      kind: "answer", text: `${n} visit${n === 1 ? "" : "s"} to ${name} on file.`,
-      facts: [{ label: "Visits on file", value: String(n), sources: [] }],
-      sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
+      kind: "answer", text: `${n} visit${n === 1 ? "" : "s"} to ${name} on file, the latest on ${humanVisitDate(visits.mostRecent.date)}.${note}`,
+      facts: [{ label: "Visits on file", value: String(n), sources }],
+      sources, confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
     };
   }
   const dateLabel = formatVisitDateLabel(visits.mostRecent.date);
   const typeLabel = documentTypeLabel(visits.mostRecent.documentType).toLowerCase();
   const techPart = visits.mostRecent.technician ? `, tech ${visits.mostRecent.technician}` : "";
+  const top = visits.mostRecent.documentId ? [{ documentId: visits.mostRecent.documentId, location: { field: "service_date" } }] : [];
   return {
     kind: "answer",
-    text: `Last visit for ${name}: ${dateLabel} (${typeLabel}${techPart}). ${n} visit${n === 1 ? "" : "s"} on file.`,
+    text: `Last visit for ${name}: ${dateLabel} (${typeLabel}${techPart}). ${n} visit${n === 1 ? "" : "s"} on file.${note}`,
     facts: [
-      { label: "Last visit", value: dateLabel, sources: [] },
-      { label: "Visits on file", value: String(n), sources: [] },
+      { label: "Last visit", value: dateLabel, sources: top },
+      { label: "Visits on file", value: String(n), sources: recent.map(cite) },
     ],
-    sources: [], confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
+    sources: top, confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
   };
 }
 
@@ -1302,9 +1371,28 @@ export function buildUnitAttributeAnswer(attribute, label, row, equipmentRows, t
  *  resolution it already does. `opts.namePhrase`/`opts.today` are only used
  *  by the named-unit-attribute branch below. */
 async function buildResolvedAnswer(db, field, row, opts = {}) {
+  // TEAM C: the citation trail (customer row, plus the units / visit documents the answer read).
+  const trail = { units: [], visits: [], kind: "customer" };
+  const answer = await buildResolvedAnswerCore(db, field, row, opts, trail);
+  const fileDocs = (trail.file?.docs ?? []).map((d) => documentRecord(d, { label: `${documentTypeLabel(d.document_type)} · ${d.original_filename ?? d.id}`, sublabel: String(d.service_date ?? d.created_at ?? "").slice(0, 10) || undefined }));
+  const records = [customerRecord(row), ...(trail.file ? fileDocs : []), ...trail.units.map((u) => unitRecord(u, { customerId: row.id })), ...trail.visits.map((v) => documentRecord(v, { label: `${documentTypeLabel(v.document_type)} · ${String(v.date ?? "").slice(0, 10) || "undated"}` }))];
+  const name = row.customer_name || row.customer_number || "this customer";
+  const basis = trail.kind === "visits"
+    ? `Counted service dates found on the ${trail.visits.length} document${trail.visits.length === 1 ? "" : "s"} linked to ${name} (by service date${(trail.future ?? []).length ? `; ${(trail.future ?? []).length} dated after today ${(trail.future ?? []).length === 1 ? "is" : "are"} left out of the count` : ""}).`
+    : trail.file ? `Everything on file for ${name}: ${fileDocs.length} document${fileDocs.length === 1 ? "" : "s"} (linked directly, through their equipment, or by name and address), ${trail.units.length} equipment record${trail.units.length === 1 ? "" : "s"} and the customer record.`
+    : trail.units.length ? `Read from the customer record and ${trail.units.length} equipment record${trail.units.length === 1 ? "" : "s"} on file for ${name}.`
+    : `Read from the customer record on file for ${name}.`;
+  return attachCitations(answer, {
+    records, total: records.length, basis,
+    ...(trail.kind === "visits" && trail.visits.length ? { claimedCount: trail.count, records: records.slice(1), total: trail.visits.length } : {}),
+  });
+}
+
+async function buildResolvedAnswerCore(db, field, row, opts, trail) {
   if (field === "lastVisit" || field === "visitCount") {
-    const visits = await computeVisitHistory(db, row.id);
-    return buildVisitAnswer(field, row, visits);
+    const visits = await computeVisitHistory(db, row.id, opts.today);
+    trail.kind = "visits"; trail.visits = visits.visits ?? []; trail.count = visits.count; trail.future = visits.future ?? [];
+    return buildVisitAnswer(field, row, visits, opts.today);
   }
   if (NAMED_UNIT_FIELDS.has(field)) {
     const attribute = Object.keys(UNIT_ATTRIBUTE_FIELD).find((k) => UNIT_ATTRIBUTE_FIELD[k] === field);
@@ -1315,6 +1403,7 @@ async function buildResolvedAnswer(db, field, row, opts = {}) {
     } catch (err) {
       console.error("buildUnitAttributeAnswer: listCustomerEquipment failed, treating as no equipment on file:", err?.message);
     }
+    trail.units = equipmentRows;
     return buildUnitAttributeAnswer(attribute, label, row, equipmentRows, opts.today);
   }
   const answer = buildContactAnswer(field, row);
@@ -1326,7 +1415,18 @@ async function buildResolvedAnswer(db, field, row, opts = {}) {
     // lookup away.
     try {
       const equipmentRows = await db.listCustomerEquipment(row.id);
-      return attachEquipmentFacts(answer, equipmentRows);
+      const withUnits = attachEquipmentFacts(answer, equipmentRows);
+      trail.units = equipmentRows;
+      if (field !== "full") return withUnits;
+      // Team A (2026-09-24): "what do we have on file for X" is the whole file, not just the contact card.
+      try {
+        const fileData = await fetchFileData(db, row);
+        trail.file = fileData; // TEAM C: the documents behind the file summary are its citation records
+        return attachFileSummary(withUnits, row, fileData, opts.today);
+      } catch (err) {
+        console.error("attachFileSummary failed, returning the contact card with units:", err?.message);
+        return withUnits;
+      }
     } catch (err) {
       console.error("attachEquipmentFacts: listCustomerEquipment failed, returning plain contact card:", err?.message);
       return answer;

@@ -5,7 +5,8 @@ import { DonovanMark } from '../components/DonovanMark';
 import { AnswerCard } from '../components/AnswerCard';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SerialCapture } from '../components/SerialCapture';
-import type { Answer, SourceRef } from '../core/types';
+import type { Answer, AnswerRecord, SourceRef } from '../core/types';
+import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions } from '../core/suggestions';
 import { ask, AskApiError } from '../services/answerService';
@@ -31,6 +32,7 @@ export function AskScreen() {
   const includeUnverified = useAppStore((s) => s.includeUnverified);
   const setIncludeUnverified = useAppStore((s) => s.setIncludeUnverified);
   const openEntity = useAppStore((s) => s.openEntity);
+  const openCustomer = useAppStore((s) => s.openCustomer);
   const billingStatus = useAppStore((s) => s.billingStatus);
   const fieldMode = useAppStore((s) => s.fieldMode);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
@@ -55,6 +57,13 @@ export function AskScreen() {
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [capture, setCapture] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // "Based on N records": a customer opens their profile, a unit its customer, a document its cited page.
+  const openRecord = useCallback((r: AnswerRecord) => {
+    const t = recordTarget(r);
+    if (t.kind === 'document') setPreview({ documentId: t.documentId, location: t.page ? { page: t.page } : {} });
+    else if (t.kind === 'customer') openCustomer(t.ref);
+    else openEntity(t.id);
+  }, [openCustomer, openEntity]);
   const requestId = useRef(0);
 
   const submit = useCallback(
@@ -240,6 +249,7 @@ export function AskScreen() {
             onToggleUnverified={setIncludeUnverified}
             onOpenSource={setPreview}
             onOpenEntity={openEntity}
+            onOpenRecord={openRecord}
           />
         )}
 

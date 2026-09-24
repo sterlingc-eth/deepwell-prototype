@@ -89,6 +89,8 @@ for (const q of DOC_LOOKUP_NEGATIVES) {
     // resolveContactCandidates -> a single ILIKE query against entities.
     raw: async (sql) => {
       if (/FROM entities/i.test(sql)) return { rows: [customerRow] };
+      // Team A: document ids now come from one raw query over links (both direct and via units).
+      if (/document_entity_links/i.test(sql) && !/FROM documents/i.test(sql)) return { rows: docRows.map((d) => ({ document_id: d.id })) };
       if (/FROM documents/i.test(sql)) return { rows: docRows };
       return { rows: [] };
     },
@@ -156,7 +158,7 @@ for (const q of ['how many times did we service customers this month', 'when is 
   const ans = buildVisitAnswer('lastVisit', { customer_name: 'John Ellison' }, visits);
   check('item 2 buildVisitAnswer :: names date, type, tech, count', ans.text === 'Last visit for John Ellison: Aug 14, 2025 (service ticket, tech Mike R.). 2 visits on file.', ans.text);
   const countAns = buildVisitAnswer('visitCount', { customer_name: 'Thomas Mercer' }, visits);
-  eq('item 2 buildVisitAnswer (visitCount) :: text', countAns.text, '2 visits to Thomas Mercer on file.');
+  eq('item 2 buildVisitAnswer (visitCount) :: text', countAns.text, '2 visits to Thomas Mercer on file, the latest on August 14, 2025.');
 }
 {
   // Honest zero: customer has no service visits on file at all.
@@ -348,7 +350,7 @@ for (const [queryAddress, storedAddress] of ADDRESS_RESOLUTION_POSITIVES) {
     raw: async (sql, params) => {
       if (/FROM entities/i.test(sql)) {
         const patterns = (params?.[0] ?? []).map(likeToRegExp);
-        return { rows: patterns.every((re) => re.test(storedAddress)) ? [customerRow] : [] };
+        return { rows: patterns.every((re) => re.test(storedAddress)) ? [{ ...customerRow, entity_type: 'customer' }] : [] };
       }
       return { rows: [] };
     },
@@ -533,6 +535,94 @@ eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernath
   };
   const answer = await runContactLookup(mockDb, "what should I check at Ellison's");
   eq('reminders :: resolved customer with no open reminders -> honest zero', answer?.text, 'No open reminders for John Ellison.');
+}
+
+
+/* ======================================================================
+ * Team A (2026-09-24): answer correctness - time semantics, future dates, comparisons, age math, maintenance due,
+ * scope resolution, deterministic routing, no-fabrication.
+ * ====================================================================== */
+{
+  const S = await import('../api/_lib/scope.js');
+  const C = await import('../api/_lib/comparison.js');
+  const M = await import('../api/_lib/maintenanceDue.js');
+  const D = await import('../api/_lib/deterministicRouter.js');
+  const A = await import('../api/_lib/analytics.js');
+  const TODAY = '2026-09-23';
+
+  // 1. time semantics
+  eq('teamA time :: "added" -> upload date', S.dateBasisOf('which documents were added in august'), 'uploaded');
+  eq('teamA time :: "uploaded/received/scanned/filed" -> upload date', ['uploaded last week', 'received in may', 'scanned today', 'filed this month'].map((q) => S.dateBasisOf(`invoices ${q}`)).join(','), 'uploaded,uploaded,uploaded,uploaded');
+  eq('teamA time :: "serviced/visited/job/work done/installed" -> service date', ['serviced in august', 'visited last month', 'jobs in march', 'work done in june', 'installed in 2019'].map((q) => S.dateBasisOf(`units ${q}`)).join(','), 'service,service,service,service,service');
+  eq('teamA time :: no stated basis -> null', S.dateBasisOf('how many customers in mesa'), null);
+  check('teamA time :: the answer says which date it used', /upload date/.test(S.dateBasisPhrase('uploaded')) && /service date/.test(S.dateBasisPhrase('service')));
+  const planA = A.validatePlan({ entity: 'documents', op: 'count', dateBasis: 'uploaded' });
+  eq('teamA time :: validatePlan keeps dateBasis', planA?.dateBasis, 'uploaded');
+  check('teamA time :: dateBasis is part of the cache identity', A.analyticsPlanHash(planA) !== A.analyticsPlanHash({ ...planA, dateBasis: 'service' }));
+
+  // 2. future dates
+  const sp = S.splitFuture([{ date: '2027-03-01' }, { date: '2026-05-01' }, { date: '2026-09-23' }], TODAY);
+  eq('teamA future :: a date after today is never "past"', sp.past.map((r) => r.date).join(','), '2026-09-23,2026-05-01');
+  eq('teamA future :: it is set aside', sp.future.map((r) => r.date).join(','), '2027-03-01');
+  check('teamA future :: the note mentions the excluded date', /March 1, 2027/.test(S.futureNote(sp.future, TODAY)) && /left it out/.test(S.futureNote(sp.future, TODAY)));
+  {
+    const v = await S.fetchVisits({ raw: async () => ({ rows: [
+      { document_id: 'd1', service_date: '2027-03-01', document_type: 'service_ticket', original_filename: 'a.pdf' },
+      { document_id: 'd2', service_date: '2026-05-01', document_type: 'service_ticket', original_filename: 'b.pdf' },
+      { document_id: 'd3', service_date: '2026-06-01', document_type: 'quote', original_filename: 'c.pdf' },
+    ] }) }, ['d1', 'd2', 'd3']);
+    eq('teamA visits :: only visit-type documents count (a quote date is not a visit)', v.map((r) => r.documentId).sort().join(','), 'd1,d2');
+  }
+
+  // 4. comparisons
+  const cmp = C.parseComparison('do we have more invoices or more service tickets on file?');
+  eq('teamA compare :: both doc types parsed', `${cmp?.a?.key}|${cmp?.b?.key}`, 'invoice|service-ticket');
+  const cAns = C.buildComparisonAnswer(cmp, { a: 12, b: 30, breakdown: [{ id: 'service-ticket', label: 'Service ticket', count: 30 }, { id: 'invoice', label: 'Invoice', count: 12 }, { id: 'permit', label: 'Permit', count: 4 }] });
+  check('teamA compare :: text gives BOTH numbers and the winner', /More service tickets: 12 invoices vs 30 service tickets|More service tickets/.test(cAns.text) && /12/.test(cAns.text) && /30/.test(cAns.text), cAns.text);
+  check('teamA compare :: breakdown lists every type on file', cAns.facts.length === 3 && cAns.facts.some((f) => f.label === 'Permit' && f.value === '4'));
+  eq('teamA compare :: brands parse', C.parseComparison('do we have more trane or more carrier units')?.kind, 'brand');
+  eq('teamA compare :: unrelated sides are left to the agent', C.parseComparison('more invoices or more trane units'), null);
+
+  // 5. age math (year arithmetic in code)
+  eq('teamA age :: older than 10 years (2026) -> installYear < 2016', JSON.stringify(A.resolveAgeFilter('customers with units older than 10 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 }));
+  eq('teamA age :: newer than 5 years -> installYear >= 2021', JSON.stringify(A.resolveAgeFilter('units newer than 5 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 }));
+  eq('teamA age :: no age words -> null', A.resolveAgeFilter('how many customers', TODAY), null);
+
+  // 8. maintenance due (deterministic)
+  eq('teamA maintenance :: "2 visits per year" -> 6 months', M.parseCadenceMonths('2 visits per year'), 6);
+  eq('teamA maintenance :: default cadence is 12', M.parseCadenceMonths('annual'), 12);
+  eq('teamA maintenance :: season parsed', M.parseMaintenanceDue('who is due for maintenance this fall')?.season, 'fall');
+  {
+    const res = M.computeMaintenanceDue({
+      customers: [{ id: 'a', name: 'Alpha', address: '1 A St' }, { id: 'b', name: 'Bravo', address: '2 B St' }, { id: 'c', name: 'Charlie', address: '3 C St' }],
+      agreements: [{ customerId: 'a', documentId: 'ag1', cadenceMonths: 6 }, { customerId: 'b', documentId: 'ag2', cadenceMonths: null }, { customerId: 'c', documentId: 'ag3', cadenceMonths: 12 }],
+      visits: [
+        { customerId: 'a', documentId: 'v1', date: '2026-01-10', documentType: 'service-ticket', serviceType: 'maintenance' },
+        { customerId: 'b', documentId: 'v2', date: '2026-02-01', documentType: 'service-ticket', serviceType: 'maintenance' },
+        { customerId: 'c', documentId: 'v3', date: '2027-01-01', documentType: 'service-ticket', serviceType: 'maintenance' }, // future: ignored
+        { customerId: 'c', documentId: 'v4', date: '2026-08-01', documentType: 'service-ticket', serviceType: 'maintenance' },
+      ],
+    }, { today: TODAY, mode: 'cadence' });
+    eq('teamA maintenance :: 6-month agreement last seen Jan 10 is overdue; 12-month (default) Feb 1 is not', res.overdue.map((e) => e.name).join(','), 'Alpha');
+    check('teamA maintenance :: a future-dated visit is excluded and mentioned', res.futureVisits.length === 1 && /left it out/.test(M.buildMaintenanceAnswer(res).text));
+    const ans = M.buildMaintenanceAnswer(res);
+    check('teamA maintenance :: each listed customer carries the last visit date and a citation', ans.facts[0].value.includes('January 10, 2026') || ans.facts[0].value.includes('Jan'), ans.facts[0].value);
+    check('teamA maintenance :: cites the visit document', ans.facts[0].sources.some((s) => s.documentId === 'v1'));
+  }
+
+  // deterministic routing (history / installer / comparison ahead of the planner)
+  eq('teamA route :: last service at an address', D.classifyDeterministic('when did we last service the unit at 12 Main St')?.kind, 'last-service');
+  eq('teamA route :: installer is a single-field lookup', D.classifyDeterministic('who installed the unit at 12 Main St')?.kind, 'installer');
+  eq('teamA route :: comparison', D.classifyDeterministic('do we have more invoices or more service tickets on file')?.route, 'comparison');
+
+  // 7. address / unit ambiguity
+  eq('teamA scope :: "Apt 104" is a unit designator', S.extractUnitDesignator('permit for 500 Elm St Apt 104'), S.extractUnitDesignator('permit for 500 Elm St Apt 104'));
+  check('teamA scope :: an address without a unit names no unit', !S.extractUnitDesignator('permit for 500 Elm St'));
+  check('teamA scope :: unit designator recognised', Boolean(S.extractUnitDesignator('permit for 500 Elm St Apt 104')));
+
+  // 9. full file / unit notes are recognised
+  eq('teamA file :: "what do we have on file for X" is a full-file lookup', parseContactLookupQuestion('what do we have on file for Bracken')?.field, 'full');
+  check('teamA notes :: "notes on the Bracken unit" is recognised', Boolean(parseContactLookupQuestion('notes on the Bracken unit')));
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

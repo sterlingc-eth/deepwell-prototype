@@ -5,11 +5,13 @@ import { reviewClient, runScorecardAll, type ScorecardStatus } from '../services
 /**
  * Donovan Scorecard strip (operator only) - lives on the "Donovan misses" card.
  *
- * The scorecard is a golden exam of ~300 questions, each with an independent SQL answer key over the shop's own
- * tables, asked through the real answer pipeline (api/_lib/scorecard). This strip shows the latest score, how it
- * moved against the previous comparable run, a bar per category (weakest first), a "Run scorecard" button with
- * progress (the server does about 6 questions per call to stay inside the 60 s function limit) and, expandable,
- * the questions that failed: what was asked, what the records say, what Donovan said.
+ * The scorecard is a golden exam of ~600 questions, each with an independent SQL answer key over the shop's own
+ * tables, asked through the real answer pipeline (api/_lib/scorecard). A question passes only when the value is right
+ * AND the answer carries a citation. This strip shows the overall score, the value-only score and citation coverage
+ * (separately), how they moved against the previous comparable run, a bar per category (weakest first), a "Run
+ * scorecard" button with progress (the server does about 6 questions per call to stay inside the 60 s function limit)
+ * and, expandable, the failing questions: what was asked, what the records say, what Donovan said, and whether the
+ * value or only the citation was the problem. The adjudication note says why a failure here is Donovan's, not the exam's.
  */
 const pct = (n: number | null | undefined) => (n == null ? '-' : `${Math.round(n * 100)}%`);
 
@@ -71,6 +73,12 @@ export function DonovanScorecardStrip() {
   const delta = run0?.score != null && status?.previous ? run0.score - status.previous.score : null;
   const cats = Object.entries(run0?.byCategory ?? {}).sort((a, b) => a[1].score - b[1].score || a[0].localeCompare(b[0]));
   const failing = status?.failing ?? [];
+  const cite = run0?.citation ?? null;
+  const prevValue = status?.previous?.valueScore ?? null;
+  const prevCite = status?.previous?.citationCoverage ?? null;
+  const valueDelta = run0?.valueScore != null && prevValue != null ? run0.valueScore - prevValue : null;
+  const citeDelta = cite?.coverage != null && prevCite != null ? cite.coverage - prevCite : null;
+  const arrow = (d: number | null) => (d == null || Math.abs(d) < 0.005 ? '' : `${d > 0 ? ' ▲' : ' ▼'}${Math.abs(Math.round(d * 100))}`);
   const noExam = status != null && status.exam.questions === 0;
 
   return (
@@ -110,6 +118,26 @@ export function DonovanScorecardStrip() {
       {noExam && <p className="text-caption text-ink-3">The exam file is not deployed with this build.</p>}
 
       {run0 && (
+        <div className="grid grid-cols-3 gap-2" aria-label="Scorecard headline numbers">
+          <div className="rounded-md bg-surface-2/60 px-2 py-1" data-testid="scorecard-overall">
+            <p className="text-caption text-ink-3">Passing</p>
+            <p className="font-display text-h3 tabular-nums">{pct(run0.score)}</p>
+            <p className="text-caption text-ink-3">value right and cited</p>
+          </div>
+          <div className="rounded-md bg-surface-2/60 px-2 py-1" data-testid="scorecard-value">
+            <p className="text-caption text-ink-3">Value accuracy</p>
+            <p className="font-display text-h3 tabular-nums">{pct(run0.valueScore)}<span className="text-caption text-ink-3">{arrow(valueDelta)}</span></p>
+            <p className="text-caption text-ink-3">citations aside</p>
+          </div>
+          <div className="rounded-md bg-surface-2/60 px-2 py-1" data-testid="scorecard-citation">
+            <p className="text-caption text-ink-3">Citation coverage</p>
+            <p className="font-display text-h3 tabular-nums">{pct(cite?.coverage)}<span className="text-caption text-ink-3">{arrow(citeDelta)}</span></p>
+            <p className="text-caption text-ink-3">{cite ? `${cite.cited} of ${cite.required} answers` : '-'}</p>
+          </div>
+        </div>
+      )}
+
+      {run0 && (
         <p className="text-caption text-ink-3">
           {run0.passed} of {run0.answered} right{run0.status === 'stopped' ? ` (stopped: ${run0.stopReason ?? 'early'})` : run0.status === 'running' ? ' (in progress)' : ''}
           {' · '}{run0.source === 'nightly' ? 'nightly slice' : run0.source === 'retry' ? 're-run of failures' : 'full run'}
@@ -125,7 +153,7 @@ export function DonovanScorecardStrip() {
             <li key={name} className="text-caption">
               <div className="flex justify-between gap-2 text-ink-2">
                 <span className="truncate" title={name}>{name}</span>
-                <span className="tabular-nums">{c.passed}/{c.total}</span>
+                <span className="tabular-nums" title={c.citationCoverage != null ? `Value ${pct(c.valueScore)} · cited ${pct(c.citationCoverage)}` : undefined}>{c.passed}/{c.total}{c.citationCoverage != null ? ` · cited ${pct(c.citationCoverage)}` : ''}</span>
               </div>
               <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden">
                 <div className={`h-full ${barTone(c.score)}`} style={{ width: `${Math.round(c.score * 100)}%` }} />
@@ -133,6 +161,12 @@ export function DonovanScorecardStrip() {
             </li>
           ))}
         </ul>
+      )}
+
+      {status?.adjudicationNote && (
+        <p className="text-caption text-ink-3" data-testid="scorecard-adjudication">
+          <span className="text-ink-2">Adjudicated:</span> {status.adjudicationNote}
+        </p>
       )}
 
       {failing.length > 0 && (
@@ -152,7 +186,12 @@ export function DonovanScorecardStrip() {
             <ul className="divide-y divide-line max-h-80 overflow-y-auto">
               {failing.map((f) => (
                 <li key={f.questionId} className="py-1.5 text-caption space-y-0.5">
-                  <p className="text-ink"><span className="dw-pill-muted mr-1">{f.category}</span>"{f.question}"</p>
+                  <p className="text-ink">
+                    <span className="dw-pill-muted mr-1">{f.category}</span>
+                    {f.persona && <span className="dw-pill-muted mr-1">{f.persona}</span>}
+                    {f.valueOk && f.citationRequired && !f.cited && <span className="dw-pill-warn mr-1">right, but no citation</span>}
+                    "{f.question}"
+                  </p>
                   <p className="text-ink-3"><span className="text-ink-2">Expected:</span> {f.expected ?? '-'}</p>
                   <p className="text-warn-ink dark:text-brass-200"><span className="text-ink-2">Donovan said:</span> {f.got ?? f.error ?? '-'}</p>
                   {f.retry && <p className="text-ink-3">Retry on {f.retry.model}: {f.retry.passed ? 'right' : 'still wrong'}</p>}
