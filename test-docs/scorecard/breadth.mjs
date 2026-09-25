@@ -74,6 +74,14 @@ export function breadthQuestions(k) {
   const OPEN = "f.status IN ('unpaid','partial')";
   const IDATE = datec("invoice_date");
   const DUE = datec("due_date");
+  // TEAM F (scorecard correctness, 2026-09-24): most invoices print no payment status at all (status is
+  // NULL), so a "how many are unpaid/overdue/paid" count of the KNOWN rows can look like a confident
+  // "0" or "1 of 68" when really "we can't tell for the other 67". UNKNOWN_STATUS is that unclassified
+  // set (used inside a FILTER alongside an outer `WHERE ${INV}`, so it does not repeat INV itself);
+  // OVERDUE_UNKNOWN adds "no due_date printed" since an overdue verdict also needs that field.
+  // See compare.js's compareCountWithUnknown / cmp "count-with-unknown".
+  const UNKNOWN_STATUS = `f.status IS NULL OR f.status NOT IN ('paid','unpaid','partial')`;
+  const OVERDUE_UNKNOWN = `(${UNKNOWN_STATUS}) OR (${OPEN} AND ${DUE} IS NULL)`;
   const FIN_REQ = (kind, dir = "receivable") => ({ sql: `SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind = '${kind}' AND f.direction = '${dir}'` });
   const money = { tolerance: 1, anyNumber: true };
   const agr = (q) => `${q.p(DOCTYPE_ALIASES["maintenance-agreement"])}::text[]`;
@@ -105,15 +113,20 @@ export function breadthQuestions(k) {
     add(extra.category ?? "financials", persona, text, (q) => ({ cmp: extra.cmp ?? "number", sql: typeof sql === "function" ? sql(q) : sql, requires: FIN_REQ(reqKind, reqDir), ...(extra.rubric ? { rubric: extra.rubric } : {}) }), flags);
   const count = { tolerance: 0 };
 
+  // TEAM F: `known` extra.cmp for the status-count questions below - "how many are unpaid/paid/overdue/
+  // partial" all depend on a status/due_date field most invoices never print. `count` is still used for
+  // "how many invoices on file" (no status involved, nothing unknown to disclose).
+  const knownUnknown = { cmp: "count-with-unknown" };
+
   // -- how many invoices, by state
   fin("bookkeeper", "How many invoices do we have on file?", `SELECT count(*) AS n FROM document_financials f WHERE ${INV}`, {}, count);
-  fin("bookkeeper", "How many invoices are still unpaid?", `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND ${OPEN}`, {}, count);
-  fin("office", "how many open invoices are there", `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND ${OPEN}`, {}, count);
-  fin("bookkeeper", "How many invoices have been paid?", `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND f.status = 'paid'`, {}, count);
-  fin("bookkeeper", "How many invoices are overdue?", (q) => `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND ${OPEN} AND ${DUE} < ${q.today()}`, {}, count);
-  fin("owner", "How many of our invoices are past due right now?", (q) => `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND ${OPEN} AND ${DUE} < ${q.today()}`, {}, count);
-  fin("bookkeeper", "How many invoices are more than 60 days overdue?", (q) => `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND ${OPEN} AND ${DUE} < ${q.today()} - 60`, {}, count);
-  fin("bookkeeper", "How many invoices are partially paid?", `SELECT count(*) AS n FROM document_financials f WHERE ${INV} AND f.status = 'partial'`, {}, count);
+  fin("bookkeeper", "How many invoices are still unpaid?", `SELECT count(*) FILTER (WHERE ${OPEN}) AS n, count(*) FILTER (WHERE ${UNKNOWN_STATUS}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
+  fin("office", "how many open invoices are there", `SELECT count(*) FILTER (WHERE ${OPEN}) AS n, count(*) FILTER (WHERE ${UNKNOWN_STATUS}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
+  fin("bookkeeper", "How many invoices have been paid?", `SELECT count(*) FILTER (WHERE f.status = 'paid') AS n, count(*) FILTER (WHERE ${UNKNOWN_STATUS}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
+  fin("bookkeeper", "How many invoices are overdue?", (q) => `SELECT count(*) FILTER (WHERE ${OPEN} AND ${DUE} < ${q.today()}) AS n, count(*) FILTER (WHERE ${OVERDUE_UNKNOWN}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
+  fin("owner", "How many of our invoices are past due right now?", (q) => `SELECT count(*) FILTER (WHERE ${OPEN} AND ${DUE} < ${q.today()}) AS n, count(*) FILTER (WHERE ${OVERDUE_UNKNOWN}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
+  fin("bookkeeper", "How many invoices are more than 60 days overdue?", (q) => `SELECT count(*) FILTER (WHERE ${OPEN} AND ${DUE} < ${q.today()} - 60) AS n, count(*) FILTER (WHERE ${OVERDUE_UNKNOWN}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
+  fin("bookkeeper", "How many invoices are partially paid?", `SELECT count(*) FILTER (WHERE f.status = 'partial') AS n, count(*) FILTER (WHERE ${UNKNOWN_STATUS}) AS u FROM document_financials f WHERE ${INV}`, knownUnknown, count);
   // -- money owed (AR)
   fin("owner", "How much are we owed in total?", `SELECT coalesce(sum(${BAL}), 0) AS n FROM document_financials f WHERE ${INV} AND ${OPEN}`);
   fin("owner", "What's the total dollar amount of our open invoices?", `SELECT coalesce(sum(${BAL}), 0) AS n FROM document_financials f WHERE ${INV} AND ${OPEN}`);

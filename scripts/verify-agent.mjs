@@ -211,7 +211,7 @@ pgMod.Pool.prototype.query = async function query(sql, params) {
 
 const { withTenant, getTenantContext } = await import('../api/_lib/recordsStore.js');
 const { createToolbox, VIEW_DOCS: VIEW_DOCS_TEXT } = await import('../api/_lib/agent/tools.js');
-const { runDonovanAgent, MAX_TURNS, agentDebugTrace, agentQuestionHash, AGENT_PROMPT_VERSION, AGENT_SYSTEM_PROMPT } = await import('../api/_lib/agent/loop.js');
+const { runDonovanAgent, MAX_TURNS, agentDebugTrace, agentQuestionHash, AGENT_PROMPT_VERSION, AGENT_SYSTEM_PROMPT, runToolsBounded, TOOL_CONCURRENCY } = await import('../api/_lib/agent/loop.js');
 const { shapeAgentAnswer } = await import('../api/_lib/agent/shape.js');
 const { EvidenceLedger } = await import('../api/_lib/agent/tools.js');
 const { ModelBudgetExceededError } = await import('../api/_lib/rateLimit.js');
@@ -449,6 +449,27 @@ const usageRow = async (tenantId) => (await lite.query('SELECT model_calls, mode
   const dbg = agentDebugTrace(r);
   check('debug trace has steps[{tool,inputSummary,rowCount,ms}], modelCalls, inputTokens, outputTokens, costUsd and no question text',
     dbg.steps.length === 3 && ['tool', 'inputSummary', 'rowCount', 'ms'].every((k) => k in dbg.steps[0]) && dbg.modelCalls === 4 && dbg.inputTokens === 4800 && dbg.outputTokens === 480 && typeof dbg.costUsd === 'number' && !JSON.stringify(dbg).includes('how many customers'), JSON.stringify(dbg));
+}
+{
+  // --- TEAM F (speed): several tool calls in one turn run concurrently, bounded, order preserved ---
+  // A fake toolbox (no real DB) so the delay is controlled, not whatever PGlite happens to take.
+  const delayMs = 40;
+  const order = [];
+  const fakeToolbox = {
+    execute: async (name, input) => {
+      await new Promise((r) => setTimeout(r, delayMs));
+      order.push(input.i);
+      return { ok: true, content: `ok${input.i}`, rowCount: 1, inputSummary: `t${input.i}`, ms: delayMs };
+    },
+  };
+  const uses = Array.from({ length: 6 }, (_, i) => ({ id: `toolu_${i}`, name: 'run_query', input: { i } }));
+  const started = Date.now();
+  const results = await runToolsBounded(fakeToolbox, uses, 3);
+  const elapsed = Date.now() - started;
+  check('runToolsBounded: 6 calls at concurrency 3 finish in ~2 batches, not 6 sequential ones',
+    elapsed < delayMs * 4, `elapsed=${elapsed}ms (sequential would be ~${delayMs * 6}ms)`);
+  eq('runToolsBounded: results keep INPUT order, not completion order', results.map((r) => r.content), uses.map((u) => `ok${u.input.i}`));
+  check('runToolsBounded: default TOOL_CONCURRENCY is bounded to at most MAX_TOOLS_PER_TURN and at least 1', TOOL_CONCURRENCY >= 1 && TOOL_CONCURRENCY <= 4, String(TOOL_CONCURRENCY));
 }
 {
   // --- turn cap ------------------------------------------------------------------------------
@@ -722,6 +743,12 @@ void missBefore;
   await run('anything at all', cmA);
   check('catalogue: another shop gets its own catalogue (no leakage between tenants)', /"customer":5/.test(cmA.calls[0].system[1].text) && !/Ada Lovelace|Warranty Heavy/.test(cmA.calls[0].system[1].text) && !/"customer":15/.test(cmA.calls[0].system[1].text));
   check('the agent system prompt tells the model the catalogue is provided, and states the list + history rules', /catalogue of this shop/i.test(AGENT_SYSTEM_PROMPT) && /EVERY row/.test(AGENT_SYSTEM_PROMPT) && /History questions/.test(AGENT_SYSTEM_PROMPT) && /SAY which in text/.test(AGENT_SYSTEM_PROMPT));
+  // TEAM F (speed): the whole point of caching is a Haiku cache HIT on the SECOND call for this shop -
+  // diagnostic only (this is real seeded data, not a worst case), so a genuinely tiny shop failing this
+  // is not itself a bug, but a shop this size never caching would be exactly the silent regression
+  // handoffs/COST_REPORT_2026-09-20.md warned about.
+  const landsBreakpoint = cm.calls[0].tools.some((t) => t.cache_control) || sysA.some((s) => s.cache_control);
+  check('catalogue: for this shop\'s real seeded size, the combined tools+prompt+catalogue prefix clears Haiku\'s 4096-token cache minimum (a cache_control lands somewhere)', landsBreakpoint, `tools cached=${cm.calls[0].tools.some((t) => t.cache_control)} system cached=${sysA.map((s) => Boolean(s.cache_control))}`);
 }
 {
   // --- search_documents scoped to one customer's documents (repair-history questions) ---

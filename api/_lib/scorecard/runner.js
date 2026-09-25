@@ -32,8 +32,20 @@ import { createRun, saveResults, getRun } from "./store.js";
 
 export const DEFAULT_BUDGET_USD = 5;
 export const DEFAULT_PAGE_SIZE = 6;
-export const MIN_QUESTION_MS = 25_000; // never start a question with less than this left on the deadline
+// TEAM F (speed, 2026-09-24): was 25_000. An agent answer that escalates to Sonnet can itself take
+// ~30s (see handoffs on agent latency); starting one with 25s left on a 60s function risked the
+// page's OWN deadline cutting it off mid-question (worse than not starting it at all - a half-run
+// question with no result). Raised to 35_000 so a question is only started when it can plausibly
+// finish, including its own retry-on-escalation-model pass.
+export const MIN_QUESTION_MS = 35_000;
 export const MAX_PAGE_SIZE = 12;
+// TEAM F (speed): questions within a page are independent (own oracle, own ask, own grade) - run this
+// many at once instead of one at a time, so a page answers roughly twice as many questions inside the
+// same 60s budget. Kept small (not e.g. 6) because each question can itself run a multi-turn agent
+// loop with its own DB connections (see agent/loop.js's TOOL_CONCURRENCY and recordsStore.js's tiny
+// connection pool) - 2 keeps total concurrent DB usage bounded even when every question in the batch
+// happens to need the agent.
+export const QUESTION_CONCURRENCY = Math.max(1, Math.min(4, Number(process.env.DONOVAN_SCORECARD_CONCURRENCY) || 2));
 
 export const scorecardBudgetUsd = (env = process.env) => {
   const n = Number(env?.DONOVAN_SCORECARD_BUDGET_USD);
@@ -129,35 +141,39 @@ export async function runScorecard({
   const end = Math.min(list.length, i + size);
   const overlay = feedMisses ? await getActiveOverlay() : null;
 
-  for (; i < end; i++) {
-    if (spent >= budget) { stopped = "budget"; break; }
-    if (deadline - Date.now() < MIN_QUESTION_MS) { stopped = "deadline"; break; }
-    const q = list[i];
+  // One question end-to-end (oracle -> ask -> grade -> optional retry). Pulled out of the loop body
+  // so a page can run QUESTION_CONCURRENCY of these at once (TEAM F, speed) instead of one at a time -
+  // each question's own DB/model work is otherwise pure wall-clock waiting. `spentBudgetHint` is the
+  // spend already committed when the BATCH started (not live-updated across concurrent siblings) -
+  // it only gates the optional escalation retry, so a slightly stale number just means that gate is
+  // approximate under concurrency, never that the run's real spend accounting drifts (each result
+  // still carries its own true costUsd, summed into `spent` after the batch settles).
+  async function runOneQuestion(q, spentBudgetHint) {
     const base = { questionId: q.id, category: q.category, comparison: q.cmp, question: q.text };
-
     const oracle = await runOracle(withTenant, ctx, q, { today });
-    if (!oracle.ok) { pageResults.push({ ...base, skipped: true, passed: false, error: oracle.error, costUsd: 0 }); continue; }
-    if (oracle.skip) { pageResults.push({ ...base, skipped: true, passed: false, error: oracle.why, costUsd: 0 }); continue; }
+    if (!oracle.ok) return { push: { ...base, skipped: true, passed: false, error: oracle.error, costUsd: 0 }, cost: 0 };
+    if (oracle.skip) return { push: { ...base, skipped: true, passed: false, error: oracle.why, costUsd: 0 }, cost: 0 };
 
     let asked;
     try {
       asked = await askViaHandler({ handler, auth: askAuth, question: q.text, today, deadlineAt: deadline });
     } catch (err) {
-      if (err?.name === "ModelBudgetExceededError") { stopped = "model-budget"; break; }
+      if (err?.name === "ModelBudgetExceededError") return { push: null, cost: 0, stopReason: "model-budget" };
       throw err;
     }
-    if (asked.status === 429) { stopped = "model-budget"; break; }
+    if (asked.status === 429) return { push: null, cost: 0, stopReason: "model-budget" };
     let cost = asked.usage.costUsd;
     let models = labelModels(asked.usage, asked.debug);
     if (!asked.data) {
-      pageResults.push({ ...base, passed: false, score: 0, expected: summarizeExpected({ ...q, expected: oracle.expected }), got: `error: ${asked.error ?? "no response"}`, error: asked.error ?? "no-response", models, costUsd: cost, latencyMs: asked.latencyMs, detail: {} });
-      spent += cost;
-      continue;
+      return {
+        push: { ...base, passed: false, score: 0, expected: summarizeExpected({ ...q, expected: oracle.expected }), got: `error: ${asked.error ?? "no response"}`, error: asked.error ?? "no-response", models, costUsd: cost, latencyMs: asked.latencyMs, detail: {} },
+        cost,
+      };
     }
 
     let graded = await gradeAnswer({ ctx, question: q, expected: oracle.expected, alts: oracle.alts, data: asked.data, callModel, deadlineAt: deadline });
     cost += graded.costUsd ?? 0;
-    if (graded.skipped) { pageResults.push({ ...base, skipped: true, passed: false, error: graded.why, costUsd: cost }); spent += cost; continue; }
+    if (graded.skipped) return { push: { ...base, skipped: true, passed: false, error: graded.why, costUsd: cost }, cost };
 
     const detail = {};
     if (asked.debug?.escalation) detail.escalation = asked.debug.escalation;
@@ -169,9 +185,10 @@ export async function runScorecard({
     detail.citationRequired = Boolean(graded.citationRequired);
     if (q.persona) detail.persona = q.persona;
 
+    let stopReason = null;
     // A failure the agent produced (or declined) is retried ONCE on the escalation model; the score stays the
     // first attempt so the number keeps meaning "what a customer got".
-    if (!graded.passed && graded.valueOk !== true && retryFailures && worthRetry(asked, sonnet) && spent + cost < budget && deadline - Date.now() >= MIN_QUESTION_MS) {
+    if (!graded.passed && graded.valueOk !== true && retryFailures && worthRetry(asked, sonnet) && spentBudgetHint + cost < budget && deadline - Date.now() >= MIN_QUESTION_MS) {
       try {
         const again = await askViaHandler({ handler, auth: askAuth, question: q.text, today, escalate: true, deadlineAt: deadline });
         cost += again.usage.costUsd;
@@ -182,22 +199,36 @@ export async function runScorecard({
           detail.retry = { model: again.debug?.model ?? sonnet, passed: Boolean(g2.passed), got: g2.got };
         }
       } catch (err) {
-        if (err?.name === "ModelBudgetExceededError") stopped = "model-budget";
+        if (err?.name === "ModelBudgetExceededError") stopReason = "model-budget";
       }
     }
 
-    pageResults.push({
-      ...base, passed: Boolean(graded.passed), score: graded.score, expected: graded.expectedSummary, got: graded.got,
-      valueOk: graded.valueOk ?? Boolean(graded.passed), cited: Boolean(graded.cited), citationRequired: Boolean(graded.citationRequired),
-      detail, models, costUsd: cost, latencyMs: asked.latencyMs, error: null,
-    });
-    spent += cost;
+    return {
+      push: {
+        ...base, passed: Boolean(graded.passed), score: graded.score, expected: graded.expectedSummary, got: graded.got,
+        valueOk: graded.valueOk ?? Boolean(graded.passed), cited: Boolean(graded.cited), citationRequired: Boolean(graded.citationRequired),
+        detail, models, costUsd: cost, latencyMs: asked.latencyMs, error: null,
+      },
+      cost, stopReason, miss: !graded.passed,
+    };
+  }
 
-    if (!graded.passed && feedMisses) {
-      // Existing learning loop: a miss row is what replay, recipes and the weekly review act on.
-      recordAskMiss(ctx, { question: q.text, questionNormalized: missKey(q.text, overlay), outcome: MISS_OUTCOMES.SCORECARD_FAIL }).catch(() => {});
+  outer: while (i < end) {
+    if (spent >= budget) { stopped = "budget"; break; }
+    if (deadline - Date.now() < MIN_QUESTION_MS) { stopped = "deadline"; break; }
+    const batch = list.slice(i, Math.min(end, i + QUESTION_CONCURRENCY));
+    const spentAtBatchStart = spent;
+    const settled = await Promise.all(batch.map((q) => runOneQuestion(q, spentAtBatchStart)));
+    for (const r of settled) {
+      i++;
+      if (r.push) pageResults.push(r.push);
+      spent += r.cost;
+      if (r.push && !r.push.skipped && r.miss && feedMisses) {
+        // Existing learning loop: a miss row is what replay, recipes and the weekly review act on.
+        recordAskMiss(ctx, { question: r.push.question, questionNormalized: missKey(r.push.question, overlay), outcome: MISS_OUTCOMES.SCORECARD_FAIL }).catch(() => {});
+      }
+      if (r.stopReason) { stopped = r.stopReason; break outer; }
     }
-    if (stopped) break;
   }
 
   const finished = !stopped && i >= list.length;

@@ -42,6 +42,31 @@ export const DEFAULT_INPUT_TOKEN_CAP = 40_000;
 const MAX_TOOLS_PER_TURN = 4;
 const MAX_OUTPUT_TOKENS = 1200;
 const MIN_CALL_BUDGET_MS = 4000;
+// TEAM F (speed, 2026-09-24): the model may issue several tool calls in one turn (e.g. two
+// find_customers/search_documents lookups) — they used to run one at a time, which is most of why
+// a 3-turn answer took 15-20s of pure round-trip time. Each execute() opens its own short-lived DB
+// transaction (tools.js), so they are independent and safe to run together; bounded at 3 (not the
+// full MAX_TOOLS_PER_TURN=4) to stay under the Neon pool's `max: 3` (recordsStore.js) so a 4th call
+// queues for a connection instead of every call queuing.
+export const TOOL_CONCURRENCY = Math.max(1, Math.min(MAX_TOOLS_PER_TURN, Number(process.env.DONOVAN_AGENT_TOOL_CONCURRENCY) || 2)); // review r3: leave 1 of the pool's 3 connections free
+
+/** Run `uses[i]` through toolbox.execute with at most `limit` in flight; results keep input order
+ *  (not completion order) so steps/telemetry read the same as the old sequential loop did.
+ *  Exported only so scripts/verify-agent.mjs can prove the concurrency bound with a fake toolbox
+ *  and a scripted delay, without needing a slow real tool call. */
+export async function runToolsBounded(toolbox, uses, limit) {
+  const results = new Array(uses.length);
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const i = next++;
+      if (i >= uses.length) return;
+      results[i] = await toolbox.execute(uses[i].name, uses[i].input);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, uses.length) }, worker));
+  return results;
+}
 
 /** DONOVAN_AGENT=0 disables the whole fallback (default ON). */
 export function isAgentEnabled(env = process.env) {
@@ -56,11 +81,14 @@ export const AGENT_SYSTEM_PROMPT = `You are Donovan, the records assistant for a
 - SINGLE FIELDS (who installed it, when installed): answer only from a field or page that states it for THAT unit. Otherwise say it is not on file and give what is (a warranty registration date: "registered on X; the install date is not recorded"). A technician on a service ticket is not the installer.
 - ADDRESSES: one address may hold several units or apartments; answer for every match unless the question names a unit, and say so.
 - COMPARISONS ("more X or more Y"): run one query per side (or GROUP BY), state BOTH numbers and which is larger, one fact per side; a "breakdown by" lists every group. "Older/newer than N years": compare installation year against today's year minus N and say whether you counted customers or units.
-- MAINTENANCE due/overdue: last service_date + agreement cadence ("2 visits per year" = 6 months, otherwise 12); list each with its last visit date, citing the document.
+- MAINTENANCE due/overdue: last service_date + agreement cadence ("2 visits per year" = 6 months, otherwise 12); list each with its last visit date, citing the document. "Last N visits at <customer>": the N most recent documents_v rows for that customer that HAVE a service_date, newest first, each cited - fewer than N is fine, just say how many were found. "Not serviced in 12 months" / "overdue for maintenance": last service_date more than 12 months before today, INCLUDING a customer whose equipment/documents show no service_date at all (never serviced is also overdue - say so explicitly, do not silently drop them from the list).
+- UNKNOWN vs ZERO: when a field most rows do not print at all (a status, a result, a technician), never report a count of 0 for what silence might mean - state the known count AND the unknown/blank count side by side ("1 shows X; the other 67 do not record this field, so it is unknown for them"), citing a few of each. A confident zero is only honest when the field IS captured and genuinely says none.
 - "What do we have on file for <customer>": contact, units, document counts by type with latest dates, open reminders and warranty status, each cited.
 - Lists: one fact per row for EVERY row (up to 40), never a partial list phrased as complete; the total must be in text. If a result says truncated, narrow the query or select fewer columns and run it again.
 - If a question could mean two things (documents of a brand: linked to that brand's units, or belonging to customers who own that brand) pick the most natural one and SAY which in text.
-- If a query errors, read the error, fix the SQL and retry. Keep tool calls few.
+- If a query errors, read the error, fix the SQL and retry. Keep the number of ROUND TRIPS (turns) low, not the number of tool calls in one turn: when you already know you need two or more independent lookups (e.g. find_customers for two different addresses, or one query per side of a comparison, or a query plus a search that do not depend on each other's result), call them together in the SAME turn - they run concurrently and reach the dispatcher faster than one call, wait, next call. Only chain calls one-at-a-time when a later call genuinely needs an id or value the earlier one returned.
+- Worked example (coverage, cite records - not a bare list): Q "what counties do we cover" -> run_query SELECT c.county, c.customer_id, c.name FROM customers c WHERE c.county IS NOT NULL ORDER BY c.county -> answer text names every distinct county, each fact is one county with a customer's entityId cited, never a bare "Maricopa, Pinal, Gila." with nothing behind it.
+- Worked example (comparison, both sides citable): Q "do we have more invoices or more work orders" -> two run_query calls in ONE turn, each SELECT document_id, customer_id FROM documents_v WHERE document_type = '...' (one per side) -> answer states both counts, which is larger, and cites a few ids from each side.
 - Warranty status comes from the equipment view's warranty_status / warranty_current columns; never work it out yourself.
 - Finish by calling the answer tool exactly once. Lists: one fact per row (label = customer or item, value = the detail), entityId = the customer_id/equipment_id returned. A fact taken from a document cites it in sources. Pure counts and lists from run_query need no sources.
 - Money: dollar totals may come ONLY from the financials view (see MONEY RULES below), summed by SQL in run_query, never added up by you. State how many documents the total sums and what was excluded (no printed total, no date), and cite the invoice documents as sources. If financials has no matching rows, use cannot_answer and say no invoice totals were captured; never estimate a dollar amount, and never total from facts/cost or search excerpts.
@@ -148,6 +176,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
   const totals = { modelCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
   let costUsd = 0;
   const steps = [];
+  const modelCallsMs = []; // TEAM F: per-turn model latency (ms), separate from tool `steps`
   const records = [];
   let reason = "";
   let finalInput = null;
@@ -180,6 +209,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
       if (deadline - Date.now() < MIN_CALL_BUDGET_MS) { reason = "deadline"; break; }
 
       const forceAnswer = turn === maxTurns || totals.inputTokens >= inputCap * 0.75 || nudged;
+      const modelStarted = Date.now();
       const resp = await callModel(
         {
           model,
@@ -192,6 +222,9 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
         },
         { deadlineAt: deadline }
       );
+      // TEAM F (speed): per-call model latency for the operator trace, kept OUT of `steps` (that array's
+      // length/contents are asserted elsewhere as "tool steps"; see modelCallsMs on the returned result).
+      modelCallsMs.push(Date.now() - modelStarted);
       const u = usageOf(resp);
       totals.modelCalls++;
       totals.inputTokens += totalInputTokens(u);
@@ -216,12 +249,14 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
       }
 
       messages.push({ role: "assistant", content });
-      const results = [];
-      for (const use of uses.slice(0, MAX_TOOLS_PER_TURN)) {
-        const r = await toolbox.execute(use.name, use.input);
+      const toRun = uses.slice(0, MAX_TOOLS_PER_TURN);
+      // Bounded concurrent execution (see TOOL_CONCURRENCY above) instead of one-at-a-time awaits.
+      const execResults = toRun.length ? await runToolsBounded(toolbox, toRun, TOOL_CONCURRENCY) : [];
+      const results = toRun.map((use, i) => {
+        const r = execResults[i];
         steps.push({ tool: use.name, inputSummary: r.inputSummary, rowCount: r.rowCount, ms: r.ms, ...(r.ok ? {} : { error: true }) });
-        results.push({ type: "tool_result", tool_use_id: use.id, content: r.content, ...(r.ok ? {} : { is_error: true }) });
-      }
+        return { type: "tool_result", tool_use_id: use.id, content: r.content, ...(r.ok ? {} : { is_error: true }) };
+      });
       for (const extra of uses.slice(MAX_TOOLS_PER_TURN)) {
         results.push({ type: "tool_result", tool_use_id: extra.id, content: "ERROR: too many tool calls in one turn", is_error: true });
       }
@@ -247,7 +282,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
     JSON.stringify({
       route: "ask", agent: true, model, reason, handled,
       model_calls: totals.modelCalls, input_tokens: totals.inputTokens, output_tokens: totals.outputTokens,
-      cache_read: totals.cacheReadInputTokens, tool_steps: steps.length,
+      cache_read: totals.cacheReadInputTokens, tool_steps: steps.length, model_ms: modelCallsMs,
       dropped_facts: shaped?.dropped.facts ?? 0, dropped_sources: shaped?.dropped.sources ?? 0,
     })
   );
@@ -260,6 +295,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
     ...totals,
     costUsd,
     steps,
+    modelCallsMs,
     queries: toolbox.queries,
     examplesInjected: examples ? examples.split("\nQ: ").length - 1 : 0,
     dropped: shaped?.dropped ?? null,
@@ -276,6 +312,7 @@ function mergeRuns(first, second) {
     cacheReadInputTokens: sum("cacheReadInputTokens"), cacheCreationInputTokens: sum("cacheCreationInputTokens"),
     costUsd: Math.round((first.costUsd + second.costUsd) * 1_000_000) / 1_000_000,
     steps: [...(first.steps ?? []).map((s) => ({ ...s, model: first.model })), ...(second.steps ?? []).map((s) => ({ ...s, model: second.model }))],
+    modelCallsMs: [...(first.modelCallsMs ?? []), ...(second.modelCallsMs ?? [])],
   };
 }
 
@@ -327,7 +364,7 @@ export async function runDonovanAgent(p) {
         const better = second.handled && (!first.handled || (second.dropped?.facts ?? 0) < (first.dropped?.facts ?? 0));
         const merged = mergeRuns(first, second);
         result = better ? merged : { ...first, modelCalls: merged.modelCalls, inputTokens: merged.inputTokens, outputTokens: merged.outputTokens,
-          cacheReadInputTokens: merged.cacheReadInputTokens, cacheCreationInputTokens: merged.cacheCreationInputTokens, costUsd: merged.costUsd, steps: merged.steps };
+          cacheReadInputTokens: merged.cacheReadInputTokens, cacheCreationInputTokens: merged.cacheCreationInputTokens, costUsd: merged.costUsd, steps: merged.steps, modelCallsMs: merged.modelCallsMs };
         escalation = { from: AGENT_MODEL, to: sonnet, reason: why, outcome: better ? "sonnet-answer-used" : "haiku-answer-kept" };
       } catch (err) {
         // A spent daily budget must not turn an answer we already have into an error: keep the Haiku run.
@@ -348,6 +385,7 @@ export async function runDonovanAgent(p) {
 export function agentDebugTrace(result) {
   return {
     steps: (result.steps ?? []).map((s) => ({ tool: s.tool, inputSummary: s.inputSummary, rowCount: s.rowCount, ms: s.ms })),
+    modelCallsMs: result.modelCallsMs ?? [],
     modelCalls: result.modelCalls,
     model: result.model ?? AGENT_MODEL,
     ...(result.models?.length > 1 ? { models: result.models } : {}),

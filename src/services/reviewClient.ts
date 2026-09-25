@@ -762,7 +762,7 @@ export const reviewClient = {
  *  is reported, or `maxRounds` is hit. `onProgress` gets the running totals after each round. */
 export async function replayAllMisses(
   onProgress?: (totals: { attempted: number; answeredNow: number; stillFailing: number; remaining: number; stopped: string | null }) => void,
-  maxRounds = 4,
+  maxRounds = 30,
 ) {
   const totals = { attempted: 0, answeredNow: 0, stillFailing: 0, remaining: 0, stopped: null as string | null, recipesLive: 0 };
   for (let round = 0; round < maxRounds; round++) {

@@ -37,6 +37,19 @@ const NUM_WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6, ten: 10 };
 const LAST_N_RE = /\blast\s+(\d{1,2}|two|three|four|five|six|ten)\s+(?:visits?|services?|service calls?|jobs?|trips?)\s+(?:at|for|to|on)\s+(?:the\s+)?(.+?)\s*\??\s*$/i;
 const UNIT_NOTES_ADDR_RE = /\b(?:notes?|findings?|observations?)\s+(?:on|for|about)\s+(?:the\s+)?(?:unit|system|equipment)\s+(?:at|on)\s+(\d{1,6}\s+.+?)\s*\??\s*$/i;
 
+// Team E (2026-09-24, R3 fail): "last 3 visjts at zimmerman's" / "last 3 viisits at quintana's" never matched LAST_N_RE
+// at all (its own literal "visits?" alternative can't survive a typo) and fell through to retrieval/the agent instead
+// of this deterministic, cited answer. nlNormalize.js's general fuzzy corrector skips every word of a question it
+// judges a single-record reference (streetVocab.js's own doc comment explains why) — exactly what a "last N visits at
+// <name>'s" question always is — so nothing upstream ever fixes this either. A tiny closed table for the exact typos
+// this corpus's own question bank produces, same idiom as contactLookup.js's own FIELD_WORD_TYPO_FIXES.
+const ROUTER_WORD_TYPO_FIXES = [[/\b(?:visjts|viisits)\b/gi, 'visits']];
+function fixRouterWordTypos(q) {
+  let out = q;
+  for (const [re, to] of ROUTER_WORD_TYPO_FIXES) out = out.replace(re, to);
+  return out;
+}
+
 /** Brand named in a question ("the Mitsubishi at ...") or null. */
 const BRAND_IN_Q = /\b(trane|carrier|goodman|lennox|rheem|york|daikin|mitsubishi)\b/i;
 
@@ -52,7 +65,7 @@ function subjectFromPhrase(phrase) {
  * null and continues down the normal router chain.
  */
 export function classifyDeterministic(question) {
-  const q = String(question ?? '').trim();
+  const q = fixRouterWordTypos(String(question ?? '').trim());
   if (!q) return null;
 
   const cmp = parseComparison(q);

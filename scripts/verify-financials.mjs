@@ -102,6 +102,29 @@ const TODAY = '2026-09-23';
     I('average invoice size')?.intent, I('what do we owe our vendors')?.intent, I('who owes us money')?.intent, I('revenue this year')?.intent,
   ], ['open_invoices', 'overdue', 'ar_aging', 'revenue_by_month', 'agreement_fees', 'quote_vs_invoice', 'top_customers', 'avg_invoice', 'payables_open', 'open_invoices', 'total_invoiced']);
   check('intent: a non-money question is not claimed', I('how many customers are in gilbert') === null && I('') === null);
+
+  // R3_FAILS.md 2026-09-24: new intents for real production failures with no shape before.
+  eq('intent: payment status (paid/partial), threshold, superlative, tax, collected, quotes waiting, needs verification, who-owes', [
+    I('how many invoices are paid')?.intent, I('how many invoices are partially paid')?.statusTarget,
+    I('how many invoices are over $5,000')?.intent, I('how many invoices are under $500')?.thresholdDir,
+    I("what's the biggest invoice we've ever sent")?.intent, I('what is the smallest invoice')?.superlative,
+    I('how much sales tax have we charged')?.intent, I('how much have we collected')?.intent,
+    I('have customers paid us')?.intent, I('do we have any quotes waiting on a customer')?.intent,
+    I('how many invoices still need someone to verify the numbers')?.intent,
+    I('which customer owes us the most')?.intent, I('who has an overdue balance I need to call')?.intent,
+  ], ['payment_status', 'partial', 'threshold_invoices', 'under', 'superlative_invoice', 'min', 'sales_tax', 'collected_total', 'collected_total', 'quotes_waiting', 'needs_verification', 'balance_leaderboard', 'balance_leaderboard']);
+  eq('intent: "which invoices are overdue" is untouched (still overdue, no threshold); "more than 60 days overdue" captures the threshold', [I('which invoices are overdue')?.intent, I('which invoices are overdue')?.dayThreshold, I('invoices more than 60 days overdue')?.dayThreshold], ['overdue', null, 60]);
+  check('intent: "who owes us money" (no superlative) still stays open_invoices, never hijacked by the new who-owes-the-most intent', I('who owes us money')?.intent === 'open_invoices');
+  check('intent: "who is our biggest customer by revenue" stays top_customers (a customer ranking, not the new single-invoice superlative)', I('who is our biggest customer by revenue')?.intent === 'top_customers');
+
+  const C = await import('../api/_lib/financials/classify.js');
+  check('classify: catches every R3_FAILS phrasing MONEY_RE (analytics.js) missed', [
+    'how many invoices are still unpaid', 'do we have any overdue invoices', 'invoices are over $5,000', 'invoices under $500',
+    "what's the biggest invoice we've ever sent", 'which customer owes us the most right now', 'who has an overdue balance i need to call',
+    'top 3 customers by invoiced revenue', 'how much sales tax have we charged', 'do we have any quotes waiting on a customer',
+    'how many invoices still need someone to verify the numbers', 'have customers paid us',
+  ].every((q) => C.isFinancialQuestion(q)), JSON.stringify(['how many invoices are still unpaid', 'do we have any overdue invoices', 'invoices are over $5,000'].map((q) => [q, C.isFinancialQuestion(q)])));
+  check('classify: an ordinary non-financial question is not claimed', !C.isFinancialQuestion('how many customers are in gilbert') && !C.isFinancialQuestion('what unit is installed at the Bracken house') && !C.isFinancialQuestion(''));
   eq('period: ytd / last quarter / in march / last 30 days', [parsePeriod('ytd', TODAY)?.from, parsePeriod('last quarter', TODAY)?.label, parsePeriod('in march', TODAY)?.to, parsePeriod('last 30 days', TODAY)?.from], ['2026-01-01', 'Q2 2026', '2026-03-31', '2026-08-24']);
   eq('subject phrase: "last invoice for Bracken" / "bill karen abernathy this year" / none', [extractSubjectPhrase('last invoice for Bracken'), extractSubjectPhrase('how much did we bill karen abernathy this year'), extractSubjectPhrase('how much did we invoice last month')], ['bracken', 'karen abernathy', null]);
   eq('fmt: exact currency text from NUMERIC strings', [fmt('1240.5'), fmt('-45'), fmt('0'), fmt(null)], ['$1,240.50', '-$45.00', '$0.00', '—']);
@@ -365,6 +388,48 @@ const text = (r) => r.data?.text ?? '';
   const allAnswers = [lm, ty, tm, all, cust, op, od, ag, oc, pay, rm, af, qv, top, avg, spend, po];
   check('EVERY answer is a well-formed answer object with counts and citations (no bare number without a document count)', allAnswers.every((r) => r.data.kind === 'answer' && Array.isArray(r.data.facts) && typeof r.data.verifiedCount === 'number') && allAnswers.every((r) => /\b\d+ (invoices?|agreements?|bills?|purchase orders?|open invoices?|open bills?)\b|\$\d/.test(r.data.text)));
   check('no answer contains a fabricated NaN / undefined / null amount', allAnswers.every((r) => !/NaN|undefined|null|\$-/.test(JSON.stringify(r.data))));
+}
+
+/* ================================================================== 3b. R3_FAILS.md new intents */
+{
+  // Fixture recap (invoice-kind, receivable, tenant A, before any correction/verification below):
+  // doc1 paid $1,200 (amount_paid $1,200) | doc2 unpaid $1,240.50 (tax $90.50) | doc3 unpaid $500
+  // doc4 unpaid $2,000 | doc5 partial $300 (amount_paid $100) | doc6 unknown, no total
+  // doc8 unknown $75 (undated) | doc9 unknown $120 (tax $10.00, flagged total_mismatch)
+  // -> 8 invoices: 1 paid, 3 unpaid, 1 partial, 3 unknown; none verified yet.
+  const paid = await gate('how many invoices are paid');
+  check('ANSWER payment status (paid): 1 invoice shows as paid ($1,200.00); 3 unknown-status invoices named, honestly', paid.handled && /1 invoice shows as paid/.test(text(paid)) && /\$1,200\.00/.test(text(paid)) && /3 invoices don't print a payment status/.test(text(paid)) && /DeepWell/.test(text(paid)), text(paid));
+  const partial = await gate('how many invoices are partially paid');
+  check('ANSWER payment status (partial): 1 invoice shows as partially paid ($300.00)', partial.handled && /1 invoice shows as partially paid/.test(text(partial)) && /\$300\.00/.test(text(partial)), text(partial));
+
+  const over = await gate('how many invoices are over $1,000');
+  check('ANSWER threshold (over): 3 invoices over $1,000 (doc1 1200, doc2 1240.50, doc4 2000), listed', over.handled && /3 invoices are over \$1,000\.00/.test(text(over)) && over.data.facts.length === 3, text(over));
+  const under = await gate('how many invoices are under $500');
+  check('ANSWER threshold (under): 3 invoices under $500 (doc3 $500 itself excluded - strictly under)', under.handled && /3 invoices are under \$500\.00/.test(text(under)), text(under));
+
+  const big = await gate("what's the biggest invoice we've ever sent");
+  check('ANSWER biggest invoice: $2,000.00 (doc4, Plaza Dental Group) - invoices only, not the $2,440.50 quote+invoice combo or any PO/agreement', big.handled && /\$2,000\.00/.test(text(big)) && /Plaza Dental Group/.test(text(big)) && /Invoices only/.test(text(big)), text(big));
+  const small = await gate('what is the smallest invoice on file');
+  check('ANSWER smallest invoice: $75.00 (doc8)', small.handled && /\$75\.00/.test(text(small)), text(small));
+
+  const tax = await gate('how much sales tax have we charged');
+  check('ANSWER sales tax: $100.50 across 2 invoices that print tax (doc2 $90.50 + doc9 $10.00)', tax.handled && /\$100\.50/.test(text(tax)) && /2 invoices/.test(text(tax)), text(tax));
+  const noTax = await gate('how much sales tax have we charged', ctxB);
+  check('ANSWER sales tax: tenant B prints none -> honest "none of your invoices print sales tax"', noTax.handled && /none of your invoices print sales tax/i.test(text(noTax)), text(noTax));
+
+  const collected = await gate('how much have we collected');
+  check('ANSWER collected: We\'ve collected $1,300.00 (doc1 $1,200 + doc5 $100 amount_paid) across 2 invoices - the headline figure is amount_paid, never the $5,385.50 invoiced total', collected.handled && /We've collected \$1,300\.00/.test(text(collected)) && /2 invoices/.test(text(collected)), text(collected));
+  const paidUs = await gate('have customers paid us');
+  check('ANSWER "have customers paid us" routes to the same collected-amount answer', paidUs.handled && /\$1,300\.00/.test(text(paidUs)), text(paidUs));
+
+  const waiting = await gate('do we have any quotes waiting on a customer');
+  check('ANSWER quotes waiting: no (Bracken\'s only quote already has two later invoices)', waiting.handled && /^No/.test(text(waiting)), text(waiting));
+
+  const needsVer = await gate('how many invoices still need someone to verify the numbers');
+  check('ANSWER needs verification: all 8 invoices are unverified so far', needsVer.handled && /8 invoices/.test(text(needsVer)) && /of 8 total/.test(text(needsVer)), text(needsVer));
+
+  const owesMost = await gate('which customer owes us the most');
+  check('ANSWER who-owes-the-most: Plaza Dental Group $2,200.00 (doc4 $2,000 + doc5 $200 open balance), ranked by balance not document count', owesMost.handled && /Plaza Dental Group owes the most/.test(text(owesMost)) && /\$2,200\.00/.test(text(owesMost)) && !/\d+ documents?\b/.test(text(owesMost)), text(owesMost));
 }
 
 /* ================================================================== 4. the agent's financials view */

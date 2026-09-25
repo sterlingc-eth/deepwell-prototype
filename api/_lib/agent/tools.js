@@ -27,6 +27,9 @@ import { financeViewsSql, FINANCE_VIEW_DOCS } from "./financeViews.js";
 import { financialsTableExists, financialsCatalogue } from "../financials/store.js";
 // TEAM C (citations everywhere): capture the customer / unit / document each run_query row IS, and what search_documents searched.
 import { collectQueryIdentities, noteQueryIdentities, noteSearch } from "../citations/agent.js";
+// TEAM E (2026-09-24): full-corpus content-count ("how many jobs mention a capacitor") — search_documents only ever
+// returns its top ~10 passages, which was silently undercounting; this scans every page. See contentCount.js.
+import { runContentCount, canonicalizeTerm } from "../contentCount.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -131,7 +134,9 @@ SQL rules: SELECT/WITH only, no semicolons, no comments, no double-quoted identi
 Common shapes (adapt, do not copy values):
 - customers with a current warranty: SELECT c.customer_id, c.name, e.model, e.warranty_status, e.warranty_expires FROM equipment e JOIN customers c ON c.customer_id = e.customer_id WHERE e.warranty_current ORDER BY c.name
 - newest / oldest unit installed: SELECT e.equipment_id, e.manufacturer, e.model, e.serial_number, e.installation_date, e.address FROM equipment e WHERE e.installation_date IS NOT NULL ORDER BY e.installation_date DESC LIMIT 5 (installation_date is text: if the top rows are not YYYY-MM-DD, say the ordering may be unreliable).
-- documents of a brand: a document belongs to a brand when it is linked to a unit of that brand or to a customer who owns one. SELECT count(DISTINCT dl.document_id) FROM doc_links dl WHERE dl.customer_id IN (SELECT customer_id FROM equipment WHERE lower(manufacturer) = 'trane'). State that definition in your answer text.`;
+- documents of a brand: a document belongs to a brand when it is linked to a unit of that brand or to a customer who owns one. SELECT count(DISTINCT dl.document_id) FROM doc_links dl WHERE dl.customer_id IN (SELECT customer_id FROM equipment WHERE lower(manufacturer) = 'trane'). State that definition in your answer text.
+- COVERAGE ("what cities/counties/zip codes do we cover or serve", "do we service anything in Nevada"): never SELECT DISTINCT county FROM customers alone - a bare distinct value has no customer_id, so nothing can be shown to back it up. Instead SELECT c.county, c.customer_id, c.name FROM customers c WHERE c.county IS NOT NULL ORDER BY c.county (same shape for city/state/zip), then name every distinct value in text with at least one customer per value cited as evidence. "Do we serve X" is the same query filtered to that one place: cite the matching customers, or say none if the result is empty.
+- COMPARISONS need citable rows on BOTH sides, not just two bare counts: SELECT customer_id, name FROM ... side A ... and the same shape for side B (LIMIT 100 each, or a sample if the count itself would exceed 100), state both totals and cite a few ids from each side - a count(*) with no ids on either side leaves the comparison with nothing to click.`;
 
 /* ----------------------------------------------------------- tool schemas */
 
@@ -199,6 +204,20 @@ export const TOOL_DEFS = [
         limit: { type: "number", description: "Max 10." },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "count_documents_mentioning",
+    description:
+      "Exact full-corpus count of jobs/documents whose page text mentions ANY of the given terms - scans EVERY page, not a top-10 search, so use this instead of search_documents for 'how many jobs/documents mention X', 'which customers had an X issue/repair on file', 'list jobs where we replaced X', 'any complaints about X'. Terms are matched with an HVAC synonym/morphology map (e.g. 'capacitor' also finds 'cap'/'dual run cap'; 'leak' also finds 'leaking'; 'noise' also finds 'rattle'/'squeal'/'loud') - pass the plain part/issue word, not every synonym yourself.",
+    input_schema: {
+      type: "object",
+      properties: {
+        terms: { type: "array", items: { type: "string" }, maxItems: 10, description: "One or more part/issue words, e.g. ['capacitor'] or ['noise']. OR'd together." },
+        documentType: { type: "string", enum: ["jobs", "documents"], description: "'jobs' = completed service-type documents only (service tickets, work orders, invoices, inspections, dispatch notes, startup sheets) - never proposals/permits/paperwork with no visit. Default 'documents' = everything on file. State which you used in your answer." },
+        groupBy: { type: "string", enum: ["customer", "document"], description: "'customer' lists the customers instead of the documents (use for 'which customers had...'). Default 'document'." },
+      },
+      required: ["terms"],
     },
   },
   {
@@ -485,6 +504,37 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return { ok: true, content: text, rowCount: found.length, inputSummary: `search${docType ? `:${docType}` : ""}${scopeCustomer ? ":customer" : ""}` };
   }
 
+  /* ---- count_documents_mentioning ---- */
+  async function countDocumentsMentioning(input) {
+    const rawTerms = Array.isArray(input?.terms) ? input.terms : [];
+    const terms = [...new Set(rawTerms.map((t) => canonicalizeTerm(t)).filter(Boolean))].slice(0, 10);
+    if (!terms.length) return fail("terms is required: one or more part/issue words", "count_mentions");
+    const scope = input?.documentType === "jobs" ? "jobs" : "documents";
+    const groupBy = input?.groupBy === "customer" ? "customer" : null;
+    let data;
+    try {
+      data = await withTenant(ctxArg, (db) => runContentCount(db, { terms, scope, groupBy }));
+    } catch (err) {
+      return fail(String(err?.message ?? err).slice(0, 300), "count_mentions");
+    }
+    if (!data) return fail("could not compute a count for those terms", "count_mentions");
+    const records = (data.records ?? []).slice(0, 40).map((r) => ({
+      type: r.type, id: r.id, label: r.label, sublabel: r.sublabel, documentId: r.documentId, page: r.page, group: r.group,
+    }));
+    const text = JSON.stringify({ text: data.text, recordsTotal: data.recordsTotal, basis: data.basis, records });
+    ledger.addShown(text);
+    for (const r of records) {
+      if (typeof r.documentId === "string" && UUID_RE.test(r.documentId)) {
+        ledger.addDoc(r.documentId);
+        if (typeof r.page === "number") ledger.addPassage(r.documentId, r.page);
+      }
+    }
+    return {
+      ok: true, content: text, rowCount: data.recordsTotal ?? 0,
+      inputSummary: `count_mentions:${scope}${groupBy ? `:${groupBy}` : ""}`, empty: (data.recordsTotal ?? 0) === 0,
+    };
+  }
+
   /* ---- find_customers ---- */
   async function findCustomers(input) {
     const limit = Math.max(1, Math.min(20, Math.trunc(Number(input?.limit)) || 10));
@@ -663,6 +713,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
         ledger.addShown(d.text);
         r = { ok: true, content: d.text, rowCount: d.rowCount, inputSummary: "describe" };
       } else if (name === "search_documents") r = await searchDocuments(input ?? {});
+      else if (name === "count_documents_mentioning") r = await countDocumentsMentioning(input ?? {});
       else if (name === "find_customers") r = await findCustomers(input ?? {});
       else if (name === "get_customer") r = await getCustomer(input ?? {});
       else if (name === "run_query") r = await runQuery(input ?? {});

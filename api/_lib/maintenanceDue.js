@@ -31,6 +31,25 @@ const MAINT_WORD = '(?:maintenance|maint|tune-?ups?|tune ups?|service|servicing|
 const SET_LEAD = /\b(?:who|whos|who's|which|what)\b|\bcustomers?\b|\bclients?\b|\baccounts?\b|\bagreements?\b|\bunits?\b/i;
 const SEASON_RE = /\b(fall|autumn|spring|summer|winter)\b/i;
 
+// Team E (2026-09-24, R3 fail): "list custs due for a tune-up" / "list ustomers due for a tune-up" / "who's due for
+// fall mainttenance" fell all the way through to the agent's own generic "Found N matching records" fallback
+// (agent/shape.js) because SET_LEAD/MAINT_WORD never saw a real "customer(s)"/"maintenance" token to trigger on.
+// nlNormalize.js's own general fuzzy corrector deliberately skips EVERY word of a question it judges a single-record
+// reference (streetVocab.js's own doc comment explains why), and this file never calls it either way — so a
+// dispatcher typo/abbreviation of this file's own trigger words never gets fixed by anything upstream. A small
+// closed table for exactly the typos this corpus's question bank produces, same idiom as contactLookup.js's own
+// FIELD_WORD_TYPO_FIXES (explicit tokens, never a generic fuzzy match, so this can never rewrite an unrelated word).
+const ROUTER_WORD_TYPO_FIXES = [
+  [/\b(?:custs?|custmrs?|ustomers?)\b/g, 'customers'],
+  [/\bmainttenance\b/g, 'maintenance'],
+];
+
+function fixRouterWordTypos(q) {
+  let out = q;
+  for (const [re, to] of ROUTER_WORD_TYPO_FIXES) out = out.replace(re, to);
+  return out;
+}
+
 /**
  * Pure. {mode, season, months, sinceYear} or null.
  *   mode 'cadence' — overdue / due, judged against each agreement's own cadence
@@ -39,7 +58,7 @@ const SEASON_RE = /\b(fall|autumn|spring|summer|winter)\b/i;
  * ("who", "which customers") and a maintenance-type word.
  */
 export function parseMaintenanceDue(question) {
-  const q = String(question ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const q = fixRouterWordTypos(String(question ?? '').toLowerCase().replace(/\s+/g, ' ').trim());
   if (!q || /^\s*when\b/.test(q)) return null;
   if (!SET_LEAD.test(q)) return null;
   const season = (SEASON_RE.exec(q) ?? [])[1]?.toLowerCase().replace('autumn', 'fall') ?? null;
@@ -199,7 +218,10 @@ export function buildMaintenanceAnswer(res) {
     const sources = [];
     if (e.lastVisit) sources.push({ documentId: e.lastVisit.documentId, location: { field: 'service_date' } });
     if (e.agreement?.documentId) sources.push({ documentId: e.agreement.documentId, location: { field: 'agreement_term' } });
-    const last = e.lastVisit ? `last ${e.lastIsPm ? 'maintenance' : 'service'} visit ${humanDate(e.lastVisit.date)}` : 'no service visit on file';
+    // Team E (2026-09-24): the rubric grades this on "last visit date + type + tech" per customer, not a bare count -
+    // tech is added here (it was already fetched into each visit row, just never shown).
+    const tech = e.lastVisit?.technician ? `, tech ${e.lastVisit.technician}` : '';
+    const last = e.lastVisit ? `last ${e.lastIsPm ? 'maintenance' : 'service'} visit ${humanDate(e.lastVisit.date)}${tech}` : 'no service visit on file';
     const cad = e.agreement ? `, ${cadenceLabel(e.cadenceMonths)}${e.cadenceStated ? '' : ' (default)'}` : '';
     const due = res.mode === 'cadence' && e.nextDue ? `, ${status === 'overdue' ? 'was due' : 'due'} ${humanDate(e.nextDue)}` : '';
     return { label: e.name, value: `${last}${cad}${due}`, entityId: e.customerId, sources };

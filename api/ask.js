@@ -28,6 +28,7 @@ import { classifyDeterministic, runDeterministic } from "./_lib/deterministicRou
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): answers money questions from SQL over document_financials.
 import { answerMoneyQuestion, moneyNoMatchAnswer } from "./_lib/financials/moneyGate.js";
+import { isFinancialQuestion } from "./_lib/financials/classify.js";
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
@@ -35,6 +36,10 @@ import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZ
 import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
 import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
+// TEAM E (2026-09-24): full-corpus content-count questions ("how many jobs mention a capacitor", "which customers had
+// a coil issue on file") — a deterministic scan of document_pages.text (all of it, not a top-K search), never the
+// agent's own search_documents fallback which was silently undercounting. See contentCount.js's own doc comment.
+import { parseContentCountQuestion, runContentCount } from "./_lib/contentCount.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -649,6 +654,10 @@ export default async function handler(req, res) {
     // checked first and take priority on any overlap). Pure shape detection
     // only here (no DB) — see docLookup.js.
     const docLookupIntent = !meta && !contactLookupIntent ? parseDocLookupQuestion(question, { overlay }) : null;
+    // Content-count pre-router (Team E, 2026-09-24): "how many jobs mention a capacitor" / "which customers had a
+    // coil issue on file" — pure shape detection only here (no DB); see contentCount.js. Tried after contact/doc
+    // lookup (their own shapes take priority on any overlap) and, like them, never for a meta question.
+    const contentCountIntent = !meta && !contactLookupIntent && !docLookupIntent ? parseContentCountQuestion(question) : null;
     const normalizedForAnalytics = normalizeQuestionForAnalytics(question, { overlay }).normalized;
     // Money gate (live miss cluster 2, 2026-09-21): "what's the total dollar
     // amount of our open invoices" style questions have no honest answer yet
@@ -658,7 +667,14 @@ export default async function handler(req, res) {
     // documents." Checked here, before the analytics pre-router, so a money
     // question NEVER reaches the Haiku planner at all — see
     // isMoneyQuestion/moneyFallbackAnswer (analytics.js).
-    const moneyQuestion = !meta && !docLookupIntent && isMoneyQuestion(normalizedForAnalytics);
+    // R3_FAILS.md 2026-09-24: isMoneyQuestion alone missed "overdue"/"past due", bare
+    // "paid"/"owe(s) us", a dollar threshold ("over $5,000") and a superlative ("biggest
+    // invoice") entirely, so those 27 financial questions fell into the analytics
+    // pre-router below and got a bare document count instead. isFinancialQuestion
+    // (financials/classify.js) is deliberately broader and OR'd in here — see its own
+    // doc comment for why a false positive here is harmless.
+    // Team E: a content-count question ("how many jobs mention a capacitor") is never a money question.
+    const moneyQuestion = !meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(normalizedForAnalytics) || isFinancialQuestion(normalizedForAnalytics));
     // Analytics pre-router (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md): a
     // cheap deterministic regex gate (preClassifyAnalytics, no DB/model cost)
     // decides whether this question is even WORTH the one Haiku planner call
@@ -675,7 +691,7 @@ export default async function handler(req, res) {
     // capitalized, on top of whatever preClassifyAnalytics(normalized) itself
     // already re-checks (redundant on lowercased text, never wrong).
     const analyticsCandidate =
-      !meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !moneyQuestion && isAnalyticsEnabled() &&
+      !meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !contentCountIntent && !moneyQuestion && isAnalyticsEnabled() &&
       !looksLikeSingleRecordReference(question) &&
       // "newest/oldest unit": ranking the whole fleet needs an ORDER BY, which the closed-vocabulary planner
       // does not have (it would list every unit) - the agent answers these (agent-first, below).
@@ -829,7 +845,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || detIntent || fastPathIntent || contactLookupIntent || docLookupIntent || moneyQuestion || analyticsCandidate
+    const retrievalPromise = meta || detIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
@@ -1073,6 +1089,38 @@ export default async function handler(req, res) {
         question, questionNormalized: normalizedForAnalytics,
         outcome: MISS_OUTCOMES.DOC_LOOKUP_ZERO,
       }).catch(() => {});
+    }
+
+    // ---- 0.63 content-count pre-router (no model, DB only) -----------------
+    // "how many jobs mention a capacitor" / "which customers had a coil issue on file" — a deterministic scan of
+    // EVERY page of the tenant's own corpus (contentCount.js), never the agent's own top-K search_documents. Always
+    // answers once the shape+term are recognized (even at zero matches: an honest "no jobs mention X" is itself the
+    // answer), so this never falls through to retrieval the way contact/doc lookup do on a miss.
+    if (contentCountIntent) {
+      let contentData = null;
+      try {
+        contentData = await timer.time("contentcount", () => withTenant(ctxArg, (db) => runContentCount(db, contentCountIntent)));
+      } catch (err) {
+        console.error("Content-count router failed, falling through to retrieval+model:", err?.message);
+      }
+      console.log(JSON.stringify({
+        route: "ask", content_count_scope: contentCountIntent.scope, content_count_group_by: contentCountIntent.groupBy,
+        content_count_hit: Boolean(contentData),
+      }));
+      if (contentData) {
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, (db) => db.logAction({
+              action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+              changes: { question_hash: hashQuestion(question), documents: (contentData.records ?? []).map((r) => r.documentId).filter(Boolean), passages: 0, contentCount: true },
+            }));
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (content count):", err?.message);
+          }
+        });
+        return send(200, { success: true, data: contentData });
+      }
+      // contentData is null only on an unexpected error above; retrieval (run inline just below) still gets a shot.
     }
 
     // ---- 0.65 money gate (no model, no DB, no cache) -----------------------

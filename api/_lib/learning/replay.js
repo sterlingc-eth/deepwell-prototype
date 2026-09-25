@@ -237,7 +237,9 @@ export async function replayMisses({ ctxArg, questions, force = false, limit = R
       const i = next++;
       if (i >= batch.length) return;
       if (spendLeft() <= 0.01) { summary.stopped = "cost-ceiling"; summary.remaining += batch.length - i; return; }
-      if (Date.now() - startedAt > budgetMs - 4000) { summary.stopped = "time-budget"; summary.remaining += batch.length - i; return; }
+      // Never START a run that could outlive the budget (a replay can take up to PER_RUN_MS): starting one at 41 s
+      // of a 45 s budget pushed the request past Vercel's 60 s limit and the UI showed a bare 504.
+      if (Date.now() - startedAt > budgetMs - PER_RUN_MS - 2000) { summary.stopped = "time-budget"; summary.remaining += batch.length - i; return; }
       try {
         const r = await replayOne({ ctxArg, item: batch[i], overlay, hint, callModel, today: day, source, confirm, spendLeft, operatorApproved, decidedBy });
         spent += r.costUsd;

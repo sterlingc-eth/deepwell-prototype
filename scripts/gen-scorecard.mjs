@@ -363,6 +363,29 @@ function historyRubric(text) {
     params: q.params, requires: requiresOf(sub, q),
   };
 }
+// TEAM F (scorecard correctness, 2026-09-24): "last N visits at X" was previously routed into
+// historyRubric() above - a generic "what's on file" summary graded against documents ordered by
+// UPLOAD date. That rubric never says the answer must be N dated VISITS (not just any document), so
+// a plausible-looking answer that was actually a file summary (or was ordered by the wrong date)
+// could pass, and a genuinely correct "last 3 visits" answer could be graded against the wrong
+// reference order and fail (R3_FAILS_2026-09-24: "last 3 visits at zimmerman's/quintana's - answers
+// look plausible but graded fail"). Its own function + reference query, ordered by SERVICE date and
+// filtered to visit-type documents only, same as lastService()/visitCount() already do.
+function lastVisitsRubric(text) {
+  const s = subjectOf(text); if (!s) return null;
+  const nMatch = /\blast\s+(\d{1,2})\s+visits?\b/i.exec(text);
+  const n = nMatch ? Math.max(1, Math.min(10, Number(nMatch[1]))) : 3;
+  const q = new Q(); const sub = subjectSql(s, q); const vt = VISIT_SQL_ARR(q);
+  return {
+    cmp: "rubric",
+    rubric: `Lists up to the ${n} most recent SERVICE VISITS (documents with a service_date) for this customer or address, newest first, each with its own date; if fewer than ${n} exist, lists what there is and says so. A generic file summary with no visit dates, or dates that do not match what is on record, does not answer this. Must not invent a visit or a date.`,
+    citeWhat: "each visit it names",
+    sql: `SELECT ${SVC_DATE}::text || ' | ' || ${DOCTYPE("d.document_type")} AS ref FROM documents d
+          WHERE d.id IN (${sub.docs}) AND ${DOCTYPE("d.document_type")} = ANY(${vt}) AND ${SVC_DATE} IS NOT NULL
+          ORDER BY ${SVC_DATE} DESC LIMIT ${n}`,
+    params: q.params, requires: requiresOf(sub, q),
+  };
+}
 function techJobs(text) {
   const nm = /\b(?:did|has)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:run|do|close|complete|make)/.exec(text);
   const q = new Q();
@@ -510,7 +533,8 @@ export function classify(entry) {
   if (/\b(?:do we have|did we|does .+ have|is there|show me the)\b/.test(t) && /(maintenance (?:agreement|plan)|permit|\bpo\b|purchase order|nameplate|startup|warranty registration|proposal|quote)/.test(t)) return docExists(text);
   if (/\b(?:when did we last|last service|when were we last|last time we)\b/.test(t)) return lastService(text);
   if (/\bhow many times (?:have|did) we (?:been|gone|visited|serviced)\b|\bhow many (?:visits|service calls|jobs) (?:have we|did we|at|to|for)\b/.test(t)) return visitCount(text);
-  if (/\b(?:what do we have on file|last \d+ visits|last service ticket|how many times have we been|visits at|history)\b/.test(t)) return historyRubric(text);
+  if (/\blast\s+\d{1,2}\s+visits?\b/.test(t)) return lastVisitsRubric(text);
+  if (/\b(?:what do we have on file|last service ticket|how many times have we been|visits at|history)\b/.test(t)) return historyRubric(text);
   if (/\bnotes?\b/.test(t)) return notesRubric(text);
   return null;
 }
@@ -558,6 +582,7 @@ function main() {
           oracle: { sql: c.spec.sql.replace(/\s+/g, " ").trim(), params: c.spec.params, ...(c.spec.requires ? { requires: { sql: c.spec.requires.sql.replace(/\s+/g, " ").trim(), params: c.spec.requires.params } } : {}) },
         };
         if (c.spec.rubric) q.rubric = c.spec.rubric;
+        if (c.spec.citeWhat) q.citeWhat = c.spec.citeWhat; // TEAM F: what the rubric grader must see cited (runner.js's gradeAnswer)
         if (c.spec.alt) q.oracle.alt = { sql: c.spec.alt.sql.replace(/\s+/g, " ").trim(), params: c.spec.alt.params };
         if (c.spec.maxItems) q.maxItems = c.spec.maxItems;
         if (entry.persona) q.persona = entry.persona;

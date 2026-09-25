@@ -39,6 +39,8 @@ import { listOpenReminders } from "./reminders.js";
 import { fetchVisits, splitFuture, futureNote, todayIso, humanDate as humanVisitDate } from "./scope.js";
 import { fetchFileData, attachFileSummary, fetchNotes, buildNotesAnswer } from "./customerFile.js";
 import { citeNotes } from "./citations/history.js"; // TEAM C
+// TEAM E (2026-09-24): full-name (not just surname) typo tolerance — see tokenFuzzyMatches below.
+import { damerauLevenshteinDistance } from "./integrity.js";
 
 /* ============================================================ shape detection */
 
@@ -656,66 +658,46 @@ export function nameTokens(namePhrase) {
     .filter(Boolean);
 }
 
-/** True when `a`/`b` are the same word, one substitution/transposition apart
- *  (equal length), or one insertion/deletion apart (length differs by 1) —
- *  Damerau-Levenshtein distance <= 1. Duplicated from nlNormalize.js's own
- *  (unexported) withinEditDistance1 rather than adding a cross-file
- *  dependency for six lines of pure string math. */
-function withinEditDistance1(a, b) {
+/** Both tokens need at least this many characters before a 2-edit difference
+ *  is trusted as a typo rather than two genuinely different short words ("Al"
+ *  vs "Ed" is 2 edits and two different people). A token in [3,5) chars only
+ *  tolerates 1 edit; unlike streetVocab.js's/integrity.js's own 1-edit-only
+ *  fuzzing, a dispatcher-typed full name ("odnald holbrook") can carry a
+ *  transposition on EITHER token, not just the surname, so both need this. */
+function tokenFuzzyMatches(a, b) {
   if (a === b) return true;
-  const la = a.length;
-  const lb = b.length;
-  if (Math.abs(la - lb) > 1) return false;
-  if (la === lb) {
-    let diffCount = 0;
-    let i1 = -1;
-    let i2 = -1;
-    for (let i = 0; i < la; i++) {
-      if (a[i] !== b[i]) {
-        diffCount++;
-        if (diffCount === 1) i1 = i;
-        else if (diffCount === 2) i2 = i;
-        else return false;
-      }
-    }
-    if (diffCount <= 1) return true;
-    return i2 === i1 + 1 && a[i1] === b[i2] && a[i2] === b[i1];
-  }
-  const [s, l] = la < lb ? [a, b] : [b, a];
-  let i = 0;
-  let j = 0;
-  let usedSkip = false;
-  while (i < s.length && j < l.length) {
-    if (s[i] === l[j]) {
-      i++;
-      j++;
-      continue;
-    }
-    if (usedSkip) return false;
-    usedSkip = true;
-    j++;
-  }
-  return true;
+  const minLen = Math.min(a.length, b.length);
+  if (minLen < 3) return false;
+  const maxDist = minLen >= 5 ? 2 : 1;
+  return damerauLevenshteinDistance(a, b) <= maxDist;
 }
 
 /**
  * Pure: does this tenant customer's own name match the searched name tokens?
- * Surname (last token) within Damerau-Levenshtein <= 1 of the customer's own
- * last token, AND (the search named no first name at all — a surname-only
- * search — OR its first token equals the customer's own first token,
- * case-insensitively). Never matches on surname alone when a first name was
- * given and disagrees — that's exactly what keeps "brian chavez" from also
- * matching a "Brian Chavez" false-positive's near-namesake "Brian Chaves"
- * while still failing closed against an unrelated "Diane Chavez".
+ * Surname (last token) within Damerau-Levenshtein <= 2 (tokenFuzzyMatches) of
+ * the customer's own last token, AND (the search named no first name at all —
+ * a surname-only search — OR its first token is an exact OR typo-tolerant
+ * match of the customer's own first token). Team E (2026-09-24, R3 fail: "what
+ * do we have on file for odnald holbrook" -> no answer): the old version
+ * required the FIRST name to match EXACTLY even when the surname was allowed
+ * to be a typo, so a typo'd first name ("odnald" for "Donald") alone sank an
+ * otherwise-unique match. Never matches on surname alone when a first name was
+ * given and disagrees outright — that's exactly what keeps "brian chavez" from
+ * also matching a "Brian Chavez" false-positive's near-namesake "Brian
+ * Chaves" while still failing closed against an unrelated "Diane Chavez"
+ * (too many edits apart to be a typo of each other).
  */
 export function fuzzyNameMatches(customerName, searchTokens) {
   const custTokens = nameTokens(customerName);
   if (!custTokens.length || !searchTokens?.length) return false;
   const custSurname = custTokens[custTokens.length - 1];
   const searchSurname = searchTokens[searchTokens.length - 1];
-  if (!withinEditDistance1(custSurname, searchSurname)) return false;
+  if (!tokenFuzzyMatches(custSurname, searchSurname)) return false;
   if (searchTokens.length === 1) return true; // surname-only search
-  return custTokens[0] === searchTokens[0];
+  if (!tokenFuzzyMatches(custTokens[0], searchTokens[0])) return false;
+  // Review r3: "Dan Kelly" must not confidently resolve to "Don Kelley" — at least one of the two tokens has to match
+  // exactly ("odnald holbrook" -> Donald Holbrook still works: the surname is exact).
+  return custTokens[0] === searchTokens[0] || custSurname === searchSurname;
 }
 
 /* ============================================================ answer building */

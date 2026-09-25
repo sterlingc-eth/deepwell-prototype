@@ -102,6 +102,14 @@ const exam = loadExam();
   check('number: a number that only echoes the question does not count', !cmp('number', 5, ans('Units older than 5 years: 19.'), 'How many units are older than 5 years?').passed);
   check('number: expected zero passes on an honest "none"', cmp('number', 0, ans('No customers match.')).passed);
   check('number: a no-answer fails', !cmp('number', 3, ans('I could not find that.', [], 'no-answer')).passed);
+  // count-with-unknown (TEAM F, scorecard correctness): a status count where most rows print no status
+  const cwu = (expected, data) => cmp('count-with-unknown', expected, data);
+  check('count-with-unknown: right known count with no unknowns behaves like a plain number', cwu({ known: 3, unknown: 0 }, ans('3 invoices are unpaid.')).passed && !cwu({ known: 3, unknown: 0 }, ans('2 invoices are unpaid.')).passed);
+  check('count-with-unknown: a confident "0" with unmentioned unknowns FAILS even though the number is right', !cwu({ known: 0, unknown: 67 }, ans('None of your invoices are unpaid.')).passed);
+  check('count-with-unknown: the same right number PASSES once the answer states the unknown count', cwu({ known: 0, unknown: 67 }, ans('None show as unpaid; the other 67 do not print a payment status, so I cannot tell.')).passed);
+  check('count-with-unknown: a non-zero known count also needs the unknowns disclosed to pass', !cwu({ known: 1, unknown: 67 }, ans('1 invoice is paid.')).passed && cwu({ known: 1, unknown: 67 }, ans("1 invoice shows paid; the other 67 don't record a status.")).passed);
+  check('count-with-unknown: a wrong known count fails regardless of unknown wording', !cwu({ known: 5, unknown: 2 }, ans('3 invoices are unpaid; 2 unclear.')).passed);
+  check('count-with-unknown: mentioning the literal unknown number also counts as disclosing it', cwu({ known: 0, unknown: 67 }, ans('0 are unpaid (67 have no status field at all).')).passed);
   // set
   const names = ['Ann Lee', 'Bo Chan', 'Cy Diaz', 'Di Evans', 'Ed Ford', 'Flo Gray', 'Gus Hill', 'Hal Ives', 'Ivy Jones', 'Jo Kim'];
   const factsFor = (list) => list.map((n) => ({ label: n, value: 'Mesa' }));
@@ -515,8 +523,13 @@ const val = async (t) => { const r = await ex2(t); return r.skip ? `SKIP:${r.why
 
 /* ---- the breadth questions, hand-computed on the seeded shop */
 {
-  eq('breadth financials: invoices on file = 4, unpaid/open = 3, paid = 1, partial = 1', [await val('How many invoices do we have on file?'), await val('How many invoices are still unpaid?'), await val('How many invoices have been paid?'), await val('How many invoices are partially paid?')], [4, 3, 1, 1]);
-  eq('breadth financials: overdue = 2 (due 09-14 and 09-15 vs today 09-23); more than 60 days = 0', [await val('How many invoices are overdue?'), await val('How many invoices are more than 60 days overdue?')], [2, 0]);
+  // TEAM F: unpaid/paid/overdue/partial are now cmp "count-with-unknown" ({known, unknown} - see
+  // compare.js's compareCountWithUnknown); this fixture's 4 invoices all print an explicit status, so
+  // unknown = 0 for every one of them (the "some unknown" path is covered by the pure unit test below).
+  const known = (v) => v?.known;
+  eq('breadth financials: invoices on file = 4, unpaid/open = 3, paid = 1, partial = 1', [await val('How many invoices do we have on file?'), known(await val('How many invoices are still unpaid?')), known(await val('How many invoices have been paid?')), known(await val('How many invoices are partially paid?'))], [4, 3, 1, 1]);
+  eq('breadth financials: unpaid/paid/partial have no unknowns in this fixture (every invoice prints a status)', [await val('How many invoices are still unpaid?'), await val('How many invoices have been paid?'), await val('How many invoices are partially paid?')].map((v) => v.unknown), [0, 0, 0]);
+  eq('breadth financials: overdue = 2 (due 09-14 and 09-15 vs today 09-23); more than 60 days = 0', [known(await val('How many invoices are overdue?')), known(await val('How many invoices are more than 60 days overdue?'))], [2, 0]);
   eq('breadth financials: total owed = 2050 (1000 + 300 partial balance + 750)', await val('How much are we owed in total?'), 2050);
   eq('breadth financials: invoiced total = 4700.50 (the reviewed 800.00 correction beats the extracted 750)', Number(await val('How much have we invoiced in total?')), 4700.5);
   eq('breadth financials: last month (August) = 1400, this month = 800, this year = 4700.50', [Number(await val('How much did we invoice last month?')), Number(await val('How much did we invoice this month?')), Number(await val('How much did we invoice this year?'))], [1400, 800, 4700.5]);
@@ -607,9 +620,10 @@ function scripted(turns, usageObj = { input_tokens: 1200, output_tokens: 120 }) 
 }
 
 // A fake /api/ask handler: answers by question text, meters model spend like the real one.
-function fakeHandler(script, { tokens = 0, model = 'claude-haiku-4-5', agentModelByQuestion = {} } = {}) {
+function fakeHandler(script, { tokens = 0, model = 'claude-haiku-4-5', agentModelByQuestion = {}, delayMs = 0 } = {}) {
   const seen = [];
   const handler = async (req, res) => {
+    if (delayMs) await new Promise((r) => setTimeout(r, delayMs)); // TEAM F: simulate model/DB latency for concurrency tests
     const call = req[SCORECARD_CALL];
     const question = req.body.question;
     seen.push({ question, escalate: call?.escalate === true, hasHook: Boolean(call), auth: call?.auth });
@@ -682,13 +696,30 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   check('runner: the rubric grader is told what must be cited', /must cite the service ticket/.test(seenRubric[0]) && /citations attached to the answer: 0/.test(seenRubric[0]), seenRubric[0]);
 }
 {
-  // budget stop: each ask costs $1.00 (1,000,000 Haiku input tokens at $1/MTok); a $2.50 budget stops after 3 questions
+  // budget stop: each ask costs $1.00 (1,000,000 Haiku input tokens at $1/MTok). TEAM F (speed): questions
+  // now run QUESTION_CONCURRENCY (2) at a time, so the budget is checked once per PAIR, not per question -
+  // a $2.50 budget lets 2 pairs (4 questions, $4) start before the 3rd pair's pre-check (spent=4 >= 2.5) stops it.
   const questions = Array.from({ length: 8 }, (_, i) => ({ ...qMesa, id: `b-${i}` }));
   const h = fakeHandler(ANSWERS, { tokens: 1_000_000 });
   const out = await runScorecard({ ctx: ctxA, questions, handler: h, budgetUsd: 2.5, pageSize: 12, today: TODAY, retryFailures: false });
-  check('budget stop: the run stops once spend reaches the budget, is marked stopped/budget, and scores what was answered', out.stopped === 'budget' && out.pageResults.length === 3 && out.run.status === 'stopped' && out.run.stopReason === 'budget' && out.done === true, JSON.stringify({ s: out.stopped, n: out.pageResults.length, run: out.run?.status }));
-  check('budget stop: cost is the TRUE per-question spend from the usage meter (~$1 each)', Math.abs(out.spentUsd - 3) < 0.01 && Math.abs(out.pageResults[0].costUsd - 1) < 0.001, `${out.spentUsd} ${out.pageResults[0].costUsd}`);
+  check('budget stop: the run stops once spend reaches the budget, is marked stopped/budget, and scores what was answered', out.stopped === 'budget' && out.pageResults.length === 4 && out.run.status === 'stopped' && out.run.stopReason === 'budget' && out.done === true, JSON.stringify({ s: out.stopped, n: out.pageResults.length, run: out.run?.status }));
+  check('budget stop: cost is the TRUE per-question spend from the usage meter (~$1 each)', Math.abs(out.spentUsd - 4) < 0.01 && Math.abs(out.pageResults[0].costUsd - 1) < 0.001, `${out.spentUsd} ${out.pageResults[0].costUsd}`);
   eq('budget default: env DONOVAN_SCORECARD_BUDGET_USD, else $5', [(await import('../api/_lib/scorecard/runner.js')).scorecardBudgetUsd({}), (await import('../api/_lib/scorecard/runner.js')).scorecardBudgetUsd({ DONOVAN_SCORECARD_BUDGET_USD: '1.5' })], [5, 1.5]);
+}
+{
+  // TEAM F (speed): 4 questions run 2-at-a-time (QUESTION_CONCURRENCY) finish in ~2 batches of wall-clock
+  // time, not 4 sequential ones - proven with an artificial per-ask delay, same shape as the agent's own
+  // tool-concurrency test in verify-agent.mjs.
+  const { QUESTION_CONCURRENCY } = await import('../api/_lib/scorecard/runner.js');
+  const questions = Array.from({ length: 4 }, (_, i) => ({ ...qMesa, id: `c-${i}` }));
+  const delayMs = 120;
+  const h = fakeHandler(ANSWERS, { delayMs });
+  const started = Date.now();
+  const out = await runScorecard({ ctx: ctxA, questions, handler: h, pageSize: 4, today: TODAY, retryFailures: false });
+  const elapsed = Date.now() - started;
+  check(`runner concurrency: 4 questions at QUESTION_CONCURRENCY=${QUESTION_CONCURRENCY} take well under 4x the per-question delay`,
+    elapsed < delayMs * 3.5, `elapsed=${elapsed}ms delay=${delayMs}ms (4 sequential would be >= ${delayMs * 4}ms)`);
+  eq('runner concurrency: all 4 still graded, in question order', out.pageResults.map((r) => r.questionId), questions.map((q) => q.id));
 }
 {
   // paging: 5 questions, 2 per invocation (3 pages), one run, offset cursor, skipped ones do not stall it
@@ -755,6 +786,19 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   check('scorecardStatus: byCategory carries per-category value score and citation coverage; failing entries say whether the VALUE or only the citation was the problem', Object.values(st.run.byCategory).every((c) => 'valueScore' in c && 'citationCoverage' in c) && (st.failing.length === 0 || st.failing.every((f) => 'valueOk' in f && 'cited' in f && 'citationRequired' in f)), JSON.stringify(st.failing[0]));
   check('scorecardStatus: exam shape includes the persona mix', st.exam.personas && st.exam.personas.owner > 0 && st.exam.personas.bookkeeper > 0, JSON.stringify(st.exam.personas));
   check('scorecardStatus: trend compares with the previous comparable run; backend is tables again', st.backend === 'tables' && st.previous && typeof st.previous.score === 'number' && st.run.score <= st.previous.score, JSON.stringify({ r: st.run?.score, p: st.previous?.score, b: st.backend }));
+  // TEAM F (speed): p50/p95 latency in the run summary, computed from the stored per-question latencyMs.
+  check('scorecardStatus: run.latency reports p50/p95 over the answered (non-skipped) questions', st.run.latency && st.run.latency.n === st.run.answered && typeof st.run.latency.p50Ms === 'number' && typeof st.run.latency.p95Ms === 'number' && st.run.latency.p95Ms >= st.run.latency.p50Ms, JSON.stringify(st.run.latency));
+}
+{
+  // TEAM F (scorecard correctness): a rubric failure's grader reason reaches the failing list as `why`,
+  // so an operator can tell "the grader disagreed" from "Donovan was wrong" without re-running anything.
+  const rq = { id: 'q-rub-why', text: 'What was found on the Ortiz job?', category: 'content', cmp: 'rubric', rubric: 'Names the part replaced.', oracle: { sql: "SELECT 'Replaced contactor' AS ref", params: [] } };
+  const badGrade = async () => ({ content: [tu('grade', { pass: false, reason: 'answer never names a part' })], usage: { input_tokens: 10, output_tokens: 5 } });
+  const run = await runScorecard({ ctx: ctxA, questions: [rq], handler: fakeHandler({ [rq.text]: { kind: 'answer', text: 'A technician visited.', facts: [], sources: SRC } }), today: TODAY, callModel: badGrade, feedMisses: false, retryFailures: false });
+  const st = await routes.scorecardStatusAction(ctxA, { runId: run.runId });
+  const f = st.failing.find((x) => x.questionId === 'q-rub-why');
+  check('scorecardStatus: failing[].why carries the grader\'s own reason', f && f.why === 'answer never names a part', JSON.stringify(f));
+  check('scorecardStatus: failing[].latencyMs is the question\'s own latency', f && typeof f.latencyMs === 'number' && f.latencyMs >= 0, JSON.stringify(f));
 }
 {
   // the nightly sweep step: claims once per day, runs the slice for the founder tenant with the injected handler

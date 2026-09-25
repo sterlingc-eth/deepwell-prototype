@@ -235,6 +235,28 @@ function compareValue(expected, view) {
   return { passed, score: passed ? 1 : 0, got: summarizeAnswer(view), why: passed ? "" : "expected value not in the answer" };
 }
 
+/**
+ * TEAM F (scorecard correctness, 2026-09-24): "how many invoices are unpaid/paid/overdue/partial" - most
+ * invoices print no payment status at all, so the KNOWN count alone is a misleading thing to state baldly
+ * ("0 invoices are unpaid" reads as "definitely none" when the truth is "1 shows a status; the other 67
+ * don't say"). expected = {known, unknown} (oracle columns n / u). Pass requires the KNOWN number (same
+ * matching as compareNumber) AND, whenever unknown > 0, that the answer actually says so - a plain
+ * confident number with no such acknowledgement fails even though the number itself is right.
+ */
+function compareCountWithUnknown(expected, view, question, opts = {}) {
+  const known = Number(expected?.known) || 0;
+  const unknown = Math.max(0, Number(expected?.unknown) || 0);
+  const base = compareNumber(known, view, question, opts);
+  if (!base.passed || unknown <= 0) return base;
+  const mentionsUnknown =
+    /\b(?:unknown|unclear|(?:don'?t|doesn'?t|can'?t|cannot) (?:show|print|say|indicate|record|have|track|tell)|not (?:shown|indicated|recorded|printed|captured|on file|available|known)|no (?:printed|recorded|listed)? ?status|status is not|no way to (?:tell|know))\b/i.test(view.text) ||
+    numbersIn(view.text).includes(unknown);
+  if (!mentionsUnknown) {
+    return { ...base, passed: false, why: `states ${known} with no mention of the ${unknown} invoice(s) whose status is not on file` };
+  }
+  return base;
+}
+
 function compareYesNo(expected, view) {
   const want = expected === true || expected === "yes" || expected === "true";
   const first = norm(view.text).split(" ").slice(0, 6).join(" ");
@@ -263,6 +285,7 @@ function compareHonestZero(view, why = "the records cannot answer this") {
 export function isSubstantive(q) {
   switch (q.cmp) {
     case "number": return Number(q.expected) > 0;
+    case "count-with-unknown": return Number(q.expected?.known) > 0 || Number(q.expected?.unknown) > 0;
     case "set": return Array.isArray(q.expected) && q.expected.length > 0;
     case "value": return (Array.isArray(q.expected) ? q.expected : [q.expected]).some((v) => v !== null && v !== undefined && String(v) !== "");
     case "yesno": return q.expected === true || q.expected === "yes" || q.expected === "true";
@@ -287,6 +310,7 @@ export function compareAnswer(q, data) {
   let r;
   switch (q.cmp) {
     case "number": r = compareNumber(q.expected, view, q.question, { alts: q.alts, tolerance: q.tolerance, anyNumber: q.anyNumber }); break;
+    case "count-with-unknown": r = compareCountWithUnknown(q.expected, view, q.question, { tolerance: q.tolerance, anyNumber: q.anyNumber }); break;
     case "set": r = compareSet(q.expected, view); break;
     case "value": r = compareValue(q.expected, view); break;
     case "yesno": r = compareYesNo(q.expected, view); break;
@@ -309,6 +333,7 @@ export function withCitation(r, q, view) {
 export function summarizeExpected(q) {
   switch (q.cmp) {
     case "number": return (q.alts ?? []).length ? clip(`${q.expected} (or ${q.alts.slice(0, 3).map((x) => `${x.expected} if it says "${String(x.says).replace(/^re:/, "")}"`).join("; ")})`) : String(q.expected);
+    case "count-with-unknown": return `${q.expected?.known ?? 0}${Number(q.expected?.unknown) > 0 ? ` (+ ${q.expected.unknown} unknown - must be mentioned)` : ""}`;
     case "set": {
       const items = q.expected ?? [];
       return clip(`${items.length} item(s): ${items.slice(0, 6).join("; ")}${items.length > 6 ? "; …" : ""}`);
@@ -340,6 +365,10 @@ export function expectedFromRows(cmp, rows) {
       const n = Number(v);
       return { expected: Number.isFinite(n) ? n : 0 };
     }
+    case "count-with-unknown": {
+      const known = Number(first.n); const unknown = Number(first.u);
+      return { expected: { known: Number.isFinite(known) ? known : 0, unknown: Number.isFinite(unknown) ? unknown : 0 } };
+    }
     case "set": return { expected: r.map((x) => x.item).filter((x) => x !== null && x !== undefined && String(x) !== "").map(String) };
     case "value": return { expected: r.map((x) => x.v).filter((x) => x !== null && x !== undefined && String(x) !== "").map(String) };
     case "yesno": return { expected: first.v === true || first.v === "t" || first.v === "true" || first.v === 1 };
@@ -347,6 +376,23 @@ export function expectedFromRows(cmp, rows) {
     case "rubric": return { expected: r.map((x) => x.ref).filter(Boolean).map(String) };
     default: throw new Error(`expectedFromRows: unsupported comparison ${String(cmp)}`);
   }
+}
+
+/**
+ * Pure: nearest-rank percentile (p in [0,100]) over a list of numbers. Sorts a copy; empty input -> null.
+ * "Nearest rank" (not interpolated) so the reported number is always one that was actually observed.
+ */
+export function percentile(values, p) {
+  const nums = (values ?? []).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+  if (!nums.length) return null;
+  const rank = Math.min(nums.length - 1, Math.max(0, Math.ceil((p / 100) * nums.length) - 1));
+  return nums[rank];
+}
+
+/** TEAM F (speed/scorecard correctness): p50/p95 latency (ms) over a set of per-question results. */
+export function latencyStats(results) {
+  const ms = (results ?? []).filter((r) => r && !r.skipped).map((r) => Number(r.latencyMs)).filter((n) => Number.isFinite(n) && n >= 0);
+  return { n: ms.length, p50Ms: percentile(ms, 50), p95Ms: percentile(ms, 95) };
 }
 
 /**
@@ -379,5 +425,6 @@ export function scoreResults(results) {
     valueScore: graded.length ? Math.round((valueOk / graded.length) * 10000) / 10000 : null,
     citation: { required: cite.required, cited: cite.cited, coverage: cite.required ? Math.round((cite.cited / cite.required) * 10000) / 10000 : null },
     byCategory: by,
+    latency: latencyStats(graded),
   };
 }

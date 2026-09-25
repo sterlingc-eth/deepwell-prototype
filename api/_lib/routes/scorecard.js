@@ -76,7 +76,9 @@ export async function scorecardStatusAction(ctx, payload = {}) {
   // Value accuracy and citation coverage are derived from the per-question results (the run row only stores pass counts).
   const results = detail?.results ?? [];
   const agg = scoreResults(results);
-  const runOut = run ? { ...run, valueScore: agg.total ? agg.valueScore : null, citation: agg.citation, byCategory: agg.total ? agg.byCategory : run.byCategory } : null;
+  // TEAM F (speed/scorecard correctness): p50/p95 answer latency alongside the pass rate, computed on the fly
+  // from the stored per-question latencyMs (no migration - the column already exists, this just surfaces it).
+  const runOut = run ? { ...run, valueScore: agg.total ? agg.valueScore : null, citation: agg.citation, byCategory: agg.total ? agg.byCategory : run.byCategory, latency: agg.latency } : null;
   const prevDetail = previous ? await getRun(ctx, previous.id) : null;
   const prevAgg = prevDetail ? scoreResults(prevDetail.results ?? []) : null;
   return {
@@ -90,6 +92,11 @@ export async function scorecardStatusAction(ctx, payload = {}) {
     failing: results.filter((r) => !r.passed).slice(0, 120).map((r) => ({
       questionId: r.questionId, category: r.category, question: r.question, expected: r.expected, got: r.got, models: r.models,
       valueOk: r.valueOk !== false, cited: Boolean(r.cited), citationRequired: Boolean(r.citationRequired),
+      // TEAM F (scorecard correctness): the rubric grader's own one-line reason (detail.why, set in runner.js's
+      // gradeAnswer / withCitation), so a failing rubric question shows WHY it failed - lets an operator tell
+      // "the grader is being strict" apart from "Donovan actually got this wrong" without re-running anything.
+      ...(r.detail?.why ? { why: r.detail.why } : {}),
+      ...(typeof r.latencyMs === "number" ? { latencyMs: r.latencyMs } : {}),
       ...(r.detail?.persona ? { persona: r.detail.persona } : {}),
       ...(r.detail?.retry ? { retry: r.detail.retry } : {}), ...(r.error ? { error: r.error } : {}),
     })),
