@@ -13,7 +13,7 @@
  * validation/verification engine, api/ask.js's overlay consumption) goes
  * through here or through learning/overlay.js's own read-only loader.
  */
-import { getPool } from '../recordsStore.js';
+import { getPool, withTenant } from '../recordsStore.js';
 
 let warned = false;
 function warnOnce(context, err) {
@@ -112,6 +112,62 @@ export async function deactivateLearned(learnedId) {
   } catch (err) {
     warnOnce('learning_deactivate', err);
     return false;
+  }
+}
+
+/* ------------------------------------------------------------- exam gate (Workstream A, optional
+ * M3-config/34-learning-exam-gate.sql)
+ * Without that migration, recordExamResult/insertGapPromotion/listGapPromotions are no-ops (false/[])
+ * — the gate itself still runs and still decides, it just cannot persist WHY (examGate.js's own doc
+ * comment). Same "warn once, degrade" idiom as every other optional-migration function in this file. */
+
+/** Records one proposal's exam-gate before/after result (migration 34's exam_before/exam_after/
+ *  exam_sample/exam_run_id columns) — via a SECURITY DEFINER function, since donovan_proposals carries
+ *  zero direct-write policies (see 26-donovan-learning.sql's own header). Returns true only when the
+ *  row was found and updated. */
+export async function recordExamResult(id, { examBefore, examAfter, examSample, examRunId } = {}) {
+  try {
+    const { rows } = await getPool().query(
+      'SELECT learning_record_exam_result($1,$2,$3,$4,$5) AS ok',
+      [id, JSON.stringify(examBefore ?? {}), JSON.stringify(examAfter ?? {}), Number.isFinite(examSample) ? Math.trunc(examSample) : null, examRunId ?? null]
+    );
+    return Boolean(rows[0]?.ok);
+  } catch (err) {
+    warnOnce('learning_record_exam_result', err);
+    return false;
+  }
+}
+
+/** One audit row per gap-cluster-or-otherwise proposal the exam gate actually promoted — an ordinary
+ *  TENANT-scoped table (FORCE RLS + a tenant-isolation policy, same shape as donovan_learned_tenant),
+ *  written through the caller's own withTenant connection like any other per-tenant write. `ctxArg` is
+ *  whichever tenant's own exam data validated the promotion (normally the founder/operator tenant). */
+export async function insertGapPromotion(ctxArg, { proposalId, kind, capability, examBefore, examAfter, examSample }) {
+  try {
+    await withTenant(ctxArg, (db) => db.raw(
+      `INSERT INTO donovan_gap_promotions (tenant_id, proposal_id, kind, capability, exam_before, exam_after, exam_sample)
+       VALUES ((current_setting('app.tenant_id', true))::uuid, $1, $2, $3, $4::jsonb, $5::jsonb, $6)`,
+      [proposalId ?? null, kind, capability ?? null, JSON.stringify(examBefore ?? {}), JSON.stringify(examAfter ?? {}), Number.isFinite(examSample) ? Math.trunc(examSample) : 0]
+    ));
+    return true;
+  } catch (err) {
+    warnOnce('donovan_gap_promotions insert', err);
+    return false;
+  }
+}
+
+/** Up to `limit` of this tenant's own gap-promotion audit rows, newest first. Empty array on failure
+ *  (migration not applied, or no rows yet). */
+export async function listGapPromotions(ctxArg, { limit = 50 } = {}) {
+  try {
+    const { rows } = await withTenant(ctxArg, (db) => db.raw(
+      `SELECT * FROM donovan_gap_promotions WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid ORDER BY created_at DESC LIMIT $1`,
+      [Math.max(1, Math.min(200, Math.trunc(limit) || 50))]
+    ));
+    return rows;
+  } catch (err) {
+    warnOnce('donovan_gap_promotions list', err);
+    return [];
   }
 }
 

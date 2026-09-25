@@ -299,3 +299,124 @@ export function findExactRecipe(recipes, question) {
   if (!norm || !Array.isArray(recipes)) return null;
   return recipes.find((r) => validateRecipePayload(r).ok && r.question === norm && r.sqls.length === 1 && r.template) ?? null;
 }
+
+/* ------------------------------------------------------------ parametric recipes (Workstream A)
+ *
+ * WHY: an exact-match recipe (findExactRecipe, above) only helps the SAME normalized question asked
+ * again word-for-word — "how many customers in Phoenix" teaches nothing about "how many customers in
+ * Tucson" even though it is the identical query shape with one word swapped. A parametric recipe
+ * generalizes over exactly that one word, but ONLY when it is a value from a CLOSED vocabulary Donovan
+ * already trusts (a city, a brand, a document type, a month) — never an arbitrary literal, so this
+ * never opens the door recipes.js's own literalsAllowed exists to keep shut (a customer name, a serial,
+ * an address). A recipe becomes parametric automatically, in submitRecipe (learning/replay.js), the
+ * moment it is built: buildParametricRecipe below finds at most one such substitutable literal; when
+ * it can't (more than one literal, or the one literal isn't in a closed vocabulary), the recipe is
+ * simply an ordinary exact-match recipe, exactly as before this addition existed.
+ */
+
+/** name -> a closed set of lower-cased values a parametric placeholder of that type may take. Every one
+ *  of these is already part of recipes.js's own LITERAL_VOCAB (above) or a question's own words, so
+ *  substituting a validated member back into the SQL can never introduce a data literal the guard above
+ *  would otherwise have refused. */
+const PARAM_VOCAB = {
+  city: () => new Set([...KNOWN_US_CITY_NAMES, ...KNOWN_AZ_CITY_NAMES].map((c) => String(c).toLowerCase())),
+  brand: () => new Set([...Object.keys(BRAND_RULES).map((k) => k.toLowerCase()), ...Object.values(BRAND_RULES).map((b) => String(b?.label ?? '').toLowerCase()).filter(Boolean)]),
+  docType: () => new Set([...DOCUMENT_TYPE_IDS].map((d) => String(d).toLowerCase())),
+};
+export const PARAM_TYPES = Object.keys(PARAM_VOCAB);
+
+/** The recipe's own casing convention for its one literal — 'Mesa' (title case, an un-lower()'d city
+ *  column) vs 'trane' (lower case, a `lower(manufacturer) = '...'` filter) are both real conventions
+ *  elsewhere in this codebase's recipes, so a substituted value must be re-cased to MATCH whichever one
+ *  the ORIGINAL literal used, not forced to one fixed style. Pure. */
+function detectCasePattern(literal) {
+  if (/^[A-Z]+$/.test(literal)) return 'upper';
+  if (/^[A-Z][a-z']*(\s[A-Z][a-z']*)*$/.test(literal)) return 'title';
+  if (/^[a-z][a-z' ]*$/.test(literal)) return 'lower';
+  return 'asis';
+}
+function applyCasePattern(pattern, value) {
+  if (pattern === 'upper') return value.toUpperCase();
+  if (pattern === 'title') return value.replace(/\b\w/g, (c) => c.toUpperCase());
+  if (pattern === 'lower') return value.toLowerCase();
+  return value;
+}
+
+/**
+ * Attempts to generalize a just-built, single-SQL recipe candidate into a PARAMETRIC one: the recipe's
+ * one string literal (stringLiterals, above — this only ever fires for a recipe with EXACTLY one) must
+ * both (a) be a member of one of PARAM_VOCAB's closed sets and (b) appear as a whole word in the asked
+ * question, otherwise this is not a safe/detectable substitution and the recipe stays exact-match only.
+ * Pure. Exported for tests.
+ * @returns {{paramType: string, paramCase: string, questionTemplate: string, sqlTemplate: string} | null}
+ */
+export function buildParametricRecipe({ question, sql }) {
+  const literals = stringLiterals(sql);
+  if (literals.length !== 1) return null;
+  const lit = literals[0].trim();
+  const litLower = lit.toLowerCase();
+  if (!litLower) return null;
+  const qNorm = normalizeRecipeQuestion(question);
+  const wordRe = new RegExp(`\\b${litLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+  if (!wordRe.test(qNorm)) return null;
+
+  for (const type of PARAM_TYPES) {
+    if (!PARAM_VOCAB[type]().has(litLower)) continue;
+    const placeholder = `{${type}}`;
+    const questionTemplate = qNorm.replace(wordRe, placeholder);
+    const literalToken = `'${lit.replace(/'/g, "''")}'`;
+    if (!sql.includes(literalToken)) continue;
+    const sqlTemplate = sql.replace(literalToken, `'${placeholder}'`);
+    if (questionTemplate === qNorm || sqlTemplate === sql) continue;
+    return { paramType: type, paramCase: detectCasePattern(lit), questionTemplate, sqlTemplate };
+  }
+  return null;
+}
+
+/**
+ * Does `question` fit `recipe.parametric`'s own template (same words before/after the placeholder, a
+ * DIFFERENT — or the same — value in the placeholder's slot that is itself a member of that param
+ * type's closed vocabulary)? Pure. Exported for tests.
+ * @returns {{value: string, paramType: string} | null}
+ */
+export function matchParametricRecipe(recipe, question) {
+  const p = recipe?.parametric;
+  if (!p || typeof p.questionTemplate !== 'string' || typeof p.sqlTemplate !== 'string' || !PARAM_VOCAB[p.paramType]) return null;
+  const placeholder = `{${p.paramType}}`;
+  const idx = p.questionTemplate.indexOf(placeholder);
+  if (idx === -1) return null;
+  const before = p.questionTemplate.slice(0, idx);
+  const after = p.questionTemplate.slice(idx + placeholder.length);
+  const qNorm = normalizeRecipeQuestion(question);
+  if (!qNorm.startsWith(before) || !qNorm.endsWith(after) || qNorm.length < before.length + after.length) return null;
+  const value = qNorm.slice(before.length, qNorm.length - after.length).trim();
+  if (!value || value.includes('{') || value.includes('}')) return null;
+  if (!PARAM_VOCAB[p.paramType]().has(value)) return null;
+  return { value, paramType: p.paramType };
+}
+
+/**
+ * The parametric counterpart to findExactRecipe: scans `recipes` for one whose parametric template
+ * matches `question` with a validated substitution, and returns a fully RESOLVED recipe object — same
+ * shape findExactRecipe/runRecipeFastPath expect (question/sqls/columns/rowCount/template) — ready to
+ * run exactly like an exact-match hit, no model call. Every substitution is re-checked with the SAME
+ * guard and literal-safety gate every recipe SQL must pass (guardSql/literalsAllowed, both already
+ * imported into this file) before it is ever returned, so a corrupted or hand-edited `parametric` field
+ * on a stored row can never produce an executable SQL string this function did not itself validate.
+ * @returns {object | null}
+ */
+export function matchParametricExamples(question, recipes) {
+  if (!Array.isArray(recipes)) return null;
+  for (const r of recipes) {
+    if (!validateRecipePayload(r).ok || !r.template) continue;
+    const m = matchParametricRecipe(r, question);
+    if (!m) continue;
+    const cased = applyCasePattern(r.parametric.paramCase, m.value);
+    const value = cased.replace(/'/g, "''");
+    const sql = r.parametric.sqlTemplate.replace(`{${m.paramType}}`, value);
+    if (!guardSql(sql).ok) continue;
+    if (!literalsAllowed(sql, question).ok) continue;
+    return { question: normalizeRecipeQuestion(question), sqls: [sql], columns: r.columns, rowCount: r.rowCount, signature: r.signature, template: r.template };
+  }
+  return null;
+}

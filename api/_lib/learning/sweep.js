@@ -26,6 +26,7 @@ import { verifyProposalLive } from './verify.js';
 import { decidePolicyStatus } from './policy.js';
 import * as store from './store.js';
 import { replayMisses } from './replay.js';
+import { runExamGatedLearningPass } from './examGate.js';
 
 const TASK_KEY = 'donovan-learning';
 
@@ -191,11 +192,32 @@ export async function runLearningCore({ ctxArg, callModel } = {}) {
 }
 
 /** Operator-triggered ("Run learning now") — same work, no once-per-day
- *  guard, still skipped when the migration isn't applied. Never throws. */
+ *  guard, still skipped when the migration isn't applied. Never throws.
+ *
+ *  Workstream A: ALSO runs the exam-gated learning pass exactly once here
+ *  (gapPromoter.js's cross-tenant cluster proposals, then examGate.js's own
+ *  promotePendingWithExamGate over every eligible PENDING proposal, old or
+ *  new) — never inside runLearningCore/runLearningSweepStep, so the nightly
+ *  cron's own once-per-day 'donovan-learning' step never ALSO runs it (the
+ *  nightly path is autopilot.js's runAutopilotSweepStep instead — see that
+ *  file's own doc comment); a pending item is never evaluated (or billed)
+ *  twice in the one run this button starts. */
 export async function runLearningNow(ctxArg) {
   if (!(await migrationApplied())) return { skipped: 'migration-not-applied' };
   try {
-    return await runLearningCore({ ctxArg });
+    const core = await runLearningCore({ ctxArg });
+    const gateCtx = ctxArg ?? (process.env.DEEPWELL_FOUNDER_TENANT_ID
+      ? { tenantKey: process.env.DEEPWELL_FOUNDER_TENANT_ID, tenantName: process.env.DEEPWELL_FOUNDER_TENANT_ID }
+      : null);
+    if (gateCtx) {
+      try {
+        core.examGatedLearning = await runExamGatedLearningPass(gateCtx);
+      } catch (err) {
+        console.error('donovan-learning: exam-gated learning pass failed (non-fatal):', err?.message);
+        core.examGatedLearning = { error: err?.message };
+      }
+    }
+    return core;
   } catch (err) {
     console.error('donovan-learning: runLearningNow failed (non-fatal):', err?.message);
     return { error: err?.message };

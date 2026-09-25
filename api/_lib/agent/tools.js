@@ -518,6 +518,16 @@ function isoDay(v) {
   return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null;
 }
 
+/** Perf pass (2026-09-25, ask-latency): per-request tool memo key. Every tool here is a pure read scoped
+ *  to one (tenant, today) run, so the SAME name+args in the SAME run can only ever produce the SAME
+ *  evidence — a stable JSON.stringify of the input is enough (no canonicalization needed: if the model
+ *  happens to spell the same call with keys in a different order, this just misses the cache, which is
+ *  a missed optimization, never a correctness issue). Returns null (never memoized) for input that fails
+ *  to stringify, which does not happen for the plain tool-call objects the model sends. */
+function memoKeyFor(name, input) {
+  try { return `${name}:${JSON.stringify(input ?? {})}`; } catch { return null; }
+}
+
 /* ---------------------------------------------------------------- toolbox */
 
 /**
@@ -1151,37 +1161,71 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return { ok: true, content: text, rowCount, inputSummary: `synthesize:${out.status}`, empty: out.status === "answered" && rowCount === 0 };
   }
 
+  // Perf pass (2026-09-25, ask-latency): per-request memo (build spec item 4). Keyed by name+args, scoped
+  // to this ONE toolbox/run (a fresh Map per createToolbox call — never shared across requests, never a
+  // process-wide cache). The map stores the in-flight PROMISE, set synchronously before the dispatch's
+  // first await, so two identical calls issued in the SAME turn (which runToolsBounded may run
+  // concurrently) dedupe onto the one real query instead of racing two — see runToolsBounded (loop.js):
+  // its worker loop invokes execute() for each queued use one after another with no await between them
+  // until the first one suspends, so the memo.set below always lands before a same-turn duplicate's own
+  // memo.get. A failed call (ok:false) is never memoized, so retrying with corrected input always runs
+  // fresh (and retrying with the SAME bad input just repeats the same fast, harmless failure).
+  //
+  // VIEW_TOOL_NAME (view_document_page) is deliberately EXCLUDED: it is not a pure function of its
+  // arguments the way every other tool here is — it also spends one of the per-question MAX_VIEWS budget
+  // (viewPage.js's own closure state) on every call, including a repeat of the exact same documentId+page,
+  // and that spend must still happen even when the memo would otherwise short-circuit it.
+  const memo = new Map();
+  let memoHits = 0;
+
   async function execute(name, input) {
+    const key = name === VIEW_TOOL_NAME ? null : memoKeyFor(name, input);
+    const hit = key ? memo.get(key) : null;
+    if (hit) {
+      memoHits++;
+      const cached = await hit;
+      if (cached.ok && name !== "describe_data") {
+        ledger.dataCalls++;
+        if (cached.rowCount === 0 || cached.empty) ledger.emptyResults++;
+      }
+      return { ...cached, ms: 0, cached: true };
+    }
     const started = Date.now();
-    let r;
-    try {
-      if (name === "describe_data") {
-        const d = await describeData();
-        ledger.addShown(d.text);
-        r = { ok: true, content: d.text, rowCount: d.rowCount, inputSummary: "describe" };
-      } else if (name === "search_documents") r = await searchDocuments(input ?? {});
-      else if (name === "count_documents_mentioning") r = await countDocumentsMentioning(input ?? {});
-      else if (name === "find_customers") r = await findCustomers(input ?? {});
-      else if (name === "get_customer") r = await getCustomer(input ?? {});
-      else if (name === "run_query") r = await runQuery(input ?? {});
-      else if (name === "filter_records") r = await filterRecords(input ?? {});
-      else if (name === READ_DOCUMENT_TOOL_NAME) r = await readDocument(input ?? {});
-      else if (name === GET_UNIT_TOOL_NAME) r = await getUnit(input ?? {});
-      else if (name === FOLLOW_LINKS_TOOL_NAME) r = await followLinks(input ?? {});
-      else if (name === TIMELINE_TOOL_NAME) r = await timelineTool(input ?? {});
-      else if (name === COMPUTE_TOOL_NAME) r = await computeTool(input ?? {});
-      else if (name === GET_DOSSIER_TOOL_NAME) r = await getDossierTool(input ?? {});
-      else if (name === SYNTHESIZE_TOOL_NAME) r = await synthesizeTool(input ?? {});
-      else if (name === VIEW_TOOL_NAME) r = await viewDocumentPage(input ?? {});
-      else r = fail(`unknown tool ${String(name).slice(0, 40)}`, "unknown");
-    } catch (err) {
-      r = fail(String(err?.message ?? err).slice(0, 300), String(name));
-    }
-    if (r.ok && name !== "describe_data") {
+    const promise = (async () => {
+      let r;
+      try {
+        if (name === "describe_data") {
+          const d = await describeData();
+          ledger.addShown(d.text);
+          r = { ok: true, content: d.text, rowCount: d.rowCount, inputSummary: "describe" };
+        } else if (name === "search_documents") r = await searchDocuments(input ?? {});
+        else if (name === "count_documents_mentioning") r = await countDocumentsMentioning(input ?? {});
+        else if (name === "find_customers") r = await findCustomers(input ?? {});
+        else if (name === "get_customer") r = await getCustomer(input ?? {});
+        else if (name === "run_query") r = await runQuery(input ?? {});
+        else if (name === "filter_records") r = await filterRecords(input ?? {});
+        else if (name === READ_DOCUMENT_TOOL_NAME) r = await readDocument(input ?? {});
+        else if (name === GET_UNIT_TOOL_NAME) r = await getUnit(input ?? {});
+        else if (name === FOLLOW_LINKS_TOOL_NAME) r = await followLinks(input ?? {});
+        else if (name === TIMELINE_TOOL_NAME) r = await timelineTool(input ?? {});
+        else if (name === COMPUTE_TOOL_NAME) r = await computeTool(input ?? {});
+        else if (name === GET_DOSSIER_TOOL_NAME) r = await getDossierTool(input ?? {});
+        else if (name === SYNTHESIZE_TOOL_NAME) r = await synthesizeTool(input ?? {});
+        else if (name === VIEW_TOOL_NAME) r = await viewDocumentPage(input ?? {});
+        else r = fail(`unknown tool ${String(name).slice(0, 40)}`, "unknown");
+      } catch (err) {
+        r = fail(String(err?.message ?? err).slice(0, 300), String(name));
+      }
+      return { ...r, tool: name, ms: Date.now() - started };
+    })();
+    if (key) memo.set(key, promise);
+    const result = await promise;
+    if (key && !result.ok) memo.delete(key);
+    if (result.ok && name !== "describe_data") {
       ledger.dataCalls++;
-      if (r.rowCount === 0 || r.empty) ledger.emptyResults++;
+      if (result.rowCount === 0 || result.empty) ledger.emptyResults++;
     }
-    return { ...r, tool: name, ms: Date.now() - started };
+    return result;
   }
 
   /** Compact catalogue text for the cached system prompt (no `today`, so it is stable for the cache). */
@@ -1198,7 +1242,12 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return r;
   };
 
-  return { ledger, execute, queries, catalogueText, runRecipeQuery, _runQueryForTests: runQuery, VIEW_NAMES };
+  return {
+    ledger, execute, queries, catalogueText, runRecipeQuery, _runQueryForTests: runQuery, VIEW_NAMES,
+    // Perf pass diagnostic only (build spec item 4): how many tool calls this run served from the memo
+    // instead of re-querying. Never logged with question text, just the count.
+    get memoHits() { return memoHits; },
+  };
 }
 
 function pickGeo(g) {

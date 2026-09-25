@@ -43,6 +43,7 @@ import { invalidateTenantOverlayCache, invalidateActiveOverlayCache } from './ov
 import * as store from './store.js';
 import { RECIPE_KIND, normalizeRecipeQuestion } from './recipes.js';
 import { buildGapReport, storeGapReport } from './gapReport.js';
+import { runExamGatedLearningPass } from './examGate.js';
 import askHandler from '../../ask.js';
 
 const AUTOPILOT_TASK_KEY = 'donovan-autopilot';
@@ -331,12 +332,35 @@ export async function runAutopilotSweepStep({ deadlineAt, env = process.env, han
       console.warn('autopilot: gap report step failed (non-fatal):', err?.message);
     }
 
+    // Workstream A: the EXAM-GATED LEARNING PASS — gapPromoter.js's cluster proposals, then
+    // examGate.js's own promotePendingWithExamGate over every eligible PENDING proposal. Runs ONCE per
+    // sweep (never once per tenant — a platform-level donovan_proposals row has no single "owning"
+    // tenant, and re-evaluating the same pending backlog for every tenant in rotation would multiply
+    // its cost for no benefit), against the founder/operator tenant's own exam data when configured,
+    // else the first tenant this sweep actually processed. This is the ONLY nightly call site (the
+    // learning-sweep step, runLearningSweepStep, deliberately does not also call it — see that file's
+    // own doc comment) — the operator's own call site is runLearningNow, also exactly once per run.
+    let examGatedLearning = null;
+    try {
+      const gateCtx = env.DEEPWELL_FOUNDER_TENANT_ID
+        ? { tenantKey: env.DEEPWELL_FOUNDER_TENANT_ID, tenantName: env.DEEPWELL_FOUNDER_TENANT_ID }
+        // Never fall back to a paying tenant: the gate swaps a candidate overlay in process-wide for its
+        // tenant while it runs (overlay.js), so it must only ever target the founder/operator tenant.
+        : null;
+      if (gateCtx && deadlineAt - Date.now() > MIN_TENANT_MS) {
+        examGatedLearning = await runExamGatedLearningPass(gateCtx, { deadlineAt, handler });
+      }
+    } catch (err) {
+      console.warn('autopilot: exam-gated learning pass failed (non-fatal):', err?.message);
+    }
+
     return {
       tenantsEligible: eligible.length,
       tenantsProcessed: perTenant.length,
       platformSpentUsd: spend.platformSpentUsd(),
       perTenant,
       ...(gapReport ? { gapReport } : {}),
+      ...(examGatedLearning ? { examGatedLearning } : {}),
     };
   } catch (err) {
     console.error('autopilot sweep step failed (non-fatal):', err?.message);

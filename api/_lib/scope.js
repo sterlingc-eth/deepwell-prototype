@@ -17,7 +17,7 @@
  * No question text or row values are ever logged here.
  */
 import { significantAddressTokens, formatDateHuman } from './fastPath.js';
-import { documentTypeLabel } from './documentTypes.js';
+import { documentTypeLabel, DOCUMENT_TYPE_ALIASES } from './documentTypes.js';
 
 export const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -116,17 +116,12 @@ export const NON_VISIT_TYPES = new Set([
 export const normalizeTypeId = (t) => String(t ?? '').trim().toLowerCase().replace(/_/g, '-');
 export const isVisitType = (t) => !NON_VISIT_TYPES.has(normalizeTypeId(t));
 
-/** Every stored spelling that means the canonical type (legacy ids, underscores). Same aliases the scorecard oracle uses. */
-const TYPE_ALIASES = {
-  'maintenance-agreement': ['maintenance-agreement', 'maintenance-plan'],
-  'warranty-registration': ['warranty-registration', 'warranty'],
-  'service-ticket': ['service-ticket', 'service-report'],
-  'proposal-quote': ['proposal-quote', 'proposal', 'quote'],
-  'nameplate-photo': ['nameplate-photo', 'nameplate'],
-};
+/** Every stored spelling that means the canonical type (legacy ids, underscores). Same aliases the scorecard oracle
+ *  uses — sourced from documentTypes.js (the single source of truth for this table; see its own doc comment) so
+ *  this file and documentTypeLabel's own alias-canonicalization can never drift apart. */
 export function docTypeAliases(id) {
   const n = normalizeTypeId(id);
-  return TYPE_ALIASES[n] ?? [n];
+  return DOCUMENT_TYPE_ALIASES[n] ?? [n];
 }
 /** SQL expression that normalizes a stored document_type the same way (lower-case, '_' -> '-'). */
 export const typeSql = (col) => `lower(replace(${col}, '_', '-'))`;

@@ -33,6 +33,39 @@ export const DOCUMENT_TYPE_IDS = new Set(DOCUMENT_TYPES.map((t) => t.id));
 const TYPE_LABEL = new Map(DOCUMENT_TYPES.map((t) => [t.id, t.label]));
 
 /**
+ * Every stored spelling (legacy ids, underscores) that means one canonical type above — the browser's older schema
+ * and earlier ingestion runs used different ids for the same real-world document ("service_report" for what this
+ * file canonically calls "service-ticket", a bare "warranty" for "warranty-registration", ...). Single source of
+ * truth for this codebase: scope.js's own docTypeAliases() re-exports this table instead of keeping a second copy,
+ * and documentTypeLabel (below) resolves through it before looking up a label.
+ *
+ * Round 6 (2026-09-25): documentTypeLabel used to look a raw stored type id up directly, so a document stored as
+ * "service_report" (a real, common alias — see scope.js's own TYPE_ALIASES) displayed as "Other" everywhere its
+ * label was shown in an answer (scope.js's describeVisit, most visibly: "the last 3 visits at Zimmerman: ...
+ * (other, tech ...)" instead of "(service report, tech ...)") — every caller would otherwise have had to remember
+ * to canonicalize first, which most never did (only comparison.js already built its own local version of this map).
+ */
+export const DOCUMENT_TYPE_ALIASES = {
+  'maintenance-agreement': ['maintenance-agreement', 'maintenance-plan'],
+  'warranty-registration': ['warranty-registration', 'warranty'],
+  'service-ticket': ['service-ticket', 'service-report'],
+  'proposal-quote': ['proposal-quote', 'proposal', 'quote'],
+  'nameplate-photo': ['nameplate-photo', 'nameplate'],
+};
+const CANONICAL_TYPE_ID = new Map();
+for (const [canon, aliases] of Object.entries(DOCUMENT_TYPE_ALIASES)) for (const alias of aliases) CANONICAL_TYPE_ID.set(alias, canon);
+
+const normalizeStoredTypeId = (t) => String(t ?? '').trim().toLowerCase().replace(/_/g, '-');
+
+/** The canonical type id a stored (possibly legacy/underscored/aliased) document_type means, e.g.
+ *  "service_report" -> "service-ticket". Never throws; an id this table doesn't know passes through normalized but
+ *  otherwise unchanged (documentTypeLabel then falls back to "Other" for it, same as always). */
+export function canonicalTypeId(typeId) {
+  const n = normalizeStoredTypeId(typeId);
+  return CANONICAL_TYPE_ID.get(n) ?? n;
+}
+
+/**
  * `pack` (optional, Team G industry packs): the tenant's resolved pack
  * (api/_lib/industry/index.js's packForTenant). Every function below that
  * takes one defaults to null, meaning "today's hard-coded HVAC document
@@ -47,8 +80,9 @@ function packTypeLabel(pack, typeId) {
 }
 
 export function documentTypeLabel(typeId, pack = null) {
-  if (pack && pack.id !== 'hvac') return packTypeLabel(pack, typeId) ?? packTypeLabel(pack, 'other') ?? typeId;
-  return TYPE_LABEL.get(typeId) ?? TYPE_LABEL.get('other');
+  const canon = canonicalTypeId(typeId);
+  if (pack && pack.id !== 'hvac') return packTypeLabel(pack, canon) ?? packTypeLabel(pack, 'other') ?? typeId;
+  return TYPE_LABEL.get(canon) ?? TYPE_LABEL.get('other');
 }
 
 /** One-line definitions for the model's classification prompt. Static text —

@@ -72,7 +72,7 @@ import { runRecipeFastPath } from "./_lib/agent/fastReplay.js";
 import { runResearchAgent, isResearchAgentEnabled, RESEARCH_PROMPT_VERSION, researchQuestionHash } from "./_lib/agent/loopV2.js";
 import { logRouteDecision } from "./_lib/agent/router.js";
 // Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
-import { findExactRecipe } from "./_lib/learning/recipes.js";
+import { findExactRecipe, matchParametricExamples } from "./_lib/learning/recipes.js";
 import { submitRecipe } from "./_lib/learning/replay.js";
 import { isPlatformOperator } from "./_lib/missDigest.js";
 // Donovan Scorecard (api/_lib/scorecard/): in-process calls carry {auth, escalate} under a Symbol no HTTP request can set.
@@ -282,8 +282,14 @@ export function extractCustomerNumber(question) {
 
 const SHOW_EVERYTHING_RE = /^show (?:me )?everything (?:for|about) (c-\d{5})$/;
 
+// Round 6 (2026-09-25): "how many invoces are there" (a typo of "invoices") never matched COUNT_QUESTIONS at all —
+// this exact-match lookup used to run only through this file's own bare normalizeQuestion (trim/lowercase/strip
+// punctuation), never nlNormalize.js's fuzzy typo corrector, even though every COUNT_QUESTIONS/LIST_* key is plain
+// English with no address/customer name in it (nothing for that corrector's own singleRecord guard to protect).
+// normalizeQuestionForAnalytics (nlNormalize.js, imported above) leaves every one of this table's own keys
+// byte-for-byte unchanged (see scripts/verify-round6.mjs) while fixing exactly this class of typo.
 export function classifyMetaQuestion(question) {
-  const q = normalizeQuestion(question);
+  const q = normalizeQuestionForAnalytics(question).normalized;
   if (!q) return null;
   const everything = q.match(SHOW_EVERYTHING_RE);
   if (everything) return { kind: "customer", number: everything[1].toUpperCase() };
@@ -726,7 +732,7 @@ export default async function handler(req, res) {
     // when it returns null, which most non-meta questions still will.
     const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
     // Team A: comparison / maintenance-due / address-history questions (pure shape detection, no DB) - see block 0.4.
-    const detIntent = !meta ? classifyDeterministic(question) : null;
+    const detIntent = !meta ? classifyDeterministic(question, { overlay }) : null;
     // Contact-lookup-by-name pre-router (live miss cluster 1, 2026-09-21):
     // "what's the phone number on file for donna thornton" — a lowercase
     // name with no HVAC anchor satisfies neither of fastPath's own gates
@@ -863,7 +869,8 @@ export default async function handler(req, res) {
         // Exact-match recipe (an ACTIVE, approved/confirmed recipe for this very question): re-run its
         // SQL fresh through the same guard and answer from the rows - no model call. Anything that
         // differs falls through to the normal agent below.
-        const recipe = findExactRecipe(overlay?.recipes, question);
+        // Same-shaped question with a different city/brand/doc type (parametric recipe, workstream A).
+        const recipe = findExactRecipe(overlay?.recipes, question) ?? matchParametricExamples(question, overlay?.recipes);
         if (recipe) {
           const fast = await timer.time("recipe", () => runRecipeFastPath({ withTenant, ctxArg, recipe, question, today: todayResolved }));
           if (fast.handled) result = fast;

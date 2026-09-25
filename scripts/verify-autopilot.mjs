@@ -307,6 +307,7 @@ const fakeHandler = () => async (req, res) => res.status(200).json({ success: tr
   const elapsed = Date.now() - t0;
   check('runAutopilotSweepStep: processed exactly the eligible tenants (never the ineligible one)', out.tenantsProcessed === 2 && out.tenantsEligible === 2, JSON.stringify(out));
   check('runAutopilotSweepStep: per-tenant summaries carry counts only, no question text anywhere', !JSON.stringify(out).includes('nothing found'));
+  check('exam-gated learning never targets a paying tenant when DEEPWELL_FOUNDER_TENANT_ID is unset (gate overlay is process-wide)', !process.env.DEEPWELL_FOUNDER_TENANT_ID && !out.examGatedLearning, JSON.stringify(out.examGatedLearning ?? null));
   check('CRON TIME BUDGET: a normal run finishes well within the 60s function limit', elapsed < 50_000, `${elapsed}ms`);
   const secondRun = await autopilot.runAutopilotSweepStep({ deadlineAt: Date.now() + 20_000, handler: fakeHandler() });
   check('the daily claim prevents a same-day re-run from processing the same tenants twice', secondRun.tenantsProcessed === 0, JSON.stringify(secondRun));

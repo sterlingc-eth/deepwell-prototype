@@ -37,24 +37,31 @@ import {
   TENANT_SQL, todayIso, humanDate, splitFuture, futureNote, fetchVisits, scopeDocumentIds, scopeFromCustomers, resolveAddressScope,
   extractUnitDesignator, describeVisit, visitFact, answerEnvelope, isoDate, normalizeTypeId,
 } from './scope.js';
+import { correctTriggerWordTypos, normalizeQuestion } from './nlNormalize.js';
 
 const HISTORY_INTENTS = new Set(['last_service_date', 'last_service_tech', 'install_date', 'installer']);
 const NUM_WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6, ten: 10 };
 
 const LAST_N_RE = /\blast\s+(\d{1,2}|two|three|four|five|six|ten)\s+(?:visits?|services?|service calls?|jobs?|trips?)\s+(?:at|for|to|on)\s+(?:the\s+)?(.+?)\s*\??\s*$/i;
 const UNIT_NOTES_ADDR_RE = /\b(?:notes?|findings?|observations?)\s+(?:on|for|about)\s+(?:the\s+)?(?:unit|system|equipment)\s+(?:at|on)\s+(\d{1,6}\s+.+?)\s*\??\s*$/i;
+// "notes on the Rios unit" / "any notes on the Jennings unit" — same shape as UNIT_NOTES_ADDR_RE but the unit is
+// named by CUSTOMER, not address (no "at <address>" at all): resolved the same way LAST_N_RE's own name subject is
+// (resolveScope below already handles a name -> customer -> equipment lookup for any 'history' intent).
+const UNIT_NOTES_NAME_RE = /\b(?:notes?|findings?|observations?)\s+(?:on|for|about)\s+(?:the\s+)?([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*)?)\s+(?:unit|system|equipment)\s*\??\s*$/i;
 
-// Team E (2026-09-24, R3 fail): "last 3 visjts at zimmerman's" / "last 3 viisits at quintana's" never matched LAST_N_RE
-// at all (its own literal "visits?" alternative can't survive a typo) and fell through to retrieval/the agent instead
-// of this deterministic, cited answer. nlNormalize.js's general fuzzy corrector skips every word of a question it
-// judges a single-record reference (streetVocab.js's own doc comment explains why) — exactly what a "last N visits at
-// <name>'s" question always is — so nothing upstream ever fixes this either. A tiny closed table for the exact typos
-// this corpus's own question bank produces, same idiom as contactLookup.js's own FIELD_WORD_TYPO_FIXES.
-const ROUTER_WORD_TYPO_FIXES = [[/\b(?:visjts|viisits)\b/gi, 'visits']];
+// Team E (2026-09-24, R3 fail) / Round 6 (2026-09-25): this router's own shape regexes (LAST_N_RE's "visits?",
+// UNIT_NOTES_*_RE's "notes?", the "installed"/"installer" fastPath intents below) all need one of their trigger
+// words spelled exactly right — "last 3 visjts at zimmerman's" / "any notfs on the Rios unit" / "who nistalled the
+// York at ..." never match at all. Every one of these is also a single-record-reference question (an address or a
+// "the <name> unit" phrase), so nlNormalize.js's general fuzzy corrector skips it entirely (see that file's own
+// singleRecord guard and streetVocab.js's doc comment for why) — nothing upstream ever fixes it either.
+// correctTriggerWordTypos (nlNormalize.js) fixes a typo of any of THIS router's own closed set of trigger words,
+// unconditionally of singleRecord — a small, explicit list like this essentially never collides with a real
+// street/customer name, so there's no address to accidentally corrupt. Replaces the old hand-written
+// [regex, replacement] table (a new trigger word or a new typo of one now needs only a vocabulary entry).
+const ROUTER_TRIGGER_WORDS = ['visits', 'notes', 'findings', 'observations', 'installed', 'installer'];
 function fixRouterWordTypos(q) {
-  let out = q;
-  for (const [re, to] of ROUTER_WORD_TYPO_FIXES) out = out.replace(re, to);
-  return out;
+  return correctTriggerWordTypos(q, ROUTER_TRIGGER_WORDS);
 }
 
 /** Brand named in a question ("the Mitsubishi at ...") or null. */
@@ -78,9 +85,20 @@ function subjectFromPhrase(phrase) {
 /**
  * Pure: question -> {route, ...} or null. Deliberately narrow — anything not confidently one of these shapes returns
  * null and continues down the normal router chain.
+ *
+ * `opts.overlay` (optional, matches every other router's own call to normalizeQuestion — contactLookup.js/
+ * docLookup.js): Round 6 (2026-09-25) — "do we have more invoices or more serrvice tickets on file" never
+ * classified as a comparison at all ("serrvice" isn't literally "service tickets"), even though
+ * nlNormalize.js's own general fuzzy corrector already knows how to fix it (it's a real, non-single-record
+ * question). Every other pre-router in this codebase (contactLookup.js/docLookup.js) runs its raw text through
+ * normalizeQuestion before its own shape regexes; this file never did, so a general vocabulary typo anywhere in a
+ * comparison/maintenance-due/last-N-visits/etc. question reached nothing that could fix it. Running the question
+ * through normalizeQuestion FIRST (falls through to its own singleRecord guard exactly as it already does for
+ * every other caller) fixes exactly that gap; fixRouterWordTypos (below) still runs after it for the trigger
+ * words normalizeQuestion's own singleRecord guard deliberately leaves alone on an address/named-unit question.
  */
-export function classifyDeterministic(question) {
-  const q = fixRouterWordTypos(String(question ?? '').trim());
+export function classifyDeterministic(question, opts = {}) {
+  const q = fixRouterWordTypos(normalizeQuestion(String(question ?? ''), { overlay: opts?.overlay }).normalized);
   if (!q) return null;
 
   const cmp = parseComparison(q);
@@ -119,6 +137,14 @@ export function classifyDeterministic(question) {
 
   const notesAddr = UNIT_NOTES_ADDR_RE.exec(q);
   if (notesAddr) return { route: 'history', kind: 'unit-notes', address: notesAddr[1], question: q };
+
+  const notesName = UNIT_NOTES_NAME_RE.exec(q);
+  // A bare "notes on the unit" (no customer named) can match the optional "(?:the\s+)?" group by NOT consuming
+  // "the" and capturing it as the name instead — reject a determiner/pronoun capture rather than treating "the"
+  // itself as a customer name.
+  if (notesName && !/^(?:the|a|an|this|that|it|its|our|my|your|their)$/i.test(notesName[1])) {
+    return { route: 'history', kind: 'unit-notes', name: notesName[1].trim(), question: q };
+  }
 
   const fast = classifyFastPath(q);
   if (fast && HISTORY_INTENTS.has(fast.intent) && !fast.subject.customerNumber && !fast.subject.identifier
@@ -345,8 +371,11 @@ export async function runDeterministic(db, intent, { today } = {}) {
     case 'unit-notes': {
       const customers = ctx.scope.customers;
       if (!customers.length) return null;
+      // Round 6 (2026-09-25): a name-based "notes on the Rios unit" resolves ctx.label to the customer's own
+      // name (resolveScope's name branch, above) — "the unit at Rios" reads oddly for a name, unlike an address.
+      const label = intent.address ? `the unit at ${ctx.label}` : ctx.label;
       const nd = await fetchNotes(db, customers, t);
-      return citeNotes(db, buildNotesAnswer(`the unit at ${ctx.label}`, customers, nd, t), `the unit at ${ctx.label}`, nd); // TEAM C
+      return citeNotes(db, buildNotesAnswer(label, customers, nd, t), label, nd); // TEAM C
     }
     default:
       return null;

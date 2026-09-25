@@ -23,7 +23,7 @@ import { normalizeQuestion } from "../nlNormalize.js";
 import { recordAskMiss, MISS_OUTCOMES } from "../missStore.js";
 import { getActiveOverlayForTenant, invalidateActiveOverlayCache } from "./overlay.js";
 import { listOpenMisses, upsertReplay } from "./replayStore.js";
-import { buildRecipeCandidate, verifyRecipe, normalizeRecipeQuestion, RECIPE_KIND } from "./recipes.js";
+import { buildRecipeCandidate, verifyRecipe, normalizeRecipeQuestion, RECIPE_KIND, buildParametricRecipe } from "./recipes.js";
 import { decideRecipeStatus } from "./policy.js";
 import * as store from "./store.js";
 
@@ -83,6 +83,17 @@ export async function submitRecipe({ ctxArg, question, run, operatorApproved = f
     const recipe = cand.recipe;
     const verification = verifyRecipe(recipe, { nameTokens: tokens });
     if (!verification.ok) return { status: "not-eligible", reason: verification.reasons.join("; ") };
+
+    // Workstream A (parametric few-shots/recipes): a single-SQL recipe whose one literal is a value
+    // from a closed vocabulary (city/brand/document type) that also appears in the question becomes
+    // ALSO parametric — recipes.js's own matchParametricExamples can then answer a same-shaped question
+    // with a DIFFERENT such value, no model call, without waiting for that exact new question to be
+    // seen and confirmed on its own. A no-op (recipe.parametric stays unset) for every other recipe,
+    // exactly as before this addition existed.
+    if (recipe.sqls.length === 1) {
+      const param = buildParametricRecipe({ question, sql: recipe.sqls[0] });
+      if (param) recipe.parametric = param;
+    }
 
     const existing = await store.findRecipes(recipe.question);
     if (existing.some((p) => p.status === "rejected")) return { status: "rejected" };

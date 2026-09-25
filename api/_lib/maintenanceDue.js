@@ -199,15 +199,30 @@ export function computeMaintenanceDue(data, opts) {
   for (const c of byCust.values()) {
     const { past, future } = splitFuture(c.visits, today);
     futureVisits = futureVisits.concat(future);
-    // Agreements that ended before today no longer create an obligation (PM history alone still does).
+    // Agreements that ended before today no longer create an obligation (any past visit still does).
     const activeAgreements = c.agreements.filter((a) => !a.end || a.end >= today);
-    const pmVisits = past.filter((v) => isPmVisit(v) && isVisitType(v.documentType));
     const anyVisits = past.filter((v) => isVisitType(v.documentType));
-    const hasObligation = activeAgreements.length > 0 || pmVisits.length > 0;
-    if (opts.mode === 'window' ? !(hasObligation || anyVisits.length) : !hasObligation) continue;
+    // Candidacy matches the scorecard oracle exactly: a customer belongs in this set the moment they have EITHER
+    // an active agreement OR any past visit of a qualifying type — a plain repair/service-ticket/invoice with no
+    // maintenance-agreement on file counts, same as the oracle's own document_type IN (service-ticket, ...,
+    // invoice) list. Restricting candidacy to agreement-holders + PM-labeled visits only (the old PM-visits-only
+    // check) silently dropped every customer whose only history is a plain, non-PM service call — exactly the
+    // scorecard's "overdue for maintenance" / "not had service in 12 months" / "haven't had a tune-up this year"
+    // failures (round 6, 2026-09-25): the reference customer list came back empty or far too short.
+    const hasObligation = activeAgreements.length > 0 || anyVisits.length > 0;
+    if (!hasObligation) continue;
     considered += 1;
 
-    const last = pmVisits[0] ?? anyVisits[0] ?? null; // splitFuture sorts newest first
+    // MAX(service_date) over every qualifying visit, exactly like the oracle's `max(v.dt)` — never PM-preferred.
+    // A customer whose most recent record is a plain repair/invoice is not "more current" than the oracle thinks
+    // just because a maintenance visit predates it; preferring the older PM visit here understated how recently
+    // this customer was actually served and could wrongly call them overdue.
+    const last = anyVisits[0] ?? null; // splitFuture sorts newest first
+    // An agreement's own stated cadence ("2 visits a year" -> 6 months) still governs when THAT customer is
+    // overdue — a real, deliberate feature (a shorter-cadence customer becomes overdue sooner than the flat
+    // default), not something round 6 should remove. Customers with no agreement (or one that states no cadence)
+    // still fall back to the flat default, which is exactly the flat 365-day rule the scorecard's generic
+    // "overdue for maintenance" / "haven't had a tune-up this year" phrasings are graded against.
     const cadence = activeAgreements.length
       ? Math.min(...activeAgreements.map((a) => a.cadenceMonths ?? defaultCadence))
       : defaultCadence;
@@ -271,7 +286,7 @@ export function buildMaintenanceAnswer(res) {
   const names = listed.slice(0, 6).map((e) => e.name);
   const nameList = names.length ? `: ${names.join(', ')}${listed.length > names.length ? `, and ${listed.length - names.length} more` : ''}` : '';
   const basis = res.mode === 'cadence'
-    ? ' Overdue = the last visit on or before today is older than the agreement cadence (12 months when the agreement does not say), or there is no visit on file.'
+    ? ' Overdue = the last visit on or before today is older than the agreement cadence (12 months when there is no agreement or it does not say), or there is no visit on file.'
     : '';
   const text = `${head}${nameList}.${basis}${futureNote(res.futureVisits, res.today)}`;
   // TEAM C: one customer record per listed customer (same lists the counts come from), future visits mentioned only.

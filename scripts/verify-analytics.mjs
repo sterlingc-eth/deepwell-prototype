@@ -1263,7 +1263,10 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
  *     describes, floored — see that file for why this is a safe
  *     under-estimate, never an over-claim).
  * ====================================================================== */
-check('ANALYTICS_FEW_SHOT has 18-25 examples', ANALYTICS_FEW_SHOT.length >= 18 && ANALYTICS_FEW_SHOT.length <= 25, String(ANALYTICS_FEW_SHOT.length));
+// Round 6 (2026-09-25): bumped to 26 for the new "what zip codes do we serve" groupBy example (coverage
+// scorecard failure) — the real budget guard is the token-estimate check below, which still passes; this range is
+// just a sanity ceiling against the bank growing unboundedly, not a hard limit tied to this specific number.
+check('ANALYTICS_FEW_SHOT has 18-26 examples', ANALYTICS_FEW_SHOT.length >= 18 && ANALYTICS_FEW_SHOT.length <= 26, String(ANALYTICS_FEW_SHOT.length));
 check('ANALYTICS_FEW_SHOT has exactly 3 negative (fallback) examples', ANALYTICS_FEW_SHOT.filter((ex) => ex.fallback).length === 3);
 
 for (const ex of ANALYTICS_FEW_SHOT) {

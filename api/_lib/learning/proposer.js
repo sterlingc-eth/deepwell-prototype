@@ -246,7 +246,7 @@ function buildLearningSystemPrompt() {
   ].join('\n');
 }
 
-function payloadFromModelInput(kind, input) {
+export function payloadFromModelInput(kind, input) {
   if (!input) return {};
   switch (kind) {
     case 'abbreviation':
@@ -302,6 +302,58 @@ async function callModelForGroup(question, group) {
     };
   } catch (err) {
     console.error('donovan-learning proposer: model call failed (non-fatal):', err?.message);
+    return { skipped: 'model-error', error: err?.message };
+  }
+}
+
+/**
+ * Workstream A item 2 (learning/gapPromoter.js): the SAME Haiku call shape as callModelForGroup above,
+ * but for a CLUSTER of up to 5 example questions (gapReport.js's own clusterFailures — the weekly
+ * cross-tenant gap report) rather than one miss group: asks for ONE GENERALIZED fix that would help
+ * EVERY example, not just one, so a proposal synthesized here is never overfit to a single shop's
+ * wording. Never proposes abbreviation/typo from a cluster (those need one exact from/to word pulled
+ * from a single question, not a generalization across several) — the tool schema is unchanged
+ * (PROPOSAL_TOOL, above) but the system prompt narrows the model to synonym/few_shot/capability_gap
+ * only, and the caller (gapPromoter.js) treats anything else as unusable.
+ */
+export async function callModelForCluster(capability, examples) {
+  try {
+    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
+    const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
+    const list = (examples ?? []).slice(0, 5).map((q, i) => `${i + 1}. "${q}"`).join('\n');
+    const response = await withBackoff(
+      () =>
+        client.messages.create(
+          {
+            model: LEARN_MODEL,
+            max_tokens: MAX_OUTPUT_TOKENS,
+            temperature: 0,
+            system: [
+              'You help Donovan, an HVAC-shop assistant, close a capability gap seen across MULTIPLE shops.',
+              'You are given several real questions that all failed the same way. Propose ONE generalized ' +
+                "fix that would help EVERY example, not just one: kind='synonym' (a new plain-English noun " +
+                "for an entity that already has a closed vocabulary) or kind='few_shot' (one representative " +
+                'question paired with a valid, executable analytics plan). Only propose ' +
+                "kind='capability_gap' if no such generalized fix exists — never guess a fix that would not " +
+                'genuinely generalize across the examples given.',
+              'Call propose_fix exactly once with your single best proposal.',
+            ].join('\n'),
+            tools: [PROPOSAL_TOOL],
+            tool_choice: { type: 'tool', name: 'propose_fix' },
+            messages: [{ role: 'user', content: `CAPABILITY: ${capability}\nFAILING EXAMPLES:\n${list}` }],
+          },
+          { timeout: Math.max(1000, deadlineAt - Date.now()) }
+        ),
+      { deadlineAt }
+    );
+    const usage = response.usage ?? {};
+    const toolUse = response.content?.find((b) => b.type === 'tool_use');
+    return {
+      raw: toolUse?.input ?? null,
+      usage: { inputTokens: Number(usage.input_tokens) || 0, outputTokens: Number(usage.output_tokens) || 0 },
+    };
+  } catch (err) {
+    console.error('donovan-gap-promoter: model call failed (non-fatal):', err?.message);
     return { skipped: 'model-error', error: err?.message };
   }
 }

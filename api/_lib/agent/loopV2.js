@@ -49,6 +49,10 @@ import { VIEW_PAGE_DOCS } from "./viewPage.js";
 import { packForTenant } from "../industry/index.js";
 import { runToolsBounded } from "./loop.js";
 import { verifyFacts, createDbSourceFetcher } from "./verify.js";
+// Perf pass (2026-09-25, ask-latency): the same free, no-DB, no-model question-shape classifiers
+// router.js already reuses for telemetry — isEnumerationQuestion/isAgentFirstQuestion pick out the
+// "everything about X" / customer-file / enumeration shapes the prefetch step (below) targets.
+import { isEnumerationQuestion, isAgentFirstQuestion } from "./intents.js";
 
 /** Sonnet by default (owner decision, 2026-09-25: "Sonnet as the default research agent for anything
  *  non-trivial; NO Opus"). Reuses escalation.js's model id rather than a second copy of it. */
@@ -57,11 +61,43 @@ export const MAX_TURNS_V2 = 8;
 /** Cumulative tool EXECUTIONS across the whole run (several in one turn still count individually). */
 export const MAX_TOOL_CALLS_V2 = 15;
 export const DEFAULT_INPUT_TOKEN_CAP_V2 = 120_000;
-const MAX_TOOLS_PER_TURN_V2 = 4;
+// Perf pass (2026-09-25, ask-latency): raised 4 -> 6 (build spec item 1) so the model can batch more
+// independent lookups (a multi-part question, several unrelated ids) into ONE turn instead of spreading
+// them across several round trips. Turn-level batching is safe to raise on its own: it only changes how
+// many tool_use blocks are QUEUED per turn, not how many run at the database at once (see
+// TOOL_CONCURRENCY_V2 just below, which is what actually bounds DB load).
+export const MAX_TOOLS_PER_TURN_V2 = 6;
 const MAX_OUTPUT_TOKENS_V2 = 1400;
+/** Perf pass item 5 (trim max_tokens for a forced final-answer turn "where safe" — see
+ *  forcedAnswerTokenBudget below): only used when the run's own evidence gives strong reason to believe
+ *  the answer will be small, never as the default cap. */
+const MAX_OUTPUT_TOKENS_V2_SMALL = 900;
 const MIN_CALL_BUDGET_MS = 4000;
 export const DEFAULT_DEADLINE_MS_V2 = Number(process.env.DONOVAN_AGENT_DEADLINE_MS) || 240_000; // must stay below vercel.json maxDuration (300 s on Pro)
-export const TOOL_CONCURRENCY_V2 = Math.max(1, Math.min(MAX_TOOLS_PER_TURN_V2, Number(process.env.DONOVAN_RESEARCH_TOOL_CONCURRENCY) || 3));
+// Perf pass (2026-09-25, ask-latency): build spec item 1 asks to raise this to 5 "if the DB pool allows".
+// It does NOT: recordsStore.js's getPool caps the whole shared Neon pool at `max: 3` — deliberately, after
+// a 2026-09-22 reviewer NO-GO on a bigger pool (see that file's own comment and
+// handoffs/API_PERF_2026-09-22.md for the "timeout exceeded when trying to connect" incident it was
+// lowered to fix). That pool is shared by every endpoint on a warm instance, not reserved for one ask, so
+// one research-agent tool turn alone must never be able to claim more connections than the pool holds.
+// Per the build spec's own fallback ("if pool is tiny, keep concurrency <= pool-1"), this stays at
+// (PG_POOL_MAX - 1) by default — 2, down from this constant's old hardcoded default of 3, which left ZERO
+// headroom (loop.js's v1 agent, by contrast, has always reserved 1 connection: TOOL_CONCURRENCY = 2 against
+// the same pool). MAX_TOOLS_PER_TURN_V2 is still raised above: more tool calls PER TURN keeps cutting model
+// round trips even though only (pool-1) of them run at the database at once — runToolsBounded just queues
+// the rest behind the same small worker pool instead of firing all N at Postgres simultaneously.
+// DONOVAN_RESEARCH_TOOL_CONCURRENCY still overrides this explicitly for an operator who has actually
+// raised PG_POOL_MAX and wants to use the extra headroom.
+const RESEARCH_POOL_HEADROOM = Math.max(1, (Number(process.env.PG_POOL_MAX) || 3) - 1);
+export const TOOL_CONCURRENCY_V2 = Math.max(1, Math.min(MAX_TOOLS_PER_TURN_V2, Number(process.env.DONOVAN_RESEARCH_TOOL_CONCURRENCY) || RESEARCH_POOL_HEADROOM));
+/** Build spec item 2: how long the pre-first-turn prefetch may run before the run just proceeds without
+ *  it (DONOVAN_RESEARCH_PREFETCH_MS overrides for tests/tuning). */
+export const PREFETCH_TIMEOUT_MS = Number(process.env.DONOVAN_RESEARCH_PREFETCH_MS) || 2500;
+/** DONOVAN_RESEARCH_PREFETCH=0 disables the pre-first-turn prefetch (default ON); a kill switch
+ *  independent of DONOVAN_RESEARCH_AGENT so prefetch alone can be rolled back without disabling v2. */
+export function isPrefetchEnabled(env = process.env) {
+  return env?.DONOVAN_RESEARCH_PREFETCH !== "0";
+}
 
 /** The research agent's OWN per-tenant daily spend cap — never shares a counter with v1's escalation
  *  cap (escalation.js's SONNET_BUCKET / DONOVAN_SONNET_DAILY_USD). */
@@ -97,7 +133,7 @@ RESEARCH DISCIPLINE:
 - State uncertainty plainly when the records only partly answer the question: say what you found, and say what you could not find, rather than rounding a partial answer up to a confident one.
 - NEVER invent a name, date, number, model, serial, address or document. Every claim in your final answer must be backed by a specific tool result; every fact that comes from a document cites that document AND its page (or field).
 - Every number in your answer — including arithmetic (a sum, an age in months, a days-until-expiry) — must come from a tool result verbatim or from the compute tool; never compute it yourself in prose. Money totals may come ONLY from the financials view (see the view docs below), never added up by hand from search excerpts.
-- Call several independent tools in the SAME turn when you already know you need them (searching two different things, reading two documents that do not depend on each other, one query per side of a comparison) — they run concurrently and reach the answer faster. Only chain calls one at a time when a later call genuinely needs an id or value an earlier one returned.
+- Call several independent tools in the SAME turn whenever you already know you need them — up to six at once: searching two different things, reading two documents that do not depend on each other, one query per side of a comparison, or the several independent parts of one multi-part question (a question naming three different customers/units/dates is three independent lookups issued in ONE turn, not three separate round trips). This reaches the answer faster. Only chain calls one at a time when a later call genuinely needs an id or value an earlier one returned.
 - TIME WORDS: "added / uploaded / received / scanned / filed" mean a document's own upload date; "serviced / visited / job / work done / installed" mean its service_date/installation_date. Say in text which date you used. A service_date later than today is a scheduled visit or a typo — never call it the last service; exclude it and mention it.
 - Lists: one fact per row for EVERY row (up to 40), never a partial list phrased as complete; the true total is always stated in text. If a result says truncated, narrow the query and run it again.
 - If the records genuinely cannot answer (a needed field was never captured), use status cannot_answer and say plainly what is missing. If you searched and there is genuinely nothing, use none_found. Never pad, never guess.
@@ -142,6 +178,23 @@ export function researchQuestionHash(question) {
 async function defaultCallModel(req, { deadlineAt }) {
   const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
   return withBackoff(() => client.messages.create(req, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
+}
+
+/**
+ * Perf pass item 5 (trim max_tokens for a forced final-answer turn "where safe"): only shrinks the cap
+ * when THIS run's own evidence so far gives strong reason to expect a small answer — no listing-capable
+ * tool (run_query / filter_records / count_documents_mentioning / synthesize / get_dossier) has been
+ * called yet, and fewer than a handful of ids have surfaced in the ledger. A genuine list/enumeration
+ * answer always keeps the FULL MAX_OUTPUT_TOKENS_V2 (it trips one of these two signals almost by
+ * definition), so this can never truncate one — the smaller cap only ever applies to a narrow
+ * single-entity lookup, where the one thing max_tokens was ever bounding is the model rambling in prose
+ * before its (forced) tool call, not a large facts[] array.
+ */
+const LIST_CAPABLE_TOOLS = new Set(["run_query", "filter_records", "count_documents_mentioning", "synthesize", "get_dossier"]);
+function forcedAnswerTokenBudget(steps, ledger) {
+  const sawListTool = steps.some((s) => LIST_CAPABLE_TOOLS.has(s.tool));
+  if (sawListTool || ledger.ids.size > 8) return MAX_OUTPUT_TOKENS_V2;
+  return MAX_OUTPUT_TOKENS_V2_SMALL;
 }
 
 function usageOf(resp) {
@@ -231,6 +284,40 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
 
   emit("plan", "Reading the question and planning what to look up…");
 
+  // ---- prefetch (build spec item 2, ask-latency pass): for an enumeration / "everything about X" /
+  // customer-file question (the same free, no-model isEnumerationQuestion/isAgentFirstQuestion shapes
+  // router.js already reuses for telemetry), run ONE cheap, time-boxed search_documents lookup — DB +
+  // embeddings only, no model call — BEFORE the first model turn, and inject its result as an
+  // already-fulfilled tool_use/tool_result pair so the first REAL model call starts with evidence already
+  // in hand instead of spending a whole round trip asking for it. Time-boxed at PREFETCH_TIMEOUT_MS: a
+  // slow prefetch is simply abandoned (Promise.race just stops waiting on it; nothing later in the run
+  // blocks on it) and the run proceeds exactly as it would have with prefetch off — this can make a run
+  // faster, never worse or wrong (a bad/empty prefetch result is just never injected, guarded by
+  // `prefetched.ok` below).
+  let prefetchUsed = false;
+  if (isPrefetchEnabled(env) && (isEnumerationQuestion(question) || isAgentFirstQuestion(question))) {
+    const prefetchBudgetMs = Math.min(PREFETCH_TIMEOUT_MS, deadline - Date.now() - MIN_CALL_BUDGET_MS);
+    if (prefetchBudgetMs >= 500 && toolCallsUsed < maxToolCalls) {
+      const prefetchInput = { query: String(question).slice(0, 300), limit: 8 };
+      let prefetched = null;
+      try {
+        prefetched = await Promise.race([
+          toolbox.execute("search_documents", prefetchInput),
+          new Promise((resolve) => { setTimeout(() => resolve(null), prefetchBudgetMs); }),
+        ]);
+      } catch { prefetched = null; }
+      if (prefetched && prefetched.ok) {
+        const useId = "prefetch-1";
+        messages.push({ role: "assistant", content: [{ type: "tool_use", id: useId, name: "search_documents", input: prefetchInput }] });
+        messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: useId, content: prefetched.content }] });
+        toolCallsUsed += 1;
+        steps.push({ tool: "search_documents", inputSummary: prefetched.inputSummary, rowCount: prefetched.rowCount, ms: prefetched.ms, prefetch: true });
+        prefetchUsed = true;
+        emit("tool", "Checking existing records before asking the model…");
+      }
+    }
+  }
+
   async function runTurns(turnBudget) {
     let nudged = false;
     for (let turn = 1; turn <= turnBudget; turn++) {
@@ -242,7 +329,9 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       const modelStarted = Date.now();
       const resp = await callModel(
         {
-          model: RESEARCH_MODEL, max_tokens: MAX_OUTPUT_TOKENS_V2, temperature: 0, system, tools,
+          model: RESEARCH_MODEL,
+          max_tokens: forceAnswer ? forcedAnswerTokenBudget(steps, toolbox.ledger) : MAX_OUTPUT_TOKENS_V2,
+          temperature: 0, system, tools,
           tool_choice: forceAnswer ? { type: "tool", name: ANSWER_TOOL_NAME } : { type: "auto" },
           messages,
         },
@@ -306,13 +395,17 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
   // not just the run's whole evidence corpus (shape.js already did that broader check above). One
   // bounded re-research turn is allowed when something gets dropped and there is still time/turn/tool
   // budget left, so a fixable gap ("I have the doc, I just cited the wrong page") gets one more chance
-  // before the answer goes out short a fact.
+  // before the answer goes out short a fact. Perf pass confirmation (2026-09-25): the condition below
+  // ALREADY gates the retry on `verifyDropped > 0` and nothing else drop-related — a clean verify pass
+  // (or an answer with no sourced facts at all, filtered out above) never spends the extra model turn.
   let verifyDropped = 0;
+  let verifySkipped = 0;
   if (shaped?.answered && shaped.data?.kind === "answer" && shaped.data.facts?.length) {
     emit("verify", "Cross-checking each fact against its source…");
     const fetchSourceText = createDbSourceFetcher({ withTenant, ctxArg });
     const first = await verifyFacts(shaped.data, fetchSourceText);
     verifyDropped = first.droppedCount;
+    verifySkipped += first.skippedCount ?? 0;
     shaped = { ...shaped, data: first.data };
     if (verifyDropped > 0 && reason !== "deadline" && reason !== "token-cap" && reason !== "tool-cap"
         && toolCallsUsed < maxToolCalls && deadline - Date.now() >= MIN_CALL_BUDGET_MS && totals.modelCalls < maxTurns) {
@@ -327,6 +420,7 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
           const second = await verifyFacts(reshaped.data, fetchSourceText);
           shaped = { ...reshaped, data: second.data };
           verifyDropped = second.droppedCount;
+          verifySkipped += second.skippedCount ?? 0;
         }
       } else {
         reason = "verify-retry-exhausted";
@@ -346,6 +440,8 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       model_calls: totals.modelCalls, input_tokens: totals.inputTokens, output_tokens: totals.outputTokens,
       tool_calls: toolCallsUsed, tool_steps: steps.length, model_ms: modelCallsMs,
       dropped_facts: (shaped?.dropped?.facts ?? 0) + verifyDropped, verify_dropped: verifyDropped,
+      // Perf pass diagnostics (build spec items 2-4) — counts only, never question/answer content.
+      verify_skipped: verifySkipped, prefetch_used: prefetchUsed, memo_hits: toolbox.memoHits,
     })
   );
 
@@ -361,7 +457,11 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     modelCallsMs,
     queries: toolbox.queries,
     examplesInjected: examples ? examples.split("\nQ: ").length - 1 : 0,
-    dropped: shaped ? { ...shaped.dropped, verify: verifyDropped } : null,
+    dropped: shaped ? { ...shaped.dropped, verify: verifyDropped, verifySkipped } : null,
+    // Perf pass diagnostics (build spec items 2-4): a prefetch that ran before the first turn, and how
+    // many tool calls this run served from the per-request memo instead of re-querying.
+    prefetchUsed,
+    memoHits: toolbox.memoHits,
     ...(error ? { error } : {}),
   };
 }

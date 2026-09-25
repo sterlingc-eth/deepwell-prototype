@@ -1385,10 +1385,15 @@ export const ANALYTICS_FEW_SHOT = [
   { q: 'how many service tickets do we have', plan: { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'service-ticket' }] } },
   // ---- technician ----
   { q: 'how many jobs did mike do last week', plan: { entity: 'serviceVisits', op: 'count', filters: [{ field: 'technician', op: 'eq', value: 'Mike' }] } },
-  // ---- groupBy: month, brand, county ----
+  // ---- groupBy: month, brand, county, zip ----
   { q: 'jobs per month this year', plan: { entity: 'serviceVisits', op: 'groupBy', groupBy: 'month' } },
   { q: 'how many units do we have by brand', plan: { entity: 'equipment', op: 'groupBy', groupBy: 'brand' } },
   { q: 'customers by county', plan: { entity: 'customers', op: 'groupBy', groupBy: 'county' } },
+  // "what zip codes do we serve" (round 6, 2026-09-25 coverage failure): the question about the DIMENSION itself
+  // ("what zip codes/counties/cities do we serve/cover") is a groupBy over that dimension, the same shape as
+  // "customers by county" above — nothing in the few-shot bank named "zip" at all before this, so the planner had
+  // no example anchoring "serve"/"cover" + a geo dimension word to groupBy instead of some other op.
+  { q: 'what zip codes do we serve', plan: { entity: 'customers', op: 'groupBy', groupBy: 'zip' } },
   // ---- list vs count ----
   { q: 'list customers in gilbert', plan: { entity: 'customers', op: 'list', filters: [{ field: 'city', op: 'eq', value: 'Gilbert' }] } },
   // ---- comparison: groupBy + an `in` filter, not two separate plans ----
@@ -2037,21 +2042,41 @@ export function normalizeStateValue(raw) {
 }
 
 /** 2-letter state code from a free-text address's trailing "..., AZ 85234" or
- *  "...AZ 85234" (no comma). Also recognizes a spelled-out "Arizona" tail. */
+ *  "...AZ 85234" (no comma). Also recognizes a spelled-out "Arizona" tail.
+ *
+ *  Geo parity fix (2026-09-25, scorecard geo counts 45/19 vs oracle 44/18): this must be the EXACT same
+ *  extraction the scorecard's own oracle SQL runs (see test-docs/scorecard/exam.json's counts-geo/comparisons
+ *  questions and scripts/verify-geo-parity.mjs), not just something close. The oracle's own regex is
+ *  case-INSENSITIVE on the 2-letter code (a lowercase or mixed-case "az 85224" still resolves to AZ) — this
+ *  used to require uppercase only, silently reading such a customer's state as unknown (excluded from every
+ *  state/city count and breakdown) while the oracle correctly counted it, an app/oracle disagreement in
+ *  exactly the direction that produces a mismatched total. Also, like the oracle, a bare trailing state with
+ *  no zip only counts right after a comma with nothing else following (no zip, no extra text) — never a
+ *  same-string state+zip match without a comma unless the code sits directly before the zip. */
 export function deriveState(address) {
   const s = String(address ?? '');
-  const m = s.match(/\b([A-Z]{2})\s*\d{5}(?:-\d{4})?\s*$/);
-  if (m) return m[1];
+  // Oracle pattern 1: a 2-letter code (either case) directly before a 5(+4)-digit ZIP at the very end of the
+  // whole address string, preceded by start-of-string or any non-letter character (works with or without a
+  // comma before the state — "Tempe AZ 85281" and "Tempe, AZ 85281" both match).
+  const m = s.match(/(?:^|[^A-Za-z])([A-Za-z]{2})\s*\d{5}(?:[\s-]*\d{4})?\s*$/);
+  if (m) return m[1].toUpperCase();
+  // Oracle pattern 2: a bare 2-letter code as the very last thing in the string, right after a comma, with no
+  // ZIP at all ("40 Pine Ln, Gilbert, AZ").
   const m2 = s.match(/,\s*([A-Za-z]{2})\s*$/);
-  if (m2 && /^[A-Za-z]{2}$/.test(m2[1])) return m2[1].toUpperCase();
+  if (m2) return m2[1].toUpperCase();
   if (/\barizona\b/i.test(s)) return 'AZ';
   return null;
 }
 
 /** 5-digit ZIP from a free-text address (a 9-digit ZIP+4 is truncated to its
- *  first 5, the USPS delivery-area digits county lookups key off). */
+ *  first 5, the USPS delivery-area digits county lookups key off).
+ *
+ *  Geo parity fix (2026-09-25): the ZIP+4 suffix separator matches the oracle's own definition
+ *  (test-docs/scorecard/exam.json's "how many different zip codes" oracle) — zero or more spaces/dashes, not a
+ *  literal dash only. "...AZ 85205-1234" (dash), "...AZ 85205 1234" (space) and "...AZ 852051234" (no
+ *  separator at all) all resolve to "85205" on both sides now; only the dash form used to. */
 export function deriveZip(address) {
-  const m = String(address ?? '').match(/\b(\d{5})(?:-\d{4})?\s*$/);
+  const m = String(address ?? '').match(/\b(\d{5})(?:[\s-]*\d{4})?\s*$/);
   return m ? m[1] : null;
 }
 

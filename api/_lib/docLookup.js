@@ -20,9 +20,9 @@
  * parseDocLookupQuestion's own doc comment for the "must not hijack an
  * analytics/retrieval question" guards this shares with contactLookup.js.
  */
-import { normalizeQuestion } from "./nlNormalize.js";
+import { correctTriggerWordTypos, normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
-import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from "./documentTypes.js";
+import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel, DOCUMENT_TYPE_SYNONYMS } from "./documentTypes.js";
 import { mergeDocumentVia } from "./routes/customers.js";
 // TEAM C (citations everywhere): every branch below states what it searched / read.
 import { attachCitations, customerRecord, documentRecord } from "./citations/records.js";
@@ -33,6 +33,17 @@ import { resolveContactCandidates, resolveAddressCandidates, nameTokens } from "
 import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitDesignator, docTypeAliases, typeSql } from "./scope.js";
 
 /* ============================================================ shape detection */
+
+// Round 6 (2026-09-25): "list invoides for delgado" (a typo of "invoices") never matched DOCTYPE_WORD_RE at all.
+// nlNormalize.js's general fuzzy corrector already knows "invoides" is one substitution away from "invoices", but
+// this question ALSO carries a trailing "for <name>" reference (analytics.js's own hasTrailingNameReference), which
+// flags the WHOLE question as a single-record reference and makes normalizeQuestion skip correcting EVERY word in
+// it, not just "delgado" — the doctype word earlier in the sentence never gets a chance either. Every individual
+// word across DOCUMENT_TYPE_SYNONYMS is exactly the kind of small, closed, unconditional-of-singleRecord trigger
+// vocabulary correctTriggerWordTypos (nlNormalize.js) exists for (see deterministicRouter.js's own use of it for
+// the same class of bug) — applied here, before normalizeQuestion, so a customer name later in the question is
+// still left completely alone.
+const DOCTYPE_TRIGGER_WORDS = [...new Set(Object.values(DOCUMENT_TYPE_SYNONYMS).flat().flatMap((phrase) => phrase.split(' ')))];
 
 const DOCTYPE_ALT = docTypeSynonymAlternation();
 // A trailing plural "s" is optional and NOT part of the alternation itself
@@ -178,7 +189,7 @@ export function parseDocLookupQuestion(question, opts = {}) {
   const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
   if (!raw) return null;
-  const q = normalizeQuestion(raw, { overlay }).normalized;
+  const q = normalizeQuestion(correctTriggerWordTypos(raw, DOCTYPE_TRIGGER_WORDS), { overlay }).normalized;
   if (!q || !DOCTYPE_WORD_RE.test(q)) return null; // cheap reject before trying every shape
 
   for (const re of SHAPES) {

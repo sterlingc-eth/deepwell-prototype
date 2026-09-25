@@ -197,7 +197,14 @@ export function correctStreetTypos(question, streetVocab) {
 
   const correctedInside = inside.replace(/[A-Za-z]+/g, (word) => {
     const lower = word.toLowerCase();
-    if (lower.length < 5) return word;
+    // Round 6 (2026-09-25): "618 N Poer Rd" (a deletion typo of "Power", one letter short of it) was never
+    // corrected — this floor used to match nlNormalize.js's own 5-letter floor for its GENERAL vocabulary, but a
+    // deletion typo of a 5-letter street name is itself only 4 letters, and byLen (above) already indexes tenant
+    // street tokens down to 4 letters for exactly this reason. Raising the floor back to 5 here silently excluded
+    // every such typo from ever reaching the edit-distance check below. 4 is still short enough that this only
+    // ever matches against the tenant's OWN real street tokens (never a generic dictionary), so the false-positive
+    // risk stays the same one this file's own header comment already accepts.
+    if (lower.length < 4) return word;
     if (VOCAB.has(lower)) return word; // a recognized general/HVAC/geo word — not this file's job
     if (streetVocab.has(lower)) return word; // already a real street token for this tenant
 

@@ -122,6 +122,26 @@ export function resetActiveOverlayCacheForTests() {
 // the global cache or any other tenant's own entry.
 const tenantCache = new Map(); // tenantKey -> { extra: object|null, expiresAt: number }
 
+// Workstream A (examGate.js): a process-global, NEVER-CACHED override used only while a gating exam
+// for `tenantKey` is in flight, so the real /api/ask pipeline (which resolves its own overlay by
+// calling getActiveOverlayForTenant right here) answers the CANDIDATE'S questions exactly as it would
+// once that candidate is live, without writing anything to donovan_learned first. Cleared by the caller
+// in a `finally` the instant that one gating call finishes — see examGate.js's own header for the
+// narrow concurrency note this implies.
+const gateOverrides = new Map(); // tenantKey -> full overlay-shaped object (the merge base for this tenant during the override)
+
+/** Sets the candidate overlay override for one tenant's exam-gate run. Never call this outside
+ *  examGate.js's own runGatingExam. */
+export function setCandidateOverlayForGate(tenantKey, extra) {
+  if (tenantKey) gateOverrides.set(tenantKey, extra ?? null);
+}
+
+/** Clears one tenant's override (or every tenant's, with no argument) — always call in a `finally`. */
+export function clearCandidateOverlayForGate(tenantKey) {
+  if (tenantKey) gateOverrides.delete(tenantKey);
+  else gateOverrides.clear();
+}
+
 /** Merge the global overlay with one tenant's OWN additions. Pure. */
 function mergeOverlays(base, extra) {
   if (!extra) return base;
@@ -152,6 +172,10 @@ export async function getActiveOverlayForTenant(ctxArg) {
   const base = await getActiveOverlay();
   const tenantKey = ctxArg?.tenantKey;
   if (!tenantKey) return base;
+  // Exam-gate override takes priority over the (persistent, DB-backed) tenant cache below and is never
+  // itself cached — every call while a gate run is in flight re-merges fresh, and the override vanishes
+  // the instant examGate.js clears it.
+  if (gateOverrides.has(tenantKey)) return mergeOverlays(base, gateOverrides.get(tenantKey));
   const now = Date.now();
   const hit = tenantCache.get(tenantKey);
   if (hit && hit.expiresAt > now) return mergeOverlays(base, hit.extra);

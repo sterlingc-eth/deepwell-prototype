@@ -67,6 +67,40 @@ console.log = (...a) => { if (typeof a[0] === 'string' && (a[0].startsWith('{"ro
   check('router.js: the route-decision log line never includes question/answer text (counts + reason codes only)', !/console\.log\([^)]*question/.test(routerSrc));
 }
 
+/* ================================================================== verify.js: deterministic-field skip (perf pass item 3) */
+{
+  const { verifyFacts, DETERMINISTIC_FIELD_KEYS } = await import('../api/_lib/agent/verify.js');
+  const DOC = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  let fetchCalls = 0;
+  const neverActuallyFetch = async () => { fetchCalls++; return null; };
+  const data = {
+    kind: 'answer', text: 'Warranty is active.', confidence: 0.9,
+    facts: [{ label: 'Warranty', value: 'active', sources: [{ documentId: DOC, location: { field: 'warranty_status' } }] }],
+  };
+  const { data: out, droppedCount, skippedCount } = await verifyFacts(data, neverActuallyFetch);
+  check('verify skip: a fact citing a deterministic/computed field (warranty_status) never reaches the DB re-fetch at all', fetchCalls === 0, `fetchCalls=${fetchCalls}`);
+  eq('verify skip: it is counted as skipped (not checked), and never dropped', [droppedCount, skippedCount], [0, 1]);
+  check('verify skip: the fact itself survives unchanged', out.facts.length === 1 && out.facts[0].value === 'active', JSON.stringify(out.facts));
+  check('verify skip: DETERMINISTIC_FIELD_KEYS covers the financials fields too (they live in document_financials, not extractions)',
+    ['total', 'subtotal', 'tax', 'amount_paid', 'balance_due', 'open_balance', 'days_past_due'].every((k) => DETERMINISTIC_FIELD_KEYS.has(k)));
+
+  // The batched .prefetch() path must exclude these sources too (nothing useful to fetch for them).
+  const seenPrefetch = [];
+  const fetcher = async () => null;
+  fetcher.prefetch = async (sources) => { seenPrefetch.push(...sources); };
+  const data2 = {
+    kind: 'answer', text: 'x', confidence: 0.9,
+    facts: [
+      { label: 'Warranty', value: 'active', sources: [{ documentId: DOC, location: { field: 'warranty_status' } }] },
+      { label: 'Technician', value: 'jordan', sources: [{ documentId: DOC, location: { field: 'technician' } }] },
+    ],
+  };
+  await verifyFacts(data2, fetcher);
+  check('verify skip: the prefetch batch itself excludes deterministic-field sources (only the real "technician" field is sent)',
+    seenPrefetch.length === 1 && seenPrefetch[0].location.field === 'technician', JSON.stringify(seenPrefetch));
+}
+
 /* ================================================================== harness: real Postgres via PGlite */
 let PGlite;
 let contrib = {};
@@ -262,6 +296,31 @@ const parseReadDoc = (r) => { const idx = r.content.indexOf('\n--- page '); retu
   check('read_document: a tenant B document id under tenant A is refused (no such document), never its text', foreignRead.ok === false && !foreignRead.content.includes('SECRET'));
 }
 
+/* ================================================================== per-request memo (build spec item 4) */
+{
+  const tb = toolboxA();
+  const r1 = await tb.execute('find_customers', { name: 'Karen Abernathy' });
+  const r2 = await tb.execute('find_customers', { name: 'Karen Abernathy' });
+  check('memo: an identical (name, args) tool call in the same run is served from the memo, not re-queried',
+    r1.ok && r2.ok && r2.cached === true && !r1.cached && r2.content === r1.content, JSON.stringify({ r1cached: r1.cached, r2cached: r2.cached }));
+  eq('memo: exactly one call was served from the memo so far', tb.memoHits, 1);
+
+  const r3 = await tb.execute('find_customers', { name: 'Plaza Dental Group' });
+  check('memo: a DIFFERENT input for the same tool name is never served from the memo (runs for real)', r3.ok && !r3.cached);
+  eq('memo: the memo-hit count only grows on an actual duplicate, not every call', tb.memoHits, 1);
+
+  // Concurrent duplicates in the SAME batch (as runToolsBounded issues within one model turn) must also
+  // dedupe onto one real call, not race two.
+  const tb2 = toolboxA();
+  const [c1, c2] = await Promise.all([tb2.execute('describe_data', {}), tb2.execute('describe_data', {})]);
+  check('memo: two CONCURRENT identical calls in one batch dedupe onto the one real call', c1.ok && c2.ok && (c1.cached === true) !== (c2.cached === true), JSON.stringify({ c1: c1.cached, c2: c2.cached }));
+  eq('memo: concurrent duplicates count as exactly one memo hit', tb2.memoHits, 1);
+
+  // view_document_page is deliberately excluded (see tools.js's own comment): it spends a per-question
+  // MAX_VIEWS budget even on a repeat of the exact same documentId+page, so it must never be served from
+  // the memo (covered end-to-end by scripts/verify-scorecard.mjs's "at most 2 views per question" case).
+}
+
 /* ================================================================== research agent: scripted model loop */
 let toolUseCounter = 0;
 const tu = (name, input) => ({ type: 'tool_use', id: `toolu_${++toolUseCounter}`, name, input });
@@ -351,6 +410,61 @@ const run = (question, callModel, extra = {}) => runResearchAgent({ withTenant, 
   check('verify step: a fact whose cited page does not actually say it is dropped, not returned', !JSON.stringify(r.data).includes('ZZ-9999-FAKE'), JSON.stringify(r.data));
   check('verify step: the run reports a non-zero verify-drop count', (r.dropped?.verify ?? 0) >= 1, JSON.stringify(r.dropped));
   eq('verify step: exactly one bounded re-research turn was used (3 model calls total)', r.modelCalls, 3);
+}
+
+/* ================================================================== batching: MAX_TOOLS_PER_TURN_V2 raised 4 -> 6 */
+{
+  // A question with several independent parts (here: 5 unrelated lookups about one customer/unit, standing
+  // in for "tell me about customer A, customer B, and compare them") used to be capped at 4 tool calls per
+  // turn; the 5th would come back "too many tool calls in one turn" and cost a WHOLE EXTRA model turn to
+  // pick up. With the cap raised to 6, all 5 run in the SAME turn.
+  const model = scripted([
+    () => [
+      tu('find_customers', { name: 'Karen Abernathy' }),
+      tu('get_unit', { equipmentId: uid('a', 'e', 1) }),
+      tu('follow_links', { entityId: uid('a', 'c', 1) }),
+      tu('timeline', { customerId: uid('a', 'c', 1) }),
+      tu('compute', { expression: '1+1' }),
+    ],
+    () => [tu('answer', { status: 'cannot_answer', text: 'n', missing: 'not needed for this check' })],
+  ]);
+  const r = await run('tell me about Karen Abernathy, her unit, its links and its timeline, all at once', model);
+  check('batching: a 5-part turn (over the OLD 4-per-turn cap) all executes in ONE turn, none rejected as over-budget',
+    r.steps.length === 5 && r.steps.every((s) => !s.error), JSON.stringify(r.steps));
+  eq('batching: the whole run finishes in 2 model calls (one tool turn, one answer turn) — the raised cap saves the 3rd call the old 4-per-turn limit would have needed', r.modelCalls, 2);
+}
+
+/* ================================================================== prefetch (build spec item 2) */
+{
+  // An enumeration question ("list all X") gets a free, no-model search_documents lookup injected before
+  // the first turn. The scripted model here is ADAPTIVE (inspects its own message history, same trick the
+  // harness's `turn` functions already support): it answers immediately once it sees evidence already in
+  // hand, or calls search_documents itself when it does not — the same script therefore proves the saved
+  // round trip for both prefetch-on and prefetch-off without needing two different fixtures.
+  const question = 'list all customers';
+  const hasSearchEvidence = (messages) => messages.some((m) =>
+    Array.isArray(m.content) && m.content.some((b) => b.type === 'tool_result' && typeof b.content === 'string' && b.content.includes('resultCount')));
+  const adaptiveTurns = [
+    (messages) => (hasSearchEvidence(messages) ? [tu('answer', { status: 'cannot_answer', text: 'n', missing: 'not needed for this check' })] : [tu('search_documents', { query: question })]),
+    () => [tu('answer', { status: 'cannot_answer', text: 'n', missing: 'not needed for this check' })],
+  ];
+  const onEnv = { DONOVAN_ESCALATION: '1', DONOVAN_RESEARCH_DAILY_USD: '10' };
+
+  const withPrefetch = await run(question, scripted(adaptiveTurns), { env: onEnv });
+  eq('prefetch: an enumeration question is answered with fewer model calls because evidence is already in the first turn', withPrefetch.modelCalls, 1);
+  check('prefetch: the injected evidence shows up in steps with a prefetch marker', withPrefetch.steps.some((s) => s.tool === 'search_documents' && s.prefetch === true), JSON.stringify(withPrefetch.steps));
+  check('prefetch: the result says a prefetch ran', withPrefetch.prefetchUsed === true);
+
+  const withoutPrefetch = await run(question, scripted(adaptiveTurns), { env: { ...onEnv, DONOVAN_RESEARCH_PREFETCH: '0' } });
+  eq('prefetch off (DONOVAN_RESEARCH_PREFETCH=0): the SAME question needs one extra model call to fetch the same evidence itself', withoutPrefetch.modelCalls, 2);
+  check('prefetch off: the result says no prefetch ran', withoutPrefetch.prefetchUsed === false);
+
+  // Graceful skip when there is no time for it (stands in for "times out"): an already-tight deadline
+  // must never hang or throw — prefetch is simply skipped and the run still completes cleanly, exactly
+  // like the existing wall-clock-deadline budget case below.
+  const tight = await run(question, scripted(adaptiveTurns), { env: onEnv, deadlineAt: Date.now() + 100 });
+  check('prefetch skips gracefully under a near-zero deadline: no hang, no throw, and the run still finishes with a sane reason',
+    ['deadline', 'turn-cap'].includes(tight.reason) && tight.prefetchUsed === false, JSON.stringify({ reason: tight.reason, prefetchUsed: tight.prefetchUsed }));
 }
 
 /* ================================================================== budgets/caps */

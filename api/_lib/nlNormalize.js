@@ -148,7 +148,7 @@ for (const w of VOCAB) {
 /** True when `a`/`b` are the same word, one substitution/transposition apart
  *  (equal length), or one insertion/deletion apart (length differs by 1) —
  *  i.e. Damerau-Levenshtein distance <= 1. */
-function withinEditDistance1(a, b) {
+export function withinEditDistance1(a, b) {
   if (a === b) return true;
   const la = a.length;
   const lb = b.length;
@@ -195,6 +195,55 @@ function fuzzyCorrect(token, vocabByLen = VOCAB_BY_LEN) {
     }
   }
   return null;
+}
+
+/**
+ * Round 6 (2026-09-25): a deterministic router's own pre-classifier (deterministicRouter.js,
+ * maintenanceDue.js, ...) keys off a handful of EXACT trigger words ("installed", "notes", "visits", ...) that
+ * this file's own general fuzzy corrector (above) never gets a chance to fix on a single-record-reference
+ * question ("who nistalled the York at 581 W Thomas Rd" / "any notfs on the Rios unit") — normalizeQuestion
+ * deliberately skips EVERY word of such a question (see the `singleRecord` guard above and streetVocab.js's own
+ * doc comment for why: a general, tenant-agnostic word list has no business rewriting an address or a customer
+ * name). A typo of one of a router's OWN small, explicit trigger words is safe to fix unconditionally and
+ * unconditionally-of-singleRecord, though: unlike a whole dictionary, a two- or three-word closed list picked by
+ * the caller essentially never collides with a real street/customer-name token, so there is no address to
+ * accidentally corrupt.
+ *
+ * Exported so every router's pre-classifier can share ONE fuzzy-correction implementation instead of each
+ * hand-writing its own regex substitution table for the same class of bug (deterministicRouter.js's own
+ * ROUTER_WORD_TYPO_FIXES / maintenanceDue.js's own copy) — new callers, or a new typo of an existing trigger
+ * word, need only a vocabulary entry, never a new regex.
+ *
+ * Deliberately conservative: corrects a word only when it is within Damerau-Levenshtein distance <= 1 of EXACTLY
+ * ONE word in `triggerWords` (never already an exact match, never shorter than 3 letters, never ambiguous between
+ * two trigger words) — the same "closed vocabulary, unambiguous winner only" rule this file's own VOCAB-based
+ * fuzzyCorrect and streetVocab.js's correctStreetTypos already use.
+ */
+export function correctTriggerWordTypos(text, triggerWords) {
+  const trig = (triggerWords ?? []).map((w) => String(w ?? '').toLowerCase()).filter(Boolean);
+  if (!trig.length) return String(text ?? '');
+  const byLen = new Map();
+  for (const w of trig) {
+    if (!byLen.has(w.length)) byLen.set(w.length, []);
+    byLen.get(w.length).push(w);
+  }
+  return String(text ?? '').replace(/[A-Za-z]+/g, (word) => {
+    const lower = word.toLowerCase();
+    // "show" is one edit from "shop" (this router's own alternation includes "shop record") — a word that is
+    // ALREADY a real, recognized word (VOCAB, the same general vocabulary fuzzyCorrect/correctStreetTypos both
+    // already defer to) is never "corrected" into some other, unrelated real word; only a token that ISN'T a
+    // known word at all is a plausible typo of one of these triggers.
+    if (lower.length < 3 || trig.includes(lower) || VOCAB.has(lower)) return word;
+    let match = null;
+    for (const len of [lower.length - 1, lower.length, lower.length + 1]) {
+      for (const cand of byLen.get(len) ?? []) {
+        if (!withinEditDistance1(lower, cand)) continue;
+        if (match && match !== cand) return word; // ambiguous between two trigger words — leave it alone
+        match = cand;
+      }
+    }
+    return match ?? word;
+  });
 }
 
 /* ============================================================ learned overlay

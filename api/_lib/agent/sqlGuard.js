@@ -42,7 +42,7 @@ export const REAL_TABLES = Object.freeze([
   "extractions", "entities", "audit_log", "document_entity_links", "tenant_deletions", "api_keys",
   "usage_counters", "rate_limit_windows", "billing_events", "notifications_sent", "notifications",
   "ask_answer_cache", "tenant_outreach_settings", "outreach_messages", "ask_misses",
-  "donovan_proposals", "donovan_learned", "platform_expenses", "ask_miss_replays",
+  "donovan_proposals", "donovan_gap_promotions", "donovan_learned", "platform_expenses", "ask_miss_replays",
   "donovan_scorecard_runs", "donovan_scorecard_results", // M3-config/30-donovan-scorecard.sql
   ...FINANCE_REAL_TABLES, // document_financials, document_financial_lines (M3-config/22)
   "page_chunks", "embedding_usage", // M3-config/31 (search by meaning)
