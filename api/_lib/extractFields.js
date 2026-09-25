@@ -89,7 +89,9 @@ const REPEATABLE = new Set(FIELD_SPECS.filter((s) => s.repeatable).map((s) => s.
  * (customer_name, service_address, warranty_term, agreement_term, cost, ...)
  * is shared across every unit the document mentions. See groupFieldsByUnit().
  */
-const UNIT_SCOPED_FIELDS = new Set([
+// Exported (Team G, industry packs) so api/_lib/industry/packs/hvac.js can
+// mark each field's `perUnit` per the contract without duplicating this list.
+export const UNIT_SCOPED_FIELDS = new Set([
   'equipment_id', 'serial_number', 'model', 'manufacturer',
   'equipment_type', 'tonnage', 'refrigerant', 'installation_date',
 ]);
@@ -149,19 +151,125 @@ export const EXTRACT_TOOL = {
 const FIELD_GUIDE = FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}${s.example ? `\n    e.g. ${s.example}` : ''}`).join('\n');
 const DOCUMENT_TYPE_GUIDE = DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYPE_DEFINITIONS[t.id] ?? ''}`).join('\n');
 
-export function buildExtractPrompt(pages, documentType) {
+/* ------------------------------------------------------- industry packs (Team G)
+ *
+ * Every function above/below this block keeps its original signature and
+ * output for callers that pass no `pack` argument (the default is always
+ * `null`, meaning "today's hard-coded HVAC vocabulary") — so every existing
+ * caller is byte-for-byte unchanged. A caller that DOES resolve the tenant's
+ * pack (api/_lib/industry/index.js's packForTenant) can pass it through here
+ * to get that pack's own field/document-type vocabulary instead, which is
+ * what lets extraction work for a plumbing/electrical/property tenant.
+ *
+ * A pack's own field list (the contract's `{key, label, perUnit,
+ * description}` shape) carries no `kind` — normalizeFields still needs one
+ * to know whether a value is a date/money/number/plain text. Every pack
+ * (see industry/packs/*.js) deliberately reuses this file's existing key
+ * names for anything date/money/number-shaped it needs (warranty_expires,
+ * cost, labor_hours, ...) and only invents a handful of new keys of its own
+ * (lease_end_date, coi_expires, gallons, amperage, rent_amount, ...) — this
+ * table teaches those new keys their kind by the same naming convention
+ * FIELD_SPECS itself already follows; anything not listed defaults to 'text'.
+ */
+const KNOWN_FIELD_KIND = {
+  reminder_trigger: 'reminder_trigger',
+  cost: 'money', rent_amount: 'money', security_deposit: 'money',
+  labor_hours: 'number', amperage: 'number', voltage: 'number', gallons: 'number',
+};
+function inferFieldKind(key) {
+  if (KNOWN_FIELD_KIND[key]) return KNOWN_FIELD_KIND[key];
+  if (/_date$/.test(key) || key === 'warranty_expires' || key === 'coi_expires') return 'date';
+  return 'text';
+}
+
+/** pack.id -> {specs: FIELD_SPECS-shaped array, specByKey: Map, unitScoped: Set,
+ *  fieldGuide: string, docTypeGuide: string, tool: object}, built once per pack
+ *  and reused ("cache keyed by pack id", per the contract). `null`/hvac packs
+ *  are never entered here — they use this file's own module-level constants,
+ *  unchanged. */
+const packFieldCache = new Map();
+
+function packFieldMeta(pack) {
+  if (!pack || pack.id === 'hvac') {
+    return { specs: FIELD_SPECS, specByKey: SPEC_BY_KEY, unitScoped: UNIT_SCOPED_FIELDS, fieldGuide: FIELD_GUIDE, docTypeGuide: DOCUMENT_TYPE_GUIDE, tool: EXTRACT_TOOL };
+  }
+  const cached = packFieldCache.get(pack.id);
+  if (cached) return cached;
+
+  const specs = pack.fields.map((f) => ({
+    key: f.key,
+    kind: inferFieldKind(f.key),
+    desc: f.description ?? f.label,
+    repeatable: f.key === 'work_performed' || f.key === 'part_number',
+  }));
+  const specByKey = new Map(specs.map((s) => [s.key, s]));
+  const unitScoped = new Set(pack.fields.filter((f) => f.perUnit).map((f) => f.key));
+  const fieldGuide = specs.map((s) => `- ${s.key}: ${s.desc}`).join('\n');
+  const docTypeGuide = pack.documentTypes.map((t) => `- ${t.id}: ${t.definition}`).join('\n');
+  const tool = buildExtractToolFor(pack.documentTypes.map((t) => t.id), specs.map((s) => s.key));
+
+  const meta = { specs, specByKey, unitScoped, fieldGuide, docTypeGuide, tool };
+  packFieldCache.set(pack.id, meta);
+  return meta;
+}
+
+function buildExtractToolFor(documentTypeIds, fieldKeys) {
+  return {
+    name: 'extract_fields',
+    description: EXTRACT_TOOL.description,
+    input_schema: {
+      type: 'object',
+      properties: {
+        document_type: { type: 'string', enum: documentTypeIds, description: EXTRACT_TOOL.input_schema.properties.document_type.description },
+        document_type_confidence: EXTRACT_TOOL.input_schema.properties.document_type_confidence,
+        fields: {
+          ...EXTRACT_TOOL.input_schema.properties.fields,
+          items: {
+            ...EXTRACT_TOOL.input_schema.properties.fields.items,
+            properties: {
+              ...EXTRACT_TOOL.input_schema.properties.fields.items.properties,
+              key: { ...EXTRACT_TOOL.input_schema.properties.fields.items.properties.key, enum: fieldKeys },
+            },
+          },
+        },
+        uncertain: EXTRACT_TOOL.input_schema.properties.uncertain,
+      },
+      required: EXTRACT_TOOL.input_schema.required,
+    },
+  };
+}
+
+/** The extract_fields tool schema for one pack — identical shape to the
+ *  module-level EXTRACT_TOOL, just scoped to that pack's own document types
+ *  and field keys. Pass the tenant's resolved pack (packForTenant); omit for
+ *  today's default HVAC vocabulary (returns EXTRACT_TOOL itself). */
+export function buildExtractToolForPack(pack) {
+  return packFieldMeta(pack).tool;
+}
+
+export function buildExtractPrompt(pages, documentType, pack = null) {
+  const meta = packFieldMeta(pack);
+  const noun = pack?.businessNoun ?? 'HVAC company';
+  // "an HVAC company" (HVAC is pronounced starting with the vowel sound
+  // "aitch", not a consonant) — hard-coded for the no-pack default so this
+  // stays byte-identical to the original text; a real pack's businessNoun
+  // ('plumbing company', 'electrical contractor', ...) all start with a
+  // consonant sound, so the plain spelling rule is correct for every one of
+  // them today. (A future pack starting with a true vowel sound would need
+  // its own exception here, same as HVAC's.)
+  const article = !pack || /^hvac\b/i.test(noun) ? 'an' : (/^[aeiou]/i.test(noun) ? 'an' : 'a');
   const body = pages.map((p) => `[page ${p.page_no}]\n${p.text}`).join('\n\n');
-  return `Below is the full text of a ${documentType || 'document'} belonging to an HVAC company, one page at a time.
+  return `Below is the full text of a ${documentType || 'document'} belonging to ${article} ${noun}, one page at a time.
 
 ${body}
 
 Read the pages and return every field the text actually states, using the extract_fields tool.
 
 FIELDS:
-${FIELD_GUIDE}
+${meta.fieldGuide}
 
 DOCUMENT TYPE — pick exactly the one id that best fits this document:
-${DOCUMENT_TYPE_GUIDE}
+${meta.docTypeGuide}
 
 Rules:
 - Copy serial numbers, model numbers, part numbers and dollar amounts character for character. They are what this document will be searched by.
@@ -400,13 +508,14 @@ export function normalizeReminderTrigger(raw) {
  * warranty_expires of "sometime next spring" in the database is worse than no
  * warranty_expires, because the entity screen would render it as a fact.
  */
-export function normalizeFields(rawFields, { pageCount, today } = {}) {
+export function normalizeFields(rawFields, { pageCount, today, pack = null } = {}) {
+  const meta = packFieldMeta(pack);
   const kept = [];
   const dropped = [];
 
   for (const f of Array.isArray(rawFields) ? rawFields : []) {
     const key = String(f?.key ?? '').trim();
-    const spec = SPEC_BY_KEY.get(key);
+    const spec = meta.specByKey.get(key);
     if (!spec) { dropped.push({ key, reason: 'unknown field' }); continue; }
 
     // A value that isn't a string or number (an object, an array, ...) has no
@@ -481,7 +590,7 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
     });
   }
 
-  return { fields: dedupe(kept), dropped };
+  return { fields: dedupe(kept, meta), dropped };
 }
 
 /**
@@ -499,7 +608,9 @@ export function normalizeFields(rawFields, { pageCount, today } = {}) {
  * field_key alone; a field with no unit_index still collapses globally,
  * which is the entire single-unit-document case.
  */
-function dedupe(fields) {
+function dedupe(fields, meta = { specs: FIELD_SPECS, unitScoped: UNIT_SCOPED_FIELDS }) {
+  const order = meta.specs === FIELD_SPECS ? FIELD_KEYS : meta.specs.map((s) => s.key);
+  const unitScoped = meta.unitScoped ?? UNIT_SCOPED_FIELDS;
   const best = new Map();
   const out = [];
 
@@ -511,7 +622,7 @@ function dedupe(fields) {
       out.push(f);
       continue;
     }
-    const groupKey = UNIT_SCOPED_FIELDS.has(f.field_key) && f.unit_index != null
+    const groupKey = unitScoped.has(f.field_key) && f.unit_index != null
       ? `${f.field_key}::unit${f.unit_index}`
       : f.field_key;
     const prev = best.get(groupKey);
@@ -523,7 +634,7 @@ function dedupe(fields) {
   }
 
   for (const f of best.values()) if (!REPEATABLE.has(f.field_key)) out.push(f);
-  return out.sort((a, b) => FIELD_KEYS.indexOf(a.field_key) - FIELD_KEYS.indexOf(b.field_key));
+  return out.sort((a, b) => order.indexOf(a.field_key) - order.indexOf(b.field_key));
 }
 
 /**
@@ -544,12 +655,13 @@ function dedupe(fields) {
  * fact, which is byte-for-byte what extractDocument.js already did before
  * multi-unit support existed. Capped at MAX_UNITS_PER_DOCUMENT.
  */
-export function groupFieldsByUnit(fields) {
+export function groupFieldsByUnit(fields, pack = null) {
+  const unitScoped = packFieldMeta(pack).unitScoped;
   const shared = {};
   const perUnit = new Map();
 
   for (const f of Array.isArray(fields) ? fields : []) {
-    if (UNIT_SCOPED_FIELDS.has(f.field_key) && f.unit_index != null) {
+    if (unitScoped.has(f.field_key) && f.unit_index != null) {
       if (!perUnit.has(f.unit_index)) perUnit.set(f.unit_index, {});
       perUnit.get(f.unit_index)[f.field_key] = f.value;
     } else {

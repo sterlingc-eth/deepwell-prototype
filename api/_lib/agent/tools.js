@@ -30,6 +30,7 @@ import { collectQueryIdentities, noteQueryIdentities, noteSearch } from "../cita
 // TEAM E (2026-09-24): full-corpus content-count ("how many jobs mention a capacitor") — search_documents only ever
 // returns its top ~10 passages, which was silently undercounting; this scans every page. See contentCount.js.
 import { runContentCount, canonicalizeTerm } from "../contentCount.js";
+import { packForTenant } from "../industry/index.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -209,7 +210,7 @@ export const TOOL_DEFS = [
   {
     name: "count_documents_mentioning",
     description:
-      "Exact full-corpus count of jobs/documents whose page text mentions ANY of the given terms - scans EVERY page, not a top-10 search, so use this instead of search_documents for 'how many jobs/documents mention X', 'which customers had an X issue/repair on file', 'list jobs where we replaced X', 'any complaints about X'. Terms are matched with an HVAC synonym/morphology map (e.g. 'capacitor' also finds 'cap'/'dual run cap'; 'leak' also finds 'leaking'; 'noise' also finds 'rattle'/'squeal'/'loud') - pass the plain part/issue word, not every synonym yourself.",
+      "Exact full-corpus count of jobs/documents whose page text mentions ANY of the given terms - scans EVERY page, not a top-10 search, so use this instead of search_documents for 'how many jobs/documents mention X', 'which customers had an X issue/repair on file', 'list jobs where we replaced X', 'any complaints about X'. Terms are matched with this shop's own industry synonym/morphology map (e.g. an HVAC tenant's 'capacitor' also finds 'cap'/'dual run cap'; 'leak' also finds 'leaking'; 'noise' also finds 'rattle'/'squeal'/'loud') - pass the plain part/issue word, not every synonym yourself.",
     input_schema: {
       type: "object",
       properties: {
@@ -506,14 +507,21 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
 
   /* ---- count_documents_mentioning ---- */
   async function countDocumentsMentioning(input) {
-    const rawTerms = Array.isArray(input?.terms) ? input.terms : [];
-    const terms = [...new Set(rawTerms.map((t) => canonicalizeTerm(t)).filter(Boolean))].slice(0, 10);
-    if (!terms.length) return fail("terms is required: one or more part/issue words", "count_mentions");
+    const rawTerms = (Array.isArray(input?.terms) ? input.terms : []).filter((tm) => String(tm ?? "").trim());
+    if (!rawTerms.length) return fail("terms is required: one or more part/issue words", "count_mentions");
     const scope = input?.documentType === "jobs" ? "jobs" : "documents";
     const groupBy = input?.groupBy === "customer" ? "customer" : null;
     let data;
     try {
-      data = await withTenant(ctxArg, (db) => runContentCount(db, { terms, scope, groupBy }));
+      // One transaction: resolve the tenant's pack (Team G) and run the scan
+      // against it, so a plumbing/electrical/property tenant's own synonym
+      // map (e.g. "water heater"/"tankless") is what terms are canonicalized
+      // and expanded against, not only HVAC's.
+      data = await withTenant(ctxArg, async (db) => {
+        const pack = await packForTenant(db);
+        const terms = [...new Set(rawTerms.map((tm) => canonicalizeTerm(tm, pack)).filter(Boolean))].slice(0, 10);
+        return runContentCount(db, { terms, scope, groupBy }, pack);
+      });
     } catch (err) {
       return fail(String(err?.message ?? err).slice(0, 300), "count_mentions");
     }

@@ -13,7 +13,7 @@ let warned = false;
 
 // "count-with-unknown" (TEAM F, 2026-09-24): a status-derived count (invoices unpaid/paid/overdue/partial)
 // where most rows print no status at all - see compare.js's compareCountWithUnknown.
-const VALID_CMP = new Set(["number", "set", "value", "yesno", "honest-zero", "rubric", "count-with-unknown"]);
+export const VALID_CMP = new Set(["number", "set", "value", "yesno", "honest-zero", "rubric", "count-with-unknown"]);
 
 /** Pure: keep only well-formed questions. */
 export function validQuestions(list) {

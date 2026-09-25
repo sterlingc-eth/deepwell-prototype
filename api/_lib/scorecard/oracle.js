@@ -12,6 +12,7 @@
  * run's date.
  */
 import { expectedFromRows } from "./compare.js";
+import { resolveOracle } from "../industry/index.js";
 
 export const ORACLE_TIMEOUT_MS = 5000;
 const SINGLE_SELECT_RE = /^\s*(?:with|select)\b/i;
@@ -38,8 +39,36 @@ const MISSING_TABLE_RE = /42P01|relation "?[\w.]+"? does not exist/i;
  * @returns {Promise<{ok: true, expected: any, alts?: object[], skip?: boolean, why?: string, rows: object[]} | {ok: false, error: string}>}
  */
 export async function runOracle(withTenant, ctxArg, question, { today }) {
-  const o = question?.oracle;
-  if (!o || !oracleSqlOk(o.sql)) return { ok: false, error: "oracle-invalid" };
+  const raw = question?.oracle;
+  if (!raw) return { ok: false, error: "oracle-invalid" };
+
+  // Team H (2026-09-24): an industry-pack exam template (api/_lib/industry/index.js) carries its
+  // oracle as the compact "templateId:param" STRING form, not the founder exam.json's {sql,params}
+  // object — resolved here, once the tenant id is known, via Team G's own resolveOracle. Kept as a
+  // separate branch so the founder exam's object-oracle path below is untouched.
+  if (typeof raw === "string") {
+    try {
+      const { rows } = await withTenant(ctxArg, async (db) => {
+        const resolved = resolveOracle(raw, db.tenantId);
+        if (!resolved || !oracleSqlOk(resolved.sql)) throw new Error("oracle-invalid");
+        await db.raw("SET LOCAL transaction_read_only = on", []);
+        await db.raw(`SET LOCAL statement_timeout = ${ORACLE_TIMEOUT_MS}`, []);
+        const res = (await db.raw(resolved.sql, resolved.values)).rows ?? [];
+        return { rows: res };
+      });
+      const e = expectedFromRows(question.cmp, rows);
+      if (question.cmp === "honest-zero" && e.dataExists) return { ok: true, skip: true, why: "data now exists", expected: null, rows };
+      return { ok: true, expected: e.expected, rows };
+    } catch (err) {
+      const msg = String(err?.message ?? err);
+      if (msg === "oracle-invalid") return { ok: false, error: "oracle-invalid" };
+      if (MISSING_TABLE_RE.test(msg + String(err?.code ?? ""))) return { ok: true, skip: true, why: "table not present yet (migration not applied)", expected: null, rows: [] };
+      return { ok: false, error: `oracle-failed: ${msg.slice(0, 120)}` };
+    }
+  }
+
+  const o = raw;
+  if (!oracleSqlOk(o.sql)) return { ok: false, error: "oracle-invalid" };
   const bind = (list) => (list ?? []).map((p) => (p === "@today" ? today : p));
   try {
     const res = await withTenant(ctxArg, async (db) => {

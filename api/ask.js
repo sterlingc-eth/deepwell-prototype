@@ -40,6 +40,7 @@ import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHo
 // a coil issue on file") — a deterministic scan of document_pages.text (all of it, not a top-K search), never the
 // agent's own search_documents fallback which was silently undercounting. See contentCount.js's own doc comment.
 import { parseContentCountQuestion, runContentCount } from "./_lib/contentCount.js";
+import { packForTenant } from "./_lib/industry/index.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -59,7 +60,7 @@ import { normalizeQuestion as normalizeQuestionForAnalytics } from "./_lib/nlNor
 // typo/synonym/few-shot example — cached 10 minutes, {} on any error (e.g.
 // migration 26 not applied yet). Threaded explicitly into every overlay-aware
 // call below rather than read again by each one.
-import { getActiveOverlay } from "./_lib/learning/overlay.js";
+import { getActiveOverlayForTenant } from "./_lib/learning/overlay.js";
 // Donovan agent fallback (api/_lib/agent/): a bounded read-only tool-use loop tried when every
 // pre-router / the analytics planner / retrieval+model could not answer. DONOVAN_AGENT=0 disables it.
 import { runDonovanAgent, isAgentEnabled, agentQuestionHash, AGENT_PROMPT_VERSION, agentDebugTrace } from "./_lib/agent/loop.js";
@@ -595,7 +596,21 @@ export default async function handler(req, res) {
     const meta = classifyMetaQuestion(question);
     // Never throws (see getActiveOverlay's own doc comment) — safe to await
     // directly with no try/catch here.
-    const overlay = await timer.time("overlay", () => getActiveOverlay());
+    // TEAM H (2026-09-24): the tenant's OWN learned vocabulary (per-tenant
+    // autopilot's vocab mining, donovan_learned_tenant) merged in on top of
+    // the global overlay — falls back to exactly getActiveOverlay()'s result
+    // when this tenant has nothing learned yet (see that function's own doc
+    // comment), so this is a no-op for every tenant until autopilot has
+    // actually promoted something for it.
+    const overlay = await timer.time("overlay", () => getActiveOverlayForTenant(ctxArg));
+    // Team G (industry packs): resolved once per request, cached ~10min per
+    // tenant inside packForTenant itself (a cache hit is a Map lookup, not a
+    // query) — needed here, before the content-count pre-router below, so a
+    // plumbing/electrical/property tenant's own vocabulary ("water heater",
+    // "tankless", "panel", "unit turn", ...) is recognized instead of only
+    // HVAC's. Never throws (packForTenant degrades to the hvac pack on any
+    // failure) — safe to await directly with no try/catch here.
+    const pack = await timer.time("pack", () => packForTenant({ withTenant, ctxArg }));
 
     // ---- street-name typo correction (live miss cluster 4, 2026-09-21) ----
     // "when was the unit at 766 n val ivsta dr, tucson installed" — the
@@ -657,7 +672,7 @@ export default async function handler(req, res) {
     // Content-count pre-router (Team E, 2026-09-24): "how many jobs mention a capacitor" / "which customers had a
     // coil issue on file" — pure shape detection only here (no DB); see contentCount.js. Tried after contact/doc
     // lookup (their own shapes take priority on any overlap) and, like them, never for a meta question.
-    const contentCountIntent = !meta && !contactLookupIntent && !docLookupIntent ? parseContentCountQuestion(question) : null;
+    const contentCountIntent = !meta && !contactLookupIntent && !docLookupIntent ? parseContentCountQuestion(question, pack) : null;
     const normalizedForAnalytics = normalizeQuestionForAnalytics(question, { overlay }).normalized;
     // Money gate (live miss cluster 2, 2026-09-21): "what's the total dollar
     // amount of our open invoices" style questions have no honest answer yet
@@ -1099,7 +1114,7 @@ export default async function handler(req, res) {
     if (contentCountIntent) {
       let contentData = null;
       try {
-        contentData = await timer.time("contentcount", () => withTenant(ctxArg, (db) => runContentCount(db, contentCountIntent)));
+        contentData = await timer.time("contentcount", () => withTenant(ctxArg, (db) => runContentCount(db, contentCountIntent, pack)));
       } catch (err) {
         console.error("Content-count router failed, falling through to retrieval+model:", err?.message);
       }

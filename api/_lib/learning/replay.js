@@ -21,7 +21,7 @@ import { withTenant } from "../recordsStore.js";
 import { runDonovanAgent, isAgentEnabled } from "../agent/loop.js";
 import { normalizeQuestion } from "../nlNormalize.js";
 import { recordAskMiss, MISS_OUTCOMES } from "../missStore.js";
-import { getActiveOverlay, invalidateActiveOverlayCache } from "./overlay.js";
+import { getActiveOverlayForTenant, invalidateActiveOverlayCache } from "./overlay.js";
 import { listOpenMisses, upsertReplay } from "./replayStore.js";
 import { buildRecipeCandidate, verifyRecipe, normalizeRecipeQuestion, RECIPE_KIND } from "./recipes.js";
 import { decideRecipeStatus } from "./policy.js";
@@ -205,7 +205,9 @@ export async function replayMisses({ ctxArg, questions, force = false, limit = R
   const summary = { attempted: 0, answeredNow: 0, stillFailing: 0, remaining: 0, costUsd: 0, stopped: null, recipes: { pending: 0, live: 0, notEligible: 0 }, items: [] };
   if (!isAgentEnabled()) return { ...summary, stopped: "agent-disabled" };
   const ceiling = Number.isFinite(maxCostUsd) ? maxCostUsd : Number(process.env.DONOVAN_REPLAY_MAX_USD) || DEFAULT_MAX_COST_USD;
-  const overlay = await getActiveOverlay();
+  // TEAM H (2026-09-24): this tenant's own learned vocabulary merged on top of the global overlay —
+  // a no-op fallback to getActiveOverlay()'s own result until autopilot has promoted something for it.
+  const overlay = await getActiveOverlayForTenant(ctxArg);
   const day = today ?? todayUtc();
 
   let queue;
@@ -302,7 +304,7 @@ export async function applyThumbsUp({ ctxArg, question, isOperator, decidedBy })
  */
 export async function applyThumbsDown({ ctxArg, question, note, callModel, today }) {
   const q = String(question ?? "").trim().slice(0, 300);
-  const overlay = await getActiveOverlay();
+  const overlay = await getActiveOverlayForTenant(ctxArg);
   const key = missKey(q, overlay);
   await recordAskMiss(ctxArg, { question: q, questionNormalized: key, outcome: MISS_OUTCOMES.USER_MARKED_WRONG });
   const retired = await retireRecipeForQuestion(q);

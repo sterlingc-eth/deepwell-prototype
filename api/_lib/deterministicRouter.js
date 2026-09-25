@@ -19,6 +19,7 @@
 import { classifyFastPath } from './fastPath.js';
 import { parseComparison, runComparison } from './comparison.js';
 import { parseMaintenanceDue, runMaintenanceDue } from './maintenanceDue.js';
+import { packForTenant } from './industry/index.js';
 import { resolveContactCandidates } from './contactLookup.js';
 import { brandMatches } from './analytics.js';
 import { fetchNotes, buildNotesAnswer } from './customerFile.js';
@@ -280,7 +281,9 @@ async function installer(db, intent, ctx) {
 export async function runDeterministic(db, intent, { today } = {}) {
   const t = todayIso(today);
   if (intent.route === 'comparison') return runComparison(db, intent.intent);
-  if (intent.route === 'maintenance') return runMaintenanceDue(db, intent.intent, { today: t });
+  // Team G (industry packs): db is already inside this tenant's transaction, so packForTenant is a plain read
+  // against it — no second transaction — and its own 10-minute cache makes repeat calls free.
+  if (intent.route === 'maintenance') return runMaintenanceDue(db, intent.intent, { today: t, pack: await packForTenant(db) });
   if (intent.route !== 'history') return null;
 
   const ctx = await resolveScope(db, intent);

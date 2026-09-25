@@ -15,6 +15,10 @@
  */
 import { createHash } from 'node:crypto';
 import { getPool } from '../recordsStore.js';
+// TEAM H (2026-09-24): the tenant-scoped overlay addition (donovan_learned_tenant, optional
+// M3-config/32-donovan-autopilot.sql) — see getActiveOverlayForTenant below. No cycle: tenantOverlay.js
+// only imports recordsStore.js.
+import { listActiveTenantLearned } from './tenantOverlay.js';
 
 const CACHE_MS = 10 * 60 * 1000;
 const EMPTY_OVERLAY = Object.freeze({ abbreviations: {}, typos: {}, vocab: [], synonyms: {}, fewShot: [], recipes: [] });
@@ -109,6 +113,63 @@ export function invalidateActiveOverlayCache() {
  *  re-reads the DB. Never called by production code. */
 export function resetActiveOverlayCacheForTests() {
   cached = null;
+}
+
+/* ------------------------------------------------------------ per-tenant overlay (TEAM H, 2026-09-24) */
+
+// Separate from the GLOBAL cache above on purpose: invalidating one tenant's
+// entry (a vocab-mining promotion/demotion for that tenant) must never touch
+// the global cache or any other tenant's own entry.
+const tenantCache = new Map(); // tenantKey -> { extra: object|null, expiresAt: number }
+
+/** Merge the global overlay with one tenant's OWN additions. Pure. */
+function mergeOverlays(base, extra) {
+  if (!extra) return base;
+  const entities = new Set([...Object.keys(base.synonyms), ...Object.keys(extra.synonyms)]);
+  const synonyms = {};
+  for (const e of entities) synonyms[e] = [...new Set([...(base.synonyms[e] ?? []), ...(extra.synonyms[e] ?? [])])];
+  return {
+    abbreviations: { ...base.abbreviations, ...extra.abbreviations },
+    typos: { ...base.typos, ...extra.typos },
+    vocab: [...new Set([...base.vocab, ...extra.vocab])],
+    synonyms,
+    fewShot: [...base.fewShot, ...extra.fewShot],
+    recipes: [...base.recipes, ...extra.recipes],
+  };
+}
+
+/**
+ * getActiveOverlay() merged with one tenant's OWN learned vocabulary
+ * (donovan_learned_tenant — learning/tenantOverlay.js, optional migration
+ * 32). Falls back to EXACTLY getActiveOverlay()'s own result when that table
+ * is missing or this tenant has nothing learned yet — a tenant with no
+ * tenant-scoped rows behaves IDENTICALLY to before this function existed, so
+ * every existing global-only caller (and every existing test) is unaffected.
+ * Cached 10 minutes per tenant, same idiom as the global cache.
+ * @param {{tenantKey?: string}} ctxArg
+ */
+export async function getActiveOverlayForTenant(ctxArg) {
+  const base = await getActiveOverlay();
+  const tenantKey = ctxArg?.tenantKey;
+  if (!tenantKey) return base;
+  const now = Date.now();
+  const hit = tenantCache.get(tenantKey);
+  if (hit && hit.expiresAt > now) return mergeOverlays(base, hit.extra);
+
+  let extra = null;
+  try {
+    const rows = await listActiveTenantLearned(ctxArg);
+    if (rows.length) extra = rowsToOverlay(rows);
+  } catch { /* listActiveTenantLearned itself never throws; belt-and-braces */ }
+  tenantCache.set(tenantKey, { extra, expiresAt: now + CACHE_MS });
+  return mergeOverlays(base, extra);
+}
+
+/** Drops one tenant's cached overlay addition (or every tenant's, with no argument) — called after a
+ *  tenant vocab item is promoted/demoted so the very next replay/ask for that tenant sees it. */
+export function invalidateTenantOverlayCache(tenantKey) {
+  if (tenantKey) tenantCache.delete(tenantKey);
+  else tenantCache.clear();
 }
 
 /**

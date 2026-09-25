@@ -47,6 +47,12 @@ import { verifyRecipe, RECIPE_KIND } from './_lib/learning/recipes.js';
 import { invalidateActiveOverlayCache } from './_lib/learning/overlay.js';
 // Donovan Scorecard (api/_lib/scorecard, routes/scorecard.js): the golden-exam runner + status, operator-only.
 import { scorecardRunAction, scorecardStatusAction } from './_lib/routes/scorecard.js';
+// TEAM H (2026-09-24): the autonomous PER-TENANT learning loop's operator-only status + weekly gap
+// report reads. The loop itself only ever runs from cron-sweep.js's nightly step; these two actions
+// are read-only (learningAutopilotStatus also computes "who runs next" from the rotation, no DB write).
+import { listEligibleTenants, isoWeekStart, listRecentAutopilotSummaries } from './_lib/learning/autopilot.js';
+import { rotationForDate } from './_lib/learning/rotation.js';
+import { buildGapReport, latestGapReport } from './_lib/learning/gapReport.js';
 // Search by meaning: status + resumable backfill of embeddings for existing pages (api/_lib/search/store.js).
 import { semanticStatus, runBackfill } from './_lib/search/store.js';
 
@@ -65,8 +71,12 @@ import { semanticStatus, runBackfill } from './_lib/search/store.js';
 // api/_lib/learning/proposer.js) — all the more reason a runaway client tab
 // must not be able to poll it without limit.
 // learningReplay / askFeedback are billed model calls too (the Donovan agent re-runs a question), so they share it.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback', 'scorecardRun', 'semanticBackfill']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'scorecardRun', 'scorecardStatus']);
+// learningAutopilotStatus/learningGapReport join this bucket too: both are cross-tenant reads
+// (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
+// list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
+// reasoning as missDigest above, even though neither makes a billed model call.
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback', 'scorecardRun', 'semanticBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'scorecardRun', 'scorecardStatus', 'learningAutopilotStatus', 'learningGapReport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -152,6 +162,8 @@ const ACTIONS = new Set([
   'scorecardStatus',
   'semanticStatus',
   'semanticBackfill',
+  'learningAutopilotStatus',
+  'learningGapReport',
 ]);
 
 export default async (req, res) => {
@@ -426,6 +438,37 @@ export default async (req, res) => {
         requireOperator(auth);
         result = await scorecardStatusAction(ctx, payload);
         break;
+      // TEAM H (2026-09-24): the autonomous per-tenant learning loop's own operator summary — last
+      // night's per-tenant counts (audit_log, no question text), spend vs. the daily caps, and which
+      // tenant runs next in tonight's fair rotation. Read-only; the loop itself only ever runs from
+      // cron-sweep.js's nightly step.
+      case 'learningAutopilotStatus': {
+        requireOperator(auth);
+        const [summaries, eligible, gapReport] = await Promise.all([
+          listRecentAutopilotSummaries(24),
+          listEligibleTenants(),
+          latestGapReport(),
+        ]);
+        const today = new Date().toISOString().slice(0, 10);
+        const order = rotationForDate(eligible, today);
+        const alreadyRan = new Set(summaries.map((s) => s.tenantKey));
+        const nextUp = order.find((t) => !alreadyRan.has(t.tenantKey)) ?? order[0] ?? null;
+        result = {
+          tenantsEligible: eligible.length,
+          perTenant: summaries,
+          platformSpentUsd: Math.round(summaries.reduce((n, s) => n + (Number(s.costUsd) || 0), 0) * 10000) / 10000,
+          nextTenant: nextUp ? { tenantKey: nextUp.tenantKey, tenantName: nextUp.tenantName } : null,
+          gapReportWeekStart: gapReport?.weekStart ?? null,
+        };
+        break;
+      }
+      case 'learningGapReport': {
+        requireOperator(auth);
+        // A live rebuild (cross-tenant scan) on demand, or the last one the nightly step stored —
+        // an operator can always see a report without waiting for the weekly cron claim to fire.
+        result = payload.rebuild === true ? await buildGapReport({}) : (await latestGapReport()) ?? { weekStart: isoWeekStart(new Date().toISOString().slice(0, 10)), clusters: [], totalFailures: 0 };
+        break;
+      }
       // Search by meaning. Owner/admin only; backfill is billing-gated + rate-limited above and capped by
       // the tenant's daily embedding budget. Each call embeds what it can in ~30 s and reports progress; the
       // Team-screen card calls it again until stoppedBy is 'done' (idempotent + resumable).

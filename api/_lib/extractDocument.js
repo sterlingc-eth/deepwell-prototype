@@ -5,9 +5,10 @@ import {
 import { REMINDER_ELIGIBLE_DOCUMENT_TYPES } from "./reminders.js";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./claude.js";
 import {
-  EXTRACT_TOOL, buildExtractPrompt, normalizeFields, selectPages,
+  buildExtractPrompt, buildExtractToolForPack, normalizeFields, selectPages,
   groupFieldsByUnit, collapseDuplicateValues,
 } from "./extractFields.js";
+import { packForTenant } from "./industry/index.js";
 import { IngestError, isValidDocumentId } from "./readDocument.js";
 import { assertModelBudget } from "./rateLimit.js";
 import { deriveWarranty } from "./warrantyRules.js";
@@ -102,12 +103,19 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const loaded = await withTenant(ctx, async (db) => {
     const doc = await db.getDocument(documentId);
     if (!doc) return null;
-    return { doc, pages: await db.listPages(documentId) };
+    // Team G (industry packs): the same read that already opens this
+    // transaction resolves the tenant's pack too, so a plumbing/electrical/
+    // property tenant's own document types and field vocabulary drive
+    // classification and extraction below instead of the hard-coded HVAC
+    // ones. packForTenant is itself cached per tenant, so this is not a
+    // second query on the hot path for a tenant it has already resolved.
+    const pack = await packForTenant(db);
+    return { doc, pages: await db.listPages(documentId), pack };
   });
 
   if (!loaded) throw new IngestError("Document not found", 404);
 
-  const { doc, pages } = loaded;
+  const { doc, pages, pack } = loaded;
   if (!pages.length || !pages.some((p) => (p.text ?? "").trim())) {
     // Two different situations, not one: a document read carries its own
     // extract_error (see readDocument.js's hasReadableText/NO_READABLE_TEXT_MESSAGE)
@@ -131,7 +139,11 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // for the measured before/after). 1h TTL: a bulk import runs this same
   // stable prefix across hundreds of documents over hours, well past the
   // default 5-minute cache window.
-  const fullPrompt = buildExtractPrompt(selected, documentType || doc.document_type);
+  // Team G (industry packs): a hvac tenant's `pack` is the hvac pack itself,
+  // so buildExtractPrompt/buildExtractToolForPack return exactly EXTRACT_TOOL
+  // and today's prompt text, unchanged — see extractFields.js's packFieldMeta.
+  const extractTool = buildExtractToolForPack(pack);
+  const fullPrompt = buildExtractPrompt(selected, documentType || doc.document_type, pack);
   const { dynamic: dynamicPrompt, stable: stablePrompt } = splitExtractPrompt(fullPrompt);
 
   const startedAt = Date.now();
@@ -140,8 +152,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     model: EXTRACT_MODEL,
     max_tokens: 4000,
     ...(stablePrompt ? { system: [withCache({ type: "text", text: stablePrompt }, EXTRACT_MODEL, { ttl: "1h" })] } : {}),
-    tools: [withCache(EXTRACT_TOOL, EXTRACT_MODEL)],
-    tool_choice: { type: "tool", name: EXTRACT_TOOL.name },
+    tools: [withCache(extractTool, EXTRACT_MODEL)],
+    tool_choice: { type: "tool", name: extractTool.name },
     messages: [{ role: "user", content: dynamicPrompt }],
   }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt, attempts: modelAttempts });
   const latencyMs = Date.now() - startedAt;
@@ -179,7 +191,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
-  let { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage });
+  let { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage, pack });
 
   // A document that states nothing extractable is a real answer, not a failure.
   // The write still happens, so an empty result replaces stale rows from an
@@ -205,10 +217,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // or a prior AI pass that already decided this document's type still wins,
   // via `existingIsDecided` below.
   const classification = documentType
-    ? { documentType: normalizeDocumentType(documentType, facts), confidence: 1, source: 'explicit' }
+    ? { documentType: normalizeDocumentType(documentType, facts, pack), confidence: 1, source: 'explicit' }
     : isShopInternalDocument(fields)
       ? { documentType: 'internal', confidence: 1, source: 'shop-internal' }
-      : resolveDocumentType(toolUse?.input, facts, doc.original_filename);
+      : resolveDocumentType(toolUse?.input, facts, doc.original_filename, pack);
 
   // A human (via review.classifyDocument) or an earlier pass already decided
   // this document's type; a routine re-extraction must not quietly relabel
@@ -250,7 +262,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // a second, serial-less equipment entity findOrCreateEquipment would
   // immediately reject anyway (it returns null with no serial) — this check
   // just skips the pointless extra work and log noise for that case.
-  const { units } = groupFieldsByUnit(fields);
+  const { units } = groupFieldsByUnit(fields, pack);
   const distinctSerials = new Set(
     fields
       .filter((f) => f.field_key === 'serial_number' && f.value)
@@ -277,7 +289,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         // Same fill-only-merge-then-derive as the single-unit path below,
         // just scoped to this unit's own facts + its own entity row.
         const unitKnown = { ...unit.facts, ...(unitEntity?.data ?? {}) };
-        const unitWarranty = deriveWarranty(unitKnown);
+        const unitWarranty = deriveWarranty(unitKnown, null, pack);
         if (unitEntity?.id) await db.setEquipmentWarranty(unitEntity.id, unitWarranty);
         unitResults.push({ index: unit.index, entity: unitEntity, warranty: unitWarranty });
       }
@@ -307,7 +319,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       // deadline, the term, the expiry, and whether that expiry was printed or
       // calculated — get stored. Day counts are computed when the list is read,
       // because "19 days left" is true for exactly one day.
-      warranty = deriveWarranty(known);
+      warranty = deriveWarranty(known, null, pack);
       if (entity?.id) await db.setEquipmentWarranty(entity.id, warranty);
     }
 
@@ -426,7 +438,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // AI_VERIFY_MIN_CONFIDENCE or better, and the document is actually linked
     // to a record. verifyByAi (recordsStore.js) re-checks the link itself in
     // SQL, forward-only — this is a cheap pre-check, not the source of truth.
-    const completeness = completenessFor(resolvedType, fields);
+    const completeness = completenessFor(resolvedType, fields, pack);
     let aiVerified = false;
     if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
       aiVerified = (await db.verifyByAi(documentId)) > 0;

@@ -32,7 +32,22 @@ export const DOCUMENT_TYPES = [
 export const DOCUMENT_TYPE_IDS = new Set(DOCUMENT_TYPES.map((t) => t.id));
 const TYPE_LABEL = new Map(DOCUMENT_TYPES.map((t) => [t.id, t.label]));
 
-export function documentTypeLabel(typeId) {
+/**
+ * `pack` (optional, Team G industry packs): the tenant's resolved pack
+ * (api/_lib/industry/index.js's packForTenant). Every function below that
+ * takes one defaults to null, meaning "today's hard-coded HVAC document
+ * types" — every existing 1-arg caller is byte-for-byte unchanged. A
+ * plumbing/electrical/property tenant's own document-type ids/labels/
+ * required-fields (including the pack's own new types — panel-schedule,
+ * lease-agreement, backflow-test-certificate, ...) only ever come from a
+ * caller that resolved and passed that tenant's pack.
+ */
+function packTypeLabel(pack, typeId) {
+  return pack?.documentTypes?.find((t) => t.id === typeId)?.label;
+}
+
+export function documentTypeLabel(typeId, pack = null) {
+  if (pack && pack.id !== 'hvac') return packTypeLabel(pack, typeId) ?? packTypeLabel(pack, 'other') ?? typeId;
   return TYPE_LABEL.get(typeId) ?? TYPE_LABEL.get('other');
 }
 
@@ -176,7 +191,10 @@ export const FIELD_LABELS = {
   reminder_trigger: 'Reminder trigger',
 };
 
-export function fieldLabel(fieldKey) {
+export function fieldLabel(fieldKey, pack = null) {
+  if (pack && pack.id !== 'hvac') {
+    return pack.fields?.find((f) => f.key === fieldKey)?.label ?? FIELD_LABELS[fieldKey] ?? fieldKey;
+  }
   return FIELD_LABELS[fieldKey] ?? fieldKey;
 }
 
@@ -283,10 +301,15 @@ export function isReclassifiable(raw) {
  * `facts` is optional and only consulted for the one legacy id
  * (`install_record`) whose correct mapping depends on what was extracted.
  */
-export function normalizeDocumentType(raw, facts = {}) {
+export function normalizeDocumentType(raw, facts = {}, pack = null) {
   const s = String(raw ?? '').trim().toLowerCase().replace(/[\s_]+/g, '-');
   if (!s) return 'other';
   if (DOCUMENT_TYPE_IDS.has(s)) return s;
+  // A pack's own additional type ids (panel-schedule, lease-agreement, ...)
+  // are canonical for that tenant even though they're not in the base
+  // DOCUMENT_TYPE_IDS set above. Checked only for a non-hvac pack — the hvac
+  // pack's own type set is exactly DOCUMENT_TYPE_IDS, already handled.
+  if (pack && pack.id !== 'hvac' && pack.documentTypes?.some((t) => t.id === s)) return s;
   if (s === 'install-record') {
     return (facts?.cost || facts?.invoice_number) ? 'invoice' : 'startup-sheet';
   }
@@ -371,14 +394,15 @@ export function inferDocumentType(facts = {}, filename = '') {
  * trustworthy classification. Never returns an invalid or missing type — an
  * unusable model answer falls back to the deterministic heuristic above.
  */
-export function resolveDocumentType(toolInput, facts, filename) {
+export function resolveDocumentType(toolInput, facts, filename, pack = null) {
   const raw = toolInput?.document_type;
   const rawConf = Number(toolInput?.document_type_confidence);
   const confidence = Number.isFinite(rawConf) ? Math.min(1, Math.max(0, rawConf)) : 0.6;
+  const validIds = pack && pack.id !== 'hvac' ? new Set(pack.documentTypes.map((t) => t.id)) : DOCUMENT_TYPE_IDS;
 
   if (typeof raw === 'string' && raw.trim()) {
-    const normalized = normalizeDocumentType(raw, facts);
-    if (DOCUMENT_TYPE_IDS.has(normalized) && normalized !== 'other') {
+    const normalized = normalizeDocumentType(raw, facts, pack);
+    if (validIds.has(normalized) && normalized !== 'other') {
       return { documentType: normalized, confidence, source: 'model' };
     }
   }
@@ -417,9 +441,11 @@ export function toCompletenessFields(rows) {
  * @returns {{type: string, required: string[], present: string[],
  *            missing: string[], minConfidence: number, complete: boolean}}
  */
-export function completenessFor(typeId, fields) {
-  const type = normalizeDocumentType(typeId);
-  const required = REQUIRED_FIELDS[type] ?? [];
+export function completenessFor(typeId, fields, pack = null) {
+  const type = normalizeDocumentType(typeId, {}, pack);
+  const required = pack && pack.id !== 'hvac'
+    ? (pack.documentTypes.find((t) => t.id === type)?.requires ?? [])
+    : (REQUIRED_FIELDS[type] ?? []);
 
   const byKey = new Map();
   for (const f of Array.isArray(fields) ? fields : []) {

@@ -1,0 +1,216 @@
+/**
+ * Plumbing pack (Team G, 2026-09-24). See handoffs/INDUSTRY_EXPANSION_2026-09-21.md
+ * ("2. Plumbing") for the ICP/document-set/warranty research this is built
+ * from. Same generic entity/table shape as hvac (no DDL): `equipment` rows
+ * carry plumbing fixtures/appliances instead of HVAC units, `customer` is
+ * unchanged, `technician` is the plumber who did the work.
+ */
+
+const documentTypes = [
+  { id: 'work-order', label: 'Work order', definition: 'A dispatched job: address, date, plumber, and what to do — not yet completed.', requires: ['service_address', 'service_date', 'technician'], visitType: true, financial: false },
+  { id: 'invoice', label: 'Invoice', definition: 'A bill for work or equipment: a customer, a charge, a total cost.', requires: ['service_address', 'cost'], visitType: true, financial: true },
+  { id: 'warranty-registration', label: 'Warranty registration', definition: 'Registers a water heater or fixture with the manufacturer for warranty coverage.', requires: ['serial_number', 'model', 'warranty_expires|warranty_term'], visitType: false, financial: false },
+  { id: 'startup-sheet', label: 'Startup sheet', definition: 'Records commissioning readings for a newly installed water heater or appliance.', requires: ['serial_number', 'service_date'], visitType: true, financial: false },
+  { id: 'permit', label: 'Permit', definition: 'A government or utility permit for plumbing or gas line work, carrying a permit number.', requires: ['service_address', 'permit_number'], visitType: false, financial: false },
+  { id: 'nameplate-photo', label: 'Nameplate photo', definition: 'A photo of a water heater or fixture data plate: just serial and model, no service context.', requires: ['serial_number', 'model'], visitType: false, financial: false },
+  { id: 'maintenance-agreement', label: 'Maintenance agreement', definition: 'A recurring service contract with a customer and a coverage term.', requires: ['service_address', 'customer_name', 'warranty_term|agreement_term'], visitType: false, financial: true },
+  { id: 'service-ticket', label: 'Service ticket', definition: 'A completed service visit: what was found and what was done.', requires: ['service_address', 'service_date', 'work_performed'], visitType: true, financial: false },
+  { id: 'dispatch-note', label: 'Dispatch note', definition: 'A short note dispatching a plumber, with little other detail.', requires: ['customer_name|service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'proposal-quote', label: 'Proposal / quote', definition: 'A proposed price for work not yet performed.', requires: ['customer_name|service_address', 'cost'], visitType: false, financial: true },
+  { id: 'inspection-report', label: 'Inspection report', definition: 'Findings from inspecting plumbing, a gas line, or a site — rough-in, final, or a gas pressure test.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or equipment.', requires: ['vendor|customer_name', 'cost'], visitType: false, financial: true },
+  { id: 'equipment-record', label: 'Equipment record', definition: 'Identifies a fixture or appliance with no service or billing context.', requires: ['serial_number|model'], visitType: false, financial: false },
+  { id: 'correspondence', label: 'Correspondence', definition: 'A letter or email about a customer or job, not a paperwork form.', requires: ['customer_name'], visitType: false, financial: false },
+  { id: 'internal', label: 'Shop record', definition: 'Shop-only record with no customer on it at all.', requires: [], visitType: false, financial: false },
+  { id: 'other', label: 'Other', definition: 'Does not clearly fit any type above.', requires: [], visitType: true, financial: false },
+  // Plumbing-specific, per the expansion brief's "▲" additions:
+  { id: 'backflow-test-certificate', label: 'Backflow test certificate', definition: 'A certified annual/biennial backflow-preventer test result, filed with the water utility.', requires: ['service_address', 'service_date', 'backflow_test_result'], visitType: true, financial: false },
+  { id: 'sewer-camera-report', label: 'Sewer/drain camera report', definition: 'A video-inspection deliverable diagnosing a sewer or drain line, with notes and often a video reference.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+];
+
+const fields = [
+  { key: 'equipment_id', label: 'Equipment ID', perUnit: true, description: 'Internal fixture/appliance ID the company uses (e.g. "WH-2"). NOT the serial number.' },
+  { key: 'serial_number', label: 'Serial number', perUnit: true, description: 'Manufacturer serial number, exactly as printed.' },
+  { key: 'model', label: 'Model', perUnit: true, description: 'Model name or number, exactly as printed.' },
+  { key: 'manufacturer', label: 'Manufacturer', perUnit: true, description: 'Manufacturer (Rheem, A.O. Smith, Bradford White, Navien, Rinnai, Kohler, Moen, ...).' },
+  { key: 'equipment_type', label: 'Equipment type', perUnit: true, description: 'What the unit is: water heater (tank), water heater (tankless), sump pump, backflow preventer / RPZ device, garbage disposal, sewer line, gas line, fixture.' },
+  { key: 'fixture_type', label: 'Fixture type', perUnit: true, description: 'Which fixture, when equipment_type is "fixture": toilet, faucet, shower valve, water softener, garbage disposal.' },
+  { key: 'gallons', label: 'Tank size (gallons)', perUnit: true, description: 'Water heater tank capacity in gallons, as printed, e.g. "50 gallon".' },
+  { key: 'pipe_material', label: 'Pipe material', perUnit: false, description: 'PEX, copper, galvanized, CPVC, cast iron — as printed for a repipe or repair job.' },
+  { key: 'service_address', label: 'Service address', perUnit: false, description: 'Street address where the work was performed — not the contractor\'s own letterhead address.' },
+  { key: 'shop_address', label: 'Shop address', perUnit: false, description: 'The plumbing company\'s own business/letterhead address.' },
+  { key: 'shop_phone', label: 'Shop phone', perUnit: false, description: 'The plumbing company\'s own business/letterhead phone number.' },
+  { key: 'shop_email', label: 'Shop email', perUnit: false, description: 'The plumbing company\'s own business/letterhead email address.' },
+  { key: 'customer_name', label: 'Customer', perUnit: false, description: 'Customer or account name.' },
+  { key: 'customer_phone', label: 'Customer phone', perUnit: false, description: 'Customer phone number, exactly as printed.' },
+  { key: 'customer_email', label: 'Customer email', perUnit: false, description: 'Customer email address, exactly as printed.' },
+  { key: 'installation_date', label: 'Installation date', perUnit: true, description: 'Date the fixture/appliance was installed.' },
+  { key: 'warranty_expires', label: 'Warranty expires', perUnit: false, description: 'Date the warranty expires.' },
+  { key: 'warranty_term', label: 'Term', perUnit: false, description: 'The manufacturer warranty length for the equipment itself, e.g. tank "6 year" or tankless "10 year heat exchanger".' },
+  { key: 'agreement_term', label: 'Agreement term', perUnit: false, description: 'The service/maintenance agreement period between the customer and the plumbing company.' },
+  { key: 'warranty_registered_date', label: 'Warranty registered', perUnit: false, description: 'Date the warranty was registered with the manufacturer.' },
+  { key: 'service_date', label: 'Service date', perUnit: false, description: 'Date service was performed.' },
+  { key: 'service_type', label: 'Service type', perUnit: false, description: 'Preventive Maintenance, Repair, Emergency, Installation, Inspection, Startup, Backflow Test, Camera Inspection.' },
+  { key: 'technician', label: 'Technician', perUnit: false, description: 'Name of the plumber who performed the work.' },
+  { key: 'work_performed', label: 'Work performed', perUnit: false, description: 'One work item performed. Return one field per item, not a joined list.' },
+  { key: 'part_number', label: 'Part number', perUnit: false, description: 'A part number referenced on the document.' },
+  { key: 'cost', label: 'Cost', perUnit: false, description: 'Total amount charged, in dollars.' },
+  { key: 'labor_hours', label: 'Labor hours', perUnit: false, description: 'Labor hours billed.' },
+  { key: 'invoice_number', label: 'Invoice number', perUnit: false, description: 'Invoice, ticket, or work-order number.' },
+  { key: 'status', label: 'Status', perUnit: false, description: 'Completed, Pending, In Progress.' },
+  { key: 'notes', label: 'Notes', perUnit: false, description: 'A short observation that does not fit another field.' },
+  { key: 'permit_number', label: 'Permit number', perUnit: false, description: 'A government or utility permit number referenced on the document.' },
+  { key: 'backflow_test_result', label: 'Backflow test result', perUnit: false, description: 'Pass or fail result of a backflow-preventer test.' },
+  { key: 'next_test_due', label: 'Next test due', perUnit: true, description: 'Next backflow test or recurring compliance due date — same shape as warranty_expires, pointed at a recurring compliance date instead of a one-time coverage date.' },
+];
+
+const brands = ['Rheem', 'A.O. Smith', 'Bradford White', 'Navien', 'Rinnai', 'Kohler', 'Moen', 'American Standard', 'Delta', 'InSinkErator', 'Watts', 'Zurn Wilkins'];
+
+const synonyms = {
+  'water heater': ['water heater', 'water heaters', 'wh', 'hot water heater', 'hot water tank'],
+  tankless: ['tankless', 'tankless water heater', 'on-demand water heater', 'on demand water heater'],
+  backflow: ['backflow', 'backflow preventer', 'backflow device', 'rpz', 'rpz device', 'backflow test', 'backflow assembly'],
+  'sewer camera': ['sewer camera', 'drain camera', 'camera inspection', 'video inspection', 'sewer scope'],
+  'sump pump': ['sump pump', 'sump pumps'],
+  disposal: ['disposal', 'garbage disposal', 'disposer'],
+  leak: ['leak', 'leaks', 'leaking', 'leaky'],
+  clog: ['clog', 'clogs', 'clogged', 'drain clog', 'blockage', 'blocked drain'],
+  'gas line': ['gas line', 'gas lines', 'gas pipe', 'gas leak'],
+  repipe: ['repipe', 'repiping', 're-pipe'],
+  fixture: ['fixture', 'fixtures', 'toilet', 'faucet', 'shower valve'],
+  softener: ['softener', 'water softener', 'water softeners'],
+};
+
+const abbreviations = { wh: 'water heater', bf: 'backflow', gpm: 'gallons per minute', tp: 'temperature pressure', po: 'purchase order' };
+const typos = { hetaer: 'heater', backfow: 'backflow', tnakless: 'tankless', drian: 'drain' };
+
+const personas = [
+  {
+    id: 'dispatcher',
+    label: 'Dispatcher',
+    sampleQuestions: [
+      'Which backflow devices are due for testing this month?',
+      'How many backflow tests did we complete last year?',
+      'Is the water heater at 412 Elm St still under warranty?',
+      'How many tankless water heaters have we installed?',
+      'List customers with a Rheem water heater.',
+      'How many gas line permits are still open?',
+      'Which customers had a sewer camera inspection in the last 12 months?',
+      'How many water heaters are older than 10 years?',
+      'How many customers in Gilbert have a sump pump installed?',
+      'What size water heater is installed at 88 Cactus Rd?',
+      'How many drain cleaning calls did we do this month?',
+      'Which customers are on a maintenance agreement for their water heater?',
+      'List all open plumbing permits by city.',
+      'How many repeat drain-clog calls did the Alvarez account have this year?',
+      'Which backflow devices failed their last test?',
+      'How many water heater replacements did we do in Tucson?',
+      'Who tested the backflow device at 200 Main St and when?',
+      'How many customers have a tank vs. tankless water heater?',
+      'Which technician installed the most water heaters this quarter?',
+      'How many gas leaks were reported and resolved this year?',
+      'How many jobs mention a clogged drain?',
+      'Which customers had a repipe done?',
+      'How many customers have a water softener installed?',
+      'How many jobs mention a leak?',
+      'Which customers had a disposal replaced?',
+      'How many startup sheets are on file for tankless water heaters?',
+      'What is the average invoice amount for a water heater replacement?',
+    ],
+  },
+  {
+    id: 'owner',
+    label: 'Shop owner',
+    sampleQuestions: [
+      'How much have we invoiced for water heater installs this year?',
+      'How many backflow test certificates are on file?',
+      'How many customers are overdue for their annual backflow test?',
+      'How many warranty registrations are missing a serial number?',
+      'How many permits are still open across all jobs?',
+      'How many maintenance agreements do we have?',
+    ],
+  },
+];
+
+// Category counts: financial (6), warranty (6), maintenance/compliance (10), entities (6), content (8), operations (6) = 42
+const examTemplates = [
+  { id: 'plumb-count-invoices', category: 'financial', question: 'How many invoices do we have on file?', oracle: 'count_documents_by_type:invoice', compare: 'number', citationRequired: false },
+  { id: 'plumb-sum-invoice-total', category: 'financial', question: 'What is the total of every invoice on file?', oracle: 'sum_financials_total:invoice', compare: 'number', citationRequired: true },
+  { id: 'plumb-unpaid-invoices', category: 'financial', question: 'How many invoices are unpaid?', oracle: 'count_financials_by_status:unpaid', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-customers-with-invoice', category: 'financial', question: 'How many customers have at least one invoice?', oracle: 'count_customers_with_doctype:invoice', compare: 'number', citationRequired: false },
+  { id: 'plumb-avg-cost', category: 'financial', question: 'What is the average cost across every invoice on file?', oracle: 'avg_numeric_field:cost', compare: 'number', citationRequired: false },
+  { id: 'plumb-sum-proposal-total', category: 'financial', question: 'What is the total of every open proposal/quote?', oracle: 'sum_financials_total:estimate', compare: 'number', citationRequired: true },
+  { id: 'plumb-count-warranty-regs', category: 'warranty', question: 'How many warranty registrations are on file?', oracle: 'count_documents_by_type:warranty-registration', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-warranty-expires', category: 'warranty', question: 'How many documents record a warranty expiration date?', oracle: 'count_documents_with_field:warranty_expires', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-warranty-term', category: 'warranty', question: 'How many documents record a warranty term?', oracle: 'count_documents_with_field:warranty_term', compare: 'number', citationRequired: false },
+  { id: 'plumb-missing-warranty-serial', category: 'warranty', question: 'How many warranty registrations are missing a serial number?', oracle: 'count_documents_missing_field:warranty-registration:serial_number', compare: 'honest-zero', citationRequired: false },
+  { id: 'plumb-warranty-expiring-90', category: 'warranty', question: 'How many warranties expire in the next 90 days?', oracle: 'count_field_date_within_days:warranty_expires:90', compare: 'number', citationRequired: true },
+  { id: 'plumb-warranty-expired', category: 'warranty', question: 'How many warranties have already expired?', oracle: 'count_field_date_before_today:warranty_expires', compare: 'number', citationRequired: true },
+  { id: 'plumb-backflow-due-30', category: 'maintenance', question: 'How many backflow devices are due for testing in the next 30 days?', oracle: 'count_field_date_within_days:next_test_due:30', compare: 'number', citationRequired: true },
+  { id: 'plumb-backflow-overdue', category: 'maintenance', question: 'How many backflow devices are overdue for testing?', oracle: 'count_field_date_before_today:next_test_due', compare: 'number', citationRequired: true },
+  { id: 'plumb-count-backflow-tests', category: 'maintenance', question: 'How many backflow test certificates are on file?', oracle: 'count_documents_by_type:backflow-test-certificate', compare: 'number', citationRequired: false },
+  { id: 'plumb-backflow-fail', category: 'maintenance', question: 'How many backflow tests recorded a failing result?', oracle: 'count_field_value_matches:backflow_test_result:fail', compare: 'number', citationRequired: true },
+  { id: 'plumb-backflow-pass', category: 'maintenance', question: 'How many backflow tests recorded a passing result?', oracle: 'count_field_value_matches:backflow_test_result:pass', compare: 'number', citationRequired: true },
+  { id: 'plumb-count-sewer-camera', category: 'maintenance', question: 'How many sewer/drain camera reports are on file?', oracle: 'count_documents_by_type:sewer-camera-report', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-maintenance-agreements', category: 'maintenance', question: 'How many maintenance agreements do we have?', oracle: 'count_documents_by_type:maintenance-agreement', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-startup-sheets', category: 'maintenance', question: 'How many startup sheets are on file?', oracle: 'count_documents_by_type:startup-sheet', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-inspection-reports', category: 'maintenance', question: 'How many inspection reports are on file?', oracle: 'count_documents_by_type:inspection-report', compare: 'number', citationRequired: false },
+  { id: 'plumb-avg-labor-hours', category: 'maintenance', question: 'What is the average labor hours billed across every job?', oracle: 'avg_numeric_field:labor_hours', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-customers', category: 'entities', question: 'How many customers are on file?', oracle: 'count_entities_by_type:customer', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-equipment', category: 'entities', question: 'How many fixtures/appliances are on file?', oracle: 'count_entities_by_type:equipment', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-technicians', category: 'entities', question: 'How many technicians are on file?', oracle: 'count_entities_by_type:technician', compare: 'number', citationRequired: false },
+  { id: 'plumb-distinct-manufacturers', category: 'entities', question: 'How many distinct manufacturers are on file?', oracle: 'count_distinct_field_values:manufacturer', compare: 'number', citationRequired: false },
+  { id: 'plumb-distinct-models', category: 'entities', question: 'How many distinct models are on file?', oracle: 'count_distinct_field_values:model', compare: 'number', citationRequired: false },
+  { id: 'plumb-distinct-equipment-type', category: 'entities', question: 'How many distinct equipment types are on file?', oracle: 'count_distinct_field_values:equipment_type', compare: 'number', citationRequired: false },
+  { id: 'plumb-mentions-tankless', category: 'content', question: 'How many documents mention a tankless water heater?', oracle: 'count_documents_mentioning:\\ytankless\\y', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-water-heater', category: 'content', question: 'How many jobs mention a water heater?', oracle: 'count_documents_mentioning:water\\s+heater', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-leak', category: 'content', question: 'How many documents mention a leak?', oracle: 'count_documents_mentioning:\\yleaks?\\y', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-clog', category: 'content', question: 'How many documents mention a clogged drain?', oracle: 'count_documents_mentioning:clog', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-backflow', category: 'content', question: 'How many documents mention backflow?', oracle: 'count_documents_mentioning:backflow', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-repipe', category: 'content', question: 'How many documents mention a repipe?', oracle: 'count_documents_mentioning:repipe', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-gas-leak', category: 'content', question: 'How many documents mention a gas leak?', oracle: 'count_documents_mentioning:gas\\s+leak', compare: 'number', citationRequired: true },
+  { id: 'plumb-mentions-sump-pump', category: 'content', question: 'How many documents mention a sump pump?', oracle: 'count_documents_mentioning:sump\\s+pump', compare: 'number', citationRequired: true },
+  { id: 'plumb-count-work-orders', category: 'operations', question: 'How many work orders are on file?', oracle: 'count_documents_by_type:work-order', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-service-tickets', category: 'operations', question: 'How many service tickets are on file?', oracle: 'count_documents_by_type:service-ticket', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-permits', category: 'operations', question: 'How many permits are on file?', oracle: 'count_documents_by_type:permit', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-technician-field', category: 'operations', question: 'How many documents record a technician name?', oracle: 'count_documents_with_field:technician', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-documents-total', category: 'operations', question: 'How many documents do we have on file in total?', oracle: 'count_documents_total', compare: 'number', citationRequired: false },
+  { id: 'plumb-count-work-performed', category: 'operations', question: 'How many documents record what work was performed?', oracle: 'count_documents_with_field:work_performed', compare: 'number', citationRequired: false },
+];
+
+const plumbingPack = {
+  id: 'plumbing',
+  label: 'Plumbing',
+  businessNoun: 'plumbing company',
+  unitNoun: 'fixture',
+  documentTypes,
+  fields,
+  brands,
+  synonyms,
+  abbreviations,
+  typos,
+  maintenance: {
+    defaultCadenceMonths: 12,
+    cadencePhrases: [
+      { re: '\\bbackflow\\b[^?]*\\b(?:test|tested|testing)\\b[^?]*\\bannual', months: 12 },
+      { re: '\\bwater\\s+heater\\b[^?]*\\bflush(?:ed)?\\b[^?]*\\bannual', months: 12 },
+      { re: '\\bbiennial\\b|\\bevery\\s+two\\s+years\\b', months: 24 },
+    ],
+    seasons: { spring: [3, 5], summer: [6, 8], fall: [9, 11], winter: [12, 2] },
+  },
+  warranty: {
+    brandRules: {
+      rheem: { label: 'Rheem', rule: { registrationWindowDays: 90, unregisteredPartsYears: 6, registeredPartsYears: 10 }, confidence: 'high', notes: 'Tank water heaters: 6yr standard tank/parts, extendable to 10-12yr on registered Professional/Marathon lines.' },
+      'a-o-smith': { label: 'A.O. Smith', aliases: ['a o smith', 'ao smith'], rule: { registrationWindowDays: 90, unregisteredPartsYears: 6, registeredPartsYears: 9 }, confidence: 'medium', notes: 'Varies by tank vs. tankless line; tankless heat exchangers commonly carry 10-15yr.' },
+      'bradford-white': { label: 'Bradford White', aliases: ['bradford white'], rule: { registrationWindowDays: 90, unregisteredPartsYears: 6, registeredPartsYears: 10 }, confidence: 'medium', notes: 'Dealer/registration-dependent; sold primarily through licensed contractors.' },
+      navien: { label: 'Navien', rule: { registrationWindowDays: 60, unregisteredPartsYears: 5, registeredPartsYears: 15 }, confidence: 'medium', notes: 'Tankless heat exchanger commonly 15yr registered, 5yr parts.' },
+      rinnai: { label: 'Rinnai', rule: { registrationWindowDays: 60, unregisteredPartsYears: 5, registeredPartsYears: 12 }, confidence: 'medium', notes: 'Tankless heat exchanger commonly 10-12yr, 5yr parts.' },
+    },
+    backflowTestCadenceMonths: 12,
+    backflowFieldKey: 'next_test_due',
+  },
+  personas,
+  examTemplates,
+};
+
+export default plumbingPack;

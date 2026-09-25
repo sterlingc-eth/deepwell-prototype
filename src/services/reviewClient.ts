@@ -509,6 +509,48 @@ export interface LearningExportItem {
   createdAt: string;
 }
 
+/* -------------------------------------------------------- autonomous per-tenant learning loop
+ * TEAM H (2026-09-24): api/_lib/learning/autopilot.js's nightly per-tenant run — operator-only,
+ * cross-tenant summary (counts + cost only, never a customer's question text). */
+
+export interface AutopilotTenantSummary {
+  tenantKey: string;
+  replayed: number;
+  answeredNow: number;
+  examAnswered: number;
+  examPassed: number;
+  vocabMined: number;
+  vocabPromoted: number;
+  demoted: number;
+  costUsd: number;
+  skipped: string | null;
+  at: string;
+}
+
+export interface AutopilotStatus {
+  tenantsEligible: number;
+  perTenant: AutopilotTenantSummary[];
+  platformSpentUsd: number;
+  nextTenant: { tenantKey: string; tenantName?: string } | null;
+  gapReportWeekStart: string | null;
+}
+
+export interface GapCluster {
+  capability: string;
+  count: number;
+  tenantCount: number;
+  industries: string[];
+  examples: string[];
+  fixSpec: string;
+}
+
+export interface GapReport {
+  weekStart: string;
+  generatedAt?: string;
+  totalFailures: number;
+  clusters: GapCluster[];
+}
+
 /** Search-by-meaning progress (api/_lib/search/store.js semanticStatus). */
 export interface SemanticStatus {
   configured: boolean;
@@ -729,6 +771,19 @@ export const reviewClient = {
    *  `remaining` > 0). Records answered-now / still-failing per miss and creates recipe proposals. */
   learningReplay(opts?: { questions?: string[]; force?: boolean }) {
     return postJson<ReplaySummary>({ action: 'learningReplay', questions: opts?.questions, force: opts?.force });
+  },
+
+  /** Operator: last night's per-tenant autopilot summary (counts + cost only), spend vs. the daily
+   *  caps, and which tenant runs next in tonight's fair rotation. */
+  learningAutopilotStatus() {
+    return postJson<AutopilotStatus>({ action: 'learningAutopilotStatus' });
+  },
+
+  /** Operator: the weekly cross-tenant gap report — capability clusters with counts, affected
+   *  industries and a proposed fix-spec paragraph each. `rebuild: true` recomputes it live instead of
+   *  returning the last one the nightly cron stored. */
+  learningGapReport(opts?: { rebuild?: boolean }) {
+    return postJson<GapReport>({ action: 'learningGapReport', rebuild: opts?.rebuild });
   },
 
   /** Operator: latest Donovan Scorecard run, trend vs the previous one, per-category scores and the failing list. */

@@ -495,7 +495,33 @@ const SPELLINGS = (() => {
  * If real paperwork turns out to put the brand somewhere this misses, the fix
  * is a new alias or a tightened extraction prompt — not a looser matcher.
  */
-export function normalizeBrand(raw) {
+/**
+ * Team G (industry packs): pack.id -> its own {spelling -> canonical key} map,
+ * built from that pack's `warranty.brandRules` the same way SPELLINGS above is
+ * built from the module-level BRAND_RULES. Cached per pack id. `null`/the hvac
+ * pack itself returns SPELLINGS unchanged (object identity), so every existing
+ * 1-arg caller of normalizeBrand/deriveWarranty is byte-for-byte unchanged.
+ */
+const packSpellingsCache = new Map();
+function spellingsFor(pack) {
+  if (!pack || pack.id === 'hvac') return SPELLINGS;
+  const cached = packSpellingsCache.get(pack.id);
+  if (cached) return cached;
+  const map = new Map();
+  for (const [key, v] of Object.entries(pack.warranty?.brandRules ?? {})) {
+    map.set(key, key);
+    for (const a of v.aliases ?? []) map.set(a, key);
+  }
+  packSpellingsCache.set(pack.id, map);
+  return map;
+}
+
+/** This pack's own brand-rules table, or BRAND_RULES for hvac/no pack. */
+export function brandRulesForPack(pack) {
+  return pack && pack.id !== 'hvac' ? (pack.warranty?.brandRules ?? {}) : BRAND_RULES;
+}
+
+export function normalizeBrand(raw, pack = null) {
   let cleaned = String(raw ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9 ]+/g, ' ')
@@ -513,7 +539,7 @@ export function normalizeBrand(raw) {
   }
   if (!cleaned) return null;
 
-  return SPELLINGS.get(cleaned) ?? null;
+  return spellingsFor(pack).get(cleaned) ?? null;
 }
 
 /** True only for a real calendar date in YYYY-MM-DD. Shape alone is not enough. */
@@ -710,10 +736,10 @@ function describePendingOptions(pending) {
  *   daysToExpiry: number|null, action: string|null, notes: string[]
  * }}
  */
-export function deriveWarranty(facts = {}, today = null) {
+export function deriveWarranty(facts = {}, today = null, pack = null) {
   const notes = [];
-  const brand = normalizeBrand(facts.manufacturer);
-  const entry = brand ? BRAND_RULES[brand] : null;
+  const brand = normalizeBrand(facts.manufacturer, pack);
+  const entry = brand ? brandRulesForPack(pack)[brand] : null;
   const rule = entry?.rule ?? null;
 
   // Accepts YYYY-MM-DD, YYYY-MM, MM/YYYY, MM/DD/YYYY and "Month YYYY" — see

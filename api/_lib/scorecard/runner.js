@@ -21,7 +21,7 @@
  */
 import { withTenant } from "../recordsStore.js";
 import { recordAskMiss, MISS_OUTCOMES } from "../missStore.js";
-import { getActiveOverlay } from "../learning/overlay.js";
+import { getActiveOverlayForTenant } from "../learning/overlay.js";
 import { missKey } from "../learning/replay.js";
 import { escalationModel } from "../agent/escalation.js";
 import { runOracle } from "./oracle.js";
@@ -139,7 +139,9 @@ export async function runScorecard({
   let stopped = null;
   let i = Math.max(0, Math.trunc(offset) || 0);
   const end = Math.min(list.length, i + size);
-  const overlay = feedMisses ? await getActiveOverlay() : null;
+  // TEAM H (2026-09-24): tenant-merged overlay — a no-op fallback to getActiveOverlay()'s own
+  // result until autopilot has promoted something for this tenant.
+  const overlay = feedMisses ? await getActiveOverlayForTenant(ctx) : null;
 
   // One question end-to-end (oracle -> ask -> grade -> optional retry). Pulled out of the loop body
   // so a page can run QUESTION_CONCURRENCY of these at once (TEAM F, speed) instead of one at a time -

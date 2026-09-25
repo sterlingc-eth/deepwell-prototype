@@ -10,6 +10,7 @@ import { integrityFixTenant } from "./integrity.js";
 import { runMissDigestSweepStep } from "../missDigest.js";
 import { runLearningSweepStep } from "../learning/sweep.js";
 import { runScorecardSweepStep } from "./scorecard.js";
+import { runAutopilotSweepStep } from "../learning/autopilot.js";
 
 /**
  * GET /api/cron-sweep
@@ -346,6 +347,19 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "scorecard" });
   }
 
+  // TEAM H (2026-09-24): the AUTONOMOUS PER-TENANT learning loop — generalizes the founder-only
+  // miss-replay/learning/scorecard steps above to EVERY paying/active tenant, fairly rotated within
+  // whatever of the shared deadline is left. LAST on purpose, same reasoning as the scorecard step:
+  // it only spends the time and money left after every customer-facing step above, and is itself
+  // bounded by its own per-tenant/platform daily $ caps (DONOVAN_LEARNING_DAILY_USD /
+  // DONOVAN_LEARNING_PLATFORM_DAILY_USD). Never fails the sweep.
+  try {
+    summary.autopilot = await runAutopilotSweepStep({ deadlineAt });
+  } catch (err) {
+    summary.autopilot = { error: err?.message };
+    await captureException(err, { route: "/api/cron-sweep", stage: "autopilot" });
+  }
+
   summary.billingGatedTenants = billingGatedTenantKeys.size;
 
   await captureMessage(
@@ -368,7 +382,8 @@ export default async function handler(req, res) {
       `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +
       `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}; ` +
       `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}; ` +
-      `scorecard: ${summary.scorecard?.skipped ?? summary.scorecard?.error ?? `${summary.scorecard?.passed ?? 0}/${summary.scorecard?.answered ?? 0} passed`}.`,
+      `scorecard: ${summary.scorecard?.skipped ?? summary.scorecard?.error ?? `${summary.scorecard?.passed ?? 0}/${summary.scorecard?.answered ?? 0} passed`}; ` +
+      `autopilot: ${summary.autopilot?.skipped ?? summary.autopilot?.error ?? `${summary.autopilot?.tenantsProcessed ?? 0}/${summary.autopilot?.tenantsEligible ?? 0} tenant(s), $${summary.autopilot?.platformSpentUsd ?? 0}`}.`,
     { route: "/api/cron-sweep" }
   );
 

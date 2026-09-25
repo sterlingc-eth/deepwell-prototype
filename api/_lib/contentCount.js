@@ -53,19 +53,45 @@ for (const [group, words] of Object.entries(HVAC_TERM_SYNONYMS)) {
   for (const w of words) TERM_TO_GROUP.set(w.toLowerCase(), group);
 }
 
-/** Any recognized variant word/phrase -> its canonical HVAC_TERM_SYNONYMS group key; an unrecognized word passes
+/**
+ * Team G (industry packs): every function below that takes an optional
+ * `pack` defaults to null, meaning "today's hard-coded HVAC_TERM_SYNONYMS
+ * map" — every existing caller (none of which pass a pack) is byte-for-byte
+ * unchanged. A plumbing/electrical/property tenant's own synonym map (see
+ * industry/packs/*.js) only ever comes from a caller that resolved and
+ * passed that tenant's pack.
+ */
+function synonymsFor(pack) {
+  return pack && pack.id !== 'hvac' ? pack.synonyms : HVAC_TERM_SYNONYMS;
+}
+
+const termToGroupCache = new Map();
+function termToGroupFor(pack) {
+  if (!pack || pack.id === 'hvac') return TERM_TO_GROUP;
+  const cached = termToGroupCache.get(pack.id);
+  if (cached) return cached;
+  const map = new Map();
+  for (const [group, words] of Object.entries(pack.synonyms)) {
+    for (const w of words) map.set(w.toLowerCase(), group);
+  }
+  termToGroupCache.set(pack.id, map);
+  return map;
+}
+
+/** Any recognized variant word/phrase -> its canonical synonym-group key; an unrecognized word passes
  *  through unchanged (expandTerms then falls back to treating it as a literal, single-word term). Used by the
  *  agent tool (tools.js), whose caller (the model) may pass a plural/variant spelling rather than the exact key. */
-export function canonicalizeTerm(word) {
+export function canonicalizeTerm(word, pack = null) {
   const w = String(word ?? '').trim().toLowerCase();
-  return TERM_TO_GROUP.get(w) ?? w;
+  return termToGroupFor(pack).get(w) ?? w;
 }
 
 /** canonical group key(s) -> every variant word/phrase, deduplicated. */
-export function expandTerms(canonicalKeys) {
+export function expandTerms(canonicalKeys, pack = null) {
+  const synonyms = synonymsFor(pack);
   const out = new Set();
   for (const key of canonicalKeys ?? []) {
-    const group = HVAC_TERM_SYNONYMS[String(key ?? '').toLowerCase()];
+    const group = synonyms[String(key ?? '').toLowerCase()];
     if (group) for (const w of group) out.add(w.toLowerCase());
     else out.add(String(key ?? '').toLowerCase());
   }
@@ -88,12 +114,13 @@ function buildJsTermRegex(variants) {
   return new RegExp(`\\b(?:${escaped.join('|')})\\b`, 'gi');
 }
 
-/** Every HVAC_TERM_SYNONYMS canonical key whose group has a word/phrase appearing (whole word/phrase) in `q`. */
-export function extractKnownTerms(q) {
+/** Every synonym-group canonical key whose group has a word/phrase appearing (whole word/phrase) in `q`. */
+export function extractKnownTerms(q, pack = null) {
+  const synonyms = synonymsFor(pack);
   const lower = String(q ?? '').toLowerCase();
   const found = [];
-  for (const group of Object.keys(HVAC_TERM_SYNONYMS)) {
-    const variants = HVAC_TERM_SYNONYMS[group];
+  for (const group of Object.keys(synonyms)) {
+    const variants = synonyms[group];
     const re = buildJsTermRegex(variants);
     if (re.test(lower)) found.push(group);
   }
@@ -118,7 +145,7 @@ const DOCUMENT_WORD_RE = /\bdocuments?\b/i;
  * recognized HVAC term (extractKnownTerms) — a question with neither is left alone (never hijacks an unrelated
  * aggregate/financials question, which has no HVAC term to match anyway).
  */
-export function parseContentCountQuestion(question) {
+export function parseContentCountQuestion(question, pack = null) {
   const q = String(question ?? '').trim();
   if (!q) return null;
   const lower = q.toLowerCase();
@@ -129,7 +156,7 @@ export function parseContentCountQuestion(question) {
   const hasListJobsWhere = LIST_JOBS_RE.test(lower) && REPLACED_WORD_RE.test(lower);
   if (!hasMention && !hasIssue && !hasComplaintsAbout && !hasListJobsWhere) return null;
 
-  const terms = extractKnownTerms(lower);
+  const terms = extractKnownTerms(lower, pack);
   if (!terms.length) return null;
 
   const scopeMatch = HOW_MANY_SCOPE_RE.exec(lower);
@@ -191,9 +218,9 @@ const MAX_LISTED_FACTS = 40;
  * @returns an /api/ask `data` object, or null when nothing matched at all is still answered (an honest zero) —
  *   this only returns null when `terms` is empty (a caller bug, never a real question).
  */
-export async function runContentCount(db, parsed) {
+export async function runContentCount(db, parsed, pack = null) {
   const { terms, scope, groupBy } = parsed;
-  const variants = expandTerms(terms);
+  const variants = expandTerms(terms, pack);
   if (!variants.length) return null;
   const pattern = buildTermPattern(variants);
   const jsRe = buildJsTermRegex(variants);
@@ -273,7 +300,7 @@ export async function runContentCount(db, parsed) {
         const d = byDoc.get(id);
         const cust = (custMap.get(id) ?? [])[0];
         return documentRecord({ id, document_type: d.documentType, original_filename: d.filename }, {
-          label: `${documentTypeLabel(d.documentType)} · ${d.filename ?? id}`,
+          label: `${documentTypeLabel(d.documentType, pack)} · ${d.filename ?? id}`,
           sublabel: d.pages[0] ? `"${d.pages[0].excerpt}"` : undefined,
           page: d.pages[0]?.page, group: cust?.name ?? 'Unlinked',
         });
@@ -293,7 +320,7 @@ export async function runContentCount(db, parsed) {
     const d = byDoc.get(id);
     const cust = (custMap.get(id) ?? [])[0];
     return {
-      label: `${documentTypeLabel(d.documentType)}${cust?.name ? ` · ${cust.name}` : ''}`,
+      label: `${documentTypeLabel(d.documentType, pack)}${cust?.name ? ` · ${cust.name}` : ''}`,
       value: d.pages[0] ? `p.${d.pages[0].page}: "${d.pages[0].excerpt}"` : d.filename ?? id,
       entityId: cust?.id, sources: [{ documentId: id, location: { page: d.pages[0]?.page } }],
     };
@@ -302,7 +329,7 @@ export async function runContentCount(db, parsed) {
     const d = byDoc.get(id);
     const cust = (custMap.get(id) ?? [])[0];
     return documentRecord({ id, document_type: d.documentType, original_filename: d.filename }, {
-      label: `${documentTypeLabel(d.documentType)} · ${d.filename ?? id}`,
+      label: `${documentTypeLabel(d.documentType, pack)} · ${d.filename ?? id}`,
       sublabel: d.pages[0] ? `"${d.pages[0].excerpt}"` : undefined,
       page: d.pages[0]?.page, group: cust?.name,
     });

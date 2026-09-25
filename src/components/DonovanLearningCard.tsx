@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import {
   Check, ChevronDown, ChevronUp, Clipboard, GraduationCap, Loader2, Play, Power, RefreshCw, X,
 } from 'lucide-react';
-import { reviewClient, replayAllMisses, type LearningLearnedItem, type LearningProposal, type LearningSummary } from '../services/reviewClient';
+import {
+  reviewClient, replayAllMisses,
+  type LearningLearnedItem, type LearningProposal, type LearningSummary, type AutopilotStatus, type GapReport,
+} from '../services/reviewClient';
 
 /**
  * Platform-operator-only "Donovan learning" card (Tier 2 Part B,
@@ -73,6 +76,27 @@ export function DonovanLearningCard() {
   const [decisionNote, setDecisionNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
+
+  // TEAM H (2026-09-24): the autonomous per-tenant loop's own summary + the weekly gap report —
+  // loaded lazily on first open (not on mount, unlike the proposal queue above) since both are
+  // cross-tenant reads a shop admin's mount of this component must never trigger before it's even
+  // known whether they're an operator.
+  const [autopilot, setAutopilot] = useState<AutopilotStatus | null>(null);
+  const [gapReport, setGapReport] = useState<GapReport | null>(null);
+  const [autopilotLoading, setAutopilotLoading] = useState(false);
+  const [autopilotError, setAutopilotError] = useState<string | null>(null);
+  const [gapReportOpen, setGapReportOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open || hidden || autopilot || autopilotLoading) return;
+    setAutopilotLoading(true);
+    setAutopilotError(null);
+    Promise.all([reviewClient.learningAutopilotStatus(), reviewClient.learningGapReport()])
+      .then(([a, g]) => { setAutopilot(a); setGapReport(g); })
+      .catch((e) => setAutopilotError(e instanceof Error ? e.message : 'Could not load the autopilot summary.'))
+      .finally(() => setAutopilotLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hidden]);
 
   const load = () => {
     setLoading(true);
@@ -331,6 +355,68 @@ export function DonovanLearningCard() {
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+
+          <div className="border-t border-line pt-3">
+            <h3 className="text-caption font-medium text-ink-3 uppercase tracking-wide mb-2">Learning autopilot</h3>
+            <p className="text-caption text-ink-3 mb-2">
+              Every night this runs the same replay-and-exam loop above for EVERY paying shop, not just this
+              one — fairly rotated so every shop gets a turn, capped per-shop and platform-wide so it can never
+              run away with spend. Customers never see other shops&apos; data here.
+            </p>
+            {autopilotLoading && !autopilot && (
+              <p className="text-body text-ink-3 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading…
+              </p>
+            )}
+            {autopilotError && <p role="alert" className="text-caption text-bad-ink">{autopilotError}</p>}
+            {autopilot && (
+              <>
+                <p className="text-caption text-ink-2 mb-2">
+                  {autopilot.tenantsEligible} eligible shop(s) · {autopilot.perTenant.length} ran in the last 24h ·
+                  ${autopilot.platformSpentUsd.toFixed(2)} spent ·{' '}
+                  {autopilot.nextTenant ? `next up: ${autopilot.nextTenant.tenantName ?? autopilot.nextTenant.tenantKey}` : 'no shop queued'}
+                </p>
+                {autopilot.perTenant.length > 0 && (
+                  <ul className="divide-y divide-line mb-2">
+                    {autopilot.perTenant.slice(0, 10).map((s) => (
+                      <li key={`${s.tenantKey}-${s.at}`} className="py-1.5 text-caption text-ink-2">
+                        <span className="font-medium text-ink">{s.tenantKey}</span>
+                        {s.skipped ? ` — skipped (${s.skipped})` : (
+                          ` — replayed ${s.replayed} (${s.answeredNow} answered now) · exam ${s.examPassed}/${s.examAnswered} passed · ` +
+                          `${s.vocabPromoted} vocab promoted · ${s.demoted} demoted · $${s.costUsd.toFixed(3)}`
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setGapReportOpen((v) => !v)}
+                  className="dw-btn-tertiary !min-h-[28px] !py-0"
+                >
+                  {gapReportOpen ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
+                  Weekly gap report{gapReport?.weekStart ? ` (week of ${gapReport.weekStart})` : ''}
+                </button>
+                {gapReportOpen && gapReport && (
+                  gapReport.clusters.length === 0 ? (
+                    <p className="text-body text-ink-3 mt-2">No clustered gaps yet.</p>
+                  ) : (
+                    <ul className="divide-y divide-line mt-2">
+                      {gapReport.clusters.map((c) => (
+                        <li key={c.capability} className="py-2">
+                          <p className="text-body text-ink">
+                            <span className="dw-pill-warn">{c.capability}</span> {c.count}x across {c.tenantCount} shop(s)
+                            {c.industries.length > 0 ? ` (${c.industries.join(', ')})` : ''}
+                          </p>
+                          <p className="text-caption text-ink-3 mt-0.5">{c.fixSpec}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                )}
+              </>
             )}
           </div>
         </div>

@@ -238,18 +238,18 @@ function buildVocabByLen(vocab) {
   return map;
 }
 
-function mergeOverlayTables(overlay) {
+function mergeOverlayTables(overlay, base = BASE_TABLES) {
   const abbrev =
     (overlay.abbreviations && Object.keys(overlay.abbreviations).length) ||
     (overlay.typos && Object.keys(overlay.typos).length)
-      ? { ...ABBREV, ...(overlay.abbreviations ?? {}), ...(overlay.typos ?? {}) }
-      : ABBREV;
-  let vocab = VOCAB;
+      ? { ...base.abbrev, ...(overlay.abbreviations ?? {}), ...(overlay.typos ?? {}) }
+      : base.abbrev;
+  let vocab = base.vocab;
   if (overlay.vocab && overlay.vocab.length) {
-    vocab = new Set(VOCAB);
+    vocab = new Set(base.vocab);
     for (const w of overlay.vocab) vocab.add(String(w ?? '').toLowerCase());
   }
-  const vocabByLen = vocab === VOCAB ? VOCAB_BY_LEN : buildVocabByLen(vocab);
+  const vocabByLen = vocab === base.vocab ? base.vocabByLen : buildVocabByLen(vocab);
   return { abbrev, vocab, vocabByLen };
 }
 
@@ -263,7 +263,10 @@ function mergeOverlayTables(overlay) {
  * real phrasing, so expanding it buys no classification benefit for the risk
  * of introducing a new ambiguous word into the pipeline.
  */
-const ABBREV = {
+// Exported (Team G, industry packs) so api/_lib/industry/packs/hvac.js can
+// carry this table as that pack's `abbreviations` — the single source of
+// truth stays here; the pack just re-exports it under the contract's shape.
+export const ABBREV = {
   az: 'arizona', nv: 'nevada', ca: 'california',
   cust: 'customer', custs: 'customers', ppl: 'people',
   ac: 'air conditioner', mo: 'month', yr: 'year', yrs: 'years',
@@ -283,14 +286,52 @@ const ABBREV = {
 const BASE_TABLES = { abbrev: ABBREV, vocab: VOCAB, vocabByLen: VOCAB_BY_LEN };
 const overlayTableCache = new WeakMap();
 
-export function withLearnedOverlay(overlay, fn) {
-  if (isOverlayEmpty(overlay)) return fn(BASE_TABLES);
-  let tables = overlayTableCache.get(overlay);
+/** `base` (optional, Team G industry packs): defaults to BASE_TABLES (today's
+ *  hard-coded HVAC abbreviations/vocab) — every existing 2-arg caller is
+ *  byte-for-byte unchanged. Passing a pack's own tables (see tablesForPack
+ *  below) widens abbreviation/vocab recognition to that tenant's industry
+ *  BEFORE the learned overlay (if any) is merged on top of it. */
+const overlayTableCacheByBase = new WeakMap();
+function overlayCacheFor(base) {
+  if (base === BASE_TABLES) return overlayTableCache;
+  let m = overlayTableCacheByBase.get(base);
+  if (!m) { m = new WeakMap(); overlayTableCacheByBase.set(base, m); }
+  return m;
+}
+
+export function withLearnedOverlay(overlay, fn, base = BASE_TABLES) {
+  if (isOverlayEmpty(overlay)) return fn(base);
+  const cache = overlayCacheFor(base);
+  let tables = cache.get(overlay);
   if (!tables) {
-    tables = mergeOverlayTables(overlay);
-    overlayTableCache.set(overlay, tables);
+    tables = mergeOverlayTables(overlay, base);
+    cache.set(overlay, tables);
   }
   return fn(tables);
+}
+
+/** pack.id -> {abbrev, vocab, vocabByLen}, widened with that pack's own
+ *  brands/synonyms/abbreviations/typos on top of the base HVAC tables (never
+ *  narrowed — a plumbing tenant keeps recognizing generic words like
+ *  "customer"/"technician" too). Built once per pack and cached, same idiom
+ *  as extractFields.js's packFieldMeta. `null`/the hvac pack itself returns
+ *  BASE_TABLES unchanged (object identity), so normalizeQuestion's default
+ *  (no pack passed) behavior is untouched.
+ */
+const packTablesCache = new Map();
+export function tablesForPack(pack) {
+  if (!pack || pack.id === 'hvac') return BASE_TABLES;
+  const cached = packTablesCache.get(pack.id);
+  if (cached) return cached;
+  const abbrev = { ...ABBREV, ...(pack.abbreviations ?? {}), ...(pack.typos ?? {}) };
+  const vocab = new Set(VOCAB);
+  for (const b of pack.brands ?? []) for (const w of wordsOf(b)) vocab.add(w);
+  for (const list of Object.values(pack.synonyms ?? {})) {
+    for (const phrase of list) for (const w of wordsOf(phrase)) vocab.add(w);
+  }
+  const tables = { abbrev, vocab, vocabByLen: buildVocabByLen(vocab) };
+  packTablesCache.set(pack.id, tables);
+  return tables;
 }
 
 // Leading filler this project's dispatchers/owners actually type before the
@@ -385,6 +426,12 @@ function expandSymbols(q) {
  */
 export function normalizeQuestion(text, opts = {}) {
   const overlay = opts?.overlay;
+  // Team G (industry packs): opts.pack widens abbreviation/vocab recognition
+  // to that tenant's industry (see tablesForPack above) before the learned
+  // overlay is merged on top. Omitted (the default on every existing
+  // caller), this resolves to BASE_TABLES — byte-identical to before packs
+  // existed.
+  const packBase = tablesForPack(opts?.pack);
   const original = String(text ?? '');
   let q = original.toLowerCase().trim().replace(/\s+/g, ' ');
   q = q.replace(/[?!.]+$/, '').trim();
@@ -448,7 +495,7 @@ export function normalizeQuestion(text, opts = {}) {
       return raw;
     });
     return out.join(' ').replace(/\s+/g, ' ').trim();
-  });
+  }, packBase);
 
   return { normalized, original, corrections };
 }

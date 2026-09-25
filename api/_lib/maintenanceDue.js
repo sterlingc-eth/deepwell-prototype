@@ -94,9 +94,20 @@ const WORD_NUM = { one: 1, once: 1, two: 2, twice: 2, three: 3, four: 4, six: 6,
  * "2 visits per year" / "twice a year" / "semi-annual" -> 6; "quarterly" / "4 visits a year" -> 3; "annual" -> 12;
  * "every 4 months" -> 4; "monthly" -> 1.
  */
-export function parseCadenceMonths(text) {
+/** `pack` (optional, Team G industry packs): checked FIRST, against that
+ *  pack's own `maintenance.cadencePhrases` ({re, months}, re a regex SOURCE
+ *  string) — a recurring compliance cadence a pack's own vocabulary states
+ *  (plumbing's "annual backflow test", electrical's "panel inspection every
+ *  three years", ...) that the generic phrasing below has no way to know
+ *  about. Omitted (every existing caller), or the hvac pack itself (which
+ *  ships no cadencePhrases — see industry/packs/hvac.js), this check is
+ *  skipped entirely and behavior is byte-for-byte unchanged. */
+export function parseCadenceMonths(text, pack = null) {
   const t = String(text ?? '').toLowerCase();
   if (!t.trim()) return null;
+  for (const phrase of pack?.maintenance?.cadencePhrases ?? []) {
+    if (new RegExp(phrase.re, 'i').test(t)) return phrase.months;
+  }
   const perYear = /(\d{1,2}|one|two|three|four|six|twelve)\s*(?:x|times)?\s*(?:scheduled\s+|annual\s+|preventive\s+|maintenance\s+|routine\s+)?(?:visits?|inspections?|tune-?ups?|service\s+(?:calls?|visits?)|check-?ups?|cleanings?|maintenance)\s*(?:per|a|each|every|\/)\s*(?:year|yr|annum)\b/.exec(t);
   if (perYear) {
     const n = /^\d/.test(perYear[1]) ? Number(perYear[1]) : WORD_NUM[perYear[1]];
@@ -128,16 +139,26 @@ export function parseAgreementTerm(text) {
 
 /* ------------------------------------------------------------------ seasons */
 
-/** The season window containing (or next after) today: {name, from, to} as ISO dates. Winter spans the year end. */
-export function seasonWindow(season, today) {
+/** The season window containing (or next after) today: {name, from, to} as ISO dates. Winter spans the year end.
+ *  `pack` (optional): every pack ships the same [startMonth, endMonth] season definitions as the hard-coded ones
+ *  below (see industry/packs/*.js's `maintenance.seasons`), so passing one changes nothing today — it exists so a
+ *  pack COULD define different seasons (a warmer-climate pack, say) without this function changing again. */
+export function seasonWindow(season, today, pack = null) {
   const t = todayIso(today);
   const y = Number(t.slice(0, 4));
-  const defs = {
-    spring: (yy) => ({ from: `${yy}-03-01`, to: `${yy}-05-31` }),
-    summer: (yy) => ({ from: `${yy}-06-01`, to: `${yy}-08-31` }),
-    fall: (yy) => ({ from: `${yy}-09-01`, to: `${yy}-11-30` }),
-    winter: (yy) => ({ from: `${yy}-12-01`, to: `${yy + 1}-02-28` }),
-  };
+  const [ps, pe] = pack?.maintenance?.seasons?.[season] ?? [];
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const lastDayOf = (yy, mo) => new Date(Date.UTC(yy, mo, 0)).getUTCDate();
+  const defs = ps && pe
+    ? { [season]: (yy) => (pe >= ps
+        ? { from: `${yy}-${pad2(ps)}-01`, to: `${yy}-${pad2(pe)}-${lastDayOf(yy, pe)}` }
+        : { from: `${yy}-${pad2(ps)}-01`, to: `${yy + 1}-${pad2(pe)}-${lastDayOf(yy + 1, pe)}` }) }
+    : {
+        spring: (yy) => ({ from: `${yy}-03-01`, to: `${yy}-05-31` }),
+        summer: (yy) => ({ from: `${yy}-06-01`, to: `${yy}-08-31` }),
+        fall: (yy) => ({ from: `${yy}-09-01`, to: `${yy}-11-30` }),
+        winter: (yy) => ({ from: `${yy}-12-01`, to: `${yy + 1}-02-28` }),
+      };
   const mk = defs[season];
   if (!mk) return null;
   let w = mk(y);
@@ -154,17 +175,20 @@ const isPmVisit = (v) => PM_RE.test(String(v.serviceType ?? '')) || /inspection/
 /**
  * @param {{customers: Array<{id, name, address}>, agreements: Array<{customerId, documentId, term, cadenceMonths}>,
  *          visits: Array<{customerId, documentId, date, documentType, serviceType, technician}>}} data
- * @param {{today: string, mode: 'cadence'|'window', season?: string|null, months?: number|null, sinceYear?: string|null}} opts
+ * @param {{today: string, mode: 'cadence'|'window', season?: string|null, months?: number|null, sinceYear?: string|null, pack?: object|null}} opts
+ *   `pack` (optional, Team G industry packs): its `maintenance.defaultCadenceMonths` replaces the hard-coded 12
+ *   below wherever an agreement/window states no cadence of its own. Omitted, every existing caller keeps 12.
  */
 export function computeMaintenanceDue(data, opts) {
   const today = todayIso(opts.today);
+  const defaultCadence = opts.pack?.maintenance?.defaultCadenceMonths ?? 12;
   const byCust = new Map((data.customers ?? []).map((c) => [c.id, { ...c, agreements: [], visits: [] }]));
   for (const a of data.agreements ?? []) byCust.get(a.customerId)?.agreements.push(a);
   for (const v of data.visits ?? []) byCust.get(v.customerId)?.visits.push(v);
 
-  const win = opts.season ? seasonWindow(opts.season, today) : null;
+  const win = opts.season ? seasonWindow(opts.season, today, opts.pack) : null;
   const cutoff = opts.mode === 'window'
-    ? (opts.sinceYear ? `${today.slice(0, 4)}-01-01` : addMonths(today, -(opts.months ?? 12)))
+    ? (opts.sinceYear ? `${today.slice(0, 4)}-01-01` : addMonths(today, -(opts.months ?? defaultCadence)))
     : null;
 
   const overdue = [];
@@ -185,8 +209,8 @@ export function computeMaintenanceDue(data, opts) {
 
     const last = pmVisits[0] ?? anyVisits[0] ?? null; // splitFuture sorts newest first
     const cadence = activeAgreements.length
-      ? Math.min(...activeAgreements.map((a) => a.cadenceMonths ?? 12))
-      : 12;
+      ? Math.min(...activeAgreements.map((a) => a.cadenceMonths ?? defaultCadence))
+      : defaultCadence;
     const agreement = activeAgreements[0] ?? null;
     const entry = {
       customerId: c.id, name: c.name, address: c.address, lastVisit: last, cadenceMonths: cadence,
@@ -258,8 +282,11 @@ export function buildMaintenanceAnswer(res) {
 
 const CADENCE_TEXT_KEYS = ['agreement_term', 'work_performed', 'notes', 'service_type'];
 
-/** Reads the tenant's customers, agreements (with cadence) and visits, then computes + formats. Returns the envelope. */
-export async function runMaintenanceDue(db, intent, { today } = {}) {
+/** Reads the tenant's customers, agreements (with cadence) and visits, then computes + formats. Returns the envelope.
+ *  `pack` (optional, Team G industry packs): threaded into parseCadenceMonths/computeMaintenanceDue so a
+ *  plumbing/electrical/property tenant's own cadence phrasing and default cadence apply. Omitted, every existing
+ *  caller keeps today's hard-coded HVAC-shaped defaults exactly. */
+export async function runMaintenanceDue(db, intent, { today, pack = null } = {}) {
   const t = todayIso(today);
   const { rows: customers } = await db.raw(
     `SELECT id, data->>'customer_name' AS name, data->>'service_address' AS address
@@ -326,7 +353,7 @@ export async function runMaintenanceDue(db, intent, { today } = {}) {
     const text = textOfDoc.get(d.id) ?? '';
     const term = textRows.find((r) => r.document_id === d.id && r.field_key === 'agreement_term')?.value ?? '';
     const { start, end } = parseAgreementTerm(term);
-    agreements.push({ customerId, documentId: d.id, term, start, end, cadenceMonths: parseCadenceMonths(text) });
+    agreements.push({ customerId, documentId: d.id, term, start, end, cadenceMonths: parseCadenceMonths(text, pack) });
   }
   const visits = [];
   for (const r of visitRows) {
@@ -337,7 +364,7 @@ export async function runMaintenanceDue(db, intent, { today } = {}) {
       customerId, documentId: r.document_id, date, documentType: r.document_type, serviceType: r.service_type, technician: r.technician,
     });
   }
-  const res = computeMaintenanceDue({ customers, agreements, visits }, { today: t, mode: intent.mode, season: intent.season, months: intent.months, sinceYear: intent.sinceYear });
+  const res = computeMaintenanceDue({ customers, agreements, visits }, { today: t, mode: intent.mode, season: intent.season, months: intent.months, sinceYear: intent.sinceYear, pack });
   if (!res.considered) return null; // nothing to judge (no agreements, no visits): let the fallback say so
   return buildMaintenanceAnswer(res);
 }
