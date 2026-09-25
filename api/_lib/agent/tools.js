@@ -31,6 +31,10 @@ import { collectQueryIdentities, noteQueryIdentities, noteSearch } from "../cita
 // returns its top ~10 passages, which was silently undercounting; this scans every page. See contentCount.js.
 import { runContentCount, canonicalizeTerm } from "../contentCount.js";
 import { packForTenant } from "../industry/index.js";
+// Team J (2026-09-25): filter_records exposes compose.js's deterministic composable filter engine to the
+// model as a tool, so a multi-hop question the model recognizes but the pre-router's own text parse
+// missed still gets an exact, code-computed answer instead of hand-rolled (and easily wrong) run_query SQL.
+import { runCompose } from "../compose.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -244,6 +248,47 @@ export const TOOL_DEFS = [
       type: "object",
       properties: { sql: { type: "string" }, purpose: { type: "string", description: "Why, in a few words." } },
       required: ["sql"],
+    },
+  },
+  {
+    name: "filter_records",
+    description:
+      "Deterministic composable filter over customers: every condition is AND'd together (code, not SQL you write), then either counted or listed. Prefer this over run_query whenever the question is customers matching several conditions at once (brand, unit age, warranty status, has/lacks a document type, geography, service history, technician, an invoiced-amount threshold) - it is exact and cannot mis-join the way hand-written SQL can.",
+    input_schema: {
+      type: "object",
+      properties: {
+        op: { type: "string", enum: ["count", "list"], description: "'count' for 'how many', 'list' for 'which customers'." },
+        conditions: {
+          type: "array",
+          minItems: 1,
+          maxItems: 6,
+          description: "ANDed together. Each condition is one shape:\n" +
+            "brand {values:[string,...]} - OR of manufacturer names\n" +
+            "ageOlder {years:number} - a unit installed more than N years ago\n" +
+            "warrantyStatus {status:'expired'|'expiring'|'active'}\n" +
+            "hasDocType / lacksDocType {id:string, phrase?:string} - id is the canonical document type (e.g. 'maintenance-agreement','permit','invoice','purchase-order')\n" +
+            "lacksRecentService {months:number} - no service visit in the last N months\n" +
+            "neverServiced {} - no service visit on file at all\n" +
+            "unitCountGt {n:number} - more than N units\n" +
+            "distinctBrandsGte {n:number} - units from N or more distinct brands\n" +
+            "noEmail {} - no email on file\n" +
+            "geoCity {value:string} - service address in this city\n" +
+            "invoicedGt {amount:number} - invoiced more than this dollar amount\n" +
+            "technician {name:string} - serviced at least once by this technician",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["brand", "ageOlder", "warrantyStatus", "hasDocType", "lacksDocType", "lacksRecentService", "neverServiced", "unitCountGt", "distinctBrandsGte", "noEmail", "geoCity", "invoicedGt", "technician"] },
+              values: { type: "array", items: { type: "string" } },
+              years: { type: "number" }, status: { type: "string", enum: ["expired", "expiring", "active"] },
+              id: { type: "string" }, phrase: { type: "string" }, months: { type: "number" }, n: { type: "number" },
+              value: { type: "string" }, amount: { type: "number" }, name: { type: "string" },
+            },
+            required: ["type"],
+          },
+        },
+      },
+      required: ["op", "conditions"],
     },
   },
 ];
@@ -712,6 +757,33 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return { ok: true, content: text, rowCount: rows.length, inputSummary: `query:${purpose}`, empty, rows, columns: cols };
   }
 
+  /* ---- filter_records (Team J: same engine as compose.js's own deterministic pre-router) ---- */
+  async function filterRecords(input) {
+    const op = input?.op === "count" ? "count" : "list";
+    const raw = Array.isArray(input?.conditions) ? input.conditions.slice(0, 6) : [];
+    if (!raw.length) return fail("conditions is required (at least one)", "filter_records");
+    // A doc-type condition with no human `phrase` still needs one for the answer text - derive it from
+    // the id (compose.js's own parser always supplies one from the tenant's pack label; the model may not).
+    const conditions = raw.map((c) =>
+      (c?.type === "hasDocType" || c?.type === "lacksDocType") && !c.phrase
+        ? { ...c, phrase: String(c.id ?? "record").replace(/-/g, " ") }
+        : c
+    );
+    let out;
+    try {
+      out = await withTenant(ctxArg, (db) => runCompose(db, { op, conditions }, { today }));
+    } catch (err) {
+      return fail(String(err?.message ?? err).slice(0, 300), "filter_records");
+    }
+    const text = JSON.stringify({ text: out.text, recordsTotal: out.recordsTotal, basis: out.basis });
+    ledger.addShown(text);
+    for (const rec of out.records ?? []) {
+      if (rec.id) ledger.ids.add(String(rec.id).toLowerCase());
+      if (rec.documentId) ledger.addDoc(rec.documentId);
+    }
+    return { ok: true, content: text, rowCount: out.recordsTotal ?? 0, inputSummary: "filter_records", empty: (out.recordsTotal ?? 0) === 0 };
+  }
+
   async function execute(name, input) {
     const started = Date.now();
     let r;
@@ -725,6 +797,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
       else if (name === "find_customers") r = await findCustomers(input ?? {});
       else if (name === "get_customer") r = await getCustomer(input ?? {});
       else if (name === "run_query") r = await runQuery(input ?? {});
+      else if (name === "filter_records") r = await filterRecords(input ?? {});
       else if (name === VIEW_TOOL_NAME) r = await viewDocumentPage(input ?? {});
       else r = fail(`unknown tool ${String(name).slice(0, 40)}`, "unknown");
     } catch (err) {

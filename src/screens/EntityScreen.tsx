@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, MessageSquareText } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { FactGrid } from '../components/FactGrid';
@@ -22,6 +22,7 @@ function entityLabel(e: Entity, labelField: string): string {
 export function EntityScreen() {
   const entityId = useAppStore((s) => s.selectedEntityId);
   const openEntity = useAppStore((s) => s.openEntity);
+  const openCustomer = useAppStore((s) => s.openCustomer);
   const askQuestion = useAppStore((s) => s.askQuestion);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const includeUnverified = useAppStore((s) => s.includeUnverified);
@@ -30,6 +31,15 @@ export function EntityScreen() {
 
   const entity = entityId ? graph.entities[entityId] : undefined;
   const typeSpec = entity ? graph.schema.entityTypes.find((t) => t.id === entity.type) : undefined;
+
+  // Defect (2026-09-25): this generic screen has no real "customer" case (it's built for
+  // property/equipment/technician/service) — a customer id landing here rendered the raw uuid as the
+  // title and "None on record" everywhere. Every caller has since been fixed to send a customer id to
+  // CustomerProfileScreen instead, but this redirect is the hard guarantee: a customer id can never
+  // render here, no matter how it arrived (a stale link, a future caller that forgets).
+  useEffect(() => {
+    if (entity?.type === 'customer') openCustomer(entity.id);
+  }, [entity, openCustomer]);
 
   const facts = useMemo<Fact[]>(() => {
     if (!entity || !typeSpec) return [];
@@ -44,6 +54,10 @@ export function EntityScreen() {
     }
     return out;
   }, [entity, typeSpec, graph]);
+
+  // Every hook above must run first (Rules of Hooks) — the redirect itself is a no-render bailout,
+  // same shape as the "not in your records" case below.
+  if (entity?.type === 'customer') return null;
 
   if (!entity || !typeSpec) {
     return (

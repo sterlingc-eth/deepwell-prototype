@@ -79,9 +79,14 @@ export async function gradeAnswer({ ctx, question, expected, data, alts, callMod
   }
   const view = answerView(data);
   const cite = question.citeWhat ? ` The answer must cite ${question.citeWhat}.` : "";
+  // TEAM K (2026-09-25, R5_FAILS.md): the answer's OWN citation records - independent ground truth
+  // for which named entities are real, so the grader stops treating "absent from a capped REFERENCE
+  // sample" as "invented" (see grader.js's SYSTEM prompt).
+  const citedRecords = (Array.isArray(data?.records) ? data.records : []).slice(0, 40).map((r) => `${r.label ?? ""}${r.sublabel ? ` — ${r.sublabel}` : ""}`).filter(Boolean);
   const g = await gradeRubric({
     ctxArg: ctx, question: question.text, rubric: `${question.rubric}${cite}`, reference: expected,
-    answerText: `${view.text}\n${view.facts.map((f) => `${f.label}: ${f.value}`).join("\n")}\n[citations attached to the answer: ${view.citations}]`, callModel, deadlineAt,
+    answerText: `${view.text}\n${view.facts.map((f) => `${f.label}: ${f.value}`).join("\n")}\n[citations attached to the answer: ${view.citations}]`,
+    citedRecords, callModel, deadlineAt,
   });
   if (g.error) return { passed: false, score: 0, skipped: true, got: summarizeAnswer(view), expectedSummary: summarizeExpected(question), why: `grader unavailable (${g.error})`, costUsd: g.costUsd };
   // A rubric answer is also held to the citation rule: the model grades the content, the citation check is deterministic.

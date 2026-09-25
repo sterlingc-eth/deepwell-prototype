@@ -102,6 +102,7 @@ import {
 import { extractStreetTokens, correctStreetTypos } from '../api/_lib/streetVocab.js';
 import { insertAskMiss } from '../api/_lib/missStore.js';
 import { normalizeQuestion as normalizeQuestionNL } from '../api/_lib/nlNormalize.js';
+import { isReasoningQuestion, isUnitRankingQuestion } from '../api/_lib/agent/intents.js';
 
 let failures = 0;
 let count = 0;
@@ -1866,6 +1867,32 @@ for (const q of ['how many active customers do we have', 'how many current custo
   check('teamA analytics :: customers-via-units states the unit count too', /3 customers/.test(cust.text) && /5 matching units/.test(cust.text), cust.text);
   const vis = formatAnalyticsAnswer({ entity: 'serviceVisits', op: 'count', filters: [] }, { total: 3, rows: [], futureVisitCount: 2 });
   check('teamA analytics :: future-dated visits are left out and mentioned', /2 records dated after today/.test(vis.text), vis.text);
+}
+
+// Owner report (2026-09-25): "how many clients are under warranty" took a long time in production —
+// suspected of missing the fast deterministic/analytics path (api/ask.js's analyticsCandidate gate)
+// and falling to the slow agent/Sonnet path instead. Reproduces api/ask.js's own analyticsCandidate
+// condition (preClassifyAnalytics AND NOT isReasoningQuestion AND NOT isUnitRankingQuestion, on the
+// same normalized text ask.js builds it from) for the reported question plus 10 similar phrasings, so
+// a future regression here fails a unit test instead of shipping to production again.
+function wouldTakeAnalyticsPath(q) {
+  const normalized = normalizeQuestionNL(q, {}).normalized;
+  return preClassifyAnalytics(normalized) && !isReasoningQuestion(q) && !isUnitRankingQuestion(q) && !looksLikeSingleRecordReference(q);
+}
+for (const q of [
+  'how many clients are under warranty',
+  'how many customers are under warranty',
+  'customers with active warranties',
+  "who's still under warranty",
+  'clients out of warranty',
+  'how many clients have equipment still covered',
+  'which customers have an expired warranty',
+  'how many accounts are currently under warranty',
+  'who has an active warranty',
+  'how many clients have warranty coverage',
+  'count of customers under warranty',
+]) {
+  check(`warranty routing (fast path) :: "${q}" reaches analytics, not the agent`, wouldTakeAnalyticsPath(q));
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

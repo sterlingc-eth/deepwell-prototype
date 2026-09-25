@@ -44,8 +44,14 @@ export const HVAC_TERM_SYNONYMS = {
   'blower motor': ['blower motor', 'blower', 'blower wheel', 'fan motor', 'fan wheel'],
   thermostat: ['thermostat', 'thermostats', 'tstat'],
   filter: ['filter', 'filters', 'air filter'],
-  leak: ['leak', 'leaks', 'leaking', 'leaky'],
-  noise: ['noise', 'noisy', 'loud', 'rattle', 'rattling', 'rattles', 'squeal', 'squealing', 'buzzing', 'humming', 'grinding', 'banging'],
+  leak: ['leak', 'leaks', 'leaking', 'leaky', 'drip', 'drips', 'dripping', 'water damage', 'puddle', 'puddling'],
+  noise: ['noise', 'noisy', 'loud', 'rattle', 'rattling', 'rattles', 'squeal', 'squealing', 'buzzing', 'humming', 'grinding', 'banging', 'vibrating', 'vibration'],
+  // Round-5 semantic paraphrases (R5_FAILS.md #2): a customer's own words for "not cooling", "won't
+  // start" and "a smell" never say the part name, so these three groups are symptom phrases, not
+  // components — same map, same expandTerms/buildTermPattern path, no separate "semantic" code path.
+  'not cooling': ['not cooling', 'no cooling', 'no cool', 'won\'t cool', 'wont cool', 'blowing warm', 'warm air', 'not cold', 'isn\'t cooling', 'isnt cooling', 'insufficient cool', 'not keeping up', 'wasn\'t keeping up', 'wasnt keeping up', 'no-cooling'],
+  'no power': ['won\'t start', 'wont start', 'not starting', 'no power', 'tripped breaker', 'tripping breaker', 'breaker tripped', 'not turning on', 'won\'t turn on', 'wont turn on', 'would not turn on', 'wouldn\'t turn on'],
+  odor: ['smell', 'smells', 'odor', 'odour', 'burning smell', 'burning odor', 'strange smell'],
 };
 
 const TERM_TO_GROUP = new Map();
@@ -129,21 +135,35 @@ export function extractKnownTerms(q, pack = null) {
 
 /* ------------------------------------------------------------------ question shape */
 
-const HOW_MANY_SCOPE_RE = /\bhow\s+many\s+(jobs?|documents?)\b/i;
+// "calls" is dispatcher shorthand for a job/visit ("how many calls were for warm air", "a no-cooling
+// call") - same scope as "jobs", never counted as "documents".
+const HOW_MANY_SCOPE_RE = /\bhow\s+many\s+(jobs?|calls?|documents?)\b/i;
 const MENTION_RE = /\bmentions?\b/i;
-const CUSTOMERS_HAD_RE = /\bwhich\s+customers?\b/i;
+const CUSTOMERS_HAD_RE = /\b(?:which\s+customers?|who)\b/i;
 const ISSUE_WORD_RE = /\b(?:issues?|repairs?|problems?|complaints?)\b/i;
 const LIST_JOBS_RE = /\b(?:list|which|show(?:\s+me)?|give\s+me)\b.*\bjobs?\b.*\b(?:where|that|which)\b/i;
 const REPLACED_WORD_RE = /\b(?:replaced|repaired|fixed|installed|swapped|changed|serviced)\b/i;
 const COMPLAINTS_ABOUT_RE = /\bcomplaints?\s+about\b/i;
-const JOB_WORD_RE = /\bjobs?\b/i;
+const JOB_WORD_RE = /\b(?:jobs?|calls?)\b/i;
 const DOCUMENT_WORD_RE = /\bdocuments?\b/i;
+// A symptom paraphrase never says "mention"/"issue"/"complaint" - the owner just describes what the
+// customer said ("complained the unit is loud", "called about a leak", "reported a strange smell",
+// "would not turn on"). These questions are still safely narrow: extractKnownTerms below requires a
+// real hit against the pack's curated vocabulary before any of this ever runs a corpus scan.
+const QUESTION_SHAPE_RE = /^\s*(?:which\s+customers?|who\b|how\s+many\b|list\b|show(?:\s+me)?\b|give\s+me\b|any\b)/i;
+// The question-shape fallback anchor is for a symptom with no anchor word of its own; a question that
+// names a replacement/repair action or a time window ("had a compressor replaced this year") is a
+// different, structured shape this parser does not do justice to and must fall through to the agent,
+// same as before this change - it still needs an explicit "mention"/"issue" anchor to be handled here.
+const TIME_WINDOW_RE = /\b(?:this|last|past)\s+(?:year|month|quarter|week)\b/i;
 
 /**
- * Pure: question -> {terms, scope, groupBy, mode, question} or null. Deliberately narrow: needs BOTH an anchor phrase
- * ("mention", "issue/repair/complaint", "complaints about", or "jobs ... where ... replaced") AND at least one
- * recognized HVAC term (extractKnownTerms) — a question with neither is left alone (never hijacks an unrelated
- * aggregate/financials question, which has no HVAC term to match anyway).
+ * Pure: question -> {terms, scope, groupBy, mode, question} or null. Deliberately narrow: needs BOTH an anchor
+ * (either a mention/issue/complaint phrase, "jobs ... where ... replaced", OR a recognizable content-question
+ * shape - "which customers", "who", "how many/calls", "list/show/give me/any" - for a symptom paraphrase that
+ * names no part) AND at least one recognized HVAC term (extractKnownTerms) — a question with neither is left
+ * alone (never hijacks an unrelated aggregate/financials question, which has no HVAC term to match anyway; the
+ * term check, not the anchor, is what actually keeps this narrow).
  */
 export function parseContentCountQuestion(question, pack = null) {
   const q = String(question ?? '').trim();
@@ -154,7 +174,8 @@ export function parseContentCountQuestion(question, pack = null) {
   const hasIssue = ISSUE_WORD_RE.test(lower);
   const hasComplaintsAbout = COMPLAINTS_ABOUT_RE.test(lower);
   const hasListJobsWhere = LIST_JOBS_RE.test(lower) && REPLACED_WORD_RE.test(lower);
-  if (!hasMention && !hasIssue && !hasComplaintsAbout && !hasListJobsWhere) return null;
+  const hasQuestionShape = QUESTION_SHAPE_RE.test(lower) && !REPLACED_WORD_RE.test(lower) && !TIME_WINDOW_RE.test(lower);
+  if (!hasMention && !hasIssue && !hasComplaintsAbout && !hasListJobsWhere && !hasQuestionShape) return null;
 
   const terms = extractKnownTerms(lower, pack);
   if (!terms.length) return null;
@@ -213,6 +234,26 @@ const MAX_PAGES = 3000;
 const MAX_LISTED_FACTS = 40;
 
 /**
+ * Reconciliation (round 5): "documents/records/paperwork mention X" is a literal, honest raw count
+ * of the text (unchanged below). "jobs mention X" means work actually done on that item, so a page
+ * counts toward it only when BOTH (a) its document type is a visit (isVisitType) and (b) at least one
+ * occurrence of the term is not a bare "Label: value" spec line — e.g. "Refrigerant: R-410A" or
+ * "Tonnage: 3 tons" is boilerplate every startup sheet/nameplate carries regardless of what work was
+ * done, never a mention of work. A page with only such label occurrences is not a job mention.
+ */
+export function hasWorkMention(text, jsRe) {
+  const s = String(text ?? '');
+  jsRe.lastIndex = 0;
+  let m;
+  while ((m = jsRe.exec(s))) {
+    const after = s.slice(m.index + m[0].length).replace(/^[ \t]*/, '');
+    if (after[0] !== ':') return true;
+    if (jsRe.lastIndex === m.index) jsRe.lastIndex += 1;
+  }
+  return false;
+}
+
+/**
  * @param db a withTenant() store
  * @param parsed parseContentCountQuestion's result (or an equivalent object built by the agent tool)
  * @returns an /api/ask `data` object, or null when nothing matched at all is still answered (an honest zero) —
@@ -246,7 +287,10 @@ export async function runContentCount(db, parsed, pack = null) {
     throw err;
   }
 
-  const jobFiltered = scope === 'jobs' ? pages.filter((p) => isVisitType(p.document_type)) : pages;
+  const allDocsCount = new Set(pages.map((p) => p.document_id)).size;
+  const jobFiltered = scope === 'jobs'
+    ? pages.filter((p) => isVisitType(p.document_type) && hasWorkMention(p.text, jsRe))
+    : pages;
 
   const byDoc = new Map();
   for (const p of jobFiltered) {
@@ -265,10 +309,22 @@ export async function runContentCount(db, parsed, pack = null) {
   const noun = scope === 'jobs' ? 'job' : 'document';
   const nDocs = docIds.length;
   const nCust = customersById.size;
-  const ruleNote = scope === 'jobs' ? ' (jobs = completed service-type documents: service tickets, work orders, invoices, inspections, dispatch notes and startup sheets — not proposals, permits or paperwork with no visit).' : '';
+  const ruleNote = scope === 'jobs'
+    ? ' (jobs = completed service-type documents — service tickets, work orders, invoices, inspections, dispatch notes and startup sheets, not proposals, permits or paperwork with no visit — where the term describes work actually done; a spec label such as "Refrigerant: R-410A" or "Tonnage: 3 tons" on its own does not count).'
+    : '';
 
   /* ------------------------------------------------------------ zero */
   if (!nDocs) {
+    if (scope === 'jobs' && allDocsCount) {
+      return attachCitations({
+        kind: 'answer',
+        text: `No jobs on file mention ${termsLabel} as work actually done, though ${allDocsCount} document${allDocsCount === 1 ? '' : 's'} on file mention${allDocsCount === 1 ? 's' : ''} it (a spec label, proposal or other non-job paperwork).`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, {
+        records: [], total: 0, kind: 'searched',
+        basis: `Scanned every job on file for ${termsLabel}${ruleNote}; none describe work done, though the term appears in ${allDocsCount} document${allDocsCount === 1 ? '' : 's'} overall.`,
+      });
+    }
     const scannedNote = scope === 'jobs' ? 'every job on file' : 'every document on file';
     return attachCitations({
       kind: 'answer',
@@ -310,12 +366,17 @@ export async function runContentCount(db, parsed, pack = null) {
       kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
     }, {
       records, total: records.length, claimedCount: nCust,
-      basis: `Counted customers with a ${noun} whose text mentions ${termsLabel}; ${nDocs} ${pluralNoun(noun, nDocs)}, ${nCust} customer${nCust === 1 ? '' : 's'}.${ruleNote}`,
+      basis: `Counted customers with a ${noun} whose text mentions ${termsLabel}; ${nDocs} ${pluralNoun(noun, nDocs)}, ${nCust} customer${nCust === 1 ? '' : 's'}.${ruleNote}${scope === 'jobs' && allDocsCount > nDocs ? ` ${allDocsCount} document${allDocsCount === 1 ? '' : 's'} mention it in total.` : ''}`,
     });
   }
 
   /* ------------------------------------------------------------ plain document/job count-or-list */
-  const text = `${nDocs} ${pluralNoun(noun, nDocs)} on file mention ${termsLabel}, across ${nCust} customer${nCust === 1 ? '' : 's'}.`;
+  // "jobs" scope leads with the job count (what was asked) and states the other, larger number too
+  // (the honest all-documents total) so the answer is never mistaken for that broader count.
+  const otherNumberNote = scope === 'jobs' && allDocsCount > nDocs
+    ? ` (${allDocsCount} document${allDocsCount === 1 ? '' : 's'} on file mention ${termsLabel} in total, including specs/proposals with no visit)`
+    : '';
+  const text = `${nDocs} ${pluralNoun(noun, nDocs)} on file mention ${termsLabel}${otherNumberNote}, across ${nCust} customer${nCust === 1 ? '' : 's'}.`;
   const facts = docIds.slice(0, MAX_LISTED_FACTS).map((id) => {
     const d = byDoc.get(id);
     const cust = (custMap.get(id) ?? [])[0];
@@ -338,7 +399,7 @@ export async function runContentCount(db, parsed, pack = null) {
     kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
   }, {
     records, total: records.length, claimedCount: nDocs,
-    basis: `Counted ${noun}s whose text mentions ${termsLabel}; ${nDocs} ${pluralNoun(noun, nDocs)}, ${nCust} customer${nCust === 1 ? '' : 's'}.${ruleNote}`,
+    basis: `Counted ${noun}s whose text mentions ${termsLabel}; ${nDocs} ${pluralNoun(noun, nDocs)}, ${nCust} customer${nCust === 1 ? '' : 's'}.${ruleNote}${scope === 'jobs' && allDocsCount > nDocs ? ` ${allDocsCount} document${allDocsCount === 1 ? '' : 's'} mention it in total.` : ''}`,
   });
 }
 

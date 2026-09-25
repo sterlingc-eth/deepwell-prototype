@@ -224,15 +224,30 @@ export function breadthQuestions(k) {
   }, { citeWhat: "the invoices behind the monthly totals" });
 
   /* ================================================================ CONTENT (only answerable by reading the document text) */
+  // Reconciliation (round 5, R5_FAILS.md #1): "documents mention X" is a literal, honest raw scan of every
+  // page (unchanged: TEXT_DOCS). "jobs mention X" means work actually done, same rule api/_lib/contentCount.js's
+  // hasWorkMention/isVisitType enforce for Donovan's own answer: only visit-type documents count, and a bare
+  // "Label: value" spec line (e.g. "Refrigerant: R-410A" on every startup sheet, "Tonnage: 3 tons" on a
+  // nameplate) is excluded via the same negative-lookahead the Postgres regex engine supports natively.
   const TEXT_DOCS = (kw, q) => `SELECT DISTINCT p.document_id FROM document_pages p WHERE p.text ~* ${q.p(kw)}`;
-  const contentSet = (persona, text, kw, cat = "content", opts = {}) => add(cat, persona, text, (q) => ({
-    cmp: "set", sql: `SELECT DISTINCT c.data->>'customer_name' AS item FROM document_entity_links l JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE l.document_id IN (${TEXT_DOCS(kw, q)}) ORDER BY 1`,
-    ...(opts.guard === false ? {} : { requires: { sql: `SELECT count(*) AS n FROM document_pages p WHERE p.text ~* $1`, params: [kw] } }),
-  }), { maxItems: 25 });
-  const contentCount = (persona, text, kw, cat = "content", opts = {}) => add(cat, persona, text, (q) => ({
-    cmp: "number", sql: `SELECT count(*) AS n FROM (${TEXT_DOCS(kw, q)}) z`,
-    ...(opts.guard === false ? {} : { requires: { sql: `SELECT count(*) AS n FROM document_pages p WHERE p.text ~* $1`, params: [kw] } }),
-  }));
+  const TEXT_DOCS_JOBS = (kw, q) => `SELECT DISTINCT p.document_id FROM document_pages p JOIN documents d ON d.id = p.document_id WHERE p.text ~* ${q.p(`${kw}(?!\\s*:)`)} AND ${DOCTYPE("d.document_type")} = ANY(${vt(q)})`;
+  const JOBS_WORD_RE = /\bjobs?\b/i;
+  const DOCS_WORD_RE = /\bdocuments?\b/i;
+  const isJobsQuestion = (text) => JOBS_WORD_RE.test(text) && !DOCS_WORD_RE.test(text);
+  const contentSet = (persona, text, kw, cat = "content", opts = {}) => {
+    const docsSql = isJobsQuestion(text) ? TEXT_DOCS_JOBS : TEXT_DOCS;
+    return add(cat, persona, text, (q) => ({
+      cmp: "set", sql: `SELECT DISTINCT c.data->>'customer_name' AS item FROM document_entity_links l JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE l.document_id IN (${docsSql(kw, q)}) ORDER BY 1`,
+      ...(opts.guard === false ? {} : { requires: { sql: `SELECT count(*) AS n FROM document_pages p WHERE p.text ~* $1`, params: [kw] } }),
+    }), { maxItems: 25 });
+  };
+  const contentCount = (persona, text, kw, cat = "content", opts = {}) => {
+    const docsSql = isJobsQuestion(text) ? TEXT_DOCS_JOBS : TEXT_DOCS;
+    return add(cat, persona, text, (q) => ({
+      cmp: "number", sql: `SELECT count(*) AS n FROM (${docsSql(kw, q)}) z`,
+      ...(opts.guard === false ? {} : { requires: { sql: `SELECT count(*) AS n FROM document_pages p WHERE p.text ~* $1`, params: [kw] } }),
+    }));
+  };
   const CONCEPTS = [
     ["capacitor", "capacitor", "capacitor"],
     ["contactor", "contactor", "contactor"],

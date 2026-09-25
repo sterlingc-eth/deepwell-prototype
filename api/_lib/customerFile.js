@@ -167,14 +167,18 @@ const NOTE_KEYS = ['notes', 'work_performed', 'status'];
 const MAX_NOTES = 25;
 
 /**
- * Notes and findings from the customer's own documents: the `notes` extractions (newest first), the work performed on
- * each visit, and any open reminders. Passage excerpts that mention findings/recommendations fill in when the
- * structured fields are thin.
+ * Notes and findings from the customer's own documents: the `notes` extractions (chronological, newest first BY
+ * SERVICE DATE - never upload order, which can differ when documents are batch-scanned later), the work performed
+ * on each visit, and any open reminders. Passage excerpts that mention findings/recommendations fill in when the
+ * structured fields are thin. Round 5 (R5_FAILS.md #3): a future-dated note or work-performed row (a typo'd year,
+ * a scheduled-but-not-yet-done visit) is excluded from "most recent" and called out, the same rule buildFileSummary
+ * already applies to visits — never a second, disagreeing definition of "most recent" in this file.
  */
-export async function fetchNotes(db, customerRows) {
+export async function fetchNotes(db, customerRows, today) {
+  const t = todayIso(today);
   const scope = await scopeFromCustomers(db, customerRows);
   const ids = await scopeDocumentIds(db, scope);
-  if (!ids.length) return { ids, notes: [], work: [], passages: [], reminders: [], scope };
+  if (!ids.length) return { ids, notes: [], work: [], passages: [], reminders: [], future: [], scope };
   const { rows } = await db.raw(
     `SELECT x.document_id, x.field_key, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS value, d.document_type,
             d.original_filename, d.created_at,
@@ -188,14 +192,19 @@ export async function fetchNotes(db, customerRows) {
       LIMIT 300`,
     [ids, NOTE_KEYS]);
   const dateOf = (r) => isoDate(r.service_date) ?? isoDate(r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at);
-  const notes = rows.filter((r) => r.field_key === 'notes').map((r) => ({ documentId: r.document_id, text: r.value, date: dateOf(r), type: r.document_type }));
+  const notesAll = rows.filter((r) => r.field_key === 'notes').map((r) => ({ documentId: r.document_id, text: r.value, date: dateOf(r), type: r.document_type }));
   const workByDoc = new Map();
   for (const r of rows.filter((x) => x.field_key === 'work_performed')) {
     const w = workByDoc.get(r.document_id) ?? { documentId: r.document_id, items: [], date: dateOf(r), type: r.document_type };
     w.items.push(r.value);
     workByDoc.set(r.document_id, w);
   }
-  const work = [...workByDoc.values()].sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+  // splitFuture also sorts `past` newest-first by date (scope.js) - the one chronology this file uses.
+  const notesSplit = splitFuture(notesAll, t);
+  const workSplit = splitFuture([...workByDoc.values()], t);
+  const notes = notesSplit.past;
+  const work = workSplit.past;
+  const future = [...notesSplit.future, ...workSplit.future];
 
   let passages = [];
   if (notes.length + work.length < 3) {
@@ -208,11 +217,12 @@ export async function fetchNotes(db, customerRows) {
   try {
     for (const c of customerRows) reminders = reminders.concat(await listOpenReminders(db, { customerId: c.id }));
   } catch { reminders = []; }
-  return { ids, notes, work, passages, reminders, scope };
+  return { ids, notes, work, passages, reminders, future, scope };
 }
 
-/** Pure: the notes answer. `label` is the phrase the user typed ("Rios unit"). */
-export function buildNotesAnswer(label, customerRows, data) {
+/** Pure: the notes answer. `label` is the phrase the user typed ("Rios unit"). `today` should be the same value
+ *  passed to fetchNotes, so the future-dated note it excluded and the date this text states agree. */
+export function buildNotesAnswer(label, customerRows, data, today) {
   const name = customerRows.length === 1 ? (customerRows[0].customer_name || label) : label;
   const facts = [];
   for (const n of data.notes.slice(0, MAX_NOTES)) {
@@ -233,9 +243,10 @@ export function buildNotesAnswer(label, customerRows, data) {
   for (const r of data.reminders) {
     facts.push({ label: r.reminderTrigger === 'next_visit' ? 'Reminder (next visit)' : 'Reminder', value: r.reminderText, sources: r.documentId ? [{ documentId: r.documentId, location: {} }] : [] });
   }
+  const fut = futureNote(data.future, todayIso(today)).trim();
   if (!facts.length) {
     return answerEnvelope({
-      text: `No notes or findings are on file for ${name}${data.ids.length ? ` (searched ${data.ids.length} document${data.ids.length === 1 ? '' : 's'})` : ''}.`,
+      text: `No notes or findings are on file for ${name}${data.ids.length ? ` (searched ${data.ids.length} document${data.ids.length === 1 ? '' : 's'})` : ''}.${fut ? ` ${fut}` : ''}`,
       facts: [],
     });
   }
@@ -245,5 +256,5 @@ export function buildNotesAnswer(label, customerRows, data) {
   if (data.reminders.length) bits.push(`${data.reminders.length} open reminder${data.reminders.length === 1 ? '' : 's'}`);
   if (data.passages.length) bits.push(`${data.passages.length} relevant page excerpt${data.passages.length === 1 ? '' : 's'}`);
   const first = facts[0];
-  return answerEnvelope({ text: `${name}: ${bits.join(', ')}. Most recent — ${first.label}: ${first.value}`, facts });
+  return answerEnvelope({ text: `${name}: ${bits.join(', ')}. Most recent — ${first.label}: ${first.value}${fut ? ` ${fut}` : ''}`, facts });
 }

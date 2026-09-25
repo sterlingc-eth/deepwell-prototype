@@ -31,6 +31,22 @@ export function normalizeCitations(a: Partial<Answer>): Pick<Answer, 'records' |
   return out;
 }
 
+/**
+ * Owner report (2026-09-25): a whole two-sentence answer ("13 customers have equipment currently
+ * under warranty (active or expiring status). 14 in all.") rendered as one giant headline read as a
+ * single confusing claim. Split at the end of the first sentence so the UI can show ONE plain
+ * headline with a short muted line underneath for anything after it — never two claims mashed
+ * together at headline size. Splits on the first ". " (period + space); a decimal ("$1,250.00") is
+ * never followed by a space, so this never cuts a number in half.
+ */
+export function splitAnswerHeadline(text: string): { headline: string; secondary: string | null } {
+  const s = String(text ?? '');
+  const idx = s.indexOf('. ');
+  if (idx === -1) return { headline: s, secondary: null };
+  const secondary = s.slice(idx + 2).trim();
+  return { headline: s.slice(0, idx + 1), secondary: secondary || null };
+}
+
 /** Distinct group keys, in first-seen order (the server orders groups largest first). */
 export function recordGroups(records: readonly AnswerRecord[]): string[] {
   const seen: string[] = [];

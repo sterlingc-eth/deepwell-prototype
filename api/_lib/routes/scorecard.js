@@ -81,6 +81,21 @@ export async function scorecardStatusAction(ctx, payload = {}) {
   const runOut = run ? { ...run, valueScore: agg.total ? agg.valueScore : null, citation: agg.citation, byCategory: agg.total ? agg.byCategory : run.byCategory, latency: agg.latency } : null;
   const prevDetail = previous ? await getRun(ctx, previous.id) : null;
   const prevAgg = prevDetail ? scoreResults(prevDetail.results ?? []) : null;
+  // TEAM K (2026-09-25): per-category trend vs the same previous comparable run the overall score
+  // is trended against - an operator otherwise only sees "up 1.4% overall" and has to re-run/diff
+  // two whole result sets by hand to see WHICH category moved. Categories only in one run (a newly
+  // added category, or one dropped from the current run's slice) report a null prevScore/delta
+  // rather than a misleading 0.
+  const categoryTrend = {};
+  if (agg.total) {
+    for (const [cat, c] of Object.entries(agg.byCategory)) {
+      const prevC = prevAgg?.byCategory?.[cat];
+      categoryTrend[cat] = {
+        score: c.score, prevScore: prevC ? prevC.score : null,
+        delta: prevC ? Math.round((c.score - prevC.score) * 1000) / 1000 : null,
+      };
+    }
+  }
   return {
     backend: detail?.backend ?? backend,
     exam: { version: exam.version, questions: exam.questions.length, categories, personas },
@@ -88,6 +103,7 @@ export async function scorecardStatusAction(ctx, payload = {}) {
     adjudicationNote: ADJUDICATION_NOTE,
     run: runOut,
     previous: previous ? { id: previous.id, score: previous.score, startedAt: previous.startedAt, answered: previous.answered, valueScore: prevAgg?.valueScore ?? null, citationCoverage: prevAgg?.citation?.coverage ?? null } : null,
+    categoryTrend,
     runs: runs.map((r) => ({ id: r.id, source: r.source, status: r.status, score: r.score, answered: r.answered, startedAt: r.startedAt, costUsd: r.costUsd })),
     failing: results.filter((r) => !r.passed).slice(0, 120).map((r) => ({
       questionId: r.questionId, category: r.category, question: r.question, expected: r.expected, got: r.got, models: r.models,

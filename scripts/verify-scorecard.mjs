@@ -694,6 +694,28 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   const rubCited = await runScorecard({ ctx: ctxA, questions: [rq], handler: fakeHandler({ [rq.text]: { kind: 'answer', text: 'They replaced the capacitor.', facts: [], sources: SRC } }), today: TODAY, callModel: rubricModel, feedMisses: false, retryFailures: false });
   check('runner: a rubric answer the grader likes still fails without a citation, and passes with one', rubUncited.pageResults[0].passed === false && rubUncited.pageResults[0].valueOk === true && rubCited.pageResults[0].passed === true, JSON.stringify([rubUncited.pageResults[0].detail, rubCited.pageResults[0].passed]));
   check('runner: the rubric grader is told what must be cited', /must cite the service ticket/.test(seenRubric[0]) && /citations attached to the answer: 0/.test(seenRubric[0]), seenRubric[0]);
+
+  // TEAM K (2026-09-25, R5_FAILS.md "maintenance-due 1/5 ... invents customer names"): the grader
+  // must see the answer's OWN citation records (not just the truncated oracle REFERENCE sample), so
+  // it stops mistaking "name absent from a capped reference" for "invented".
+  const mdq = {
+    id: 'q-maint-due', category: 'maintenance-due', cmp: 'rubric',
+    text: "Who's due for fall maintenance?",
+    rubric: 'Names customers overdue or coming due, each backed by a citation.',
+    oracle: { sql: "SELECT 'Betty Winslow | last service 2024-01-01' AS ref", params: [] },
+  };
+  const seenMaint = [];
+  const maintModel = async (req) => { seenMaint.push(req.messages[0].content[0].text); return { content: [tu('grade', { pass: true, reason: 'ok' })], usage: { input_tokens: 10, output_tokens: 5 } }; };
+  const maintAnswer = {
+    kind: 'answer', text: 'Betty Winslow and Carol Rios are due for fall maintenance.', facts: [], sources: [],
+    records: [
+      { type: 'customer', id: 'c1', label: 'Betty Winslow', sublabel: 'last maintenance visit Jan 2024' },
+      { type: 'customer', id: 'c2', label: 'Carol Rios', sublabel: 'last maintenance visit Jun 2024, agreement due sooner' },
+    ], recordsTotal: 2, recordsKind: 'basis', basis: 'test',
+  };
+  await runScorecard({ ctx: ctxA, questions: [mdq], handler: fakeHandler({ [mdq.text]: maintAnswer }), today: TODAY, callModel: maintModel, feedMisses: false, retryFailures: false });
+  check('runner: the grader sees the answer\'s own citation records, including a name absent from the (truncated) oracle reference',
+    /RECORDS THE ANSWER CITES/.test(seenMaint[0]) && /Carol Rios/.test(seenMaint[0]) && /Betty Winslow/.test(seenMaint[0]), seenMaint[0]);
 }
 {
   // budget stop: each ask costs $1.00 (1,000,000 Haiku input tokens at $1/MTok). TEAM F (speed): questions
@@ -786,6 +808,10 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   check('scorecardStatus: byCategory carries per-category value score and citation coverage; failing entries say whether the VALUE or only the citation was the problem', Object.values(st.run.byCategory).every((c) => 'valueScore' in c && 'citationCoverage' in c) && (st.failing.length === 0 || st.failing.every((f) => 'valueOk' in f && 'cited' in f && 'citationRequired' in f)), JSON.stringify(st.failing[0]));
   check('scorecardStatus: exam shape includes the persona mix', st.exam.personas && st.exam.personas.owner > 0 && st.exam.personas.bookkeeper > 0, JSON.stringify(st.exam.personas));
   check('scorecardStatus: trend compares with the previous comparable run; backend is tables again', st.backend === 'tables' && st.previous && typeof st.previous.score === 'number' && st.run.score <= st.previous.score, JSON.stringify({ r: st.run?.score, p: st.previous?.score, b: st.backend }));
+  // TEAM K (2026-09-25): per-category trend alongside the overall one - qMesa's category is the only one
+  // present in both runs, and its score got WORSE (the "9 customers" answer), so its delta must be negative.
+  const catKey = qMesa.category;
+  check('scorecardStatus: categoryTrend reports a per-category score/prevScore/delta against the same previous run', st.categoryTrend && st.categoryTrend[catKey] && typeof st.categoryTrend[catKey].score === 'number' && typeof st.categoryTrend[catKey].prevScore === 'number' && st.categoryTrend[catKey].delta < 0, JSON.stringify(st.categoryTrend));
   // TEAM F (speed): p50/p95 latency in the run summary, computed from the stored per-question latencyMs.
   check('scorecardStatus: run.latency reports p50/p95 over the answered (non-skipped) questions', st.run.latency && st.run.latency.n === st.run.answered && typeof st.run.latency.p50Ms === 'number' && typeof st.run.latency.p95Ms === 'number' && st.run.latency.p95Ms >= st.run.latency.p50Ms, JSON.stringify(st.run.latency));
 }

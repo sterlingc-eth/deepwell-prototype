@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { Fact, FactStatus, SourceRef } from '../core/types';
 import { useGraph } from '../core/entityGraph';
@@ -46,9 +47,162 @@ interface GroupSelect {
   onSelectGroup?: ((label: string) => void) | undefined;
 }
 
-function GroupTable({ facts, onOpenEntity, groupKeys, activeGroup, onSelectGroup }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void } & GroupSelect) {
+// Owner report (2026-09-25): a warranty breakdown ("Carlos Ramirez" -> "active warranty, expires
+// 2031-02-15") rendered as a cramped 2-column grid that TRUNCATED every name ("Carlos Ra…") next to a
+// monospace, underlined value — unreadable, and looked like a broken link. A breakdown whose values
+// name a status word (active/expiring/expired/unknown) gets the richer, full-width treatment below
+// instead: full names that wrap, a real status pill, a humanized date, sorted/grouped by status, capped
+// at 12 rows with "Show all N". Any other breakdown (a city/brand/month count) keeps the plain 2-column
+// grid, just without the truncation/monospace/underline this same defect report flagged there too.
+const STATUS_WORD: Record<string, { status: FactStatus; label: string }> = {
+  active: { status: 'ok', label: 'Active' },
+  current: { status: 'ok', label: 'Active' },
+  valid: { status: 'ok', label: 'Active' },
+  expiring: { status: 'warn', label: 'Expiring soon' },
+  expired: { status: 'bad', label: 'Expired' },
+  unknown: { status: 'muted', label: 'Unknown' },
+};
+const STATUS_GROUP_ORDER: FactStatus[] = ['warn', 'bad', 'ok', 'muted'];
+const STATUS_ROWS_INITIAL_CAP = 12;
+
+interface ParsedStatus {
+  status: FactStatus;
+  statusLabel: string;
+  dateIso?: string;
+}
+
+function parseStatusValue(value: string): ParsedStatus | null {
+  const m = value.match(/\b(active|current|valid|expiring|expired|unknown)\b/i);
+  const key = m?.[1]?.toLowerCase();
+  const meta = key ? STATUS_WORD[key] : undefined;
+  if (!meta) return null;
+  const dateMatch = value.match(/\d{4}-\d{2}-\d{2}/);
+  return { status: meta.status, statusLabel: meta.label, ...(dateMatch ? { dateIso: dateMatch[0] } : {}) };
+}
+
+function humanizeDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** "in 4 months" / "this month" / "3 months ago" — omitted (null) once it's far enough out that a
+ *  bare date reads better than a big month count. */
+function relativeDateNote(iso: string, status: FactStatus): string | null {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
+  if (status === 'bad') {
+    const ago = -months;
+    return ago > 0 && ago < 24 ? `${ago} month${ago === 1 ? '' : 's'} ago` : null;
+  }
+  if (months < 0 || months >= 24) return null;
+  return months === 0 ? 'this month' : `in ${months} month${months === 1 ? '' : 's'}`;
+}
+
+function StatusBreakdownTable({ facts, onOpenEntity }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void }) {
+  const [sortByDate, setSortByDate] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const rows = useMemo(() => {
+    const byStatus = new Map<FactStatus, { fact: Fact; parsed: ParsedStatus }[]>();
+    for (const fact of facts) {
+      const parsed = parseStatusValue(fact.value) ?? { status: 'muted' as FactStatus, statusLabel: 'Unknown' };
+      if (!byStatus.has(parsed.status)) byStatus.set(parsed.status, []);
+      byStatus.get(parsed.status)!.push({ fact, parsed });
+    }
+    const order = STATUS_GROUP_ORDER.filter((s) => byStatus.has(s));
+    if (sortByDate) {
+      for (const s of order) byStatus.get(s)!.sort((a, b) => (a.parsed.dateIso ?? '').localeCompare(b.parsed.dateIso ?? ''));
+    }
+    return order.flatMap((status) => byStatus.get(status)!.map((r) => ({ ...r, groupStatus: status, groupCount: byStatus.get(status)!.length })));
+  }, [facts, sortByDate]);
+
+  const capped = !showAll && rows.length > STATUS_ROWS_INITIAL_CAP;
+  const visible = capped ? rows.slice(0, STATUS_ROWS_INITIAL_CAP) : rows;
+  const multiGroup = new Set(rows.map((r) => r.groupStatus)).size > 1;
+
   return (
-    <dl className="border border-line rounded-lg bg-surface divide-y divide-line grid grid-cols-1 sm:grid-cols-2 max-h-[28rem] overflow-y-auto">
+    <section aria-labelledby="facts-heading">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 id="facts-heading" className="dw-label">Breakdown</h3>
+        <button
+          type="button"
+          onClick={() => setSortByDate((v) => !v)}
+          aria-pressed={sortByDate}
+          className="text-caption text-ink-2 hover:text-ink underline decoration-line-2 underline-offset-4 min-h-[28px]"
+        >
+          {sortByDate ? 'Sorted by date ✓' : 'Sort by date'}
+        </button>
+      </div>
+      <div className="border border-line rounded-lg bg-surface divide-y divide-line overflow-hidden">
+        {visible.map((r, i) => {
+          const showHeading = multiGroup && r.groupStatus !== visible[i - 1]?.groupStatus;
+          const linkable = !!(r.fact.entityId && onOpenEntity);
+          const dateText = r.parsed.dateIso ? humanizeDate(r.parsed.dateIso) : null;
+          const relNote = r.parsed.dateIso ? relativeDateNote(r.parsed.dateIso, r.parsed.status) : null;
+          const row = (
+            // Owner report (2026-09-25), mobile pass: sharing one flex row with the pill+date squeezed
+            // a long name ("Kimberly Ostrowski-Vance") into a sliver of width and it broke mid-word on
+            // 375px. Stacked below `xs` (420px, tailwind.config.ts) so the name always gets the full
+            // row width to wrap on whole words; side by side once there is room.
+            <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-x-3 gap-y-1.5 px-3 py-2.5 min-h-[44px] w-full text-left">
+              <span className="min-w-0 text-body text-ink break-words">{r.fact.label}</span>
+              <span className="shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className={PILL[r.parsed.status]}>{r.parsed.statusLabel}</span>
+                {dateText && (
+                  <span className="text-caption text-ink-3 whitespace-nowrap">
+                    {r.parsed.status === 'bad' ? 'expired ' : 'until '}{dateText}{relNote ? ` · ${relNote}` : ''}
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+          return (
+            <div key={`${r.fact.label}-${i}`}>
+              {showHeading && (
+                <div className="px-3 pt-2.5 pb-1 bg-surface-2/60">
+                  <p className="dw-label text-ink-3">{r.parsed.statusLabel} <span className="normal-case font-normal">· {r.groupCount}</span></p>
+                </div>
+              )}
+              {linkable ? (
+                <button type="button" onClick={() => r.fact.entityId && onOpenEntity?.(r.fact.entityId)} className="w-full hover:bg-surface-2 transition-colors duration-quick">
+                  {row}
+                </button>
+              ) : row}
+            </div>
+          );
+        })}
+      </div>
+      {capped && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="mt-2 text-caption text-ink-2 hover:text-ink underline decoration-line-2 underline-offset-4 min-h-[28px]"
+        >
+          Show all {rows.length}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function GroupTable({ facts, onOpenEntity, groupKeys, activeGroup, onSelectGroup }: { facts: Fact[]; onOpenEntity?: (entityId: string) => void } & GroupSelect) {
+  // A status-shaped breakdown (most values name active/expiring/expired/unknown) gets the richer table
+  // above instead of the plain numeric grid below. Excluded only when a fact's LABEL is itself an
+  // active breakdown-filter key (a real "grouped by warranty status" count, e.g. "Active" -> "10") —
+  // that is a different shape (a bucket count, not a per-customer status) and keeps the plain grid.
+  const anyFilterable = !!(onSelectGroup && groupKeys && facts.some((f) => groupKeys.has(f.label)));
+  const statusLike = !anyFilterable && facts.filter((f) => parseStatusValue(f.value)).length >= Math.max(3, Math.ceil(facts.length * 0.6));
+  if (statusLike) return <StatusBreakdownTable facts={facts} onOpenEntity={onOpenEntity} />;
+
+  return (
+    <section aria-labelledby="facts-heading">
+      <div className="mb-2">
+        <h3 id="facts-heading" className="dw-label">Breakdown</h3>
+      </div>
+      <dl className="border border-line rounded-lg bg-surface divide-y divide-line grid grid-cols-1 sm:grid-cols-2 max-h-[28rem] overflow-y-auto">
       {facts.map((f, i) => {
         const linkable = !!(f.entityId && onOpenEntity);
         const filterable = !!(onSelectGroup && groupKeys?.has(f.label));
@@ -68,29 +222,30 @@ function GroupTable({ facts, onOpenEntity, groupKeys, activeGroup, onSelectGroup
                 onClick={() => onSelectGroup?.(f.label)}
                 aria-pressed={active}
                 aria-label={`${f.label}: ${f.value}. Show these records`}
-                className="w-full flex items-baseline justify-between gap-3 text-left min-h-[28px] hover:text-ink"
+                className="w-full flex items-baseline justify-between gap-3 text-left min-h-[28px] hover:text-ink hover:bg-surface-2 rounded px-1 -mx-1"
               >
-                <span className="text-body text-ink-2 truncate">{f.label}</span>
-                <span className="font-mono text-data text-ink underline decoration-line-2 underline-offset-4">{f.value}</span>
+                <span className="text-body text-ink-2 break-words">{f.label}</span>
+                <span className="text-data text-ink shrink-0">{f.value}</span>
               </button>
             ) : (
-              <dt className="text-body text-ink-2 truncate">{f.label}</dt>
+              <dt className="text-body text-ink-2 break-words">{f.label}</dt>
             )}
             {filterable ? null : linkable ? (
               <button
                 type="button"
                 onClick={() => f.entityId && onOpenEntity?.(f.entityId)}
-                className="font-mono text-data text-ink underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 dark:hover:decoration-brass-300"
+                className="text-data text-ink hover:text-forest-700 dark:hover:text-brass-300 shrink-0"
               >
                 {f.value}
               </button>
             ) : (
-              <dd className="font-mono text-data text-ink">{f.value}</dd>
+              <dd className="text-data text-ink shrink-0">{f.value}</dd>
             )}
           </div>
         );
       })}
-    </dl>
+      </dl>
+    </section>
   );
 }
 
@@ -107,14 +262,9 @@ export function FactGrid({ facts, citation, onOpenSource, onOpenEntity, sourceLa
   // A groupBy/list breakdown (many sourceless, statusless rows) renders as a
   // dense two-column table instead of the citation-oriented grid below.
   if (facts.length > GROUP_TABLE_THRESHOLD && facts.every(isGroupLikeFact)) {
-    return (
-      <section aria-labelledby="facts-heading">
-        <div className="mb-2">
-          <h3 id="facts-heading" className="dw-label">Breakdown</h3>
-        </div>
-        <GroupTable facts={facts} onOpenEntity={onOpenEntity} groupKeys={groupKeys} activeGroup={activeGroup} onSelectGroup={onSelectGroup} />
-      </section>
-    );
+    // GroupTable/StatusBreakdownTable each own their own <section>+heading (the latter also carries
+    // the "Sort by date" control in that same heading row) — no wrapper here, or "Breakdown" doubled.
+    return <GroupTable facts={facts} onOpenEntity={onOpenEntity} groupKeys={groupKeys} activeGroup={activeGroup} onSelectGroup={onSelectGroup} />;
   }
   // Owner follow-up (2026-09-21): "signify the citations better". A bare
   // [2] is a footnote; "2 · Invoice" says what kind of page backs the fact

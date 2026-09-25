@@ -117,7 +117,32 @@ const TODAY = '2026-09-23';
   check('intent: "who owes us money" (no superlative) still stays open_invoices, never hijacked by the new who-owes-the-most intent', I('who owes us money')?.intent === 'open_invoices');
   check('intent: "who is our biggest customer by revenue" stays top_customers (a customer ranking, not the new single-invoice superlative)', I('who is our biggest customer by revenue')?.intent === 'top_customers');
 
+  // TEAM K (2026-09-25, R5_FAILS.md financials 59/81): plain "how many <docs> do we have",
+  // "average quote/agreement-fee", "total value of our quotes", "biggest purchase order" and
+  // "is X all paid up" had NO shape here at all and fell through to the agent.
+  eq('intent: plain document counts (invoices/quotes/POs), never stolen by a status/threshold word', [
+    I('How many invoices do we have on file?')?.intent, I('How many purchase orders do we have?')?.intent,
+    I('How many quotes or estimates do we have on file?')?.intent, I('How many invoices did we send last month?')?.intent,
+    I('How many invoices are still unpaid?')?.intent, I('How many invoices are over $5,000?')?.intent,
+  ], ['document_count', 'document_count', 'document_count', 'document_count', 'open_invoices', 'threshold_invoices']);
+  eq('intent: customers invoiced, quotes total value, quote/agreement averages, PO superlative, paid-up', [
+    I('How many customers have we invoiced?')?.intent,
+    I("What's the total value of our quotes?")?.intent,
+    I("What's the average quote amount?")?.intent, I("What's the average quote amount?")?.docKind,
+    I("What's the average annual fee on our maintenance agreements?")?.intent,
+    I("What's our biggest purchase order?")?.intent, I("What's our biggest purchase order?")?.superlative,
+    I('Is Mercer all paid up?')?.intent, I('Is Mercer all paid up?')?.subject,
+  ], ['customers_invoiced_count', 'quotes_total', 'avg_invoice', 'estimate', 'avg_agreement_fee', 'superlative_po', 'max', 'customer_paid_up', 'mercer']);
+
   const C = await import('../api/_lib/financials/classify.js');
+  const analyticsMod = await import('../api/_lib/analytics.js');
+  check('classify gate: every new shape above also clears isFinancialQuestion/isMoneyQuestion (the money gate ask.js checks before calling parseMoneyIntent)', [
+    'How many invoices do we have on file?', 'How many purchase orders do we have?', 'How many quotes or estimates do we have on file?',
+    'How many customers have we invoiced?', "What's the total value of our quotes?", "What's the average quote amount?",
+    "What's the average annual fee on our maintenance agreements?", "What's our biggest purchase order?", 'Is Mercer all paid up?',
+    'How much do our maintenance agreements bring in?', 'How much have we spent on purchase orders?', 'How much do we owe vendors right now?',
+    'How much is past due?', 'When was the last invoice for Holbrook?',
+  ].every((qq) => C.isFinancialQuestion(qq.toLowerCase()) || analyticsMod.isMoneyQuestion(qq.toLowerCase())));
   check('classify: catches every R3_FAILS phrasing MONEY_RE (analytics.js) missed', [
     'how many invoices are still unpaid', 'do we have any overdue invoices', 'invoices are over $5,000', 'invoices under $500',
     "what's the biggest invoice we've ever sent", 'which customer owes us the most right now', 'who has an overdue balance i need to call',

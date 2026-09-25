@@ -64,6 +64,16 @@ export function AskScreen() {
     else if (t.kind === 'customer') openCustomer(t.ref);
     else openEntity(t.id);
   }, [openCustomer, openEntity]);
+  // Owner defect report (2026-09-25): a fact whose entityId happens to be a customer (e.g. a name in
+  // the warranty breakdown) went through the generic openEntity -> EntityScreen, which has no real
+  // "customer" case (it's built for property/equipment/technician/service) — the screen fell back to
+  // showing the raw id as the title and "None on record" for a "Properties" section this domain
+  // doesn't even have. A customer entityId must open the real CustomerProfileScreen instead, same as
+  // every other customer link in the app; EntityScreen stays correct for equipment/other entity types.
+  const openFactEntity = useCallback((id: string) => {
+    if (entities[id]?.type === 'customer') openCustomer(id);
+    else openEntity(id);
+  }, [entities, openCustomer, openEntity]);
   const requestId = useRef(0);
 
   const submit = useCallback(
@@ -248,7 +258,7 @@ export function AskScreen() {
             includeUnverified={includeUnverified}
             onToggleUnverified={setIncludeUnverified}
             onOpenSource={setPreview}
-            onOpenEntity={openEntity}
+            onOpenEntity={openFactEntity}
             onOpenRecord={openRecord}
           />
         )}

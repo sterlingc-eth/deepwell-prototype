@@ -23,7 +23,7 @@ export const MAX_RECORDS = 200;
 export const RECORD_TYPES = Object.freeze(['customer', 'unit', 'document', 'invoice']);
 
 /** In-process counters (tests read them; the log line is the production signal). */
-export const citationStats = { countMismatch: 0, derived: 0, defaulted: 0, capped: 0 };
+export const citationStats = { countMismatch: 0, derived: 0, defaulted: 0, capped: 0, uncited: 0 };
 
 const clip = (v, n) => {
   if (v == null) return undefined;
@@ -228,6 +228,14 @@ export function finalizeCitations(data) {
   if (typeof data.basis !== 'string' || !data.basis.trim()) {
     citationStats.defaulted++;
     data.basis = defaultBasis(data, data.records, data.recordsTotal);
+  }
+  // TEAM K (2026-09-25, R5_FAILS.md "several right answers had no citation"): a real answer (not a
+  // no-answer, which has nothing to cite by definition, and not an honest 'searched'-kind zero) that
+  // still carries zero records after every producer/enrich/derive step has had its chance is worth
+  // watching in production - counted here, never logged with the question or the answer text.
+  if (data.kind === 'answer' && data.records.length === 0 && data.recordsKind !== 'searched') {
+    citationStats.uncited++;
+    logCounter('uncited_answer', data.kind);
   }
   return data;
 }

@@ -68,6 +68,24 @@ const UI = await import('../src/core/citations.ts');
   check('finalize is idempotent', twice === JSON.stringify(fin));
   check('finalize leaves non-answer bodies alone', C.finalizeCitations({ error: 'x' }).records === undefined);
 
+  // TEAM K (2026-09-25, R5_FAILS.md "several right answers had no citation"): a production counter,
+  // never the question or answer text, fires whenever a real answer still ends up with zero records
+  // after finalize's own best-effort derivation - the signal an operator needs to catch a producer
+  // that silently stopped citing, without logging anything sensitive.
+  const beforeUncited = C.citationStats.uncited;
+  const bare = C.finalizeCitations({ kind: 'answer', text: 'Yes, 3 of them.', facts: [] });
+  check('uncited_answer counter: a real answer with nothing to derive a record from is counted and logged (bare counter, no text)',
+    C.citationStats.uncited === beforeUncited + 1 && bare.records.length === 0
+    && logged.some((l) => /"citations":"uncited_answer"/.test(l) && !/Yes, 3 of them/.test(l)));
+  const stillUncited = C.citationStats.uncited;
+  C.finalizeCitations({ kind: 'no-answer', text: 'Nothing found.', facts: [] });
+  check('uncited_answer counter: a no-answer never counts (nothing to cite by definition)', C.citationStats.uncited === stillUncited);
+  const stillUncited2 = C.citationStats.uncited;
+  C.finalizeCitations({ kind: 'answer', text: 'x', facts: [], records: [], recordsTotal: 0, recordsKind: 'searched', basis: 'Searched everything; nothing matched.' });
+  check('uncited_answer counter: an honest "searched, found nothing" zero never counts either', C.citationStats.uncited === stillUncited2);
+  const withRecord = C.finalizeCitations({ kind: 'answer', text: 'x', facts: [{ label: 'A', value: '1', entityId: 'e1', sources: [] }] });
+  check('uncited_answer counter: an answer finalize CAN derive a record from is never counted', C.citationStats.uncited === stillUncited2 && withRecord.records.length === 1);
+
   const basis = (plan, o) => A.analyticsBasis(plan, o);
   check('basis: "Counted customers whose service address is in Mesa, AZ"-style sentence', /^Counted customers whose service address is in Mesa and whose service address is in AZ\.$/.test(basis({ entity: 'customers', op: 'count', filters: [{ field: 'city', op: 'eq', value: 'Mesa' }, { field: 'state', op: 'eq', value: 'AZ' }] })) || /^Counted customers whose service address is in Mesa/.test(basis({ entity: 'customers', op: 'count', filters: [{ field: 'city', op: 'eq', value: 'Mesa' }] })));
   check('basis: documents by month say which date they are dated by', /by service date/.test(basis({ entity: 'documents', op: 'groupBy', groupBy: 'month', filters: [] })) && /by upload date/.test(basis({ entity: 'documents', op: 'count', dateBasis: 'uploaded', filters: [] }, { monthLabel: 'September 2026' })) && /1 future-dated service record/.test(basis({ entity: 'serviceVisits', op: 'count', filters: [] }, { futureVisitCount: 1 })));
@@ -95,6 +113,12 @@ const UI = await import('../src/core/citations.ts');
   const n = UI.normalizeCitations({ records: [{ type: 'customer', id: 'a', label: 'A' }, { type: 'bogus', id: 'b' }, null, { type: 'unit' }], recordsTotal: 9, basis: '  how  ' });
   check('ui: normalizeCitations drops malformed rows, keeps recordsTotal and trims basis', n.records.length === 1 && n.recordsTotal === 9 && n.basis === 'how');
   check('ui: the panel is hidden when it would only repeat the Sources list', UI.showRecordsPanel({ records: [{ type: 'document', id: 'd1', label: 'x' }], sources: [{ documentId: 'd1', location: {} }], kind: 'answer' }) === false && UI.showRecordsPanel({ records: recs, sources: [], kind: 'answer' }) === true);
+
+  // Owner report (2026-09-25): a two-sentence answer must split into one plain headline + a muted
+  // secondary line, never render as one giant confusing claim.
+  eq('ui: splitAnswerHeadline splits at the first sentence', UI.splitAnswerHeadline('13 customers have equipment currently under warranty (active or expiring status). 14 in all.'), { headline: '13 customers have equipment currently under warranty (active or expiring status).', secondary: '14 in all.' });
+  eq('ui: splitAnswerHeadline leaves a single sentence alone', UI.splitAnswerHeadline('You have 6 customers.'), { headline: 'You have 6 customers.', secondary: null });
+  eq('ui: splitAnswerHeadline never splits inside a dollar amount', UI.splitAnswerHeadline('The total is $1,250.00 across 3 invoices.'), { headline: 'The total is $1,250.00 across 3 invoices.', secondary: null });
 }
 
 /* ================================================================== harness: real Postgres via PGlite */
@@ -302,6 +326,22 @@ const plan = (p) => withTenant(ctxA, (db) => executeAnalyticsPlan(db, { filters:
   check('financial revenue by month: every month row has records carrying that month as group key', mon.handled && mon.data.facts.every((f) => gm[f.label] >= 1) && contractOk(mon.data), JSON.stringify({ gm, f: mon.data.facts.map((f) => f.label) }));
   const none = await gate('what did we spend with ferguson');
   if (none.handled) check('financial honest zero cites what was searched', none.data.recordsKind === 'searched' && /Searched/.test(none.data.basis));
+
+  // TEAM K (2026-09-25, R5_FAILS.md "citations everywhere"): every producer's representative answer
+  // carries records/sources unless it is an honest zero (recordsKind 'searched', or a no-answer) -
+  // exercised here over the newest financial intents (document counts, quotes total, PO superlative,
+  // customer paid-up), each against the same seeded fixture used by every other check in this file.
+  const citedOrHonestZero = (d) => Boolean(d) && (d.records.length > 0 || d.recordsKind === 'searched' || d.kind === 'no-answer');
+  const docCount = await gate('How many invoices do we have on file?');
+  check('financial document count: cites the invoices counted', docCount.handled && citedOrHonestZero(docCount.data) && docCount.data.records.length === 3, JSON.stringify(docCount.data).slice(0, 300));
+  const custCount = await gate('How many customers have we invoiced?');
+  check('financial customers-invoiced count: cites the customers, not a bare number', custCount.handled && citedOrHonestZero(custCount.data) && custCount.data.records.length === 2, JSON.stringify(custCount.data).slice(0, 300));
+  const avgQuote = await gate("What's the average quote amount?");
+  check('financial average quote (none on file): an honest zero, not a fabricated average', avgQuote.handled && citedOrHonestZero(avgQuote.data) && avgQuote.data.recordsKind === 'searched', JSON.stringify(avgQuote.data).slice(0, 300));
+  const bigPo = await gate("What's our biggest purchase order?");
+  check('financial biggest PO (none on file): an honest zero, not an invented figure', bigPo.handled && citedOrHonestZero(bigPo.data) && bigPo.data.recordsKind === 'searched', JSON.stringify(bigPo.data).slice(0, 300));
+  const paidUp = await gate('Is Karen Abernathy all paid up?');
+  check('financial "is X paid up": cites her invoices (not a bare yes/no)', paidUp.handled && citedOrHonestZero(paidUp.data) && paidUp.data.records.length >= 1 && /No —/.test(paidUp.data.text), JSON.stringify(paidUp.data).slice(0, 300));
 }
 
 /* ================================================================== 8. agent: run_query row identities */
@@ -321,6 +361,19 @@ const run = (question, callModel) => runDonovanAgent({ withTenant, ctxArg: ctxA,
   check('agent: aggregates keep the unsourced shape (sources stay [] - records are separate)', d.sources.length === 0 && d.facts.every((f) => f.sources.length === 0));
   check('agent: basis is deterministic and names the views + purpose', /Computed from 3 matching records returned by a read-only query over your customer records \(customers in Mesa\)/.test(d.basis), d.basis);
   check('agent: tenant B never appears', noTenantB(d));
+}
+{
+  // Owner report (2026-09-25): the model's own `basis` echoed the SQL schema it was shown
+  // ("Counted distinct customer_id from equipment where warranty_current = true.") instead of plain
+  // English. Even though every number in it is real evidence (so the digit-grounding check alone
+  // would accept it), it must still be rejected as jargon and replaced with the deterministic,
+  // always-human queryBasis() sentence.
+  const model = scripted([
+    () => [tu('run_query', { purpose: 'customers in Mesa', sql: "SELECT customer_id, name, city, count(*) OVER () AS total_count FROM customers WHERE city = 'Mesa' ORDER BY name" })],
+    (m) => { const p = JSON.parse(lastResult(m)); return [tu('answer', { status: 'answered', text: `You have ${p.rowCount} customers in Mesa.`, basis: 'Counted distinct customer_id from customers where city_name = true.', facts: [{ label: 'Customers in Mesa', value: String(p.rowCount) }] })]; },
+  ]);
+  const r = await run('how many customers are in Mesa', model);
+  check('agent: a SQL-jargon model basis is rejected for the deterministic, human sentence', /Computed from 3 matching records returned by a read-only query over your customer records/.test(r.data.basis) && !/customer_id|city_name/.test(r.data.basis), r.data.basis);
 }
 {
   // breakdown: group_key is carried per record

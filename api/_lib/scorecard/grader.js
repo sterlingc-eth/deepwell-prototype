@@ -23,8 +23,16 @@ const GRADE_TOOL = {
   },
 };
 
-const SYSTEM = `You are a strict grader for an HVAC shop's records assistant. You get a QUESTION, a RUBRIC, REFERENCE facts pulled straight from the shop's database, and the assistant's ANSWER.
-Pass only if the ANSWER meets every requirement in the RUBRIC and is consistent with the REFERENCE: it must not contradict the reference and must not state facts the reference does not support. If the REFERENCE is empty, the only correct answer is that nothing is on file (an answer that invents details fails). A vague or evasive answer to a question the reference can answer fails. Call the grade tool once.`;
+// TEAM K (2026-09-25, R5_FAILS.md "maintenance-due 1/5 ... invents customer names"): the grader
+// used to see ONLY a capped, alphabetically-truncated REFERENCE sample (e.g. the oracle's own
+// "first 15" rows) with no way to tell a real name the sample happened to cut off from a genuine
+// fabrication - it judged "not in REFERENCE" as "invented". RECORDS below is the deterministic
+// citation list the answer itself attaches (api/_lib/citations/records.js): every name there is
+// backed by an actual document/customer row in the shop's own data, independent of whatever
+// REFERENCE's own SQL happened to sample. The grader now treats REFERENCE as a (possibly partial)
+// sample to check CONSISTENCY against, and RECORDS as the ground truth for WHICH names are real.
+const SYSTEM = `You are a strict grader for an HVAC shop's records assistant. You get a QUESTION, a RUBRIC, REFERENCE facts pulled straight from the shop's database (a SAMPLE of matching rows, not necessarily the complete list - a name absent from it is not by itself evidence of fabrication), the RECORDS the answer itself cites (each one backed by an actual document or customer row in the shop's own files - a name appearing here is grounded, whether or not REFERENCE repeats it), and the assistant's ANSWER.
+Pass only if the ANSWER meets every requirement in the RUBRIC and does not CONTRADICT the REFERENCE, and every fact it states is supported by REFERENCE or RECORDS (or is plain arithmetic/wording over them). Fail only a fact backed by NEITHER REFERENCE NOR RECORDS - never a name merely missing from a capped REFERENCE sample when RECORDS backs it. If REFERENCE and RECORDS are both empty, the only correct answer is that nothing is on file (an answer that invents details then fails). A vague or evasive answer to a question the reference can answer fails. Call the grade tool once.`;
 
 const clip = (s, n) => String(s ?? "").slice(0, n);
 
@@ -34,11 +42,15 @@ async function defaultCallModel(req, { deadlineAt }) {
 }
 
 /**
+ * @param {string[]} [p.citedRecords]  the answer's OWN citation records (records[].label + sublabel,
+ *   from api/_lib/citations/records.js), formatted as short lines - independent ground truth for which
+ *   named entities are real, since REFERENCE alone may be a capped/truncated sample (TEAM K, see SYSTEM above).
  * @returns {Promise<{passed: boolean, reason: string, costUsd: number, error?: string}>}
  */
-export async function gradeRubric({ ctxArg, question, rubric, reference, answerText, callModel = defaultCallModel, deadlineAt = Date.now() + 20_000 }) {
+export async function gradeRubric({ ctxArg, question, rubric, reference, answerText, citedRecords, callModel = defaultCallModel, deadlineAt = Date.now() + 20_000 }) {
   const refText = (reference ?? []).map((r) => `- ${clip(r, 300)}`).join("\n").slice(0, 2500) || "(empty: nothing on file)";
-  const user = `QUESTION: ${clip(question, 300)}\n\nRUBRIC: ${clip(rubric, 400)}\n\nREFERENCE (from the database):\n${refText}\n\nANSWER:\n${clip(answerText, 1200)}`;
+  const recordsText = (citedRecords ?? []).length ? `\n\nRECORDS THE ANSWER CITES (each backed by a real document/customer row):\n${(citedRecords ?? []).map((r) => `- ${clip(r, 200)}`).join("\n").slice(0, 2000)}` : "";
+  const user = `QUESTION: ${clip(question, 300)}\n\nRUBRIC: ${clip(rubric, 400)}\n\nREFERENCE (sample from the database, not necessarily complete):\n${refText}${recordsText}\n\nANSWER:\n${clip(answerText, 1200)}`;
   try {
     const resp = await callModel(
       {

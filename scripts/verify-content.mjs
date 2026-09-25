@@ -75,6 +75,37 @@ const {
     'which customers are overdue for maintenance',
   ];
   for (const q of neverHijack) check(`parse: never hijacks "${q}"`, parseContentCountQuestion(q) === null);
+  // still yields to a structured, time-scoped or replacement question (round 5: the question-shape
+  // fallback anchor must not swallow these — they need the agent/multi-hop path, not a bare mention scan).
+  const stillFallsThrough = [
+    'which customers had a compressor replaced this year',
+    'how many trane customers had a capacitor replaced last year',
+  ];
+  for (const q of stillFallsThrough) check(`parse: still falls through (replaced/time-window) "${q}"`, parseContentCountQuestion(q) === null);
+
+  // round 5 (R5_FAILS.md #2): all 15 semantic-paraphrase exam questions (test-docs/scorecard/breadth.mjs
+  // SYMPTOMS) parse and pick a real HVAC term, even though none of them say "mention"/"issue"/"complaint".
+  const semanticCases = [
+    ['Which customers complained the unit is loud?', 'noise'],
+    ['Who called about a rattling or humming outdoor unit?', 'noise'],
+    ['How many jobs were for a noise complaint?', 'noise'],
+    ['Which customers said their AC wasn\'t keeping up?', 'not cooling'],
+    ['Who had a no-cooling call?', 'not cooling'],
+    ['How many calls were for warm air coming out of the vents?', 'not cooling'],
+    ['Which customers had water dripping from the unit?', 'leak'],
+    ['Who called about a leak?', 'leak'],
+    ['How many jobs mention a water leak?', 'leak'],
+    ['Which customers had a unit that would not turn on?', 'no power'],
+    ['Who had a tripped breaker on the AC?', 'no power'],
+    ['How many calls were for a system that won\'t start?', 'no power'],
+    ['Which customers reported a strange smell?', 'odor'],
+    ['Who complained about a burning odor from the vents?', 'odor'],
+    ['How many jobs mention an odor?', 'odor'],
+  ];
+  for (const [q, term] of semanticCases) {
+    const got = parseContentCountQuestion(q);
+    check(`semantic parse: "${q}" -> parses and finds "${term}"`, Boolean(got) && got.terms.includes(term), JSON.stringify(got));
+  }
 }
 
 /* ================================================================== harness: real Postgres via PGlite */

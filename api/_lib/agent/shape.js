@@ -159,7 +159,12 @@ export function shapeAgentAnswer(raw, ledger, { question = "", today = "" } = {}
   if (rowsCut || overflow) {
     text = `${text.replace(/[.\s]+$/, "")}. Showing ${facts.length} of ${totalRows}; ask me to narrow it down for the rest.`;
     dropped.truncated = true;
-  } else if (facts.length >= 4 && !digitTokens(text).includes(String(facts.length))) {
+  } else if (facts.length >= 4 && digitTokens(text).length === 0) {
+    // Only append a fact count when the sentence states NO number at all. When it already states one
+    // (e.g. "13 customers have equipment under warranty") but that number differs from facts.length
+    // (14 rows: one customer has two units), appending "14 in all" reads as a contradiction — a real
+    // owner-reported defect (2026-09-25). The model's own number already passed textNumsOk above (it
+    // must appear in the tool evidence), so it is trusted over a blind row count here.
     text = `${text.replace(/[.\s]+$/, "")}. ${facts.length} in all.`;
   }
 

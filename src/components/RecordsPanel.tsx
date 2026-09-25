@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { ChevronDown, FileText, Receipt, Search, User, Wrench, X } from 'lucide-react';
-import type { AnswerRecord } from '../core/types';
+import type { AnswerRecord, SourceRef } from '../core/types';
 import { filterRecords, recordGroups, recordsHeading } from '../core/citations';
 
 const ICON = { customer: User, unit: Wrench, document: FileText, invoice: Receipt } as const;
@@ -16,6 +16,9 @@ interface RecordsPanelProps {
   group: string | null;
   onGroupChange: (group: string | null) => void;
   onOpenRecord: (record: AnswerRecord) => void;
+  /** A customer/unit record's own supporting document (e.g. a warranty registration) — records carry
+   *  `documentId` when there is one to show. Optional: omitted, rows just carry no source affordance. */
+  onOpenSource?: (ref: SourceRef) => void;
 }
 
 /**
@@ -24,7 +27,7 @@ interface RecordsPanelProps {
  * the customer profile, a unit's customer, or the document at the cited page. Fully keyboard operable:
  * the disclosure and every row are real buttons, Escape in the search box clears it.
  */
-export function RecordsPanel({ records, total, kind, open, onToggle, group, onGroupChange, onOpenRecord }: RecordsPanelProps) {
+export function RecordsPanel({ records, total, kind, open, onToggle, group, onGroupChange, onOpenRecord, onOpenSource }: RecordsPanelProps) {
   const [query, setQuery] = useState('');
   const uid = useId();
   const panelId = `${uid}-records`;
@@ -97,13 +100,17 @@ export function RecordsPanel({ records, total, kind, open, onToggle, group, onGr
             <ul className="max-h-80 overflow-y-auto divide-y divide-line">
               {shown.map((r, i) => {
                 const Icon = ICON[r.type];
+                // A customer/unit record's own supporting document (e.g. a warranty registration) —
+                // owner report (2026-09-25): "SOURCES · 0" should never appear when a record like this
+                // one actually has a document behind it; show it here instead.
+                const hasOwnSource = (r.type === 'customer' || r.type === 'unit') && Boolean(r.documentId) && Boolean(onOpenSource);
                 return (
-                  <li key={`${r.type}-${r.id}-${r.group ?? ''}-${r.page ?? ''}-${i}`}>
+                  <li key={`${r.type}-${r.id}-${r.group ?? ''}-${r.page ?? ''}-${i}`} className="flex items-stretch">
                     <button
                       type="button"
                       onClick={() => onOpenRecord(r)}
                       aria-label={`Open ${TYPE_WORD[r.type].toLowerCase()}: ${r.label}${r.page ? `, page ${r.page}` : ''}`}
-                      className="w-full text-left flex items-start gap-2.5 px-3 py-2 min-h-[44px] hover:bg-surface-2 transition-colors duration-quick"
+                      className="flex-1 min-w-0 text-left flex items-start gap-2.5 px-3 py-2 min-h-[44px] hover:bg-surface-2 transition-colors duration-quick"
                     >
                       <Icon className="w-4 h-4 mt-1 shrink-0 text-ink-3" aria-hidden="true" />
                       <span className="min-w-0 flex-1">
@@ -118,6 +125,17 @@ export function RecordsPanel({ records, total, kind, open, onToggle, group, onGr
                         <span className="dw-pill-muted shrink-0 max-w-[10rem] truncate">{r.group}</span>
                       )}
                     </button>
+                    {hasOwnSource && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenSource?.({ documentId: r.documentId as string, location: r.page ? { page: r.page } : { field: 'document' } })}
+                        aria-label={`Open the source document for ${r.label}`}
+                        title="Open source document"
+                        className="shrink-0 self-stretch px-3 grid place-items-center text-ink-3 hover:text-ink hover:bg-surface-2 border-l border-line transition-colors duration-quick"
+                      >
+                        <FileText className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    )}
                   </li>
                 );
               })}

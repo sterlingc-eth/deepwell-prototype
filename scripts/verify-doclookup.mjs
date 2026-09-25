@@ -623,6 +623,33 @@ eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernath
   // 9. full file / unit notes are recognised
   eq('teamA file :: "what do we have on file for X" is a full-file lookup', parseContactLookupQuestion('what do we have on file for Bracken')?.field, 'full');
   check('teamA notes :: "notes on the Bracken unit" is recognised', Boolean(parseContactLookupQuestion('notes on the Bracken unit')));
+
+  // 10. round 5 (R5_FAILS.md #3): notes are chronological BY SERVICE DATE (never upload order) and a
+  // future-dated one is excluded from "most recent" and called out, same rule as visits.
+  const CF = await import('../api/_lib/customerFile.js');
+  {
+    const TODAY2 = '2026-09-23';
+    // upload order (documentId d1..d3) deliberately disagrees with service-date order.
+    const data = {
+      ids: ['d1', 'd2', 'd3'],
+      notes: [
+        { documentId: 'd1', text: 'Oldest note', date: '2026-01-01', type: 'service-ticket' },
+        { documentId: 'd2', text: 'Newest note', date: '2026-08-01', type: 'service-ticket' },
+        { documentId: 'd3', text: 'Middle note', date: '2026-04-01', type: 'service-ticket' },
+      ],
+      work: [], passages: [], reminders: [], future: [],
+    };
+    // exercise fetchNotes' own sort/split via scope.js directly (pure, no DB needed)
+    const sorted = S.splitFuture(data.notes, TODAY2);
+    eq('teamA notes :: sorted by SERVICE date, not upload/document order', sorted.past.map((n) => n.text).join(','), 'Newest note,Middle note,Oldest note');
+
+    const withFuture = [...data.notes, { documentId: 'd4', text: 'Scheduled note', date: '2027-01-01', type: 'service-ticket' }];
+    const split2 = S.splitFuture(withFuture, TODAY2);
+    eq('teamA notes :: a future-dated note is set aside, not treated as most recent', split2.past[0].text, 'Newest note');
+    eq('teamA notes :: the future note is the one excluded', split2.future.map((n) => n.text).join(','), 'Scheduled note');
+    const ans = CF.buildNotesAnswer('the unit at 1 Main St', [{ id: 'c1' }], { ids: ['d1', 'd2', 'd3', 'd4'], notes: split2.past, work: [], passages: [], reminders: [], future: split2.future }, TODAY2);
+    check('teamA notes :: buildNotesAnswer mentions the excluded future note', /left it out/.test(ans.text), ans.text);
+  }
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

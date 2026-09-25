@@ -112,6 +112,16 @@ export function noteSearch(ledger, s) {
 
 const digits = (s) => (String(s).toLowerCase().match(/[a-z0-9$#][a-z0-9$#.,:/-]*/g) ?? []).map((t) => t.replace(/[.,:/-]+$/, '')).filter((t) => /\d/.test(t));
 
+// Owner report (2026-09-25): the model's own `basis` field ("Counted distinct customer_id from
+// equipment where warranty_current = true.") passed the digit-grounding check above but read as raw
+// SQL/schema — it was parroting the column names agent/tools.js's system prompt shows it
+// (warranty_current, customer_id, equipment_id, ...). Rejected here so those fall back to the
+// deterministic, always-human queryBasis()/viewsPhrase() wording instead. A false positive just means
+// an honest generic sentence where the model's own (still fine) one might have worked — never wrong,
+// see this file's basisOk pattern throughout.
+const SQL_JARGON_RE = /\b[a-z][a-z]*_[a-z][a-z_]*\b|=\s*(?:true|false)\b|\b(?:select|distinct|inner join|left join|group by|order by|where)\b/i;
+const looksLikeSqlJargon = (s) => SQL_JARGON_RE.test(String(s ?? ''));
+
 function viewsPhrase(views) {
   const nouns = [...new Set(views.map((v) => VIEW_NOUN[v]).filter(Boolean))];
   return nouns.length ? nouns.join(' and ') : 'your records';
@@ -136,7 +146,8 @@ export async function citeAgentData({ withTenant, ctxArg, data, ledger, input })
     // the model may add its own one-sentence basis, but only if every number in it is real evidence
     const modelBasis = typeof input?.basis === 'string' ? input.basis.trim().replace(/\s+/g, ' ') : '';
     const evidence = ledger.corpus ?? '';
-    const basisOk = modelBasis && modelBasis.length <= 240 && digits(modelBasis).every((t) => evidence.includes(t) || evidence.includes(t.replace(/,/g, '')) || String(data.text).toLowerCase().includes(t));
+    const basisOk = modelBasis && modelBasis.length <= 240 && !looksLikeSqlJargon(modelBasis) &&
+      digits(modelBasis).every((t) => evidence.includes(t) || evidence.includes(t.replace(/,/g, '')) || String(data.text).toLowerCase().includes(t));
 
     if (iq.length) {
       const chosen = (factNums != null ? [...iq].reverse().find((q) => q.total === factNums) : null) ?? iq[iq.length - 1];

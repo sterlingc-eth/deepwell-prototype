@@ -367,6 +367,12 @@ const THE_MOST_RE = /\bthe\s+most\b/i;
 // optional inside "who's", which would also start matching an unrelated
 // "whose" ("customers whose warranty...", a different shape entirely).
 const WHO_DUE_RE = /\bwho(?:'s|s\b|\s+is|\s+needs)\s+(?:due|overdue)\b/i;
+/** "Who's still under warranty?" / "who's out of warranty" — same bare "who's" shape as WHO_DUE_RE
+ *  above (no customer/equipment noun at all), for warranty instead of maintenance-due. Live gap
+ *  (2026-09-25 owner report): "how many clients are under warranty" already reaches analytics via
+ *  QUANTIFIER+aggregateNoun, but a "who's ..." phrasing of the exact same question named no
+ *  quantifier and no noun, so it fell through every gate here into the slow agent path instead. */
+const WHO_WARRANTY_RE = /\bwho(?:'s|s\b|\s+is|\s+are|\s+has|\s+have)\b[^?]*\bwarrant/i;
 /**
  * "Expired warranties -- what about just the Mesa ones?" / "Casa Grande
  * customers -- now just the ones with Goodman units" — a follow-up question
@@ -854,6 +860,10 @@ export function preClassifyAnalytics(question, opts = {}) {
       cr.whatDidWe.test(q) ||
       THE_MOST_RE.test(q) ||
       WHO_DUE_RE.test(q) ||
+      WHO_WARRANTY_RE.test(q) ||
+      // "clients out of warranty" / "customers under warranty" — a bare noun + warranty-status
+      // phrase with no quantifier word (QUANTIFIER below requires "how many"/"which"/etc).
+      (cr.aggregateNoun.test(q) && WARRANTY_STATUS_WORD_RE.test(q)) ||
       (cr.aggregateNoun.test(q) && AGE_FILTER_RE.test(q)) ||
       (cr.aggregateNoun.test(q) && SUPERLATIVE_RE.test(q)) ||
       (cr.aggregateNoun.test(q) && CONTACT_FILTER_RE.test(q)) ||

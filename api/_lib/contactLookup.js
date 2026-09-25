@@ -1080,8 +1080,8 @@ export async function runContactLookup(db, question, opts = {}) {
   if (parsed.field === "unitNotes") {
     const noteCandidates = await resolveContactCandidates(db, parsed.namePhrase);
     if (noteCandidates.length === 0) return null;
-    const noteData = await fetchNotes(db, noteCandidates);
-    return citeNotes(db, buildNotesAnswer(parsed.noteLabel, noteCandidates, noteData), parsed.noteLabel, noteData); // TEAM C
+    const noteData = await fetchNotes(db, noteCandidates, today);
+    return citeNotes(db, buildNotesAnswer(parsed.noteLabel, noteCandidates, noteData, today), parsed.noteLabel, noteData); // TEAM C
   }
 
   // Street-only shape (no customer name at all — see STREET_ONLY_RE's own

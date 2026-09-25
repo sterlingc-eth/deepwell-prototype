@@ -19,6 +19,12 @@
 import { classifyFastPath } from './fastPath.js';
 import { parseComparison, runComparison } from './comparison.js';
 import { parseMaintenanceDue, runMaintenanceDue } from './maintenanceDue.js';
+// Team J (2026-09-25): "why"/"explain" (explain.js) and multi-hop composable filters (compose.js) — same
+// idiom as comparison/maintenance-due above: pure shape detection here, DB work only in runDeterministic.
+import { parseExplain, runExplain } from './explain.js';
+import { parseCompose, runCompose } from './compose.js';
+import { parseTrends, runTrends } from './trends.js';
+import { parseRanking, runRanking } from './rankings.js';
 import { packForTenant } from './industry/index.js';
 import { resolveContactCandidates } from './contactLookup.js';
 import { brandMatches } from './analytics.js';
@@ -54,6 +60,14 @@ function fixRouterWordTypos(q) {
 /** Brand named in a question ("the Mitsubishi at ...") or null. */
 const BRAND_IN_Q = /\b(trane|carrier|goodman|lennox|rheem|york|daikin|mitsubishi)\b/i;
 
+// Team J: cheap, pack-agnostic gate for compose.js's real (pack-aware) parse — see classifyDeterministic's
+// own comment above. False positives cost one extra bounded DB read and fall through harmlessly; a false
+// negative here just means that phrasing goes down the normal analytics/agent chain instead, same as today.
+const COMPOSE_HINT_RE = /\b(older than \d+\s*years?|no email|more than\s+(?:one|\d+)\s+units?|two or more different brands|expired warrant(?:y|ies)|warrant(?:y|ies)\s+expiring|active warrant(?:y|ies)|maintenance agreement|purchase order|permits?\b|invoiced?|invoice)\b/i;
+function looksLikeComposeCandidate(q) {
+  return /\bcustomers?\b/i.test(q) && COMPOSE_HINT_RE.test(q);
+}
+
 /** Splits an "at <subject>" phrase into {address} or {name}. */
 function subjectFromPhrase(phrase) {
   const p = String(phrase ?? '').replace(/'s\b/i, '').trim();
@@ -74,6 +88,27 @@ export function classifyDeterministic(question) {
 
   const maint = parseMaintenanceDue(q);
   if (maint) return { route: 'maintenance', intent: maint };
+
+  // Team J: "why is X flagged" / "explain what happened" / "why would X need a follow-up" — pure (no pack
+  // needed to parse), so classified here just like every other route.
+  const explain = parseExplain(q);
+  if (explain) return { route: 'explain', intent: explain };
+
+  // Team J: period-over-period trends ("did we do more service calls last quarter than the quarter
+  // before", "which month had the most service calls this year") — pure (no pack needed).
+  const trend = parseTrends(q);
+  if (trend) return { route: 'trend', intent: trend };
+
+  // Team J: superlatives ("which customer has the most units") and technician performance ("how many
+  // jobs has X done") — pure (no pack needed).
+  const rank = parseRanking(q);
+  if (rank) return { route: 'rank', intent: rank };
+
+  // Team J: multi-hop composable filters ("a Trane unit older than 10 years and no maintenance
+  // agreement"). Real parsing needs the tenant's industry pack (brand/doc-type vocab), which this pure
+  // classifier has no DB for — so this is only a cheap candidate GATE; runDeterministic does the real
+  // parse (with pack) and returns null (falls through, same as any other route) when it doesn't hold up.
+  if (looksLikeComposeCandidate(q)) return { route: 'compose', question: q };
 
   const lastN = LAST_N_RE.exec(q);
   if (lastN) {
@@ -284,6 +319,15 @@ export async function runDeterministic(db, intent, { today } = {}) {
   // Team G (industry packs): db is already inside this tenant's transaction, so packForTenant is a plain read
   // against it — no second transaction — and its own 10-minute cache makes repeat calls free.
   if (intent.route === 'maintenance') return runMaintenanceDue(db, intent.intent, { today: t, pack: await packForTenant(db) });
+  if (intent.route === 'explain') return runExplain(db, intent.intent, { today: t, pack: await packForTenant(db) });
+  if (intent.route === 'trend') return runTrends(db, intent.intent, { today: t });
+  if (intent.route === 'rank') return runRanking(db, intent.intent);
+  if (intent.route === 'compose') {
+    const pack = await packForTenant(db);
+    const parsed = parseCompose(intent.question, pack);
+    if (!parsed) return null; // the cheap gate over-fired; not actually a multi-hop shape — fall through
+    return runCompose(db, parsed, { today: t });
+  }
   if (intent.route !== 'history') return null;
 
   const ctx = await resolveScope(db, intent);
@@ -301,8 +345,8 @@ export async function runDeterministic(db, intent, { today } = {}) {
     case 'unit-notes': {
       const customers = ctx.scope.customers;
       if (!customers.length) return null;
-      const nd = await fetchNotes(db, customers);
-      return citeNotes(db, buildNotesAnswer(`the unit at ${ctx.label}`, customers, nd), `the unit at ${ctx.label}`, nd); // TEAM C
+      const nd = await fetchNotes(db, customers, t);
+      return citeNotes(db, buildNotesAnswer(`the unit at ${ctx.label}`, customers, nd, t), `the unit at ${ctx.label}`, nd); // TEAM C
     }
     default:
       return null;

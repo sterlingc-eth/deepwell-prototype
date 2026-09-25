@@ -156,7 +156,7 @@ const RE = {
   open: /\b(?:open|unpaid|outstanding|owe us|owes us|owed to us|owing|receivables?|haven'?t paid|hasn'?t paid|not paid|still owe|who owes|money owed|balance due)\b|\bare owed\b|\bowed\b/i,
   byMonth: /\b(?:by month|monthly|per month|each month|month by month|month over month|by the month)\b/i,
   topCustomers: /\b(?:biggest|largest|top|best|highest)\b[^?]*\bcustomers?\b|\bcustomers?\b[^?]*\bby (?:revenue|sales|billing|spend)\b|\bwho(?:'s| is) our (?:biggest|best|top)\b/i,
-  avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair)\b|\bavg\s+(?:ticket|invoice)\b/i,
+  avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair|quote|estimate|proposal)\b|\bavg\s+(?:ticket|invoice)\b/i,
   last: /\b(?:last|latest|most recent|newest|previous)\s+(?:invoice|bill|job|ticket|charge|one|visit|service|repair|install(?:ation)?)\b/i,
   totalInvoiced: /\b(?:how much|total|revenue|sales|invoiced|billed|billing|income|earn(?:ed)?|brought in|made)\b/i,
   po: /\bpurchase orders?\b|\bpos\b/i,
@@ -179,6 +179,27 @@ const PAID_STATUS_RE = /\binvoices?\b[^?]*\b(paid|partial(?:ly\s+paid)?)\b|\b(pa
 const THRESHOLD_RE = /\b(over|above|more than|greater than|under|below|less than)\s*\$?\s?([\d,]+(?:\.\d+)?)\b(?!\s*days?\b)/i;
 const SUPERLATIVE_WORD_RE = /\b(biggest|largest|smallest|highest|lowest)\b/i;
 const OVERDUE_DAYS_RE = /\b(?:more than|over)\s+(\d{1,4})\s+days?\b/i;
+/*
+ * TEAM K (financial remainders, 2026-09-25, R5_FAILS.md): a handful of plain "how many
+ * <documents> do we have" / "total value of our quotes" / "average fee on our agreements" /
+ * "biggest purchase order" shapes had NO regex here at all and fell through to the agent
+ * (RE.totalInvoiced only fires on a money WORD - "how many invoices do we have on file" has
+ * none). Each is deterministic and cited exactly like its siblings above.
+ */
+const DOC_COUNT_RE = /\bhow many\s+(invoices?|quotes?|estimates?|proposals?|purchase orders?|pos)\b(?!.*\b(?:overdue|past due|paid|unpaid|open|outstanding|over\s*\$|under\s*\$|more than|less than|verify|unverified)\b)/i;
+const CUSTOMERS_INVOICED_RE = /\bhow many customers\b[^?]*\b(?:have we invoiced|did we invoice|have been invoiced|has invoiced us|bought from us)\b/i;
+const QUOTES_TOTAL_RE = /\btotal\s+(?:value|amount)\s+of\s+(?:our\s+)?(?:quotes?|estimates?|proposals?)\b/i;
+const AVG_AGREEMENT_FEE_RE = /\baverage\b[^?]*\b(?:annual\s+)?fee\b[^?]*\bagreements?\b|\bagreements?\b[^?]*\baverage\b[^?]*\bfee\b/i;
+/** "Is Mercer all paid up?" - a per-customer yes/no, always naming the unknown-status count too. */
+const CUSTOMER_PAID_UP_RE = /^is\s+(.+?)\s+(?:all\s+)?paid\s+up\b/i;
+
+/** "invoices" / "quotes or estimates" / "purchase orders" -> the financials `doc_kind` scope + noun. */
+function docKindFromWord(w) {
+  const s = String(w ?? '').toLowerCase();
+  if (/purchase order|^pos$/.test(s)) return { kind: 'po', noun: 'purchase order' };
+  if (/quote|estimate|proposal/.test(s)) return { kind: 'estimate', noun: 'quote' };
+  return { kind: 'invoice', noun: 'invoice' };
+}
 
 /**
  * @returns {{intent: string, period: object|null, subject: string|null}|null}  null when the
@@ -190,6 +211,16 @@ export function parseMoneyIntent(question, { today }) {
   const period = parsePeriod(q, today);
   const subject = extractSubjectPhrase(question);
   const mk = (intent, extra = {}) => ({ intent, period, subject, ...extra });
+  // "Is Mercer all paid up?" - extractSubjectPhrase's patterns don't cover this shape at all.
+  {
+    const m = q.match(CUSTOMER_PAID_UP_RE);
+    if (m) {
+      const nm = usablePhrase(m[1]);
+      if (nm) return mk('customer_paid_up', { subject: nm });
+    }
+  }
+  // Checked BEFORE RE.agreementFees (which would otherwise sum, not average, the fees).
+  if (AVG_AGREEMENT_FEE_RE.test(q)) return mk('avg_agreement_fee', { subject: null });
   if (RE.agreementFees.test(q)) return mk('agreement_fees', { subject: null });
   if (RE.quoteVsInvoice.test(q)) return mk('quote_vs_invoice');
   if (RE.payables.test(q) && !/\bowe us\b|\bowes us\b/.test(q)) return mk('payables_open', { subject: null });
@@ -201,6 +232,11 @@ export function parseMoneyIntent(question, { today }) {
   if (SUPERLATIVE_WORD_RE.test(q) && /\binvoices?\b/.test(q) && !/\bcustomers?\b/.test(q)) {
     const word = q.match(SUPERLATIVE_WORD_RE)[1].toLowerCase();
     return mk('superlative_invoice', { subject: null, superlative: word === 'smallest' || word === 'lowest' ? 'min' : 'max' });
+  }
+  // "what's our biggest purchase order" - same shape, purchase orders instead of invoices.
+  if (SUPERLATIVE_WORD_RE.test(q) && /\bpurchase orders?\b|\bpos\b/.test(q) && !/\bcustomers?\b/.test(q)) {
+    const word = q.match(SUPERLATIVE_WORD_RE)[1].toLowerCase();
+    return mk('superlative_po', { subject: null, superlative: word === 'smallest' || word === 'lowest' ? 'min' : 'max' });
   }
   // "invoices over $5,000" / "under $500" - a threshold count+list, never RE.totalInvoiced's
   // catch-all sum below (which would ignore the threshold entirely).
@@ -224,10 +260,13 @@ export function parseMoneyIntent(question, { today }) {
   if (RE.open.test(q) && !RE.last.test(q) && !RE.topCustomers.test(q)) return mk('open_invoices', { subject });
   if (RE.byMonth.test(q) && /\b(?:revenue|invoic|bill|sales|income|money)\w*/.test(q)) return mk('revenue_by_month', { subject: null });
   if (RE.topCustomers.test(q)) return mk('top_customers', { subject: null });
-  if (RE.avg.test(q)) return mk('avg_invoice', { subject });
+  if (RE.avg.test(q)) return mk('avg_invoice', { subject, docKind: /\b(?:quote|estimate|proposal)\b/.test(q) ? 'estimate' : 'invoice' });
   if (RE.last.test(q)) return mk('last_invoice', { subject });
   if (RE.spend.test(q) && !/\b(?:invoice|billed|bill) (?:we|to)\b/.test(q)) return mk('spend_total', { subject });
   if (RE.po.test(q) && RE.totalInvoiced.test(q)) return mk('po_total', { subject: null });
+  if (QUOTES_TOTAL_RE.test(q)) return mk('quotes_total', { subject: null });
+  if (CUSTOMERS_INVOICED_RE.test(q)) return mk('customers_invoiced_count', { subject: null });
+  if (DOC_COUNT_RE.test(q)) return mk('document_count', { subject: null, docKindWord: q.match(DOC_COUNT_RE)[1] });
   if (RE.totalInvoiced.test(q)) return mk('total_invoiced');
   return null;
 }
@@ -586,18 +625,91 @@ async function avgInvoice(db, intent, ctx) {
   if (g?.unresolved) return null;
   if (g?.answer) return g.answer;
   const p = intent.period;
+  // TEAM K (2026-09-25): "average quote/estimate amount" is the same shape over doc_kind='estimate'
+  // instead of 'invoice' - RE.avg now matches "quote"/"estimate" too (see parseMoneyIntent).
+  const isQuote = intent.docKind === 'estimate';
+  const noun = isQuote ? 'quote' : 'invoice';
+  const docKindSql = isQuote ? 'estimate' : 'invoice';
   const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
   const [a] = await q(db,
     `SELECT count(*)::int AS n, round(avg(f.total), 2) AS avg_total, sum(f.total) AS sum_total,
             (array_agg(jsonb_build_object('id', f.document_id, 'no', f.invoice_number, 'cust', f.customer_name, 'total', f.total, 'page', f.total_page, 'date', f.doc_date) ORDER BY f.doc_date DESC NULLS LAST))[1:200] AS docs,
-            (SELECT count(*)::int FROM financials x WHERE x.direction = 'receivable' AND x.doc_kind = 'invoice' AND x.total IS NULL) AS n_no_total
-       FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice' AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}
-        AND ($4::uuid[] IS NULL OR f.customer_id = ANY($4::uuid[]))`, [p?.from ?? null, p?.to ?? null, g?.ids ?? null], ctx.hu);
-  if (!a || a.n === 0) return baseAnswer('No invoices with printed totals match that, so there is no average to give.', [], { confidence: 1, ...zeroCite('Searched every customer invoice; none with a printed total match.') });
-  const text = `The average invoice${g ? ` for ${g.name}` : ''}${p ? ` in ${p.label}` : ''} is ${fmt(a.avg_total)} across ${plural(a.n, 'invoice')} (${fmt(a.sum_total)} total).${exclusionText({ noTotal: a.n_no_total })}`;
-  return baseAnswer(text, [{ label: 'Average invoice', value: fmt(a.avg_total), status: 'ok', sources: [] }, { label: 'Invoices averaged', value: String(a.n), status: 'info', sources: [] }], {
-    interpretation: 'average invoice',
-    cite: { records: (Array.isArray(a.docs) ? a.docs : []).map((d) => aggregatedDocRecord(d)), total: a.n, claimedCount: a.n, basis: `Averaged the printed totals of ${plural(a.n, 'customer invoice')}${g ? ` for ${g.name}` : ''}${p ? ` dated ${p.label}` : ''} (the sum divided by the count).` },
+            (SELECT count(*)::int FROM financials x WHERE x.direction = 'receivable' AND x.doc_kind = $5 AND x.total IS NULL) AS n_no_total
+       FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = $5 AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}
+        AND ($4::uuid[] IS NULL OR f.customer_id = ANY($4::uuid[]))`, [p?.from ?? null, p?.to ?? null, g?.ids ?? null, docKindSql], ctx.hu);
+  if (!a || a.n === 0) return baseAnswer(`No ${noun}s with printed totals match that, so there is no average to give.`, [], { confidence: 1, ...zeroCite(`Searched every customer ${noun}; none with a printed total match.`) });
+  const text = `The average ${noun}${g ? ` for ${g.name}` : ''}${p ? ` in ${p.label}` : ''} is ${fmt(a.avg_total)} across ${plural(a.n, noun)} (${fmt(a.sum_total)} total).${exclusionText({ noTotal: a.n_no_total, noun })}`;
+  return baseAnswer(text, [{ label: `Average ${noun}`, value: fmt(a.avg_total), status: 'ok', sources: [] }, { label: `${noun[0].toUpperCase()}${noun.slice(1)}s averaged`, value: String(a.n), status: 'info', sources: [] }], {
+    interpretation: `average ${noun}`,
+    cite: { records: (Array.isArray(a.docs) ? a.docs : []).map((d) => aggregatedDocRecord(d)), total: a.n, claimedCount: a.n, basis: `Averaged the printed totals of ${plural(a.n, `customer ${noun}`)}${g ? ` for ${g.name}` : ''}${p ? ` dated ${p.label}` : ''} (the sum divided by the count).` },
+  });
+}
+
+/** TEAM K: "total value of our quotes/estimates" - the estimate-side twin of totalInvoiced. */
+async function quotesTotal(db, intent, ctx) {
+  const p = intent.period;
+  const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
+  const [a] = await q(db,
+    `SELECT count(*) FILTER (WHERE f.total IS NOT NULL)::int AS n, COALESCE(sum(f.total) FILTER (WHERE f.total IS NOT NULL), 0) AS amount,
+            count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total
+       FROM financials f WHERE f.doc_kind = 'estimate' AND f.direction = 'receivable' AND f.currency = 'USD' AND ${inRange}`, [p?.from ?? null, p?.to ?? null], ctx.hu);
+  const docs = await q(db,
+    `SELECT f.* FROM financials f WHERE f.doc_kind = 'estimate' AND f.direction = 'receivable' AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}
+      ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null], ctx.hu);
+  if (!a || (a.n === 0 && a.n_no_total === 0)) return baseAnswer('No quotes or estimates with a printed total are on file yet.', [], { confidence: 1, ...zeroCite('Searched every quote/estimate on file; none have a printed total.') });
+  const text = a.n === 0
+    ? `None of the ${plural(a.n_no_total, 'quote')} on file print a total, so I can't total them.`
+    : `Quotes and estimates on file total ${fmt(a.amount)} across ${plural(a.n, 'quote')}${p ? ` (${p.label})` : ''}.${exclusionText({ noTotal: a.n_no_total, noun: 'quote' })}`;
+  return baseAnswer(text, [{ label: `Quote total${p ? ` (${p.label})` : ''}`, value: fmt(a.amount), status: 'ok', sources: docs.slice(0, 40).map((d) => docSource(d.document_id, d.total_page)) }, ...docs.slice(0, 8).map((d) => invoiceFact(d))], {
+    sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: 'total value of quotes',
+    cite: { records: financeRecords(docs), total: a.n, claimedCount: a.n, basis: `Summed the printed totals of ${plural(a.n, 'quote or estimate')}${p ? ` dated ${p.label}` : ''}.` },
+  });
+}
+
+/** TEAM K: "average annual fee on our maintenance agreements" - averages, never sums (agreementFees sums). */
+async function avgAgreementFee(db, intent, ctx) {
+  const [a] = await q(db,
+    `SELECT count(*)::int AS n, round(avg(f.total), 2) AS avg_total, count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_fee
+       FROM financials f WHERE f.doc_kind = 'agreement' AND f.direction = 'receivable' AND f.currency = 'USD' AND f.total IS NOT NULL`, [], ctx.hu);
+  if (!a || (a.n === 0 && a.n_no_fee === 0)) return baseAnswer('No maintenance agreements with a printed fee are on file yet.', [], { confidence: 1, ...zeroCite('Searched every maintenance agreement on file; none print a fee.') });
+  if (a.n === 0) return baseAnswer(`None of the ${plural(a.n_no_fee, 'maintenance agreement')} on file print a fee, so there is no average to give.`, [], { confidence: 1, ...zeroCite('Searched every maintenance agreement on file; none print a fee.') });
+  const docs = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'agreement' AND f.direction = 'receivable' AND f.currency = 'USD' AND f.total IS NOT NULL ORDER BY f.total DESC LIMIT 200`, [], ctx.hu);
+  const text = `The average maintenance agreement fee is ${fmt(a.avg_total)} across ${plural(a.n, 'agreement')} that print a fee.${exclusionText({ noTotal: a.n_no_fee, noun: 'agreement' })}`;
+  return baseAnswer(text, [{ label: 'Average agreement fee', value: fmt(a.avg_total), status: 'ok', sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)) }, { label: 'Agreements averaged', value: String(a.n), status: 'info', sources: [] }], {
+    interpretation: 'average maintenance agreement fee',
+    cite: { records: financeRecords(docs), total: a.n, claimedCount: a.n, basis: `Averaged the printed fee of ${plural(a.n, 'maintenance agreement')} (the sum divided by the count).` },
+  });
+}
+
+/** TEAM K: plain "how many invoices/quotes/purchase orders do we have on file" - no status/threshold word. */
+async function documentCount(db, intent, ctx) {
+  const { kind, noun } = docKindFromWord(intent.docKindWord);
+  const p = intent.period;
+  const scope = kind === 'po' ? `f.doc_kind = 'po'` : kind === 'estimate' ? `f.doc_kind = 'estimate' AND f.direction = 'receivable'` : `f.doc_kind = 'invoice' AND f.direction = 'receivable'`;
+  const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
+  const [a] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}`, [p?.from ?? null, p?.to ?? null], ctx.hu);
+  if (!a || a.n === 0) return baseAnswer(`No ${noun}s are on file${p ? ` in ${p.label}` : ''} yet.`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} on file${p ? ` dated ${p.label}` : ''}; found none.`) });
+  const docs = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null], ctx.hu);
+  const text = `We have ${plural(a.n, noun)} on file${p ? ` in ${p.label}` : ''}.`;
+  return baseAnswer(text, [{ label: `${noun[0].toUpperCase()}${noun.slice(1)}s on file`, value: String(a.n), status: 'info', sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)) }, ...docs.slice(0, 8).map((d) => invoiceFact(d))], {
+    sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: `${noun} count`,
+    cite: { records: financeRecords(docs), total: a.n, claimedCount: a.n, basis: `Counted every ${noun} on file${p ? ` dated ${p.label}` : ''}.` },
+  });
+}
+
+/** TEAM K: "how many customers have we invoiced" - distinct customers with at least one invoice. */
+async function customersInvoicedCount(db, intent, ctx) {
+  const rows = await q(db,
+    `SELECT f.customer_id, max(f.customer_name) AS name, count(*)::int AS n FROM financials f
+      WHERE ${REVENUE_WHERE} AND f.customer_id IS NOT NULL GROUP BY f.customer_id ORDER BY max(f.customer_name)`, [], ctx.hu);
+  const [ex] = await q(db, `SELECT count(*) FILTER (WHERE f.customer_id IS NULL)::int AS n_unlinked FROM financials f WHERE ${REVENUE_WHERE}`, [], ctx.hu);
+  if (!rows.length) return baseAnswer('No invoices are linked to a customer yet, so I can\'t count customers invoiced.', [], { confidence: 1, ...zeroCite('Searched every customer invoice; none are linked to a customer yet.') });
+  const unlinkedNote = ex.n_unlinked ? ` ${plural(ex.n_unlinked, 'invoice')} ${ex.n_unlinked === 1 ? "isn't" : "aren't"} linked to a customer and ${ex.n_unlinked === 1 ? "isn't" : "aren't"} counted.` : '';
+  const text = `We've invoiced ${plural(rows.length, 'customer')}.${unlinkedNote}`;
+  return baseAnswer(text, rows.slice(0, 40).map((r) => ({ label: r.name, value: plural(r.n, 'invoice'), status: 'ok', entityId: r.customer_id, sources: [] })), {
+    interpretation: 'distinct customers invoiced',
+    cite: { records: rows.map((r) => customerRecord({ id: r.customer_id, name: r.name }, { sublabel: plural(r.n, 'invoice') })), total: rows.length, claimedCount: rows.length,
+      basis: 'Counted distinct customers with at least one customer invoice or credit memo (USD).' },
   });
 }
 
@@ -772,6 +884,46 @@ async function superlativeInvoice(db, intent, ctx) {
   });
 }
 
+/** TEAM K: "what's our biggest/smallest purchase order" - the PO-side twin of superlativeInvoice. */
+async function superlativePo(db, intent, ctx) {
+  const which = intent.superlative === 'min' ? 'smallest' : 'biggest';
+  const dir = intent.superlative === 'min' ? 'ASC' : 'DESC';
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'po' AND f.currency = 'USD' AND f.total IS NOT NULL ORDER BY f.total ${dir} LIMIT 1`, [], ctx.hu);
+  if (!rows.length) return baseAnswer('No purchase orders with a printed total are on file yet.', [], { confidence: 1, ...zeroCite('Searched every purchase order for a printed total; none have one.') });
+  const r = rows[0];
+  const text = `The ${which} purchase order on file is ${fmt(r.total)}${r.invoice_number ? ` (PO #${r.invoice_number})` : ''}${r.doc_date ? `, dated ${humanDate(r.doc_date)}` : ''}.`;
+  return baseAnswer(text, [invoiceFact(r, `${which === 'biggest' ? 'Biggest' : 'Smallest'} purchase order`)], {
+    sources: [docSource(r.document_id, r.total_page)], interpretation: `${which} purchase order`,
+    cite: { records: financeRecords(rows), total: 1, claimedCount: 1, basis: `Took the purchase order with the ${which === 'biggest' ? 'highest' : 'lowest'} printed total.` },
+  });
+}
+
+/** TEAM K: "Is Mercer all paid up?" - names the unknown-status count too, never a bare confident yes/no. */
+async function customerPaidUp(db, intent, ctx) {
+  const g = await subjectGate(db, intent);
+  if (!g || g.unresolved) return null;
+  if (g.answer) return g.answer;
+  const [a] = await q(db,
+    `SELECT count(*)::int AS n_all, count(*) FILTER (WHERE f.status IN ('unpaid', 'partial'))::int AS n_open,
+            COALESCE(sum(f.open_balance) FILTER (WHERE f.status IN ('unpaid', 'partial') AND f.open_balance > 0), 0) AS open_total,
+            count(*) FILTER (WHERE f.status = 'unknown')::int AS n_unknown
+       FROM financials f WHERE ${INVOICE_SCOPE} AND f.customer_id = ANY($2::uuid[])`, [g.ids], ctx.hu);
+  if (!a || a.n_all === 0) return baseAnswer(`No invoices with financial details are on file for ${g.name} yet.`, [], { confidence: 1, ...zeroCite(`Searched the invoices linked to ${g.name}; none have financial details captured yet.`) });
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${INVOICE_SCOPE} AND f.customer_id = ANY($2::uuid[]) ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [g.ids], ctx.hu);
+  let text;
+  if (a.n_open === 0 && a.n_unknown === 0) {
+    text = `Yes — every invoice on file for ${g.name} is marked paid.`;
+  } else if (a.n_open > 0) {
+    text = `No — ${g.name} has ${plural(a.n_open, 'invoice')} marked unpaid or partly paid, totaling ${fmt(a.open_total)}.${a.n_unknown ? ` ${plural(a.n_unknown, 'invoice')} for ${g.name} ${a.n_unknown === 1 ? 'shows' : 'show'} no payment status, so ${a.n_unknown === 1 ? "it isn't" : "they aren't"} counted either way.` : ''}`;
+  } else {
+    text = `I can't say for sure — ${plural(a.n_unknown, 'invoice')} for ${g.name} ${a.n_unknown === 1 ? 'shows' : 'show'} no payment status on file, and none are marked unpaid.`;
+  }
+  return baseAnswer(text, rows.slice(0, 12).map((r) => invoiceFact(r)), {
+    sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `payment status, ${g.name}`,
+    cite: { records: financeRecords(rows), total: rows.length, claimedCount: rows.length, basis: `Checked the payment status printed on ${plural(rows.length, 'invoice')} for ${g.name}.` },
+  });
+}
+
 /**
  * @param {object} db  recordsStore db (tenant transaction)
  * @param {{intent: string, period: object|null, subject: string|null}} intent
@@ -801,6 +953,12 @@ export async function runMoneyIntent(db, intent, { today }) {
     case 'needs_verification': return needsVerification(db, intent, ctx);
     case 'balance_leaderboard': return balanceLeaderboard(db, intent, ctx);
     case 'superlative_invoice': return superlativeInvoice(db, intent, ctx);
+    case 'superlative_po': return superlativePo(db, intent, ctx);
+    case 'quotes_total': return quotesTotal(db, intent, ctx);
+    case 'avg_agreement_fee': return avgAgreementFee(db, intent, ctx);
+    case 'document_count': return documentCount(db, intent, ctx);
+    case 'customers_invoiced_count': return customersInvoicedCount(db, intent, ctx);
+    case 'customer_paid_up': return customerPaidUp(db, intent, ctx);
     default: return null;
   }
 }

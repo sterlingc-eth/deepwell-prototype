@@ -32,9 +32,10 @@ const FIN_STATUS_RE = /\b(?:overdue|past[\s-]?due|unpaid|outstanding|delinquent|
 // A bare money-domain word that is unambiguous on its own (no noun required).
 const FIN_MONEY_WORD_RE = /\b(?:revenue|balances?|receivables?|payables?|invoiced|billed|sales\s*tax|taxe?s?)\b/i;
 
-// "owes us"/"owe us"/"owed to us"/"paid us" — the HVAC-persona "who owes us" cluster names
-// no invoice/bill noun at all ("which customer owes us the most").
-const FIN_STANDALONE_RE = /\bowe[sd]?\s+us\b|\bowed\s+to\s+us\b|\bpaid\s+us\b/i;
+// "owes us"/"owe us"/"owed to us"/"paid us"/"owe our vendors"/"is X all paid up" — a cluster
+// that names no invoice/bill noun at all ("which customer owes us the most", "is Mercer all
+// paid up", "how much do we owe vendors").
+const FIN_STANDALONE_RE = /\bowe[sd]?\s+us\b|\bowed\s+to\s+us\b|\bpaid\s+us\b|\bowe\s+(?:our\s+|the\s+)?(?:vendors?|suppliers?)\b|\bpaid\s+up\b|\bar\s+aging\b|\baging\b|\bageing\b|\bpast[\s-]?due\b/i;
 
 // "quotes/proposals ... waiting" (either order) — a real yes/no shape with no other money
 // word present.
@@ -47,6 +48,14 @@ const FIN_THRESHOLD_RE = /\b(?:over|above|more than|greater than|under|below|les
 
 // A superlative ("biggest/smallest/highest/lowest invoice").
 const FIN_SUPERLATIVE_RE = /\b(?:biggest|largest|smallest|highest|lowest)\b/i;
+
+// TEAM K (2026-09-25, R5_FAILS.md): "how many invoices do we have on file", "average quote
+// amount", "total value of our quotes", "average annual fee on our agreements" - a plain count
+// or average of a money-document noun, with no separate status/threshold/superlative word to
+// trigger any check above.
+// Also: "last/latest invoice for X" (a person's name gives it no other money word), "bring in"
+// (agreement revenue) and "spent" (MONEY_RE only has "spend(?:ing)?", never the past tense).
+const FIN_COUNT_OR_AVG_RE = /\b(?:how many|average|avg|total\s+(?:value|amount)|annual\s+fee|last|latest|most recent|bring(?:s|ing)?\s+in|spent)\b/i;
 
 /**
  * @param {string} question  the ALREADY fuzzy-corrected / lowercased question text
@@ -61,6 +70,7 @@ export function isFinancialQuestion(question) {
   if (FIN_QUOTE_WAITING_RE.test(q)) return true;
   if (FIN_THRESHOLD_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
   if (FIN_SUPERLATIVE_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
+  if (FIN_NOUN_RE.test(q) && FIN_COUNT_OR_AVG_RE.test(q)) return true;
   if (FIN_NOUN_RE.test(q) && FIN_STATUS_RE.test(q)) {
     // Review r3: "which customers have paid for a maintenance agreement" is a coverage/list question, not money.
     // An agreement noun with a status word needs a money word too (fee, $, amount, invoice, bill, balance, owed…).
@@ -71,4 +81,4 @@ export function isFinancialQuestion(question) {
   return false;
 }
 
-export const _internals = { FIN_NOUN_RE, FIN_STATUS_RE, FIN_MONEY_WORD_RE, FIN_STANDALONE_RE, FIN_QUOTE_WAITING_RE, FIN_THRESHOLD_RE, FIN_SUPERLATIVE_RE };
+export const _internals = { FIN_NOUN_RE, FIN_STATUS_RE, FIN_MONEY_WORD_RE, FIN_STANDALONE_RE, FIN_QUOTE_WAITING_RE, FIN_THRESHOLD_RE, FIN_SUPERLATIVE_RE, FIN_COUNT_OR_AVG_RE };
