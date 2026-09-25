@@ -46,7 +46,7 @@ import { listReplays, listOpenMisses } from './_lib/learning/replayStore.js';
 import { verifyRecipe, RECIPE_KIND } from './_lib/learning/recipes.js';
 import { invalidateActiveOverlayCache } from './_lib/learning/overlay.js';
 // Donovan Scorecard (api/_lib/scorecard, routes/scorecard.js): the golden-exam runner + status, operator-only.
-import { scorecardRunAction, scorecardStatusAction } from './_lib/routes/scorecard.js';
+import { scorecardRunAction, scorecardStatusAction, scorecardBaselineAction } from './_lib/routes/scorecard.js';
 // TEAM H (2026-09-24): the autonomous PER-TENANT learning loop's operator-only status + weekly gap
 // report reads. The loop itself only ever runs from cron-sweep.js's nightly step; these two actions
 // are read-only (learningAutopilotStatus also computes "who runs next" from the rotation, no DB write).
@@ -55,6 +55,8 @@ import { rotationForDate } from './_lib/learning/rotation.js';
 import { buildGapReport, latestGapReport } from './_lib/learning/gapReport.js';
 // Search by meaning: status + resumable backfill of embeddings for existing pages (api/_lib/search/store.js).
 import { semanticStatus, runBackfill } from './_lib/search/store.js';
+// TEAM T2 (2026-09-25): dossiers — status + resumable, budget-aware backfill (api/_lib/search/dossier.js).
+import { dossierStatus, runDossierBackfillPage } from './_lib/search/dossier.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -75,8 +77,8 @@ import { semanticStatus, runBackfill } from './_lib/search/store.js';
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback', 'scorecardRun', 'semanticBackfill', 'learningAutopilotStatus', 'learningGapReport']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'scorecardRun', 'scorecardStatus', 'learningAutopilotStatus', 'learningGapReport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -86,7 +88,7 @@ const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide'
 // (reviewStore.reclassifyDocuments) does, as a Haiku fallback when its
 // deterministic heuristic can't place a document — see RECLASSIFY_MODEL in
 // reviewStore.js.
-const MODEL_BILLED_ACTIONS = new Set(['reclassify', 'extractReminders', 'semanticBackfill']);
+const MODEL_BILLED_ACTIONS = new Set(['reclassify', 'extractReminders', 'semanticBackfill', 'dossierBackfill']);
 
 // Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
 // renumbers/retires customer or equipment records, so on a Clerk org tenant
@@ -117,10 +119,12 @@ function requireOperator(auth) {
 
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
-  // reclassify can make up to 20 sequential model calls (see reviewStore.js's
-  // RECLASSIFY_DEADLINE_MS); the platform default ceiling is shorter than
-  // that could need.
-  maxDuration: 60,
+  // 300 (Vercel Pro, 2026-09-25): reclassify can make up to 20 sequential model calls (see reviewStore.js's
+  // RECLASSIFY_DEADLINE_MS), and this route now also carries the scorecard exam run + T3's Claude-baseline
+  // (scorecardRun/scorecardBaseline — dozens of graded questions, each its own model call) and T2's
+  // resumable dossier/semantic backfills (semanticBackfill/dossierBackfill) — all considerably longer than
+  // the old 60s platform default could reliably finish within.
+  maxDuration: 300,
 };
 
 const ACTIONS = new Set([
@@ -160,8 +164,11 @@ const ACTIONS = new Set([
   'askFeedback',
   'scorecardRun',
   'scorecardStatus',
+  'scorecardBaseline',
   'semanticStatus',
   'semanticBackfill',
+  'dossierStatus',
+  'dossierBackfill',
   'learningAutopilotStatus',
   'learningGapReport',
 ]);
@@ -438,6 +445,10 @@ export default async (req, res) => {
         requireOperator(auth);
         result = await scorecardStatusAction(ctx, payload);
         break;
+      case 'scorecardBaseline':
+        requireOperator(auth);
+        result = await scorecardBaselineAction(ctx, auth, payload);
+        break;
       // TEAM H (2026-09-24): the autonomous per-tenant learning loop's own operator summary — last
       // night's per-tenant counts (audit_log, no question text), spend vs. the daily caps, and which
       // tenant runs next in tonight's fair rotation. Read-only; the loop itself only ever runs from
@@ -480,6 +491,19 @@ export default async (req, res) => {
         requireAdmin(auth);
         const run = await runBackfill(ctx);
         result = { ...run, status: await semanticStatus(ctx) };
+        break;
+      }
+      // Dossiers (TEAM T2, 2026-09-25): same owner/admin-gated, billed, rate-limited shape as
+      // semanticStatus/semanticBackfill above — the Team screen calls dossierBackfill in a loop
+      // until stoppedBy is 'done' (idempotent + resumable, see dossier.js's runDossierBackfillPage).
+      case 'dossierStatus':
+        requireAdmin(auth);
+        result = await dossierStatus(ctx);
+        break;
+      case 'dossierBackfill': {
+        requireAdmin(auth);
+        const run = await runDossierBackfillPage(ctx);
+        result = { ...run, status: await dossierStatus(ctx) };
         break;
       }
       case 'learningExport':

@@ -180,7 +180,20 @@ const exam = loadExam();
     { category: 'a', passed: true, valueOk: true, cited: true, citationRequired: true }, { category: 'a', passed: false, valueOk: true, cited: false, citationRequired: true },
     { category: 'b', passed: false, valueOk: false, cited: true, citationRequired: true }, { category: 'b', passed: true, valueOk: true, cited: false, citationRequired: false },
   ]);
-  eq('scoreResults: pass score, value-only score and citation coverage are reported separately', [scored.score, scored.valueScore, scored.citation, scored.byCategory.a.citationCoverage, scored.byCategory.b.valueScore], [0.5, 0.75, { required: 3, cited: 2, coverage: 0.6667 }, 0.5, 0.5]);
+  eq('scoreResults: pass score, value-only score and citation coverage are reported separately', [scored.score, scored.valueScore, scored.citation.required, scored.citation.cited, scored.citation.coverage, scored.byCategory.a.citationCoverage, scored.byCategory.b.valueScore], [0.5, 0.75, 3, 2, 0.6667, 0.5, 0.5]);
+  // TEAM T3 (2026-09-25): citation precision / unsupported-claim rate, list recall and average cost are all
+  // averaged from detail.citationPrecision / detail.recall / costUsd - null/absent when nothing measured it.
+  const qualityResults = [
+    { category: 'a', passed: true, costUsd: 0.01, comparison: 'number', latencyMs: 100, detail: { citationPrecision: 1, recall: 1 } },
+    { category: 'a', passed: false, costUsd: 0.02, comparison: 'set', latencyMs: 200, detail: { citationPrecision: 0.5, recall: 0.8 } },
+    { category: 'b', passed: true, costUsd: 0.03, comparison: 'number', latencyMs: 300, detail: {} },
+  ];
+  const qs = scoreResults(qualityResults);
+  eq('scoreResults: citation precision / unsupported-claim rate averaged over answers actually checked', [qs.citation.precisionAvg, qs.citation.unsupportedClaimRate, qs.citation.checked], [0.75, 0.25, 2]);
+  eq('scoreResults: list recall (completeness) averaged over set-comparison answers', [qs.completeness.recallAvg, qs.completeness.n], [0.9, 2]);
+  eq('scoreResults: average cost per question, overall and per category', [qs.avgCostUsd, qs.byCategory.a.avgCostUsd, qs.byCategory.b.avgCostUsd], [0.02, 0.015, 0.03]);
+  eq('scoreResults: latency bucketed by comparison type (the nearest available route proxy)', [qs.latencyByComparison.number.n, qs.latencyByComparison.number.p50Ms, qs.latencyByComparison.set.n], [2, 100, 1]);
+  eq('scoreResults: no measurable citation precision/recall reports null, not zero', scoreResults([{ category: 'a', passed: true, costUsd: 0.01 }]).citation.precisionAvg, null);
   eq('scoreResults: results stored before citation scoring count their pass as the value verdict', scoreResults([{ category: 'a', passed: true }]).valueScore, 1);
   check('oracleSqlOk refuses writes, multi-statements and non-selects', !oracleSqlOk('DELETE FROM entities') && !oracleSqlOk('SELECT 1; DROP TABLE x') && !oracleSqlOk('WITH x AS (INSERT INTO t VALUES (1) RETURNING *) SELECT * FROM x') && oracleSqlOk("SELECT 'update' AS v"));
 }
@@ -228,6 +241,9 @@ const { SCORECARD_CALL, takeScorecardCall } = await import('../api/_lib/scorecar
 const routes = await import('../api/_lib/routes/scorecard.js');
 const { findCustomersInBody, applyBodyNameLinks } = await import('../api/_lib/bodyNameLink.js');
 const integrity = await import('../api/_lib/routes/integrity.js');
+const { significantTokens, claimSupportedByText, citationPrecision, checkCitationPrecision } = await import('../api/_lib/scorecard/citationCheck.js');
+const baseline = await import('../api/_lib/scorecard/baseline.js');
+const baselineStore = await import('../api/_lib/scorecard/baselineStore.js');
 
 const TODAY = '2026-09-23';
 const ctxA = { tenantKey: 'org_harness_a', tenantName: 'Desert Peak HVAC' };
@@ -1085,6 +1101,86 @@ const fetchObject = async (key) => { if (!objects[key]) throw new Error('missing
   check('UI: a non-blocking "Linked from name in document - confirm" chip renders from linked_by name-in-body (not a DocumentIssue)', /Linked from name in document/.test(chip) && /linkedFromBodyName/.test(fs.readFileSync(path.join(ROOT, 'src/hooks/usePostgresSync.ts'), 'utf8')));
 }
 
+/* ================================================================== 9. citation precision (TEAM T3) */
+{
+  eq('significantTokens: numbers verbatim, words 4+ letters, no stopwords, de-duplicated', significantTokens('Replaced the capacitor on 2026-09-10, twice'), ['2026', '09', '10', 'replaced', 'capacitor', 'twice']);
+  check('claimSupportedByText: nothing concrete to check ("Yes.") is always supported', claimSupportedByText('Yes.', 'unrelated text entirely'));
+  check('claimSupportedByText: a claim whose concrete tokens are in the text is supported', claimSupportedByText('technician Danny Ochoa', 'Visit by Danny Ochoa on site'));
+  check('claimSupportedByText: a claim whose concrete tokens are absent is NOT supported', !claimSupportedByText('total 4300 dollars', 'Replaced capacitor, no charge'));
+  {
+    const data = { facts: [{ label: 'technician', value: 'Danny Ochoa', documentId: 'd1' }, { label: 'total', value: '4300', documentId: 'd1' }], sources: [{ documentId: 'd1' }] };
+    const map = new Map([['d1', 'Visit by Danny Ochoa. Replaced capacitor, no charge.']]);
+    const p = citationPrecision(data, map);
+    eq('citationPrecision: precision is supported/total over the facts actually cited, with the unsupported one named', [p.citedCount, p.supportedCount, p.precision, p.unsupportedClaims.length], [2, 1, 0.5, 1]);
+  }
+  eq('citationPrecision: no citation and/or no facts reports null (nothing to check), not zero', citationPrecision({ facts: [] }, new Map()).precision, null);
+  {
+    const data = { facts: [{ label: 'note', value: 'Replaced capacitor', documentId: uid('f', 'd', 1) }], sources: [{ documentId: uid('f', 'd', 1) }] };
+    const cp = await checkCitationPrecision(withTenant, ctxF, data);
+    eq('checkCitationPrecision (DB): fetches the cited document\'s own text and confirms the claim against it', [cp.citedCount, cp.precision], [1, 1]);
+    const wrong = { facts: [{ label: 'note', value: 'Replaced the entire compressor unit', documentId: uid('f', 'd', 1) }], sources: [{ documentId: uid('f', 'd', 1) }] };
+    check('checkCitationPrecision (DB): a claim the cited document does not support scores below 1', (await checkCitationPrecision(withTenant, ctxF, wrong)).precision < 1);
+  }
+  check('checkCitationPrecision (DB): a bogus document id never throws, just reports null', (await checkCitationPrecision(withTenant, ctxF, { facts: [{ label: 'x', value: 'y', documentId: '00000000-0000-0000-0000-000000000000' }] })).precision === null || typeof (await checkCitationPrecision(withTenant, ctxF, { facts: [{ label: 'x', value: 'y', documentId: '00000000-0000-0000-0000-000000000000' }] })).precision === 'number');
+}
+
+/* ================================================================== 10. Claude baseline (TEAM T3) */
+{
+  eq('baseline.keywordsOf: significant words only (stopwords/short words dropped), capped at 6', baseline.keywordsOf('Has Ann Alpha had any part replaced more than once on the same unit?'), ['alpha', 'part', 'replaced', 'more', 'once', 'same']);
+
+  await withTenant(ctxF, async (db) => {
+    const scoped = { oracle: { scope: { sql: `SELECT document_id FROM document_entity_links WHERE entity_id = $1`, params: [uid('f', 'c', 1)] } } };
+    const ids = await baseline.candidateDocIds(db, scoped, { today: TODAY });
+    check('baseline.candidateDocIds: uses oracle.scope when present (the oracle\'s own candidate set)', ids.length > 0 && ids.every((id) => [1, 2, 3, 13, 14].map((n) => uid('f', 'd', n)).includes(id)), JSON.stringify(ids));
+
+    const unscoped = { text: 'What was found about the capacitor?' };
+    const fallback = await baseline.candidateDocIds(db, unscoped, { today: TODAY });
+    check('baseline.candidateDocIds: falls back to keyword full-text search when there is no oracle.scope', fallback.includes(uid('f', 'd', 1)), JSON.stringify(fallback));
+
+    const built = await baseline.scopeText(db, [uid('f', 'd', 1)]);
+    check('baseline.scopeText: labels each document and includes its page text', built.text.includes('Replaced capacitor') && built.docIds.length === 1);
+  });
+
+  // citationRequired:false isolates the caching/budget/gap behavior under test from citation grading,
+  // which has its own dedicated coverage above (runner/compare tests) and is unaffected by this scripted model.
+  const q1 = { id: 'baseline-t3-001', category: 'connect', text: 'Was the capacitor replaced for Ann Alpha?', cmp: 'yesno', citationRequired: false, oracle: { sql: `SELECT true AS v`, params: [] } };
+  let calls = 0;
+  const scriptedModel = async () => {
+    calls++;
+    return { usage: { input_tokens: 100, output_tokens: 20 }, content: [{ type: 'tool_use', name: 'answer', input: { text: 'Yes, the capacitor was replaced.', facts: [], citedDocumentIds: [] } }] };
+  };
+  const examV = 'verify-scorecard-baseline-test';
+  baselineStore.resetBaselineStoreForTests?.();
+  const r1 = await baseline.runBaselineForQuestion({ ctxArg: ctxF, withTenant, question: q1, examVersion: examV, today: TODAY, callModel: scriptedModel, deadlineAt: Date.now() + 60_000 });
+  check('runBaselineForQuestion: asks the model and grades + caches the result', calls === 1 && r1.cached === false && r1.passed === true, JSON.stringify(r1));
+  const r2 = await baseline.runBaselineForQuestion({ ctxArg: ctxF, withTenant, question: q1, examVersion: examV, today: TODAY, callModel: scriptedModel, deadlineAt: Date.now() + 60_000 });
+  check('runBaselineForQuestion: a second call for the same (examVersion, questionId) is served from cache, never re-asks the model', calls === 1 && r2.cached === true, `calls=${calls}`);
+
+  {
+    const q2 = { id: 'baseline-t3-002', category: 'connect', text: 'Was Bob Bravo billed for his unit?', cmp: 'yesno', citationRequired: false, oracle: { sql: `SELECT true AS v`, params: [] } };
+    const examV2 = 'verify-scorecard-baseline-budget-test';
+    const page = await baseline.runBaselinePage({ ctxArg: ctxF, withTenant, questions: [q1, q2], examVersion: examV2, today: TODAY, offset: 0, pageSize: 6, budgetUsd: 0.0000001, deadlineAt: Date.now() + 60_000, callModel: scriptedModel });
+    check('runBaselinePage: stops as soon as spend reaches a tiny budget (one question answered, then stopped/budget, done)', page.stopped === 'budget' && page.results.length === 1 && page.done === true, JSON.stringify({ stopped: page.stopped, n: page.results.length, done: page.done }));
+    const page2 = await baseline.runBaselinePage({ ctxArg: ctxF, withTenant, questions: [q1, q2], examVersion: examV2, today: TODAY, offset: 0, pageSize: 6, budgetUsd: 5, deadlineAt: Date.now() + 1_000, callModel: scriptedModel });
+    check('runBaselinePage: stops when the deadline is too close to safely start another question', page2.stopped === 'deadline' && page2.results.length === 0, JSON.stringify(page2.stopped));
+
+    const examV3 = 'verify-scorecard-baseline-pagesize-test';
+    const page3 = await baseline.runBaselinePage({ ctxArg: ctxF, withTenant, questions: [q1, q2], examVersion: examV3, today: TODAY, offset: 0, pageSize: 1, budgetUsd: 5, deadlineAt: Date.now() + 60_000, callModel: scriptedModel });
+    check('runBaselinePage: a single call never asks more than pageSize questions, and hands back the right nextOffset to resume', page3.results.length === 1 && page3.nextOffset === 1 && page3.done === false && page3.stopped === null, JSON.stringify({ n: page3.results.length, next: page3.nextOffset, done: page3.done, stopped: page3.stopped }));
+  }
+
+  {
+    const donovanResults = [
+      { questionId: q1.id, category: 'connect', passed: true, skipped: false },
+      { questionId: 'baseline-t3-999', category: 'connect', passed: false, skipped: false },
+      { questionId: 'baseline-t3-other', category: 'lists', passed: true, skipped: false },
+    ];
+    const gap = await baseline.baselineGapReport(ctxF, examV, donovanResults);
+    eq('baselineGapReport: donovan vs cached baseline per category, gap = donovan - baseline', [gap.connect.donovanScore, gap.connect.baselineScore, gap.connect.gap, gap.connect.baselineCoverage], [0.5, 1, -0.5, 0.5]);
+    eq('baselineGapReport: a category with no cached baseline at all reports null (not a misleading 0)', [gap.lists.baselineScore, gap.lists.gap], [null, null]);
+  }
+}
+
 /* ================================================================== hygiene */
 {
   const apiTop = fs.readdirSync(path.join(ROOT, 'api')).filter((f) => fs.statSync(path.join(ROOT, 'api', f)).isFile());
@@ -1096,7 +1192,8 @@ const fetchObject = async (key) => { if (!objects[key]) throw new Error('missing
   const mig = fs.readFileSync(path.join(ROOT, 'M3-config/30-donovan-scorecard.sql'), 'utf8');
   check('migration 30: two tables, tenant RLS ENABLE + FORCE, optional', /FORCE\s+ROW LEVEL SECURITY/.test(mig) && (mig.match(/FORCE\s+ROW LEVEL SECURITY/g) ?? []).length === 2 && /OPTIONAL/.test(mig));
   const review = fs.readFileSync(path.join(ROOT, 'api/review.js'), 'utf8');
-  check('operator actions scorecardRun / scorecardStatus are registered as OPERATOR_ACTIONS', /OPERATOR_ACTIONS[^;]*scorecardRun/.test(review.replace(/\n/g, ' ')) && /OPERATOR_ACTIONS[^;]*scorecardStatus/.test(review.replace(/\n/g, ' ')));
+  check('operator actions scorecardRun / scorecardStatus / scorecardBaseline are registered as OPERATOR_ACTIONS', /OPERATOR_ACTIONS[^;]*scorecardRun/.test(review.replace(/\n/g, ' ')) && /OPERATOR_ACTIONS[^;]*scorecardStatus/.test(review.replace(/\n/g, ' ')) && /OPERATOR_ACTIONS[^;]*scorecardBaseline/.test(review.replace(/\n/g, ' ')));
+  check('scorecardBaseline is wired into the action switch and rate limiter alongside the other scorecard actions', /case 'scorecardBaseline':/.test(review) && /INTEGRITY_RATE_LIMIT_ACTIONS[^;]*scorecardBaseline/.test(review.replace(/\n/g, ' ')));
 }
 
 console.log = realLog; console.warn = realWarn; console.error = realErr;

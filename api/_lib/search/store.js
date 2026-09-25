@@ -274,6 +274,39 @@ export async function runBackfill(ctx, { deadlineMs = 30_000, pagesPerBatch = 24
 let iterativeScan = true;
 export function _resetIterativeScan() { iterativeScan = true; }
 
+/* --------------------------------------------------- per-tenant ANN tuning (TEAM T2, 2026-09-25) */
+
+/** ef_search bounds the HNSW candidate list BEFORE the tenant filter is applied — and the index spans
+ *  EVERY tenant, so a tenant with a small slice of a huge shared index needs a wider candidate list to
+ *  keep recall up than a tenant whose corpus is most of the index already. Pure; exported for tests. */
+export function annEfSearchForScale(chunkCount) {
+  const n = Number(chunkCount) || 0;
+  if (n > 200_000) return 400;
+  if (n > 20_000) return 200;
+  return 100;
+}
+
+const annScaleCache = new Map(); // tenant_id -> { at, chunks }
+const ANN_SCALE_CACHE_TTL_MS = 10 * 60_000;
+export function _resetAnnScaleCache() { annScaleCache.clear(); }
+
+/** Cached (10 min) count of the CURRENT tenant's own chunks, used to pick ef_search automatically
+ *  when the caller doesn't pass one. One cheap indexed count per cold tenant per cache window, not
+ *  per search. Never throws — falls back to the default scale on any error. */
+async function tenantAnnEfSearch(db, now = Date.now()) {
+  try {
+    const tid = (await db.query("SELECT current_setting('app.tenant_id', true) AS tid")).rows[0]?.tid;
+    if (!tid) return annEfSearchForScale(0);
+    const hit = annScaleCache.get(tid);
+    if (hit && now - hit.at < ANN_SCALE_CACHE_TTL_MS) return annEfSearchForScale(hit.chunks);
+    const chunks = Number((await db.query(`SELECT count(*)::int AS n FROM page_chunks WHERE ${TENANT}`)).rows[0]?.n ?? 0);
+    annScaleCache.set(tid, { at: now, chunks });
+    return annEfSearchForScale(chunks);
+  } catch {
+    return annEfSearchForScale(0);
+  }
+}
+
 /**
  * The K nearest chunks to `vector` for the CURRENT tenant (RLS, plus an
  * explicit predicate), optionally restricted to `documentIds`, best chunk per
@@ -284,9 +317,13 @@ export function _resetIterativeScan() { iterativeScan = true; }
  * Iterative scan matters: the HNSW index spans every tenant, so without it a
  * tenant whose vectors are outnumbered could get fewer than K rows back after
  * the tenant filter is applied.
+ * @param {number} [efSearch]  explicit hnsw.ef_search override (tests only);
+ *   omitted, it is chosen automatically from this tenant's own chunk count
+ *   (annEfSearchForScale) — see the per-tenant ANN tuning note above.
  * @returns {Promise<{id: string, document_id: string, page_no: number, original_filename: string, document_type: string, stage: string, chunk_text: string, sim: number}[]>}
  */
-export async function nearestChunks(db, { vector, model, k = 30, documentIds = null, minSim = 0.25 }) {
+export async function nearestChunks(db, { vector, model, k = 30, documentIds = null, minSim = 0.25, efSearch } = {}) {
+  const ef = Math.max(10, Math.min(1000, Math.trunc(Number(efSearch)) || (await tenantAnnEfSearch(db))));
   const params = [toVectorLiteral(vector), model, k];
   let scope = '';
   if (documentIds) { params.push(documentIds); scope = ` AND c.document_id = ANY($${params.length}::uuid[])`; }
@@ -308,8 +345,8 @@ export async function nearestChunks(db, { vector, model, k = 30, documentIds = n
     try {
       await db.query(
         useIterative
-          ? "SELECT set_config('hnsw.ef_search', '100', true), set_config('hnsw.iterative_scan', 'relaxed_order', true)"
-          : "SELECT set_config('hnsw.ef_search', '100', true)"
+          ? `SELECT set_config('hnsw.ef_search', '${ef}', true), set_config('hnsw.iterative_scan', 'relaxed_order', true)`
+          : `SELECT set_config('hnsw.ef_search', '${ef}', true)`
       );
       return (await db.query(sql, params)).rows;
     } catch (err) {

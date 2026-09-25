@@ -35,6 +35,16 @@ import { packForTenant } from "../industry/index.js";
 // model as a tool, so a multi-hop question the model recognizes but the pre-router's own text parse
 // missed still gets an exact, code-computed answer instead of hand-rolled (and easily wrong) run_query SQL.
 import { runCompose } from "../compose.js";
+// Donovan v2 (research agent) tools: safe arithmetic/date math for the compute() tool (see its own doc comment).
+import { computeExpression } from "./computeExpr.js";
+// TEAM T2 (2026-09-25) knowledge layer, wired into v2 ONLY (see createToolbox's `variant` param below) — v1's
+// loop.js keeps calling db.searchPassages exactly as it always has, so verify-agent.mjs's v1 assertions are
+// untouched. searchKnowledge is the SAME hybrid db.searchPassages under the hood, plus entity-first filter
+// resolution, Voyage rerank and near-dup collapse (see knowledge.js's own header); getDossier and
+// mapReduceAnswer back the two new v2-only tools below.
+import { searchKnowledge } from "../search/knowledge.js";
+import { getDossier } from "../search/dossier.js";
+import { mapReduceAnswer } from "../search/mapReduce.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -43,6 +53,9 @@ export const RESULT_CHAR_CAP = 6000;
 /** run_query results may be larger: a "who all" list of 40 customers must reach the model whole
  *  (a list silently cut at ~5 rows and phrased as complete was a live defect). */
 export const QUERY_RESULT_CHAR_CAP = 10000;
+/** read_document (v2): larger than a query result cap since a full page of transcript is meant to be read
+ *  whole; still bounded, with pagination (nextPage) picking up whatever did not fit. */
+export const READ_DOCUMENT_CHAR_CAP = 12000;
 export const MAX_QUERY_ROWS = 100;
 const QUERY_TIMEOUT_MS = () => Math.max(200, Number(process.env.DONOVAN_AGENT_QUERY_TIMEOUT_MS) || 3000);
 const DERIVED_ROW_CAP = 20000;
@@ -295,6 +308,107 @@ export const TOOL_DEFS = [
 
 export const ALL_TOOL_DEFS = [...TOOL_DEFS, VIEW_PAGE_TOOL_DEF, ANSWER_TOOL_DEF];
 
+/* ------------------------------------------------------ v2 (research agent) tool schemas */
+// Donovan v2 (2026-09-25): the extra capability a Claude-grade research agent needs that the bounded
+// Haiku loop above never did — reading a WHOLE document (not a top-K excerpt), a unit's own profile,
+// walking the customer<->unit<->document<->technician graph explicitly, a real chronology, and doing
+// its own arithmetic/date math through a tool instead of prose (see computeExpr.js). These are additive:
+// TOOL_DEFS/ALL_TOOL_DEFS (the v1 Haiku loop, loop.js) are untouched, so v1's behavior and every existing
+// verify-agent.mjs assertion against it stay exactly as they were. loopV2.js is what actually exposes
+// ALL_TOOL_DEFS_V2 to the model.
+
+export const READ_DOCUMENT_TOOL_NAME = "read_document";
+export const READ_DOCUMENT_TOOL_DEF = {
+  name: READ_DOCUMENT_TOOL_NAME,
+  description:
+    "Read the FULL transcribed text of a document, page by page — not a search excerpt. Use this when a question depends on the whole document (a multi-page contract's terms, everything a long work order says, reconciling two documents against each other) or when search_documents' excerpt is not enough context. Paginates: a long document may say 'more pages: call again with fromPage'.",
+  input_schema: {
+    type: "object",
+    properties: {
+      documentId: { type: "string", description: "A documentId returned by another tool." },
+      fromPage: { type: "number", description: "First page to read (1-based). Default 1." },
+    },
+    required: ["documentId"],
+  },
+};
+
+export const GET_UNIT_TOOL_NAME = "get_unit";
+export const GET_UNIT_TOOL_DEF = {
+  name: GET_UNIT_TOOL_NAME,
+  description: "One piece of equipment's full profile: manufacturer/model/serial/install date, warranty status, its owning customer, and every document linked to THIS unit specifically (not the whole customer).",
+  input_schema: { type: "object", properties: { equipmentId: { type: "string" } }, required: ["equipmentId"] },
+};
+
+export const FOLLOW_LINKS_TOOL_NAME = "follow_links";
+export const FOLLOW_LINKS_TOOL_DEF = {
+  name: FOLLOW_LINKS_TOOL_NAME,
+  description:
+    "Walk the record graph from one id (a customerId, equipmentId or documentId returned by another tool): what it connects to — a customer's units and documents, a unit's customer and documents, or a document's customer/units/technician/service date. Use this to connect entities across documents (e.g. 'which other units does this customer have', 'what else do we have for the technician on this ticket').",
+  input_schema: { type: "object", properties: { entityId: { type: "string" } }, required: ["entityId"] },
+};
+
+export const TIMELINE_TOOL_NAME = "timeline";
+export const TIMELINE_TOOL_DEF = {
+  name: TIMELINE_TOOL_NAME,
+  description:
+    "Chronological list of events (service visits, uploads) for a customer or unit, or across a date range — each with its date, document type, technician and documentId. Use this for 'what happened over time', 'last N visits', 'everything between these dates', and to work out which of two documents is NEWER (more authoritative) when they disagree.",
+  input_schema: {
+    type: "object",
+    properties: {
+      customerId: { type: "string" }, equipmentId: { type: "string" },
+      dateFrom: { type: "string", description: "YYYY-MM-DD, inclusive." }, dateTo: { type: "string", description: "YYYY-MM-DD, inclusive." },
+      documentType: { type: "string" },
+      order: { type: "string", enum: ["asc", "desc"], description: "Default desc (most recent first)." },
+    },
+  },
+};
+
+export const COMPUTE_TOOL_NAME = "compute";
+export const COMPUTE_TOOL_DEF = {
+  name: COMPUTE_TOOL_NAME,
+  description:
+    "Arithmetic and date math (+ - * /, and today()/daysBetween/monthsBetween/yearsBetween/addDays/addMonths/addYears over 'YYYY-MM-DD' dates). Use this for ANY arithmetic in your answer (a sum, an age, a days-until) instead of doing it yourself — a number in your answer must come from a tool.",
+  input_schema: { type: "object", properties: { expression: { type: "string" } }, required: ["expression"] },
+};
+
+// TEAM T2 knowledge layer, v2 only (2026-09-25): a precomputed rolling summary for a broad "everything
+// about X" question (cheaper and less turn-hungry than several search_documents/get_customer calls), and
+// synthesis over many documents at once for a question no single lookup answers.
+export const GET_DOSSIER_TOOL_NAME = "get_dossier";
+export const GET_DOSSIER_TOOL_DEF = {
+  name: GET_DOSSIER_TOOL_NAME,
+  description:
+    "A precomputed, cited rolling summary for ONE customer or unit — short factual sentences, each citing the document and page it came from, built up over every document ever linked to that entity. Use this FIRST for a broad 'everything about X' / 'what do we know about this customer' / 'tell me about this unit's history' question, before reaching for several search_documents/get_customer/timeline calls. Returns dossier:null (not an error) when none has been built yet for this entity — fall back to get_customer/get_unit/search_documents in that case.",
+  input_schema: {
+    type: "object",
+    properties: { entityId: { type: "string", description: "A customerId or equipmentId returned by another tool." } },
+    required: ["entityId"],
+  },
+};
+
+export const SYNTHESIZE_TOOL_NAME = "synthesize";
+export const SYNTHESIZE_TOOL_DEF = {
+  name: SYNTHESIZE_TOOL_NAME,
+  description:
+    "Answer a question that spans MANY documents at once (dozens to hundreds) by reading each matching one and combining cited facts into a single answer with an honest coverage note — for 'across all of...' / 'every time we...' / a whole customer's history question that a handful of search_documents/read_document calls cannot cover completely. Slower and more expensive than the other tools: use it only when the question genuinely needs many documents combined, not just the best few (search_documents) or one customer's profile (get_customer/get_dossier). May come back as status:'dossier' (answered from the precomputed summary instead, when the exact document set is too large) or status:'queued' (too large even for that; a fuller report will be emailed) — say so plainly in your answer rather than presenting either as a complete fresh read.",
+  input_schema: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "The question to answer from the matching documents." },
+      customerId: { type: "string" },
+      equipmentId: { type: "string" },
+      docType: { type: "string", description: "Optional document_type filter, e.g. invoice." },
+      technician: { type: "string" },
+      dateFrom: { type: "string", description: "YYYY-MM-DD" },
+      dateTo: { type: "string", description: "YYYY-MM-DD" },
+    },
+    required: ["question"],
+  },
+};
+
+export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF];
+export const ALL_TOOL_DEFS_V2 = [...TOOL_DEFS_V2, VIEW_PAGE_TOOL_DEF, ANSWER_TOOL_DEF];
+
 /* ----------------------------------------------------------------- ledger */
 
 /**
@@ -407,11 +521,15 @@ function isoDay(v) {
 /* ---------------------------------------------------------------- toolbox */
 
 /**
- * @param {{withTenant: Function, ctxArg: object, today: string}} opts
+ * @param {{withTenant: Function, ctxArg: object, today: string, variant?: 'v1'|'v2'}} opts
+ *   `variant: 'v2'` (loopV2.js only; loop.js's v1 toolbox omits it and keeps its original behavior
+ *   byte-for-byte) turns search_documents' retrieval over to searchKnowledge (entity-first filters +
+ *   Voyage rerank + near-dup collapse — see the TEAM T2 import above) and enables get_dossier/synthesize.
  * @returns an object with execute(name, input) -> {ok, content, rowCount, inputSummary}
  *   and .ledger. Never throws.
  */
-export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadlineAt }) {
+export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadlineAt, variant = "v1" }) {
+  const isV2 = variant === "v2";
   const ledger = new EvidenceLedger();
   const viewDocumentPage = createPageViewer({ withTenant, ctxArg, ledger, ...(fetchObject ? { fetchObject } : {}), ...(deadlineAt ? { deadlineAt } : {}) });
   const cache = { describe: null, derivedC: null, derivedE: null };
@@ -509,6 +627,11 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     let searchScope = null; // TEAM C: what this search covered, for an honest-zero citation
     const found = await withTenant(ctxArg, async (db) => {
       let scopeIds = null;
+      // Customer's OWN equipment entity ids, only needed for the v2/searchKnowledge branch below —
+      // searchKnowledge's filters merge customerIds+unitIds into ONE union query (see knowledge.js's
+      // resolveFilterDocumentIds), so passing both replicates customerDocumentIds()'s broader "linked
+      // to the customer directly OR to one of their units" scope exactly, without a second definition of it.
+      let scopeEquipmentIds = [];
       if (scopeCustomer) {
         const { rows: cr } = await db.raw(
           `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address
@@ -517,10 +640,30 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
         scopeIds = await customerDocumentIds(db, cr[0]);
         searchScope = { name: cr[0].customer_name, docIds: scopeIds };
         if (!scopeIds.length) return [];
+        if (isV2) {
+          scopeEquipmentIds = (await db.raw(
+            `SELECT id FROM entities WHERE customer_id = $1 AND entity_type = 'equipment' AND merged_into IS NULL AND ${t("entities")}`,
+            [scopeCustomer])).rows.map((r) => r.id);
+        }
       }
-      let rows = await db.searchPassages(query, scopeIds ? 40 : docType ? 40 : limit + 4, scopeIds ? { documentIds: scopeIds } : {});
-      if (docType) rows = rows.filter((r) => String(r.document_type ?? "").toLowerCase() === docType);
-      rows = rows.slice(0, limit);
+      let rows;
+      if (isV2) {
+        // TEAM T2 wiring (build spec item 3): entity-first filters + Voyage rerank + near-dup collapse.
+        // With no customerId given, searchKnowledge also tries its own (never-guessing) entity-first
+        // read of `query` itself — pure upside over the v1 branch below, which never attempted that.
+        const filters = {};
+        if (scopeCustomer) filters.customerIds = [scopeCustomer, ...scopeEquipmentIds];
+        if (docType) filters.docTypes = [docType];
+        const hits = await searchKnowledge(db, { query, filters, k: limit, rerank: true });
+        rows = hits.map((h) => ({
+          document_id: h.doc.id, page_no: h.page, original_filename: h.doc.filename,
+          document_type: h.doc.docType, stage: h.doc.stage, excerpt: h.excerpt,
+        }));
+      } else {
+        rows = await db.searchPassages(query, scopeIds ? 40 : docType ? 40 : limit + 4, scopeIds ? { documentIds: scopeIds } : {});
+        if (docType) rows = rows.filter((r) => String(r.document_type ?? "").toLowerCase() === docType);
+        rows = rows.slice(0, limit);
+      }
       const ids = [...new Set(rows.map((r) => r.document_id))];
       let names = new Map();
       if (ids.length) {
@@ -784,6 +927,230 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return { ok: true, content: text, rowCount: out.recordsTotal ?? 0, inputSummary: "filter_records", empty: (out.recordsTotal ?? 0) === 0 };
   }
 
+  /* ---- read_document (v2): FULL page text, paginated ---- */
+  async function readDocument(input) {
+    const id = typeof input?.documentId === "string" ? input.documentId.trim().toLowerCase() : "";
+    if (!UUID_RE.test(id)) return fail("documentId must be a documentId returned by another tool", "read_document");
+    const fromPage = Math.max(1, Math.trunc(Number(input?.fromPage)) || 1);
+    const out = await withTenant(ctxArg, async (db) => {
+      const { rows: dr } = await db.raw(`SELECT id, document_type, original_filename, stage FROM documents WHERE id = $1 AND ${t("documents")}`, [id]);
+      if (!dr[0]) return null;
+      const { rows: pages } = await db.raw(
+        `SELECT page_no, text FROM document_pages WHERE document_id = $1 AND ${t("document_pages")} AND page_no >= $2 ORDER BY page_no LIMIT 200`,
+        [id, fromPage]
+      );
+      return { doc: dr[0], pages };
+    });
+    if (!out) return fail("no such document", "read_document");
+    if (!out.pages.length) return fail(fromPage > 1 ? `this document has no page ${fromPage} or later` : "this document has no transcribed text yet", "read_document");
+    const cap = READ_DOCUMENT_CHAR_CAP;
+    let used = 80;
+    const included = [];
+    for (const p of out.pages) {
+      const body = String(p.text ?? "").slice(0, 6000);
+      const chunk = `\n--- page ${p.page_no} ---\n${body}`;
+      if (used + chunk.length > cap && included.length) break;
+      included.push({ page: p.page_no, text: body });
+      used += chunk.length;
+    }
+    const lastIncluded = included[included.length - 1]?.page ?? fromPage;
+    const nextPage = out.pages.some((p) => p.page_no > lastIncluded) ? lastIncluded + 1 : null;
+    const body = included.map((p) => `\n--- page ${p.page} ---\n${p.text}`).join("");
+    const text = JSON.stringify({
+      documentId: id, documentType: out.doc.document_type, filename: out.doc.original_filename,
+      pagesShown: included.map((p) => p.page), nextPage,
+      ...(nextPage ? { note: `more pages follow — call read_document again with fromPage:${nextPage} to continue` } : {}),
+    }) + body;
+    for (const p of included) ledger.addPassage(id, p.page, out.doc.stage, out.doc.original_filename);
+    ledger.addShown(text);
+    return { ok: true, content: text, rowCount: included.length, inputSummary: `read_document:${fromPage}` };
+  }
+
+  /* ---- get_unit (v2): one piece of equipment's full profile ---- */
+  async function getUnit(input) {
+    const id = typeof input?.equipmentId === "string" ? input.equipmentId.trim() : "";
+    if (!UUID_RE.test(id)) return fail("equipmentId must be an equipment_id returned by another tool", "get_unit");
+    const out = await withTenant(ctxArg, async (db) => {
+      const { rows: er } = await db.raw(
+        `SELECT id, customer_id, data->>'manufacturer' AS manufacturer, data->>'model' AS model, data->>'serial_number' AS serial_number,
+                data->>'equipment_type' AS equipment_type, data->>'tonnage' AS tonnage, data->>'installation_date' AS installation_date,
+                data->>'service_address' AS address, data->'warranty' AS warranty
+           FROM entities WHERE id = $1 AND entity_type = 'equipment' AND merged_into IS NULL AND ${t("entities")}`, [id]);
+      const e = er[0];
+      if (!e) return null;
+      const { rows: cr } = await db.raw(
+        `SELECT id, customer_number, data->>'customer_name' AS customer_name FROM entities
+          WHERE id = $1 AND entity_type = 'customer' AND ${t("entities")}`, [e.customer_id]);
+      const v = await views(db);
+      const { rows: docRows } = await db.raw(
+        `WITH ${v} SELECT DISTINCT dv.id, dv.filename, dv.document_type, dv.stage, dv.created_at, dv.service_date, dv.technician
+           FROM doc_links dl JOIN documents_v dv ON dv.id = dl.document_id
+          WHERE dl.entity_id = $2 AND dl.entity_type = 'equipment'
+          ORDER BY dv.service_date DESC NULLS LAST, dv.created_at DESC LIMIT 60`,
+        [JSON.stringify({ c: [], e: [] }), id]);
+      return { e, c: cr[0] ?? null, docRows };
+    });
+    if (!out) return { ok: true, content: '{"unit":null,"note":"no such unit"}', rowCount: 0, inputSummary: "get_unit", empty: true };
+    const w = out.e.warranty && typeof out.e.warranty === "object" ? out.e.warranty : null;
+    const docs = out.docRows.map((d) => ({
+      documentId: d.id, filename: d.filename, documentType: d.document_type,
+      serviceDate: isoDay(d.service_date), uploaded: isoDay(d.created_at instanceof Date ? d.created_at.toISOString() : d.created_at), technician: d.technician,
+    }));
+    const text = JSON.stringify({
+      unit: {
+        equipmentId: out.e.id, manufacturer: out.e.manufacturer, model: out.e.model, serial: out.e.serial_number,
+        type: out.e.equipment_type, tonnage: out.e.tonnage, installed: out.e.installation_date, address: out.e.address,
+        warrantyStatus: warrantyStatusOf(w, today), warrantyExpires: isoDay(w?.expires),
+      },
+      customer: out.c ? { customerId: out.c.id, customerNumber: out.c.customer_number, name: out.c.customer_name } : null,
+      documents: docs,
+    });
+    ledger.addShown(text);
+    if (out.c) ledger.ids.add(String(out.c.id).toLowerCase());
+    ledger.ids.add(id.toLowerCase());
+    for (const d of docs) ledger.addDoc(d.documentId, undefined, d.filename);
+    return { ok: true, content: text, rowCount: docs.length + 1, inputSummary: "get_unit" };
+  }
+
+  /* ---- follow_links (v2): one hop of the customer<->unit<->document<->technician graph ---- */
+  async function followLinks(input) {
+    const id = typeof input?.entityId === "string" ? input.entityId.trim().toLowerCase() : "";
+    if (!UUID_RE.test(id)) return fail("entityId must be an id returned by another tool", "follow_links");
+    const out = await withTenant(ctxArg, async (db) => {
+      const v = await views(db);
+      const params = [JSON.stringify({ c: [], e: [] }), id];
+      const { rows: cust } = await db.raw(`WITH ${v} SELECT customer_id, name FROM customers WHERE customer_id = $2`, params);
+      if (cust[0]) {
+        const { rows: equip } = await db.raw(`WITH ${v} SELECT equipment_id, manufacturer, model FROM equipment WHERE customer_id = $2`, params);
+        const { rows: docs } = await db.raw(`WITH ${v} SELECT DISTINCT document_id, entity_type FROM doc_links WHERE customer_id = $2`, params);
+        return { kind: "customer", id, name: cust[0].name, equipment: equip, documentIds: docs.map((d) => d.document_id) };
+      }
+      const { rows: equip } = await db.raw(`WITH ${v} SELECT equipment_id, customer_id, manufacturer, model FROM equipment WHERE equipment_id = $2`, params);
+      if (equip[0]) {
+        const { rows: docs } = await db.raw(`WITH ${v} SELECT DISTINCT document_id FROM doc_links WHERE entity_id = $2 AND entity_type = 'equipment'`, params);
+        return { kind: "equipment", id, customerId: equip[0].customer_id, manufacturer: equip[0].manufacturer, model: equip[0].model, documentIds: docs.map((d) => d.document_id) };
+      }
+      const { rows: doc } = await db.raw(`WITH ${v} SELECT id, customer_id, customer_name, technician, service_date, document_type FROM documents_v WHERE id = $2`, params);
+      if (doc[0]) {
+        const { rows: linked } = await db.raw(`WITH ${v} SELECT entity_id FROM doc_links WHERE document_id = $2 AND entity_type = 'equipment'`, params);
+        return { kind: "document", id, customerId: doc[0].customer_id, customerName: doc[0].customer_name, technician: doc[0].technician, serviceDate: isoDay(doc[0].service_date), documentType: doc[0].document_type, equipmentIds: linked.map((r) => r.entity_id) };
+      }
+      return null;
+    });
+    if (!out) return fail("no customer, unit or document with that id", "follow_links");
+    const text = JSON.stringify(out);
+    ledger.addShown(text);
+    return { ok: true, content: text, rowCount: (out.documentIds?.length ?? 0) + (out.equipmentIds?.length ?? 0) + 1, inputSummary: `follow_links:${out.kind}` };
+  }
+
+  /* ---- timeline (v2): chronological events for a customer/unit or date range ---- */
+  async function timelineTool(input) {
+    const customerId = typeof input?.customerId === "string" && UUID_RE.test(input.customerId) ? input.customerId : null;
+    const equipmentId = typeof input?.equipmentId === "string" && UUID_RE.test(input.equipmentId) ? input.equipmentId : null;
+    if (!customerId && !equipmentId) return fail("give customerId or equipmentId (from another tool)", "timeline");
+    const order = input?.order === "asc" ? "ASC" : "DESC";
+    const docType = typeof input?.documentType === "string" && input.documentType.trim() ? input.documentType.trim().toLowerCase() : null;
+    const dateFrom = typeof input?.dateFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.dateFrom) ? input.dateFrom : null;
+    const dateTo = typeof input?.dateTo === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.dateTo) ? input.dateTo : null;
+    const rows = await withTenant(ctxArg, async (db) => {
+      const v = await views(db);
+      const params = [JSON.stringify({ c: [], e: [] }), customerId ?? equipmentId];
+      const scopeClause = customerId ? "dl.customer_id = $2" : "dl.entity_id = $2 AND dl.entity_type = 'equipment'";
+      // SELECT DISTINCT requires its ORDER BY expression in the select list itself (a document reachable
+      // via more than one doc_links row — a direct link AND an extraction link to the same customer,
+      // say — would otherwise duplicate); order_key carries it, and is not part of the mapped output below.
+      const { rows: r } = await db.raw(
+        `WITH ${v} SELECT DISTINCT dv.id AS document_id, dv.document_type, dv.filename, dv.stage, dv.service_date, dv.technician, dv.created_at,
+                COALESCE(dv.service_date, left(dv.created_at::text, 10)) AS order_key
+           FROM doc_links dl JOIN documents_v dv ON dv.id = dl.document_id
+          WHERE ${scopeClause}
+          ORDER BY order_key ${order} LIMIT 80`,
+        params);
+      return r;
+    });
+    let events = rows.map((r) => ({
+      documentId: r.document_id, date: isoDay(r.service_date) ?? isoDay(r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at),
+      dateKind: r.service_date ? "service" : "uploaded", documentType: r.document_type, filename: r.filename, technician: r.technician,
+    }));
+    if (docType) events = events.filter((e) => e.documentType === docType);
+    if (dateFrom) events = events.filter((e) => e.date && e.date >= dateFrom);
+    if (dateTo) events = events.filter((e) => e.date && e.date <= dateTo);
+    events = events.slice(0, 60);
+    const text = JSON.stringify({ eventCount: events.length, events });
+    ledger.addShown(text);
+    for (const e of events) ledger.addDoc(e.documentId, undefined, e.filename);
+    return { ok: true, content: text, rowCount: events.length, inputSummary: "timeline", empty: events.length === 0 };
+  }
+
+  /* ---- compute (v2): safe arithmetic/date math, see computeExpr.js ---- */
+  async function computeTool(input) {
+    const r = computeExpression(input?.expression, today);
+    if (!r.ok) return fail(r.error, "compute");
+    const text = JSON.stringify({ expression: String(input.expression).slice(0, 300), result: r.value });
+    ledger.addShown(text);
+    return { ok: true, content: text, rowCount: 1, inputSummary: "compute" };
+  }
+
+  /* ---- get_dossier (v2, TEAM T2): a precomputed, cited rolling summary for one customer/unit ---- */
+  async function getDossierTool(input) {
+    const id = typeof input?.entityId === "string" ? input.entityId.trim().toLowerCase() : "";
+    if (!UUID_RE.test(id)) return fail("entityId must be a customerId or equipmentId returned by another tool", "get_dossier");
+    let out;
+    try {
+      out = await withTenant(ctxArg, (db) => getDossier(db, id));
+    } catch (err) {
+      return fail(String(err?.message ?? err).slice(0, 300), "get_dossier");
+    }
+    if (!out) {
+      return {
+        ok: true, content: '{"dossier":null,"note":"no rolling summary built yet for this entity - use search_documents, get_customer or get_unit instead"}',
+        rowCount: 0, inputSummary: "get_dossier", empty: true,
+      };
+    }
+    const sentences = (out.sentences ?? []).map((s) => ({ text: s.text, citations: s.citations ?? [] }));
+    const text = JSON.stringify({ entityId: out.entityId, entityType: out.entityType, summary: out.summary, sentences, updatedAt: out.updatedAt });
+    ledger.addShown(text);
+    ledger.ids.add(id);
+    for (const s of sentences) {
+      for (const c of s.citations) {
+        if (typeof c?.documentId === "string" && UUID_RE.test(c.documentId)) ledger.addPassage(c.documentId, typeof c.page === "number" ? c.page : undefined);
+      }
+    }
+    return { ok: true, content: text, rowCount: sentences.length, inputSummary: "get_dossier", empty: sentences.length === 0 };
+  }
+
+  /* ---- synthesize (v2, TEAM T2): mapReduceAnswer over many documents at once ---- */
+  async function synthesizeTool(input) {
+    const question = typeof input?.question === "string" ? input.question.trim().slice(0, 500) : "";
+    if (!question) return fail("question is required", "synthesize");
+    const filters = {};
+    const custId = typeof input?.customerId === "string" && UUID_RE.test(input.customerId) ? input.customerId : null;
+    const equipId = typeof input?.equipmentId === "string" && UUID_RE.test(input.equipmentId) ? input.equipmentId : null;
+    if (custId) filters.customerIds = [custId];
+    if (equipId) filters.unitIds = [equipId];
+    if (typeof input?.docType === "string" && input.docType.trim()) filters.docTypes = [input.docType.trim().toLowerCase()];
+    if (typeof input?.technician === "string" && input.technician.trim()) filters.technician = input.technician.trim();
+    if (typeof input?.dateFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.dateFrom)) filters.dateFrom = input.dateFrom;
+    if (typeof input?.dateTo === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.dateTo)) filters.dateTo = input.dateTo;
+    // Leaves a margin for the reduce step's own response + this run's remaining turns; never runs past
+    // the agent's own overall deadline (deadlineAt, threaded in from loopV2.js's caller-supplied budget).
+    const budgetMs = deadlineAt ? Math.max(5000, Math.min(60_000, deadlineAt - Date.now() - 5000)) : 45_000;
+    let out;
+    try {
+      out = await mapReduceAnswer(ctxArg, { question, filters, deadlineMs: budgetMs, budgetUsd: 0.5 });
+    } catch (err) {
+      return fail(String(err?.message ?? err).slice(0, 300), "synthesize");
+    }
+    if (out.status === "error") return fail(out.error ?? "synthesis is not available right now", "synthesize");
+    const text = JSON.stringify(out);
+    ledger.addShown(text);
+    for (const c of out.citations ?? []) {
+      if (typeof c?.documentId === "string" && UUID_RE.test(c.documentId)) ledger.addPassage(c.documentId, typeof c.page === "number" ? c.page : undefined);
+    }
+    const rowCount = out.citations?.length ?? 0;
+    return { ok: true, content: text, rowCount, inputSummary: `synthesize:${out.status}`, empty: out.status === "answered" && rowCount === 0 };
+  }
+
   async function execute(name, input) {
     const started = Date.now();
     let r;
@@ -798,6 +1165,13 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
       else if (name === "get_customer") r = await getCustomer(input ?? {});
       else if (name === "run_query") r = await runQuery(input ?? {});
       else if (name === "filter_records") r = await filterRecords(input ?? {});
+      else if (name === READ_DOCUMENT_TOOL_NAME) r = await readDocument(input ?? {});
+      else if (name === GET_UNIT_TOOL_NAME) r = await getUnit(input ?? {});
+      else if (name === FOLLOW_LINKS_TOOL_NAME) r = await followLinks(input ?? {});
+      else if (name === TIMELINE_TOOL_NAME) r = await timelineTool(input ?? {});
+      else if (name === COMPUTE_TOOL_NAME) r = await computeTool(input ?? {});
+      else if (name === GET_DOSSIER_TOOL_NAME) r = await getDossierTool(input ?? {});
+      else if (name === SYNTHESIZE_TOOL_NAME) r = await synthesizeTool(input ?? {});
       else if (name === VIEW_TOOL_NAME) r = await viewDocumentPage(input ?? {});
       else r = fail(`unknown tool ${String(name).slice(0, 40)}`, "unknown");
     } catch (err) {

@@ -42,7 +42,11 @@ export function breadthQuestions(k) {
     return { sql: text.replace(/\s+/g, " ").trim(), params: order.map((i) => params[i - 1]) };
   };
 
-  /** add one question. `build(q)` returns {cmp, sql, requires?, alt?, rubric?, flags?} using q.p / q.today for binds; every SQL text is compacted to the params it uses. */
+  /** add one question. `build(q)` returns {cmp, sql, requires?, alt?, scope?, rubric?, flags?} using q.p / q.today
+   *  for binds; every SQL text is compacted to the params it uses. `scope` (TEAM T3, 2026-09-25) is an
+   *  OPTIONAL {sql, params} returning `document_id` - the exact documents this question's own answer is
+   *  drawn from, read by the Claude baseline (api/_lib/scorecard/baseline.js's candidateDocIds) as the
+   *  "oracle's own candidate set" instead of its generic keyword fallback. */
   function add(category, persona, text, build, flags = {}) {
     const q = new Q();
     const spec = build(q);
@@ -56,6 +60,7 @@ export function breadthQuestions(k) {
         ...main,
         ...(spec.requires ? { requires: withParams(spec.requires) } : {}),
         ...(spec.alt ? { alt: withParams(spec.alt) } : {}),
+        ...(spec.scope ? { scope: withParams(spec.scope) } : {}),
       },
       ...(spec.rubric ? { rubric: spec.rubric } : {}),
       ...flags, ...(spec.flags ?? {}),
@@ -491,6 +496,316 @@ export function breadthQuestions(k) {
   add("persona", "office", "How many work orders do we have?", (q) => ({ cmp: "number", sql: `SELECT count(*) AS n FROM documents d WHERE ${DOCTYPE("d.document_type")} = ANY(${q.p(DOCTYPE_ALIASES["work-order"])}::text[])` }));
   add("persona", "owner", "How many units have a warranty expiring in the next year?", (q) => ({ cmp: "number", sql: `SELECT count(*) AS n FROM ${EQUIP} AND ${wstatus("e", q)} = 'expiring'` }));
   add("persona", "owner", "What percent of our units are out of warranty?", (q) => ({ cmp: "number", sql: `SELECT round(100.0 * count(*) FILTER (WHERE ${wstatus("e", q)} = 'expired') / nullif(count(*), 0)) AS n FROM ${EQUIP}` }), { tolerance: 1, anyNumber: true });
+
+  /* ================================================================ CONNECT-THE-DOTS (TEAM T3, 2026-09-25)
+   * "Is Donovan as good as Claude with full access to the documents?" - the new yardstick needs questions
+   * that CANNOT be answered from one row of one table: a unit's install date against its later visits, a
+   * quote's own wording against what was actually invoiced, a technician's job against a same-customer
+   * follow-up a different document recorded weeks later, an entity's own field against what a document's
+   * text actually says. Same discipline as MULTI-HOP above: an independent oracle over the base tables
+   * (entities, documents, extractions, document_pages, document_financials, document_entity_links), no
+   * shared code with Donovan. A "job"/"visit" here is the same VISIT_TYPES-gated, service_date-bearing
+   * document every other family in this file already uses (lastService/visitCount/serviced/multi-hop).
+   */
+  const CQ = (cmp, text, persona, build, flags = {}) => add("connect", persona, text, (q) => {
+    const r = build(q);
+    return typeof r === "string" ? { cmp, sql: r } : { cmp, ...r };
+  }, cmp === "set" ? { maxItems: 25, ...flags } : flags);
+
+  // Every visit (a VISIT_TYPES document with its own service_date, dated on or before today), resolved to
+  // its CUSTOMER whether the document was linked to the customer directly or to one of their units, plus
+  // that document's own technician extraction (null if it has none). Used as a CTE ("WITH v AS (...)") so a
+  // question can self-join it (a visit against another visit) without re-running the same join twice.
+  const VISIT_ROWS = (q) => `SELECT c.id AS cust_id, d.id AS doc_id, ${ISO("y.value")} AS dt,
+      (SELECT t.value FROM extractions t WHERE t.document_id = d.id AND t.field_key = 'technician' LIMIT 1) AS tech
+    FROM document_entity_links l JOIN documents d ON d.id = l.document_id
+    LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+    JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer' AND c.merged_into IS NULL
+    JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date'
+    WHERE ${DOCTYPE("d.document_type")} = ANY(${vt(q)}) AND ${ISO("y.value")} <= ${q.today()}`;
+  const INSTALL_DATE = (e) => `(CASE WHEN ${e}.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(${e}.data->>'installation_date', 1, 10)::date END)`;
+  const REPLACE_RE = (word) => `(replac\\w*[^.]{0,60}${word}|${word}[^.]{0,40}replac)`;
+
+  /* ---- repeat failures: another visit soon after a unit was installed */
+  for (const days of [30, 90, 180]) {
+    CQ("set", `Which customers had another service visit within ${days} days of a unit's installation?`, "owner", (q) => `SELECT DISTINCT c.data->>'customer_name' AS item FROM ${CUST} AND EXISTS (
+        SELECT 1 FROM ${EQUIP} AND e.customer_id = c.id AND ${INSTALL_DATE("e")} IS NOT NULL
+          AND EXISTS (SELECT 1 FROM (${VISIT_ROWS(q)}) vv WHERE vv.cust_id = c.id AND vv.dt > ${INSTALL_DATE("e")} AND vv.dt <= ${INSTALL_DATE("e")} + ${days})
+      ) ORDER BY 1`);
+    CQ("number", `How many units had a repeat visit within ${days} days of installation?`, "tech", (q) => `SELECT count(*) AS n FROM ${EQUIP} AND ${INSTALL_DATE("e")} IS NOT NULL
+        AND EXISTS (SELECT 1 FROM (${VISIT_ROWS(q)}) vv WHERE vv.cust_id = e.customer_id AND vv.dt > ${INSTALL_DATE("e")} AND vv.dt <= ${INSTALL_DATE("e")} + ${days})`);
+  }
+  for (const brand of BRANDS) {
+    CQ("number", `How many ${brand} units had a repeat visit within 90 days of installation?`, "tech", (q) => {
+      const b = q.p(brand);
+      return `SELECT count(*) AS n FROM ${EQUIP} AND lower(e.data->>'manufacturer') = lower(${b}) AND ${INSTALL_DATE("e")} IS NOT NULL
+        AND EXISTS (SELECT 1 FROM (${VISIT_ROWS(q)}) vv WHERE vv.cust_id = e.customer_id AND vv.dt > ${INSTALL_DATE("e")} AND vv.dt <= ${INSTALL_DATE("e")} + 90)`;
+    });
+  }
+  for (const name of NAMES.slice(0, 8)) {
+    CQ("yesno", `Did ${name} have a repeat visit within 90 days of installing a unit?`, "office", (q) => {
+      const s = subj(name, q);
+      return { sql: `SELECT EXISTS (SELECT 1 FROM ${EQUIP} AND e.customer_id IN (${s.cust}) AND ${INSTALL_DATE("e")} IS NOT NULL
+          AND EXISTS (SELECT 1 FROM (${VISIT_ROWS(q)}) vv WHERE vv.cust_id = e.customer_id AND vv.dt > ${INSTALL_DATE("e")} AND vv.dt <= ${INSTALL_DATE("e")} + 90)) AS v`, requires: { sql: s.req }, scope: { sql: s.docs } };
+    });
+  }
+
+  /* ---- callbacks: a second visit soon after an earlier one (same customer), and per-technician versions */
+  for (const days of [14, 30, 60]) {
+    CQ("set", `Which customers had a callback within ${days} days of a previous service visit?`, "office", (q) => `WITH v AS (${VISIT_ROWS(q)}) SELECT DISTINCT c.data->>'customer_name' AS item FROM ${CUST}
+      AND EXISTS (SELECT 1 FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt > a.dt AND b.dt <= a.dt + ${days} WHERE a.cust_id = c.id) ORDER BY 1`);
+    CQ("number", `How many customers had a callback within ${days} days of a service visit?`, "owner", (q) => `WITH v AS (${VISIT_ROWS(q)}) SELECT count(DISTINCT a.cust_id) AS n FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt > a.dt AND b.dt <= a.dt + ${days}`);
+  }
+  for (const city of CITIES.slice(0, 4)) {
+    CQ("set", `Which customers in ${city} had a callback within 30 days of a service visit?`, "office", (q) => {
+      const c = q.p(city);
+      return `WITH v AS (${VISIT_ROWS(q)}) SELECT DISTINCT c.data->>'customer_name' AS item FROM ${CUST}
+        AND lower(${GEO.city("(c.data->>'service_address')")}) = lower(${c})
+        AND EXISTS (SELECT 1 FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt > a.dt AND b.dt <= a.dt + 30 WHERE a.cust_id = c.id) ORDER BY 1`;
+    });
+  }
+  for (const tech of TECHS) {
+    CQ("number", `How many of ${tech}'s jobs had a callback within 30 days?`, "office", (q) => {
+      const pat = q.p(`%${esc(tech)}%`);
+      return { sql: `WITH v AS (${VISIT_ROWS(q)}) SELECT count(DISTINCT a.doc_id) AS n FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt > a.dt AND b.dt <= a.dt + 30 WHERE a.tech ILIKE ${pat}`, requires: techReq(tech) };
+    });
+  }
+  CQ("set", "Which technicians have had a callback within 30 days on one of their jobs?", "owner", (q) => `WITH v AS (${VISIT_ROWS(q)}) SELECT DISTINCT a.tech AS item FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt > a.dt AND b.dt <= a.dt + 30 WHERE coalesce(a.tech, '') <> '' ORDER BY 1`);
+
+  /* ---- two different technicians on the same customer within a short window (a handoff or a re-check) */
+  for (const days of [14, 30]) {
+    CQ("set", `Which customers had two different technicians visit within ${days} days of each other?`, "office", (q) => `WITH v AS (${VISIT_ROWS(q)}) SELECT DISTINCT c.data->>'customer_name' AS item FROM ${CUST}
+      AND EXISTS (SELECT 1 FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt >= a.dt AND b.dt <= a.dt + ${days} AND coalesce(a.tech, '') <> '' AND coalesce(b.tech, '') <> '' AND lower(a.tech) <> lower(b.tech) WHERE a.cust_id = c.id) ORDER BY 1`);
+    CQ("number", `How many customers had two different technicians visit within ${days} days of each other?`, "owner", (q) => `WITH v AS (${VISIT_ROWS(q)}) SELECT count(DISTINCT a.cust_id) AS n FROM v a JOIN v b ON b.cust_id = a.cust_id AND b.doc_id <> a.doc_id AND b.dt >= a.dt AND b.dt <= a.dt + ${days} AND coalesce(a.tech, '') <> '' AND coalesce(b.tech, '') <> '' AND lower(a.tech) <> lower(b.tech)`);
+  }
+
+  /* ---- quoted a replacement, never got one */
+  const REPL_KW = "(replac\\w*\\s+(the\\s+)?(unit|system|equipment|condenser|furnace|ac)|new (unit|system)|full replacement|system replacement)";
+  const quotedNoReplacement = (extra = "") => (q) => {
+    const kw = q.p(REPL_KW); const qt = q.p(DOCTYPE_ALIASES["proposal-quote"]);
+    return `${extra} EXISTS (
+        SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id JOIN document_pages p ON p.document_id = d.id
+        LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND ${DOCTYPE("d.document_type")} = ANY(${qt}::text[]) AND p.text ~* ${kw}
+      ) AND NOT EXISTS (
+        SELECT 1 FROM ${EQUIP} AND e.customer_id = c.id AND ${INSTALL_DATE("e")} IS NOT NULL AND ${INSTALL_DATE("e")} > (
+          SELECT min(d2.created_at::date) FROM document_entity_links l2 JOIN documents d2 ON d2.id = l2.document_id LEFT JOIN entities le2 ON le2.id = l2.entity_id AND le2.entity_type = 'equipment'
+          WHERE (l2.entity_id = c.id OR le2.customer_id = c.id) AND ${DOCTYPE("d2.document_type")} = ANY(${qt}::text[])
+        )
+      )`;
+  };
+  CQ("set", "Which customers were quoted a replacement but have not had a new unit installed since?", "owner", (q) => `SELECT DISTINCT c.data->>'customer_name' AS item FROM ${CUST} AND ${quotedNoReplacement()(q)} ORDER BY 1`);
+  CQ("number", "How many customers were quoted a replacement but never got one?", "bookkeeper", (q) => `SELECT count(*) AS n FROM ${CUST} AND ${quotedNoReplacement()(q)}`);
+  for (const city of CITIES.slice(0, 4)) {
+    CQ("number", `How many ${city} customers were quoted a replacement but have only had repairs since?`, "office", (q) => {
+      const c = q.p(city);
+      return `SELECT count(*) AS n FROM ${CUST} AND lower(${GEO.city("(c.data->>'service_address')")}) = lower(${c}) AND ${quotedNoReplacement()(q)}`;
+    });
+  }
+
+  /* ---- warranty registration missing despite an install well in the past */
+  const noWarrantyReg = (q) => {
+    const wt = q.p(DOCTYPE_ALIASES["warranty-registration"]);
+    return `NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id WHERE l.entity_id = e.id AND ${DOCTYPE("d.document_type")} = ANY(${wt}::text[]))
+      AND NOT EXISTS (SELECT 1 FROM document_entity_links l2 JOIN documents d2 ON d2.id = l2.document_id WHERE l2.entity_id = e.customer_id AND ${DOCTYPE("d2.document_type")} = ANY(${wt}::text[]))`;
+  };
+  CQ("set", "Which units were installed more than 90 days ago but have no warranty registration on file?", "office", (q) => `SELECT DISTINCT c.data->>'customer_name' AS item FROM ${EQUIP.replace("WHERE", "JOIN entities c ON c.id = e.customer_id WHERE")}
+      AND ${INSTALL_DATE("e")} IS NOT NULL AND ${INSTALL_DATE("e")} <= ${q.today()} - 90 AND ${noWarrantyReg(q)} ORDER BY 1`);
+  CQ("number", "How many units were installed more than 90 days ago with no warranty registration on file?", "office", (q) => `SELECT count(*) AS n FROM ${EQUIP} AND ${INSTALL_DATE("e")} IS NOT NULL AND ${INSTALL_DATE("e")} <= ${q.today()} - 90 AND ${noWarrantyReg(q)}`);
+  for (const brand of BRANDS) {
+    CQ("number", `How many ${brand} units installed more than 90 days ago have no warranty registration on file?`, "tech", (q) => {
+      const b = q.p(brand);
+      return `SELECT count(*) AS n FROM ${EQUIP} AND lower(e.data->>'manufacturer') = lower(${b}) AND ${INSTALL_DATE("e")} IS NOT NULL AND ${INSTALL_DATE("e")} <= ${q.today()} - 90 AND ${noWarrantyReg(q)}`;
+    });
+  }
+  for (const city of CITIES.slice(0, 4)) {
+    CQ("number", `How many units in ${city} installed more than 90 days ago have no warranty registration on file?`, "office", (q) => {
+      const c = q.p(city);
+      return `SELECT count(*) AS n FROM ${EQUIP} AND lower(${GEO.city(`COALESCE(e.data->>'service_address', (SELECT c0.data->>'service_address' FROM entities c0 WHERE c0.id = e.customer_id))`)}) = lower(${c}) AND ${INSTALL_DATE("e")} IS NOT NULL AND ${INSTALL_DATE("e")} <= ${q.today()} - 90 AND ${noWarrantyReg(q)}`;
+    });
+  }
+
+  /* ---- invoices that don't match what was quoted for the same job */
+  const INV_QUOTE_DIFF = `SELECT c.data->>'customer_name' AS name, sum(f.total) FILTER (WHERE f.doc_kind = 'invoice') AS inv_total, sum(f.total) FILTER (WHERE f.doc_kind = 'estimate') AS quote_total
+      FROM document_financials f JOIN document_entity_links l ON l.document_id = f.document_id LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+      JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer' AND c.merged_into IS NULL
+      WHERE f.doc_kind IN ('invoice', 'estimate') AND f.direction = 'receivable' GROUP BY c.id, c.data`;
+  const FIN_REQ2 = { sql: `SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind IN ('invoice', 'estimate')` };
+  CQ("set", "Which customers have an invoice that doesn't match the amount on their quote?", "bookkeeper", () => ({ sql: `SELECT name AS item FROM (${INV_QUOTE_DIFF}) g WHERE inv_total IS NOT NULL AND quote_total IS NOT NULL AND abs(inv_total - quote_total) > 1 ORDER BY 1`, requires: FIN_REQ2 }));
+  CQ("number", "How many customers were invoiced a different amount than what they were quoted?", "owner", () => ({ sql: `SELECT count(*) AS n FROM (${INV_QUOTE_DIFF}) g WHERE inv_total IS NOT NULL AND quote_total IS NOT NULL AND abs(inv_total - quote_total) > 1`, requires: FIN_REQ2 }));
+  for (const city of CITIES.slice(0, 4)) {
+    add("connect", "office", `How many ${city} customers have an invoice that doesn't match their quote?`, (q) => {
+      const c = q.p(city);
+      return { cmp: "number", sql: `SELECT count(*) AS n FROM (${INV_QUOTE_DIFF}) g, ${CUST} AND c.data->>'customer_name' = g.name AND lower(${GEO.city("(c.data->>'service_address')")}) = lower(${c}) AND g.inv_total IS NOT NULL AND g.quote_total IS NOT NULL AND abs(g.inv_total - g.quote_total) > 1`, requires: FIN_REQ2 };
+    });
+  }
+  for (const name of NAMES.slice(0, 6)) {
+    add("connect", "bookkeeper", `Does ${name}'s invoice match what was quoted for the job?`, (q) => {
+      const s = subj(name, q);
+      return {
+        cmp: "yesno",
+        sql: `SELECT (abs(coalesce((SELECT sum(f.total) FROM document_financials f WHERE f.doc_kind = 'invoice' AND f.document_id IN (${s.docs})), 0)
+          - coalesce((SELECT sum(f.total) FROM document_financials f WHERE f.doc_kind = 'estimate' AND f.document_id IN (${s.docs})), 0)) <= 1) AS v`,
+        requires: { sql: `SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind IN ('invoice', 'estimate') AND f.document_id IN (${s.docs})` },
+        scope: { sql: s.docs },
+      };
+    });
+  }
+
+  /* ---- customers quoted more than 6 months ago with no invoice since (a stalled job) */
+  // `idsSql`: a subquery of the candidate customer id(s) - either the whole customers table (c.id, one row per
+  // customer already in the outer FROM) or one named subject's own id(s) (subj().cust, for the per-name form below).
+  const quotedNotInvoiced = (q, idsSql) => `EXISTS (
+      SELECT 1 FROM document_financials f JOIN document_entity_links l ON l.document_id = f.document_id LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+      WHERE (l.entity_id IN (${idsSql}) OR le.customer_id IN (${idsSql})) AND f.doc_kind = 'estimate' AND f.invoice_date IS NOT NULL AND f.invoice_date <= ${q.today()} - 180
+    ) AND NOT EXISTS (
+      SELECT 1 FROM document_financials f2 JOIN document_entity_links l2 ON l2.document_id = f2.document_id LEFT JOIN entities le2 ON le2.id = l2.entity_id AND le2.entity_type = 'equipment'
+      WHERE (l2.entity_id IN (${idsSql}) OR le2.customer_id IN (${idsSql})) AND f2.doc_kind = 'invoice'
+    )`;
+  const OWN_ID = "SELECT c.id";
+  CQ("set", "Which customers were quoted more than 6 months ago and have not been invoiced since?", "owner", (q) => ({ sql: `SELECT c.data->>'customer_name' AS item FROM ${CUST} AND ${quotedNotInvoiced(q, OWN_ID)} ORDER BY 1`, requires: FIN_REQ2 }));
+  CQ("number", "How many customers were quoted more than 6 months ago with no invoice since?", "bookkeeper", (q) => ({ sql: `SELECT count(*) AS n FROM ${CUST} AND ${quotedNotInvoiced(q, OWN_ID)}`, requires: FIN_REQ2 }));
+  for (const name of NAMES.slice(0, 6)) {
+    add("connect", "office", `Was ${name} quoted a job that was never invoiced?`, (q) => {
+      const s = subj(name, q);
+      return { cmp: "yesno", sql: `SELECT ${quotedNotInvoiced(q, s.cust)} AS v`, requires: { sql: `SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind IN ('invoice', 'estimate') AND f.document_id IN (${s.docs})` }, scope: { sql: s.docs } };
+    });
+  }
+
+  /* ---- customers with more than one open invoice at once (a billing pile-up) */
+  const MULTI_OPEN = `SELECT c.data->>'customer_name' AS item FROM document_financials f JOIN document_entity_links l ON l.document_id = f.document_id LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+      JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer' AND c.merged_into IS NULL
+      WHERE ${INV} AND ${OPEN} GROUP BY c.id, c.data HAVING count(*) > 1`;
+  CQ("set", "Which customers have more than one open invoice at once?", "bookkeeper", () => ({ sql: `SELECT item FROM (${MULTI_OPEN}) z ORDER BY 1`, requires: FIN_REQ("invoice") }));
+  CQ("number", "How many customers have more than one open invoice right now?", "owner", () => ({ sql: `SELECT count(*) AS n FROM (${MULTI_OPEN}) z`, requires: FIN_REQ("invoice") }));
+  for (const city of CITIES.slice(0, 4)) {
+    add("connect", "office", `How many ${city} customers have more than one open invoice at once?`, (q) => {
+      const c = q.p(city);
+      return { cmp: "number", sql: `SELECT count(*) AS n FROM (${MULTI_OPEN}) z, ${CUST} AND c.data->>'customer_name' = z.item AND lower(${GEO.city("(c.data->>'service_address')")}) = lower(${c})`, requires: FIN_REQ("invoice") };
+    });
+  }
+
+  /* ---- the same part replaced more than once on the same unit */
+  const PARTS = ["capacitor", "contactor", "motor", "filter", "coil", "thermostat"];
+  PARTS.forEach((part, i) => {
+    CQ("set", `Which customers have had the ${part} replaced more than once?`, "tech", (q) => {
+      const pat = q.p(REPLACE_RE(part));
+      return `SELECT c.data->>'customer_name' AS item FROM ${CUST} AND (
+          SELECT count(DISTINCT p.document_id) FROM document_pages p JOIN document_entity_links l ON l.document_id = p.document_id LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+          WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND p.text ~* ${pat}
+        ) > 1 ORDER BY 1`;
+    });
+    CQ("number", `How many units have had the ${part} replaced more than once?`, ["owner", "tech"][i % 2], (q) => {
+      const pat = q.p(REPLACE_RE(part));
+      return `SELECT count(*) AS n FROM (
+          SELECT le.id FROM document_pages p JOIN document_entity_links l ON l.document_id = p.document_id JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment'
+          WHERE p.text ~* ${pat} GROUP BY le.id HAVING count(DISTINCT p.document_id) > 1
+        ) z`;
+    });
+  });
+  for (const name of NAMES.slice(0, 8)) {
+    add("connect", "office", `Has ${name} had any part replaced more than once on the same unit?`, (q) => {
+      const s = subj(name, q); const pat = q.p("(replac\\w*[^.]{0,60}(capacitor|contactor|motor|filter|coil|thermostat)|(capacitor|contactor|motor|filter|coil|thermostat)[^.]{0,40}replac)");
+      return { cmp: "yesno", sql: `SELECT EXISTS (
+          SELECT 1 FROM document_pages p JOIN document_entity_links l ON l.document_id = p.document_id
+          WHERE l.entity_id IN (${s.equip}) AND p.text ~* ${pat} GROUP BY l.entity_id HAVING count(DISTINCT p.document_id) > 1
+        ) AS v`, requires: { sql: s.req }, scope: { sql: s.docs } };
+    });
+  }
+
+  /* ---- addresses that disagree across documents */
+  const ADDR_MISMATCH_FROM = "entities c JOIN document_entity_links l ON l.entity_id = c.id JOIN extractions y ON y.document_id = l.document_id AND y.field_key = 'service_address'";
+  const ADDR_MISMATCH_WHERE = "c.entity_type = 'customer' AND c.merged_into IS NULL AND coalesce(y.value, '') <> '' AND lower(btrim(y.value)) <> lower(btrim(coalesce(c.data->>'service_address', '')))";
+  CQ("set", "Which customers have a different address on one of their documents than what's on file?", "office", () => `SELECT DISTINCT c.data->>'customer_name' AS item FROM ${ADDR_MISMATCH_FROM} WHERE ${ADDR_MISMATCH_WHERE} ORDER BY 1`);
+  CQ("number", "How many customers have a document with an address that doesn't match what's on file?", "office", () => `SELECT count(DISTINCT c.id) AS n FROM ${ADDR_MISMATCH_FROM} WHERE ${ADDR_MISMATCH_WHERE}`);
+  for (const city of CITIES.slice(0, 4)) {
+    add("connect", "office", `How many ${city} customers have a document address that doesn't match their record?`, (q) => {
+      const c = q.p(city);
+      return { cmp: "number", sql: `SELECT count(DISTINCT c.id) AS n FROM ${ADDR_MISMATCH_FROM} WHERE ${ADDR_MISMATCH_WHERE} AND lower(${GEO.city("(c.data->>'service_address')")}) = lower(${c})` };
+    });
+  }
+  for (const name of NAMES.slice(0, 4)) {
+    add("connect", "office", `What is the correct current address for ${name}, and why?`, (q) => {
+      const s = subj(name, q);
+      return {
+        cmp: "rubric",
+        rubric: "States one current address for this customer, matching the most recently dated document/record in the reference, and explains why if the reference shows more than one address on file (which is newest). Must not invent an address not in the reference.",
+        sql: `SELECT addr || ' (as of ' || coalesce(dt::text, 'unknown date') || ')' AS ref FROM (
+            SELECT c.data->>'service_address' AS addr, c.created_at::date AS dt FROM entities c WHERE c.id IN (${s.cust})
+            UNION ALL
+            SELECT y.value, d.created_at::date FROM extractions y JOIN documents d ON d.id = y.document_id JOIN document_entity_links l ON l.document_id = d.id WHERE l.entity_id IN (${s.cust}) AND y.field_key = 'service_address' AND coalesce(y.value, '') <> ''
+          ) z ORDER BY dt DESC NULLS LAST LIMIT 8`,
+        requires: { sql: s.req },
+        scope: { sql: s.docs },
+      };
+    }, { citeWhat: "the document that carries the most recent address" });
+  }
+
+  /* ---- equipment serials that appear under more than one customer (a data-entry or a real duplicate) */
+  CQ("yesno", "Are there any equipment serial numbers that appear under more than one customer?", "tech", () => `SELECT EXISTS (SELECT 1 FROM ${EQUIP} AND coalesce(e.data->>'serial_number', '') <> ''
+      AND (SELECT count(DISTINCT e2.customer_id) FROM entities e2 WHERE e2.entity_type = 'equipment' AND e2.merged_into IS NULL AND upper(e2.data->>'serial_number') = upper(e.data->>'serial_number')) > 1) AS v`);
+  CQ("set", "Which serial numbers appear under more than one customer?", "tech", () => `SELECT DISTINCT upper(e.data->>'serial_number') AS item FROM ${EQUIP} AND coalesce(e.data->>'serial_number', '') <> ''
+      AND (SELECT count(DISTINCT e2.customer_id) FROM entities e2 WHERE e2.entity_type = 'equipment' AND e2.merged_into IS NULL AND upper(e2.data->>'serial_number') = upper(e.data->>'serial_number')) > 1 ORDER BY 1`);
+  CQ("number", "How many equipment serial numbers are shared by more than one customer?", "owner", () => `SELECT count(*) AS n FROM (SELECT upper(e.data->>'serial_number') AS sn FROM ${EQUIP} AND coalesce(e.data->>'serial_number', '') <> '' GROUP BY 1 HAVING count(DISTINCT e.customer_id) > 1) z`);
+
+  /* ---- maintenance agreements with zero visits behind them */
+  const AGR_NO_VISIT = (q) => `${custDoc(agr(q))} AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND ${DOCTYPE("d.document_type")} = ANY(${vt(q)}))`;
+  CQ("set", "Which customers have a maintenance agreement but have never had a service visit?", "owner", (q) => `SELECT c.data->>'customer_name' AS item FROM ${CUST} AND ${AGR_NO_VISIT(q)} ORDER BY 1`);
+  CQ("number", "How many maintenance agreements have zero service visits behind them?", "bookkeeper", (q) => `SELECT count(*) AS n FROM ${CUST} AND ${AGR_NO_VISIT(q)}`);
+  for (const city of CITIES.slice(0, 4)) {
+    CQ("number", `How many customers in ${city} have a maintenance agreement but no service visits on file?`, "office", (q) => {
+      const c = q.p(city);
+      return `SELECT count(*) AS n FROM ${CUST} AND lower(${GEO.city("(c.data->>'service_address')")}) = lower(${c}) AND ${AGR_NO_VISIT(q)}`;
+    });
+  }
+  for (const brand of BRANDS.slice(0, 4)) {
+    CQ("number", `How many maintenance agreements are there for ${brand} customers with zero service visits?`, "office", (q) => {
+      const b = q.p(brand);
+      return `SELECT count(*) AS n FROM ${CUST} AND ${custUnit(` AND lower(e.data->>'manufacturer') = lower(${b})`)} AND ${AGR_NO_VISIT(q)}`;
+    });
+  }
+
+  /* ---- narratives: what happened, in order, across the year's documents (must not invent a visit or date) */
+  for (const name of NAMES) {
+    const persona = ["office", "tech", "owner", "bookkeeper"][NAMES.indexOf(name) % 4];
+    add("connect", persona, `Walk me through what happened at ${name}'s property this year, in order.`, (q) => {
+      const s = subj(name, q); const w = windowFor("this year", q);
+      return {
+        cmp: "rubric",
+        rubric: "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
+        sql: `SELECT ${ISO("y.value")}::text || ' | ' || ${DOCTYPE("d.document_type")} || ' | ' || left(regexp_replace(coalesce((SELECT string_agg(p.text, ' ') FROM document_pages p WHERE p.document_id = d.id), ''), '[[:space:]]+', ' ', 'g'), 160) AS ref
+          FROM extractions y JOIN documents d ON d.id = y.document_id WHERE y.field_key = 'service_date' AND y.document_id IN (${s.docs}) AND ${ISO("y.value")} >= ${w.start} AND ${ISO("y.value")} < ${w.end} ORDER BY ${ISO("y.value")} ASC LIMIT 10`,
+        requires: { sql: s.req },
+        scope: { sql: s.docs },
+      };
+    }, { citeWhat: "each visit or document it narrates" });
+  }
+
+  /* ---- conflicting facts across documents: which is right, and why */
+  for (const name of NAMES) {
+    add("connect", ["bookkeeper", "office"][NAMES.indexOf(name) % 2], `Do any of ${name}'s documents disagree with our records, and if so which is right?`, (q) => {
+      const s = subj(name, q);
+      return {
+        cmp: "rubric",
+        rubric: "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
+        sql: `SELECT field || ': record says ' || coalesce(onfile, '(nothing on file)') || ' -- document ' || docname || ' (' || coalesce(docdate::text, 'undated') || ') says ' || docval AS ref FROM (
+            SELECT 'phone' AS field, c.data->>'phone' AS onfile, y.value AS docval, d.original_filename AS docname, d.created_at::date AS docdate
+              FROM entities c JOIN document_entity_links l ON l.entity_id = c.id JOIN extractions y ON y.document_id = l.document_id AND y.field_key = 'phone' JOIN documents d ON d.id = y.document_id
+              WHERE c.id IN (${s.cust}) AND coalesce(y.value, '') <> '' AND regexp_replace(y.value, '[^0-9]', '', 'g') <> regexp_replace(coalesce(c.data->>'phone', ''), '[^0-9]', '', 'g')
+            UNION ALL
+            SELECT 'email', c.data->>'email', y.value, d.original_filename, d.created_at::date
+              FROM entities c JOIN document_entity_links l ON l.entity_id = c.id JOIN extractions y ON y.document_id = l.document_id AND y.field_key = 'email' JOIN documents d ON d.id = y.document_id
+              WHERE c.id IN (${s.cust}) AND coalesce(y.value, '') <> '' AND lower(btrim(y.value)) <> lower(btrim(coalesce(c.data->>'email', '')))
+            UNION ALL
+            SELECT 'address', c.data->>'service_address', y.value, d.original_filename, d.created_at::date
+              FROM entities c JOIN document_entity_links l ON l.entity_id = c.id JOIN extractions y ON y.document_id = l.document_id AND y.field_key = 'service_address' JOIN documents d ON d.id = y.document_id
+              WHERE c.id IN (${s.cust}) AND coalesce(y.value, '') <> '' AND lower(btrim(y.value)) <> lower(btrim(coalesce(c.data->>'service_address', '')))
+          ) z ORDER BY docdate DESC LIMIT 6`,
+        requires: { sql: s.req },
+        scope: { sql: s.docs },
+      };
+    }, { citeWhat: "the document whose value differs from the record" });
+  }
 
   return out;
 }

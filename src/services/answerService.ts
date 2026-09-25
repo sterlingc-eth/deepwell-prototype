@@ -9,7 +9,6 @@
  */
 import type { Answer, AnswerProvider, AskOptions } from '../core/types';
 import { useGraph } from '../core/entityGraph';
-import { createMockProvider } from './answerService.mock';
 import { createClaudeProvider } from './answerService.claude';
 
 // Re-exported so screens (AskScreen) can `instanceof` check a 402 without
@@ -36,10 +35,18 @@ export function setProvider(name: ProviderName): void {
   provider = null;
 }
 
-function getProvider(): AnswerProvider {
+// The deterministic mock (and the HVAC demo answer engine behind it) is only
+// ever used in demo/dev builds, so it's loaded on demand rather than shipped
+// in every production bundle (it was ~30 KB of the phone app's first load).
+async function getProvider(): Promise<AnswerProvider> {
   if (!provider) {
     const snapshot = () => useGraph.getState();
-    provider = providerName === 'claude' ? createClaudeProvider(snapshot) : createMockProvider(snapshot);
+    if (providerName === 'claude') {
+      provider = createClaudeProvider(snapshot);
+    } else {
+      const { createMockProvider } = await import('./answerService.mock');
+      provider = createMockProvider(snapshot);
+    }
   }
   return provider;
 }
@@ -58,5 +65,5 @@ export function ask(question: string, opts?: AskOptions): Promise<Answer> {
       closest: [],
     });
   }
-  return getProvider().ask(trimmed, opts);
+  return getProvider().then((p) => p.ask(trimmed, opts));
 }

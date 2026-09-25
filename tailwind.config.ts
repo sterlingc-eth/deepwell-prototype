@@ -150,5 +150,8 @@ export default {
     // `.field` = Field view ergonomics (bigger type/targets). Colors live on
     // `.dark` (Office view) — the two are independent, see src/index.css.
     ({ addVariant }: { addVariant: (n: string, v: string) => void }) => addVariant('field', '.field &'),
+    // `short:` = landscape phones (DeepWell Mobile compacts its chrome). A variant, not a
+    // `screens` entry: a raw-media screen would disable Tailwind's min-[…] variants.
+    ({ addVariant }: { addVariant: (n: string, v: string) => void }) => addVariant('short', '@media (max-height: 520px)'),
   ],
 } satisfies Config;

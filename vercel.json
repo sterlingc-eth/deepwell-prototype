@@ -18,6 +18,14 @@
       "destination": "/expenses/index.html"
     },
     {
+      "source": "/m",
+      "destination": "/m/index.html"
+    },
+    {
+      "source": "/m/(.*)",
+      "destination": "/m/index.html"
+    },
+    {
       "source": "/app",
       "destination": "/app/index.html"
     },
@@ -85,6 +93,22 @@
     {
       "source": "/app/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/m",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/m/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/m/manifest.webmanifest",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
     }
   ]
 }

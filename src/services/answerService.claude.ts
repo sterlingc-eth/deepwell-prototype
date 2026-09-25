@@ -54,14 +54,74 @@ export class AskApiError extends Error {
   }
 }
 
+/**
+ * Reads a `/api/ask` response that opted into streaming (see below): newline-delimited JSON, zero or
+ * more `{"type":"step","message":"..."}` progress lines (forwarded to `onStep`, best-effort — a
+ * malformed or missing step line is simply skipped, never fatal) and exactly one
+ * `{"type":"final",success,data|error,url?}` line, which resolves/rejects exactly as the non-streaming
+ * branch below would have from the whole-body JSON. A response whose Content-Type turns out NOT to be
+ * NDJSON (a deterministic fast-layer answer never streams at all — see api/ask.js) is read as a single
+ * JSON object instead, so this path is a strict superset of the non-streaming one, never a second
+ * contract to keep in sync.
+ */
+async function readNdjsonAnswer(res: Response, onStep?: (step: { message: string }) => void): Promise<{ success: boolean; data?: Partial<Answer>; error?: string; url?: string }> {
+  const reader = res.body?.getReader();
+  if (!reader) return res.json();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let final: { success: boolean; data?: Partial<Answer>; error?: string; url?: string } | null = null;
+  const handleLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    let evt: unknown;
+    try {
+      evt = JSON.parse(trimmed);
+    } catch {
+      return; // a partial/garbled line is skipped, never fatal
+    }
+    const e = evt as { type?: string; message?: string; success?: boolean; data?: Partial<Answer>; error?: string; url?: string };
+    if (e.type === 'step') {
+      if (typeof e.message === 'string' && onStep) onStep({ message: e.message });
+    } else if (e.type === 'final') {
+      final = { success: e.success !== false, data: e.data, error: e.error, url: e.url };
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    // eslint-disable-next-line no-cond-assign
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      handleLine(buffer.slice(0, idx));
+      buffer = buffer.slice(idx + 1);
+    }
+  }
+  if (buffer) handleLine(buffer);
+  return final ?? { success: false, error: 'The connection ended before an answer arrived.' };
+}
+
 export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '/api/ask'): AnswerProvider {
   return {
     async ask(question, opts) {
       const g = snapshot();
+      // Streaming is opt-in from the caller's side too: only asked for when something wants to show
+      // progress (AskScreen passes onStep). A caller with no onStep gets the exact same request/response
+      // shape as before this feature existed.
+      const wantStream = typeof opts?.onStep === 'function';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-        body: JSON.stringify({ question, today: (opts?.now ?? new Date()).toISOString().slice(0, 10) }),
+        body: JSON.stringify({
+          question,
+          today: (opts?.now ?? new Date()).toISOString().slice(0, 10),
+          ...(wantStream ? { stream: true } : {}),
+          // TEAM T2: only sent when the thread actually has a prior turn — see
+          // api/_lib/conversation.js. Omitted entirely for a first/"New question" ask.
+          // Sent on a streaming request exactly the same as a non-streaming one.
+          ...(opts?.conversationContext?.turns.length ? { conversationContext: opts.conversationContext } : {}),
+        }),
+        signal: opts?.signal,
       });
       if (!res.ok) {
         // A 500 from Vercel is an HTML page, not JSON. Reading it as text and
@@ -81,7 +141,10 @@ export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '
         const billingUrl = (parsedBody as { url?: string } | null)?.url;
         throw new AskApiError(message, res.status, billingUrl);
       }
-      const body = (await res.json()) as { success: boolean; data?: Partial<Answer>; error?: string };
+      const contentType = res.headers.get('content-type') ?? '';
+      const body = contentType.includes('ndjson')
+        ? await readNdjsonAnswer(res, opts?.onStep)
+        : ((await res.json()) as { success: boolean; data?: Partial<Answer>; error?: string });
       if (!body.success || !body.data) throw new Error(body.error ?? 'Answer service returned no data');
       return normalizeAnswer(body.data, g);
     },

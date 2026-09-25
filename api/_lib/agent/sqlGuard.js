@@ -47,6 +47,7 @@ export const REAL_TABLES = Object.freeze([
   ...FINANCE_REAL_TABLES, // document_financials, document_financial_lines (M3-config/22)
   "page_chunks", "embedding_usage", // M3-config/31 (search by meaning)
   "donovan_learned_tenant", "donovan_gap_reports", // M3-config/32-donovan-autopilot.sql (TEAM H)
+  "dossiers", "knowledge_reports", // M3-config/33-knowledge.sql (TEAM T2)
 ]);
 
 const DENY_TOKENS = new Set([

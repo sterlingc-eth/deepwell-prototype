@@ -800,7 +800,12 @@ void missBefore;
   check('ask.js: the agent is tried from five places (incl. money gate) + agent-first (analytics fallback / unhandled, no retrieval, model no-answer, enumeration/history before retrieval)', (ask.match(/await tryAgent\(/g) ?? []).length === 6, String((ask.match(/await tryAgent\(/g) ?? []).length));
   check('ask.js: the money gate is left alone (money-fallback never goes to the agent)', /missOutcome !== MISS_OUTCOMES\.MONEY_FALLBACK/.test(ask));
   check('ask.js: data.debug needs an operator AND body.debug === true', /req\.body\?\.debug === true && isPlatformOperator\(auth\)/.test(ask));
-  check('ask.js: agent answers are cached under their own hash + prompt version', /agentQuestionHash\(question\)/.test(ask) && /promptVersion: AGENT_PROMPT_VERSION/.test(ask));
+  // T1 (research agent v2, 2026-09-25): the cache key is now RESEARCH_V2_ENABLED ? the v2 hash/prompt
+  // version : these same v1 ones (see loopV2.js's own, differently-namespaced researchQuestionHash/
+  // RESEARCH_PROMPT_VERSION) — still resolved once per request into `qHash`/`promptVersion`, still never
+  // shared with a retrieval or analytics cache row either way. Checks the conditional form directly
+  // rather than the old unconditional one line 803 used to assert.
+  check('ask.js: agent answers are cached under their own hash + prompt version', /agentQuestionHash\(question\)/.test(ask) && /AGENT_PROMPT_VERSION/.test(ask) && /RESEARCH_V2_ENABLED \? researchQuestionHash\(question\) : agentQuestionHash\(question\)/.test(ask));
   check('ask.js: the agent path never logs question text', !/console\.(log|error)\([^)]*question[^)]*\)/.test(ask.slice(ask.indexOf('const tryAgent'), ask.indexOf('// ---- overlap, not a chain'))));
   check('agent loop logs counts only (no question / answer text)', !/JSON\.stringify\(\{[^}]*(question|text)/.test(loop.slice(loop.indexOf('console.log('))));
 }

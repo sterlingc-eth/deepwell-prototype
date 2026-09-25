@@ -395,36 +395,80 @@ export function latencyStats(results) {
   return { n: ms.length, p50Ms: percentile(ms, 50), p95Ms: percentile(ms, 95) };
 }
 
+/** Pure: 1-decimal-rounded average of a list of numbers (nulls/NaN skipped), or null when there are none. */
+function avg(nums) {
+  const list = (nums ?? []).filter((n) => Number.isFinite(n));
+  return list.length ? Math.round((list.reduce((a, b) => a + b, 0) / list.length) * 1000) / 1000 : null;
+}
+
 /**
  * Pure: overall and per-category score from per-question results (skipped ones are excluded).
  * `score` = share that passed (value right AND cited when a citation is required); `valueScore` = share whose
  * value was right, citations aside; `citation` = of the answers that needed a citation, how many carried one.
+ *
+ * TEAM T3 (2026-09-25) quality metrics beyond pass/fail, all pulled from fields the runner already stores
+ * per question (never a second pass over the DB):
+ *   citation.precisionAvg / unsupportedClaimRate  - citationCheck.js's text-match precision (detail.citationPrecision),
+ *     averaged over answers it could actually check; unsupportedClaimRate is simply 1 - precisionAvg.
+ *   completeness.recallAvg  - average list recall (detail.recall, already set for every "set"-comparison
+ *     question by compareSet/withCitation above) - "did the answer name everything the oracle expected".
+ *   avgCostUsd  - mean per-question spend (costUsd), overall and per category.
+ *   latencyByComparison  - p50/p95 latency bucketed by comparison type (number/set/value/yesno/rubric/...):
+ *     the scorecard has no true request-route label to bucket by (askCall.js's `debug` trace only exists
+ *     for agent-answered questions), so the comparison type - which correlates with which pre-router or
+ *     model path a question tends to take - is used as the nearest available proxy. Documented here rather
+ *     than overclaimed as a literal route.
  */
 export function scoreResults(results) {
   const graded = (results ?? []).filter((r) => r && !r.skipped);
   const by = {};
   const cite = { required: 0, cited: 0 };
   let valueOk = 0;
+  const citePrecisionAll = [];
+  const recallAll = [];
+  const costAll = [];
+  const byComparison = {};
   for (const r of graded) {
-    const c = (by[r.category] ??= { passed: 0, total: 0, valueOk: 0, citeRequired: 0, cited: 0 });
+    const c = (by[r.category] ??= { passed: 0, total: 0, valueOk: 0, citeRequired: 0, cited: 0, citationPrecisions: [], recalls: [], costs: [] });
     c.total += 1;
     if (r.passed) c.passed += 1;
     // Results stored before citation scoring have no valueOk: their pass IS the value verdict.
     const v = r.valueOk === undefined ? Boolean(r.passed) : Boolean(r.valueOk);
     if (v) { c.valueOk += 1; valueOk += 1; }
     if (r.citationRequired) { c.citeRequired += 1; cite.required += 1; if (r.cited) { c.cited += 1; cite.cited += 1; } }
+    const cp = r.detail?.citationPrecision;
+    if (typeof cp === "number") { c.citationPrecisions.push(cp); citePrecisionAll.push(cp); }
+    const rc = r.detail?.recall;
+    if (typeof rc === "number") { c.recalls.push(rc); recallAll.push(rc); }
+    const cost = Number(r.costUsd);
+    if (Number.isFinite(cost)) { c.costs.push(cost); costAll.push(cost); }
+    if (r.comparison) {
+      const cm = (byComparison[r.comparison] ??= []);
+      if (Number.isFinite(Number(r.latencyMs))) cm.push(Number(r.latencyMs));
+    }
   }
   for (const c of Object.values(by)) {
     c.score = c.total ? Math.round((c.passed / c.total) * 1000) / 1000 : 0;
     c.valueScore = c.total ? Math.round((c.valueOk / c.total) * 1000) / 1000 : 0;
     c.citationCoverage = c.citeRequired ? Math.round((c.cited / c.citeRequired) * 1000) / 1000 : null;
+    c.citationPrecisionAvg = avg(c.citationPrecisions);
+    c.recallAvg = avg(c.recalls);
+    c.avgCostUsd = c.costs.length ? Math.round(avg(c.costs) * 100000) / 100000 : null;
+    delete c.citationPrecisions; delete c.recalls; delete c.costs;
   }
   const passed = graded.filter((r) => r.passed).length;
+  const precisionAvg = avg(citePrecisionAll);
   return {
     total: graded.length, passed, score: graded.length ? Math.round((passed / graded.length) * 10000) / 10000 : null,
     valueScore: graded.length ? Math.round((valueOk / graded.length) * 10000) / 10000 : null,
-    citation: { required: cite.required, cited: cite.cited, coverage: cite.required ? Math.round((cite.cited / cite.required) * 10000) / 10000 : null },
+    citation: {
+      required: cite.required, cited: cite.cited, coverage: cite.required ? Math.round((cite.cited / cite.required) * 10000) / 10000 : null,
+      precisionAvg, unsupportedClaimRate: precisionAvg == null ? null : Math.round((1 - precisionAvg) * 1000) / 1000, checked: citePrecisionAll.length,
+    },
+    completeness: { recallAvg: avg(recallAll), n: recallAll.length },
+    avgCostUsd: costAll.length ? Math.round(avg(costAll) * 100000) / 100000 : null,
     byCategory: by,
     latency: latencyStats(graded),
+    latencyByComparison: Object.fromEntries(Object.entries(byComparison).map(([k, ms]) => [k, { n: ms.length, p50Ms: percentile(ms, 50), p95Ms: percentile(ms, 95) }])),
   };
 }

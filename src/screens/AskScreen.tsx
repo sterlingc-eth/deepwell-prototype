@@ -5,7 +5,7 @@ import { DonovanMark } from '../components/DonovanMark';
 import { AnswerCard } from '../components/AnswerCard';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SerialCapture } from '../components/SerialCapture';
-import type { Answer, AnswerRecord, SourceRef } from '../core/types';
+import type { Answer, AnswerRecord, ConversationTurn, SourceRef } from '../core/types';
 import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions } from '../core/suggestions';
@@ -50,12 +50,23 @@ export function AskScreen() {
   const [asked, setAsked] = useState<string | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [loading, setLoading] = useState(false);
+  // Research agent v2 streaming UX (2026-09-25): the live step list under the Donovan mark while a
+  // non-trivial question is being researched ("Searching invoices for Plaza Dental…", "Reading 6
+  // documents…"). Stays empty for a question the deterministic fast layer answers instantly — the
+  // server only ever streams steps when it actually has some to report.
+  const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Set alongside `error` only for a 402 (subscription required / free
   // preview used up) — AskApiError's own `url`, defaulting to Billing.
   const [billingUrl, setBillingUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [capture, setCapture] = useState(false);
+  // TEAM T2 (2026-09-25): the current thread — prior turns only, never including
+  // the question in flight — so "and last year?" / "just the Trane ones" / "who
+  // was the tech?" compose with what was just asked (api/_lib/conversation.js
+  // validates this same shape server-side). "New question" below just empties it.
+  // Capped at 4, matching conversation.js's own MAX_CONTEXT_TURNS.
+  const [thread, setThread] = useState<ConversationTurn[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // "Based on N records": a customer opens their profile, a unit its customer, a document its cited page.
   const openRecord = useCallback((r: AnswerRecord) => {
@@ -90,20 +101,32 @@ export function AskScreen() {
       setLoading(true);
       setError(null);
       setBillingUrl(null);
+      setSteps([]);
       if (opts.record !== false) pushRecentQuestion(q);
+      // Captured before this turn is added — the prior turns only, per composeFollowup's contract.
+      const priorTurns = opts.record !== false ? thread : [];
       try {
-        const a = await ask(q, { includeUnverified });
-        if (id === requestId.current) setAnswer(a);
+        const a = await ask(q, {
+          includeUnverified,
+          conversationContext: { turns: priorTurns },
+          onStep: (step) => {
+            if (id === requestId.current) setSteps((prev) => [...prev, step.message]);
+          },
+        });
+        if (id === requestId.current) {
+          setAnswer(a);
+          if (opts.record !== false) setThread((t) => [...t, { question: q, askedAt: new Date().toISOString() }].slice(-4));
+        }
       } catch (e) {
         if (id === requestId.current) {
           setError(e instanceof Error ? e.message : 'Something went wrong answering that.');
           if (e instanceof AskApiError && e.status === 402) setBillingUrl(e.url ?? '/app/?screen=billing');
         }
       } finally {
-        if (id === requestId.current) setLoading(false);
+        if (id === requestId.current) { setLoading(false); setSteps([]); }
       }
     },
-    [includeUnverified, pushRecentQuestion],
+    [includeUnverified, pushRecentQuestion, thread],
   );
 
   // Deep links (dashboard rows, entity pages) arrive as a pending question
@@ -161,6 +184,7 @@ export function AskScreen() {
     setAnswer(null);
     setError(null);
     setBillingUrl(null);
+    setThread([]);
     inputRef.current?.focus();
   };
 
@@ -224,9 +248,16 @@ export function AskScreen() {
           </div>
           <p className="text-caption text-ink-3" aria-live="polite">
             {loading
-              ? <span className="inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Donovan is reading your records…</span>
+              ? <span className="inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> {steps.length ? steps[steps.length - 1] : 'Donovan is reading your records…'}</span>
               : <><kbd className="dw-kbd">Enter</kbd> to ask · <kbd className="dw-kbd">Esc</kbd> to clear</>}
           </p>
+          {loading && steps.length > 1 && (
+            <ul className="space-y-1 pl-1" aria-hidden="true">
+              {steps.slice(0, -1).map((s, i) => (
+                <li key={i} className="text-caption text-ink-3/70 line-through decoration-ink-3/40">{s}</li>
+              ))}
+            </ul>
+          )}
           {askPct != null && askPct >= 0.8 && !billingUrl && (
             <p className="text-caption text-ink-3">
               {Math.round(Math.min(askPct, 1) * 100)}% of this month's usage
@@ -252,15 +283,28 @@ export function AskScreen() {
         )}
 
         {answer && asked && !error && (
-          <AnswerCard
-            answer={answer}
-            question={asked}
-            includeUnverified={includeUnverified}
-            onToggleUnverified={setIncludeUnverified}
-            onOpenSource={setPreview}
-            onOpenEntity={openFactEntity}
-            onOpenRecord={openRecord}
-          />
+          <>
+            {thread.length > 1 && (
+              // Only worth showing once a follow-up has actually happened (thread.length > 1) — a single
+              // fresh question has nothing to "reset". Breaks the chain explicitly, so the next question
+              // is asked cold instead of silently composing with everything said so far.
+              <div className="flex items-center justify-between text-caption text-ink-3">
+                <span>Following up on {thread.length - 1} earlier question{thread.length - 1 === 1 ? '' : 's'}</span>
+                <button type="button" onClick={clear} className="dw-btn-secondary !min-h-[32px] !py-1">
+                  New question
+                </button>
+              </div>
+            )}
+            <AnswerCard
+              answer={answer}
+              question={asked}
+              includeUnverified={includeUnverified}
+              onToggleUnverified={setIncludeUnverified}
+              onOpenSource={setPreview}
+              onOpenEntity={openFactEntity}
+              onOpenRecord={openRecord}
+            />
+          </>
         )}
 
         {!asked && (

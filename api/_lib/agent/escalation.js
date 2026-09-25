@@ -113,21 +113,24 @@ const utcDayStart = (now = Date.now()) => {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
 };
 
-/** USD of Sonnet spend recorded for this tenant today. Returns null when it cannot be read (fail closed). */
-export async function sonnetSpentTodayUsd(withTenant, ctxArg, now = Date.now()) {
+/** USD of Sonnet spend recorded for this tenant today. Returns null when it cannot be read (fail closed).
+ *  `bucket` (Donovan v2 research agent, 2026-09-25): defaults to SONNET_BUCKET so every existing call
+ *  keeps reading/writing the escalation counter unchanged; the research agent (agent/loopV2.js) passes
+ *  its own bucket so its daily spend cap is tracked separately from Haiku-run escalation spend. */
+export async function sonnetSpentTodayUsd(withTenant, ctxArg, now = Date.now(), bucket = SONNET_BUCKET) {
   try {
     const { rows } = await withTenant(ctxArg, (db) => db.raw(
       `SELECT units FROM rate_limit_windows
         WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND bucket = $1 AND window_start = $2::timestamptz`,
-      [SONNET_BUCKET, utcDayStart(now)]));
+      [bucket, utcDayStart(now)]));
     return (Number(rows[0]?.units) || 0) / 1_000_000;
   } catch {
     return null;
   }
 }
 
-/** Add `usd` to this tenant's Sonnet spend for today. Best-effort, never throws. */
-export async function recordSonnetSpend(withTenant, ctxArg, usd, now = Date.now()) {
+/** Add `usd` to this tenant's Sonnet spend for today. Best-effort, never throws. See bucket note above. */
+export async function recordSonnetSpend(withTenant, ctxArg, usd, now = Date.now(), bucket = SONNET_BUCKET) {
   const micro = Math.max(0, Math.min(2_000_000_000, Math.round((Number(usd) || 0) * 1_000_000)));
   if (!micro) return false;
   try {
@@ -136,19 +139,20 @@ export async function recordSonnetSpend(withTenant, ctxArg, usd, now = Date.now(
        VALUES ((current_setting('app.tenant_id', true))::uuid, $1, $2::timestamptz, $3)
        ON CONFLICT (tenant_id, bucket, window_start)
        DO UPDATE SET units = LEAST(2000000000, rate_limit_windows.units + EXCLUDED.units)`,
-      [SONNET_BUCKET, utcDayStart(now), micro]));
+      [bucket, utcDayStart(now), micro]));
     return true;
   } catch {
     return false;
   }
 }
 
-/** True when this tenant may still start a Sonnet run today. */
-export async function sonnetAllowed(withTenant, ctxArg, env = process.env, now = Date.now()) {
+/** True when this tenant may still start a Sonnet run today. `capUsd`/`bucket` let a caller (the research
+ *  agent) meter against its own, separately-configured daily cap instead of the escalation one. */
+export async function sonnetAllowed(withTenant, ctxArg, env = process.env, now = Date.now(), { capUsd, bucket = SONNET_BUCKET } = {}) {
   if (!isEscalationEnabled(env)) return { allowed: false, why: "disabled" };
-  const cap = sonnetDailyCapUsd(env);
+  const cap = capUsd ?? sonnetDailyCapUsd(env);
   if (cap <= 0) return { allowed: false, why: "cap-zero" };
-  const spent = await sonnetSpentTodayUsd(withTenant, ctxArg, now);
+  const spent = await sonnetSpentTodayUsd(withTenant, ctxArg, now, bucket);
   if (spent === null) return { allowed: false, why: "spend-unreadable" };
   if (spent >= cap) return { allowed: false, why: "daily-cap", spentUsd: spent, capUsd: cap };
   return { allowed: true, spentUsd: spent, capUsd: cap };

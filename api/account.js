@@ -24,8 +24,13 @@ import financials from "./_lib/routes/financials.js";
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
+ *
+ * maxDuration 300 (Vercel Pro, 2026-09-25): the cron sweep (?action=sweep) now also runs the T2 knowledge
+ * layer's nightly dossier catch-up and async report-job sweep step (see cron-sweep.js) on top of its
+ * existing per-tenant work — the same reasoning as ask.js's own 300s bump, just for the batch/cron side.
+ * Every other action here still finishes in well under a second.
  */
-export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 60 };
+export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
 const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials };
 

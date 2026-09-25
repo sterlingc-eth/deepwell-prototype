@@ -278,10 +278,35 @@ export interface Answer {
   basis?: string;
 }
 
+/**
+ * One prior turn in the current AskScreen thread, as the client remembers it —
+ * the same shape api/_lib/conversation.js validates server-side (TEAM T2,
+ * 2026-09-25). "New question" simply means the caller sends no context at all.
+ */
+export interface ConversationTurn {
+  question: string;
+  askedAt?: string;
+}
+export interface ConversationContext {
+  turns: ConversationTurn[];
+}
+
 export interface AskOptions {
   includeUnverified?: boolean;
   /** Injected clock so "expiring in 90 days" is testable */
   now?: Date;
+  /**
+   * Research agent v2 streaming UX (2026-09-25): when set, the Claude-backed provider asks the server
+   * to stream progress ("Searching invoices for Plaza Dental…", "Reading 6 documents…") and calls this
+   * for each step as it arrives, before the final Answer resolves the promise as usual. A provider that
+   * cannot stream (the mock provider, or a server that answered instantly from the deterministic fast
+   * layer) simply never calls it — this is cosmetic only, never load-bearing for the answer itself.
+   */
+  onStep?: (step: { message: string }) => void;
+  /** The prior turns in this thread, so a follow-up like "and last year?" composes with them. */
+  conversationContext?: ConversationContext;
+  /** Cancels the in-flight request (the mobile app's slow-network timeout). */
+  signal?: AbortSignal;
 }
 
 /** The seam. Mock today; Claude-backed tomorrow; same UI either way. */

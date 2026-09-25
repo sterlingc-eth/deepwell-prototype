@@ -1,0 +1,21 @@
+{
+  "id": "/m/",
+  "name": "DeepWell Mobile",
+  "short_name": "DeepWell",
+  "description": "Ask Donovan, scan paperwork, and find documents from the field.",
+  "start_url": "/m/",
+  "scope": "/m/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#05100B",
+  "background_color": "#05100B",
+  "icons": [
+    { "src": "/m/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/m/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/m/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Scan a document", "url": "/m/?tab=scan" },
+    { "name": "Ask Donovan", "url": "/m/?tab=ask" }
+  ]
+}

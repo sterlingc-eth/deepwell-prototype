@@ -1,0 +1,10 @@
+/* Phone-shell details the Tailwind tokens don't cover: notch/home-bar safe
+   areas, no rubber-band on the fixed chrome, no 300ms tap delay. */
+html, body { height: 100%; overscroll-behavior-y: none; }
+body { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.dw-safe-top { padding-top: env(safe-area-inset-top); }
+.dw-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+/* 16px minimum on inputs stops iOS Safari zooming the page on focus. */
+.dw-m input, .dw-m textarea, .dw-m select { font-size: 16px; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

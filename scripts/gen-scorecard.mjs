@@ -40,7 +40,13 @@ const QUOTA = {
 };
 const VARIANT_EVERY = 3; // every 3rd selected base also gets its typo + abbreviated wording
 const RUBRIC_CAP = 0.15;
-const BREADTH_CATEGORIES = ["financials", "content", "semantic", "multi-hop", "trends", "rankings", "tech-performance", "data-quality", "existence", "explain", "persona"];
+const BREADTH_CATEGORIES = ["financials", "content", "semantic", "multi-hop", "trends", "rankings", "tech-performance", "data-quality", "existence", "explain", "persona", "connect"];
+// TEAM T3 (2026-09-25): "connect" needs its own minimum and rubric ceiling - it is meant to be the
+// hardest category (facts linked ACROSS documents/entities: repeat failures, quoted-but-never-replaced,
+// missing warranty registrations past 90 days, callbacks, mismatched invoices, conflicting facts across
+// documents...), so it is checked separately from the exam-wide RUBRIC_CAP below.
+const CONNECT_MIN = 150;
+const CONNECT_RUBRIC_CAP = 0.25;
 
 /* ------------------------------------------------------------------ SQL building blocks */
 const ADDR = (col) => col;
@@ -614,9 +620,13 @@ function main() {
 
   // contract checks
   const problems = [];
-  if (questions.length < 480 || questions.length > 800) problems.push(`total ${questions.length} outside 480..800`);
+  if (questions.length < 480 || questions.length > 1000) problems.push(`total ${questions.length} outside 480..1000`);
   if (breadth.length < 200) problems.push(`breadth questions ${breadth.length} < 200`);
-  for (const cat of BREADTH_CATEGORIES) if (!breadth.some((b) => b.category === cat)) problems.push(`breadth category with no questions: ${cat}`);
+  for (const cat of BREADTH_CATEGORIES) if (!byCat[cat]) problems.push(`breadth category with no questions: ${cat}`);
+  const connectQs = questions.filter((q) => q.category === "connect");
+  if (connectQs.length < CONNECT_MIN) problems.push(`connect questions ${connectQs.length} < ${CONNECT_MIN}`);
+  const connectRubric = connectQs.filter((q) => q.cmp === "rubric").length;
+  if (connectQs.length && connectRubric / connectQs.length > CONNECT_RUBRIC_CAP) problems.push(`connect rubric ${connectRubric}/${connectQs.length} exceeds ${CONNECT_RUBRIC_CAP * 100}%`);
   if (rubric / questions.length > RUBRIC_CAP) problems.push(`rubric ${rubric}/${questions.length} exceeds ${RUBRIC_CAP * 100}%`);
   for (const cat of Object.keys(QUOTA)) if (!byCat[cat]) problems.push(`category with no questions: ${cat}`);
   if (new Set(questions.map((q) => q.id)).size !== questions.length) problems.push("duplicate ids");

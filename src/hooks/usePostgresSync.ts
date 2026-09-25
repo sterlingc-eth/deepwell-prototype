@@ -18,7 +18,9 @@ import { recordsStore } from '../services/recordsStoreClient';
 import { reviewClient, isIntegrityFixDebounced, type DocumentLink, type Correction } from '../services/reviewClient';
 import { authHeader } from '../services/authToken';
 import { maxStageFor, recomputeIssues, useGraph } from '../core/entityGraph';
-import { hvacSchema } from '../domains/hvac';
+// Straight from ./schema, not the domain index: the index also re-exports
+// bootstrapHvac, which drags the demo seed fixture into every bundle that syncs.
+import { hvacSchema } from '../domains/hvac/schema';
 import { normalizeDocumentType } from '../domains/hvac/documentTypes';
 import type { Batch, Doc, DocCompleteness, Entity, FieldValue, FileType, PipelineStage } from '../core/types';
 import type { Entity as ApiEntity } from '../services/postgresRecordsStore';
@@ -522,7 +524,15 @@ async function runInboxLinkSweep(tenantKey: string): Promise<void> {
  *   `recordsStore.connect()` — the server derives the real tenant from the
  *   verified Clerk token regardless of what is sent here.
  */
-export function usePostgresSync(enabled: boolean, tenantKey: string | null): PostgresSyncState {
+export interface PostgresSyncOptions {
+  /** Run the post-load inbox link sweep (default true). The lite mobile app
+   *  turns it off: it's a write-side maintenance pass the desktop already
+   *  runs, and on a phone it's extra round trips before the tech can work. */
+  linkSweep?: boolean;
+}
+
+export function usePostgresSync(enabled: boolean, tenantKey: string | null, opts: PostgresSyncOptions = {}): PostgresSyncState {
+  const linkSweep = opts.linkSweep !== false;
   const [state, setState] = useState<PostgresSyncState>(IDLE);
   const requestId = useRef(0);
 
@@ -541,7 +551,7 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
         const { isEmpty } = await loadGraphFromServer(tenantKey ?? '');
         if (cancelled || requestId.current !== id) return;
         setState({ status: 'ready', error: null, isEmpty, refresh: run });
-        if (!isEmpty) void runInboxLinkSweep(tenantKey ?? '');
+        if (!isEmpty && linkSweep) void runInboxLinkSweep(tenantKey ?? '');
       } catch (err) {
         if (cancelled || requestId.current !== id) return;
         // A 401 (session resolved by Clerk client-side but rejected by the
@@ -558,7 +568,7 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null): Pos
     return () => {
       cancelled = true;
     };
-  }, [enabled, tenantKey]);
+  }, [enabled, tenantKey, linkSweep]);
 
   return state;
 }

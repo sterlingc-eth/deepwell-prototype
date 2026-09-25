@@ -29,6 +29,7 @@ import { compareAnswer, answerView, summarizeAnswer, summarizeExpected, scoreRes
 import { gradeRubric } from "./grader.js";
 import { askViaHandler } from "./askCall.js";
 import { createRun, saveResults, getRun } from "./store.js";
+import { checkCitationPrecision } from "./citationCheck.js";
 
 export const DEFAULT_BUDGET_USD = 5;
 export const DEFAULT_PAGE_SIZE = 6;
@@ -191,6 +192,16 @@ export async function runScorecard({
     detail.cited = Boolean(graded.cited);
     detail.citationRequired = Boolean(graded.citationRequired);
     if (q.persona) detail.persona = q.persona;
+
+    // TEAM T3 (2026-09-25): a cheap, deterministic text-match check - did the cited document(s) actually
+    // contain what the answer claims? Only worth the query when a citation was actually given.
+    if (graded.cited) {
+      const cp = await checkCitationPrecision(withTenant, ctx, asked.data);
+      if (typeof cp.precision === "number") {
+        detail.citationPrecision = cp.precision;
+        if (cp.unsupportedClaims.length) detail.unsupportedClaims = cp.unsupportedClaims;
+      }
+    }
 
     let stopReason = null;
     // A failure the agent produced (or declined) is retried ONCE on the escalation model; the score stays the

@@ -66,12 +66,24 @@ import { getActiveOverlayForTenant } from "./_lib/learning/overlay.js";
 import { runDonovanAgent, isAgentEnabled, agentQuestionHash, AGENT_PROMPT_VERSION, agentDebugTrace } from "./_lib/agent/loop.js";
 import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion, isReasoningQuestion } from "./_lib/agent/intents.js";
 import { runRecipeFastPath } from "./_lib/agent/fastReplay.js";
+// TEAM T1 (research agent v2, 2026-09-25): Sonnet-first, more-tools, longer-budget successor to the
+// Haiku loop above, with its own verify step. Swapped in at every existing tryAgent() call site below —
+// none of the pre-router chain above it changes. See loopV2.js's own doc comment.
+import { runResearchAgent, isResearchAgentEnabled, RESEARCH_PROMPT_VERSION, researchQuestionHash } from "./_lib/agent/loopV2.js";
+import { logRouteDecision } from "./_lib/agent/router.js";
 // Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
 import { findExactRecipe } from "./_lib/learning/recipes.js";
 import { submitRecipe } from "./_lib/learning/replay.js";
 import { isPlatformOperator } from "./_lib/missDigest.js";
 // Donovan Scorecard (api/_lib/scorecard/): in-process calls carry {auth, escalate} under a Symbol no HTTP request can set.
 import { takeScorecardCall } from "./_lib/scorecard/hook.js";
+// TEAM T2 (2026-09-25): conversational follow-ups — an optional, client-supplied conversationContext
+// (see api/_lib/conversation.js for the shape T1's agent shares) is validated server-side and, only when
+// the new question actually reads as a continuation ("and last year?", "just the Trane ones", "who was
+// the tech?"), folded into a self-contained question BEFORE the existing pipeline below ever sees it.
+// A self-contained question, or a request with no conversationContext at all (every existing caller),
+// takes this exact same path it always has — nothing here changes behavior unless the field is sent.
+import { validateConversationContext, isFollowupContinuation, composeFollowup } from "./_lib/conversation.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -179,7 +191,16 @@ export function hashQuestion(question) {
 // the platform's bare default, which is SHORTER than 60s — so the model call
 // below could be hard-killed before its own timeout ever fired, and a hard kill
 // runs no catch block and tells the user nothing.
-export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration: 60 };
+//
+// 300 (owner decision, 2026-09-25, Vercel Pro): the research agent (loopV2.js) budgets up to ~240s of
+// tool-use before it forces an answer; every OTHER path here (meta/deterministic/fast-path/retrieval)
+// still finishes in well under a second and is completely unaffected by a larger ceiling.
+export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration: 300 };
+
+// Research agent v2 (owner decision, 2026-09-25): "Sonnet as the default research agent for anything
+// non-trivial." Resolved once per process, not per request — DONOVAN_RESEARCH_AGENT=0 reverts every
+// tryAgent() call site below to the v1 Haiku loop (loop.js) with no other change.
+const RESEARCH_V2_ENABLED = isResearchAgentEnabled();
 
 const MAX_QUESTION = 2000;
 const MAX_PASSAGES = 12;
@@ -546,11 +567,48 @@ export default async function handler(req, res) {
   // Server-Timing + the ASK_DEBUG_TIMINGS escape hatch (both handoffs/
   // ASK_LATENCY_2026-09-20.md) — ms only, no PII, no question text.
   const timer = startTimer();
+
+  // ---- streaming UX (build spec item 4, 2026-09-25) --------------------------------------------------
+  // Opt-in only (`{stream: true}` in the request body): a non-streaming caller (an API key integration,
+  // the scorecard runner) gets EXACTLY today's single JSON response — nothing below changes their
+  // contract. When it IS requested, `startStreaming()` (called once, from inside tryAgent below, right
+  // before the research agent actually runs) switches the response to newline-delimited JSON: zero or
+  // more `{"type":"step","message":"..."}` progress lines, one final `{"type":"final",...}` line carrying
+  // exactly the same `success`/`data`/`error` shape `send()` would otherwise have returned as the whole
+  // body. A question the deterministic fast layer answers never streams at all (send() is called before
+  // streaming is ever started), so the vast majority of asks are completely unaffected.
+  let streaming = false;
+  const startStreaming = () => {
+    if (streaming || res.headersSent) return false;
+    try {
+      handleCors(res, req);
+      res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.writeHead(200);
+      streaming = true;
+    } catch (err) {
+      console.error("ask: failed to start streaming, falling back to a single JSON response:", err?.message);
+    }
+    return streaming;
+  };
   const send = (status, body) => {
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
     // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
     if (body?.data && typeof body.data === "object") {
       try { finalizeCitations(body.data); } catch (err) { console.error("finalizeCitations failed, sending answer without it:", err?.message); }
+    }
+    if (streaming) {
+      try {
+        const line = status < 400
+          ? { type: "final", success: true, data: body.data }
+          : { type: "final", success: false, error: body.error, ...(body.url ? { url: body.url } : {}) };
+        res.write(`${JSON.stringify(line)}\n`);
+      } catch (err) {
+        console.error("ask: failed to write final streaming event:", err?.message);
+      }
+      try { res.end(); } catch { /* the client may already be gone */ }
+      return res;
     }
     const header = formatServerTiming(timer.snapshot());
     if (header && !res.headersSent) res.setHeader("Server-Timing", header);
@@ -565,6 +623,9 @@ export default async function handler(req, res) {
   const scorecardCall = takeScorecardCall(req);
   const incrementAsksThisMonth = scorecardCall ? async () => {} : incrementAsksThisMonthRaw;
   const ASK_CACHE_ENABLED = ASK_CACHE_ENABLED_RAW && !scorecardCall;
+  // Non-streaming clients (an API key integration, the scorecard runner) never set this — see the
+  // streaming block's own comment above for exactly what changes when they do.
+  const wantStream = !scorecardCall && req.body?.stream === true;
 
   let auth;
   try {
@@ -584,12 +645,25 @@ export default async function handler(req, res) {
   if (!scorecardCall && !(await timer.time("limit", () => limit(req, res, auth, "ask")))) return;
 
   try {
-    let { question, today } = req.body ?? {};
+    let { question, today, conversationContext } = req.body ?? {};
     if (typeof question !== "string" || !question.trim()) {
       return res.status(400).json({ error: "Missing question" });
     }
     if (question.length > MAX_QUESTION) {
       return res.status(400).json({ error: "Question is too long" });
+    }
+
+    // TEAM T2: fold a real follow-up into a self-contained question (see the
+    // import above) — never throws, never blocks the question on a malformed
+    // context, and re-checks the length cap since the composed text is longer.
+    if (conversationContext) {
+      try {
+        const convo = validateConversationContext(conversationContext);
+        if (convo.turns.length && isFollowupContinuation(question)) {
+          const composed = composeFollowup(convo, question).query;
+          if (composed && composed.length <= MAX_QUESTION) question = composed;
+        }
+      } catch { /* not a followup — the question is asked exactly as typed */ }
     }
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
@@ -737,16 +811,31 @@ export default async function handler(req, res) {
     const agentDebug = agentOn && (Boolean(scorecardCall) || (req.body?.debug === true && isPlatformOperator(auth)));
     const requestStartedAt = Date.now();
     let agentTried = false;
-    const tryAgent = async ({ extraUsage = null, budgetMs = 50_000, recordMiss = true } = {}) => {
+    // The research agent budgets up to ~240s of tool-use (loopV2.js); the v1 Haiku loop stays at its
+    // original, much shorter default. Every explicit budgetMs below scales the same way.
+    const DEFAULT_AGENT_BUDGET_MS = RESEARCH_V2_ENABLED ? Math.max(20_000, (Number(process.env.DONOVAN_AGENT_DEADLINE_MS) || 240_000) - 20_000) : 50_000; // must track vercel.json maxDuration (300 s on Pro)
+    const tryAgent = async ({ extraUsage = null, budgetMs = DEFAULT_AGENT_BUDGET_MS, recordMiss = true } = {}) => {
       if (!agentOn || agentTried) return false;
       agentTried = true;
-      const qHash = agentQuestionHash(question);
+      // Route-decision log (build spec item 1): counts only (route id + reason codes), never question
+      // text — see router.js's own doc comment. Every call here already fell through the whole
+      // deterministic fast layer (meta/detIntent/fastPath/contact/doc-lookup/content-count/money), so
+      // this only records WHY, not whether, the research agent gets involved.
+      logRouteDecision(question, { agent_version: RESEARCH_V2_ENABLED ? "v2" : "v1" });
+      // Streaming (build spec item 4): only for the research agent, and only once, from whichever of
+      // this function's several call sites actually gets here first for this request.
+      if (wantStream && RESEARCH_V2_ENABLED) startStreaming();
+      const onEvent = streaming
+        ? (evt) => { try { res.write(`${JSON.stringify({ type: "step", ...evt })}\n`); } catch { /* client may be gone */ } }
+        : undefined;
+      const qHash = RESEARCH_V2_ENABLED ? researchQuestionHash(question) : agentQuestionHash(question);
+      const promptVersion = RESEARCH_V2_ENABLED ? RESEARCH_PROMPT_VERSION : AGENT_PROMPT_VERSION;
       let corpusStamp = null;
       let result = null;
       try {
         if (ASK_CACHE_ENABLED) {
           try {
-            const probe = await withTenant(ctxArg, (db) => getCacheEntry(db, { questionHash: qHash, today: todayResolved, promptVersion: AGENT_PROMPT_VERSION }));
+            const probe = await withTenant(ctxArg, (db) => getCacheEntry(db, { questionHash: qHash, today: todayResolved, promptVersion }));
             corpusStamp = probe.corpusStamp;
             if (isCacheHit(probe.row, probe.corpusStamp)) {
               const cachedData = { ...probe.row.answer, cached: true };
@@ -780,9 +869,10 @@ export default async function handler(req, res) {
           if (fast.handled) result = fast;
         }
         if (!result) {
-          result = await timer.time("agent", () =>
-            runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt: Math.min(requestStartedAt + budgetMs, scorecardCall?.deadlineAt ?? Infinity), escalate: scorecardCall?.escalate === true })
-          );
+          const deadlineAt = Math.min(requestStartedAt + budgetMs, scorecardCall?.deadlineAt ?? Infinity);
+          result = RESEARCH_V2_ENABLED
+            ? await timer.time("agent", () => runResearchAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, onEvent }))
+            : await timer.time("agent", () => runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: scorecardCall?.escalate === true }));
         }
       } catch (err) {
         // Includes ModelBudgetExceededError: the standard fallback below decides what a
@@ -1306,7 +1396,9 @@ export default async function handler(req, res) {
       // await (nothing else here is awaited yet either), never delaying the
       // retrieval fallback.
       // "Analytics plan rejected" (live miss cluster): the agent gets a shot before retrieval.
-      if (await tryAgent({ budgetMs: 18_000 }) /* retrieval + model (35s) still follows on a miss: stay inside maxDuration 60 */) return;
+      // v1: retrieval + model (35s) still follows on a miss, so this stays a small share of the old 60s
+      // budget. v2 (streaming, up to maxDuration 300) can afford to give the research agent a full try here.
+      if (await tryAgent({ budgetMs: RESEARCH_V2_ENABLED ? 90_000 : 18_000 })) return;
       recordAskMiss(ctxArg, {
         question, questionNormalized: normalizedForAnalytics,
         outcome: MISS_OUTCOMES.ANALYTICS_FALLTHROUGH,
@@ -1431,7 +1523,7 @@ export default async function handler(req, res) {
     // compressor replaced?") go to the agent BEFORE the retrieval model: retrieval answers from the top few
     // pages and caps a reply at 5 facts, which silently truncated a 13-customer list. Falls through to
     // retrieval when the agent cannot answer (its budget leaves room for the retrieval call inside maxDuration).
-    if (isAgentFirstQuestion(question) && (await tryAgent({ budgetMs: 20_000, recordMiss: false }))) return;
+    if (isAgentFirstQuestion(question) && (await tryAgent({ budgetMs: RESEARCH_V2_ENABLED ? 90_000 : 20_000, recordMiss: false }))) return;
 
     // ---- 2. ask ------------------------------------------------------------
     // Three separate blocks, not one flat prompt string, so an Anthropic
@@ -1658,9 +1750,21 @@ export default async function handler(req, res) {
       if (header && !res.headersSent) res.setHeader("Server-Timing", header);
     } catch { /* never let timing observability break error reporting */ }
     if (res.headersSent) {
-      // Only reachable if the post-response bookkeeping above somehow threw
-      // past its own per-promise .catch — the customer already has their
-      // answer, so there is nothing left to send.
+      // Streaming (build spec item 4): headers went out before the answer did (startStreaming() writes
+      // them as soon as the research agent begins), so a mid-run failure here would otherwise leave the
+      // client's stream hanging with no final event at all — write one now, best-effort, same shape
+      // send() would have used for an error.
+      if (streaming && !res.writableEnded) {
+        try {
+          const message = error?.name === "ModelBudgetExceededError" ? (error.message ?? "Daily AI budget reached") : "Something went wrong answering that.";
+          res.write(`${JSON.stringify({ type: "final", success: false, error: message })}\n`);
+        } catch { /* the client may already be gone */ }
+        try { res.end(); } catch { /* the client may already be gone */ }
+        console.error("ask: error after streaming started:", error?.message);
+        return;
+      }
+      // Otherwise only reachable if the post-response bookkeeping above somehow threw past its own
+      // per-promise .catch — the customer already has their answer, so there is nothing left to send.
       console.error("ask: error after response already sent:", error?.message);
       return;
     }

@@ -7,12 +7,16 @@
  * questions of, and compares against, that tenant's own data. The spend ceiling is env-controlled
  * (DONOVAN_SCORECARD_BUDGET_USD, default $5); a caller can only ask for LESS.
  */
-import { getPool } from "../recordsStore.js";
+import { getPool, withTenant } from "../recordsStore.js";
 import askHandler from "../../ask.js";
 import { loadExam } from "../scorecard/exam.js";
 import { runScorecard, scorecardBudgetUsd, nightlySlice, NIGHTLY_SLICE, DEFAULT_PAGE_SIZE } from "../scorecard/runner.js";
 import { scoreResults } from "../scorecard/compare.js";
 import { listRuns, getRun } from "../scorecard/store.js";
+// TEAM T3 (2026-09-25): the Claude baseline - "is Donovan as good as Claude with full document access?" -
+// and its per-category gap against the latest Donovan run. Its own module (api/_lib/scorecard/baseline.js);
+// this file only wires it into the operator actions, same split as the runner above.
+import { runBaselinePage, baselineBudgetUsd, baselineGapReport, DEFAULT_BASELINE_PAGE_SIZE } from "../scorecard/baseline.js";
 
 const todayUtc = () => new Date().toISOString().slice(0, 10);
 const TASK_KEY = "donovan-scorecard";
@@ -60,7 +64,32 @@ export async function scorecardRunAction(ctx, auth, payload = {}) {
   };
 }
 
-/** Latest run + trend + failing list + exam shape. Payload: {runId?}. */
+/**
+ * One page of the Claude baseline: fills in any question of `scope` that the CURRENT exam version does not
+ * already have a cached baseline for (never repeats a cached one), inside its own spend ceiling.
+ * Payload: {scope?, offset?, pageSize?, today?, category?, budgetUsd?} - same `scope` vocabulary as
+ * scorecardRunAction ("full" | "slice" | "category" | "ids").
+ */
+export async function scorecardBaselineAction(ctx, auth, payload = {}) {
+  const exam = loadExam();
+  if (!exam.questions.length) return { error: "exam-missing", message: "The scorecard exam file is not deployed (test-docs/scorecard/exam.json)." };
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.today ?? "")) ? payload.today : todayUtc();
+  const scope = payload.scope === "slice" || payload.scope === "category" || payload.scope === "ids" ? payload.scope : "full";
+  const questions = selectQuestions(exam, { scope, today, category: payload.category, ids: payload.ids });
+  const asked = Number(payload.budgetUsd);
+  const budgetUsd = Number.isFinite(asked) && asked > 0 ? Math.min(asked, baselineBudgetUsd()) : baselineBudgetUsd();
+  const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+  const out = await runBaselinePage({
+    ctxArg, withTenant, questions, examVersion: exam.version, today,
+    offset: Number(payload.offset) || 0, pageSize: Number(payload.pageSize) || DEFAULT_BASELINE_PAGE_SIZE, budgetUsd,
+  });
+  return {
+    examVersion: exam.version, scope, today, total: questions.length, nextOffset: out.nextOffset, done: out.done, stopped: out.stopped, spentUsd: out.spentUsd,
+    page: out.results.map((r) => ({ questionId: r.questionId, cached: Boolean(r.cached), skipped: Boolean(r.skipped), passed: Boolean(r.passed) })),
+  };
+}
+
+/** Latest run + trend + failing list + exam shape (+ the Claude-baseline gap, when one has been run). Payload: {runId?}. */
 export async function scorecardStatusAction(ctx, payload = {}) {
   const exam = loadExam();
   const { runs, backend } = await listRuns(ctx, { limit: 8 });
@@ -96,12 +125,19 @@ export async function scorecardStatusAction(ctx, payload = {}) {
       };
     }
   }
+  // TEAM T3 (2026-09-25): the Claude baseline, if any question in this run has one cached for the run's
+  // OWN exam version - "Donovan vs. Claude with full document access", per category, with the gap
+  // (donovan - baseline). A category with no cached baseline yet reports baselineScore: null, never a
+  // misleading 0 (see baseline.js's baselineGapReport).
+  const baselineGap = run ? await baselineGapReport(ctx, run.examVersion ?? exam.version, results) : {};
   return {
     backend: detail?.backend ?? backend,
     exam: { version: exam.version, questions: exam.questions.length, categories, personas },
     budgetUsd: scorecardBudgetUsd(),
+    baselineBudgetUsd: baselineBudgetUsd(),
     adjudicationNote: ADJUDICATION_NOTE,
     run: runOut,
+    baselineGap,
     previous: previous ? { id: previous.id, score: previous.score, startedAt: previous.startedAt, answered: previous.answered, valueScore: prevAgg?.valueScore ?? null, citationCoverage: prevAgg?.citation?.coverage ?? null } : null,
     categoryTrend,
     runs: runs.map((r) => ({ id: r.id, source: r.source, status: r.status, score: r.score, answered: r.answered, startedAt: r.startedAt, costUsd: r.costUsd })),

@@ -11,6 +11,8 @@ import { runMissDigestSweepStep } from "../missDigest.js";
 import { runLearningSweepStep } from "../learning/sweep.js";
 import { runScorecardSweepStep } from "./scorecard.js";
 import { runAutopilotSweepStep } from "../learning/autopilot.js";
+import { runDossierCatchup } from "../search/dossier.js";
+import { runKnowledgeReportSweepStep } from "../search/mapReduce.js";
 
 /**
  * GET /api/cron-sweep
@@ -132,6 +134,11 @@ export default async function handler(req, res) {
     integrityNamesRelinkable: 0,
     integritySkippedTenants: 0,
     billingGatedTenants: 0,
+    // TEAM T2 (2026-09-25): dossier catch-up (per tenant, below) + async full-report jobs (one per tenant, below).
+    dossiersBuilt: 0,
+    dossiersUnchanged: 0,
+    dossiersSkippedTenants: 0,
+    knowledgeReportsProcessed: 0,
     errors: [],
   };
 
@@ -276,6 +283,34 @@ export default async function handler(req, res) {
     } else {
       summary.integritySkippedTenants += 1;
     }
+
+    // TEAM T2 (2026-09-25): dossier catch-up for THIS tenant — small, bounded slice (a few seconds,
+    // a few dozen entities) so one tenant's backlog never crowds out the rest of the sweep. Never throws.
+    if (Date.now() < deadlineAt) {
+      try {
+        const d = await runDossierCatchup(ctx, { deadlineMs: 6000, maxEntities: 25 });
+        summary.dossiersBuilt += d.built ?? 0;
+        summary.dossiersUnchanged += d.unchanged ?? 0;
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "dossier-catchup", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "dossier-catchup" });
+      }
+    } else {
+      summary.dossiersSkippedTenants += 1;
+    }
+
+    // One queued full-report job per tenant per sweep (mapReduceAnswer's async fallback for a synthesis
+    // question spanning more documents than a single request can cover). Rare and already its own
+    // deadline/budget internally; never allowed to fail the rest of this sweep.
+    if (Date.now() < deadlineAt) {
+      try {
+        const rep = await runKnowledgeReportSweepStep(ctx, { deadlineMs: Math.max(5000, deadlineAt - Date.now()) });
+        summary.knowledgeReportsProcessed += rep.processed ?? 0;
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "knowledge-report", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "knowledge-report" });
+      }
+    }
   }
 
   // Warranty-expiration notifications (handoffs/NOTIFICATIONS.md). Its own
@@ -383,7 +418,9 @@ export default async function handler(req, res) {
       `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}; ` +
       `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}; ` +
       `scorecard: ${summary.scorecard?.skipped ?? summary.scorecard?.error ?? `${summary.scorecard?.passed ?? 0}/${summary.scorecard?.answered ?? 0} passed`}; ` +
-      `autopilot: ${summary.autopilot?.skipped ?? summary.autopilot?.error ?? `${summary.autopilot?.tenantsProcessed ?? 0}/${summary.autopilot?.tenantsEligible ?? 0} tenant(s), $${summary.autopilot?.platformSpentUsd ?? 0}`}.`,
+      `autopilot: ${summary.autopilot?.skipped ?? summary.autopilot?.error ?? `${summary.autopilot?.tenantsProcessed ?? 0}/${summary.autopilot?.tenantsEligible ?? 0} tenant(s), $${summary.autopilot?.platformSpentUsd ?? 0}`}; ` +
+      `dossiers: ${summary.dossiersBuilt} built, ${summary.dossiersUnchanged} unchanged, ${summary.dossiersSkippedTenants} tenant(s) skipped (deadline); ` +
+      `knowledge-reports: ${summary.knowledgeReportsProcessed} processed.`,
     { route: "/api/cron-sweep" }
   );
 

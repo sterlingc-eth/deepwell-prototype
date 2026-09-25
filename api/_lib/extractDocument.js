@@ -14,6 +14,7 @@ import { assertModelBudget } from "./rateLimit.js";
 import { deriveWarranty } from "./warrantyRules.js";
 import { withCache, modelCallLogLine } from "./promptCache.js";
 import { recordModelCall } from "./usage.js";
+import { updateDossierForDocument } from "./search/dossier.js";
 import {
   normalizeDocumentType,
   resolveDocumentType,
@@ -511,6 +512,12 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // Memo/correspondence whose BODY names exactly one existing customer: link it (deterministic, no model; ambiguous or
   // partial matches are left for review). Never throws. See bodyNameLink.js.
   await applyBodyNameLinks(ctx, { documentId });
+
+  // DOSSIER HOOK (TEAM T2, 2026-09-25): this document is now linked to whatever customer/unit it
+  // names, so THIS is the earliest point their rolling summary can incorporate it — updateDossierForDocument
+  // never throws (the document is already fully ingested either way) and is inert without an API key or
+  // before migration 33 is pasted; the nightly catch-up (cron-sweep.js) picks up anything this misses.
+  await updateDossierForDocument(ctx, documentId).catch(() => {});
 
   return {
     documentId,
