@@ -10,6 +10,7 @@ import { FollowupsCard } from '../components/FollowupsCard';
 import { DonovanMissesCard } from '../components/DonovanMissesCard';
 import { DonovanLearningCard } from '../components/DonovanLearningCard';
 import { SemanticSearchCard } from '../components/SemanticSearchCard';
+import { PhoneAppCard } from '../components/PhoneAppCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -147,6 +148,8 @@ export function TeamScreen() {
             {pending > 0 ? ` · ${pending} pending invite${pending === 1 ? '' : 's'}` : ''}
           </span>
         </div>
+
+        <PhoneAppCard />
 
         {admin && <NotificationsCard />}
         {admin && <FollowupsCard />}

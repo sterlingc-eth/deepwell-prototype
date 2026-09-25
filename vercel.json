@@ -8,6 +8,11 @@
     "api/review.js": { "includeFiles": "test-docs/scorecard/exam.json" },
     "api/account.js": { "includeFiles": "test-docs/scorecard/exam.json" }
   },
+  "redirects": [
+    { "source": "/download", "destination": "/get", "permanent": false },
+    { "source": "/mobile", "destination": "/get", "permanent": false },
+    { "source": "/app-download", "destination": "/get", "permanent": false }
+  ],
   "rewrites": [
     {
       "source": "/expenses",
@@ -16,6 +21,10 @@
     {
       "source": "/expenses/",
       "destination": "/expenses/index.html"
+    },
+    {
+      "source": "/get",
+      "destination": "/get/index.html"
     },
     {
       "source": "/m",
@@ -92,6 +101,10 @@
     },
     {
       "source": "/app/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/get(/.*)?",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
     },
     {

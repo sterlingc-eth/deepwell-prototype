@@ -54,5 +54,36 @@ export function isStandalone(): boolean {
 }
 
 export function isIos(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const ua = navigator.userAgent
+  // iPadOS 13+ reports itself as a Mac; a Mac with touch is an iPad.
+  return /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+}
+
+export function isAndroid(): boolean {
+  return /android/i.test(navigator.userAgent)
+}
+
+/**
+ * Email / social apps open links in their own browser, which cannot install
+ * a web app. The person has to move to Safari (iPhone) or Chrome (Android).
+ */
+export function isInAppBrowser(): boolean {
+  return /FBAN|FBAV|Instagram|LinkedInApp|Line\/|Snapchat|Twitter|GSA\/|; wv\)|MicroMessenger|Pinterest/i.test(navigator.userAgent)
+}
+
+/** Safari itself (not Chrome/Firefox/Edge for iOS, which still install via their Share menu on iOS 16.4+). */
+export function isIosSafari(): boolean {
+  return isIos() && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent)
+}
+
+/** How this browser installs the app — drives the words on the install guide. */
+export type InstallPath = 'installed' | 'prompt' | 'ios-safari' | 'ios-other' | 'in-app' | 'android-menu' | 'desktop'
+
+export function installPath(): InstallPath {
+  if (isStandalone()) return 'installed'
+  if (isInAppBrowser()) return 'in-app'
+  if (canPromptInstall()) return 'prompt'
+  if (isIos()) return isIosSafari() ? 'ios-safari' : 'ios-other'
+  if (isAndroid()) return 'android-menu'
+  return 'desktop'
 }

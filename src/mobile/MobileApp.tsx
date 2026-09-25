@@ -11,6 +11,7 @@ import { DocsTab } from './DocsTab'
 import { DocSheet } from './DocSheet'
 import { CustomerSheet } from './CustomerSheet'
 import { useKeyboardOpen } from './useKeyboardOpen'
+import { InstallGuide } from './InstallGuide'
 
 export type MobileTab = 'ask' | 'scan' | 'docs'
 const TABS: { id: MobileTab; label: string; Icon: typeof MessageCircle }[] = [
@@ -113,6 +114,7 @@ export function MobileApp() {
     return (
       <div className="dw-m dw-safe-top min-h-screen bg-gradient-to-br from-[#163C2C] to-[#0F2818] flex flex-col items-center justify-center gap-6 p-4">
         <Wordmark size="lg" animated />
+        <InstallGuide />
         <div className="w-full max-w-md rounded-lg p-4 flex justify-center" style={{ background: '#F6F8F6' }}>
           <SignIn
             routing="hash"

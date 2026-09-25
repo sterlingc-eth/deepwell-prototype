@@ -1,5 +1,5 @@
-import type { ComponentType, ReactNode } from 'react';
-import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe, Users } from 'lucide-react';
+import { useState, type ComponentType, type ReactNode } from 'react';
+import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe, Users, Smartphone, X } from 'lucide-react';
 import { AskMark } from './AskMark';
 import { OrganizationSwitcher, useAuth, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
@@ -233,6 +233,8 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
         </button>
       )}
 
+      <PhoneBanner />
+
       <main
         id="main"
         tabIndex={-1}
@@ -249,12 +251,56 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           <span>DeepWell Technology · Knowledge Builds Business.</span>
           <span className="flex items-center gap-4">
             <span>Every answer shows its source.</span>
+            <a href="/get" target="_blank" rel="noopener" className="inline-flex items-center gap-1 hover:text-ink-2 transition-colors duration-quick">
+              <Smartphone className="w-3.5 h-3.5" aria-hidden="true" /> Phone app
+            </a>
             <a href="/" className="inline-flex items-center gap-1 hover:text-ink-2 transition-colors duration-quick">
               <Globe className="w-3.5 h-3.5" aria-hidden="true" /> Website
             </a>
           </span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/**
+ * A phone that opens the desktop app (for example from a Clerk invite email)
+ * gets a one-line nudge to DeepWell Mobile, which is built for that screen.
+ * Touch + narrow only; dismissal is remembered on this device.
+ */
+const PHONE_BANNER_KEY = 'deepwell.app.phoneBanner';
+
+function PhoneBanner() {
+  const [show, setShow] = useState(() => {
+    try {
+      if (localStorage.getItem(PHONE_BANNER_KEY) === 'off') return false;
+      return window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches;
+    } catch {
+      return false;
+    }
+  });
+  if (!show) return null;
+  const dismiss = () => {
+    setShow(false);
+    try {
+      localStorage.setItem(PHONE_BANNER_KEY, 'off');
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div className="bg-info-bg text-info-ink text-body">
+      <div className="max-w-content mx-auto pl-4 pr-1 flex items-center gap-2">
+        <Smartphone className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span className="flex-1 py-2">On a phone? DeepWell Mobile is built for it.</span>
+        <a href="/m/?install=1" className="min-h-touch inline-flex items-center px-2 font-semibold underline">
+          Open
+        </a>
+        <button type="button" onClick={dismiss} aria-label="Dismiss" className="min-h-touch min-w-touch inline-flex items-center justify-center">
+          <X className="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }

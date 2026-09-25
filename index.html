@@ -1223,6 +1223,36 @@ footer a{color:var(--muted);text-decoration:none}
   </div>
 </section>
 
+<!-- Mobile app (2026-09-25): where visitors get the phone app. Phones get an
+     "Install" button straight into /m/ (which shows the install steps);
+     computers get a QR code that opens the same link on the phone. -->
+<style>
+.mob{display:grid;grid-template-columns:minmax(0,1.2fr) auto;gap:clamp(20px,4vw,48px);align-items:center}
+.mob .qr{width:168px;height:168px;background:#fff;border-radius:12px;padding:8px;border:1px solid var(--line)}
+.mob .qr img{width:100%;height:100%;display:block}
+.mob .qr-cap{font-size:.82rem;color:var(--muted);text-align:center;margin-top:8px;max-width:168px}
+.mob .row{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+.mob .mob-phone{display:none}
+@media (hover:none) and (pointer:coarse){.mob .mob-phone{display:inline-flex}.mob .mob-qr{display:none}.mob{grid-template-columns:1fr}}
+</style>
+<section id="mobile">
+  <div class="wrap mob">
+    <div class="dw-observe dw-once">
+      <div class="eyebrow">DeepWell Mobile</div>
+      <h2>Your records, in your pocket.</h2>
+      <p class="lede">Ask Donovan, scan paperwork and pull up any document from the job site. iPhone and Android, installed straight from the browser, with no app store. Included with every plan.</p>
+      <div class="row">
+        <a class="btn btn-primary mob-phone" href="/m/?install=1">Install on this phone</a>
+        <a class="btn btn-ghost" href="/get">How to install</a>
+      </div>
+    </div>
+    <div class="mob-qr dw-observe dw-once">
+      <div class="qr"><img src="/get/qr.svg" alt="QR code that opens DeepWell Mobile on your phone" width="152" height="152" loading="lazy"></div>
+      <div class="qr-cap">Scan with your phone's camera</div>
+    </div>
+  </div>
+</section>
+
 <section id="plans">
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
@@ -1406,7 +1436,7 @@ footer a{color:var(--muted);text-decoration:none}
 <footer>
   <div class="wrap">
     <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
-    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/get">Mobile app</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
   </div>
 </footer>
 
