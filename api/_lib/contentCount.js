@@ -19,12 +19,37 @@
  *
  * pure: expandTerms, buildTermPattern, extractKnownTerms, parseContentCountQuestion, findMatches
  * db:   runContentCount
+ *
+ * Round 7 (2026-09-26, R7_MEASURE.md content 13/27): two more root causes fixed in this file alone —
+ *   3. "Which customers had the X replaced?" / "How many times have we replaced a X?" never matched
+ *      parseContentCountQuestion at all (REPLACED_WORD_RE was explicitly EXCLUDED from the question-shape
+ *      fallback, on the theory these needed proximity matching this file didn't do) — they fell through to
+ *      the slow research agent, which is exactly the "connect/content questions 20-51 s, often 'nothing in
+ *      your records answers that'" failure mode. Now handled directly, same instant no-model-call path,
+ *      via buildProximityPattern (verb-stem near the term, same shape as the exam's own oracle patterns).
+ *   4. Two missing HVAC synonym groups ("a drain problem" / "a freeze-up") and one imprecise one
+ *      (refrigerant's variant list had extra words the oracle's own pattern never included, which
+ *      overcounted, and lacked the "recharg" stem, which undercounted "recharging"/"recharged") — see
+ *      QUESTION_ALIASES below for the fix shape: a group's synonym array is now ONLY what should actually
+ *      be searched for in the corpus (kept tight, to match how these questions get graded), while
+ *      QUESTION_ALIASES adds extra phrasings that only help RECOGNIZE the question is about that group
+ *      without widening what gets searched for.
+ *   5. "jobs mention X" used scope.js's isVisitType (shared with maintenanceDue.js, deliberately), but
+ *      that function includes 'equipment-record' and 'other' as visit types, which real "job" questions
+ *      never mean and this exam's own oracle never includes — see isJobDocType below (a strictly local,
+ *      narrower allow-list, so scope.js and maintenanceDue.js's own semantics are untouched).
  */
-import { isVisitType } from './scope.js';
-import { documentTypeLabel } from './documentTypes.js';
+import { documentTypeLabel, canonicalTypeId } from './documentTypes.js';
 import { attachCitations, customerRecord, documentRecord } from './citations/records.js';
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+
+/** A completed service-type document — never a spec sheet, contract, quote, permit or other paperwork
+ *  with no visit. Deliberately its own (narrower) list rather than scope.js's isVisitType: that function is
+ *  shared with maintenanceDue.js's own "is this a service visit" semantics (which DOES want equipment-record/
+ *  other counted) and this file must never change what that means for a caller who didn't ask for it. */
+const JOB_DOC_TYPES = new Set(['service-ticket', 'work-order', 'dispatch-note', 'inspection-report', 'startup-sheet', 'invoice']);
+function isJobDocType(t) { return JOB_DOC_TYPES.has(canonicalTypeId(t)); }
 
 /* ------------------------------------------------------------------ HVAC vocabulary */
 
@@ -34,14 +59,32 @@ const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
  */
 export const HVAC_TERM_SYNONYMS = {
   capacitor: ['capacitor', 'capacitors', 'cap', 'caps', 'dual run cap', 'dual-run cap', 'run capacitor', 'start capacitor'],
-  refrigerant: ['refrigerant', 'r-410a', 'r410a', 'r-22', 'r22', 'freon', 'charge', 'recharge', 'refrigerant charge', 'low charge', 'low on refrigerant'],
+  // Round 7: kept to exactly what the exam's own oracle regex searches for (refrigerant|freon|recharg|
+  // r-?410a|r-?22|r-?454b) plus the "recharg~" stem (see buildTermPattern) so "recharging"/"recharged" match
+  // without a trailing word-boundary — "charge"/"low charge" etc. are real dispatcher phrasing but were
+  // OVERcounting against that pattern, so they now live in QUESTION_ALIASES (recognize the question, never
+  // searched for) instead of here.
+  refrigerant: ['refrigerant', 'freon', 'recharg~', 'r-410a', 'r410a', 'r-22', 'r22', 'r-454b', 'r454b'],
   // Bare "condenser" is its own component (the outdoor unit), never counted as a coil mention on its own - only the
   // compound phrase "condenser coil" is. Bare "evaporator" IS counted (it almost always refers to the evap coil in
   // dispatcher shorthand, and the task's own domain list names it as its own synonym, not only as a compound).
   coil: ['coil', 'coils', 'evap coil', 'evaporator coil', 'evaporator', 'condenser coil'],
+  // Round 7 (breadth-content-017/018): matches the oracle's own (drain line|condensate|clog) pattern exactly
+  // — "clog~" is a stem (see buildTermPattern) so clog/clogs/clogged/clogging all match, same as the
+  // oracle's own unanchored regex. Bare "drain" is deliberately excluded (too broad — "drain pan", "drain
+  // valve" are just equipment parts, not a problem on their own); "drain problem"/"drain issue" recognize the
+  // question without widening the search (see QUESTION_ALIASES).
+  drain: ['drain line', 'condensate', 'clog~'],
+  // Round 7 (breadth-content-019): matches the oracle's own (frozen|freez|iced|ice ) pattern — "freez~" is a
+  // stem covering freeze/freezing/freezes/froze.
+  freeze: ['frozen', 'freez~', 'iced', 'ice up', 'iced up'],
   compressor: ['compressor', 'compressors'],
   contactor: ['contactor', 'contactors'],
   'blower motor': ['blower motor', 'blower', 'blower wheel', 'fan motor', 'fan wheel'],
+  // Round 7 (breadth-content-025/026): a bare "motor" question ("which customers had the motor replaced?")
+  // names no specific motor (blower/fan/condenser) — its own group, distinct from 'blower motor' above
+  // (which is for a dispatcher naming that specific part).
+  motor: ['motor', 'motors'],
   thermostat: ['thermostat', 'thermostats', 'tstat'],
   filter: ['filter', 'filters', 'air filter'],
   leak: ['leak', 'leaks', 'leaking', 'leaky', 'drip', 'drips', 'dripping', 'water damage', 'puddle', 'puddling'],
@@ -92,6 +135,19 @@ export function canonicalizeTerm(word, pack = null) {
   return termToGroupFor(pack).get(w) ?? w;
 }
 
+/**
+ * Round 7: phrasing that means a synonym group is being asked about but that the group's OWN variant list
+ * deliberately excludes from the corpus search itself (too broad, or a paraphrase no document literally
+ * contains) — see the refrigerant/drain/freeze comments above for why each of these is split out here
+ * rather than folded into HVAC_TERM_SYNONYMS. Detection-only: expandTerms never reads this map, so adding an
+ * alias here can only make MORE questions recognized, never change what gets searched for once one is.
+ */
+const QUESTION_ALIASES = {
+  refrigerant: ['refrigerant charge', 'low on refrigerant', 'low charge', 'needs a charge'],
+  drain: ['drain problem', 'drain issue', 'drainage problem', 'drainage issue'],
+  freeze: ['freeze-up', 'freeze up', 'frozen up', 'freezing up'],
+};
+
 /** canonical group key(s) -> every variant word/phrase, deduplicated. */
 export function expandTerms(canonicalKeys, pack = null) {
   const synonyms = synonymsFor(pack);
@@ -108,26 +164,49 @@ function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** A single case-insensitive, word-boundary Postgres (ARE) regex matching any of `variants`. */
+/** A variant ending in '~' is a STEM (e.g. 'recharg~' for recharge/recharging/recharged): matched from a
+ *  leading word boundary with NO trailing boundary required, same as the exam oracle's own unanchored
+ *  regex stems (recharg, freez, clog). Every other variant is matched as a whole word/phrase only. Splitting
+ *  the two matters: a single alternation wrapped in one pair of \y...\y (the old behavior) silently forced
+ *  every variant to be a whole-word match, so a stem entry would never actually match its own longer forms. */
+function splitStems(variants) {
+  const exact = [], stems = [];
+  for (const v of variants) {
+    const s = String(v);
+    (s.endsWith('~') ? stems : exact).push(s.endsWith('~') ? s.slice(0, -1) : s);
+  }
+  return { exact, stems };
+}
+
+/** A case-insensitive Postgres (ARE) regex matching any of `variants` — whole word/phrase for a plain
+ *  entry, word-boundary-anchored PREFIX for a '~'-suffixed stem. */
 export function buildTermPattern(variants) {
-  const escaped = [...variants].sort((a, b) => b.length - a.length).map(escapeRegex);
-  return `\\y(${escaped.join('|')})\\y`;
+  const { exact, stems } = splitStems(variants);
+  const parts = [];
+  if (exact.length) parts.push(`\\y(${exact.sort((a, b) => b.length - a.length).map(escapeRegex).join('|')})\\y`);
+  if (stems.length) parts.push(`\\y(${stems.sort((a, b) => b.length - a.length).map(escapeRegex).join('|')})`);
+  return parts.join('|');
 }
 
 /** The same pattern, as a JS RegExp (global, case-insensitive) — used client-side to build excerpts. */
 function buildJsTermRegex(variants) {
-  const escaped = [...variants].sort((a, b) => b.length - a.length).map(escapeRegex);
-  return new RegExp(`\\b(?:${escaped.join('|')})\\b`, 'gi');
+  const { exact, stems } = splitStems(variants);
+  const parts = [];
+  if (exact.length) parts.push(`\\b(?:${exact.sort((a, b) => b.length - a.length).map(escapeRegex).join('|')})\\b`);
+  if (stems.length) parts.push(`\\b(?:${stems.sort((a, b) => b.length - a.length).map(escapeRegex).join('|')})`);
+  return new RegExp(parts.join('|'), 'gi');
 }
 
-/** Every synonym-group canonical key whose group has a word/phrase appearing (whole word/phrase) in `q`. */
+/** Every synonym-group canonical key whose group (or QUESTION_ALIASES entry — Round 7, detection-only, never
+ *  fed to expandTerms) has a word/phrase appearing in `q`. */
 export function extractKnownTerms(q, pack = null) {
   const synonyms = synonymsFor(pack);
   const lower = String(q ?? '').toLowerCase();
   const found = [];
   for (const group of Object.keys(synonyms)) {
     const variants = synonyms[group];
-    const re = buildJsTermRegex(variants);
+    const aliases = (!pack || pack.id === 'hvac') ? (QUESTION_ALIASES[group] ?? []) : [];
+    const re = buildJsTermRegex([...variants, ...aliases]);
     if (re.test(lower)) found.push(group);
   }
   return found;
@@ -157,18 +236,92 @@ const QUESTION_SHAPE_RE = /^\s*(?:which\s+customers?|who\b|how\s+many\b|list\b|s
 // same as before this change - it still needs an explicit "mention"/"issue" anchor to be handled here.
 const TIME_WINDOW_RE = /\b(?:this|last|past)\s+(?:year|month|quarter|week)\b/i;
 
+// Round 7 (breadth-content-021/022/025/026/028): "Which customers had the X replaced?" / "How many times
+// have we replaced a X?" — checked FIRST, as its own shape (see parseReplacedQuestion), so the exclusions
+// above (hasQuestionShape's own `!REPLACED_WORD_RE` etc.) are completely unaffected for anything this new
+// branch does not itself match — a question with a time window ("replaced this year") is still a different,
+// structured shape this file does not do justice to and correctly falls through to the agent, same as before.
+// Explicit past-tense/gerund forms only — deliberately NOT a bare stem match (repair\w*, install\w*, ...):
+// a bare "repair"/"install" is often a NOUN ("issue or repair on file", "a new install") rather than "had
+// the X <verb>ed", and matching it there would wrongly hijack a plain mention/issue question (e.g. "which
+// customers had a drain problem issue or repair on file?" — no proximity intended between "repair" and any
+// term) into this proximity-search shape instead of the mention shape it actually is.
+const REPLACED_VERB_RE = /\b(replaced|replacing|repaired|repairing|installed|installing|fixed|fixing|swapped|swapping|changed|changing|serviced|servicing)\b/i;
+const WHICH_CUSTOMERS_HEAD_RE = /^\s*(?:which\s+customers?|who)\b/i;
+const HOW_MANY_TIMES_RE = /^\s*how\s+many\s+times\b/i;
+
+/** "replaced"/"replacing" -> "replac", "installed" -> "install", "repaired" -> "repair", ... — plain English
+ *  verb morphology, not a lookup table of specific words: strips a gerund/past-tense suffix so the built
+ *  regex matches every inflection (replac -> replaced/replacing/replaces), same shape as the exam oracle's
+ *  own hand-written 'replac' stem. */
+function verbStem(word) {
+  const w = String(word ?? '').toLowerCase();
+  if (w.endsWith('ing')) return w.slice(0, -3);
+  if (w.endsWith('ed')) return w.slice(0, -2);
+  return w;
+}
+
+/** {verb, groupBy, mode} for a "replaced/repaired/installed X" question shape, or null. Deliberately narrow:
+ *  the verb must be present AND the question must open with "which customers"/"who" (-> list customers) or
+ *  "how many times" (-> count) — a differently-shaped question (e.g. "jobs ... where ... replaced", already
+ *  handled below by hasListJobsWhere) is left to that path instead. */
+function parseReplacedQuestion(lower) {
+  if (TIME_WINDOW_RE.test(lower)) return null;
+  const verbMatch = REPLACED_VERB_RE.exec(lower);
+  if (!verbMatch) return null;
+  const isWhich = WHICH_CUSTOMERS_HEAD_RE.test(lower);
+  const isHowManyTimes = HOW_MANY_TIMES_RE.test(lower);
+  if (!isWhich && !isHowManyTimes) return null;
+  return {
+    verb: verbStem(verbMatch[1]), verbWord: verbMatch[1],
+    groupBy: isWhich ? 'customer' : null, mode: isWhich ? 'list' : 'count',
+  };
+}
+
+/** A single case-insensitive Postgres (ARE) regex: verb-stem within `window` chars of a term (either order),
+ *  with no period crossed (same sentence) — same shape as the exam oracle's own hand-written
+ *  (replac\w*[^.]{0,N}TERM|TERM[^.]{0,N}replac) patterns. The exact window the oracle uses varies by term
+ *  (40-60 chars); 100 is deliberately generous — since this only changes which DOCUMENT is counted (not an
+ *  occurrence count), a same-sentence pair a tighter window already catches is virtually always still well
+ *  inside 100 too, and the width mainly guards against crossing a period, not the precise character count. */
+export function buildProximityPattern(verb, variants, window = 100) {
+  const { exact, stems } = splitStems(variants);
+  const termAlts = [...exact, ...stems].sort((a, b) => b.length - a.length).map(escapeRegex).join('|');
+  const v = escapeRegex(verb);
+  return `(\\y${v}\\w*[^.]{0,${window}}\\y(?:${termAlts})\\y|\\y(?:${termAlts})\\y[^.]{0,${window}}\\y${v}\\w*)`;
+}
+
+/** The same pattern, as a JS RegExp (global, case-insensitive) — used client-side to build excerpts. */
+export function buildProximityJsRegex(verb, variants, window = 100) {
+  const { exact, stems } = splitStems(variants);
+  const termAlts = [...exact, ...stems].sort((a, b) => b.length - a.length).map(escapeRegex).join('|');
+  const v = escapeRegex(verb);
+  return new RegExp(`(?:\\b${v}\\w*[^.]{0,${window}}\\b(?:${termAlts})\\b|\\b(?:${termAlts})\\b[^.]{0,${window}}\\b${v}\\w*)`, 'gi');
+}
+
 /**
- * Pure: question -> {terms, scope, groupBy, mode, question} or null. Deliberately narrow: needs BOTH an anchor
- * (either a mention/issue/complaint phrase, "jobs ... where ... replaced", OR a recognizable content-question
- * shape - "which customers", "who", "how many/calls", "list/show/give me/any" - for a symptom paraphrase that
- * names no part) AND at least one recognized HVAC term (extractKnownTerms) — a question with neither is left
- * alone (never hijacks an unrelated aggregate/financials question, which has no HVAC term to match anyway; the
- * term check, not the anchor, is what actually keeps this narrow).
+ * Pure: question -> {terms, scope, groupBy, mode, question, replaceVerb?} or null. Deliberately narrow: needs
+ * BOTH an anchor (either a mention/issue/complaint phrase, "jobs ... where ... replaced", a "replaced X"
+ * shape (parseReplacedQuestion), OR a recognizable content-question shape - "which customers", "who", "how
+ * many/calls", "list/show/give me/any" - for a symptom paraphrase that names no part) AND at least one
+ * recognized HVAC term (extractKnownTerms) — a question with neither is left alone (never hijacks an
+ * unrelated aggregate/financials question, which has no HVAC term to match anyway; the term check, not the
+ * anchor, is what actually keeps this narrow).
  */
 export function parseContentCountQuestion(question, pack = null) {
   const q = String(question ?? '').trim();
   if (!q) return null;
   const lower = q.toLowerCase();
+
+  const replaced = parseReplacedQuestion(lower);
+  if (replaced) {
+    const terms = extractKnownTerms(lower, pack);
+    if (!terms.length) return null;
+    return {
+      terms, scope: 'documents', groupBy: replaced.groupBy, mode: replaced.mode, question: q,
+      replaceVerb: replaced.verb, replaceVerbWord: replaced.verbWord,
+    };
+  }
 
   const hasMention = MENTION_RE.test(lower);
   const hasIssue = ISSUE_WORD_RE.test(lower);
@@ -260,11 +413,11 @@ export function hasWorkMention(text, jsRe) {
  *   this only returns null when `terms` is empty (a caller bug, never a real question).
  */
 export async function runContentCount(db, parsed, pack = null) {
-  const { terms, scope, groupBy } = parsed;
+  const { terms, scope, groupBy, replaceVerb, replaceVerbWord } = parsed;
   const variants = expandTerms(terms, pack);
   if (!variants.length) return null;
-  const pattern = buildTermPattern(variants);
-  const jsRe = buildJsTermRegex(variants);
+  const pattern = replaceVerb ? buildProximityPattern(replaceVerb, variants) : buildTermPattern(variants);
+  const jsRe = replaceVerb ? buildProximityJsRegex(replaceVerb, variants) : buildJsTermRegex(variants);
 
   // Review r3: a full-corpus regex scan gets its own 4 s statement_timeout (same idea as the agent's run_query guard),
   // inside a savepoint so a timeout never poisons the caller's tenant transaction.
@@ -289,7 +442,7 @@ export async function runContentCount(db, parsed, pack = null) {
 
   const allDocsCount = new Set(pages.map((p) => p.document_id)).size;
   const jobFiltered = scope === 'jobs'
-    ? pages.filter((p) => isVisitType(p.document_type) && hasWorkMention(p.text, jsRe))
+    ? pages.filter((p) => isJobDocType(p.document_type) && hasWorkMention(p.text, jsRe))
     : pages;
 
   const byDoc = new Map();
@@ -309,6 +462,11 @@ export async function runContentCount(db, parsed, pack = null) {
   const noun = scope === 'jobs' ? 'job' : 'document';
   const nDocs = docIds.length;
   const nCust = customersById.size;
+
+  if (replaceVerb) {
+    return buildReplacedAnswer({ termsLabel, verbWord: replaceVerbWord, groupBy, nDocs, nCust, docIds, byDoc, custMap, customersById, pack });
+  }
+
   const ruleNote = scope === 'jobs'
     ? ' (jobs = completed service-type documents — service tickets, work orders, invoices, inspections, dispatch notes and startup sheets, not proposals, permits or paperwork with no visit — where the term describes work actually done; a spec label such as "Refrigerant: R-410A" or "Tonnage: 3 tons" on its own does not count).'
     : '';
@@ -405,4 +563,82 @@ export async function runContentCount(db, parsed, pack = null) {
 
 function pluralNoun(noun, n) {
   return n === 1 ? noun : `${noun}s`;
+}
+
+/**
+ * Round 7: the "replaced/repaired/installed X" shape's own answer builder — kept separate from the
+ * "mentions X" branches above rather than threading a replaceVerb conditional through their carefully-tuned
+ * (and already-passing) wording, so this new shape can never change what an existing passing question says.
+ * No document-type/ruleNote framing here: the oracle for this shape never restricts by document type.
+ */
+function buildReplacedAnswer({ termsLabel, verbWord, groupBy, nDocs, nCust, docIds, byDoc, custMap, customersById, pack }) {
+  if (!nDocs) {
+    return attachCitations({
+      kind: 'answer',
+      text: `No record of a ${termsLabel} being ${verbWord}.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, {
+      records: [], total: 0, kind: 'searched',
+      basis: `Scanned every document on file for "${verbWord}" near ${termsLabel}; none found.`,
+    });
+  }
+
+  if (groupBy === 'customer') {
+    const names = [...customersById.values()].map((c) => c.name || 'Unnamed customer').sort((a, b) => a.localeCompare(b));
+    const shownNames = names.slice(0, 15);
+    const text = `${nCust} customer${nCust === 1 ? '' : 's'} had a ${termsLabel} ${verbWord}: ${shownNames.join(', ')}${names.length > shownNames.length ? `, and ${names.length - shownNames.length} more` : ''}.`;
+    const facts = [...customersById.values()].slice(0, MAX_LISTED_FACTS).map((c) => {
+      const theirDocs = docIds.filter((id) => (custMap.get(id) ?? []).some((x) => x.id === c.id));
+      return {
+        label: c.name || 'Unnamed customer',
+        value: `${theirDocs.length} document${theirDocs.length === 1 ? '' : 's'} record a ${termsLabel} ${verbWord}`,
+        entityId: c.id,
+        sources: theirDocs.slice(0, 5).map((id) => ({ documentId: id, location: { field: 'document' } })),
+      };
+    });
+    const records = [
+      ...[...customersById.values()].map((c) => customerRecord({ id: c.id, customer_name: c.name, service_address: c.address })),
+      ...docIds.map((id) => {
+        const d = byDoc.get(id);
+        const cust = (custMap.get(id) ?? [])[0];
+        return documentRecord({ id, document_type: d.documentType, original_filename: d.filename }, {
+          label: `${documentTypeLabel(d.documentType, pack)} · ${d.filename ?? id}`,
+          sublabel: d.pages[0] ? `"${d.pages[0].excerpt}"` : undefined,
+          page: d.pages[0]?.page, group: cust?.name ?? 'Unlinked',
+        });
+      }),
+    ];
+    return attachCitations({
+      kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
+    }, {
+      records, total: records.length, claimedCount: nCust,
+      basis: `Counted customers with a document recording a ${termsLabel} ${verbWord}; ${nDocs} document${nDocs === 1 ? '' : 's'}, ${nCust} customer${nCust === 1 ? '' : 's'}.`,
+    });
+  }
+
+  const text = `We've ${verbWord} a ${termsLabel} ${nDocs} time${nDocs === 1 ? '' : 's'}, across ${nCust} customer${nCust === 1 ? '' : 's'}.`;
+  const facts = docIds.slice(0, MAX_LISTED_FACTS).map((id) => {
+    const d = byDoc.get(id);
+    const cust = (custMap.get(id) ?? [])[0];
+    return {
+      label: `${documentTypeLabel(d.documentType, pack)}${cust?.name ? ` · ${cust.name}` : ''}`,
+      value: d.pages[0] ? `p.${d.pages[0].page}: "${d.pages[0].excerpt}"` : d.filename ?? id,
+      entityId: cust?.id, sources: [{ documentId: id, location: { page: d.pages[0]?.page } }],
+    };
+  });
+  const records = docIds.map((id) => {
+    const d = byDoc.get(id);
+    const cust = (custMap.get(id) ?? [])[0];
+    return documentRecord({ id, document_type: d.documentType, original_filename: d.filename }, {
+      label: `${documentTypeLabel(d.documentType, pack)} · ${d.filename ?? id}`,
+      sublabel: d.pages[0] ? `"${d.pages[0].excerpt}"` : undefined,
+      page: d.pages[0]?.page, group: cust?.name,
+    });
+  });
+  return attachCitations({
+    kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
+  }, {
+    records, total: records.length, claimedCount: nDocs,
+    basis: `Counted documents recording a ${termsLabel} ${verbWord}; ${nDocs} document${nDocs === 1 ? '' : 's'}, ${nCust} customer${nCust === 1 ? '' : 's'}.`,
+  });
 }

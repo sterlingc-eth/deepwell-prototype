@@ -15,7 +15,7 @@
  */
 import { TENANT_SQL, isoDate, humanDate } from './scope.js';
 import { installYearOf, warrantyStatusOf, deriveGeo } from './analytics.js';
-import { attachCitations, customerRecord, documentRecord } from './citations/records.js';
+import { attachCitations, customerRecord, documentRecord, unitRecord } from './citations/records.js';
 import { financialsTableExists } from './financials/store.js';
 
 const answer = (text, facts = []) => ({ kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] });
@@ -92,6 +92,10 @@ async function fetchEquipment(db) {
                                     FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND customer_id IS NOT NULL AND ${TENANT_SQL} LIMIT 20000`);
   return rows;
 }
+async function fetchDocTypeRows(db) {
+  const { rows } = await db.raw(`SELECT id, lower(replace(document_type, '_', '-')) AS k FROM documents WHERE ${TENANT_SQL} LIMIT 20000`);
+  return rows;
+}
 async function fetchTechnicianRows(db, nameLike) {
   const { rows } = await db.raw(
     `SELECT t.document_id, t.value AS technician,
@@ -158,68 +162,91 @@ const HANDLERS = {
 
   async mostCustomersCity(db) {
     const customers = await fetchCustomers(db);
-    const entries = groupCount(customers, (c) => deriveGeo(c.service_address).city);
+    const withKey = customers.map((c) => ({ ...c, _k: deriveGeo(c.service_address).city }));
+    const entries = groupCount(withKey, (c) => c._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No customer has a recognizable city on file.');
-    return answer(`${namesList(winners)} has the most customers, with ${value}.`, [{ label: 'Customers', value: String(value) }]);
+    const records = withKey.filter((c) => c._k && winners.includes(c._k)).map((c) => customerRecord(c));
+    return attachCitations(answer(`${namesList(winners)} has the most customers, with ${value}.`, [{ label: 'Customers', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped customers by city; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async mostCustomersZip(db) {
     const customers = await fetchCustomers(db);
-    const entries = groupCount(customers, (c) => deriveGeo(c.service_address).zip);
+    const withKey = customers.map((c) => ({ ...c, _k: deriveGeo(c.service_address).zip }));
+    const entries = groupCount(withKey, (c) => c._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No customer has a recognizable ZIP code on file.');
-    return answer(`ZIP ${namesList(winners)} has the most customers, with ${value}.`, [{ label: 'Customers', value: String(value) }]);
+    const records = withKey.filter((c) => c._k && winners.includes(c._k)).map((c) => customerRecord(c));
+    return attachCitations(answer(`ZIP ${namesList(winners)} has the most customers, with ${value}.`, [{ label: 'Customers', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped customers by ZIP code; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async mostCustomersState(db) {
     const customers = await fetchCustomers(db);
-    const entries = groupCount(customers, (c) => deriveGeo(c.service_address).state);
+    const withKey = customers.map((c) => ({ ...c, _k: deriveGeo(c.service_address).state }));
+    const entries = groupCount(withKey, (c) => c._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No customer has a recognizable state on file.');
-    return answer(`Most of our customers live in ${namesList(winners)} (${value}).`, [{ label: 'Customers', value: String(value) }]);
+    const records = withKey.filter((c) => c._k && winners.includes(c._k)).map((c) => customerRecord(c));
+    return attachCitations(answer(`Most of our customers live in ${namesList(winners)} (${value}).`, [{ label: 'Customers', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped customers by state; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async mostCommonBrand(db) {
     const equipment = await fetchEquipment(db);
-    const entries = groupCount(equipment, (e) => e.manufacturer?.toLowerCase() ?? null);
+    const withKey = equipment.map((e) => ({ ...e, _k: e.manufacturer?.toLowerCase() ?? null }));
+    const entries = groupCount(withKey, (e) => e._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No unit has a manufacturer on file.');
-    return answer(`${namesList(winners)} is our most common brand, with ${value} unit${value === 1 ? '' : 's'}.`, [{ label: 'Units', value: String(value) }]);
+    const records = withKey.filter((e) => e._k && winners.includes(e._k)).map((e) => unitRecord(e, { label: e.manufacturer }));
+    return attachCitations(answer(`${namesList(winners)} is our most common brand, with ${value} unit${value === 1 ? '' : 's'}.`, [{ label: 'Units', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped equipment by manufacturer; the most common is ${namesList(winners)} with ${value}.` });
   },
 
   async fewestBrand(db) {
     const equipment = await fetchEquipment(db);
-    const entries = groupCount(equipment, (e) => e.manufacturer?.toLowerCase() ?? null);
+    const withKey = equipment.map((e) => ({ ...e, _k: e.manufacturer?.toLowerCase() ?? null }));
+    const entries = groupCount(withKey, (e) => e._k);
     const { value, winners } = topOf(entries, { max: false });
     if (!value) return noAnswer('No unit has a manufacturer on file.');
-    return answer(`${namesList(winners)} — we have the fewest units of that brand, ${value}.`, [{ label: 'Units', value: String(value) }]);
+    const records = withKey.filter((e) => e._k && winners.includes(e._k)).map((e) => unitRecord(e, { label: e.manufacturer }));
+    return attachCitations(answer(`${namesList(winners)} — we have the fewest units of that brand, ${value}.`, [{ label: 'Units', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped equipment by manufacturer; the fewest is ${namesList(winners)} with ${value}.` });
   },
 
-  async mostExpiredBrand(db) {
+  async mostExpiredBrand(db, intent) {
     const equipment = await fetchEquipment(db);
-    const today = new Date().toISOString().slice(0, 10);
-    const expired = equipment.filter((e) => warrantyStatusOf(e.warranty, today) === 'expired');
-    const entries = groupCount(expired, (e) => e.manufacturer?.toLowerCase() ?? null);
+    const today = nowIso(intent).slice(0, 10);
+    const expired = equipment.filter((e) => warrantyStatusOf(e.warranty, today) === 'expired').map((e) => ({ ...e, _k: e.manufacturer?.toLowerCase() ?? null }));
+    const entries = groupCount(expired, (e) => e._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No unit is currently out of warranty.');
-    return answer(`${namesList(winners)} has the most out-of-warranty units, ${value}.`, [{ label: 'Out-of-warranty units', value: String(value) }]);
+    const records = expired.filter((e) => e._k && winners.includes(e._k)).map((e) => unitRecord(e, { label: e.manufacturer, sublabel: 'warranty expired' }));
+    return attachCitations(answer(`${namesList(winners)} has the most out-of-warranty units, ${value}.`, [{ label: 'Out-of-warranty units', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped currently-expired-warranty equipment by manufacturer; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async mostCommonModel(db) {
     const equipment = await fetchEquipment(db);
-    const entries = groupCount(equipment, (e) => e.model?.toUpperCase() ?? null);
+    const withKey = equipment.map((e) => ({ ...e, _k: e.model?.toUpperCase() ?? null }));
+    const entries = groupCount(withKey, (e) => e._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No unit has a model on file.');
-    return answer(`${namesList(winners)} is the most common unit model we service, with ${value}.`, [{ label: 'Units', value: String(value) }]);
+    const records = withKey.filter((e) => e._k && winners.includes(e._k)).map((e) => unitRecord(e, { label: [e.manufacturer, e.model].filter(Boolean).join(' ') }));
+    return attachCitations(answer(`${namesList(winners)} is the most common unit model we service, with ${value}.`, [{ label: 'Units', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped equipment by model; the most common is ${namesList(winners)} with ${value}.` });
   },
 
   async mostCommonTonnage(db) {
     const equipment = await fetchEquipment(db);
-    const entries = groupCount(equipment, (e) => e.tonnage ?? null);
+    const withKey = equipment.map((e) => ({ ...e, _k: e.tonnage ?? null }));
+    const entries = groupCount(withKey, (e) => e._k);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No unit has a tonnage on file.');
-    return answer(`${namesList(winners)} is the tonnage we see most often, ${value} time${value === 1 ? '' : 's'}.`, [{ label: 'Units', value: String(value) }]);
+    const records = withKey.filter((e) => e._k != null && winners.includes(e._k)).map((e) => unitRecord(e, { label: [e.manufacturer, e.model].filter(Boolean).join(' '), sublabel: e.tonnage ? `${e.tonnage} ton` : undefined }));
+    return attachCitations(answer(`${namesList(winners)} is the tonnage we see most often, ${value} time${value === 1 ? '' : 's'}.`, [{ label: 'Units', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped equipment by tonnage; the most common is ${namesList(winners)} with ${value}.` });
   },
 
   async oldestUnitCustomer(db) {
@@ -234,9 +261,9 @@ const HANDLERS = {
     return attachCitations(answer(`${namesList(names)} has the oldest unit on file, installed in ${minYear}.`, [{ label: 'Installed', value: String(minYear) }]), { records, total: records.length, basis: `Compared every unit's installation year; the oldest is ${minYear}.` });
   },
 
-  async newestUnitCustomer(db) {
+  async newestUnitCustomer(db, intent) {
     const [customers, equipment] = await Promise.all([fetchCustomers(db), fetchEquipment(db)]);
-    const thisYear = Number(new Date().toISOString().slice(0, 4));
+    const thisYear = Number(nowIso(intent).slice(0, 4));
     const withYear = equipment.map((e) => ({ ...e, year: installYearOf(e.installation_date) })).filter((e) => e.year != null && e.year <= thisYear);
     if (!withYear.length) return noAnswer('No unit has an installation date on file.');
     const maxYear = Math.max(...withYear.map((e) => e.year));
@@ -248,22 +275,28 @@ const HANDLERS = {
   },
 
   async mostDocType(db) {
-    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS k, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} GROUP BY 1`);
-    const { value, winners } = topOf(rows.map((r) => ({ k: r.k, n: r.n })).filter((e) => e.k));
+    const docs = await fetchDocTypeRows(db);
+    const entries = groupCount(docs.filter((d) => d.k), (d) => d.k);
+    const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No documents are on file.');
-    return answer(`${namesList(winners)} is the document type we have the most of, ${value}.`, [{ label: 'Documents', value: String(value) }]);
+    const records = docs.filter((d) => d.k && winners.includes(d.k)).map((d) => documentRecord(d));
+    return attachCitations(answer(`${namesList(winners)} is the document type we have the most of, ${value}.`, [{ label: 'Documents', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped documents by type; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async fewestDocType(db) {
-    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS k, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} GROUP BY 1`);
-    const { value, winners } = topOf(rows.map((r) => ({ k: r.k, n: r.n })).filter((e) => e.k), { max: false });
+    const docs = await fetchDocTypeRows(db);
+    const entries = groupCount(docs.filter((d) => d.k), (d) => d.k);
+    const { value, winners } = topOf(entries, { max: false });
     if (!value) return noAnswer('No documents are on file.');
-    return answer(`${namesList(winners)} is the document type we have the fewest of, ${value}.`, [{ label: 'Documents', value: String(value) }]);
+    const records = docs.filter((d) => d.k && winners.includes(d.k)).map((d) => documentRecord(d));
+    return attachCitations(answer(`${namesList(winners)} is the document type we have the fewest of, ${value}.`, [{ label: 'Documents', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped documents by type; the fewest is ${namesList(winners)} with ${value}.` });
   },
 
-  async mostExpiredWarrantiesCustomer(db) {
+  async mostExpiredWarrantiesCustomer(db, intent) {
     const [customers, equipment] = await Promise.all([fetchCustomers(db), fetchEquipment(db)]);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = nowIso(intent).slice(0, 10);
     const expired = equipment.filter((e) => warrantyStatusOf(e.warranty, today) === 'expired');
     const byCust = groupCount(expired, (e) => e.customer_id);
     const entries = byCust.map((e) => ({ k: customerNameOf(customers, e.k), id: e.k, n: e.n })).filter((e) => e.k);
@@ -292,23 +325,31 @@ const HANDLERS = {
 
   async mostInstallsYear(db) {
     const equipment = await fetchEquipment(db);
-    const entries = groupCount(equipment.map((e) => ({ year: installYearOf(e.installation_date) })).filter((e) => e.year != null), (e) => String(e.year));
+    const withKey = equipment.map((e) => ({ ...e, _k: installYearOf(e.installation_date) })).filter((e) => e._k != null);
+    const entries = groupCount(withKey, (e) => String(e._k));
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No unit has an installation date on file.');
-    return answer(`${namesList(winners)} is the year we installed the most units, ${value}.`, [{ label: 'Units installed', value: String(value) }]);
+    const records = withKey.filter((e) => winners.includes(String(e._k))).map((e) => unitRecord(e, { label: [e.manufacturer, e.model].filter(Boolean).join(' '), sublabel: `installed ${e._k}` }));
+    return attachCitations(answer(`${namesList(winners)} is the year we installed the most units, ${value}.`, [{ label: 'Units installed', value: String(value) }]),
+      { records, total: records.length, basis: `Grouped equipment by installation year; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async techTotalJobs(db, { name }) {
     const rows = await fetchTechnicianRows(db, name);
-    const n = new Set(rows.map((r) => r.documentId)).size;
-    return answer(`${name} has done ${n} job${n === 1 ? '' : 's'} in total.`, [{ label: 'Jobs', value: String(n) }]);
+    const ids = [...new Set(rows.map((r) => r.documentId))];
+    const n = ids.length;
+    return attachCitations(answer(`${name} has done ${n} job${n === 1 ? '' : 's'} in total.`, [{ label: 'Jobs', value: String(n) }]),
+      { records: ids.map((id) => documentRecord({ id })), total: n, basis: `Counted the distinct dated service documents naming ${name} as technician.` });
   },
 
-  async techJobsThisYear(db, { name }) {
+  async techJobsThisYear(db, intent) {
+    const { name } = intent;
     const rows = await fetchTechnicianRows(db, name);
-    const year = new Date().toISOString().slice(0, 4);
-    const n = new Set(rows.filter((r) => r.date.startsWith(year)).map((r) => r.documentId)).size;
-    return answer(`${name} ran ${n} job${n === 1 ? '' : 's'} this year.`, [{ label: 'Jobs this year', value: String(n) }]);
+    const year = nowIso(intent).slice(0, 4);
+    const ids = [...new Set(rows.filter((r) => r.date.startsWith(year)).map((r) => r.documentId))];
+    const n = ids.length;
+    return attachCitations(answer(`${name} ran ${n} job${n === 1 ? '' : 's'} this year.`, [{ label: 'Jobs this year', value: String(n) }]),
+      { records: ids.map((id) => documentRecord({ id })), total: n, basis: `Counted ${name}'s distinct dated service documents from ${year}.` });
   },
 
   async techCustomerCount(db, { name }) {
@@ -316,18 +357,23 @@ const HANDLERS = {
     if (!rows.length) return answer(`${name} isn't on record as having worked any jobs.`, [{ label: 'Customers', value: '0' }]);
     const ids = [...new Set(rows.map((r) => r.documentId))];
     const { rows: cust } = await db.raw(
-      `SELECT DISTINCT c.id FROM document_entity_links l
+      `SELECT DISTINCT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address
+         FROM document_entity_links l
          JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
         WHERE l.document_id = ANY($1::uuid[]) AND l.${TENANT_SQL}`, [ids]);
-    return answer(`${name} has worked for ${cust.length} different customer${cust.length === 1 ? '' : 's'}.`, [{ label: 'Customers', value: String(cust.length) }]);
+    return attachCitations(answer(`${name} has worked for ${cust.length} different customer${cust.length === 1 ? '' : 's'}.`, [{ label: 'Customers', value: String(cust.length) }]),
+      { records: cust.map((c) => customerRecord(c)), total: cust.length, basis: `Counted the distinct customers linked to ${name}'s service documents.` });
   },
 
-  async techLastJob(db, { name }) {
+  async techLastJob(db, intent) {
+    const { name } = intent;
     const rows = await fetchTechnicianRows(db, name);
-    const today = new Date().toISOString().slice(0, 10);
-    const past = rows.filter((r) => r.date <= today).map((r) => r.date).sort().reverse();
+    const today = nowIso(intent).slice(0, 10);
+    const past = rows.filter((r) => r.date <= today).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     if (!past.length) return noAnswer(`No job on file for ${name}.`);
-    return answer(`${name}'s most recent job was ${humanDate(past[0])}.`, [{ label: 'Most recent job', value: humanDate(past[0]) }]);
+    const top = past[0];
+    return attachCitations(answer(`${name}'s most recent job was ${humanDate(top.date)}.`, [{ label: 'Most recent job', value: humanDate(top.date) }]),
+      { records: [documentRecord({ id: top.documentId })], total: 1, basis: `Read the most recent dated service document naming ${name} as technician.` });
   },
 
   async topTechByCustomers(db) {
@@ -349,31 +395,44 @@ const HANDLERS = {
     const entries = [...perTech.entries()].map(([k, set]) => ({ k, n: set.size }));
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No technician is linked to any customer.');
-    return answer(`${namesList(winners)} ${winners.length > 1 ? 'have' : 'has'} worked for the most different customers, ${value}.`, [{ label: 'Customers', value: String(value) }]);
+    const winnerDocIds = [...new Set(rows.filter((r) => winners.includes(r.technician)).map((r) => r.documentId))];
+    return attachCitations(answer(`${namesList(winners)} ${winners.length > 1 ? 'have' : 'has'} worked for the most different customers, ${value}.`, [{ label: 'Customers', value: String(value) }]),
+      { records: winnerDocIds.map((id) => documentRecord({ id })), total: winnerDocIds.length, basis: `Counted the distinct customers linked to each technician's service documents; the most is ${namesList(winners)} with ${value}.` });
   },
 
-  async busiestTechThisYear(db) {
+  async busiestTechThisYear(db, intent) {
     const rows = await fetchTechnicianRows(db, null);
-    const year = new Date().toISOString().slice(0, 4);
-    const entries = groupCount(rows.filter((r) => r.date.startsWith(year)), (r) => r.technician, (r) => r.documentId);
+    const year = nowIso(intent).slice(0, 4);
+    const thisYear = rows.filter((r) => r.date.startsWith(year));
+    const entries = groupCount(thisYear, (r) => r.technician, (r) => r.documentId);
     const { value, winners } = topOf(entries);
     if (!value) return noAnswer('No technician has a job on file this year.');
-    return answer(`${namesList(winners)} ${winners.length > 1 ? 'are' : 'is'} our busiest technician this year, with ${value} job${value === 1 ? '' : 's'}.`, [{ label: 'Jobs this year', value: String(value) }]);
+    const winnerDocIds = [...new Set(thisYear.filter((r) => winners.includes(r.technician)).map((r) => r.documentId))];
+    return attachCitations(answer(`${namesList(winners)} ${winners.length > 1 ? 'are' : 'is'} our busiest technician this year, with ${value} job${value === 1 ? '' : 's'}.`, [{ label: 'Jobs this year', value: String(value) }]),
+      { records: winnerDocIds.map((id) => documentRecord({ id })), total: winnerDocIds.length, basis: `Counted each technician's distinct dated service documents from ${year}; the most is ${namesList(winners)} with ${value}.` });
   },
 
   async jobsNoTech(db) {
     const { rows } = await db.raw(
-      `SELECT count(DISTINCT y.document_id)::int AS n FROM extractions y
+      `SELECT y.document_id FROM extractions y
         WHERE y.field_key = 'service_date' AND y.${TENANT_SQL}
           AND NOT EXISTS (SELECT 1 FROM extractions t WHERE t.document_id = y.document_id AND t.field_key = 'technician' AND coalesce(t.value, '') <> '' AND t.${TENANT_SQL})`);
-    const n = rows[0]?.n ?? 0;
-    return answer(`${n} service job${n === 1 ? '' : 's'} have no technician assigned.`, [{ label: 'No technician', value: String(n) }]);
+    const ids = [...new Set(rows.map((r) => r.document_id))];
+    const n = ids.length;
+    return attachCitations(answer(`${n} service job${n === 1 ? '' : 's'} have no technician assigned.`, [{ label: 'No technician', value: String(n) }]),
+      { records: ids.map((id) => documentRecord({ id })), total: n, basis: 'Counted dated service documents with no technician value recorded.' });
   },
 
   async techCount(db) {
     const rows = await fetchTechnicianRows(db, null);
-    const n = new Set(rows.map((r) => r.technician.trim().toLowerCase())).size;
-    return answer(`${n} technician${n === 1 ? '' : 's'} on record.`, [{ label: 'Technicians', value: String(n) }]);
+    const byTech = new Map();
+    for (const r of rows) {
+      const k = r.technician.trim().toLowerCase();
+      if (!byTech.has(k)) byTech.set(k, r.documentId);
+    }
+    const n = byTech.size;
+    return attachCitations(answer(`${n} technician${n === 1 ? '' : 's'} on record.`, [{ label: 'Technicians', value: String(n) }]),
+      { records: [...byTech.values()].map((id) => documentRecord({ id })), total: n, basis: 'Counted the distinct technician names on dated service documents (one representative document per technician).' });
   },
 
   async listTechJobs(db) {
@@ -381,7 +440,12 @@ const HANDLERS = {
     const entries = groupCount(rows, (r) => r.technician, (r) => r.documentId).sort((a, b) => a.k.localeCompare(b.k));
     if (!entries.length) return noAnswer('No technician is on record.');
     const text = `${entries.map((e) => `${e.k}: ${e.n}`).join('; ')}.`;
-    return answer(text, entries.map((e) => ({ label: e.k, value: String(e.n) })));
+    const records = entries.flatMap((e) => {
+      const ids = [...new Set(rows.filter((r) => r.technician === e.k).map((r) => r.documentId))];
+      return ids.map((id) => documentRecord({ id }, { group: e.k }));
+    });
+    return attachCitations(answer(text, entries.map((e) => ({ label: e.k, value: String(e.n) }))),
+      { records, total: records.length, basis: "Counted each technician's distinct dated service documents." });
   },
 };
 
@@ -400,10 +464,10 @@ function groupCount(rows, keyOf, idOf = null) {
 
 /* ------------------------------------------------------------------ entry */
 
-export async function runRanking(db, intent) {
+export async function runRanking(db, intent, { today } = {}) {
   const fn = HANDLERS[intent.kind];
   if (!fn) return null;
-  const data = await fn(db, intent);
+  const data = await fn(db, today ? { ...intent, today } : intent);
   // A handler that already cited real rows (customer/document records) is left as-is; the rest get a
   // human basis sentence with no per-row records (a group-by-column count, not one entity's own fact).
   if (Array.isArray(data.records)) return data;
@@ -414,4 +478,9 @@ export async function classifyAndRunRanking(db, question) {
   const intent = parseRanking(question);
   if (!intent) return null;
   return runRanking(db, intent);
+}
+
+/** The resolved 'today' (scorecard/timezone aware) when the caller passed one, else the wall clock. */
+function nowIso(intent) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(intent?.today ?? '') ? `${intent.today}T12:00:00.000Z` : new Date().toISOString();
 }

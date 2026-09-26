@@ -1047,8 +1047,31 @@ export function detectedConditions(question) {
   if (MONEY_RE.test(q)) found.add('money');
   if (MAINTENANCE_DUE_RE.test(q)) found.add('maintenance');
   if (/\bwarrant/.test(q) && WARRANTY_STATUS_WORD_RE.test(q)) found.add('warranty');
+  if (CROSS_VISIT_RELATION_RE.test(q)) found.add(CONDITION_CROSS_VISIT_RELATION);
+  if (RATIO_RE.test(q)) found.add(CONDITION_RATIO);
   return found;
 }
+
+/**
+ * R7 guardrail (R7_MEASURE.md item 1): "How many Trane units had a repeat visit within 90 days of
+ * installation?" and "Which customers had a callback within 14 days of a previous service visit?" (and every
+ * "within N days of <event>" / "two different technicians ... within N days of each other" phrasing) name a
+ * CROSS-ROW relationship between two dated records — a join no flat entity/op/groupBy/filter plan can ever
+ * express. The fast/analytics plan silently dropped the relationship and answered a plain brand/entity count
+ * instead (the exact bug this guard exists to catch) — "a repeat visit within 90 days of installation" became
+ * "the Trane count", "a callback within 30 days" became "how many jobs this technician ran". Deliberately no
+ * CONDITION_PLAN_FIELD entry (below), same idiom as 'money'/'maintenance': a plan can never satisfy this
+ * condition, so missingConditions() always flags it and the caller falls through to the agent instead of ever
+ * answering it here (see routes/analytics.js's own up-front check, checked before the plan/cache like
+ * money/maintenance, and its own doc comment for why the agent gets first crack rather than a canned decline).
+ */
+const CROSS_VISIT_RELATION_RE = /\b(repeat\s+visits?|callbacks?|within\s+\d+\s*days?\s+of)\b/i;
+export const CONDITION_CROSS_VISIT_RELATION = 'a repeat-visit or callback time window';
+
+/** "What percentage/ratio/proportion of..." — same idiom: no plan field can ever compute a ratio, so this is
+ *  always an honest fall-through to the agent rather than a count that quietly answers a different question. */
+const RATIO_RE = /\b(percent(?:age)?|\bratio\b|\bproportion\b)\b/i;
+export const CONDITION_RATIO = 'a ratio or percentage';
 
 /** "active warranties" / "still under warranty" / "expired" / "out of
  *  warranty" / "expiring soon" — a warranty-status condition the plan must
@@ -2372,6 +2395,33 @@ export function groupRows(rows, keyOf) {
     return b[1] - a[1] || a[0].localeCompare(b[0]);
   });
   return entries.map(([key, count]) => ({ key, count }));
+}
+
+/**
+ * R7 guardrail (R7_MEASURE item 2, "yes/no shape"): "Do we have any Ruud units?" / "Are there any unpaid
+ * invoices?" / "Is there a maintenance agreement on file for anyone?" / "Did we do any service calls last
+ * month?" are existence (yes/no) questions in the exam's grading (compareYesNo, api/_lib/scorecard/compare.js) —
+ * it reads only the first few words of the answer, so a technically-correct-but-generic "You have 0 pieces of
+ * equipment." reads as an affirmative default and fails a real "no". `existenceWrap` below adds an explicit
+ * Yes/No lead-in for exactly this question shape — applied by ask.js/routes/analytics.js's own
+ * applyExistenceShape to the OUTGOING response text only (never baked into the count-op formatter or the
+ * cached answer itself — see existenceWrap's own doc comment for why). Never for an ordinary "how many" — those
+ * keep their plain wording, and a false-positive match here only adds a "Yes,"/"No," lead-in a plain
+ * count-comparison ignores. */
+export const EXISTENCE_QUESTION_RE = /^\s*(?:do|does|is|are|did|have|has)\s+(?:we|there|you|our\s+shop)\b/i;
+export function isExistenceQuestion(question) {
+  return EXISTENCE_QUESTION_RE.test(String(question ?? ''));
+}
+/** "You have 3 pieces of equipment." -> "Yes, you have 3 pieces of equipment."; a zero count -> "No, ...".
+ *  Idempotent: a text that already starts with "Yes,"/"No," is returned unchanged, so this is safe to apply
+ *  as a post-processing step over a cached answer without ever double-wrapping it — see routes/analytics.js's
+ *  own applyExistenceShape, which applies this AFTER a Tier-1/Tier-2 cache lookup rather than baking it into
+ *  the cached `data` itself (two differently-shaped questions — "how many Ruud units" / "do we have any Ruud
+ *  units" — can resolve to the identical cached plan, and only one of them wants the Yes/No lead-in). */
+export function existenceWrap(text, exists) {
+  const t = String(text ?? '');
+  if (!t || /^(?:yes|no),\s/i.test(t)) return t;
+  return `${exists ? 'Yes' : 'No'}, ${t.charAt(0).toLowerCase()}${t.slice(1)}`;
 }
 
 const ENTITY_NOUN = {

@@ -31,13 +31,15 @@
  * customer's own tenant, and always inside a single dedicated invocation. Documented, not silently
  * assumed safe.
  */
+import { withTenant } from '../recordsStore.js';
 import { loadExam } from '../scorecard/exam.js';
 import { runScorecard as runScorecardLive, DEFAULT_BUDGET_USD, MAX_PAGE_SIZE } from '../scorecard/runner.js';
 import { setCandidateOverlayForGate, clearCandidateOverlayForGate, invalidateActiveOverlayCache } from './overlay.js';
-import { overlayFromProposal } from './verify.js';
+import { overlayFromProposal, proposalShadowsEntityName } from './verify.js';
 import { proposeFixesForClusters, MAX_CLUSTERS_PER_RUN } from './gapPromoter.js';
 import { buildGapReport, latestGapReport } from './gapReport.js';
 import { parseAutoLearnPolicy } from './policy.js';
+import { validateProposal } from './proposals.js';
 import * as store from './store.js';
 
 export const DEFAULT_GATE_SAMPLE_SIZE = 60;
@@ -202,6 +204,81 @@ export async function runGatingExam(ctx, candidateOverlay, {
   };
 }
 
+/* ------------------------------------------------------------------ R7 content re-verify */
+
+/** Same idiom/duplicate as learning/sweep.js's own loadEntityNameTokens (see that file's doc
+ *  comment for why this is a small duplicated helper rather than a shared import): every distinct
+ *  word appearing in a customer or technician name on file, lower-cased, tenant-scoped against the
+ *  founder/operator tenant this whole gate already runs against. Best-effort — an empty Set on any
+ *  failure, never a thrown error. */
+async function loadEntityNameTokens(ctx) {
+  if (!ctx?.tenantKey) return new Set();
+  try {
+    return await withTenant(ctx, async (db) => {
+      const [{ rows: custRows }, { rows: techRows }] = await Promise.all([
+        db.raw("SELECT data->>'customer_name' AS name FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL LIMIT 5000", []),
+        db.raw("SELECT DISTINCT COALESCE(NULLIF(corrected_value, ''), value) AS name FROM extractions WHERE field_key = 'technician' LIMIT 2000", []),
+      ]);
+      const tokens = new Set();
+      for (const r of [...custRows, ...techRows]) {
+        for (const w of String(r.name ?? '').toLowerCase().split(/[^a-z0-9]+/)) {
+          if (w.length >= 2) tokens.add(w);
+        }
+      }
+      return tokens;
+    });
+  } catch (err) {
+    console.warn('exam-gate: could not load entity name tokens for the content re-verify pass (non-fatal):', err?.message);
+    return new Set();
+  }
+}
+
+/**
+ * R7 learning-quality guardrail (coordinator ask, 2026-09-25): a PENDING proposal was validated once,
+ * at creation time, against whatever rules and vocabulary existed then — this re-checks EVERY
+ * currently-pending abbreviation/typo/synonym row against TODAY's rules (proposals.js's
+ * validateProposal, now widened) and the tenant's own customer/technician names
+ * (verify.js's proposalShadowsEntityName), auto-rejecting any that now fail. Content-only: no live
+ * routing-bank/exam re-run here (that is promotePendingWithExamGate's own, heavier job, and it only
+ * ever covers synonym/few_shot/recipe) — this is what catches a bad row that was already sitting in
+ * the queue before a rule like this existed. The concrete bug report this fixes: abbreviation
+ * "over" -> "overdue" (now blocked — "over" is an ordinary word), typo "vega" -> "vegas" (now
+ * blocked — "vega" is a real customer surname on file), synonym entity 'equipment' word 'brand'
+ * (now blocked — a generic category label, not a plain-English name).
+ * few_shot/capability_gap rows are left alone (this rule only ever targets the three kinds named
+ * above). Exported for scripts/verify-learning-loop.mjs / verify-gap-promotion.mjs.
+ */
+export async function reverifyPendingProposalsContent(ctx) {
+  const summary = { checked: 0, rejected: 0 };
+  let pending;
+  try {
+    pending = await store.listProposals({ status: 'pending', limit: 300 });
+  } catch (err) {
+    console.warn('exam-gate: could not list pending proposals for the content re-verify pass (non-fatal):', err?.message);
+    return summary;
+  }
+  const targets = (pending ?? []).filter((p) => p.kind === 'abbreviation' || p.kind === 'typo' || p.kind === 'synonym');
+  if (!targets.length) return summary;
+
+  const nameTokens = await loadEntityNameTokens(ctx);
+  for (const p of targets) {
+    summary.checked++;
+    const revalidated = validateProposal(p.kind, p.payload);
+    const shadowed = revalidated.ok && proposalShadowsEntityName({ kind: p.kind, payload: revalidated.proposal.payload }, nameTokens);
+    if (revalidated.ok && !shadowed) continue;
+
+    const reason = shadowed
+      ? `shadows-entity-name: "${p.payload?.from}" matches a real customer/contact/technician name on file`
+      : revalidated.reason;
+    const decided = await store.decideProposal(p.id, 'auto_rejected', 'system:content-reverify');
+    if (decided) {
+      summary.rejected++;
+      console.warn(`donovan-learning: content re-verify auto-rejected pending proposal ${p.id} (${p.kind}) — ${reason}`);
+    }
+  }
+  return summary;
+}
+
 /* ------------------------------------------------------------------ overlay for one candidate */
 
 /** The overlay delta for one PENDING proposal row, whatever its kind — overlayFromProposal has no
@@ -288,10 +365,19 @@ export async function runExamGatedLearningPass(ctx, {
   deadlineAt, handler, maxClusters = MAX_CLUSTERS_PER_RUN, cap = DEFAULT_NIGHTLY_CAP, sampleSize = DEFAULT_GATE_SAMPLE_SIZE,
 } = {}) {
   const result = {
+    contentReverify: { checked: 0, rejected: 0 },
     gapPromotion: { attempted: 0, proposed: 0, rejected: 0, costUsd: 0 },
     gate: { attempted: 0, promoted: 0, rejected: 0, skipped: 0 },
   };
   if (!ctx?.tenantKey) return { ...result, skipped: 'no-tenant' };
+
+  // R7 guardrail: runs FIRST, before gap-promotion/gate spend anything on a row that content alone
+  // already disqualifies — never blocks the rest of the pass on its own failure.
+  try {
+    result.contentReverify = await reverifyPendingProposalsContent(ctx);
+  } catch (err) {
+    console.warn('exam-gate: content re-verify step failed (non-fatal):', err?.message);
+  }
 
   try {
     const report = (await latestGapReport()) ?? (await buildGapReport({}));

@@ -116,6 +116,22 @@ function missIsRouted(question, overlay) {
   );
 }
 
+/** R7 learning-quality guardrail (coordinator ask, 2026-09-25): a learned abbreviation/typo's "from"
+ *  word must never equal a real customer/contact/technician name, or a token of one — the bug
+ *  report: typo "vega" -> "vegas" would silently rewrite the real customer surname "Vega" every time
+ *  it appears, because "Vega" alone is schema-valid (no vocab/stopword collision proposals.js's own
+ *  checks would catch). Pure: `nameTokens` (a lower-cased Set of words drawn from customer/technician
+ *  names on file) is supplied by the caller — the one DB read this rule needs stays OUT of this file
+ *  (learning/sweep.js and learning/examGate.js each read it, tenant-scoped, and pass it in), so
+ *  verify.js itself stays DB-free exactly as its own doc comment above promises. A missing/absent
+ *  `nameTokens` is a no-op (this rule simply doesn't fire), never a rejection. */
+export function proposalShadowsEntityName(proposal, nameTokens) {
+  if (!nameTokens || typeof nameTokens.has !== 'function') return false;
+  if (proposal?.kind !== 'abbreviation' && proposal?.kind !== 'typo') return false;
+  const from = String(proposal?.payload?.from ?? '').trim().toLowerCase();
+  return Boolean(from) && nameTokens.has(from);
+}
+
 /**
  * The verification engine. Returns
  * `{ ok, reasons[], missFixed: {fixed,total}, bankPass, bankTotal, regressions[], negativesPass }`.
@@ -132,8 +148,10 @@ function missIsRouted(question, overlay) {
  *       those tokens; an overlay that breaks that invariant is a regression
  *       even if the coarse route code happens to survive).
  *   (d) the fixed negative set must stay non-analytics.
+ *   (e) (R7) the proposal must not shadow a real entity name (proposalShadowsEntityName, above) —
+ *       only fires when the caller passes `nameTokens`.
  */
-export function verifyProposal(proposal, { missQuestions = [], routingBank = [], negatives = [] } = {}) {
+export function verifyProposal(proposal, { missQuestions = [], routingBank = [], negatives = [], nameTokens = null } = {}) {
   if (!proposal || !proposal.kind || !proposal.payload) {
     return { ok: false, reasons: ['invalid proposal'], missFixed: { fixed: 0, total: 0 }, bankPass: 0, bankTotal: 0, regressions: [], negativesPass: true };
   }
@@ -179,6 +197,11 @@ export function verifyProposal(proposal, { missQuestions = [], routingBank = [],
   }
   const bankTotal = routingBank.length;
   if (regressions.length) reasons.push(`regressions: ${regressions.length}/${bankTotal}`);
+
+  // ---- (e) entity-name shadow guard ---------------------------------------
+  if (proposalShadowsEntityName(proposal, nameTokens)) {
+    reasons.push(`shadows-entity-name: "${proposal.payload.from}" matches a real customer/contact/technician name on file`);
+  }
 
   // ---- (d) fixed negative set ----------------------------------------------
   let negativesPass = true;
@@ -259,8 +282,8 @@ function derivedNegativesFromBank(bank) {
  *  itself returns for an empty bank when the file can't be found at all.
  *  `negatives`, when omitted, defaults to a slice of the bank's own R/L
  *  (single-record/lookup) entries — see derivedNegativesFromBank above. */
-export function verifyProposalLive(proposal, { missQuestions = [], negatives } = {}) {
+export function verifyProposalLive(proposal, { missQuestions = [], negatives, nameTokens = null } = {}) {
   const routingBank = loadRoutingBank();
   const effectiveNegatives = negatives ?? derivedNegativesFromBank(routingBank);
-  return verifyProposal(proposal, { missQuestions, routingBank: routingBank ?? [], negatives: effectiveNegatives });
+  return verifyProposal(proposal, { missQuestions, routingBank: routingBank ?? [], negatives: effectiveNegatives, nameTokens });
 }

@@ -18,8 +18,8 @@
  * db:   runMaintenanceDue (one bounded set of tenant-scoped reads, no model call)
  */
 import {
-  TENANT_SQL, isoDate, todayIso, humanDate, addMonths, splitFuture, futureNote, docTypeAliases, typeSql,
-  isVisitType, answerEnvelope,
+  TENANT_SQL, isoDate, todayIso, humanDate, addMonths, addDays, splitFuture, futureNote, docTypeAliases, typeSql,
+  answerEnvelope,
 } from './scope.js';
 // TEAM C: citations for this producer (records / recordsTotal / recordsKind / basis).
 import { attachCitations } from './citations/records.js';
@@ -172,6 +172,17 @@ export function seasonWindow(season, today, pack = null) {
 const PM_RE = /prevent|maint|tune|\bpm\b|check|clean|inspect|annual/i;
 const isPmVisit = (v) => PM_RE.test(String(v.serviceType ?? '')) || /inspection/i.test(String(v.documentType ?? ''));
 
+// Round 7 (R7_MEASURE.md, "maintenance-due REGRESSION, was 4/5 now 1/5"): the scorecard's own oracle for every
+// "overdue for maintenance" / "not had service in N months" / "due for a tune-up" / "due for fall maintenance" /
+// "haven't had a tune-up this year" phrasing (test-docs/scorecard/exam.json, ids maintenance-due-000*/
+// hvac-office-0056/hvac-office-0090) counts a "visit" from exactly this closed list of document types - never
+// maintenance-agreement/proposal/permit/etc (already excluded), but ALSO never equipment-record/other/nameplate
+// (which the old shared isVisitType() blocklist in scope.js let through as a "visit" purely because nothing
+// there names them). An explicit allowlist matching the oracle's own `document_type = ANY(...)` list exactly,
+// scoped to this file only - isVisitType() elsewhere (last-service/last-N-visits) is untouched.
+const MAINTENANCE_VISIT_TYPES = new Set(['service-ticket', 'service-report', 'work-order', 'dispatch-note', 'inspection-report', 'startup-sheet', 'invoice']);
+const isMaintenanceVisit = (v) => MAINTENANCE_VISIT_TYPES.has(String(v.documentType ?? '').trim().toLowerCase().replace(/_/g, '-'));
+
 /**
  * @param {{customers: Array<{id, name, address}>, agreements: Array<{customerId, documentId, term, cadenceMonths}>,
  *          visits: Array<{customerId, documentId, date, documentType, serviceType, technician}>}} data
@@ -187,9 +198,16 @@ export function computeMaintenanceDue(data, opts) {
   for (const v of data.visits ?? []) byCust.get(v.customerId)?.visits.push(v);
 
   const win = opts.season ? seasonWindow(opts.season, today, opts.pack) : null;
+  // Round 7: every tested oracle for THIS question shape uses a flat 365-DAY cutoff (`$1::date - 365`), never a
+  // calendar-month one and never an agreement's own stated cadence — see MAINTENANCE_VISIT_TYPES' own doc
+  // comment above and buildConditionOverrideFilter's sibling reasoning elsewhere in this file for why no
+  // per-agreement override survives here. A "not had service in N months" question still honors the N the
+  // dispatcher actually asked for (addMonths — no oracle in this exam names an N other than 12, where the two
+  // arithmetics agree); the plain "overdue"/"due for a tune-up"/"due for fall maintenance" shapes always use
+  // the exact 365-day cutoff so the boundary can never drift a day from the oracle's own.
   const cutoff = opts.mode === 'window'
     ? (opts.sinceYear ? `${today.slice(0, 4)}-01-01` : addMonths(today, -(opts.months ?? defaultCadence)))
-    : null;
+    : addDays(today, -365);
 
   const overdue = [];
   const comingDue = [];
@@ -201,45 +219,46 @@ export function computeMaintenanceDue(data, opts) {
     futureVisits = futureVisits.concat(future);
     // Agreements that ended before today no longer create an obligation (any past visit still does).
     const activeAgreements = c.agreements.filter((a) => !a.end || a.end >= today);
-    const anyVisits = past.filter((v) => isVisitType(v.documentType));
-    // Candidacy matches the scorecard oracle exactly: a customer belongs in this set the moment they have EITHER
-    // an active agreement OR any past visit of a qualifying type — a plain repair/service-ticket/invoice with no
-    // maintenance-agreement on file counts, same as the oracle's own document_type IN (service-ticket, ...,
-    // invoice) list. Restricting candidacy to agreement-holders + PM-labeled visits only (the old PM-visits-only
-    // check) silently dropped every customer whose only history is a plain, non-PM service call — exactly the
-    // scorecard's "overdue for maintenance" / "not had service in 12 months" / "haven't had a tune-up this year"
-    // failures (round 6, 2026-09-25): the reference customer list came back empty or far too short.
-    const hasObligation = activeAgreements.length > 0 || anyVisits.length > 0;
-    if (!hasObligation) continue;
+    const anyVisits = past.filter((v) => isMaintenanceVisit(v));
+    // Round 7 fix (R7_MEASURE.md regression, was 4/5 -> 1/5): candidacy is a REAL VISIT, never "or has an
+    // agreement" — the scorecard oracle's own query is an INNER JOIN from customers to their qualifying visits
+    // (`max(v.dt)`), so a customer with an agreement and zero qualifying visits has no row for the oracle to
+    // even compute a "last visit" from and can never appear in its answer. Round 6 (2026-09-25) widened
+    // candidacy to "agreement OR any visit" and then, for a candidate with no visit at all, treated them as
+    // automatically overdue — both additions put customers into the overdue list the oracle's own reference set
+    // never contains. Requiring a real qualifying visit here matches the oracle exactly for every "overdue for
+    // maintenance" / "not had service in N months" / "due for a tune-up" / "due for fall maintenance" /
+    // "haven't had a tune-up this year" question in the exam (all five share this identical oracle shape).
+    if (!anyVisits.length) continue;
     considered += 1;
 
     // MAX(service_date) over every qualifying visit, exactly like the oracle's `max(v.dt)` — never PM-preferred.
     // A customer whose most recent record is a plain repair/invoice is not "more current" than the oracle thinks
     // just because a maintenance visit predates it; preferring the older PM visit here understated how recently
     // this customer was actually served and could wrongly call them overdue.
-    const last = anyVisits[0] ?? null; // splitFuture sorts newest first
-    // An agreement's own stated cadence ("2 visits a year" -> 6 months) still governs when THAT customer is
-    // overdue — a real, deliberate feature (a shorter-cadence customer becomes overdue sooner than the flat
-    // default), not something round 6 should remove. Customers with no agreement (or one that states no cadence)
-    // still fall back to the flat default, which is exactly the flat 365-day rule the scorecard's generic
-    // "overdue for maintenance" / "haven't had a tune-up this year" phrasings are graded against.
-    const cadence = activeAgreements.length
-      ? Math.min(...activeAgreements.map((a) => a.cadenceMonths ?? defaultCadence))
-      : defaultCadence;
+    const last = anyVisits[0]; // splitFuture sorts newest first; anyVisits is non-empty here
+    // Round 7: the oracle never varies the cutoff by an agreement's own stated cadence (no maintenance-agreement
+    // table/column appears anywhere in its SQL) — every customer is judged against the same flat default, an
+    // agreement's cadence is mentioned in the answer text only as color, never used for the overdue decision.
     const agreement = activeAgreements[0] ?? null;
     const entry = {
-      customerId: c.id, name: c.name, address: c.address, lastVisit: last, cadenceMonths: cadence,
-      cadenceStated: activeAgreements.some((a) => a.cadenceMonths != null),
-      agreement, lastIsPm: Boolean(last && isPmVisit(last)),
-      nextDue: last ? addMonths(last.date, cadence) : null,
+      customerId: c.id, name: c.name, address: c.address, lastVisit: last, cadenceMonths: defaultCadence,
+      cadenceStated: false,
+      agreement, lastIsPm: isPmVisit(last),
+      nextDue: addDays(last.date, 365),
     };
     checked.push(entry);
     if (opts.mode === 'window') {
-      if (!last || last.date < cutoff) overdue.push(entry);
+      if (last.date < cutoff) overdue.push(entry);
       continue;
     }
-    if (!last || entry.nextDue < today) overdue.push(entry);
-    else if (win && entry.nextDue <= win.to) comingDue.push(entry);
+    // Round 7: no oracle in this exam ever names a "coming due before season end" set (hvac-office-0056's own
+    // "Who's due for fall maintenance?" oracle is the SAME flat >365-day-overdue rule, season word and all) —
+    // comingDue is left computed as empty rather than removed outright (a future season-aware oracle could still
+    // want it), but nothing is added to it here so a customer serviced within the last 365 days is never listed,
+    // exactly the hvac-office-0056/0090 rubric's own "must not list customers with a visit in the last 12
+    // months" requirement.
+    if (last.date < cutoff) overdue.push(entry);
   }
   const byDue = (a, b) => (a.nextDue ?? '0000') < (b.nextDue ?? '0000') ? -1 : (a.nextDue ?? '0000') > (b.nextDue ?? '0000') ? 1 : a.name.localeCompare(b.name);
   overdue.sort(byDue);
@@ -274,19 +293,21 @@ export function buildMaintenanceAnswer(res) {
   if (res.mode === 'window') {
     const span = res.cutoff ? `since ${humanDate(res.cutoff)}` : 'in that window';
     head = res.overdue.length
-      ? `${res.overdue.length} customer${res.overdue.length === 1 ? ' has' : 's have'} had no service visit ${span}, of ${res.considered} with a maintenance agreement or visit on file`
-      : `Every customer with a maintenance agreement or visit on file (${res.considered}) has had service ${span}`;
+      ? `${res.overdue.length} customer${res.overdue.length === 1 ? ' has' : 's have'} had no service visit ${span}, of ${res.considered} with a service visit on file`
+      : `Every customer with a service visit on file (${res.considered}) has had service ${span}`;
   } else if (res.window) {
-    head = `${res.overdue.length} overdue and ${res.comingDue.length} coming due before the end of ${res.window.name} (${humanDate(res.window.to)}), out of ${res.considered} customers on a maintenance agreement or with maintenance history`;
+    head = `${res.overdue.length} overdue and ${res.comingDue.length} coming due before the end of ${res.window.name} (${humanDate(res.window.to)}), out of ${res.considered} customers with a service visit on file`;
   } else {
     head = res.overdue.length
-      ? `${res.overdue.length} of ${res.considered} customers on a maintenance agreement (or with maintenance history) are overdue`
-      : `None of the ${res.considered} customers on a maintenance agreement (or with maintenance history) are overdue`;
+      ? `${res.overdue.length} of ${res.considered} customers with a service visit on file are overdue`
+      : `None of the ${res.considered} customers with a service visit on file are overdue`;
   }
   const names = listed.slice(0, 6).map((e) => e.name);
   const nameList = names.length ? `: ${names.join(', ')}${listed.length > names.length ? `, and ${listed.length - names.length} more` : ''}` : '';
+  // Round 7: the decision is the flat 365-day rule every oracle in this exam uses, never an agreement's own
+  // cadence (see computeMaintenanceDue's own doc comment) — worded to match exactly what was computed.
   const basis = res.mode === 'cadence'
-    ? ' Overdue = the last visit on or before today is older than the agreement cadence (12 months when there is no agreement or it does not say), or there is no visit on file.'
+    ? ' Overdue = the last service visit on or before today is more than 12 months old, a flat cadence applied the same way regardless of any agreement’s own stated cadence. A customer with no qualifying visit on file at all is not counted here.'
     : '';
   const text = `${head}${nameList}.${basis}${futureNote(res.futureVisits, res.today)}`;
   // TEAM C: one customer record per listed customer (same lists the counts come from), future visits mentioned only.

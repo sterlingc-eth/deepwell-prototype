@@ -57,9 +57,44 @@ import { isEnumerationQuestion, isAgentFirstQuestion } from "./intents.js";
 /** Sonnet by default (owner decision, 2026-09-25: "Sonnet as the default research agent for anything
  *  non-trivial; NO Opus"). Reuses escalation.js's model id rather than a second copy of it. */
 export const RESEARCH_MODEL = process.env.DONOVAN_RESEARCH_MODEL || escalationModel();
-export const MAX_TURNS_V2 = 8;
+// R7 latency pass (2026-09-26, p95 29.1 s / observed 20-50 s answers — see R7_MEASURE.md): the previous
+// 8-turn/15-tool-call ceiling was the ACTUAL shape of the slow answers, not a rarely-hit safety net — a
+// question the model can't resolve (a join/window computation no read-only tool exposes, e.g. "callback
+// within 14 days of a previous visit") burns every turn searching without ever finding new evidence and
+// still returns "nothing in your records answers that" after the full 8 turns. Trimmed to 6/12 (still
+// generous for genuine multi-hop) and backed by the no-progress/soft-deadline early exits below, which are
+// what actually shorten the pathological runs — this cap alone only bounds the worst case.
+export const MAX_TURNS_V2 = 6;
 /** Cumulative tool EXECUTIONS across the whole run (several in one turn still count individually). */
-export const MAX_TOOL_CALLS_V2 = 15;
+export const MAX_TOOL_CALLS_V2 = 12;
+/** R7 latency pass: once elapsed wall-clock time since the run started passes this AND at least one tool
+ *  round has already run, the run is forced to answer from whatever evidence it has instead of spending
+ *  another full turn — "provisional answer from the best evidence" rather than the model's own judgement
+ *  of when it's done. Deliberately looser than the ~8s target quoted for the system as a whole (most of
+ *  that 8s is fast-path/no-agent questions); this only bounds the agent's OWN slice of a run.
+ *  DONOVAN_RESEARCH_SOFT_DEADLINE_MS overrides for tests/tuning. */
+export const SOFT_DEADLINE_MS_V2 = Number(process.env.DONOVAN_RESEARCH_SOFT_DEADLINE_MS) || 14_000;
+/** R7 latency pass: two consecutive tool rounds that ran an evidence-gathering tool (search/query/filter/
+ *  synthesize/etc.) and turned up NO new rows at all means the model is stuck, not converging — forcing an
+ *  answer here is what actually fixes "never spend 40 s to say nothing found" (a stuck run answers
+ *  none_found/cannot_answer after ~2-3 rounds instead of 6). A round that only ran non-evidence tools
+ *  (compute, view_document_page) neither counts against nor resets this — it is simply not a signal either
+ *  way. */
+export const NO_PROGRESS_ROUND_LIMIT_V2 = 2;
+export const EVIDENCE_TOOLS_V2 = new Set([
+  "search_documents", "run_query", "filter_records", "count_documents_mentioning", "synthesize",
+  "find_customers", "get_customer", "get_unit", "get_dossier", "timeline", "follow_links",
+]);
+/** R7 latency pass: caps how much of any ONE tool result's text goes into the model's context. A huge
+ *  result (a wide run_query, a long read_document page) is exactly what turns one turn's model call into a
+ *  slow one — the model still gets the content it needs (evidence tools already return their own top-N/
+ *  LIMIT-ed rows; this only trims pathological outliers) plus an explicit note to narrow the query instead
+ *  of silently truncating. DONOVAN_RESEARCH_MAX_TOOL_CHARS overrides for tests/tuning. */
+export const MAX_TOOL_RESULT_CHARS_V2 = Number(process.env.DONOVAN_RESEARCH_MAX_TOOL_CHARS) || 6000;
+export function capToolResultContent(content) {
+  if (typeof content !== "string" || content.length <= MAX_TOOL_RESULT_CHARS_V2) return content;
+  return `${content.slice(0, MAX_TOOL_RESULT_CHARS_V2)}\n…[truncated ${content.length - MAX_TOOL_RESULT_CHARS_V2} more characters — narrow the query (a customerId/equipmentId/date range) or use read_document/synthesize for the rest]`;
+}
 export const DEFAULT_INPUT_TOKEN_CAP_V2 = 120_000;
 // Perf pass (2026-09-25, ask-latency): raised 4 -> 6 (build spec item 1) so the model can batch more
 // independent lookups (a multi-part question, several unrelated ids) into ONE turn instead of spreading
@@ -254,6 +289,9 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
   const maxToolCalls = Math.max(1, Math.min(MAX_TOOL_CALLS_V2, limits.maxToolCalls ?? MAX_TOOL_CALLS_V2));
   const inputCap = limits.inputTokenCap ?? (Number(env?.DONOVAN_RESEARCH_MAX_INPUT_TOKENS) || DEFAULT_INPUT_TOKEN_CAP_V2);
   const deadline = deadlineAt ?? Date.now() + DEFAULT_DEADLINE_MS_V2;
+  const runStartedAt = Date.now();
+  let noProgressRounds = 0;
+  let earlyExitReason = null; // "soft-deadline" | "no-progress", diagnostics only — never changes behavior
 
   const toolbox = createToolbox({ withTenant, ctxArg, today, deadlineAt: deadline, variant: "v2" });
   const totals = { modelCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
@@ -309,7 +347,7 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       if (prefetched && prefetched.ok) {
         const useId = "prefetch-1";
         messages.push({ role: "assistant", content: [{ type: "tool_use", id: useId, name: "search_documents", input: prefetchInput }] });
-        messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: useId, content: prefetched.content }] });
+        messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: useId, content: capToolResultContent(prefetched.content) }] });
         toolCallsUsed += 1;
         steps.push({ tool: "search_documents", inputSummary: prefetched.inputSummary, rowCount: prefetched.rowCount, ms: prefetched.ms, prefetch: true });
         prefetchUsed = true;
@@ -325,7 +363,11 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       if (toolCallsUsed >= maxToolCalls) { reason = "tool-cap"; return; }
       if (deadline - Date.now() < MIN_CALL_BUDGET_MS) { reason = "deadline"; return; }
 
-      const forceAnswer = turn === turnBudget || totals.inputTokens >= inputCap * 0.75 || toolCallsUsed >= maxToolCalls - 1 || nudged;
+      const softDeadlineHit = turn > 1 && toolCallsUsed > 0 && (Date.now() - runStartedAt) > SOFT_DEADLINE_MS_V2;
+      const stuck = noProgressRounds >= NO_PROGRESS_ROUND_LIMIT_V2;
+      const forceAnswer = turn === turnBudget || totals.inputTokens >= inputCap * 0.75 || toolCallsUsed >= maxToolCalls - 1
+        || nudged || softDeadlineHit || stuck;
+      if (!earlyExitReason && (softDeadlineHit || stuck)) earlyExitReason = stuck ? "no-progress" : "soft-deadline";
       const modelStarted = Date.now();
       const resp = await callModel(
         {
@@ -369,8 +411,16 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       const results = toRun.map((use, i) => {
         const r = execResults[i];
         steps.push({ tool: use.name, inputSummary: r.inputSummary, rowCount: r.rowCount, ms: r.ms, ...(r.ok ? {} : { error: true }) });
-        return { type: "tool_result", tool_use_id: use.id, content: r.content, ...(r.ok ? {} : { is_error: true }) };
+        return { type: "tool_result", tool_use_id: use.id, content: capToolResultContent(r.content), ...(r.ok ? {} : { is_error: true }) };
       });
+      // R7 latency pass: did this round's evidence-gathering tools (if any) turn up anything new? Two
+      // rounds in a row of "ran a search/query and found nothing" forces the next turn to answer instead
+      // of continuing to search — see NO_PROGRESS_ROUND_LIMIT_V2 above.
+      const ranEvidenceTool = toRun.some((use) => EVIDENCE_TOOLS_V2.has(use.name));
+      if (ranEvidenceTool) {
+        const foundRows = execResults.some((r) => Number(r?.rowCount) > 0);
+        noProgressRounds = foundRows ? 0 : noProgressRounds + 1;
+      }
       for (const extra of uses.slice(toRun.length)) {
         results.push({ type: "tool_result", tool_use_id: extra.id, content: "ERROR: tool-call budget for this question is used up; answer from what you have", is_error: true });
       }
@@ -442,6 +492,7 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       dropped_facts: (shaped?.dropped?.facts ?? 0) + verifyDropped, verify_dropped: verifyDropped,
       // Perf pass diagnostics (build spec items 2-4) — counts only, never question/answer content.
       verify_skipped: verifySkipped, prefetch_used: prefetchUsed, memo_hits: toolbox.memoHits,
+      early_exit: earlyExitReason, run_ms: Date.now() - runStartedAt,
     })
   );
 

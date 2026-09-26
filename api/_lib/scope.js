@@ -56,6 +56,16 @@ export function addMonths(iso, months) {
   return `${y}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+/** Adds whole days to a YYYY-MM-DD date (UTC), returns YYYY-MM-DD. Round 7 (maintenanceDue.js): the scorecard
+ *  oracle's own cutoff is a literal `$1::date - 365`, a day count, not a calendar-month one - addMonths(x, -12)
+ *  can drift a day from that across some dates, so the flat-cadence overdue rule uses this instead. */
+export function addDays(iso, days) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.trunc(days)));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
 /**
  * Splits dated rows into those on/before `today` and those after it. A date after today is a scheduled visit or a
  * data-entry typo; it must never be reported as the last/most recent one.

@@ -84,6 +84,43 @@ export const STOPWORDS = new Set([
   'many', 'much',
 ]);
 
+/** R7 learning-quality guardrail (coordinator ask, 2026-09-25): a compact stoplist of ordinary
+ *  English words BEYOND the closed function-word STOPWORDS above — a learned `from` word must never
+ *  be one of these either. The bug report that prompted this: abbreviation "over" -> "overdue"
+ *  reached PENDING because "over" is schema-valid (not already vocab, not a stopword) even though it
+ *  is an everyday word in almost every question, not a misspelling/abbreviation of anything. Named
+ *  explicitly by the report — over/under/due/last/next/new/old/brand/unit/part/job/call/check/
+ *  service — plus their nearest everyday neighbors (short, common verbs/adjectives/time words a
+ *  4-letter-or-under abbreviation match or an edit-distance-1 typo match could plausibly land on).
+ *  Not a full frequency dictionary by design: compact, reviewable, and merged into the SAME
+ *  never-shadow guard as STOPWORDS, so any word here is rejected regardless of kind. */
+export const COMMON_WORDS = new Set([
+  'over', 'under', 'due', 'last', 'next', 'new', 'old', 'brand', 'brands', 'unit', 'units',
+  'part', 'parts', 'job', 'jobs', 'call', 'calls', 'called', 'check', 'checks', 'checked',
+  'service', 'services', 'serviced',
+  'up', 'down', 'out', 'off', 'on', 'in', 'now', 'here', 'there', 'once', 'about', 'after',
+  'before', 'again', 'still', 'yet', 'ever', 'never', 'always', 'often', 'soon', 'today',
+  'tomorrow', 'yesterday', 'good', 'bad', 'big', 'small', 'high', 'low', 'long', 'short',
+  'far', 'near', 'open', 'close', 'closed', 'right', 'left', 'top', 'bottom', 'full', 'empty',
+  'fast', 'slow', 'hard', 'easy', 'clear', 'clean', 'work', 'works', 'working', 'need', 'needs',
+  'want', 'wants', 'like', 'likes', 'get', 'gets', 'got', 'go', 'goes', 'went', 'come', 'comes',
+  'came', 'see', 'sees', 'saw', 'look', 'looks', 'looked', 'know', 'knows', 'knew', 'think',
+  'thinks', 'thought', 'say', 'says', 'said', 'tell', 'tells', 'told', 'make', 'makes', 'made',
+  'take', 'takes', 'took', 'give', 'gives', 'gave', 'find', 'finds', 'found', 'use', 'uses',
+  'used', 'run', 'runs', 'ran', 'set', 'sets', 'put', 'puts', 'help', 'helps', 'helped',
+  'people', 'person', 'time', 'times', 'day', 'days', 'week', 'weeks', 'month', 'months',
+  'year', 'years', 'one', 'two', 'three', 'first', 'second', 'third', 'list', 'name', 'names',
+  'number', 'numbers',
+]);
+
+/** R7 learning-quality guardrail: a synonym's WORD may never be one of these — each is a generic
+ *  category label ("brand", "model", "unit", "type"), not a plain-English NAME for the entity
+ *  itself. The bug report: entity 'equipment', word 'brand' — learning that would let the bare word
+ *  "brand" satisfy a brand-name filter for ANY question mentioning it, rather than teaching a real
+ *  brand's own plain-English name. A real brand name (ruud/bryant/amana) is unaffected — those are
+ *  proper nouns and never appear on this list. */
+export const GENERIC_SYNONYM_WORDS = new Set(['brand', 'brands', 'model', 'models', 'unit', 'units', 'type', 'types']);
+
 function isWordFormat(s) {
   return typeof s === 'string' && WORD_RE.test(s);
 }
@@ -102,6 +139,7 @@ function validFromWord(from) {
   if (US_STATE_CODES.has(from)) return false;
   if (STREET_SUFFIX_WORDS.has(from)) return false;
   if (STOPWORDS.has(from)) return false;
+  if (COMMON_WORDS.has(from)) return false;
   return true;
 }
 
@@ -119,7 +157,7 @@ function validateAbbreviationOrTypo(kind, payload) {
   if (!validFromWord(from)) {
     return {
       ok: false,
-      reason: `${kind}: "from" must be a new 2-30 char lowercase word (letters/digits/&/# only) that is not already known vocabulary, a US state code, a street-suffix word, or a common stopword`,
+      reason: `${kind}: "from" must be a new 2-30 char lowercase word (letters/digits/&/# only) that is not already known vocabulary, a US state code, a street-suffix word, or a common English word (stopword or otherwise)`,
     };
   }
   if (!validToWord(to)) {
@@ -140,6 +178,9 @@ function validateSynonym(payload) {
   }
   if ((ENTITY_SYNONYMS[entity] ?? []).includes(word)) {
     return { ok: false, reason: `synonym: "${word}" is already a known synonym for ${entity}` };
+  }
+  if (GENERIC_SYNONYM_WORDS.has(word)) {
+    return { ok: false, reason: `synonym: "${word}" is a generic category label, not a plain-English name for ${entity} — a real brand/product name stays valid` };
   }
   return { ok: true, proposal: { kind: 'synonym', payload: { entity, word } } };
 }

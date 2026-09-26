@@ -33,13 +33,14 @@ import { isFinancialQuestion } from "./_lib/financials/classify.js";
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
 import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZeroCitations, searchedLibraryBasis } from "./_lib/citations/enrich.js";
-import { runAnalyticsQuestion, isAnalyticsEnabled } from "./_lib/routes/analytics.js";
+import { runAnalyticsQuestion, isAnalyticsEnabled, applyExistenceShape } from "./_lib/routes/analytics.js";
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
 import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
 // TEAM E (2026-09-24): full-corpus content-count questions ("how many jobs mention a capacitor", "which customers had
 // a coil issue on file") — a deterministic scan of document_pages.text (all of it, not a top-K search), never the
 // agent's own search_documents fallback which was silently undercounting. See contentCount.js's own doc comment.
 import { parseContentCountQuestion, runContentCount } from "./_lib/contentCount.js";
+import { classifyRelationsQuestion, answerRelationsQuestion } from "./_lib/relations/questions.js";
 import { packForTenant } from "./_lib/industry/index.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
@@ -733,6 +734,9 @@ export default async function handler(req, res) {
     const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
     // Team A: comparison / maintenance-due / address-history questions (pure shape detection, no DB) - see block 0.4.
     const detIntent = !meta ? classifyDeterministic(question, { overlay }) : null;
+    // Round 7 relations engine: visit-timeline questions (repeat visits after install, callbacks within N days,
+    // technician performance, rankings, multi-hop conjunctions). Pure shape detection here; answered in block 0.35.
+    const relationsIntent = !meta ? classifyRelationsQuestion(question) : null;
     // Contact-lookup-by-name pre-router (live miss cluster 1, 2026-09-21):
     // "what's the phone number on file for donna thornton" — a lowercase
     // name with no HVAC anchor satisfies neither of fastPath's own gates
@@ -957,7 +961,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || detIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate
+    const retrievalPromise = meta || relationsIntent || detIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
@@ -998,6 +1002,14 @@ export default async function handler(req, res) {
         // the normal retrieval+model path rather than failing the request.
         console.error("Meta-question router failed, falling through:", err?.message);
       }
+    }
+
+    // ---- 0.35 relations engine (Round 7, no model, DB only) -----------------
+    // Returns null (falls through) whenever a named condition can't be applied exactly.
+    if (relationsIntent) {
+      const relData = await timer.time("relations", () => answerRelationsQuestion({ withTenant, ctxArg, question, today: todayResolved }));
+      console.log(JSON.stringify({ route: "ask", relations_family: relationsIntent.family, relations_hit: Boolean(relData) }));
+      if (relData) return send(200, { success: true, data: relData });
     }
 
     // ---- 0.4 deterministic history router (Team A, no model, DB only) ------
@@ -1323,7 +1335,13 @@ export default async function handler(req, res) {
         // shot at the agent first. The money gate is deliberately left alone (financials phase).
         if (analyticsResult.missOutcome && analyticsResult.missOutcome !== MISS_OUTCOMES.MONEY_FALLBACK && (await tryAgent())) return;
         const data = analyticsResult.cacheHit ? { ...analyticsResult.data, cached: true } : analyticsResult.data;
-        send(200, { success: true, data });
+        // R7 guardrail item 2 ("yes/no shape"): applied to the OUTGOING response only, never to `data` itself —
+        // `data` is also what the bookkeeping block below caches (Tier 1/Tier 2, routes/analytics.js), and a
+        // "how many Ruud units" question can share a Tier-2 plan-hash row with "do we have any Ruud units";
+        // only the second one wants the Yes/No lead-in, so the wrap must never be persisted into the shared
+        // cache row itself. applyExistenceShape is a pure, idempotent string transform (see its own doc
+        // comment), so computing it fresh on every response costs nothing.
+        send(200, { success: true, data: applyExistenceShape(data, question) });
         await timer.time("bookkeeping", async () => {
           try {
             await withTenant(ctxArg, async (db) => {

@@ -35,6 +35,7 @@ import { packForTenant } from "../industry/index.js";
 // model as a tool, so a multi-hop question the model recognizes but the pre-router's own text parse
 // missed still gets an exact, code-computed answer instead of hand-rolled (and easily wrong) run_query SQL.
 import { runCompose } from "../compose.js";
+import { classifyRelationsQuestion, answerRelationsQuestion } from "../relations/questions.js";
 // Donovan v2 (research agent) tools: safe arithmetic/date math for the compute() tool (see its own doc comment).
 import { computeExpression } from "./computeExpr.js";
 // TEAM T2 (2026-09-25) knowledge layer, wired into v2 ONLY (see createToolbox's `variant` param below) — v1's
@@ -406,7 +407,24 @@ export const SYNTHESIZE_TOOL_DEF = {
   },
 };
 
-export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF];
+// WORKSTREAM B (2026-09-25): "connect the dots" relations engine — repeat-visit-after-install,
+// callback-within-N-days, two-different-technicians, technician performance, some rankings and
+// multi-hop conditions, each answered with citations to the underlying visit documents. A separate
+// tool (not folded into filter_records/compose) because these questions need same-row, per-visit
+// timeline reasoning that compose.js's per-condition existence checks don't do.
+export const RELATIONS_TOOL_NAME = "relations_query";
+export const RELATIONS_TOOL_DEF = {
+  name: RELATIONS_TOOL_NAME,
+  description:
+    "Answer a 'connect the dots' question that needs a service-visit timeline joined across documents: repeat visits within N days of an install, callbacks within N days of a prior visit, two different technicians visiting close together, technician job/customer counts and rankings, or a multi-part condition on one customer (e.g. an old unit AND no maintenance agreement). Pass the user's question text verbatim. Returns matched:false (not an error) when the question isn't one of these shapes, or when it names a customer/technician not on file — fall back to your other tools in that case.",
+  input_schema: {
+    type: "object",
+    properties: { question: { type: "string", description: "The user's question, verbatim." } },
+    required: ["question"],
+  },
+};
+
+export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF, RELATIONS_TOOL_DEF];
 export const ALL_TOOL_DEFS_V2 = [...TOOL_DEFS_V2, VIEW_PAGE_TOOL_DEF, ANSWER_TOOL_DEF];
 
 /* ----------------------------------------------------------------- ledger */
@@ -937,6 +955,31 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return { ok: true, content: text, rowCount: out.recordsTotal ?? 0, inputSummary: "filter_records", empty: (out.recordsTotal ?? 0) === 0 };
   }
 
+  /* ---- relations_query (Workstream B: repeat-visit / callback / tech-performance / connect-the-dots) ---- */
+  async function relationsQuery(input) {
+    const question = typeof input?.question === "string" ? input.question : "";
+    if (!question.trim()) return fail("question is required", "relations_query");
+    if (!classifyRelationsQuestion(question)) {
+      return { ok: true, content: JSON.stringify({ matched: false }), rowCount: 0, inputSummary: "relations_query", empty: true };
+    }
+    let out;
+    try {
+      out = await answerRelationsQuestion({ withTenant, ctxArg, question, today });
+    } catch (err) {
+      return fail(String(err?.message ?? err).slice(0, 300), "relations_query");
+    }
+    if (!out) {
+      return { ok: true, content: JSON.stringify({ matched: false }), rowCount: 0, inputSummary: "relations_query", empty: true };
+    }
+    const text = JSON.stringify({ matched: true, text: out.text, recordsTotal: out.recordsTotal, basis: out.basis });
+    ledger.addShown(text);
+    for (const rec of out.records ?? []) {
+      if (rec.id) ledger.ids.add(String(rec.id).toLowerCase());
+      if (rec.documentId) ledger.addDoc(rec.documentId);
+    }
+    return { ok: true, content: text, rowCount: out.recordsTotal ?? 0, inputSummary: "relations_query", empty: (out.recordsTotal ?? 0) === 0 };
+  }
+
   /* ---- read_document (v2): FULL page text, paginated ---- */
   async function readDocument(input) {
     const id = typeof input?.documentId === "string" ? input.documentId.trim().toLowerCase() : "";
@@ -1204,6 +1247,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
         else if (name === "get_customer") r = await getCustomer(input ?? {});
         else if (name === "run_query") r = await runQuery(input ?? {});
         else if (name === "filter_records") r = await filterRecords(input ?? {});
+        else if (name === RELATIONS_TOOL_NAME) r = await relationsQuery(input ?? {});
         else if (name === READ_DOCUMENT_TOOL_NAME) r = await readDocument(input ?? {});
         else if (name === GET_UNIT_TOOL_NAME) r = await getUnit(input ?? {});
         else if (name === FOLLOW_LINKS_TOOL_NAME) r = await followLinks(input ?? {});

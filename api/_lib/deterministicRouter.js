@@ -347,7 +347,7 @@ export async function runDeterministic(db, intent, { today } = {}) {
   if (intent.route === 'maintenance') return runMaintenanceDue(db, intent.intent, { today: t, pack: await packForTenant(db) });
   if (intent.route === 'explain') return runExplain(db, intent.intent, { today: t, pack: await packForTenant(db) });
   if (intent.route === 'trend') return runTrends(db, intent.intent, { today: t });
-  if (intent.route === 'rank') return runRanking(db, intent.intent);
+  if (intent.route === 'rank') return runRanking(db, intent.intent, { today: t });
   if (intent.route === 'compose') {
     const pack = await packForTenant(db);
     const parsed = parseCompose(intent.question, pack);

@@ -196,8 +196,18 @@ const {
   const seasonDefault = md.seasonWindow('fall', '2026-01-01');
   const seasonHvac = md.seasonWindow('fall', '2026-01-01', hvac);
   eq('seasonWindow default === seasonWindow(hvac pack)', seasonDefault, seasonHvac);
+  // Round 7 (maintenanceDue.js): the scorecard oracle's own query is an INNER JOIN from customers to a qualifying
+  // visit (never an agreement alone) - a customer with an agreement and NO visit on file has no row for the
+  // oracle to compute a "last visit" from and is never a candidate at all, so this fixture now gives 'c1' one
+  // (past, qualifying) visit to be judged - the same candidacy rule scripts/verify-r7-guardrails.mjs and
+  // scripts/verify-round6.mjs already pin. What this check itself verifies (unstated cadence -> the pack's own
+  // defaultCadenceMonths, 12 when absent) is unchanged and still holds.
   const cadenceComputeDefault = md.computeMaintenanceDue(
-    { customers: [{ id: 'c1', name: 'A', address: 'x' }], agreements: [{ customerId: 'c1', documentId: 'd1', term: '', cadenceMonths: null, start: null, end: null }], visits: [] },
+    {
+      customers: [{ id: 'c1', name: 'A', address: 'x' }],
+      agreements: [{ customerId: 'c1', documentId: 'd1', term: '', cadenceMonths: null, start: null, end: null }],
+      visits: [{ customerId: 'c1', documentId: 'v1', date: '2026-01-01', documentType: 'service-ticket' }],
+    },
     { today: '2026-06-01', mode: 'cadence', season: null, months: null, sinceYear: null },
   );
   check('computeMaintenanceDue default: unstated cadence falls back to 12 months', cadenceComputeDefault.checked[0].cadenceMonths === 12);

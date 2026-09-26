@@ -34,6 +34,10 @@ import {
   parseCrossDocCondition,
   crossDocUnsupportedAnswer,
   moneyFallbackAnswer,
+  isExistenceQuestion,
+  existenceWrap,
+  CONDITION_CROSS_VISIT_RELATION,
+  CONDITION_RATIO,
   BOOLEAN_FILTER_FIELDS,
   DOC_TYPE_FILTER_FIELDS,
   validatePlan,
@@ -614,6 +618,23 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
 }
 
 /**
+ * R7 guardrail item 2 ("yes/no shape"): exported for api/ask.js to apply to the OUTGOING response text only,
+ * AFTER runAnalyticsQuestion's own cache write/read logic has already used the un-wrapped `data` — never baked
+ * into what gets cached here, because a "how many Ruud units" and a "do we have any Ruud units" question can
+ * resolve to the exact same Tier-2 plan-hash row, and only the second one wants the Yes/No lead-in; caching the
+ * wrapped text would leak it onto the first question's answer too. Only wraps when the answer's own first fact
+ * is cleanly a number (the ordinary count-op shape); anything else (a list breakdown, a sum, an honest fallback
+ * with no facts) is left exactly as it was — never guesses at "yes"/"no" from a shape that doesn't actually say
+ * a count. existenceWrap itself is idempotent, so an already-wrapped answer is never double-prefixed.
+ */
+export function applyExistenceShape(data, question) {
+  if (!data || data.kind !== 'answer' || typeof data.text !== 'string' || !isExistenceQuestion(question)) return data;
+  const n = Number(data.facts?.[0]?.value);
+  if (!Number.isFinite(n)) return data;
+  return { ...data, text: existenceWrap(data.text, n > 0) };
+}
+
+/**
  * Full orchestration for one question: cache check -> plan -> guard ->
  * execute. Returns {handled, data, cacheHit, writes} — `writes` lists every
  * (questionHash, corpusStamp) pair api/ask.js's own bookkeeping should
@@ -672,6 +693,26 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
       return {
         handled: true, data: unsupportedConditionAnswer('maintenance', 'customers'), cacheHit: false, modelCalled: false, writes: [],
         missOutcome: 'maintenance-fallback',
+      };
+    }
+    // R7 guardrail item 1 (R7_MEASURE.md: "How many Trane units had a repeat visit within 90 days of
+    // installation?" answered with the plain Trane count — the plan silently dropped the relationship). Same
+    // idiom as money/maintenance above: CONDITION_CROSS_VISIT_RELATION/CONDITION_RATIO have no
+    // CONDITION_PLAN_FIELD entry (analytics.js) and never will (no flat plan can express either), so deciding
+    // this before the plan/cache is both cheaper (no wasted Haiku call) and immune to a stale cached wrong
+    // answer for the same reason the round-6 fix above was needed. missOutcome routes this through ask.js's
+    // "give the agent one shot first" branch (api/ask.js, near tryAgent()) rather than a bare decline, since a
+    // real multi-hop agent CAN answer these — this layer must only ever decline to guess, never answer wrong.
+    if (conditionsUpFront.has(CONDITION_CROSS_VISIT_RELATION)) {
+      return {
+        handled: true, data: unsupportedConditionAnswer(CONDITION_CROSS_VISIT_RELATION, 'customers'), cacheHit: false, modelCalled: false, writes: [],
+        missOutcome: 'unsupported-condition', missMeta: { condition: CONDITION_CROSS_VISIT_RELATION },
+      };
+    }
+    if (conditionsUpFront.has(CONDITION_RATIO)) {
+      return {
+        handled: true, data: unsupportedConditionAnswer(CONDITION_RATIO, 'customers'), cacheHit: false, modelCalled: false, writes: [],
+        missOutcome: 'unsupported-condition', missMeta: { condition: CONDITION_RATIO },
       };
     }
 

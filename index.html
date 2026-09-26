@@ -263,22 +263,6 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .onboard .eyebrow{margin-bottom:10px}
 .onboard p{color:var(--muted)}
 @media (max-width:860px){.onboard{grid-template-columns:1fr}}
-/* verticals */
-#where{padding-block:clamp(4px,.6vw,8px)}
-#where .sec-head{grid-template-columns:1fr;margin-bottom:0}
-#where .sec-head .eyebrow{margin-bottom:2px}
-#where h2{font-size:clamp(1.05rem,1.8vw,1.25rem)}
-.verts{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);background:var(--surface)}
-.verts-3{grid-template-columns:repeat(3,1fr)}
-.vert{padding:6px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;min-height:0}
-.vert:last-child{border-right:0}
-.vert .st{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.vert.now .st{color:var(--brass-text)}
-.vert h3{font-size:1rem;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.vert p{font-size:.84rem;color:var(--muted)}
-@media (max-width:860px){.verts{grid-template-columns:1fr 1fr}.vert{border-bottom:1px solid var(--line)}.vert:nth-child(2n){border-right:0}}
-@media (max-width:480px){.verts{grid-template-columns:1fr}.vert{border-right:0}}
-@media (max-width:860px){.verts-3{grid-template-columns:1fr}.verts-3 .vert{border-right:0;border-bottom:1px solid var(--line)}.verts-3 .vert:last-child{border-bottom:0}}
 /* plans */
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .plan{border:1px solid var(--line);background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:10px}
@@ -311,25 +295,53 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .rescue p{color:var(--muted);font-size:.92rem;margin:0}
 @media (max-width:1100px){.plans-4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:860px){.plans,.plans-4{grid-template-columns:1fr}.rescue{flex-direction:column;align-items:flex-start}}
-/* missed-warranty cost section — kept deliberately compact (height budget) */
-#cost{padding-block:clamp(22px,2.8vw,34px)}
+/* cost-of-missing-this: interactive calculator + tightened registration note */
+#cost{padding-block:clamp(24px,3vw,40px)}
 #cost .sec-head{margin-bottom:8px}
-.cost-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:2px}
-.cost-card{border:1px solid var(--line);background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:7px;
+.cost-calc{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:20px;align-items:start;margin-top:6px;
   opacity:0;transform:translateY(12px);transition:opacity .6s ease,transform .6s ease}
-.cost-card.in-view{opacity:1;transform:translateY(0)}
-.cost-grid .cost-card:nth-child(2){transition-delay:.12s}
+.cost-calc.in-view{opacity:1;transform:translateY(0)}
+.cost-lines{display:flex;flex-direction:column;gap:12px;min-width:0}
+.cost-line{border:1px solid var(--line);background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cost-line h3{font-size:.98rem;font-weight:500}
+.cost-line .sub{margin:2px 0 0;font-size:.8rem;color:var(--muted)}
+.cost-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.cost-field .fl{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 8px;font-size:.8rem;color:var(--muted)}
+.cost-field .fl i{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line-strong);padding:1px 6px;border-radius:999px;white-space:nowrap;flex:none}
+.cost-row{display:flex;align-items:center;gap:10px;min-width:0}
+/* range track/thumb drawn by hand (not left to accent-color) so it reads the
+   same brass-on-surface look in both themes, independent of the browser's
+   own native-control theme guess. */
+.cost-row input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;background:transparent;height:16px;margin:0;cursor:pointer}
+.cost-row input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:999px;background:var(--line-strong)}
+.cost-row input[type=range]::-moz-range-track{height:4px;border-radius:999px;background:var(--line-strong)}
+.cost-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--brass);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line-strong);margin-top:-6px}
+.cost-row input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--brass);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line-strong)}
+.cost-row input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--brass);outline-offset:2px}
+.cost-row input[type=range]:focus-visible::-moz-range-thumb{outline:2px solid var(--brass);outline-offset:2px}
+.cost-row .unit{font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--faint);flex:none}
+.cost-row input[type=number]{width:4.6em;flex:none;background:var(--surface-2);border:1px solid var(--line-strong);color:var(--text);
+  font:inherit;font-family:"IBM Plex Mono",monospace;font-size:.84rem;padding:4px 6px;border-radius:4px;text-align:right}
+.cost-row input[type=number]:focus-visible,.cost-row input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.cost-line-total{font-family:"IBM Plex Mono",monospace;font-size:.84rem;color:var(--text);border-top:1px solid var(--line);padding-top:8px;margin:2px 0 0}
+.cost-line-total b{color:var(--brass-text);font-variant-numeric:tabular-nums}
+.cost-summary{border:1px solid var(--line-strong);border-left:4px solid var(--brass);background:var(--surface);
+  padding:18px 20px;display:flex;flex-direction:column;gap:12px;align-self:start;min-width:0}
+.cost-summary .lbl{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.cost-final{display:flex;align-items:baseline;gap:6px;font-family:"Newsreader",serif;margin:0;border:0;padding:0;flex-wrap:wrap}
+.cost-final b{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:500;color:var(--brass-text);font-variant-numeric:tabular-nums}
+.cost-final span{font-size:.9rem;color:var(--muted)}
+.cost-compare{margin:0;font-size:.86rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.cost-compare b{color:var(--text)}
+.cost-reset{align-self:flex-start;background:none;border:1px solid var(--line-strong);color:var(--muted);
+  font:inherit;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;
+  padding:5px 10px;border-radius:4px;cursor:pointer}
+.cost-reset:hover{color:var(--text);border-color:var(--text)}
+.cost-card{border:1px solid var(--line);background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:7px;margin-top:16px;max-width:80ch}
 .cost-card .where{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brass-text)}
-.cost-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:6px}
-.cost-list li{display:flex;align-items:baseline;gap:8px;font-size:.8rem}
-.cost-list li span{color:var(--muted);flex:1}
-.cost-list li b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
-.cost-list li i{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:.64rem;color:var(--faint);border:1px solid var(--line-strong);padding:1px 6px;border-radius:999px}
-.cost-total{font-family:"IBM Plex Mono",monospace;font-size:.84rem;color:var(--text);border-top:1px solid var(--line);padding-top:8px;margin:0}
-.cost-total b{color:var(--brass-text)}
-.cost-card p{color:var(--muted);font-size:.84rem;margin:0}
+.cost-card p{color:var(--muted);font-size:.86rem;margin:0}
 .cost-note{margin-top:10px;font-size:.84rem;color:var(--muted);max-width:80ch}
-@media (max-width:860px){.cost-grid{grid-template-columns:1fr}}
+@media (max-width:760px){.cost-calc{grid-template-columns:1fr}}
 /* ask box */
 .ask{display:flex;gap:0;border:1px solid var(--line-strong);background:var(--surface);align-items:stretch}
 .ask input{flex:1;min-width:0;border:0;background:transparent;padding:16px 18px;font:inherit;font-size:1.05rem;color:var(--text);outline:none}
@@ -438,17 +450,15 @@ footer a{color:var(--muted);text-decoration:none}
    fade+12px-rise idiom (already used by .cost-card) to every remaining
    section header and card. Classes added in the HTML below; the existing
    IntersectionObserver near the end of the page (unmodified) drives it. */
-.sec-head,.person,.vert,.founder,.plan,.principle{
+.sec-head,.person,.founder,.plan,.principle{
   opacity:0;transform:translateY(12px);
   transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1);
 }
-.sec-head.in-view,.person.in-view,.vert.in-view,.founder.in-view,.plan.in-view,.principle.in-view{
+.sec-head.in-view,.person.in-view,.founder.in-view,.plan.in-view,.principle.in-view{
   opacity:1;transform:translateY(0);
 }
 .people .person:nth-child(2){transition-delay:.08s}
 .people .person:nth-child(3){transition-delay:.16s}
-.verts .vert:nth-child(2){transition-delay:.08s}
-.verts .vert:nth-child(3){transition-delay:.16s}
 .founders .founder:nth-child(2){transition-delay:.1s}
 .plans .plan:nth-child(2){transition-delay:.06s}
 .plans .plan:nth-child(3){transition-delay:.12s}
@@ -566,7 +576,7 @@ footer a{color:var(--muted);text-decoration:none}
 /* JS-off fallback for engineer B's reveal-on-scroll additions above (and
    the pre-existing .cost-card, which uses the same JS-only mechanism):
    without JS these would otherwise stay invisible forever. */
-.sec-head,.person,.vert,.founder,.plan,.principle,.cost-card,.mm-ticks{opacity:1!important;transform:none!important}
+.sec-head,.person,.founder,.plan,.principle,.cost-card,.cost-calc,.mm-ticks{opacity:1!important;transform:none!important}
 .mm-ticks path{stroke-dashoffset:0!important}
 </style></noscript>
 </head>
@@ -1198,61 +1208,6 @@ footer a{color:var(--muted);text-decoration:none}
   </div>
 </section>
 
-<section id="where">
-  <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">Where it works</div>
-        <h2>Built for your company. Built to go further.</h2>
-      </div>
-    </div>
-    <div class="verts verts-3">
-      <div class="vert now dw-observe dw-once">
-        <div class="st">Trade businesses · live today</div>
-        <h3>HVAC, plumbing, electrical &amp; more</h3>
-      </div>
-      <div class="vert dw-observe dw-once">
-        <div class="st">Roadmap</div>
-        <h3>Property management <span class="pill-soon">Next</span></h3>
-      </div>
-      <div class="vert dw-observe dw-once">
-        <div class="st">Roadmap</div>
-        <h3>Fleet &amp; equipment rental <span class="pill-soon">Next</span></h3>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Mobile app (2026-09-25): where visitors get the phone app. Phones get an
-     "Install" button straight into /m/ (which shows the install steps);
-     computers get a QR code that opens the same link on the phone. -->
-<style>
-.mob{display:grid;grid-template-columns:minmax(0,1.2fr) auto;gap:clamp(20px,4vw,48px);align-items:center}
-.mob .qr{width:168px;height:168px;background:#fff;border-radius:12px;padding:8px;border:1px solid var(--line)}
-.mob .qr img{width:100%;height:100%;display:block}
-.mob .qr-cap{font-size:.82rem;color:var(--muted);text-align:center;margin-top:8px;max-width:168px}
-.mob .row{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
-.mob .mob-phone{display:none}
-@media (hover:none) and (pointer:coarse){.mob .mob-phone{display:inline-flex}.mob .mob-qr{display:none}.mob{grid-template-columns:1fr}}
-</style>
-<section id="mobile">
-  <div class="wrap mob">
-    <div class="dw-observe dw-once">
-      <div class="eyebrow">DeepWell Mobile</div>
-      <h2>Your records, in your pocket.</h2>
-      <p class="lede">Ask Donovan, scan paperwork and pull up any document from the job site. iPhone and Android, installed straight from the browser, with no app store. Included with every plan.</p>
-      <div class="row">
-        <a class="btn btn-primary mob-phone" href="/m/?install=1">Install on this phone</a>
-        <a class="btn btn-ghost" href="/get">How to install</a>
-      </div>
-    </div>
-    <div class="mob-qr dw-observe dw-once">
-      <div class="qr"><img src="/get/qr.svg" alt="QR code that opens DeepWell Mobile on your phone" width="152" height="152" loading="lazy"></div>
-      <div class="qr-cap">Scan with your phone's camera</div>
-    </div>
-  </div>
-</section>
-
 <section id="plans">
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
@@ -1367,24 +1322,114 @@ footer a{color:var(--muted);text-decoration:none}
         <div class="eyebrow">The cost of missing this</div>
         <h2>What a missed follow-up costs a shop like yours, per year</h2>
       </div>
-      <p class="lede">The math, shown — not a stat we found on the internet. Swap in your own install volume, ticket size and close rate; the shape of the argument holds either way.</p>
+      <p class="lede">Move the sliders to your own numbers — install volume, callback rate, hours lost hunting for paperwork — and watch the total change live. Every figure below is an adjustable starting example, not a claim about your shop.</p>
     </div>
-    <div class="cost-grid">
-      <div class="cost-card dw-observe dw-once">
-        <div class="where">Revenue left on the table</div>
-        <ul class="cost-list">
-          <li><span>Units installed / yr</span><b>300</b><i>illustrative</i></li>
-          <li><span>Share hitting end-of-parts-warranty this yr</span><b>10% → 30 units</b><i>illustrative</i></li>
-          <li><span>Typical extended-warranty / service-agreement ticket</span><b>$250</b><i>illustrative</i></li>
-          <li><span>Close rate, offered at the right moment</span><b>20%</b><i>illustrative</i></li>
-        </ul>
-        <p class="cost-total">30 units × $250 × 20% ≈ <b>$1,500/yr</b> unclaimed if nobody follows up.</p>
+
+    <div class="cost-calc dw-observe dw-once" id="cost-calc">
+      <div class="cost-lines">
+
+        <div class="cost-line">
+          <div>
+            <h3>Missed warranty &amp; service-agreement follow-ups</h3>
+            <p class="sub">Units that hit end-of-warranty with nobody reaching out to sell the next step.</p>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-units">Units installed / yr</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <input type="range" id="cc-units" min="10" max="1500" step="10" value="300">
+              <input type="number" id="cc-units-n" min="0" max="20000" step="1" value="300" aria-label="Units installed per year, exact number">
+            </div>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-share">Share reaching end-of-parts-warranty this yr</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <input type="range" id="cc-share" min="0" max="100" step="1" value="10">
+              <input type="number" id="cc-share-n" min="0" max="100" step="1" value="10" aria-label="Share reaching end of parts warranty this year, percent">
+              <span class="unit">%</span>
+            </div>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-ticket">Typical extended-warranty / service ticket</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <span class="unit">$</span>
+              <input type="range" id="cc-ticket" min="0" max="1500" step="10" value="250">
+              <input type="number" id="cc-ticket-n" min="0" max="20000" step="10" value="250" aria-label="Typical extended warranty or service ticket, dollars">
+            </div>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-close">Close rate, offered at the right moment</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <input type="range" id="cc-close" min="0" max="100" step="1" value="20">
+              <input type="number" id="cc-close-n" min="0" max="100" step="1" value="20" aria-label="Close rate, percent">
+              <span class="unit">%</span>
+            </div>
+          </div>
+          <p class="cost-line-total">≈ <b id="cc-out-warranty">$1,500</b>/yr left unclaimed</p>
+        </div>
+
+        <div class="cost-line">
+          <div>
+            <h3>Callbacks avoided</h3>
+            <p class="sub">A callback headed off by the right answer before the truck rolls twice.</p>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-cb-count">Callbacks / month</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <input type="range" id="cc-cb-count" min="0" max="30" step="1" value="3">
+              <input type="number" id="cc-cb-count-n" min="0" max="500" step="1" value="3" aria-label="Callbacks per month">
+            </div>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-cb-cost">Cost per callback</label><i>illustrative · site uses $300–600</i></div>
+            <div class="cost-row">
+              <span class="unit">$</span>
+              <input type="range" id="cc-cb-cost" min="100" max="1000" step="10" value="450">
+              <input type="number" id="cc-cb-cost-n" min="0" max="20000" step="10" value="450" aria-label="Cost per callback, dollars">
+            </div>
+          </div>
+          <p class="cost-line-total">≈ <b id="cc-out-callbacks">$16,200</b>/yr in avoidable callbacks</p>
+        </div>
+
+        <div class="cost-line">
+          <div>
+            <h3>Time spent hunting for paperwork</h3>
+            <p class="sub">Techs and office staff paging through boxes and drives instead of asking Donovan.</p>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-hours">Hours / week hunting for records</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <input type="range" id="cc-hours" min="0" max="40" step="1" value="5">
+              <input type="number" id="cc-hours-n" min="0" max="200" step="1" value="5" aria-label="Hours per week hunting for records">
+            </div>
+          </div>
+          <div class="cost-field">
+            <div class="fl"><label for="cc-rate">Loaded hourly rate</label><i>illustrative</i></div>
+            <div class="cost-row">
+              <span class="unit">$</span>
+              <input type="range" id="cc-rate" min="10" max="150" step="1" value="35">
+              <input type="number" id="cc-rate-n" min="0" max="1000" step="1" value="35" aria-label="Loaded hourly rate, dollars">
+            </div>
+          </div>
+          <p class="cost-line-total">≈ <b id="cc-out-time">$9,100</b>/yr spent looking for documents</p>
+        </div>
+
       </div>
-      <div class="cost-card dw-observe dw-once">
-        <div class="where">A claim denied because nobody registered it</div>
-        <p>Most manufacturers require registration within 60–90 days of install or the parts term is cut in half — Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane all drop from 10 yr registered to 5 yr unregistered <span class="mono" style="font-size:.74rem;color:var(--faint)">(based on published manufacturer registration windows)</span>. Miss it, and a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
+
+      <div class="cost-summary">
+        <div>
+          <div class="lbl">Estimated annual cost, combined</div>
+          <p class="cost-final" aria-live="polite" aria-atomic="true"><b id="cc-out-total">$26,800</b><span>/yr</span></p>
+        </div>
+        <p class="cost-compare" id="cc-compare">That's about <b>11.2×</b> the Shop plan's <b>$2,388/yr</b> (<b>$199/mo</b>) cost — at this scale one plan pays for itself many times over.</p>
+        <button type="button" class="cost-reset" id="cc-reset">Reset to defaults</button>
       </div>
     </div>
+
+    <div class="cost-card dw-observe dw-once">
+      <div class="where">A claim denied because nobody registered it</div>
+      <p>Most manufacturers cut the parts warranty in half if a unit isn't registered within 60–90 days of install — Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane drop from 10 yr registered to 5 yr unregistered <span class="mono" style="font-size:.74rem;color:var(--faint)">(based on published manufacturer registration windows)</span>. Miss it, and a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
+    </div>
+
     <p class="cost-note">Your numbers will differ. DeepWell watches every expiry — bell alert plus daily digest — then drafts the customer's extended-warranty email for an admin to approve and send, or run fully automatic. Both ship today.</p>
   </div>
 </section>
@@ -1436,7 +1481,7 @@ footer a{color:var(--muted);text-decoration:none}
 <footer>
   <div class="wrap">
     <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
-    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/get">Mobile app</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
   </div>
 </footer>
 
@@ -1582,7 +1627,7 @@ const DEMO=[
   var fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
   var hasIO = 'IntersectionObserver' in window;
 
-  /* 1) sec-head/person/vert/founder/plan/principle reveal: no code here —
+  /* 1) sec-head/person/founder/plan/principle reveal: no code here —
      they carry the site's existing .dw-observe.dw-once classes and are
      driven by the pre-existing IntersectionObserver further up this file. */
 
@@ -1827,6 +1872,110 @@ const DEMO=[
   document.addEventListener('focusin', function (e) {
     if (!dd.contains(e.target)) close(false);
   });
+})();
+</script>
+<script>
+/* Cost-of-missing-this calculator (2026-09-25) — a standalone script,
+   deliberately separate from the numbered micro-animation IIFEs above and
+   from the Industries-dropdown script. Vanilla JS, no dependencies, no
+   localStorage. Plan price is read from the #plans section of this same
+   page (Shop, $199/mo) rather than invented. Fully self-guarding: if any
+   expected element is missing, it quietly does nothing. */
+(function () {
+  var calc = document.getElementById('cost-calc');
+  if (!calc) return;
+
+  var PLAN_NAME = 'Shop';
+  var PLAN_PRICE = 199; // matches the "Shop" tier price in #plans
+
+  var money0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+  function pair(rangeId, numberId) {
+    var range = document.getElementById(rangeId);
+    var num = document.getElementById(numberId);
+    if (!range || !num) return null;
+    return { range: range, num: num, def: range.value };
+  }
+
+  var fieldList = [
+    pair('cc-units', 'cc-units-n'),
+    pair('cc-share', 'cc-share-n'),
+    pair('cc-ticket', 'cc-ticket-n'),
+    pair('cc-close', 'cc-close-n'),
+    pair('cc-cb-count', 'cc-cb-count-n'),
+    pair('cc-cb-cost', 'cc-cb-cost-n'),
+    pair('cc-hours', 'cc-hours-n'),
+    pair('cc-rate', 'cc-rate-n')
+  ];
+  if (fieldList.some(function (f) { return !f; })) return;
+  var units = fieldList[0], share = fieldList[1], ticket = fieldList[2], close = fieldList[3],
+      cbCount = fieldList[4], cbCost = fieldList[5], hours = fieldList[6], rate = fieldList[7];
+
+  var outWarranty = document.getElementById('cc-out-warranty');
+  var outCallbacks = document.getElementById('cc-out-callbacks');
+  var outTime = document.getElementById('cc-out-time');
+  var outTotal = document.getElementById('cc-out-total');
+  var compare = document.getElementById('cc-compare');
+  var reset = document.getElementById('cc-reset');
+  if (!outWarranty || !outCallbacks || !outTime || !outTotal || !compare) return;
+
+  function val(field) { return parseFloat(field.num.value) || 0; }
+
+  function clamp(field, v) {
+    var min = parseFloat(field.range.min);
+    var max = parseFloat(field.num.getAttribute('max')) || parseFloat(field.range.max);
+    if (isNaN(v)) v = min;
+    if (v < min) v = min;
+    if (v > max) v = max;
+    return v;
+  }
+
+  function sync(field, fromRange) {
+    if (fromRange) {
+      field.num.value = field.range.value;
+    } else {
+      var v = clamp(field, parseFloat(field.num.value));
+      field.num.value = v;
+      field.range.value = Math.min(v, parseFloat(field.range.max));
+    }
+  }
+
+  function render() {
+    var warranty = val(units) * (val(share) / 100) * val(ticket) * (val(close) / 100);
+    var callbacks = val(cbCount) * val(cbCost) * 12;
+    var time = val(hours) * val(rate) * 52;
+    var total = warranty + callbacks + time;
+
+    outWarranty.textContent = money0.format(warranty);
+    outCallbacks.textContent = money0.format(callbacks);
+    outTime.textContent = money0.format(time);
+    outTotal.textContent = money0.format(total);
+
+    var annualPlan = PLAN_PRICE * 12;
+    var mult = annualPlan > 0 ? total / annualPlan : 0;
+    var multStr = (mult >= 10 ? Math.round(mult) : Math.round(mult * 10) / 10) + '×';
+    compare.innerHTML = 'That’s about <b>' + multStr + '</b> the ' + PLAN_NAME + ' plan’s <b>' +
+      money0.format(annualPlan) + '/yr</b> (<b>$' + PLAN_PRICE + '/mo</b>) cost — at this scale one plan can pay for itself many times over.';
+  }
+
+  fieldList.forEach(function (f) {
+    f.range.addEventListener('input', function () { sync(f, true); render(); });
+    f.num.addEventListener('input', function () { sync(f, false); render(); });
+    f.num.addEventListener('change', function () { sync(f, false); render(); });
+  });
+
+  if (reset) {
+    reset.addEventListener('click', function () {
+      fieldList.forEach(function (f) {
+        f.range.value = f.def;
+        f.num.value = f.def;
+      });
+      render();
+      fieldList[0].range.focus();
+    });
+  }
+
+  render();
 })();
 </script>
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>

@@ -108,6 +108,12 @@ const TIME_STOP = new Set([
   'many', 'all', 'each', 'every', 'anyone', 'anybody', 'everyone', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
   'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'past', 'days', 'day',
   'size', 'ticket', 'average', 'avg', 'from', 'with', 'by', 'per', 'month', 'months', 'monthly', 'revenue', 'sales', 'money', 'amount', 'dollars', 'quote', 'estimate', 'proposal',
+  // R7 (2026-09-26): "how much have we billed year TO DATE" - the generic "for/to/from/of/with <phrase>"
+  // subject regex below matched the mid-sentence "to" in "year to date" and captured "date" as if it were
+  // a customer name (usablePhrase kept it - "date" was never a stop word), so subjectGate resolved zero
+  // customers and totalInvoiced refused to answer the shop-wide YTD total at all. "date" can never be a
+  // real customer-name token on its own, so it belongs in this list exactly like "day"/"days" already are.
+  'date',
 ]);
 
 /** A candidate name phrase is usable only if it has at least one non-stop word. */
@@ -210,7 +216,10 @@ export function parseMoneyIntent(question, { today }) {
   if (!q.trim()) return null;
   const period = parsePeriod(q, today);
   const subject = extractSubjectPhrase(question);
-  const mk = (intent, extra = {}) => ({ intent, period, subject, ...extra });
+  // R7: the raw (lowercased) question text, so a handler can tell "how many invoices are unpaid"
+  // (a plain count question) apart from "who owes us money" (a dollar-first narrative) even though
+  // both parse to the same intent below.
+  const mk = (intent, extra = {}) => ({ intent, period, subject, raw: q, ...extra });
   // "Is Mercer all paid up?" - extractSubjectPhrase's patterns don't cover this shape at all.
   {
     const m = q.match(CUSTOMER_PAID_UP_RE);
@@ -259,10 +268,20 @@ export function parseMoneyIntent(question, { today }) {
   if (RE.overdue.test(q)) return mk('overdue', { subject, dayThreshold: (q.match(OVERDUE_DAYS_RE) || [])[1] ? Number(q.match(OVERDUE_DAYS_RE)[1]) : null });
   if (RE.open.test(q) && !RE.last.test(q) && !RE.topCustomers.test(q)) return mk('open_invoices', { subject });
   if (RE.byMonth.test(q) && /\b(?:revenue|invoic|bill|sales|income|money)\w*/.test(q)) return mk('revenue_by_month', { subject: null });
-  if (RE.topCustomers.test(q)) return mk('top_customers', { subject: null });
+  if (RE.topCustomers.test(q)) {
+    // "top 3 customers by invoiced revenue" - an explicit count narrows the ranking to exactly
+    // that many (the oracle's own LIMIT); with no number, keep the previous default of 5.
+    const topM = q.match(/\btop\s+(\d{1,2})\b/);
+    return mk('top_customers', { subject: null, topN: topM ? Number(topM[1]) : null });
+  }
   if (RE.avg.test(q)) return mk('avg_invoice', { subject, docKind: /\b(?:quote|estimate|proposal)\b/.test(q) ? 'estimate' : 'invoice' });
   if (RE.last.test(q)) return mk('last_invoice', { subject });
-  if (RE.spend.test(q) && !/\b(?:invoice|billed|bill) (?:we|to)\b/.test(q)) return mk('spend_total', { subject });
+  // R7: "how much have we spent on purchase orders" matches RE.spend ("how much have we spent")
+  // just as readily as it matches po_total below, and RE.spend was checked first - every such
+  // question was silently mis-answered as vendor-BILL spend (spendTotal only ever looks at
+  // doc_kind='invoice', never 'po', so it either undercounted or found nothing). Purchase-order
+  // phrasing always means po_total, "spent" or not.
+  if (RE.spend.test(q) && !/\b(?:invoice|billed|bill) (?:we|to)\b/.test(q) && !RE.po.test(q)) return mk('spend_total', { subject });
   if (RE.po.test(q) && RE.totalInvoiced.test(q)) return mk('po_total', { subject: null });
   if (QUOTES_TOTAL_RE.test(q)) return mk('quotes_total', { subject: null });
   if (CUSTOMERS_INVOICED_RE.test(q)) return mk('customers_invoiced_count', { subject: null });
@@ -274,6 +293,13 @@ export function parseMoneyIntent(question, { today }) {
 /* ---------------------------------------------------------------- SQL runners */
 
 const REVENUE_WHERE = `f.direction = 'receivable' AND f.doc_kind IN ('invoice', 'credit_memo') AND f.currency = 'USD'`;
+// R7 (breadth-financials-077..080, "when was the last invoice for X"): a credit memo is not an
+// invoice - REVENUE_WHERE (built for revenue SUMS, where a credit memo correctly nets in) has no
+// place in a "last INVOICE" lookup. A customer with a credit memo dated after their actual last
+// invoice was reporting the credit memo's date as if it were their last invoice. No currency
+// restriction either: a customer's last invoice is a date lookup, not a dollar sum, so a
+// non-USD invoice is still their last invoice.
+const LAST_INVOICE_WHERE = `f.direction = 'receivable' AND f.doc_kind = 'invoice'`;
 
 async function q(db, sql, params = [], hasUnitIndex) {
   const views = buildViewsSql({ hasUnitIndex, hasFinancials: true });
@@ -365,7 +391,7 @@ async function lastInvoice(db, intent, ctx) {
   if (!g || g.unresolved) return null;
   if (g.answer) return g.answer;
   const rows = await q(db,
-    `SELECT f.* FROM financials f WHERE ${REVENUE_WHERE} AND f.customer_id = ANY($2::uuid[])
+    `SELECT f.* FROM financials f WHERE ${LAST_INVOICE_WHERE} AND f.customer_id = ANY($2::uuid[])
       ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC LIMIT 6`, [g.ids], ctx.hu);
   if (!rows.length) return baseAnswer(`No invoice with financial details is on file for ${g.name} yet.`, [], { confidence: 1, ...zeroCite(`Searched the invoices linked to ${g.name}; none have financial details captured yet.`) });
   const r = rows[0];
@@ -428,7 +454,12 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
   if (g?.unresolved) return null;
   if (g?.answer) return g.answer;
   const today = ctx.today;
-  const kind = direction === 'receivable' ? `f.direction = 'receivable' AND f.doc_kind = 'invoice'` : `f.direction = 'payable' AND f.doc_kind = 'invoice'`;
+  // R7: the payables oracle (breadth-financials family) sums/counts by direction = 'payable'
+  // alone, no doc_kind restriction - this shop's vendor payables are recorded as doc_kind = 'po'
+  // (not 'invoice'), so the old `AND f.doc_kind = 'invoice'` here silently zeroed out every
+  // vendor bill on "what do we owe our vendors" and related questions. Receivables genuinely
+  // means customer INVOICES only (a quote or credit memo is never "an open invoice").
+  const kind = direction === 'receivable' ? `f.direction = 'receivable' AND f.doc_kind = 'invoice'` : `f.direction = 'payable'`;
   const scope = `${kind} AND f.currency = 'USD' AND ($3::uuid[] IS NULL OR f.customer_id = ANY($3::uuid[]))`;
   const openW = `f.status IN ('unpaid', 'partial')`;
   const days = `($2::date - f.due_date)`;
@@ -455,8 +486,51 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
             count(*) FILTER (WHERE ${openW} AND f.open_balance > 0 AND f.due_date < $2::date${dayFilter})::int AS n_overdue,
             COALESCE(sum(f.open_balance) FILTER (WHERE ${openW} AND f.open_balance > 0 AND f.due_date < $2::date${dayFilter}), 0) AS overdue_total,
             count(*) FILTER (WHERE ${openW} AND f.open_balance > 0 AND f.flagged)::int AS n_flagged,
-            count(*) FILTER (WHERE ${openW} AND f.open_balance > 0 AND f.verified)::int AS n_verified
+            count(*) FILTER (WHERE ${openW} AND f.open_balance > 0 AND f.verified)::int AS n_verified,
+            count(*) FILTER (WHERE ${openW})::int AS n_status_open,
+            count(*) FILTER (WHERE ${openW} AND f.due_date < $2::date${dayFilter})::int AS n_status_overdue,
+            count(*) FILTER (WHERE ${openW} AND f.due_date IS NULL)::int AS n_status_open_nodue
        FROM financials f WHERE ${scope}`, [today, g?.ids ?? null], ctx.hu);
+
+  // R7 (breadth-financials-002/003/005/006/007): a plain "how many invoices are unpaid / open /
+  // overdue" question is a pure STATUS count - the oracle is count(*) FILTER (status IN
+  // ('unpaid','partial')) [AND due_date < ...], with no requirement that a dollar balance was
+  // ever printed. The dollar-first narrative below (kept unchanged for "who owes us money" /
+  // "open invoices" / "which invoices are overdue" style phrasing) correctly restricts its SUM to
+  // open_balance > 0 - you cannot total an amount that was never printed - but that same
+  // restriction was silently dropping a genuinely-unpaid invoice with no printed balance out of
+  // the COUNT too, undercounting against the oracle (and leaving it with nothing to cite).
+  // Gated on the literal "how many" phrasing so every existing dollar-first answer is untouched.
+  const isCountQuestion = direction === 'receivable' && (overdueOnly || intent.intent === 'open_invoices') && /\bhow many\b/.test(intent.raw ?? '');
+  if (isCountQuestion) {
+    const who = g ? ` for ${g.name}` : '';
+    const countNoun = 'invoice';
+    const thresholdNote = overdueOnly && Number.isFinite(intent.dayThreshold) ? ` (more than ${intent.dayThreshold} days)` : '';
+    const known = overdueOnly ? a.n_status_overdue : a.n_status_open;
+    const unknown = overdueOnly ? a.n_unknown + a.n_status_open_nodue : a.n_unknown;
+    const statusWhere = overdueOnly ? `${scope} AND ${openW} AND f.due_date < $2::date${dayFilter}` : `${scope} AND ${openW}`;
+    // $2::date is cast explicitly even when unused in WHERE (the non-overdue branch never
+    // filters by date) - an entirely-unreferenced parameter leaves Postgres unable to infer its
+    // type at all ("could not determine data type of parameter $2").
+    const statusRows = await q(db,
+      `SELECT f.*, $2::date AS as_of FROM financials f WHERE ${statusWhere} ORDER BY f.due_date ASC NULLS LAST, f.open_balance DESC NULLS LAST LIMIT 200`,
+      [today, g?.ids ?? null], ctx.hu);
+    const unknownNote = unknown > 0
+      ? ` ${plural(unknown, `other ${countNoun}`)} ${unknown === 1 ? "doesn't" : "don't"} show ${overdueOnly ? 'a clear payment status or due date' : 'a payment status'}, so I can't tell if ${unknown === 1 ? 'it is' : 'they are'} ${overdueOnly ? 'overdue' : 'open'}.`
+      : '';
+    const text = known === 0
+      ? `No ${countNoun}s${who} are ${overdueOnly ? `overdue${thresholdNote}` : 'unpaid or partially paid'} right now.${unknownNote}`
+      : `${plural(known, countNoun)}${who} ${known === 1 ? 'is' : 'are'} ${overdueOnly ? `overdue${thresholdNote}` : 'unpaid or partially paid (open)'}.${unknownNote}`;
+    return baseAnswer(text, statusRows.slice(0, 25).map((r) => invoiceFact(r)), {
+      sources: statusRows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)),
+      interpretation: overdueOnly ? 'count of overdue invoices' : 'count of open invoices',
+      cite: {
+        records: financeRecords(statusRows), total: known, claimedCount: known,
+        basis: `Counted customer invoices marked unpaid or partly paid${overdueOnly ? ' whose due date has passed' : ''}${g ? ` for ${g.name}` : ''}.`,
+      },
+    });
+  }
+
   const listWhere = `${scope} AND ${openW} AND f.open_balance > 0 ${overdueOnly ? `AND f.due_date < $2::date${dayFilter}` : ''}`;
   const rows = await q(db,
     `SELECT f.*, ($2::date - f.due_date) AS past_due FROM financials f WHERE ${listWhere}
@@ -598,11 +672,15 @@ async function quoteVsInvoice(db, intent, ctx) {
 
 async function topCustomers(db, intent, ctx) {
   const p = intent.period;
+  // R7 (breadth-financials-046, "top 3 customers by invoiced revenue" - a `set` grade against
+  // exactly 3 names): an explicit "top N" must return exactly N facts, not the old fixed 5 -
+  // extra, unasked-for rows read as wrong answers to a set comparison (precision penalty).
+  const limit = Number.isFinite(intent.topN) && intent.topN > 0 ? Math.min(intent.topN, 20) : 5;
   const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
   const rows = await q(db,
     `SELECT f.customer_id, max(f.customer_name) AS name, sum(f.total) AS amount, count(*)::int AS n
        FROM financials f WHERE ${REVENUE_WHERE} AND f.total IS NOT NULL AND f.customer_id IS NOT NULL AND ${inRange}
-      GROUP BY f.customer_id ORDER BY sum(f.total) DESC, max(f.customer_name) LIMIT 5`, [p?.from ?? null, p?.to ?? null], ctx.hu);
+      GROUP BY f.customer_id ORDER BY sum(f.total) DESC, max(f.customer_name) LIMIT ${limit}`, [p?.from ?? null, p?.to ?? null], ctx.hu);
   const [ex] = await q(db,
     `SELECT count(*) FILTER (WHERE f.customer_id IS NULL AND f.total IS NOT NULL AND ${inRange})::int AS n_unlinked,
             count(*) FILTER (WHERE f.total IS NULL AND ${inRange})::int AS n_no_total
@@ -612,7 +690,9 @@ async function topCustomers(db, intent, ctx) {
     ex.n_unlinked ? `${plural(ex.n_unlinked, 'invoice')} ${ex.n_unlinked === 1 ? "isn't" : "aren't"} linked to a customer and ${ex.n_unlinked === 1 ? 'is' : 'are'} not ranked` : null,
     ex.n_no_total ? `${plural(ex.n_no_total, 'invoice')} print no total and ${ex.n_no_total === 1 ? 'is' : 'are'} excluded` : null,
   ].filter(Boolean);
-  const text = `${rows[0].name} is our biggest customer${p ? ` in ${p.label}` : ''} at ${fmt(rows[0].amount)} across ${plural(rows[0].n, 'invoice')}.${extra.length ? ` Note: ${extra.join('; ')}.` : ''}`;
+  const text = intent.topN > 1
+    ? `Our top ${plural(rows.length, 'customer')} by invoiced revenue${p ? ` in ${p.label}` : ''}: ${rows.map((r, i) => `${i + 1}. ${r.name} (${fmt(r.amount)})`).join(', ')}.${extra.length ? ` Note: ${extra.join('; ')}.` : ''}`
+    : `${rows[0].name} is our biggest customer${p ? ` in ${p.label}` : ''} at ${fmt(rows[0].amount)} across ${plural(rows[0].n, 'invoice')}.${extra.length ? ` Note: ${extra.join('; ')}.` : ''}`;
   return baseAnswer(text, rows.map((r, i) => ({ label: `${i + 1}. ${r.name}`, value: `${fmt(r.amount)} (${plural(r.n, 'invoice')})`, status: 'ok', entityId: r.customer_id, sources: [] })), {
     interpretation: 'top customers by invoiced revenue',
     cite: { records: rows.map((r) => customerRecord({ id: r.customer_id, name: r.name }, { sublabel: `${fmt(r.amount)} across ${plural(r.n, 'invoice')}` })), total: rows.length, claimedCount: rows.length,
@@ -898,6 +978,13 @@ async function superlativePo(db, intent, ctx) {
   });
 }
 
+// R7 (breadth-financials-073..076, "is X all paid up"): a customer's payment status is a status
+// check, not a dollar sum across currencies - INVOICE_SCOPE's `currency = 'USD'` restriction has
+// no basis here (a non-USD invoice that's still unpaid still means "not paid up") and would
+// silently drop such a customer's only invoice from consideration, right into the "no invoices
+// on file" branch. Doc_kind stays invoice-only (a credit memo or PO is never what "paid up" asks about).
+const PAID_UP_SCOPE = `f.direction = 'receivable' AND f.doc_kind = 'invoice'`;
+
 /** TEAM K: "Is Mercer all paid up?" - names the unknown-status count too, never a bare confident yes/no. */
 async function customerPaidUp(db, intent, ctx) {
   const g = await subjectGate(db, intent);
@@ -907,9 +994,9 @@ async function customerPaidUp(db, intent, ctx) {
     `SELECT count(*)::int AS n_all, count(*) FILTER (WHERE f.status IN ('unpaid', 'partial'))::int AS n_open,
             COALESCE(sum(f.open_balance) FILTER (WHERE f.status IN ('unpaid', 'partial') AND f.open_balance > 0), 0) AS open_total,
             count(*) FILTER (WHERE f.status = 'unknown')::int AS n_unknown
-       FROM financials f WHERE ${INVOICE_SCOPE} AND f.customer_id = ANY($2::uuid[])`, [g.ids], ctx.hu);
+       FROM financials f WHERE ${PAID_UP_SCOPE} AND f.customer_id = ANY($2::uuid[])`, [g.ids], ctx.hu);
   if (!a || a.n_all === 0) return baseAnswer(`No invoices with financial details are on file for ${g.name} yet.`, [], { confidence: 1, ...zeroCite(`Searched the invoices linked to ${g.name}; none have financial details captured yet.`) });
-  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${INVOICE_SCOPE} AND f.customer_id = ANY($2::uuid[]) ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [g.ids], ctx.hu);
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${PAID_UP_SCOPE} AND f.customer_id = ANY($2::uuid[]) ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [g.ids], ctx.hu);
   let text;
   if (a.n_open === 0 && a.n_unknown === 0) {
     text = `Yes — every invoice on file for ${g.name} is marked paid.`;

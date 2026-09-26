@@ -96,9 +96,11 @@ export function maintenanceCitations(res, listed) {
     group,
     sublabel: [e.lastVisit ? `last ${e.lastIsPm ? 'maintenance' : 'service'} ${humanDate(e.lastVisit.date)}` : 'no visit on file', e.nextDue && res.mode === 'cadence' ? `due ${humanDate(e.nextDue)}` : null].filter(Boolean).join(' · '),
   });
+  // Round 7 (maintenanceDue.js): candidacy is a real qualifying service visit, never a maintenance agreement
+  // alone (see computeMaintenanceDue's own doc comment) — worded to match exactly what was compared.
   const basis = res.mode === 'window'
-    ? `Compared the last service visit on or before today (${dateBasisPhrase('service')}) of each of the ${res.considered} customers with a maintenance agreement or visit on file against the cut-off${res.cutoff ? ` ${humanDate(res.cutoff)}` : ''}.`
-    : `Compared the last visit on or before today (${dateBasisPhrase('service')}) plus the agreement cadence for each of the ${res.considered} customers on a maintenance agreement or with maintenance history.`;
+    ? `Compared the last service visit on or before today (${dateBasisPhrase('service')}) of each of the ${res.considered} customers with a service visit on file against the cut-off${res.cutoff ? ` ${humanDate(res.cutoff)}` : ''}.`
+    : `Compared the last service visit on or before today (${dateBasisPhrase('service')}) against a flat 12-month cutoff for each of the ${res.considered} customers with a service visit on file.`;
   const future = futureClause(res.futureVisits);
   if (listed.length) {
     return {

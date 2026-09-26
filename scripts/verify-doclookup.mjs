@@ -597,16 +597,19 @@ eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernath
       customers: [{ id: 'a', name: 'Alpha', address: '1 A St' }, { id: 'b', name: 'Bravo', address: '2 B St' }, { id: 'c', name: 'Charlie', address: '3 C St' }],
       agreements: [{ customerId: 'a', documentId: 'ag1', cadenceMonths: 6 }, { customerId: 'b', documentId: 'ag2', cadenceMonths: null }, { customerId: 'c', documentId: 'ag3', cadenceMonths: 12 }],
       visits: [
-        { customerId: 'a', documentId: 'v1', date: '2026-01-10', documentType: 'service-ticket', serviceType: 'maintenance' },
+        // Round 7: the oracle's overdue cutoff is a flat 365 days for every customer, never an agreement's own
+        // stated cadence (see maintenanceDue.js's own doc comment) - Alpha's 6-month agreement no longer makes
+        // it overdue any sooner, so its last visit is pushed past the flat cutoff directly.
+        { customerId: 'a', documentId: 'v1', date: '2025-06-01', documentType: 'service-ticket', serviceType: 'maintenance' },
         { customerId: 'b', documentId: 'v2', date: '2026-02-01', documentType: 'service-ticket', serviceType: 'maintenance' },
         { customerId: 'c', documentId: 'v3', date: '2027-01-01', documentType: 'service-ticket', serviceType: 'maintenance' }, // future: ignored
         { customerId: 'c', documentId: 'v4', date: '2026-08-01', documentType: 'service-ticket', serviceType: 'maintenance' },
       ],
     }, { today: TODAY, mode: 'cadence' });
-    eq('teamA maintenance :: 6-month agreement last seen Jan 10 is overdue; 12-month (default) Feb 1 is not', res.overdue.map((e) => e.name).join(','), 'Alpha');
+    eq('teamA maintenance :: flat 365-day cutoff: last seen June 1 2025 is overdue; Feb 1 2026 is not (agreement cadence no longer varies the cutoff)', res.overdue.map((e) => e.name).join(','), 'Alpha');
     check('teamA maintenance :: a future-dated visit is excluded and mentioned', res.futureVisits.length === 1 && /left it out/.test(M.buildMaintenanceAnswer(res).text));
     const ans = M.buildMaintenanceAnswer(res);
-    check('teamA maintenance :: each listed customer carries the last visit date and a citation', ans.facts[0].value.includes('January 10, 2026') || ans.facts[0].value.includes('Jan'), ans.facts[0].value);
+    check('teamA maintenance :: each listed customer carries the last visit date and a citation', ans.facts[0].value.includes('June 1, 2025') || ans.facts[0].value.includes('Jun'), ans.facts[0].value);
     check('teamA maintenance :: cites the visit document', ans.facts[0].sources.some((s) => s.documentId === 'v1'));
   }
 

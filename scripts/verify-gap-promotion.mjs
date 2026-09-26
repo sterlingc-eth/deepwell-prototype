@@ -132,6 +132,40 @@ const R = await import('../api/_lib/learning/recipes.js');
   check('matchParametricExamples: a tampered sqlTemplate is rejected by sqlGuard (never returned)', R.matchParametricExamples(paraphrase, [tampered]) === null);
 }
 
+/* ================================================================== R7 learning-quality guardrails
+ * (coordinator ask, 2026-09-25): proposals.js's widened validator (a compact common-English-word
+ * stoplist + a generic-noun synonym blocklist) and verify.js's entity-name shadow guard — the pure
+ * halves first, the DB-backed content-reverify pass with the PGlite harness below.
+ */
+const P = await import('../api/_lib/learning/proposals.js');
+const V = await import('../api/_lib/learning/verify.js');
+{
+  const overResult = P.validateProposal('abbreviation', { from: 'over', to: 'overdue' });
+  check('R7 (a) "over" is blocked as an abbreviation SOURCE — an ordinary English word, not a misspelling', overResult.ok === false, JSON.stringify(overResult));
+  for (const word of ['under', 'due', 'last', 'next', 'new', 'old', 'unit', 'part', 'job', 'call', 'check', 'service']) {
+    check(`R7 (a) "${word}" is on the common-word stoplist`, P.COMMON_WORDS.has(word));
+  }
+  const legitResult = P.validateProposal('abbreviation', { from: 'hoas', to: 'homeowners' });
+  check('R7 (a) a genuine abbreviation ("hoas" -> "homeowners") is unaffected by the widened stoplist', legitResult.ok === true, JSON.stringify(legitResult));
+
+  const brandSynonym = P.validateProposal('synonym', { entity: 'equipment', word: 'brand' });
+  check('R7 (c) synonym word "brand" is rejected — a generic category label, not a plain-English name', brandSynonym.ok === false, JSON.stringify(brandSynonym));
+  const modelSynonym = P.validateProposal('synonym', { entity: 'equipment', word: 'model' });
+  check('R7 (c) synonym word "model" is rejected too', modelSynonym.ok === false, JSON.stringify(modelSynonym));
+  const realBrandSynonym = P.validateProposal('synonym', { entity: 'equipment', word: 'ruud' });
+  check('R7 (c) a real brand name ("ruud") stays a valid equipment synonym', realBrandSynonym.ok === true, JSON.stringify(realBrandSynonym));
+
+  const names = new Set(['vega', 'cooling']);
+  const shadowed = V.proposalShadowsEntityName({ kind: 'typo', payload: { from: 'vega', to: 'vegas' } }, names);
+  check('R7 (b) proposalShadowsEntityName flags a "from" word matching a real name token', shadowed === true);
+  const notShadowed = V.proposalShadowsEntityName({ kind: 'typo', payload: { from: 'serrvice', to: 'service' } }, names);
+  check('R7 (b) proposalShadowsEntityName leaves an unrelated typo alone', notShadowed === false);
+  const noTokensGiven = V.proposalShadowsEntityName({ kind: 'typo', payload: { from: 'vega', to: 'vegas' } }, null);
+  check('R7 (b) proposalShadowsEntityName is a no-op when no nameTokens are supplied (never a false rejection)', noTokensGiven === false);
+  const synonymNeverShadowed = V.proposalShadowsEntityName({ kind: 'synonym', payload: { entity: 'equipment', word: 'vega' } }, names);
+  check('R7 (b) proposalShadowsEntityName only ever applies to abbreviation/typo, never synonym', synonymNeverShadowed === false);
+}
+
 /* ================================================================== harness: real Postgres via PGlite */
 let PGlite;
 let contrib = {};
@@ -278,6 +312,49 @@ const { getActiveOverlay, resetActiveOverlayCacheForTests } = await import('../a
   check('(b) DONOVAN_AUTO_LEARN=off: the gate does not even attempt a candidate', offRun.skipped === 'auto-learn-off' && offRun.attempted === 0, JSON.stringify(offRun));
   delete process.env.DONOVAN_AUTO_LEARN;
   resetActiveOverlayCacheForTests();
+}
+
+/* ---------- (e) R7: reverifyPendingProposalsContent auto-rejects existing bad PENDING rows ---------- */
+{
+  const { lite } = await buildLite(true);
+  installPgHarness(lite);
+
+  const ctx = { tenantKey: 'org_gate_e', tenantName: 'Gate Shop E' };
+  const tenId = (await getTenantContext(ctx.tenantKey, ctx.tenantName)).id;
+  // A real customer named "Vega" on file — the same shop data the "vega" -> "vegas" typo would have
+  // silently rewritten every time it appeared, had it gone live.
+  await lite.query(
+    "INSERT INTO entities (id, tenant_id, entity_type, data) VALUES ('eeeeeeee-0000-4000-8000-000000000001',$1,'customer',$2::jsonb)",
+    [tenId, JSON.stringify({ customer_name: 'Vega Cooling & Heat' })]
+  );
+
+  // Three proposals that reached PENDING under the OLD rules (each schema-valid then), plus one
+  // genuine control that must survive the re-verify untouched.
+  const idOver = await store.insertProposal({ kind: 'abbreviation', payload: { from: 'over', to: 'overdue' }, evidence: {}, verification: { ok: true }, status: 'pending' });
+  const idVega = await store.insertProposal({ kind: 'typo', payload: { from: 'vega', to: 'vegas' }, evidence: {}, verification: { ok: true }, status: 'pending' });
+  const idBrand = await store.insertProposal({ kind: 'synonym', payload: { entity: 'equipment', word: 'brand' }, evidence: {}, verification: { ok: true }, status: 'pending' });
+  const idGood = await store.insertProposal({ kind: 'abbreviation', payload: { from: 'hoas', to: 'homeowners' }, evidence: {}, verification: { ok: true }, status: 'pending' });
+  check('(e) setup: all four pending proposals stored', [idOver, idVega, idBrand, idGood].every(Boolean));
+
+  const result = await examGate.reverifyPendingProposalsContent(ctx);
+  check('(e) checked exactly the 4 abbreviation/typo/synonym pending rows', result.checked === 4, JSON.stringify(result));
+  check('(e) rejected exactly the 3 bad rows (over/vega/brand), never the genuine one', result.rejected === 3, JSON.stringify(result));
+
+  const [rOver, rVega, rBrand, rGood] = await Promise.all([idOver, idVega, idBrand, idGood].map((id) => store.getProposal(id)));
+  check('(e) abbreviation "over"->"overdue" is auto_rejected (a common English word)', rOver.status === 'auto_rejected', rOver.status);
+  check('(e) typo "vega"->"vegas" is auto_rejected (shadows the real customer name "Vega")', rVega.status === 'auto_rejected', rVega.status);
+  check('(e) synonym equipment/"brand" is auto_rejected (a generic category label)', rBrand.status === 'auto_rejected', rBrand.status);
+  check('(e) the genuine abbreviation "hoas"->"homeowners" is left PENDING, untouched', rGood.status === 'pending', rGood.status);
+
+  // runExamGatedLearningPass runs this pass exactly once, ahead of gap-promotion/gate — proven here
+  // with DONOVAN_AUTO_LEARN='off' so the (already-exercised) gate step itself does no further work.
+  const idOver2 = await store.insertProposal({ kind: 'abbreviation', payload: { from: 'brand', to: 'bryant' }, evidence: {}, verification: { ok: true }, status: 'pending' });
+  process.env.DONOVAN_AUTO_LEARN = 'off';
+  const pass = await examGate.runExamGatedLearningPass(ctx, { handler: async () => ({}) });
+  check('(e) runExamGatedLearningPass wires the content-reverify pass in (contentReverify.rejected >= 1)', pass.contentReverify?.rejected >= 1, JSON.stringify(pass.contentReverify));
+  const rOver2 = await store.getProposal(idOver2);
+  check('(e) the newly-inserted bad row is caught even under DONOVAN_AUTO_LEARN=off (content rules are not a gate-policy toggle)', rOver2.status === 'auto_rejected', rOver2.status);
+  delete process.env.DONOVAN_AUTO_LEARN;
 }
 
 /* ---------- (d): migration 34 NOT applied -> no crash, graceful degrade ---------- */

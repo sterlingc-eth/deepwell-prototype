@@ -19,7 +19,7 @@
  *     guard — an operator explicitly asking for it should always get a real
  *     run, but still skipped when the migration isn't applied.
  */
-import { getPool } from '../recordsStore.js';
+import { getPool, withTenant } from '../recordsStore.js';
 import { buildMissDigest } from '../missDigest.js';
 import { proposeFixesForMisses } from './proposer.js';
 import { verifyProposalLive } from './verify.js';
@@ -29,6 +29,43 @@ import { replayMisses } from './replay.js';
 import { runExamGatedLearningPass } from './examGate.js';
 
 const TASK_KEY = 'donovan-learning';
+
+/** R7 learning-quality guardrail (coordinator ask, 2026-09-25): every distinct word appearing in a
+ *  customer name or a technician name on file, lower-cased — fed to verify.js's
+ *  proposalShadowsEntityName so a learned abbreviation/typo can never quietly rewrite a real name
+ *  (the bug report: typo "vega" -> "vegas" would have corrupted the real customer surname "Vega").
+ *  Tenant-scoped (withTenant — the same safe, RLS-respecting read every other entity query in this
+ *  codebase uses), against the SAME founder/operator tenant this whole loop already runs its
+ *  exam-gate/replay steps against — never a cross-tenant, RLS-bypassing read. Best-effort: any
+ *  failure (no tenant, migration/table issue) yields an empty Set, i.e. this guard simply does not
+ *  fire rather than blocking every proposal. Small and self-contained rather than shared with
+ *  learning/examGate.js's own copy — same "duplicate a handful of lines rather than widen a file's
+ *  surface" idiom this whole directory already uses (proposals.js/proposer.js's own doc comments).
+ */
+async function loadEntityNameTokens(ctxArg) {
+  const ctx = ctxArg ?? (process.env.DEEPWELL_FOUNDER_TENANT_ID
+    ? { tenantKey: process.env.DEEPWELL_FOUNDER_TENANT_ID, tenantName: process.env.DEEPWELL_FOUNDER_TENANT_ID }
+    : null);
+  if (!ctx?.tenantKey) return new Set();
+  try {
+    return await withTenant(ctx, async (db) => {
+      const [{ rows: custRows }, { rows: techRows }] = await Promise.all([
+        db.raw("SELECT data->>'customer_name' AS name FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL LIMIT 5000", []),
+        db.raw("SELECT DISTINCT COALESCE(NULLIF(corrected_value, ''), value) AS name FROM extractions WHERE field_key = 'technician' LIMIT 2000", []),
+      ]);
+      const tokens = new Set();
+      for (const r of [...custRows, ...techRows]) {
+        for (const w of String(r.name ?? '').toLowerCase().split(/[^a-z0-9]+/)) {
+          if (w.length >= 2) tokens.add(w);
+        }
+      }
+      return tokens;
+    });
+  } catch (err) {
+    console.warn('donovan-learning: could not load entity name tokens for the shadow guard (non-fatal):', err?.message);
+    return new Set();
+  }
+}
 
 // Best-effort fallback ONLY for a deployment that hasn't set
 // DEEPWELL_FOUNDER_TENANT_ID — same "prevents the same warm process from
@@ -155,6 +192,12 @@ export async function runLearningCore({ ctxArg, callModel } = {}) {
   summary.modelCallsMade = modelCallsMade;
   summary.estimatedCostUsd = estimatedCostUsd;
 
+  // R7 guardrail: only worth the query when at least one fresh candidate could actually use it
+  // (an abbreviation/typo — the only kinds proposalShadowsEntityName ever checks).
+  const nameTokens = proposals.some((p) => p.valid && (p.kind === 'abbreviation' || p.kind === 'typo'))
+    ? await loadEntityNameTokens(ctxArg)
+    : new Set();
+
   for (const p of proposals) {
     let status;
     let reason = p.reason ?? null;
@@ -170,7 +213,7 @@ export async function runLearningCore({ ctxArg, callModel } = {}) {
       // proposal time).
       verification = verifyProposalLive(
         { kind: p.kind, payload: p.payload },
-        { missQuestions: p.evidence?.questions ?? [] }
+        { missQuestions: p.evidence?.questions ?? [], nameTokens }
       );
       const decision = decidePolicyStatus(
         { kind: p.kind, tenantCount: p.evidence?.tenantCount ?? 0, count: p.evidence?.count ?? 0 },
