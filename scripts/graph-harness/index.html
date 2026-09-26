@@ -1,0 +1,21 @@
+<!doctype html>
+<!--
+  Dev-only harness for scripts/verify-graph-ui.mjs: mounts KnowledgeGraph
+  alone (no Clerk, no AppShell) against a mocked /api/v1/graph, so the
+  Playwright check can render it via the project's own `vite` dev server
+  (real Tailwind/PostCSS pipeline, so it looks like it does in the app)
+  without needing a signed-in session. Not part of any production build
+  entry (vite.config.ts's rollupOptions.input never lists it), so it never
+  ships.
+-->
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KnowledgeGraph harness</title>
+  </head>
+  <body>
+    <div id="root" style="max-width: 900px; margin: 0 auto; padding: 16px;"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, MessageSquareText } from 'lucide-react';
+import { ArrowLeft, MessageSquareText, Network } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { FactGrid } from '../components/FactGrid';
 import { SourceList } from '../components/SourceList';
 import { DocumentPreview } from '../components/DocumentPreview';
+import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
 import { docsLinkedTo, entitiesOfType, sourcesFor, useGraph } from '../core/entityGraph';
 import { dateOf, fmtValue, str } from '../core/answer';
+import { entityNodeId } from '../core/graphNodeId';
 import type { Entity, Fact, SourceRef } from '../core/types';
 import { useAppStore } from '../store/appStore';
 
@@ -28,9 +30,11 @@ export function EntityScreen() {
   const includeUnverified = useAppStore((s) => s.includeUnverified);
   const graph = useGraph();
   const [preview, setPreview] = useState<SourceRef | null>(null);
+  const [showGraph, setShowGraph] = useState(false);
 
   const entity = entityId ? graph.entities[entityId] : undefined;
   const typeSpec = entity ? graph.schema.entityTypes.find((t) => t.id === entity.type) : undefined;
+  const graphNodeId = entity ? entityNodeId(entity) : null;
 
   // Defect (2026-09-25): this generic screen has no real "customer" case (it's built for
   // property/equipment/technician/service) — a customer id landing here rendered the raw uuid as the
@@ -121,9 +125,23 @@ export function EntityScreen() {
             <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => askQuestion(label)}>
               <MessageSquareText className="w-4 h-4" aria-hidden="true" /> Ask about this
             </button>
+            {graphNodeId && <button
+              type="button"
+              className="dw-btn-secondary !min-h-[40px] !py-1.5"
+              aria-pressed={showGraph}
+              onClick={() => setShowGraph((v) => !v)}
+            >
+              <Network className="w-4 h-4" aria-hidden="true" /> {showGraph ? 'Hide graph' : 'Graph'}
+            </button>}
           </div>
           {!includeUnverified && <p className="text-caption text-ink-3">Fields below show every document that mentions them, including unverified ones. Ask answers use verified documents only.</p>}
         </header>
+
+        {showGraph && graphNodeId && (
+          <section aria-label="Knowledge graph" className="dw-card p-4">
+            <KnowledgeGraph seedNodeId={graphNodeId} heading={`${label} knowledge graph`} />
+          </section>
+        )}
 
         <FactGrid facts={facts} citation={citation} onOpenSource={setPreview} sourceLabel={(r) => graph.docs[r.documentId]?.filename} />
 

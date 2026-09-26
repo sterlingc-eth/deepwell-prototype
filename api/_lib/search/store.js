@@ -17,6 +17,8 @@
 import { getPool, getTenantContext } from '../recordsStore.js';
 import {
   chunkPages, embedConfig, estimateTokens, toVectorLiteral, voyageEmbed, EmbedError,
+  buildChunkContextHeader, withContextHeader, NO_CONTEXT_VERSION, CURRENT_CONTEXT_VERSION,
+  estimateEmbedCostUsd,
 } from './embed.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -49,7 +51,7 @@ const PROBE_FALSE_TTL_MS = 5 * 60_000;
 /** { ok: boolean, at: number } — `true` is remembered for the life of the instance; `false` is re-probed after 5 minutes so pasting the migration needs no redeploy. */
 let probe = null;
 
-export function _resetSemanticProbe() { probe = null; }
+export function _resetSemanticProbe() { probe = null; ctxColProbe = null; }
 
 /**
  * Is pgvector installed AND are both tables present? `db` is any client already
@@ -69,6 +71,73 @@ export async function semanticSchemaReady(db, now = Date.now()) {
     return false; // don't memoize a transient failure
   }
   return probe.ok;
+}
+
+/** { ok, at } cache for the M3-config/38 `page_chunks.context_version` column, same TTL contract as
+ *  `probe` above (semanticSchemaReady): `true` sticks, `false` is re-checked every few minutes so
+ *  pasting the migration needs no redeploy. Independent of `probe` — a tenant can have the base
+ *  semantic-search schema without this later, optional column. */
+let ctxColProbe = null;
+export function _resetContextVersionProbe() { ctxColProbe = null; }
+
+/** Is page_chunks.context_version present (M3-config/38)? Without it, headers are still built and
+ *  embedded (that needs no schema change), but there is no way to tell an old chunk from a new one,
+ *  so the backfill just treats "no chunk yet" as the only thing needing embedding — exactly today's
+ *  behavior. `db` is any client already inside a tenant transaction (this reads only the catalog). */
+export async function contextVersionReady(db, now = Date.now()) {
+  if (ctxColProbe && (ctxColProbe.ok || now - ctxColProbe.at < PROBE_FALSE_TTL_MS)) return ctxColProbe.ok;
+  try {
+    const r = await db.query(
+      `SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'page_chunks' AND column_name = 'context_version') AS ok`
+    );
+    ctxColProbe = { ok: Boolean(r.rows[0]?.ok), at: now };
+  } catch {
+    return false;
+  }
+  return ctxColProbe.ok;
+}
+
+/* ------------------------------------------------------- contextual chunk headers */
+
+/** extraction field_keys a chunk-context header is built from — see extractFields.js's FIELD_SPECS
+ *  for what each canonically means, and embed.js's buildChunkContextHeader for how they're combined.
+ *  Document-level, not per-unit: a multi-unit document's header uses whichever unit's fields were
+ *  recorded first for the manufacturer/model/serial slots (DISTINCT ON below) — a header is a
+ *  retrieval aid, not a citation of record, so this deliberate simplification costs nothing: the
+ *  real per-unit facts still come from `extractions`/entities, unaffected by this. */
+const CONTEXT_FIELD_KEYS = [
+  'customer_name', 'service_address', 'manufacturer', 'model', 'serial_number',
+  'service_date', 'technician', 'invoice_number',
+];
+
+/**
+ * One best-effort read of the structured facts buildChunkContextHeader needs, for every document in
+ * `documentIds`. Never throws itself (embedAndStore treats a failure here as "no header this round"
+ * rather than blocking embedding) — but IS tenant-scoped like everything else here, so a caller that
+ * wants that guarantee should catch around it, same as any other withTenantRaw call.
+ * @returns {Promise<Map<string, {documentType: string|null, [field_key: string]: string}>>}
+ */
+export async function documentContextFacts(ctx, documentIds) {
+  const ids = [...new Set(documentIds ?? [])];
+  if (!ids.length) return new Map();
+  return withTenantRaw(ctx, async (db) => {
+    const docRows = (await db.query(
+      `SELECT id, document_type FROM documents WHERE id = ANY($1::uuid[]) AND ${TENANT}`, [ids]
+    )).rows;
+    const out = new Map(ids.map((id) => [id, { documentType: null }]));
+    for (const r of docRows) out.set(r.id, { documentType: r.document_type ?? null });
+    const factRows = (await db.query(
+      `SELECT DISTINCT ON (document_id, field_key) document_id, field_key, value
+         FROM extractions
+        WHERE document_id = ANY($1::uuid[]) AND field_key = ANY($2::text[]) AND ${TENANT}
+          AND value IS NOT NULL AND btrim(value) <> ''
+        ORDER BY document_id, field_key, created_at ASC NULLS LAST, id ASC`,
+      [ids, CONTEXT_FIELD_KEYS]
+    )).rows;
+    for (const r of factRows) out.get(r.document_id)[r.field_key] = r.value;
+    return out;
+  });
 }
 
 /* -------------------------------------------------------------------- budget */
@@ -106,8 +175,20 @@ const INSERT_ROWS_PER_STATEMENT = 100;
 /** The ingest hook embeds at most this many pages of one document inline; a longer document's remainder is left to the backfill. */
 const HOOK_MAX_PAGES = 60;
 
-/** Pages (of one document, or of the whole tenant) with no chunks for the current model at the current text. */
-async function pagesNeedingEmbedding(db, { model, documentId = null, limit }) {
+/**
+ * Pages (of one document, or of the whole tenant) with no UP TO DATE chunk for the current model.
+ * "Up to date" means the page text hasn't changed since it was last chunked (page_hash, as always)
+ * AND — when M3-config/38's column is present — its chunk's context_version is at least
+ * `neededVersion`. That second clause is what lets the same query, and the same resumable/
+ * cost-capped loop (runBackfill), also serve as the "re-embed chunks whose context_version is old"
+ * backfill: a chunk embedded before this feature (or while DONOVAN_CHUNK_CONTEXT=0) is
+ * context_version 0, which is "not up to date" the moment neededVersion is 1 or more.
+ */
+async function pagesNeedingEmbedding(db, { model, documentId = null, limit, neededVersion = NO_CONTEXT_VERSION }) {
+  const versioned = await contextVersionReady(db);
+  const upToDate = versioned
+    ? `c.model = $1 AND c.page_hash = md5(p.text) AND c.context_version >= ${Math.trunc(neededVersion)}`
+    : `c.model = $1 AND c.page_hash = md5(p.text)`;
   const r = await db.query(
     `SELECT p.document_id, p.page_no, p.text, md5(p.text) AS page_hash
        FROM document_pages p
@@ -117,7 +198,7 @@ async function pagesNeedingEmbedding(db, { model, documentId = null, limit }) {
         AND NOT EXISTS (
               SELECT 1 FROM page_chunks c
                WHERE c.tenant_id = p.tenant_id AND c.document_id = p.document_id
-                 AND c.page_no = p.page_no AND c.model = $1 AND c.page_hash = md5(p.text))
+                 AND c.page_no = p.page_no AND ${upToDate})
       ORDER BY p.document_id, p.page_no
       LIMIT $2`,
     documentId ? [model, limit, documentId] : [model, limit]
@@ -129,6 +210,16 @@ async function pagesNeedingEmbedding(db, { model, documentId = null, limit }) {
  * Chunk, embed and store a set of pages. Idempotent: a page's old chunks (for
  * this model) are deleted and replaced in the same transaction, so re-running
  * converges on one set of rows.
+ *
+ * CONTEXTUAL HEADERS (see embed.js's buildChunkContextHeader): when
+ * cfg.chunkContext is on (the default), every chunk of a document gets that
+ * document's header prepended before embedding — one extra, best-effort read
+ * (documentContextFacts) per call, never one per chunk. A facts-lookup
+ * failure just means no header this round (embedding still happens), and a
+ * document with no header-worthy facts yet (the common case for the ingest
+ * hook, which runs BEFORE extraction — see readDocument.js) embeds exactly
+ * the raw chunk text, same as before this feature existed; the later
+ * semantic-backfill re-embed picks it up once extraction has run.
  * @returns {{pages: number, chunks: number, tokens: number}}
  */
 async function embedAndStore(ctx, tenantId, pages, cfg, net = {}) {
@@ -144,9 +235,22 @@ async function embedAndStore(ctx, tenantId, pages, cfg, net = {}) {
   }
   if (!chunks.length) return { pages: 0, chunks: 0, tokens: 0 };
 
-  const { vectors, tokens, calls } = await voyageEmbed(chunks.map((c) => c.text), { inputType: 'document', cfg, ...net });
+  const targetVersion = cfg.chunkContext ? CURRENT_CONTEXT_VERSION : NO_CONTEXT_VERSION;
+  let headerByDoc = new Map();
+  if (cfg.chunkContext) {
+    headerByDoc = await documentContextFacts(ctx, [...byDoc.keys()])
+      .then((factsByDoc) => new Map([...factsByDoc].map(([id, facts]) => [id, buildChunkContextHeader(facts)])))
+      .catch((err) => {
+        console.warn(`semantic: could not read chunk-context facts (${err?.name ?? 'Error'}); embedding without a header this round`);
+        return new Map();
+      });
+  }
+  const embedTexts = chunks.map((c) => withContextHeader(headerByDoc.get(c.document_id), c.text));
+
+  const { vectors, tokens, calls } = await voyageEmbed(embedTexts, { inputType: 'document', cfg, ...net });
 
   await withTenantRaw(ctx, async (db, tid) => {
+    const versioned = await contextVersionReady(db);
     for (const [document_id, ps] of byDoc) {
       await db.query(
         `DELETE FROM page_chunks WHERE ${TENANT} AND document_id = $1 AND model = $2 AND page_no = ANY($3::int[])`,
@@ -156,22 +260,33 @@ async function embedAndStore(ctx, tenantId, pages, cfg, net = {}) {
     for (let i = 0; i < chunks.length; i += INSERT_ROWS_PER_STATEMENT) {
       const slice = chunks.slice(i, i + INSERT_ROWS_PER_STATEMENT);
       const vals = [];
+      const cols = versioned ? 9 : 8;
       const tuples = slice.map((c, j) => {
-        const b = j * 8;
-        vals.push(tid, c.document_id, c.page_no, c.chunk_no, c.text, c.page_hash, toVectorLiteral(vectors[i + j]), cfg.model);
-        return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7}::vector,$${b + 8})`;
+        const idx = i + j;
+        const b = j * cols;
+        vals.push(tid, c.document_id, c.page_no, c.chunk_no, embedTexts[idx], c.page_hash, toVectorLiteral(vectors[idx]), cfg.model);
+        if (versioned) vals.push(targetVersion);
+        const ph = [1, 2, 3, 4, 5, 6].map((n) => `$${b + n}`).join(',');
+        return versioned
+          ? `(${ph},$${b + 7}::vector,$${b + 8},$${b + 9})`
+          : `(${ph},$${b + 7}::vector,$${b + 8})`;
       });
       await db.query(
-        `INSERT INTO page_chunks (tenant_id, document_id, page_no, chunk_no, text, page_hash, embedding, model)
-         VALUES ${tuples.join(',')}
-         ON CONFLICT (tenant_id, document_id, page_no, chunk_no, model)
-         DO UPDATE SET text = EXCLUDED.text, page_hash = EXCLUDED.page_hash, embedding = EXCLUDED.embedding`,
+        versioned
+          ? `INSERT INTO page_chunks (tenant_id, document_id, page_no, chunk_no, text, page_hash, embedding, model, context_version)
+             VALUES ${tuples.join(',')}
+             ON CONFLICT (tenant_id, document_id, page_no, chunk_no, model)
+             DO UPDATE SET text = EXCLUDED.text, page_hash = EXCLUDED.page_hash, embedding = EXCLUDED.embedding, context_version = EXCLUDED.context_version`
+          : `INSERT INTO page_chunks (tenant_id, document_id, page_no, chunk_no, text, page_hash, embedding, model)
+             VALUES ${tuples.join(',')}
+             ON CONFLICT (tenant_id, document_id, page_no, chunk_no, model)
+             DO UPDATE SET text = EXCLUDED.text, page_hash = EXCLUDED.page_hash, embedding = EXCLUDED.embedding`,
         vals
       );
     }
     await recordEmbeddingUsage(db, tid, tokens, calls);
   });
-  console.log(JSON.stringify({ route: 'semantic', t: 'embed_pages', pages: pages.length, chunks: chunks.length, tokens, model: cfg.model }));
+  console.log(JSON.stringify({ route: 'semantic', t: 'embed_pages', pages: pages.length, chunks: chunks.length, tokens, model: cfg.model, contextVersion: targetVersion }));
   return { pages: pages.length, chunks: chunks.length, tokens };
 }
 
@@ -188,7 +303,8 @@ export async function embedDocumentPages(ctx, documentId, { cfg = embedConfig() 
     const found = await withTenantRaw(ctx, async (db, tid) => {
       if (!(await semanticSchemaReady(db))) return null;
       const used = await tokensUsedToday(db);
-      const pages = await pagesNeedingEmbedding(db, { model: cfg.model, documentId, limit: HOOK_MAX_PAGES });
+      const neededVersion = cfg.chunkContext ? CURRENT_CONTEXT_VERSION : NO_CONTEXT_VERSION;
+      const pages = await pagesNeedingEmbedding(db, { model: cfg.model, documentId, limit: HOOK_MAX_PAGES, neededVersion });
       return { tid, used, pages };
     });
     if (!found) return { status: 'no-schema' };
@@ -205,9 +321,12 @@ export async function embedDocumentPages(ctx, documentId, { cfg = embedConfig() 
 
 /* ------------------------------------------------------------ status/backfill */
 
-/** Progress numbers for the Team-screen card. Cheap: three counts and one sum. */
+/** Progress numbers for the Team-screen card. Cheap: three counts and one sum, plus (when
+ *  M3-config/38 is present) how many already-embedded chunks are behind the current chunk-context
+ *  header version and a rough $ estimate for re-embedding them — an operator's pre-flight number
+ *  before they trigger semanticBackfill again; never computed automatically, never billed off of. */
 export async function semanticStatus(ctx, { cfg = embedConfig() } = {}) {
-  const base = { configured: cfg.enabled, model: cfg.model, rerank: Boolean(cfg.rerankModel) };
+  const base = { configured: cfg.enabled, model: cfg.model, rerank: Boolean(cfg.rerankModel), chunkContext: cfg.chunkContext, contextVersion: CURRENT_CONTEXT_VERSION };
   if (!cfg.enabled) return { ...base, ready: false, reason: 'not-configured' };
   const cap = await embeddingDailyCap(ctx, cfg);
   return withTenantRaw(ctx, async (db) => {
@@ -222,7 +341,17 @@ export async function semanticStatus(ctx, { cfg = embedConfig() } = {}) {
     );
     const { total, embedded, chunks } = r.rows[0];
     const used = await tokensUsedToday(db);
-    return { ...base, ready: true, pagesTotal: total, pagesEmbedded: embedded, pagesRemaining: Math.max(0, total - embedded), chunks, tokensToday: used, tokenBudget: cap };
+    const out = { ...base, ready: true, pagesTotal: total, pagesEmbedded: embedded, pagesRemaining: Math.max(0, total - embedded), chunks, tokensToday: used, tokenBudget: cap };
+    if (await contextVersionReady(db)) {
+      const stale = Number((await db.query(
+        `SELECT count(*)::int AS n FROM page_chunks c WHERE c.${TENANT} AND c.model = $1 AND c.context_version < $2`,
+        [cfg.model, CURRENT_CONTEXT_VERSION]
+      )).rows[0]?.n ?? 0);
+      out.chunksNeedingContextUpdate = stale;
+      out.estimatedReembedCostUsd = Number(estimateEmbedCostUsd(stale).toFixed(4));
+    }
+    out.estimatedCostUsdPer1kChunks = Number(estimateEmbedCostUsd(1000).toFixed(4));
+    return out;
   });
 }
 
@@ -245,7 +374,8 @@ export async function runBackfill(ctx, { deadlineMs = 30_000, pagesPerBatch = 24
       batch = await withTenantRaw(ctx, async (db, tid) => {
         if (!(await semanticSchemaReady(db))) return { schema: false };
         const used = await tokensUsedToday(db);
-        const pages = await pagesNeedingEmbedding(db, { model: cfg.model, limit: pagesPerBatch });
+        const neededVersion = cfg.chunkContext ? CURRENT_CONTEXT_VERSION : NO_CONTEXT_VERSION;
+        const pages = await pagesNeedingEmbedding(db, { model: cfg.model, limit: pagesPerBatch, neededVersion });
         return { schema: true, tid, used, pages };
       });
     } catch {

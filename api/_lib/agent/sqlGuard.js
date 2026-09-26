@@ -48,6 +48,7 @@ export const REAL_TABLES = Object.freeze([
   "page_chunks", "embedding_usage", // M3-config/31 (search by meaning)
   "donovan_learned_tenant", "donovan_gap_reports", // M3-config/32-donovan-autopilot.sql (TEAM H)
   "dossiers", "knowledge_reports", // M3-config/33-knowledge.sql (TEAM T2)
+  "kg_edges", // M3-config/37-knowledge-graph.sql (Knowledge Graph v1) — read only via graph_traverse
 ]);
 
 const DENY_TOKENS = new Set([

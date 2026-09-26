@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Download, FolderOpen, Loader2, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowRight, Download, FolderOpen, Loader2, Network, Search, Trash2, Users, X } from 'lucide-react';
 import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
+import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { StagePill } from '../components/StagePill';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
 import { entitiesOfType, useGraph } from '../core/entityGraph';
@@ -478,7 +479,7 @@ export function BrowseScreen() {
   const openEntity = useAppStore((s) => s.openEntity);
   const askQuestion = useAppStore((s) => s.askQuestion);
   // Customers first (owner, 2026-09-20): the shop's people are the entry point; documents hang off them.
-  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search'>('customers');
+  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search' | 'graph'>('customers');
   const [kind, setKind] = useState<Kind>('all');
   const [debounced, setDebounced] = useState(query);
   useEffect(() => {
@@ -547,6 +548,7 @@ export function BrowseScreen() {
             { id: 'documents' as const, label: 'Documents', Icon: FolderOpen },
             { id: 'customers' as const, label: 'Customers', Icon: Users },
             { id: 'search' as const, label: 'Search', Icon: Search },
+            { id: 'graph' as const, label: 'Graph', Icon: Network },
           ]).map((t) => (
             <button
               key={t.id}
@@ -564,6 +566,8 @@ export function BrowseScreen() {
           <DocumentsTab />
         ) : mainTab === 'customers' ? (
           <CustomersScreen />
+        ) : mainTab === 'graph' ? (
+          <KnowledgeGraph showSearch heading="DeepWell knowledge graph" />
         ) : (
           <div className="space-y-6">
             <div className="relative">

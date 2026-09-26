@@ -27,7 +27,7 @@
     "verify:multiunit": "node scripts/verify-multiunit.mjs",
     "verify:integrity": "node scripts/verify-integrity.mjs",
     "verify:linking": "tsx scripts/verify-linking.mjs",
-    "verify:all": "npm run verify:extract && npm run verify:doctypes && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:customers && npm run verify:multiunit && npm run verify:integrity && npm run verify:linking && npm run verify:hardening && npm run verify:auth && npm run verify:review && npm run verify:ops && npm run verify:apikeys && npm run verify:transcribe && npm run verify:caching && npm run verify:bulk && npm run verify:scale && npm run verify:perf && npm run verify:ui && npm run verify:docaccess && npm run verify:billing && npm run verify:notify && npm run verify:ask-cache && npm run verify:outreach && npm run verify:fastpath && npm run verify:workfilter && npm run verify:followups && npm run verify:analytics && npm run verify:doclookup && npm run verify:business-corpus && npm run verify:question-bank && npm run verify:miss-digest && npm run verify:learning && npm run verify:expenses && npm run verify:agent && npm run verify:agent-v2 && npm run verify:learning-loop && npm run verify:scorecard && npm run verify:financials && npm run verify:r7-finance && npm run verify:semantic && npm run verify:citations && npm run verify:content && npm run verify:industry && npm run verify:autopilot && npm run verify:reasoning && npm run verify:knowledge && npm run verify:geo-parity && npm run verify:count-parity && npm run verify:round6 && npm run verify:r7-guardrails && npm run verify:r7-search && npm run verify:relations && npm run verify:job-costing && npm run verify:explain && npm run verify:offline-exam",
+    "verify:all": "npm run verify:extract && npm run verify:doctypes && npm run verify:warranty && npm run verify:answer && npm run verify:customer && npm run verify:customers && npm run verify:multiunit && npm run verify:integrity && npm run verify:linking && npm run verify:hardening && npm run verify:auth && npm run verify:review && npm run verify:ops && npm run verify:apikeys && npm run verify:transcribe && npm run verify:caching && npm run verify:bulk && npm run verify:scale && npm run verify:perf && npm run verify:ui && npm run verify:docaccess && npm run verify:billing && npm run verify:notify && npm run verify:ask-cache && npm run verify:outreach && npm run verify:fastpath && npm run verify:workfilter && npm run verify:followups && npm run verify:analytics && npm run verify:doclookup && npm run verify:business-corpus && npm run verify:question-bank && npm run verify:miss-digest && npm run verify:learning && npm run verify:expenses && npm run verify:agent && npm run verify:agent-v2 && npm run verify:learning-loop && npm run verify:scorecard && npm run verify:financials && npm run verify:r7-finance && npm run verify:semantic && npm run verify:citations && npm run verify:content && npm run verify:industry && npm run verify:autopilot && npm run verify:reasoning && npm run verify:knowledge && npm run verify:geo-parity && npm run verify:count-parity && npm run verify:round6 && npm run verify:r7-guardrails && npm run verify:r7-search && npm run verify:relations && npm run verify:job-costing && npm run verify:graph && npm run verify:explain && npm run verify:offline-exam && npm run verify:r10-retrieval",
     "verify:hardening": "node scripts/verify-hardening.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:review": "node scripts/verify-review.mjs",
@@ -69,12 +69,15 @@
     "verify:content": "node scripts/verify-content.mjs",
     "verify:industry": "node scripts/verify-industry.mjs",
     "verify:reasoning": "node scripts/verify-reasoning.mjs",
-  "verify:explain": "node scripts/verify-explain.mjs",
+    "verify:explain": "node scripts/verify-explain.mjs",
     "verify:geo-parity": "node scripts/verify-geo-parity.mjs",
     "verify:count-parity": "node scripts/verify-count-parity.mjs",
     "verify:relations": "node scripts/verify-relations.mjs",
     "verify:job-costing": "node scripts/verify-job-costing.mjs",
-    "verify:offline-exam": "node scripts/verify-offline-exam.mjs"
+    "verify:graph": "node scripts/verify-graph.mjs",
+    "verify:offline-exam": "node scripts/verify-offline-exam.mjs",
+    "verify:graph-ui": "node scripts/verify-graph-ui.mjs",
+    "verify:r10-retrieval": "node scripts/verify-r10-retrieval.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
@@ -82,6 +85,7 @@
     "@clerk/clerk-react": "^5.3.2",
     "@sentry/node": "^8.45.0",
     "@types/pg": "^8.23.1",
+    "cytoscape": "^3.34.3",
     "html2canvas": "^1.4.1",
     "inngest": "^4.20.0",
     "jspdf": "^4.2.1",
@@ -97,6 +101,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@electric-sql/pglite-pgvector": "^0.0.9",
+    "@types/cytoscape": "^3.21.9",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

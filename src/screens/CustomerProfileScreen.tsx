@@ -4,8 +4,10 @@ import {
 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DocumentPreview } from '../components/DocumentPreview';
+import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { WarrantyStatusBadge, type AlertTier } from '../components/WarrantyStatusBadge';
 import { formatYmd, normalize } from '../core/answer';
+import { customerNodeId } from '../core/graphNodeId';
 import { useGraph } from '../core/entityGraph';
 import {
   customerClient,
@@ -136,11 +138,12 @@ function EditableField({ label, value, placeholder, onSave }: EditableFieldProps
   );
 }
 
-type Tab = 'documents' | 'equipment' | 'timeline' | 'notes';
+type Tab = 'documents' | 'equipment' | 'timeline' | 'graph' | 'notes';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'documents', label: 'Documents' },
   { id: 'equipment', label: 'Equipment' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'graph', label: 'Graph' },
   { id: 'notes', label: 'Notes' },
 ];
 
@@ -596,6 +599,10 @@ export function CustomerProfileScreen() {
             ))}
             {timeline.length === 0 && <li className="px-4 py-8 text-center text-ink-3">Nothing on the timeline yet.</li>}
           </ul>
+        )}
+
+        {tab === 'graph' && (
+          <KnowledgeGraph seedNodeId={customerNodeId(customer.id)} heading={`${customer.name ?? 'Customer'} knowledge graph`} />
         )}
 
         {tab === 'notes' && (

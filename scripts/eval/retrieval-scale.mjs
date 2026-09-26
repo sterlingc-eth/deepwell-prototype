@@ -139,7 +139,7 @@ pgMod.Pool.prototype.query = async function query(sql, params) {
 };
 
 const { withTenant, getTenantContext } = await import('../../api/_lib/recordsStore.js');
-const { runBackfill } = await import('../../api/_lib/search/store.js');
+const { runBackfill, embedDocumentPages } = await import('../../api/_lib/search/store.js');
 const { embedConfig } = await import('../../api/_lib/search/embed.js');
 const { searchKnowledge } = await import('../../api/_lib/search/knowledge.js');
 
@@ -306,6 +306,92 @@ const report = {
 };
 console.log(JSON.stringify(report, null, 2));
 
+/* ============================================================== r10c: keyword-heavy + contextual-header eval
+ *
+ * The BEFORE/AFTER above measures entity-first scoping + rerank + dedup — a different mechanism,
+ * already resolved (searchKnowledge auto-scopes to the ONE customer a query names). This section
+ * measures something the mechanism above would quietly launder away: whether a page whose OWN raw
+ * text carries none of a document's identifying facts (page 2 of a two-page visit, where the
+ * customer/address/unit are only ever printed on the cover page) is findable at all — and whether
+ * exact identifiers (serials, invoice numbers) still surface regardless. It runs db.searchPassages
+ * directly (NOT searchKnowledge), so entity-first auto-scoping never narrows the search space and
+ * masks what is being measured here.
+ *
+ * Deliberately its OWN customer names (never customers[], whose "Bellview{i} {noun}" scheme bakes
+ * a digit into a single token — that token alone gets treated as an IDENTIFIER by the keyword pass
+ * and pins that customer's unrelated pre-existing filler documents to the top by itself, which would
+ * measure the identifier pass, not the header; ordinary human names carry no such digit).
+ *
+ * BURIED_N documents are seeded, EACH ONE PAGE, and every one of them uses the exact SAME
+ * boilerplate repair sentence — deliberately adversarial: with no chunk-context header, the page's
+ * own raw text names no customer and no address at all (only a serial number, which the identifier
+ * pass already finds on its own), so a query naming the customer has NOTHING on the page itself to
+ * match against — every buried document's page is an exact tie with every other one. This is the
+ * real gap the header exists for: a page whose OWN text carries none of the identifying facts the
+ * pipeline already extracted about it. `noContext` embeds with DONOVAN_CHUNK_CONTEXT=0 (this
+ * build's chunks look exactly like every chunk embedded before this feature existed); `withContext`
+ * re-embeds the SAME page with it back on (the default) — the document's own header (built from its
+ * `extractions` rows, never printed on the page) is what tells otherwise-identical pages apart.
+ */
+console.log('\nSeeding keyword-heavy + buried-context eval set...');
+const BURIED_N = Math.min(60, N_LABELED);
+const buriedLabels = []; // { query, documentId, page } — customer name + a boilerplate issue; the page names no customer at all
+const identLabels = [];  // { query, documentId, page } — an exact serial number, printed on the page itself (identifier pass, unaffected by headers)
+const BOILERPLATE_NOTES = 'Replaced the failed run capacitor and cleared the condensate drain line during the scheduled visit; airflow was restored to normal operation and the system was left in working order.';
+const BURIED_FIRST = ['Carol', 'Karen', 'Bill', 'Diane', 'Marcus', 'Priya', 'Samir', 'Elena', 'Jordan', 'Angela'];
+const BURIED_LAST = ['Rios', 'Abernathy', 'Whitmore', 'Castillo', 'Webb', 'Nakamura', 'Delgado', 'Fitzgerald', 'Okafor', 'Larsen'];
+for (let i = 0; i < BURIED_N; i++) {
+  const name = `${BURIED_FIRST[i % BURIED_FIRST.length]} ${BURIED_LAST[Math.floor(i / BURIED_FIRST.length) % BURIED_LAST.length]}`;
+  const serial = `SN-${100000 + i}`;
+  const docId = mkUuid('f');
+  await lite.query(
+    `INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,'service-ticket',$4,'verified')`,
+    [docId, tenantId, `${name}-buried.pdf`, `h-buried-${docId}`]
+  );
+  await lite.query(
+    `INSERT INTO document_pages (document_id, tenant_id, page_no, text) VALUES ($1,$2,1,$3)`,
+    [docId, tenantId, `Serial ${serial}: ${BOILERPLATE_NOTES}`]
+  );
+  await lite.query(
+    `INSERT INTO extractions (tenant_id, document_id, field_key, value, confidence)
+       SELECT $1::uuid, $2::uuid, k, v, 0.9 FROM unnest($3::text[], $4::text[]) AS t(k, v)`,
+    [tenantId, docId, ['customer_name', 'manufacturer', 'model', 'serial_number'], [name, 'Trane', 'XR16', serial]]
+  );
+  buriedLabels.push({ query: `Was there ever a capacitor or airflow issue reported for ${name}?`, documentId: docId, page: 1 });
+  identLabels.push({ query: `What was serviced under serial ${serial}?`, documentId: docId, page: 1 });
+}
+const buriedDocIds = buriedLabels.map((l) => l.documentId);
+console.log(`Seeded ${BURIED_N} buried-context documents (${buriedLabels.length} buried queries, ${identLabels.length} identifier queries).`);
+
+const K5 = 5;
+function recallAndRankK(hits, want, k) {
+  const idx = hits.findIndex((h) => h.documentId === want.documentId && h.page === want.page);
+  return { hit: idx !== -1 && idx < k, rank: idx === -1 ? null : idx + 1 };
+}
+async function measure(labelSet, k) {
+  let hits = 0, rr = 0;
+  for (const label of labelSet) {
+    const rows = await withTenant(ctx, (db) => db.searchPassages(label.query, k, { documentIds: null }));
+    const mapped = rows.map((r) => ({ documentId: r.document_id, page: r.page_no }));
+    const r = recallAndRankK(mapped, label, k);
+    if (r.hit) { hits++; rr += 1 / r.rank; }
+  }
+  return { recallAtK: +(hits / labelSet.length).toFixed(3), mrr: +(rr / labelSet.length).toFixed(3) };
+}
+
+console.log('Embedding the buried-context set WITHOUT chunk-context headers (DONOVAN_CHUNK_CONTEXT=0)...');
+process.env.DONOVAN_CHUNK_CONTEXT = '0';
+for (const docId of buriedDocIds) await embedDocumentPages(ctx, docId, { cfg: embedConfig() });
+const noContext = { buried: await measure(buriedLabels, K5), identifier: await measure(identLabels, K5) };
+
+console.log('Re-embedding the SAME pages WITH chunk-context headers (the default)...');
+delete process.env.DONOVAN_CHUNK_CONTEXT;
+for (const docId of buriedDocIds) await embedDocumentPages(ctx, docId, { cfg: embedConfig() });
+const withContext = { buried: await measure(buriedLabels, K5), identifier: await measure(identLabels, K5) };
+
+const contextReport = { corpus: { buriedDocuments: BURIED_N, k: K5 }, noContext, withContext };
+console.log(JSON.stringify(contextReport, null, 2));
+
 /* ============================================================== handoff doc */
 const handoffPath = path.join(ROOT, 'handoffs', 'RETRIEVAL_AT_SCALE_2026-09-25.md');
 const md = `# Retrieval at scale — eval results (TEAM T2, 2026-09-25)
@@ -364,6 +450,45 @@ that mechanism specifically, not just "reranking helps a little."
 ## Timing
 
 Seed: ${report.timingSec.seed}s · Embed: ${report.timingSec.embed}s · Search (${n} labeled queries × 2 passes): ${report.timingSec.search}s.
+
+## Keyword-heavy + contextual chunk headers (r10c)
+
+A separate, adversarial eval set, measured with \`db.searchPassages\` directly
+(NOT \`searchKnowledge\`) so entity-first auto-scoping never narrows the search
+space and masks what this specifically measures. ${BURIED_N} ONE-PAGE
+documents were seeded, every one of them the exact SAME boilerplate repair
+sentence plus a unique serial number — no customer name anywhere in the page
+text at all (the customer is known only via that document's own
+\`extractions\` row, exactly the real-world case a technician's notes page
+never restates the customer's name). Each is the answer key for two labeled
+queries:
+
+- **buried** — the customer's name + a generic issue phrase, expecting that
+  customer's own page. With no header, every page embeds to (very nearly) the
+  same vector, and none of them mention any customer name at all — the right
+  one is an exact tie with ${BURIED_N - 1} others.
+- **identifier** — an exact serial number, which the page's own text DOES
+  carry. This should hold up regardless of the header setting — identifier
+  matches are pinned by the existing keyword pass (recordsStore.js's
+  searchPassages), not the embedding.
+
+**noContext** embeds with \`DONOVAN_CHUNK_CONTEXT=0\` (every chunk looks exactly
+like a chunk embedded before this feature existed). **withContext** then
+re-embeds the SAME page with it back on (the default) — the document's own
+header, built from its \`extractions\` row and never printed on the page
+itself, is what tells otherwise-identical pages apart.
+
+| category | recall@${K5} (no context) | MRR (no context) | recall@${K5} (with context) | MRR (with context) |
+|---|---|---|---|---|
+| buried (customer name never on the page itself) | ${noContext.buried.recallAtK} | ${noContext.buried.mrr} | ${withContext.buried.recallAtK} | ${withContext.buried.mrr} |
+| identifier (exact serial, printed on the page) | ${noContext.identifier.recallAtK} | ${noContext.identifier.mrr} | ${withContext.identifier.recallAtK} | ${withContext.identifier.mrr} |
+
+Labelled honestly: the **identifier** row is expected to stay high in both
+columns (the mechanism it exercises does not depend on chunk embeddings at
+all) — it is here to show headers do not regress exact-match retrieval, not to
+show them improving it. The **buried** row is where a header should matter:
+without one, a page that never mentions its own customer has no way to be told
+apart from ${BURIED_N - 1} other pages that read identically.
 
 ## Reproduce
 

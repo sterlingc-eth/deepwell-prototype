@@ -7,7 +7,7 @@ No model (Haiku/Sonnet) is called anywhere in this eval.
 
 ## Corpus
 
-- 2,280 documents, **50,120 pages**
+- 2,280 documents, **8,520 pages**
 - 260 customers; each has 8 templated "annual maintenance
   checklist" filler documents (the bulk of the page count, and exactly the
   kind of repeated boilerplate near-duplicate collapse exists for)
@@ -23,7 +23,7 @@ For every labeled query, two searches ran over the SAME corpus:
 - **BEFORE** — `db.searchPassages(query, 10, {documentIds:null})` directly:
   hybrid FTS+pgvector+RRF exactly as it existed before this build, with no
   entity-first scoping, no rerank layer, no near-dup collapse. It has to find
-  the one right page among the whole tenant's 50,120 pages.
+  the one right page among the whole tenant's 8,520 pages.
 - **AFTER** — `searchKnowledge(db, {query, k:10, rerank:true})`: the same
   underlying hybrid search, but first scoped to the one customer the query
   names (via `resolveQueryEntities`, the same deterministic resolver
@@ -48,12 +48,51 @@ tenant's document count grows — a plain hybrid search has to rank the right
 page against every other page in the tenant, while a search that first
 resolves "Bellview42 Clinic" to one customer only has to rank it against that
 customer's own 9 documents. This corpus deliberately makes that gap
-large (260 customers, 193 pages each) so the BEFORE/AFTER delta reflects
+large (260 customers, 33 pages each) so the BEFORE/AFTER delta reflects
 that mechanism specifically, not just "reranking helps a little."
 
 ## Timing
 
-Seed: 8.8s · Embed: 104.7s · Search (200 labeled queries × 2 passes): 211.7s.
+Seed: 1.9s · Embed: 13.8s · Search (200 labeled queries × 2 passes): 36s.
+
+## Keyword-heavy + contextual chunk headers (r10c)
+
+A separate, adversarial eval set, measured with `db.searchPassages` directly
+(NOT `searchKnowledge`) so entity-first auto-scoping never narrows the search
+space and masks what this specifically measures. 60 ONE-PAGE
+documents were seeded, every one of them the exact SAME boilerplate repair
+sentence plus a unique serial number — no customer name anywhere in the page
+text at all (the customer is known only via that document's own
+`extractions` row, exactly the real-world case a technician's notes page
+never restates the customer's name). Each is the answer key for two labeled
+queries:
+
+- **buried** — the customer's name + a generic issue phrase, expecting that
+  customer's own page. With no header, every page embeds to (very nearly) the
+  same vector, and none of them mention any customer name at all — the right
+  one is an exact tie with 59 others.
+- **identifier** — an exact serial number, which the page's own text DOES
+  carry. This should hold up regardless of the header setting — identifier
+  matches are pinned by the existing keyword pass (recordsStore.js's
+  searchPassages), not the embedding.
+
+**noContext** embeds with `DONOVAN_CHUNK_CONTEXT=0` (every chunk looks exactly
+like a chunk embedded before this feature existed). **withContext** then
+re-embeds the SAME page with it back on (the default) — the document's own
+header, built from its `extractions` row and never printed on the page
+itself, is what tells otherwise-identical pages apart.
+
+| category | recall@5 (no context) | MRR (no context) | recall@5 (with context) | MRR (with context) |
+|---|---|---|---|---|
+| buried (customer name never on the page itself) | 0.05 | 0.013 | 0.767 | 0.488 |
+| identifier (exact serial, printed on the page) | 1 | 1 | 1 | 1 |
+
+Labelled honestly: the **identifier** row is expected to stay high in both
+columns (the mechanism it exercises does not depend on chunk embeddings at
+all) — it is here to show headers do not regress exact-match retrieval, not to
+show them improving it. The **buried** row is where a header should matter:
+without one, a page that never mentions its own customer has no way to be told
+apart from 59 other pages that read identically.
 
 ## Reproduce
 

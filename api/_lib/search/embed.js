@@ -27,6 +27,7 @@
  * Neither is ever logged here — only counts, token totals and status codes.
  */
 import { createHash } from 'node:crypto';
+import { documentTypeLabel } from '../documentTypes.js';
 
 export const VOYAGE_BASE_URL = 'https://api.voyageai.com/v1';
 export const DEFAULT_EMBED_MODEL = 'voyage-4-lite'; // same $0.02/M + 1024 dims as 3.5-lite, but 200M free tokens per account (3.5-lite has none)
@@ -68,6 +69,11 @@ export function embedConfig(env = process.env) {
     rerankModel: apiKey && !off ? rerankModel : '',
     rerankTimeoutMs: posInt(env.DONOVAN_RERANK_TIMEOUT_MS, 1200),
     dailyTokens: posInt(env.DONOVAN_EMBED_DAILY_TOKENS, 5_000_000),
+    // R10c: deterministic contextual chunk headers (see buildChunkContextHeader below), on by
+    // default. A production escape hatch, same shape as DONOVAN_SEMANTIC=0 — never needed in the
+    // ordinary case, but lets an owner turn this specific piece off without losing semantic search
+    // entirely if a header ever turns out to hurt some tenant's retrieval.
+    chunkContext: String(env.DONOVAN_CHUNK_CONTEXT ?? '1').trim() !== '0',
   };
 }
 
@@ -150,6 +156,71 @@ export function estimateTokens(texts) {
   let chars = 0;
   for (const t of texts) chars += String(t).length;
   return Math.ceil(chars / 3);
+}
+
+/* ------------------------------------------------------- contextual chunk headers */
+
+/**
+ * CONTEXTUAL CHUNK HEADERS (evidence: Anthropic's "Contextual Retrieval" reports large drops in
+ * retrieval failures from adding chunk context). A page chunked in isolation loses the facts that
+ * make it findable: a page 2 that only says "replaced the run capacitor, checked refrigerant
+ * levels" has no customer name, address or unit on it — those are on page 1. Prepending a short,
+ * deterministic header (built from structured facts the extraction pipeline already produced — see
+ * store.js's documentContextFacts) before embedding means every chunk of a document carries its own
+ * "what is this page about" context, independent of what that specific page happens to mention.
+ *
+ * NO MODEL CALL: this is a plain string template over already-extracted fields, not a summary an
+ * LLM writes. `facts` keys match the extraction field_keys documentContextFacts reads (plus
+ * `documentType`, from documents.document_type) — see extractFields.js's FIELD_SPECS for their
+ * canonical meaning. Pure; every field is optional, and a document with none of them yields ''
+ * (no header at all, same as before this feature existed).
+ *
+ * @param {{documentType?, customer_name?, service_address?, manufacturer?, model?, serial_number?, service_date?, technician?, invoice_number?}} facts
+ * @returns {string} e.g. "[Work order · Carol Rios · 581 W Thomas Rd, Casa Grande · Trane XR16 · 2025-06-12 · tech: M. Vega]", or '' when nothing is known yet.
+ */
+export function buildChunkContextHeader(facts = {}) {
+  const parts = [];
+  if (facts.documentType) {
+    const label = documentTypeLabel(facts.documentType);
+    if (label) parts.push(label);
+  }
+  if (facts.customer_name) parts.push(String(facts.customer_name).trim());
+  if (facts.service_address) parts.push(String(facts.service_address).trim());
+  const unit = [facts.manufacturer, facts.model].filter(Boolean).join(' ').trim();
+  if (unit) parts.push(unit);
+  if (facts.serial_number) parts.push(`S/N ${String(facts.serial_number).trim()}`);
+  if (facts.service_date) parts.push(String(facts.service_date).trim());
+  if (facts.technician) parts.push(`tech: ${String(facts.technician).trim()}`);
+  if (facts.invoice_number) parts.push(`inv ${String(facts.invoice_number).trim()}`);
+  return parts.length ? `[${parts.join(' · ')}]` : '';
+}
+
+/** Prepend `header` to `text` on its own line (never mid-sentence); `text` unchanged when there is no header. Pure. */
+export function withContextHeader(header, text) {
+  return header ? `${header}\n${text}` : text;
+}
+
+/**
+ * Which header generation a chunk's embedding reflects: 0 = none (embedded before this feature
+ * existed, or while DONOVAN_CHUNK_CONTEXT=0), CURRENT = the header buildChunkContextHeader produces
+ * today. Bump CURRENT when the header's shape changes materially enough that old chunks should be
+ * re-embedded; store.js's semantic backfill re-embeds anything below CURRENT (see M3-config/38).
+ */
+export const NO_CONTEXT_VERSION = 0;
+export const CURRENT_CONTEXT_VERSION = 1;
+
+/**
+ * Voyage's list price for voyage-4-lite / voyage-3.5-lite (see this file's header comment) — used
+ * ONLY to give an operator a rough $ estimate before they trigger a re-embed backfill, never to
+ * gate, bill or throttle anything.
+ */
+export const VOYAGE_USD_PER_MILLION_TOKENS = 0.02;
+
+/** Rough $ estimate for embedding `chunkCount` chunks at ~CHUNK_TARGET/3 tokens each (the same
+ *  chars/3 heuristic estimateTokens uses). A pre-flight number, not a billing figure. Pure. */
+export function estimateEmbedCostUsd(chunkCount, avgTokensPerChunk = Math.ceil(CHUNK_TARGET / 3)) {
+  const n = Math.max(0, Number(chunkCount) || 0);
+  return (n * avgTokensPerChunk * VOYAGE_USD_PER_MILLION_TOKENS) / 1_000_000;
 }
 
 /* -------------------------------------------------------------- HTTP client */

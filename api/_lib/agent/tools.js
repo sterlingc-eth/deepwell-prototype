@@ -46,6 +46,11 @@ import { computeExpression } from "./computeExpr.js";
 import { searchKnowledge } from "../search/knowledge.js";
 import { getDossier } from "../search/dossier.js";
 import { mapReduceAnswer } from "../search/mapReduce.js";
+// Knowledge Graph v1 (M3-config/37-knowledge-graph.sql, graph/{build,query}.js): the same
+// getSubgraph() the public GET /api/v1/graph route calls, wired in here as a tool so the research
+// agent can follow typed links (customer/site/unit/document/tech) with provenance, instead of
+// chaining follow_links/timeline calls by hand for a "how does X connect to Y" question.
+import { getSubgraph } from "../graph/query.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -424,7 +429,28 @@ export const RELATIONS_TOOL_DEF = {
   },
 };
 
-export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF, RELATIONS_TOOL_DEF];
+// DeepWell Knowledge Graph v1 (2026-09-26): a bounded, typed-edge neighborhood around one seed
+// node — customer/unit/document/tech/site — with provenance on every edge, so the model can
+// answer "how are these connected" / "what's linked to this invoice" questions by walking the
+// graph instead of chaining several follow_links/timeline calls and reasoning about the join itself.
+export const GRAPH_TRAVERSE_TOOL_NAME = "graph_traverse";
+export const GRAPH_TRAVERSE_TOOL_DEF = {
+  name: GRAPH_TRAVERSE_TOOL_NAME,
+  description:
+    "Walk the knowledge graph from one seed node — a customerId/equipmentId/documentId returned by another tool (given bare, e.g. the uuid itself; this tool adds the customer:/unit:/document: prefix), a technician name, or a 'site:<address key>' id from another graph_traverse result. Returns every node and typed edge (owns, located_at, has_unit, has_document, billed, has_agreement, performed_by, same_job) within a bounded number of hops, each edge citing the document and page it came from. Use this for 'how is X connected to Y', 'what else is linked to this unit/invoice/technician', or to find the PO that matches an invoice (same_job) — instead of several follow_links/timeline calls.",
+  input_schema: {
+    type: "object",
+    properties: {
+      node: { type: "string", description: "A bare id from another tool (a customerId/equipmentId/documentId) or an already-typed node id ('tech:mike r.', 'site:...') from a prior graph_traverse call." },
+      nodeType: { type: "string", enum: ["customer", "unit", "document", "tech", "site"], description: "Required when `node` is a bare uuid/name with no type prefix yet — customer, unit (equipment), document, tech, or site." },
+      depth: { type: "integer", description: "1-3 hops (default 2)." },
+      edgeTypes: { type: "array", items: { type: "string" }, description: "Optional filter, e.g. ['same_job'] to jump straight from an invoice to its PO." },
+    },
+    required: ["node"],
+  },
+};
+
+export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF, RELATIONS_TOOL_DEF, GRAPH_TRAVERSE_TOOL_DEF];
 export const ALL_TOOL_DEFS_V2 = [...TOOL_DEFS_V2, VIEW_PAGE_TOOL_DEF, ANSWER_TOOL_DEF];
 
 /* ----------------------------------------------------------------- ledger */
@@ -1144,6 +1170,30 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     return { ok: true, content: text, rowCount: 1, inputSummary: "compute" };
   }
 
+  /* ---- graph_traverse (v2): bounded typed-edge neighborhood, provenance on every edge ---- */
+  async function graphTraverseTool(input) {
+    const raw = typeof input?.node === "string" ? input.node.trim() : "";
+    if (!raw) return fail("node is required", "graph_traverse");
+    const typed = /^(customer|unit|document|tech|site):/.test(raw) ? raw
+      : input?.nodeType && ["customer", "unit", "document", "tech", "site"].includes(input.nodeType) ? `${input.nodeType}:${raw}`
+      : null;
+    if (!typed) return fail("node must already be typed ('customer:<id>', 'tech:<name>', ...) or nodeType must be given alongside a bare id", "graph_traverse");
+    const depth = Math.max(1, Math.min(3, Math.trunc(Number(input?.depth)) || 2));
+    const edgeTypes = Array.isArray(input?.edgeTypes) ? input.edgeTypes.filter((t) => typeof t === "string") : undefined;
+    let out;
+    try {
+      out = await getSubgraph({ withTenant, ctxArg, node: typed, depth, edgeTypes, limit: 100, today });
+    } catch (err) {
+      return fail(String(err?.message ?? err).slice(0, 300), "graph_traverse");
+    }
+    if (out.center == null) return fail("not a valid node id", "graph_traverse");
+    const text = JSON.stringify(out);
+    ledger.addShown(text);
+    for (const n of out.nodes) { const p = n.id.match(UUID_G)?.[0]; if (p) ledger.ids.add(p.toLowerCase()); }
+    for (const e of out.edges) if (e.source?.documentId) ledger.addDoc(e.source.documentId);
+    return { ok: true, content: text, rowCount: out.nodes.length, inputSummary: `graph_traverse:${typed}`, empty: out.nodes.length <= 1 };
+  }
+
   /* ---- get_dossier (v2, TEAM T2): a precomputed, cited rolling summary for one customer/unit ---- */
   async function getDossierTool(input) {
     const id = typeof input?.entityId === "string" ? input.entityId.trim().toLowerCase() : "";
@@ -1248,6 +1298,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
         else if (name === "run_query") r = await runQuery(input ?? {});
         else if (name === "filter_records") r = await filterRecords(input ?? {});
         else if (name === RELATIONS_TOOL_NAME) r = await relationsQuery(input ?? {});
+        else if (name === GRAPH_TRAVERSE_TOOL_NAME) r = await graphTraverseTool(input ?? {});
         else if (name === READ_DOCUMENT_TOOL_NAME) r = await readDocument(input ?? {});
         else if (name === GET_UNIT_TOOL_NAME) r = await getUnit(input ?? {});
         else if (name === FOLLOW_LINKS_TOOL_NAME) r = await followLinks(input ?? {});

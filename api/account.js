@@ -8,6 +8,7 @@ import outreach from "./_lib/routes/outreach.js";
 import followups from "./_lib/routes/followups.js";
 import expenses from "./_lib/routes/expenses.js";
 import financials from "./_lib/routes/financials.js";
+import graph from "./_lib/routes/graph.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -21,6 +22,7 @@ import financials from "./_lib/routes/financials.js";
  *   POST outreach             -> ?action=outreach (warranty-upsell email drafts, settings, send)
  *   POST followups            -> ?action=followups (missing-info technician follow-ups, settings, run)
  *   POST expenses             -> ?action=expenses (DeepWell's own business expenses; platform-operator only)
+ *   POST graph                -> ?action=graph   (Knowledge Graph v1: kg_edges backfill/refresh status; admin)
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
@@ -32,7 +34,7 @@ import financials from "./_lib/routes/financials.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");
