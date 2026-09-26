@@ -36,7 +36,7 @@
  */
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "../claude.js";
+import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
 import { assertModelBudget } from "../rateLimit.js";
 import { planCacheBreakpoints } from "../promptCache.js";
 import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usage.js";
@@ -304,6 +304,7 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
   let reason = "";
   let finalInput = null;
   let error;
+  let providerUnavailable = false;
 
   let pack = null;
   try { pack = await packForTenant({ withTenant, ctxArg }); } catch { pack = null; }
@@ -435,8 +436,19 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     await runTurns(maxTurns);
   } catch (err) {
     if (err?.name === "ModelBudgetExceededError") { await Promise.allSettled(records); throw err; }
-    reason = "error";
-    error = String(err?.message ?? err).slice(0, 200);
+    // ROUND 14: see loop.js's own comment on this same branch — a credits/auth/overload failure is
+    // recorded once, at the source, so every downstream consumer (scorecard runner, replay.js, the
+    // provider-status flag other model call sites check) sees it without re-parsing the raw error.
+    const provider = err?.name === "ProviderUnavailableError" ? { reason: err.reason, detail: err.detail } : classifyProviderError(err);
+    if (provider) {
+      recordProviderOutage(provider);
+      providerUnavailable = true;
+      reason = "provider-unavailable";
+      error = provider.detail || provider.reason;
+    } else {
+      reason = "error";
+      error = String(err?.message ?? err).slice(0, 200);
+    }
   }
 
   let shaped = null;
@@ -528,6 +540,7 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     handled,
     data: handled ? shaped.data : null,
     reason,
+    providerUnavailable,
     model: RESEARCH_MODEL,
     models: [RESEARCH_MODEL],
     ...totals,

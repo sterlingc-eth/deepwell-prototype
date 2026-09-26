@@ -48,6 +48,23 @@ const { classifyDecompose } = await import('../api/_lib/decompose/index.js');
   no('Compare apples to oranges for the Rios job'); // neither side is a recognized doc-type phrase
   no('Which customers had a callback this year?'); // callback alone, no other clause to intersect against
 
+  // R14 (K4): follow-up narrowing ("first question -- second question", the second answered as a
+  // further AND'd condition against the same universe) and the two new filter conditions (hasEmail,
+  // noPhone).
+  yes('Which customers have no email on file -- and how many of those are in Mesa?');
+  yes('which custs missing an e-mail -- and how many of those are in tucson'); // typo/abbrev tolerance
+  yes('Which customers have a Trane unit -- and which of those have an email on file?');
+  yes('Which customers have a Carrier unit -- and which of those have no phone number on file?');
+  no('Which customers have no email on file?'); // one clause, no " -- " second half -> below the floor
+  no('Which customers have a Carrier unit -- what is the weather today?'); // second half has no recognized clause
+
+  const flt2 = Clauses.parseFilterClauses('Which customers have a Trane unit and have an email on file?', HVAC_PACK);
+  eq('parseFilterClauses: recognizes brand + hasEmail', flt2.conditions.map((c) => c.type).sort(), ['brand', 'hasEmail'].sort());
+  const flt3 = Clauses.parseFilterClauses("Which customers have a Carrier unit and don't have a phone number on file?", HVAC_PACK);
+  eq('parseFilterClauses: recognizes brand + noPhone', flt3.conditions.map((c) => c.type).sort(), ['brand', 'noPhone'].sort());
+  const fu = Clauses.parseFollowupNarrowing('Which customers have a Trane unit -- and which of those have no email on file?', HVAC_PACK);
+  eq('parseFollowupNarrowing: merges conditions from both halves, deduped by type', fu.conditions.map((c) => c.type).sort(), ['brand', 'noEmail'].sort());
+
   const cmp = Clauses.parseComparison('Compare invoices vs POs for the Rios job');
   eq('parseComparison: doc-type phrases resolve to their canonical doc_kind', [cmp.aKinds, cmp.bKinds], [['invoice'], ['po']]);
   eq('parseComparison: subject captured verbatim (trailing "job" stripped by the regex)', cmp.subject, 'Rios');
@@ -195,6 +212,42 @@ await doc(13, { type: 'service-ticket', customer: 8, serviceDate: '2023-05-01' }
   // correctly on its own when asked directly.
   const overlapping = classifyDecompose('Which customers have a Carrier unit older than 10 years?', { pack: HVAC_PACK });
   check('classify: a 2-condition question decompose also understands is still answered correctly standalone', Boolean(overlapping));
+}
+
+/* ---------------------------------------------------------------- fixture: hasEmail / noPhone / follow-up */
+async function insertCustomerContact(n, name, address, { email = null, phone = null } = {}) {
+  await lite.query('INSERT INTO entities (id, tenant_id, entity_type, data, customer_number) VALUES ($1,$2,$3,$4::jsonb,$5)',
+    [cId(n), tenId, 'customer', JSON.stringify({ customer_name: name, service_address: address, email, phone }), `C-DC${String(n).padStart(4, '0')}`]);
+}
+// C15: Trane, has an email on file, has a phone -> qualifies "Trane + has email", excluded from "Trane + no email".
+await insertCustomerContact(15, 'HasEmail Hank', '15 Vine St, Mesa, AZ 85201', { email: 'hank@example.com', phone: '480-555-0101' });
+await insertEquipment(15, 15, 'Trane', '2018-01-01');
+// C16: Trane, NO email on file, no phone -> qualifies "Trane + no email" / "Trane + no phone".
+await insertCustomerContact(16, 'NoEmail Nora', '16 Lake Dr, Mesa, AZ 85201', { email: null, phone: null });
+await insertEquipment(16, 16, 'Trane', '2018-01-01');
+
+// The follow-up shape (parseFollowupNarrowing) always answers as a COUNT (every follow-up-category exam
+// item is cmp:"number", e.g. "Customers missing an email -- and how many of those are in Tucson?") — so
+// these check the count + citation records, not a name list in the text (a plain filter question with the
+// SAME two conditions, exercised separately below, is what actually lists names).
+{
+  const intent = classifyDecompose('Which customers have a Trane unit -- and which of those have no email on file?', { pack: HVAC_PACK });
+  eq('classify: follow-up narrowing always answers as a count (op)', intent.op, 'count');
+  const data = await withTenant(ctxArg, (db) => runDecompose(db, intent, { today: TODAY }));
+  check('decompose follow-up :: brand + noEmail answers with a hit', Boolean(data), JSON.stringify(data));
+  check('decompose follow-up :: counts NoEmail Nora but not HasEmail Hank', data?.records?.some((r) => r.label === 'NoEmail Nora') && !data?.records?.some((r) => r.label === 'HasEmail Hank'), JSON.stringify(data?.records));
+}
+{
+  const intent = classifyDecompose('Which customers have a Trane unit and have an email on file?', { pack: HVAC_PACK });
+  const data = await withTenant(ctxArg, (db) => runDecompose(db, intent, { today: TODAY }));
+  check('decompose filter :: brand + hasEmail :: HasEmail Hank qualifies', /HasEmail Hank/.test(data?.text ?? ''), data?.text);
+  check('decompose filter :: brand + hasEmail :: NoEmail Nora (no email) is excluded', !/NoEmail Nora/.test(data?.text ?? ''), data?.text);
+}
+{
+  const intent = classifyDecompose("Which customers have a Trane unit and don't have a phone number on file?", { pack: HVAC_PACK });
+  const data = await withTenant(ctxArg, (db) => runDecompose(db, intent, { today: TODAY }));
+  check('decompose filter :: brand + noPhone :: NoEmail Nora (no phone either) qualifies', /NoEmail Nora/.test(data?.text ?? ''), data?.text);
+  check('decompose filter :: brand + noPhone :: HasEmail Hank (has a phone) is excluded', !/HasEmail Hank/.test(data?.text ?? ''), data?.text);
 }
 
 /* ---------------------------------------------------------------- fixture: comparison */

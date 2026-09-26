@@ -21,11 +21,15 @@ import { runComparison } from './compare.js';
 import { todayIso, answerEnvelope } from '../scope.js';
 import { attachCitations, customerRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
+import { classifyWithTypoTolerance } from '../relations/normalize.js';
 
 /** Pure: question (+ the tenant's own industry pack, already resolved by ask.js before this is called —
- *  same convention as classifyRelationsQuestion/classifyDeterministic) -> a decompose intent, or null. */
+ *  same convention as classifyRelationsQuestion/classifyDeterministic) -> a decompose intent, or null.
+ *  Tries the raw question first (byte-identical to before R14) and, only if that fails, a couple of
+ *  typo/abbreviation-normalized candidates — see relations/normalize.js's own doc comment for why this
+ *  lives here rather than in ask.js. */
 export function classifyDecompose(question, { pack } = {}) {
-  return parseDecompose(question, pack);
+  return classifyWithTypoTolerance(question, (q) => parseDecompose(q, pack));
 }
 
 /** One short, human sentence naming every condition applied — same "list every condition in one basis
@@ -43,6 +47,8 @@ function describeClause(cond) {
     case 'lacksDocType': return `have no ${cond.phrase} on file`;
     case 'geoCity': return `have a service address in ${cond.value}`;
     case 'noEmail': return 'have no email on file';
+    case 'hasEmail': return 'have an email on file';
+    case 'noPhone': return 'have no phone number on file';
     case 'unitCountGt': return `have more than ${cond.n} unit${cond.n === 1 ? '' : 's'}`;
     case 'distinctBrandsGte': return `have units from ${cond.n} or more different brands`;
     case 'technician': return `have been serviced by ${cond.name}`;

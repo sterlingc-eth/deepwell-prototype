@@ -24,6 +24,7 @@
  * failed miss write never delays, and never fails, the customer's answer.
  */
 import { withTenant } from './recordsStore.js';
+import { getProviderOutage } from './claude.js';
 
 /** Outcome codes this file writes — the single source of truth api/ask.js,
  *  api/review.js and scripts/miss-review.mjs all import rather than
@@ -49,7 +50,33 @@ export const MISS_OUTCOMES = {
   USER_MARKED_WRONG: 'user-marked-wrong',
   // The Donovan Scorecard (api/_lib/scorecard) asked a golden-exam question and the answer did not match its oracle.
   SCORECARD_FAIL: 'scorecard-fail',
+  // ROUND 14 (owner: "405 misses" that were really the Anthropic account being out of credits): the
+  // outcome insertAskMiss REWRITES a model-dependent outcome to, below, whenever the provider is
+  // currently marked unavailable — never written directly by a call site. Kept as a plain TEXT value
+  // (no CHECK on this column, same as every other outcome here) so list_ask_misses_window
+  // (M3-config/48) can exclude it from the cross-tenant digest/learning feed with one WHERE clause.
+  PROVIDER_UNAVAILABLE: 'provider-unavailable',
 };
+
+/** Outcomes that can ONLY happen because a model call was needed and failed — the ones a provider
+ *  outage can produce. An outcome NOT in this set (a deterministic zero-match, a gated fallback) means
+ *  something else decided the answer, so it is never rewritten even while the provider is down.
+ *
+ *  Reviewer NO-GO (2026-09-26, round 14): SCORECARD_FAIL must NEVER be in this set. Unlike the other
+ *  three (which all mean "no answer was produced at all"), a SCORECARD_FAIL is recorded ONLY for a
+ *  question that got a REAL answer and was graded WRONG against the oracle (scorecard/runner.js's own
+ *  outer loop only feeds this outcome for a non-`skipped` result — the "the provider is down and this
+ *  question got no answer at all" case is already handled separately, upstream, by that same runner,
+ *  before a SCORECARD_FAIL is ever produced). Keeping it here meant a genuinely wrong, fully-answered
+ *  deterministic-path question (a det-planner/relations/decompose bug just like the ones this round's
+ *  own review found) would get silently hidden behind an outage flag that could be true for a reason
+ *  entirely unrelated to this question — e.g. a DIFFERENT question in the same run tripped it moments
+ *  earlier — masking a real regression for as long as that flag stays set. */
+const MODEL_DEPENDENT_OUTCOMES = new Set([
+  MISS_OUTCOMES.NO_ANSWER,
+  MISS_OUTCOMES.AGENT_NO_ANSWER,
+  MISS_OUTCOMES.ANALYTICS_FALLTHROUGH,
+]);
 
 const MAX_QUESTION_CHARS = 300;
 
@@ -90,6 +117,16 @@ let warnedMissingTable = false;
  */
 export async function insertAskMiss(db, { question, questionNormalized, outcome, detectedConditions, plan } = {}) {
   if (!db || !outcome) return;
+  // ROUND 14: a "no answer"/"agent gave up"/"analytics fell through"/scorecard-fail miss recorded
+  // while the AI provider is known to be unavailable right now (out of credits, bad key, overloaded —
+  // see api/_lib/claude.js's recordProviderOutage) did not happen because Donovan is missing a
+  // capability; it happened because nothing could even ask the model. Recording it under its own
+  // outcome, rather than under whatever the caller asked for, keeps it OUT of "Donovan misses" counts
+  // and out of the learning proposer's fodder (both read list_ask_misses_window, M3-config/48, which
+  // excludes this outcome) while still leaving an honest trail in this tenant's own ask_misses table.
+  if (MODEL_DEPENDENT_OUTCOMES.has(outcome) && getProviderOutage()) {
+    outcome = MISS_OUTCOMES.PROVIDER_UNAVAILABLE;
+  }
   // SAVEPOINT: this runs inside the caller's withTenant transaction. If the
   // table is missing (migration 23 not yet run) the failed INSERT must not
   // abort that transaction and silently roll back the audit / usage rows

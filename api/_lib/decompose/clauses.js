@@ -108,10 +108,22 @@ function docTypeMention(q, phrase) {
 // first so "Casa Grande" wins over a shorter city that happens to be a substring of it.
 const CITY_NAMES_BY_LENGTH = [...new Set([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES])].sort((a, b) => b.length - a.length);
 function geoCityFrom(q) {
-  if (!/\bin\s+[A-Z]/.test(q)) return null;
-  const lower = q.toLowerCase();
-  const hit = CITY_NAMES_BY_LENGTH.find((c) => new RegExp(`\\bin\\s+${reEscape(c)}\\b`, 'i').test(lower));
-  return hit ? hit.replace(/\b\w/g, (ch) => ch.toUpperCase()) : null;
+  if (/\bin\s+[A-Za-z]/.test(q)) {
+    const lower = q.toLowerCase();
+    const hit = CITY_NAMES_BY_LENGTH.find((c) => new RegExp(`\\bin\\s+${reEscape(c)}\\b`, 'i').test(lower));
+    if (hit) return hit.replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+  // R14 (K4): a follow-up narrowing's own idiom — "...what about just the Mesa ones?" — names the city
+  // with no "in" at all. Matched the same way (longest known city name first) against ONLY this one
+  // extra shape, never a bare "the Mesa ones" with no "just" (too easy to collide with an unrelated
+  // "the <adjective> ones" sentence that never meant a city).
+  const justThe = /\bjust the ([A-Za-z][A-Za-z .'-]*?) ones\b/i.exec(q);
+  if (justThe) {
+    const lower = justThe[1].toLowerCase().trim();
+    const hit = CITY_NAMES_BY_LENGTH.find((c) => c === lower);
+    if (hit) return hit.replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+  return null;
 }
 
 // "no visit since 2024" / "haven't had a service visit since 2024" / "no service since 2024" — an
@@ -126,29 +138,33 @@ const CALLBACK_DAYS_RE = /\bcallback\s+within\s+(\d{1,4})\s*days?\b/i;
 const CALLBACK_THIS_YEAR_RE = /\bhad\s+a\s+callback\s+this\s+year\b/i;
 const CALLBACK_SINCE_RE = /\bhad\s+a\s+callback\s+since\s+(\d{4})\b/i;
 
-const AGE_OLDER_RE = /\bolder than\s+(\d{1,3})\s*years?\b/i;
+// "older than 10 years" / "over 10 years old" — both real phrasings the exam's own two-condition
+// category uses for the identical shape ("a unit over 10 years old" alongside "older than 10 years").
+const AGE_OLDER_RE = /\b(?:older than|over)\s+(\d{1,3})\s*years?(?:\s+old)?\b/i;
 // "installed more than N days ago" — a DAY-accurate cutoff (today - N days), distinct from AGE_OLDER_RE's
 // year-truncated comparison; compose.js's own 'ageOlder' has no vocabulary for this at all, so it was
 // previously silently dropped here too (breadth-connect-052/056-059, golden tenant).
 const AGE_OLDER_DAYS_RE = /\binstalled\s+more\s+than\s+(\d{1,4})\s*days?\s+ago\b/i;
-const WARRANTY_EXPIRED_RE = /\bexpired\s+warrant(?:y|ies)\b/i;
+// R14 (K4): "out of warranty" / "warranty (already) lapsed" are the SAME 'expired' status compose.js's
+// warrantyStatus condition already computes (warrantyRules.js's own three-bucket expired/expiring/active) —
+// just two more everyday phrasings for it, never a new status.
+const WARRANTY_EXPIRED_RE = /\bexpired\s+warrant(?:y|ies)\b|\bwarrant(?:y|ies)\s+(?:already\s+)?lapsed\b|\bout\s+of\s+warranty\b/i;
 const WARRANTY_EXPIRING_RE = /\bwarrant(?:y|ies)\s+expiring\b|\bexpiring\s+warrant(?:y|ies)\b/i;
 const WARRANTY_ACTIVE_RE = /\bactive\s+warrant(?:y|ies)\b/i;
-const NO_EMAIL_RE = /\bno\s+email\b/i;
+const NO_EMAIL_RE = /\b(?:no|missing|without)\s+(?:an?\s+)?email\b|\bemail\b.*\bmissing\b/i;
+// R14 (K4): the positive counterpart — "have email on file" / "with an email on file" — needed for a
+// follow-up narrowing ("...and how many of those have email on file?"), never confused with NO_EMAIL_RE
+// (checked first by parseFilterClauses) since that one already claims every negated phrasing.
+const HAS_EMAIL_RE = /\bhave\s+(?:an?\s+)?email\b|\bemail\s+on\s+file\b/i;
+const NO_PHONE_RE = /\b(?:no|missing|without)\s+(?:a\s+)?phone\b|\bdon'?t have\s+(?:a\s+)?phone\b/i;
 const UNIT_COUNT_RE = /\bmore than\s+(\d{1,3}|one)\s+units?\b/i;
 const BRAND_SPREAD_RE = /\b(two|three|four|\d+)\s+or more\s+different\s+brands\b/i;
 const TECHNICIAN_RE = /\bserviced by\s+([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2})\b/;
 
-/**
- * Pure: question + tenant pack -> {mode:'filter', conditions: Condition[]} or null. Requires at least
- * TWO recognized clauses (a single-condition question belongs to compose.js/analytics.js, which already
- * answer it well) UNLESS one of them is decompose's own callback/noVisitSinceYear clause standing next to
- * at least one other recognized clause — a bare "which customers had a callback this year" with no other
- * condition at all is not this engine's job either (no entity filter to intersect against).
- */
-export function parseFilterClauses(question, pack) {
-  const q = String(question ?? '').trim();
-  if (!q) return null;
+/** Pure: every condition clause `q` names, in a closed vocabulary shared by parseFilterClauses and the
+ *  follow-up combo parser below — factored out so a two-part "-- " question can collect conditions from
+ *  EACH half with the exact same detectors, rather than a second, drifting copy of this list. */
+function collectConditions(q, pack) {
   const conditions = [];
 
   const brands = (pack?.brands ?? []).filter((b) => new RegExp(`\\b${reEscape(b)}\\b`, 'i').test(q));
@@ -182,7 +198,13 @@ export function parseFilterClauses(question, pack) {
   else if (CALLBACK_THIS_YEAR_RE.test(q)) conditions.push({ type: 'callback', days: null, scope: 'thisYear' });
   else if (cbYear) conditions.push({ type: 'callback', days: null, scope: 'sinceYear', year: Number(cbYear[1]) });
 
+  // R14 (K4): NO_EMAIL_RE checked first — it already claims every negated phrasing ("no email", "missing
+  // an email") — so HAS_EMAIL_RE only ever fires on the positive phrasing a follow-up narrowing uses
+  // ("...have email on file?"), never double-counted against the same clause.
   if (NO_EMAIL_RE.test(q)) conditions.push({ type: 'noEmail' });
+  else if (HAS_EMAIL_RE.test(q)) conditions.push({ type: 'hasEmail' });
+
+  if (NO_PHONE_RE.test(q)) conditions.push({ type: 'noPhone' });
 
   const unitCount = UNIT_COUNT_RE.exec(q);
   if (unitCount) conditions.push({ type: 'unitCountGt', n: /^\d+$/.test(unitCount[1]) ? Number(unitCount[1]) : 1 });
@@ -193,6 +215,20 @@ export function parseFilterClauses(question, pack) {
   const tech = TECHNICIAN_RE.exec(q);
   if (tech) conditions.push({ type: 'technician', name: tech[1] });
 
+  return conditions;
+}
+
+/**
+ * Pure: question + tenant pack -> {mode:'filter', conditions: Condition[]} or null. Requires at least
+ * TWO recognized clauses (a single-condition question belongs to compose.js/analytics.js, which already
+ * answer it well) UNLESS one of them is decompose's own callback/noVisitSinceYear clause standing next to
+ * at least one other recognized clause — a bare "which customers had a callback this year" with no other
+ * condition at all is not this engine's job either (no entity filter to intersect against).
+ */
+export function parseFilterClauses(question, pack) {
+  const q = String(question ?? '').trim();
+  if (!q) return null;
+  const conditions = collectConditions(q, pack);
   if (conditions.length < 2) return null;
   const op = /^\s*how many\b/i.test(q) ? 'count' : 'list';
 
@@ -205,18 +241,48 @@ export function parseFilterClauses(question, pack) {
   // condition already narrows the question to (in practice) at most one qualifying unit per customer;
   // a bare "units in <City>..." with no brand has no such narrowing, so this returns null (fall through)
   // rather than risk the same undercount — an honest non-claim, never a wrong count.
-  if (op === 'count' && /\bunits?\b/i.test(q) && !/\bcustomers?\b/i.test(q) && !brands.length
+  const brands = conditions.find((c) => c.type === 'brand');
+  if (op === 'count' && /\bunits?\b/i.test(q) && !/\bcustomers?\b/i.test(q) && !brands
     && conditions.some((c) => c.type === 'hasDocType' || c.type === 'lacksDocType')) {
     return null;
   }
   return { mode: 'filter', op, conditions };
 }
 
+// "<premise clause> -- <narrowing clause>": a compact, self-contained conversational follow-up ("Expired
+// warranties -- what about just the Mesa ones?", "Mesa customers -- and how many of those have email on
+// file?") — every observed instance of this shape (R14 golden tenant) asks for a COUNT of the narrowed
+// set, whether or not it happens to literally say "how many", so this is the one place op is fixed rather
+// than sniffed from the text. Each half is parsed with the exact same collectConditions detectors as a
+// single, ordinary filter question — never a special-cased regex against the WHOLE sentence, so a
+// paraphrase or typo'd variant of either half (already run through this file's own typo-tolerant
+// candidates — see relations/normalize.js) is caught the same way a one-shot two-condition question is.
+const FOLLOWUP_SPLIT_RE = /\s+--\s+/;
+
+/** Pure: question + tenant pack -> {mode:'filter', op:'count', conditions} or null. */
+export function parseFollowupNarrowing(question, pack) {
+  const q = String(question ?? '').trim();
+  if (!FOLLOWUP_SPLIT_RE.test(q)) return null;
+  const [first, ...rest] = q.split(FOLLOWUP_SPLIT_RE);
+  const second = rest.join(' -- ').trim();
+  if (!first || !second) return null;
+  const seen = new Set();
+  const conditions = [];
+  for (const cond of [...collectConditions(first, pack), ...collectConditions(second, pack)]) {
+    if (seen.has(cond.type)) continue; // the SAME clause type named twice ("Mesa" in both halves) counts once
+    seen.add(cond.type);
+    conditions.push(cond);
+  }
+  if (conditions.length < 2) return null;
+  return { mode: 'filter', op: 'count', conditions };
+}
+
 /** Pure entry point: comparison shape tried first (structurally distinct from a conjunctive filter list),
- *  then the conjunctive-clause parse. Returns null the moment neither recognizes the question — decompose/
- *  index.js falls through to the normal chain exactly like every other deterministic router here. */
+ *  then a follow-up narrowing ("X -- what about just the Y ones?"), then the ordinary conjunctive-clause
+ *  parse. Returns null the moment none of the three recognizes the question — decompose/index.js falls
+ *  through to the normal chain exactly like every other deterministic router here. */
 export function parseDecompose(question, pack) {
-  return parseComparison(question) ?? parseFilterClauses(question, pack);
+  return parseComparison(question) ?? parseFollowupNarrowing(question, pack) ?? parseFilterClauses(question, pack);
 }
 
 export { docTypePhrases };

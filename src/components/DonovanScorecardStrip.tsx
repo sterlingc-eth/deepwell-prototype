@@ -58,7 +58,10 @@ export function DonovanScorecardStrip() {
     setProgress({ offset: 0, total: status?.exam.questions ?? 0, spentUsd: 0 });
     try {
       const last = await runScorecardAll(opts, setProgress);
-      const stop = last.stopped === 'budget' ? ` Stopped at the $${status?.budgetUsd ?? 5} spend limit.` : last.stopped === 'model-budget' ? ' Stopped: daily AI budget reached.' : last.stopped === 'deadline' ? ' Stopped early (time).' : '';
+      const stop = last.stopped === 'budget' ? ` Stopped at the $${status?.budgetUsd ?? 5} spend limit.`
+        : last.stopped === 'model-budget' ? ' Stopped: daily AI budget reached.'
+        : last.stopped === 'model-credits' ? ' Paused: the AI provider is out of credits.'
+        : last.stopped === 'deadline' ? ' Stopped early (time).' : '';
       setNote(`Finished: ${last.run?.passed ?? 0} of ${last.run?.answered ?? 0} right, $${last.spentUsd.toFixed(2)} spent.${stop}`);
       load();
     } catch (e) {
@@ -80,6 +83,11 @@ export function DonovanScorecardStrip() {
   const citeDelta = cite?.coverage != null && prevCite != null ? cite.coverage - prevCite : null;
   const arrow = (d: number | null) => (d == null || Math.abs(d) < 0.005 ? '' : `${d > 0 ? ' ▲' : ' ▼'}${Math.abs(Math.round(d * 100))}`);
   const noExam = status != null && status.exam.questions === 0;
+  // ROUND 14 (owner: "live scorecard shows 36%" — really "4 of 11 right" because every question that
+  // needed the model was skipped mid-run when the AI provider ran out of credits): a run that stopped
+  // for that reason gets its own honest banner instead of a percentage over a near-empty sample.
+  const paused = run0?.status === 'stopped' && run0.stopReason === 'model-credits';
+  const providerDown = Boolean(status?.providerStatus);
 
   return (
     <div className="rounded-lg border border-line bg-surface-2/40 p-3 space-y-2" data-testid="scorecard-strip">
@@ -116,6 +124,13 @@ export function DonovanScorecardStrip() {
       {note && <p className="text-caption text-ink-2">{note}</p>}
       {error && <p role="alert" className="text-caption text-bad-ink">{error}</p>}
       {noExam && <p className="text-caption text-ink-3">The exam file is not deployed with this build.</p>}
+
+      {(paused || providerDown) && run0 && (
+        <p role="status" className="text-caption dw-pill-warn !inline-block" data-testid="scorecard-paused">
+          Paused — AI provider credits are exhausted; {run0.answered} question{run0.answered === 1 ? '' : 's'} answered
+          without AI: {pct(run0.score)} correct.
+        </p>
+      )}
 
       {run0 && (
         <div className="grid grid-cols-3 gap-2" aria-label="Scorecard headline numbers">

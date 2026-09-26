@@ -101,6 +101,21 @@ export async function decideProposal(id, status, decidedBy) {
   }
 }
 
+/** Same as decideProposal, plus a human-readable `reason` note on the row (M3-config/48's
+ *  learning_decide_reason — learning_decide itself never touches the `reason` column). Used for the
+ *  ROUND 14 capability_gap auto-resolve ("fixed — answered now") — see learning/replay.js's
+ *  autoResolveCapabilityGaps. Falls back to plain decideProposal (losing only the note, never the
+ *  status change) when migration 48 is not applied yet, so this never regresses to "does nothing". */
+export async function decideProposalWithReason(id, status, decidedBy, reason) {
+  try {
+    const { rows } = await getPool().query('SELECT learning_decide_reason($1,$2,$3,$4) AS ok', [id, status, decidedBy ?? null, reason ?? null]);
+    return Boolean(rows[0]?.ok);
+  } catch (err) {
+    warnOnce('learning_decide_reason', err);
+    return decideProposal(id, status, decidedBy);
+  }
+}
+
 /** Retires one learned row (sets active=false) without deleting it — the
  *  overlay loader (learning/overlay.js) only ever reads active=true rows, so
  *  this is how a bad learned item gets turned off without losing the

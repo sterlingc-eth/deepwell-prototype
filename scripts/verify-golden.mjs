@@ -221,9 +221,13 @@ if (examExport) {
     );
 
     // Coverage floor (deliverable #2) — regressions in no-model coverage fail CI; the floor sits a
-    // little below the measured value (318/272) so ordinary noise doesn't flake this.
-    check(`no-model coverage floor: answeredWithoutModel ≥ 300 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 300, JSON.stringify(overall));
-    check(`no-model coverage floor: correct ≥ 260 (got ${overall.correct})`, overall.correct >= 260, JSON.stringify(overall));
+    // little below the measured value so ordinary noise doesn't flake this. Round 14 (K3): raised
+    // from 300/260 to 520/460 after the deterministic analytics planner (api/_lib/analytics/detPlan.js)
+    // moved counts-geo/brand/age/warranty/docs, coverage, data-hygiene, existence, lists, technician
+    // and most of time/data-quality off the model entirely (measured 532/474 at the time of this
+    // change). Combined with K4 relations/decompose work at integration: measured 582/521 → floor 565/505.
+    check(`no-model coverage floor: answeredWithoutModel ≥ 565 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 565, JSON.stringify(overall));
+    check(`no-model coverage floor: correct ≥ 505 (got ${overall.correct})`, overall.correct >= 505, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 
     realLog(`NOTE  golden offline exam: ${JSON.stringify(overall)}`);

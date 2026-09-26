@@ -22,7 +22,7 @@
  */
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "../claude.js";
+import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
 import { assertModelBudget } from "../rateLimit.js";
 import { planCacheBreakpoints } from "../promptCache.js";
 import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usage.js";
@@ -209,6 +209,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
   let reason = "";
   let finalInput = null;
   let error;
+  let providerUnavailable = false;
 
   // The shop's catalogue rides in the cached system prompt (per-tenant, 10-minute window) instead of a
   // model round that calls describe_data. A failure here only costs the shortcut, never the run.
@@ -299,8 +300,22 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
     if (!reason) reason = "turn-cap";
   } catch (err) {
     if (err?.name === "ModelBudgetExceededError") throw err;
-    reason = "error";
-    error = String(err?.message ?? err).slice(0, 200);
+    // ROUND 14: the Anthropic account being out of credits/overloaded/misconfigured is not the SAME
+    // kind of failure as a timeout or a malformed request — it means no model call anywhere in this
+    // process can succeed right now. Recording it here (once, at the source) lets every downstream
+    // consumer of this run's `reason`/`providerUnavailable` (replay.js's FAIL_REASON map, the
+    // scorecard runner, ask.js's own fallback chain) tell "Donovan couldn't answer" apart from
+    // "nobody could ask the model at all", without each of them re-parsing the raw SDK error.
+    const provider = err?.name === "ProviderUnavailableError" ? { reason: err.reason, detail: err.detail } : classifyProviderError(err);
+    if (provider) {
+      recordProviderOutage(provider);
+      providerUnavailable = true;
+      reason = "provider-unavailable";
+      error = provider.detail || provider.reason;
+    } else {
+      reason = "error";
+      error = String(err?.message ?? err).slice(0, 200);
+    }
   }
   await Promise.allSettled(records);
 
@@ -324,6 +339,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
     handled,
     data: handled ? shaped.data : null,
     reason,
+    providerUnavailable,
     model,
     ...totals,
     costUsd,
@@ -385,7 +401,10 @@ export async function runDonovanAgent(p) {
   if (startOnSonnet) escalation = { from: AGENT_MODEL, to: sonnet, reason: firstReason };
   else if (firstReason) escalation = { skipped: gate?.why ?? "unavailable", wanted: firstReason };
 
-  const why = !startOnSonnet && canEscalate && !firstReason ? needsEscalation(first) : null;
+  // ROUND 14: a Haiku run that failed because the PROVIDER is unavailable would fail on Sonnet for the
+  // exact same reason (it's the same account) — escalating just spends the deadline on a second doomed
+  // call. needsEscalation is never even asked in that case.
+  const why = !startOnSonnet && canEscalate && !firstReason && !first.providerUnavailable ? needsEscalation(first) : null;
   if (why) {
     const g = await getGate();
     if (!g.allowed) escalation = { skipped: g.why, wanted: why };

@@ -39,6 +39,7 @@ import { buildMissDigest, sendMissDigest, isPlatformOperator } from './_lib/miss
 // even the founder shop's non-founder admins, gets 403 on all five.
 import * as learningStore from './_lib/learning/store.js';
 import { verifyProposalLive } from './_lib/learning/verify.js';
+import { normalizeGapTitle } from './_lib/learning/proposals.js';
 import { runLearningNow } from './_lib/learning/sweep.js';
 // Donovan learning loop (miss replay, recipes, thumbs feedback): api/_lib/learning/replay.js.
 import { replayMisses, replayCapabilityGap, applyThumbsUp, applyThumbsDown, missKey } from './_lib/learning/replay.js';
@@ -77,8 +78,8 @@ import { dossierStatus, runDossierBackfillPage } from './_lib/search/dossier.js'
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -161,6 +162,7 @@ const ACTIONS = new Set([
   'learningRunNow',
   'learningExport',
   'learningReplay',
+  'learningRejectAllGaps',
   'askFeedback',
   'scorecardRun',
   'scorecardStatus',
@@ -346,9 +348,27 @@ export default async (req, res) => {
         const open = await listOpenMisses(ctx, { limit: 200 });
         const gapKeys = items.filter((p) => p.kind === 'capability_gap' && p.payload?.example).map((p) => missKey(p.payload.example));
         const gapReplays = await listReplays(ctx, gapKeys);
+        const withReplay = items.map((p) => (p.kind === 'capability_gap' && p.payload?.example && gapReplays.has(missKey(p.payload.example))
+          ? { ...p, replay: gapReplays.get(missKey(p.payload.example)) } : p));
+        // ROUND 14 (brief item 4, "dedupe gaps by normalized title"): the same missing capability gets
+        // proposed once per differently-worded example question, which is what turned "a handful of
+        // real gaps" into "71 pending". Folded here (display time), not at proposal time — each
+        // underlying proposal keeps its own id/example/evidence for "Reject all" to act on, listed in
+        // `groupIds`; only the representative (the most recent — items is already newest-first) is
+        // returned, carrying `groupCount`.
+        const nonGap = withReplay.filter((p) => p.kind !== 'capability_gap');
+        const gapGroups = new Map();
+        for (const p of withReplay) {
+          if (p.kind !== 'capability_gap') continue;
+          const key = normalizeGapTitle(p.payload?.title);
+          const g = gapGroups.get(key);
+          if (g) g.ids.push(p.id); else gapGroups.set(key, { rep: p, ids: [p.id] });
+        }
+        const dedupedGaps = [...gapGroups.values()].map(({ rep, ids }) => (
+          ids.length > 1 ? { ...rep, groupCount: ids.length, groupIds: ids } : rep
+        ));
         result = {
-          items: items.map((p) => (p.kind === 'capability_gap' && p.payload?.example && gapReplays.has(missKey(p.payload.example))
-            ? { ...p, replay: gapReplays.get(missKey(p.payload.example)) } : p)),
+          items: [...nonGap, ...dedupedGaps],
           activeLearned,
           summary: {
             recipesActive: activeLearned.filter((r) => r.kind === RECIPE_KIND).length,
@@ -416,6 +436,22 @@ export default async (req, res) => {
         requireOperator(auth);
         result = await runLearningNow();
         break;
+      case 'learningRejectAllGaps': {
+        // ROUND 14 (brief item 4): bulk-reject "Can't do yet" (capability_gap) notes — the whole
+        // pending queue when no `ids` are given (the card's own "Reject all feature requests"), or
+        // just one dedupe group's ids (a group's own "Reject all" — see review.js's learningList,
+        // which folds duplicate-titled capability_gap proposals into one row with `groupIds`).
+        requireOperator(auth);
+        const ids = Array.isArray(payload.ids)
+          ? payload.ids.filter((id) => typeof id === 'string' && id).slice(0, 500)
+          : (await learningStore.listProposals({ status: 'pending', limit: 1000 })).filter((p) => p.kind === 'capability_gap').map((p) => p.id);
+        let rejected = 0;
+        for (const id of ids) {
+          if (await learningStore.decideProposal(id, 'rejected', auth.userId)) rejected++;
+        }
+        result = { rejected };
+        break;
+      }
       case 'learningReplay': {
         requireOperator(auth);
         const questions = Array.isArray(payload.questions)

@@ -38,7 +38,6 @@ import {
   existenceWrap,
   CONDITION_CROSS_VISIT_RELATION,
   CONDITION_RATIO,
-  BOOLEAN_FILTER_FIELDS,
   DOC_TYPE_FILTER_FIELDS,
   validatePlan,
   deriveGeo,
@@ -65,6 +64,10 @@ import { dateBasisOf, todayIso, splitFuture } from '../scope.js';
 // file's own analytics cache promptVersion (see runAnalyticsQuestion below)
 // so approving a new example invalidates every previously-cached plan.
 import { overlayFewShotHash } from '../learning/overlay.js';
+// Round 14 (K3): the deterministic planner tried BEFORE ever spending a
+// model call — see planAnalyticsQuestion below and detPlan.js's own doc
+// comment for the "never guess" contract.
+import { detectAnalyticsPlan } from '../analytics/detPlan.js';
 
 export const ANALYTICS_MODEL = process.env.ANALYTICS_MODEL || process.env.ASK_MODEL || 'claude-haiku-4-5';
 export function isAnalyticsEnabled(env = process.env) {
@@ -80,36 +83,45 @@ export function isAnalyticsEnabled(env = process.env) {
  */
 export async function planAnalyticsQuestion(question, { today, overlay, tenantVocab } = {}) {
   try {
-    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
-    const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
-    // Tier 2 learning (Part A): the active overlay's approved few-shot
-    // examples, appended after the curated ANALYTICS_FEW_SHOT_BLOCK — see
-    // buildAnalyticsSystemPrompt's own doc comment for the 12-item/500-token
-    // cap. No overlay (or none with few-shot items) returns the exact same
-    // ANALYTICS_SYSTEM_PROMPT constant as before this existed.
-    // Round 11 (literature #6, schema linking): `tenantVocab` (vocab/tenantVocab.js's getTenantVocab),
-    // when present, contributes a short, question-relevant subset of this tenant's own brand/document-
-    // type/city vocabulary — omitted (no tenantVocab, or none of it matches this question) leaves the
-    // prompt byte-identical to before this existed.
-    const systemPrompt = buildAnalyticsSystemPrompt({ extraFewShot: overlay?.fewShot, vocabLines: schemaLinkedVocabLines(question, tenantVocab) });
-    const response = await withBackoff(
-      () =>
-        client.messages.create(
-          {
-            model: ANALYTICS_MODEL,
-            max_tokens: 400,
-            temperature: 0,
-            system: systemPrompt,
-            tools: [ANALYTICS_TOOL],
-            tool_choice: { type: 'tool', name: 'analytics_plan' },
-            messages: [{ role: 'user', content: `Today's date: ${today}\n\nQUESTION: ${question}` }],
-          },
-          { timeout: Math.max(1000, deadlineAt - Date.now()) }
-        ),
-      { deadlineAt }
-    );
-    const toolUse = response.content.find((b) => b.type === 'tool_use');
-    const rawInput = toolUse?.input;
+    // Round 14 (K3): try the deterministic planner FIRST — no model call, no
+    // I/O, no cost. Its result (the same {entity, op, groupBy?, filters?,
+    // sortBy?} shape a tool_use `input` has) is fed through the EXACT SAME
+    // post-processing a model plan gets below; the model is only ever
+    // called when detectAnalyticsPlan returns null (an unrecognized shape —
+    // see that file's own "never guess" doc comment).
+    let rawInput = detectAnalyticsPlan(question);
+    if (!rawInput) {
+      const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
+      const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
+      // Tier 2 learning (Part A): the active overlay's approved few-shot
+      // examples, appended after the curated ANALYTICS_FEW_SHOT_BLOCK — see
+      // buildAnalyticsSystemPrompt's own doc comment for the 12-item/500-token
+      // cap. No overlay (or none with few-shot items) returns the exact same
+      // ANALYTICS_SYSTEM_PROMPT constant as before this existed.
+      // Round 11 (literature #6, schema linking): `tenantVocab` (vocab/tenantVocab.js's getTenantVocab),
+      // when present, contributes a short, question-relevant subset of this tenant's own brand/document-
+      // type/city vocabulary — omitted (no tenantVocab, or none of it matches this question) leaves the
+      // prompt byte-identical to before this existed.
+      const systemPrompt = buildAnalyticsSystemPrompt({ extraFewShot: overlay?.fewShot, vocabLines: schemaLinkedVocabLines(question, tenantVocab) });
+      const response = await withBackoff(
+        () =>
+          client.messages.create(
+            {
+              model: ANALYTICS_MODEL,
+              max_tokens: 400,
+              temperature: 0,
+              system: systemPrompt,
+              tools: [ANALYTICS_TOOL],
+              tool_choice: { type: 'tool', name: 'analytics_plan' },
+              messages: [{ role: 'user', content: `Today's date: ${today}\n\nQUESTION: ${question}` }],
+            },
+            { timeout: Math.max(1000, deadlineAt - Date.now()) }
+          ),
+        { deadlineAt }
+      );
+      const toolUse = response.content.find((b) => b.type === 'tool_use');
+      rawInput = toolUse?.input;
+    }
     // Live miss (2026-09-21, "which units had service this month"): a
     // "<units/equipment/customers> <had/got/were> service(d)" / "<did/do> we
     // service" / "service call(s)" shape forces entity 'serviceVisits' and a
@@ -196,7 +208,17 @@ function shapeDocumentRow(r, dateBasis) {
   const fullDate = r.service_date && /^\d{4}-\d{2}-\d{2}/.test(String(r.service_date))
     ? String(r.service_date).slice(0, 10)
     : null;
-  const uploadDate = r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : null;
+  // Round 14 (K3) BUG FIX: the DB's own `::date` cast of a timestamptz runs
+  // under its session timezone — 'Etc/GMT+8' (a fixed -8h offset, no DST) is
+  // what this app's Postgres/PGlite session actually uses by default — so a
+  // document created at "2026-09-01T00:00:00Z" is that DB's "2026-08-31" for
+  // any date/month bucketing. Reading it back as a plain UTC slice (no
+  // offset) silently disagreed with that by up to a full calendar day right
+  // at every month boundary — several "documents added THIS/LAST month"
+  // counts were off by exactly the handful of midnight-UTC uploads that
+  // straddle the boundary. Applying the same fixed -8h shift here keeps this
+  // in agreement with the DB no matter which entity's date math is compared.
+  const uploadDate = r.created_at ? new Date(new Date(r.created_at).getTime() - 8 * 3600 * 1000).toISOString().slice(0, 10) : null;
   // Team A: an "uploaded/added/received" question is about when the paper arrived (created_at), never the job date.
   const date = dateBasis === 'uploaded' ? uploadDate : (fullDate ?? uploadDate);
   const month = date ? date.slice(0, 7) : r.service_date ? String(r.service_date).slice(0, 7) : null;
@@ -286,30 +308,37 @@ const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
  * was actually asking about today.
  */
 async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
-  const equipmentPlan = { ...plan, entity: 'equipment' };
+  // Round 14 (K3) BUG FIX: equipment rows in this corpus carry NO address of
+  // their own at all (data.service_address is never populated on an
+  // equipment entity — only the CUSTOMER row has one) — passing plan.filters
+  // through UNCHANGED here used to hand a city/county/state/zip filter
+  // straight to buildAnalyticsSQL's equipment branch, whose WHERE clause
+  // compares against that always-empty column, silently zeroing out every
+  // row before the customer join below ever runs (a geo-filtered "which
+  // customers have Trane units in Mesa" always answered "0 customers", no
+  // matter how many actually matched). Only genuinely equipment-level fields
+  // belong in the SQL run against the equipment table; a geo/customerName/
+  // contact-info/doc-type filter riding along in the same plan is resolved
+  // the correct way, against the JOINED customer row, by
+  // executeAnalyticsPlan's own full-plan.filters applyEntityFilters pass
+  // over what this function returns (see that idempotent-pass comment).
+  const equipmentFilters = (plan.filters ?? []).filter((f) => EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN.has(f.field));
+  const equipmentPlan = { ...plan, entity: 'equipment', filters: equipmentFilters };
   const { sql, params } = buildAnalyticsSQL(equipmentPlan);
   const { rows: raw } = await db.raw(sql, params);
   const unitRows = raw
     .map((r) => ({ ...shapeEquipmentRow(r, today), customerId: r.customer_id || null }))
     .filter((r) => r.customerId);
 
-  // Reviewer NO-GO (2026-09-21, round 5, item 1): hasEmail/hasPhone are
-  // CUSTOMER-level facts a unit row never carries — applying them here (with
-  // the rest of plan.filters, against a row that has no email/phone at all)
-  // made matchesFilter compare against undefined and silently return wrong
-  // rows (every unit looking like "no contact info"). Only the genuinely
-  // equipment-level filters apply at this stage; hasEmail/hasPhone are
-  // deferred to the CUSTOMER rows fetched below, then re-checked by
+  // Only the genuinely equipment-level filters apply at this stage (same set
+  // as the SQL above) — hasEmail/hasPhone/geo/customerName/hasDocType are all
+  // CUSTOMER-level facts a raw unit row never carries; applying any of them
+  // here (against a row that has none of those fields) would make
+  // matchesFilter compare against undefined and silently return wrong rows.
+  // They are deferred to the CUSTOMER rows fetched below, then re-checked by
   // executeAnalyticsPlan's own second applyEntityFilters pass over what this
   // function returns (see that idempotent-pass comment further down).
-  const unitFilters = (plan.filters ?? []).filter((f) => !BOOLEAN_FILTER_FIELDS.includes(f.field));
-
-  // Only the equipment-level filters apply here (state/county/city/zip are
-  // already on the unit's own row via its service_address; customerName has
-  // no equivalent on an equipment row and is intentionally left to fail
-  // closed — see matchesFilter's own null-actual -> false rule — rather than
-  // silently ignored).
-  const filtered = applyEntityFilters(unitRows, unitFilters);
+  const filtered = applyEntityFilters(unitRows, equipmentFilters);
   if (!filtered.length) return { rows: [], unfilteredCustomerIds: [], unitCount: 0 };
 
   const customerIds = [...new Set(filtered.map((r) => r.customerId))];
@@ -801,7 +830,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
       const stillMissing = [];
       const addedFilters = [];
       for (const condition of missing) {
-        const override = buildConditionOverrideFilter(condition, question_n);
+        const override = buildConditionOverrideFilter(condition, question_n, plan.entity);
         if (override) addedFilters.push(override);
         else stillMissing.push(condition);
       }

@@ -185,9 +185,59 @@ const oracleQ = (sql, params) => lite.query(sql, params.map((p) => (p === '@toda
   yes('Who is our busiest technician this year?');
   // negative / not-our-shape controls (must fall through, never guess)
   no('What is the weather today?');
-  no('How many customers do we have?');
+  // R14 (K4): "How many customers do we have?" is now its own answered family (totalCustomersCount) —
+  // see the "persona: totals / doc-type / warranty-status counts" block below for its DB-backed check.
   no('Why is this unit not under warranty?');
   no('Which customers have a Carrier unit older than 10 years?'); // single condition, not this family's 2-condition shape
+
+  // R14 (K4): connect — quoted-replacement / units-no-doctype-days / invoice-vs-quote / open-invoice.
+  yes('Which customers were quoted a replacement but have not had a new unit installed since?');
+  yes('How many customers were quoted a replacement but never got one?');
+  yes('How many Mesa customers were quoted a replacement but have only had repairs since?');
+  yes('Which units were installed more than 90 days ago but have no warranty registration on file?');
+  yes('How many units were installed more than 90 days ago with no warranty registration on file?');
+  yes('How many Trane units installed more than 90 days ago have no warranty registration on file?');
+  yes('How many units in Mesa installed more than 90 days ago have no warranty registration on file?');
+  yes('Which customers have an invoice that doesn\'t match the amount on their quote?');
+  yes('How many customers were invoiced a different amount than what they were quoted?');
+  yes('How many Mesa customers have an invoice that doesn\'t match their quote?');
+  yes('Does Mercer\'s invoice match what was quoted for the job?');
+  yes('Which customers were quoted more than 6 months ago and have not been invoiced since?');
+  yes('How many customers were quoted more than 6 months ago with no invoice since?');
+  yes('Was Mercer quoted a job that was never invoiced?');
+  yes('Which customers have more than one open invoice at once?');
+  yes('How many customers have more than one open invoice right now?');
+  yes('How many Mesa customers have more than one open invoice at once?');
+  // typo/paraphrase tolerance for a few of the above
+  yes('how many custs were quoted a replacement but never got one');
+  yes('how many units were instaled more than 90 days ago with no warranty registration on file');
+
+  // R14 (K4): persona — totals / doc-type counts / warranty-status counts.
+  yes('How many customers do we have in total?');
+  yes('How many units are we tracking?');
+  yes('How many permits do we have on file?');
+  yes('Which customers have a maintenance agreement on file?');
+  yes('How many customers have a maintenance agreement on file?');
+  yes('How many Goodman units are out of warranty?');
+  yes('How many units have a warranty expiring in the next year?');
+  yes('What percent of our units are out of warranty?');
+  yes('How many Trane installs have we done since 2020?');
+
+  // R14 (K4): live-misses-2026-09-21b — "this month".
+  yes('How many service calls this month?');
+  yes('Which customers did we service this month?');
+  yes('Which units had services this month?');
+  yes('What units were serviced this month?');
+  yes('how many service caalls this month'); // typo
+  yes('how many service calls this mo'); // abbreviated ("mo" -> "month")
+
+  // R14 (K4): comparisons — full "group by" breakdowns.
+  yes('Group units by warranty status');
+  yes('Show me a breakdown of customers by city');
+  yes('What\'s our customer count by city?');
+  yes('Show me a breakdown of customers by state');
+  yes('Show me a breakdown of units by brand');
+  yes('Group equipment by brand');
 }
 
 /* ================================================================== connect: repeat visit after install */
@@ -322,6 +372,108 @@ const oracleQ = (sql, params) => lite.query(sql, params.map((p) => (p === '@toda
     const a = await answerRelationsQuestion({ withTenant, ctxArg, question: q, today: TODAY });
     check(`citations :: "${q}" carries records/recordsTotal/basis`, Boolean(a) && Array.isArray(a.records) && Number.isFinite(a.recordsTotal) && typeof a.basis === 'string' && a.basis.length > 0, JSON.stringify({ recordsTotal: a?.recordsTotal, basis: a?.basis }));
   }
+}
+
+/* ================================================================== R14 (K4): repeat-visit yes/no, ambiguous surname */
+{
+  // Round 14 bug fix: repeatVisitYesNo used to bail (return null) whenever an ILIKE surname match hit
+  // more than one customer, but the scorecard oracle's own SQL is an EXISTS across every matching row,
+  // not "resolve to exactly one person" — so a genuinely ambiguous name should still answer, as long as
+  // AT LEAST ONE of the matching customers qualifies (or, for a clean "No", none of them do). Two
+  // "Mercer" customers here reproduce that: Thomas Mercer qualifies, Loretta Mercer does not.
+  await insertCustomer({ n: 30, name: 'Thomas Mercer', address: '30 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 30, customer: 30, mfr: 'Trane', installed: '2026-01-01' });
+  await doc(40, { type: 'service-ticket', customer: 30, unit: 30, serviceDate: '2026-01-15' }); // repeat visit within 90d
+  await insertCustomer({ n: 31, name: 'Loretta Mercer', address: '31 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 31, customer: 31, mfr: 'Trane', installed: '2026-01-01' }); // no later visit at all
+
+  const yesAns = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Did Mercer have a repeat visit within 90 days of installing a unit?', today: TODAY });
+  check('repeat-visit yes/no :: ambiguous surname with >=1 qualifying match still answers Yes (was: null)', Boolean(yesAns) && /^Yes/.test(yesAns.text), yesAns?.text);
+
+  // Two customers where NEITHER qualifies must still answer a clean No, not bail.
+  await insertCustomer({ n: 32, name: 'Wendell Salazar', address: '32 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 32, customer: 32, mfr: 'Trane', installed: '2026-01-01' });
+  await insertCustomer({ n: 33, name: 'Priya Salazar', address: '33 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 33, customer: 33, mfr: 'Trane', installed: '2026-01-01' });
+  const noAns = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Did Salazar have a repeat visit within 90 days of installing a unit?', today: TODAY });
+  check('repeat-visit yes/no :: ambiguous surname where NO match qualifies answers No (never bails)', Boolean(noAns) && /^No/.test(noAns.text), noAns?.text);
+}
+
+/* ================================================================== R14 (K4): persona — totals / doc-type / warranty-status */
+{
+  const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many customers do we have in total?', today: TODAY });
+  check('persona :: total customers answers with a real count and cites customer records', Boolean(a) && /^\d+ customers?/.test(a.text) && a.recordsTotal > 0, a?.text);
+
+  const b = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many units are we tracking?', today: TODAY });
+  check('persona :: total units answers with a real count and cites unit records', Boolean(b) && /^\d+ units?/.test(b.text) && b.recordsTotal > 0, b?.text);
+
+  const c = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many permits do we have on file?', today: TODAY });
+  eq('persona :: doc-type document count — 1 permit on file (doc 14, Ivan India)', Number(c.facts[0].value), 1);
+
+  const d = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Which customers have a maintenance agreement on file?', today: TODAY });
+  for (const name of ['Frank Foxtrot', 'Erin Epsilon', 'Dave Delta', 'Helen Hotel']) {
+    check(`persona :: doc-type customer set includes ${name} (has a maintenance-agreement doc)`, new RegExp(name).test(d.text), d.text);
+  }
+  check('persona :: doc-type customer set excludes Carol Gamma (no agreement on file)', !/Carol Gamma/.test(d.text), d.text);
+
+  // Trane units installed since 2020 in the shared fixture as of this point: eq1 (Alice, 2026), eq2 (Bob,
+  // 2026), eq10 (Jane, 2024) = 3, PLUS the 4 added by the repeat-visit-yes/no ambiguous-surname block just
+  // above (eq30/31/32/33, all Trane, all 2026) = 7.
+  const e = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many Trane installs have we done since 2020?', today: TODAY });
+  eq('persona :: brand-installs-since-year — 7 Trane units installed since 2020', Number(e.facts[0].value), 7);
+}
+
+/* ================================================================== R14 (K4): comparisons — group-by breakdowns */
+{
+  const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Show me a breakdown of customers by city', today: TODAY });
+  check('comparisons :: city breakdown names Mesa with its count and is cited', /Mesa[^a-zA-Z]*\d+/.test(a.text) && a.recordsTotal > 0, a.text);
+
+  const b = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Show me a breakdown of units by brand', today: TODAY });
+  check('comparisons :: brand breakdown names Trane with its count (7, as of this point in the fixture) and is cited', /trane:\s*7\b/i.test(b.text) && b.recordsTotal > 0, b.text);
+}
+
+/* ================================================================== R14 (K4): connect — quoted-replacement / invoice-vs-quote / open-invoice */
+{
+  // Q40: quoted a full-system replacement (page text match), no NEW unit installed since the quote.
+  await insertCustomer({ n: 40, name: 'Quinn Replacement', address: '40 Test Ave, Mesa, AZ 85201' });
+  await lite.query(`INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [dId(50), tenId, 'quote-50.pdf', 'proposal-quote', 'hash-50', 'verified']);
+  await lite.query(`INSERT INTO document_entity_links (tenant_id, document_id, entity_id) VALUES ($1,$2,$3)`, [tenId, dId(50), cId(40)]);
+  await lite.query(`INSERT INTO document_pages (document_id, tenant_id, page_no, text) VALUES ($1,$2,1,$3)`,
+    [dId(50), tenId, 'Proposal: full system replacement recommended. New unit not yet approved.']);
+
+  const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Which customers were quoted a replacement but have not had a new unit installed since?', today: TODAY });
+  check('connect :: quoted-replacement-no-install cites Quinn Replacement (quoted, no later install)', /Quinn Replacement/.test(a.text), a.text);
+
+  // Financials fixture: Rios-style invoice/quote mismatch + open invoices, reusing verify-decompose's
+  // document_financials pattern.
+  async function financialDoc(n, { docKind, direction, total, status, customer, invoiceDate = null }) {
+    await lite.query('INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,$4,$5,$6)',
+      [dId(n), tenId, `fin-${n}.pdf`, docKind === 'po' ? 'purchase-order' : docKind === 'estimate' ? 'proposal-quote' : 'invoice', `fin-hash-${n}`, 'verified']);
+    await lite.query('INSERT INTO document_entity_links (tenant_id, document_id, entity_id) VALUES ($1,$2,$3)', [tenId, dId(n), cId(customer)]);
+    await lite.query(
+      `INSERT INTO document_financials (tenant_id, document_id, doc_kind, direction, currency, total, status, invoice_date)
+       VALUES ($1,$2,$3,$4,'USD',$5,$6,$7)`,
+      [tenId, dId(n), docKind, direction, total, status, invoiceDate]
+    );
+  }
+
+  // Q41: quoted $500, invoiced $650 -> mismatch.
+  await insertCustomer({ n: 41, name: 'Mia Mismatch', address: '41 Test Ave, Mesa, AZ 85201' });
+  await financialDoc(51, { docKind: 'estimate', direction: 'receivable', total: '500.00', status: 'unknown', customer: 41 });
+  await financialDoc(52, { docKind: 'invoice', direction: 'receivable', total: '650.00', status: 'unpaid', customer: 41, invoiceDate: '2026-08-01' });
+  const b = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many customers were invoiced a different amount than what they were quoted?', today: TODAY });
+  check('connect :: invoice-vs-quote mismatch count includes Mia Mismatch ($500 quoted, $650 invoiced)', Number(b.facts[0].value) >= 1, b.text);
+
+  // Q42: two OPEN (unpaid) invoices at once for the same customer.
+  await insertCustomer({ n: 42, name: 'Oscar Openinvoice', address: '42 Test Ave, Mesa, AZ 85201' });
+  await financialDoc(53, { docKind: 'invoice', direction: 'receivable', total: '100.00', status: 'unpaid', customer: 42, invoiceDate: '2026-07-01' });
+  await financialDoc(54, { docKind: 'invoice', direction: 'receivable', total: '200.00', status: 'unpaid', customer: 42, invoiceDate: '2026-08-01' });
+  const c = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Which customers have more than one open invoice at once?', today: TODAY });
+  check('connect :: open-invoice set includes Oscar Openinvoice (2 unpaid invoices)', /Oscar Openinvoice/.test(c.text), c.text);
+
+  const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Does Nobody Special\'s invoice match what was quoted for the job?', today: TODAY });
+  check('connect :: invoice-vs-quote yes/no for an unknown customer returns null (never guesses)', missing === null);
 }
 
 console.error = realErr;

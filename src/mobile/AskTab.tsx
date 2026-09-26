@@ -3,7 +3,8 @@ import { ArrowUp, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
 import { authHeader } from '../services/authToken'
 import { asksUsedFraction, resetsOnShortLabel, type BillingStatus } from '../services/billingClient'
-import { buildSuggestions } from '../core/suggestions'
+import { buildSuggestions, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
+import { PreflightPill, TypeaheadDropdown, DidYouMeanChips } from '../components/ask'
 import { useGraph } from '../core/entityGraph'
 import { DonovanMark } from '../components/DonovanMark'
 import type { Answer } from '../core/types'
@@ -78,6 +79,12 @@ const Composer = memo(
   ) {
     const [input, setInput] = useState('')
     const taRef = useRef<HTMLTextAreaElement>(null)
+    // Round 14 K1: typeahead completions + a preflight hint, same no-model server route the desktop Ask
+    // composer uses (src/core/suggestions.ts). Big touch targets, works in sunlight — see TypeaheadDropdown.
+    const { completions, hint } = useTypeahead(input)
+    const [dropdownOpen, setDropdownOpen] = useState(false)
+    const [activeIndex, setActiveIndex] = useState(-1)
+    const showDropdown = dropdownOpen && completions.length > 0
 
     useImperativeHandle(ref, () => ({
       fill(text: string) {
@@ -99,17 +106,24 @@ const Composer = memo(
       ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`
     }, [input])
 
-    const send = () => {
-      if (busy || !input.trim()) return
-      onSubmit(input)
+    const send = (text = input) => {
+      if (busy || !text.trim()) return
+      onSubmit(text)
       setInput('')
+      setDropdownOpen(false)
+      setActiveIndex(-1)
       taRef.current?.blur() // drop the keyboard so the answer has the screen
     }
 
     return (
       <div className="shrink-0 border-t border-line/60 bg-surface">
+        {hint && !busy && (
+          <p className="max-w-2xl mx-auto px-4 pt-1.5 short:hidden">
+            <PreflightPill hint={hint} />
+          </p>
+        )}
         <form
-          className="max-w-2xl mx-auto px-3 py-2 short:py-1.5 flex items-end gap-2"
+          className="max-w-2xl mx-auto px-3 py-2 short:py-1.5 flex items-end gap-2 relative"
           onSubmit={(e) => {
             e.preventDefault()
             send()
@@ -123,12 +137,33 @@ const Composer = memo(
             id="dw-m-ask"
             rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onFocus={() => void authHeader()} // warm the session token so the ask doesn't wait on a refresh
+            onChange={(e) => {
+              setInput(e.target.value)
+              setDropdownOpen(true)
+              setActiveIndex(-1)
+            }}
+            onFocus={() => {
+              void authHeader() // warm the session token so the ask doesn't wait on a refresh
+              setDropdownOpen(true)
+            }}
+            onBlur={() => setDropdownOpen(false)}
+            role="combobox"
+            aria-expanded={showDropdown}
+            aria-autocomplete="list"
             onKeyDown={(e) => {
+              if (showDropdown && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                e.preventDefault()
+                setActiveIndex((i) => {
+                  const max = completions.length - 1
+                  if (e.key === 'ArrowDown') return i >= max ? max : i + 1
+                  return i <= 0 ? -1 : i - 1
+                })
+                return
+              }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                send()
+                if (showDropdown && activeIndex >= 0 && completions[activeIndex]) send(completions[activeIndex].text)
+                else send()
               }
             }}
             placeholder="Ask Donovan…"
@@ -136,6 +171,9 @@ const Composer = memo(
             autoComplete="off"
             className="flex-1 min-h-12 resize-none rounded-2xl bg-surface-2 text-ink px-4 py-3 placeholder:text-ink-3 border border-transparent focus:outline-none focus:border-accent"
           />
+          {showDropdown && (
+            <TypeaheadDropdown items={completions} activeIndex={activeIndex} onHover={setActiveIndex} onSelect={(text) => send(text)} />
+          )}
           <button
             type="submit"
             disabled={busy || !input.trim()}
@@ -166,10 +204,13 @@ const TurnView = memo(function TurnView({
   onRetry: (q: string) => void
   onAsk: (q: string) => void
 }) {
+  // Round 14 K1: "Did you mean…" chips once this turn's own answer has actually come back with nothing.
+  const didYouMean = useDidYouMean(turn.answer?.kind === 'no-answer' ? turn.question : null)
   return (
     <div className="grid grid-cols-1 gap-2 min-w-0 scroll-mt-3" data-turn={turn.id}>
       <div className="justify-self-end max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-forest-600 text-stone-0 text-body-lg break-words">{turn.question}</div>
       {turn.answer && <MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onAsk={onAsk} />}
+      {turn.answer?.kind === 'no-answer' && didYouMean.length > 0 && <DidYouMeanChips chips={didYouMean} onPick={onAsk} />}
       {turn.error && (
         <div role="alert" className="rounded-2xl bg-bad-bg text-bad-ink p-4 text-body grid gap-2">
           <span>{turn.error}</span>
@@ -213,12 +254,17 @@ export function AskTab({
   const composerRef = useRef<ComposerHandle>(null)
   const nextId = useRef(1)
 
-  // Real suggestions from this shop's own records once they've loaded.
+  // Real suggestions from this shop's own records once they've loaded. Round 14 K1: the server's own
+  // role-based ("tech" — this is the field app) sample prompts come first when it has any — pre-validated
+  // to answer without a model call, same as the desktop Ask screen's own "Try asking" — falling back to
+  // the client-only entity-graph suggestions, then the generic fill-in templates, exactly as before.
   const entities = useGraph((s) => s.entities)
+  const serverPrompts = useSamplePrompts('tech', turns.length === 0)
   const suggestions = useMemo(() => {
+    if (serverPrompts.length) return serverPrompts.map((p) => ({ label: p.text, fill: p.text, send: true }))
     const real = buildSuggestions(Object.values(entities), 3)
     return real.length ? real.map((q) => ({ label: q, fill: q, send: true })) : TEMPLATES.map((t) => ({ label: t.endsWith(' ') ? `${t}…` : t, fill: t, send: !t.endsWith(' ') }))
-  }, [entities])
+  }, [entities, serverPrompts])
 
   const update = (id: number, patch: Partial<Turn>) => setTurns((t) => t.map((x) => (x.id === id ? { ...x, ...patch } : x)))
 

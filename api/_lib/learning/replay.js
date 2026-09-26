@@ -18,6 +18,7 @@
  * No question text or answer text is ever logged - counts only.
  */
 import { withTenant } from "../recordsStore.js";
+import { getProviderOutage } from "../claude.js";
 import { runDonovanAgent, isAgentEnabled } from "../agent/loop.js";
 import { normalizeQuestion } from "../nlNormalize.js";
 import { recordAskMiss, MISS_OUTCOMES } from "../missStore.js";
@@ -177,6 +178,15 @@ export async function replayOne({ ctxArg, item, overlay, hint: hintArg, callMode
   }
   const key = item.normalized;
   if (!run.handled) {
+    // ROUND 14 (brief item 3: "Replay must not mark outage failures as 'still failing'"): the AI
+    // provider being out of credits/overloaded/misconfigured is not a case of "Donovan tried and still
+    // can't do this" — it means the replay never really got a chance to try. Recording NOTHING (rather
+    // than upserting "still_failing") leaves the miss exactly as it was: open, and due for a real
+    // retry once the provider is back (the normal "not replayed yet" state — see replayStore.js's
+    // listOpenMisses, which already treats no-replay-row as "notReplayed").
+    if (run.providerUnavailable || getProviderOutage()) {
+      return { question: item.question, outcome: "provider_unavailable", reason: "AI provider is temporarily unavailable", costUsd: cost };
+    }
     const reason = FAIL_REASON[run.reason] ?? "still failing";
     await upsertReplay(ctxArg, { question: item.question, questionNormalized: key, outcome: "still_failing", reason, note: hint, trace: traceOf(run), costUsd: cost, source });
     return { question: item.question, outcome: "still_failing", reason, costUsd: cost };
@@ -256,6 +266,14 @@ export async function replayMisses({ ctxArg, questions, force = false, limit = R
       try {
         const r = await replayOne({ ctxArg, item: batch[i], overlay, hint, callModel, today: day, source, confirm, spendLeft, operatorApproved, decidedBy });
         spent += r.costUsd;
+        if (r.outcome === "provider_unavailable") {
+          // Nothing left to try right now: stop the batch (same shape as the cost/time/model-budget
+          // stops above) rather than burning the rest of it on questions that will fail the same way.
+          summary.providerUnavailable = (summary.providerUnavailable ?? 0) + 1;
+          if (!summary.stopped) summary.stopped = "model-credits";
+          summary.remaining += batch.length - i;
+          return;
+        }
         summary.attempted++;
         if (r.outcome === "answered_now") summary.answeredNow++; else summary.stillFailing++;
         if (r.recipe) {
@@ -329,6 +347,43 @@ export async function applyThumbsDown({ ctxArg, question, note, callModel, today
   }
 }
 
+/** How many pending capability_gap proposals one autoResolveCapabilityGaps call checks. Same bound as
+ *  a replay batch (REPLAY_LIMIT) — this delegates to replayCapabilityGap/replayMisses per proposal. */
+export const GAP_AUTO_RESOLVE_LIMIT = REPLAY_LIMIT;
+
+/**
+ * ROUND 14 (brief item 4, owner: "71 pending" — capability_gap proposals sit pending FOREVER by design,
+ * policy.js line ~71 — so 'Run learning now' never cleared the ones Donovan can already answer today).
+ * Re-runs every PENDING capability_gap proposal's example question and auto-resolves the ones that come
+ * back answered_now (grounded — replayOne's own bar for that outcome): no human needed to confirm a gap
+ * that has already closed. One that is still failing, or hit an active provider outage, is left exactly
+ * as it was (still pending) for the next run. Never throws.
+ * @param {Function} [p.callModel]  injectable for tests (passed straight through to replayCapabilityGap)
+ * @returns {Promise<{checked: number, resolved: number, stillOpen: number, stopped: string|null}>}
+ */
+export async function autoResolveCapabilityGaps({ ctxArg, limit = GAP_AUTO_RESOLVE_LIMIT, decidedBy = "system:capability-gap-autoresolve", callModel } = {}) {
+  const summary = { checked: 0, resolved: 0, stillOpen: 0, stopped: null };
+  try {
+    const pending = (await store.listProposals({ status: "pending", limit: 500 }))
+      .filter((p) => p.kind === "capability_gap" && p.payload?.example);
+    const batch = pending.slice(0, Math.max(1, Math.min(GAP_AUTO_RESOLVE_LIMIT, limit)));
+    for (const p of batch) {
+      if (summary.stopped) { summary.stillOpen++; continue; }
+      const r = await replayCapabilityGap({ ctxArg, proposal: p, decidedBy, callModel });
+      summary.checked++;
+      if (r.stopped === "model-credits") { summary.stopped = "model-credits"; summary.stillOpen++; continue; }
+      if (r.replayed && r.outcome === "answered_now") {
+        const ok = await store.decideProposalWithReason(p.id, "auto_approved", decidedBy, "fixed — answered now");
+        if (ok) { summary.resolved++; continue; }
+      }
+      summary.stillOpen++;
+    }
+  } catch (err) {
+    console.warn("donovan-learning: autoResolveCapabilityGaps failed (non-fatal):", err?.name ?? "error");
+  }
+  return summary;
+}
+
 /**
  * An operator approving a "Can't do yet" (capability_gap) proposal: approving must DO something, so the
  * example question that exposed the gap is replayed now and, when the agent answers it with a grounded
@@ -339,6 +394,13 @@ export async function replayCapabilityGap({ ctxArg, proposal, decidedBy, callMod
   const example = String(proposal?.payload?.example ?? "").trim();
   if (!example) return { replayed: false, reason: "this proposal has no example question" };
   const r = await replayMisses({ ctxArg, questions: [example], force: true, confirm: false, source: "capability-gap", operatorApproved: true, decidedBy, callModel, today });
+  if (r.stopped === "model-credits" || !r.items[0]) {
+    // ROUND 14: either the provider-unavailable branch above stopped the batch before this one
+    // question even ran (r.items is empty), or it's the item itself — either way this is "try again
+    // once the provider is back", never "not replayed" (which reads as a permanent no-op) nor a false
+    // "still failing".
+    return { replayed: false, stopped: "model-credits", reason: "AI provider is temporarily unavailable — try again once it is restored." };
+  }
   const item = r.items[0];
   if (!item) return { replayed: false, ...(r.stopped ? { stopped: r.stopped } : {}), reason: r.stopped ?? "not replayed" };
   return { replayed: true, outcome: item.outcome, ...(item.reason ? { reason: item.reason } : {}), ...(item.answer ? { answer: item.answer } : {}), ...(item.recipe ? { recipe: item.recipe } : {}), costUsd: r.costUsd };

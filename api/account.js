@@ -13,6 +13,7 @@ import entityMerge from "./_lib/routes/entity-merge.js";
 import naming from "./_lib/routes/naming.js";
 import intake from "./_lib/routes/intake-resolve.js";
 import grid from "./_lib/grid/route.js";
+import askSuggest from "./_lib/routes/ask-suggest.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -33,6 +34,8 @@ import grid from "./_lib/grid/route.js";
  *   POST intake               -> ?action=intake   (clean exception queue: resolve/dismiss/snooze
  *                                                   one open question — any member — round 13)
  *   POST grid                 -> ?action=grid     (Grid view: documentCells/units — round 13)
+ *   POST ask-suggest          -> ?action=ask-suggest (Ask-box typeahead/sample-prompts/did-you-mean;
+ *                                                      no model call, ever — any member — round 14)
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
@@ -44,7 +47,7 @@ import grid from "./_lib/grid/route.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

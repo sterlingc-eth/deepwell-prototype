@@ -5,7 +5,7 @@
  * Spend is recorded like any other model call. Injectable `callModel` for tests. No text is logged.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "../claude.js";
+import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
 import { recordModelCall, estimateModelCostUsd } from "../usage.js";
 
 export const GRADER_MODEL = process.env.DONOVAN_SCORECARD_GRADER_MODEL || "claude-haiku-4-5";
@@ -70,6 +70,11 @@ export async function gradeRubric({ ctxArg, question, rubric, reference, answerT
     return { passed: use.input?.pass === true, reason: clip(use.input?.reason, 200), costUsd };
   } catch (err) {
     if (err?.name === "ModelBudgetExceededError") throw err;
+    const provider = classifyProviderError(err);
+    if (provider) {
+      recordProviderOutage(provider);
+      return { passed: false, reason: "provider unavailable", costUsd: 0, error: "provider-unavailable", providerUnavailable: true };
+    }
     return { passed: false, reason: "grader failed", costUsd: 0, error: String(err?.name ?? "error") };
   }
 }

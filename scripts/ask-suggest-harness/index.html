@@ -1,0 +1,16 @@
+<!doctype html>
+<!--
+  Dev-only harness for scripts/verify-ask-suggest-ui.mjs. See main.tsx's comment. Not part of any
+  production build entry (vite.config.ts's rollupOptions.input never lists it), so it never ships.
+-->
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ask-suggest component harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

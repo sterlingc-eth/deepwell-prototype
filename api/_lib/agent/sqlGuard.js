@@ -52,6 +52,7 @@ export const REAL_TABLES = Object.freeze([
   "entity_merge_suggestions", // M3-config/39-entity-resolution.sql (R11: entity resolution)
   "ask_semantic_cache", "tenant_rollups", // M3-config/40-rollups-and-semantic-cache.sql (R11: semantic cache + rollups)
   "intake_field_inferences", "intake_needs_info", // M3-config/43-intake-autofill.sql (R12: straight-through intake)
+  "donovan_provider_status", // M3-config/48-donovan-provider-status.sql (R14: provider-outage detection)
 ]);
 
 const DENY_TOKENS = new Set([
@@ -73,7 +74,8 @@ const DENY_TOKENS = new Set([
   "increment_usage_counters", "increment_rate_limit_window", "list_ask_misses_window", "merge_tenant",
   "next_customer_number", "billing_apply", "billing_record_event", "billing_tenant_by_customer",
   "claim_platform_daily_task", "insert_platform_notification", "learning_decide", "learning_deactivate",
-  "learning_get_proposal", "learning_insert_proposal", "learning_list_proposals",
+  "learning_get_proposal", "learning_insert_proposal", "learning_list_proposals", "learning_decide_reason",
+  "provider_status_mark", "provider_status_clear", "provider_status_current",
   "list_notification_eligible_tenants", "list_outreach_enabled_tenants", "mark_outreach_swept",
   "mark_tenant_digest_sent", "mark_tenant_notified", "record_warranty_notification",
   "expenses_delete", "expenses_insert", "expenses_list", "expenses_totals", "expenses_update",

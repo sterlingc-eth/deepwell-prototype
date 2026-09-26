@@ -20,6 +20,7 @@
  * No question text is logged (counts only).
  */
 import { withTenant } from "../recordsStore.js";
+import { getProviderOutage } from "../claude.js";
 import { recordAskMiss, MISS_OUTCOMES } from "../missStore.js";
 import { getActiveOverlayForTenant } from "../learning/overlay.js";
 import { missKey } from "../learning/replay.js";
@@ -89,7 +90,13 @@ export async function gradeAnswer({ ctx, question, expected, data, alts, callMod
     answerText: `${view.text}\n${view.facts.map((f) => `${f.label}: ${f.value}`).join("\n")}\n[citations attached to the answer: ${view.citations}]`,
     citedRecords, callModel, deadlineAt,
   });
-  if (g.error) return { passed: false, score: 0, skipped: true, got: summarizeAnswer(view), expectedSummary: summarizeExpected(question), why: `grader unavailable (${g.error})`, costUsd: g.costUsd };
+  if (g.error) {
+    return {
+      passed: false, score: 0, skipped: true, got: summarizeAnswer(view), expectedSummary: summarizeExpected(question),
+      why: g.providerUnavailable ? "AI provider is temporarily unavailable" : `grader unavailable (${g.error})`,
+      costUsd: g.costUsd, providerUnavailable: Boolean(g.providerUnavailable),
+    };
+  }
   // A rubric answer is also held to the citation rule: the model grades the content, the citation check is deterministic.
   const r = withCitation({ passed: g.passed, score: g.passed ? 1 : 0, got: summarizeAnswer(view), why: g.reason }, { ...question, cmp: "rubric", expected }, view);
   return { ...r, costUsd: g.costUsd };
@@ -173,6 +180,20 @@ export async function runScorecard({
     let cost = asked.usage.costUsd;
     let models = labelModels(asked.usage, asked.debug);
     if (!asked.data) {
+      // ROUND 14 (owner: scorecard showed a misleading 36% — "4 of 11 right"): a question that could
+      // ONLY fail because the AI provider is unavailable (out of credits, bad key, overloaded) is not
+      // a Donovan mistake and must not be scored as one. `getProviderOutage()` reflects whatever the
+      // agent/analytics call this question just made recorded, in-process, moments ago (see
+      // agent/loop.js and agent/loopV2.js's own classifyProviderError integration). Marked `skipped`
+      // (scoreResults already excludes skipped rows from both the overall % and every category), and
+      // the whole run stops early rather than burning the rest of its budget on doomed questions.
+      const outage = getProviderOutage();
+      if (outage) {
+        return {
+          push: { ...base, skipped: true, passed: false, error: "model-unavailable", costUsd: cost, latencyMs: asked.latencyMs, detail: { providerUnavailable: outage.reason } },
+          cost, stopReason: "model-credits",
+        };
+      }
       return {
         push: { ...base, passed: false, score: 0, expected: summarizeExpected({ ...q, expected: oracle.expected }), got: `error: ${asked.error ?? "no response"}`, error: asked.error ?? "no-response", models, costUsd: cost, latencyMs: asked.latencyMs, detail: {} },
         cost,
@@ -181,7 +202,12 @@ export async function runScorecard({
 
     let graded = await gradeAnswer({ ctx, question: q, expected: oracle.expected, alts: oracle.alts, data: asked.data, callModel, deadlineAt: deadline });
     cost += graded.costUsd ?? 0;
-    if (graded.skipped) return { push: { ...base, skipped: true, passed: false, error: graded.why, costUsd: cost }, cost };
+    if (graded.skipped) {
+      return {
+        push: { ...base, skipped: true, passed: false, error: graded.why, costUsd: cost },
+        cost, ...(graded.providerUnavailable ? { stopReason: "model-credits" } : {}),
+      };
+    }
 
     const detail = {};
     if (asked.debug?.escalation) detail.escalation = asked.debug.escalation;

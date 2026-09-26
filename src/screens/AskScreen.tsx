@@ -8,7 +8,8 @@ import { SerialCapture } from '../components/SerialCapture';
 import type { Answer, AnswerRecord, ConversationTurn, SourceRef } from '../core/types';
 import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
-import { buildSuggestions } from '../core/suggestions';
+import { buildSuggestions, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
+import { PreflightPill, SamplePromptChips, DidYouMeanChips, TypeaheadDropdown } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
 import { asksUsedFraction, resetsOnShortLabel } from '../services/billingClient';
 import { useAppStore } from '../store/appStore';
@@ -68,6 +69,24 @@ export function AskScreen() {
   // Capped at 4, matching conversation.js's own MAX_CONTEXT_TURNS.
   const [thread, setThread] = useState<ConversationTurn[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Round 14 K1: role-based sample prompts (tech vs office) for the empty screen, seeded with this
+  // tenant's own real data and pre-validated server-side to answer without a model call — preferred over
+  // the client-only buildSuggestions() above when the server has anything to offer (a fresh tenant with
+  // nothing ingested yet falls back to the same client suggestions/example-questions this screen already
+  // showed). Typeahead completions + the preflight hint for whatever is currently typed, and "Did you
+  // mean…" chips once a question has actually come back with no answer.
+  const askRole = fieldMode ? 'tech' : 'office';
+  const samplePrompts = useSamplePrompts(askRole, !asked);
+  const displaySuggestions = useMemo(
+    () => (samplePrompts.length ? samplePrompts.map((p) => p.text) : suggestions),
+    [samplePrompts, suggestions],
+  );
+  const { completions, hint } = useTypeahead(input);
+  const didYouMean = useDidYouMean(answer?.kind === 'no-answer' ? asked : null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const showDropdown = dropdownOpen && completions.length > 0;
   // "Based on N records": a customer opens their profile, a unit its customer, a document its cited page.
   const openRecord = useCallback((r: AnswerRecord) => {
     const t = recordTarget(r);
@@ -188,6 +207,14 @@ export function AskScreen() {
     inputRef.current?.focus();
   };
 
+  // A typeahead completion (Round 14 K1) is already a full, validated question — selecting one asks it
+  // immediately, same as tapping a sample-prompt/Did-you-mean chip, rather than just filling the box.
+  const selectCompletion = (text: string) => {
+    setDropdownOpen(false);
+    setActiveIndex(-1);
+    void submit(text);
+  };
+
   return (
     <AppShell width="ask">
       <div className="space-y-8">
@@ -212,16 +239,46 @@ export function AskScreen() {
               ref={inputRef}
               id="ask-input"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setDropdownOpen(true);
+                setActiveIndex(-1);
+              }}
+              onFocus={() => setDropdownOpen(true)}
+              onBlur={() => setDropdownOpen(false)}
+              role="combobox"
+              aria-expanded={showDropdown}
+              aria-controls="ask-typeahead-listbox"
+              aria-autocomplete="list"
               onKeyDown={(e) => {
+                if (showDropdown && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                  e.preventDefault();
+                  setActiveIndex((i) => {
+                    const max = completions.length - 1;
+                    if (e.key === 'ArrowDown') return i >= max ? max : i + 1;
+                    return i <= 0 ? -1 : i - 1;
+                  });
+                  return;
+                }
                 if (e.key === 'Enter' && !e.shiftKey) {
                   // Enter asks; Shift+Enter inserts a newline (the browser's
-                  // default textarea behavior, left alone below).
+                  // default textarea behavior, left alone below). A highlighted
+                  // typeahead completion (Round 14 K1) is asked instead of
+                  // whatever's literally typed.
                   e.preventDefault();
-                  void submit(input);
+                  if (showDropdown && activeIndex >= 0 && completions[activeIndex]) {
+                    selectCompletion(completions[activeIndex].text);
+                  } else {
+                    void submit(input);
+                  }
                 } else if (e.key === 'Escape') {
                   e.preventDefault();
-                  if (input) clear();
+                  if (showDropdown) {
+                    setDropdownOpen(false);
+                    setActiveIndex(-1);
+                  } else if (input) {
+                    clear();
+                  }
                 }
               }}
               placeholder="Ask Donovan anything — an address, a serial, a name, a question…"
@@ -232,6 +289,11 @@ export function AskScreen() {
               className="dw-input pr-[7.5rem] text-body-lg field:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4 resize-none overflow-y-auto max-h-48"
               style={{ minHeight: fieldMode ? 60 : 56 }}
             />
+            {showDropdown && (
+              <div id="ask-typeahead-listbox">
+                <TypeaheadDropdown items={completions} activeIndex={activeIndex} onHover={setActiveIndex} onSelect={selectCompletion} />
+              </div>
+            )}
             <div className="absolute inset-y-0 right-1.5 flex items-center gap-1">
               {input && (
                 <button type="button" onClick={clear} aria-label="Clear question" className="min-w-touch min-h-touch grid place-items-center text-ink-3 hover:text-ink rounded-md">
@@ -246,10 +308,11 @@ export function AskScreen() {
               </button>
             </div>
           </div>
-          <p className="text-caption text-ink-3" aria-live="polite">
+          <p className="text-caption text-ink-3 flex items-center flex-wrap gap-x-3 gap-y-1" aria-live="polite">
             {loading
               ? <span className="inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> {steps.length ? steps[steps.length - 1] : 'Donovan is reading your records…'}</span>
               : <><kbd className="dw-kbd">Enter</kbd> to ask · <kbd className="dw-kbd">Esc</kbd> to clear</>}
+            {!loading && <PreflightPill hint={hint} />}
           </p>
           {loading && steps.length > 1 && (
             <ul className="space-y-1 pl-1" aria-hidden="true">
@@ -305,24 +368,22 @@ export function AskScreen() {
               onOpenRecord={openRecord}
               onAsk={(q) => void submit(q)}
             />
+            {answer.kind === 'no-answer' && didYouMean.length > 0 && (
+              <DidYouMeanChips chips={didYouMean} onPick={(q) => void submit(q)} />
+            )}
           </>
         )}
 
         {!asked && (
           <section aria-labelledby="suggested-heading" className="space-y-3">
             <h2 id="suggested-heading" className="dw-label">
-              {suggestions.length > 0 ? 'Try asking' : 'For example'}
+              {displaySuggestions.length > 0 ? 'Try asking' : 'For example'}
             </h2>
-            {suggestions.length > 0 ? (
-              <ul className="flex flex-wrap gap-2">
-                {suggestions.map((q) => (
-                  <li key={q}>
-                    <button type="button" onClick={() => void submit(q)} className="dw-btn-secondary !min-h-[44px] !py-2 text-left font-normal">
-                      {q}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {displaySuggestions.length > 0 ? (
+              <SamplePromptChips
+                prompts={samplePrompts.length ? samplePrompts : displaySuggestions.map((q) => ({ id: q, text: q, category: 'client' }))}
+                onPick={(q) => void submit(q)}
+              />
             ) : (
               <>
                 <ul className="flex flex-wrap gap-2">

@@ -316,6 +316,15 @@ export interface ScorecardFailing {
   error?: string;
 }
 
+/** ROUND 14: the AI provider account is currently marked unavailable (out of credits, a bad/revoked
+ *  key, or overloaded past its retries — api/_lib/claude.js's classifyProviderError). `since` is when
+ *  it was FIRST seen, not the most recent request that hit it. Absent/null = not currently unavailable. */
+export interface ProviderOutageStatus {
+  reason: 'credits' | 'auth' | 'overloaded';
+  detail: string | null;
+  since: string;
+}
+
 export interface ScorecardStatus {
   backend: 'tables' | 'audit' | 'memory';
   exam: { version: string; questions: number; categories: Record<string, number>; personas?: Record<string, number> };
@@ -326,6 +335,8 @@ export interface ScorecardStatus {
   previous: { id: string; score: number; startedAt: string | null; answered: number; valueScore?: number | null; citationCoverage?: number | null } | null;
   runs: { id: string; source: string; status: string; score: number | null; answered: number; startedAt: string | null; costUsd: number }[];
   failing: ScorecardFailing[];
+  /** ROUND 14: set whenever the AI provider is currently unavailable, even between runs. */
+  providerStatus?: ProviderOutageStatus | null;
 }
 
 export interface ScorecardPage {
@@ -404,6 +415,8 @@ export interface MissDigest {
   };
   groups: MissDigestGroup[];
   topQuestions: MissDigestQuestion[];
+  /** ROUND 14 (brief item 5): set whenever the AI provider was unavailable at digest-build time. */
+  providerStatus?: ProviderOutageStatus | null;
 }
 
 export interface MissDigestResult {
@@ -456,6 +469,12 @@ export interface LearningProposal {
   decided_by: string | null;
   /** capability_gap only: the replay outcome of its example question, when one exists. */
   replay?: MissReplay;
+  /** ROUND 14 (brief item 4, dedupe by normalized title): capability_gap only. When several pending
+   *  proposals share the same normalized title, the server folds them into one row and reports how
+   *  many (`groupCount`) plus every id in the group (`groupIds`, this row's own id included) — used by
+   *  "Reject all" for that group. Absent/1 = not part of a group. */
+  groupCount?: number;
+  groupIds?: string[];
 }
 
 /** api/_lib/learning/replay.js's replayMisses() summary. */
@@ -487,6 +506,10 @@ export interface LearningRunSummary {
   skipped?: string;
   error?: string;
   replay?: Partial<ReplaySummary> & { skipped?: string; error?: string };
+  /** ROUND 14 (brief item 4): capability_gap proposals whose example question was re-checked this run. */
+  gapAutoResolve?: { checked: number; resolved: number; stillOpen: number; stopped: string | null; skipped?: string; error?: string };
+  /** ROUND 14 (brief item 3): set to a plain, human-readable line whenever the AI provider is unavailable. */
+  providerStatus?: string;
 }
 
 /** One row of donovan_learned (M3-config/26-donovan-learning.sql) — an
@@ -757,6 +780,12 @@ export const reviewClient = {
    *  the proposal it came from are kept). */
   learningDeactivate(learnedId: string) {
     return postJson<{ ok: boolean }>({ action: 'learningDeactivate', learnedId });
+  },
+
+  /** ROUND 14 (brief item 4): bulk-reject pending "Can't do yet" (capability_gap) notes — every one
+   *  currently pending, or (from a dedupe group's "Reject all") just the given `ids`. */
+  learningRejectAllGaps(opts?: { ids?: string[] }) {
+    return postJson<{ rejected: number }>({ action: 'learningRejectAllGaps', ids: opts?.ids });
   },
 
   /** Runs the nightly learning sweep on demand ("Run learning now"). Same

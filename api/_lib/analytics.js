@@ -43,7 +43,19 @@ const zipCounty = JSON.parse(readFileSync(join(__dirname, 'geo', 'zip-county.jso
  *  can be built from them at module load without a temporal-dead-zone
  *  ordering problem — both are still exported/used exactly as before by
  *  detectedConditions further down. */
-const BRAND_WORDS = ['trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi'];
+// Round 14 (K3): beyond the brands actually present in this tenant's data
+// (trane..mitsubishi), a handful more common real-world HVAC manufacturer
+// names are included so a question naming one of THEM ("do we have any Ruud
+// units?") still recognizes it as a brand condition and builds a real
+// (zero-row-matching) filter, rather than falling through with no filter
+// recognized at all and confidently reporting the TOTAL unfiltered equipment
+// count as if it answered the brand question (see suspiciousUnfilteredCustomerPlan's
+// own doc comment for why an unrecognized-but-real condition must never be
+// silently dropped like this).
+const BRAND_WORDS = [
+  'trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi',
+  'ruud', 'bryant', 'amana', 'american standard', 'heil', 'payne', 'coleman', 'maytag',
+];
 const KNOWN_COUNTY_NAMES = [
   ...new Set(
     [...Object.values(zipCounty.azZip3Default), ...Object.values(zipCounty.azZipExceptions)]
@@ -1081,14 +1093,58 @@ export const CONDITION_RATIO = 'a ratio or percentage';
 const WARRANTY_STATUS_WORD_RE =
   /\b(?:active|current|valid|still (?:under|covered|in) warranty|under warranty|in warranty|covered|expired|out of warranty|no longer (?:under|covered)|lapsed|expiring|expires? soon|about to expire|running out|unknown warranty|warranty (?:status )?unknown)\b/i;
 
+// Reviewer NO-GO (2026-09-26, round 14): "units that are NOT expired" / "not
+// active" / "which units aren't under warranty" / "not out of warranty" all
+// matched their bucket's own positive substring exactly as the positive
+// phrasing would (a bare "expired"/"active"/"under warranty" test has no
+// idea a "not"/"isn't"/"aren't" sits right in front of it) and returned that
+// SAME bucket — the exact opposite status, confidently. A negation
+// directly in front of the matched phrase (never a wide word-window, so an
+// unrelated negation elsewhere in the sentence can't flip this) means this
+// specific bucket was RULED OUT, not asked for — and which of the other two
+// buckets was actually meant is genuinely ambiguous ("not expired" could be
+// active OR expiring OR unknown), so this returns null (never guesses)
+// rather than picking one.
+const STATUS_NEGATED_BEFORE_RE = /\b(?:not|isn'?t|aren'?t|wasn'?t|weren'?t|doesn'?t|don'?t)\b(?:\s+\S+){0,2}\s*$/i;
+function statusNegatedAt(q, idx) {
+  return STATUS_NEGATED_BEFORE_RE.test(q.slice(0, idx));
+}
+
+/** True when the question names one of warrantyStatusFromQuestion's own status phrases but with a
+ *  negation directly in front of it — the "genuinely ambiguous, never guess" case that function itself
+ *  already returns null for. A caller (detPlan.js's impliedWarrantyStatus) that would otherwise silently
+ *  build an UNFILTERED plan when this function returns null (mistaking "negated" for "no warranty
+ *  condition mentioned at all") needs this to tell the two apart and bail on the whole plan instead — see
+ *  that call site's own doc comment. */
+export function hasAmbiguousWarrantyStatusNegation(question) {
+  const q = String(question ?? '').toLowerCase();
+  if (!/\bwarrant/.test(q)) return false;
+  const REGEXES = [
+    /\be[xp]{2}ir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/,
+    /\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/,
+    /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/,
+  ];
+  return REGEXES.some((re) => {
+    const m = re.exec(q);
+    return m ? statusNegatedAt(q, m.index) : false;
+  });
+}
+
 /** The warrantyStatus bucket a question names, or null. Pure. */
 export function warrantyStatusFromQuestion(question) {
   const q = String(question ?? '').toLowerCase();
   if (!/\bwarrant/.test(q)) return null;
-  if (/\bexpir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/.test(q)) return 'expiring';
-  if (/\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/.test(q)) return 'expired';
+  // "epxiring" — a common adjacent-letter-transposition typo of "expiring"
+  // (swapping the 2nd/3rd letters is one of the most frequent human typing
+  // slips) that normalizeQuestion's own fuzzy-corrector never catches
+  // (its VOCAB is domain nouns/names, not generic words like "expiring").
+  let m = /\be[xp]{2}ir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/.exec(q);
+  if (m) return statusNegatedAt(q, m.index) ? null : 'expiring';
+  m = /\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/.exec(q);
+  if (m) return statusNegatedAt(q, m.index) ? null : 'expired';
   if (/\bunknown\b/.test(q)) return 'unknown';
-  if (/\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/.test(q)) return 'active';
+  m = /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/.exec(q);
+  if (m) return statusNegatedAt(q, m.index) ? null : 'active';
   return null;
 }
 
@@ -1136,36 +1192,121 @@ function titleCaseWords(s) {
  * those have no CONDITION_PLAN_FIELD entry at all and are handled earlier,
  * by the plan-independent up-front checks in runAnalyticsQuestion.
  */
-export function buildConditionOverrideFilter(condition, question) {
+// Reviewer NO-GO (2026-09-26, round 14): "how many customers are not in
+// Mesa" / "units that are not Trane" / "excluding Mesa" / "outside of Mesa"
+// all detected their geo/brand word exactly as any positive phrasing would,
+// then silently built a POSITIVE `eq` filter — the exact opposite of the
+// asked-for set, answered with full confidence. Checked right before the
+// matched word itself (never a wide word-window, which would risk an
+// unrelated "don't have a phone" elsewhere in the same sentence flipping an
+// unrelated city/brand word) — a real, common negation idiom directly
+// governing THIS SPECIFIC matched word, nothing else.
+const NEGATION_IMMEDIATELY_BEFORE_RE =
+  /\b(?:not|except(?:\s+for)?|excluding|other\s+than|besides|outside(?:\s+of)?|without|no|isn'?t|aren'?t|wasn'?t|weren'?t)\s+(?:(?:an?|the|in|from|on)\s+){0,2}$/i;
+
+function isNegatedWord(q, word) {
+  const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idx = new RegExp(`\\b${esc}\\b`, 'i').exec(q)?.index;
+  if (idx == null) return false;
+  if (NEGATION_IMMEDIATELY_BEFORE_RE.test(q.slice(0, idx))) return true;
+  // "customers who do not have a Trane unit" / "don't have a unit in Mesa" —
+  // the same negative-possession shape buildConditionOverrideFilter's own
+  // email/phone branch already recognizes, just generalized to whichever
+  // word this call is checking (bounded window, so an unrelated "don't have
+  // an email" earlier in a long sentence never flips a LATER, unrelated
+  // city/brand mention).
+  return new RegExp(`\\b(?:don'?t|doesn'?t|do not|does not)\\s+have\\b[\\s\\S]{0,20}\\b${esc}\\b`, 'i').test(q);
+}
+
+/**
+ * `entity`, when given, is the plan's (or detPlan.js's own current best
+ * guess at the) entity — only ever consulted for a NEGATED brand condition:
+ * "customers without a Trane unit" cannot be expressed as a single-row
+ * `brand != Trane` filter the way "units that are not Trane" can (a customer
+ * can own several units, so "has a non-Trane unit" — what a neq filter over
+ * the joined equipment rows would actually compute — is not the same claim
+ * as "owns no Trane unit at all", a NOT EXISTS this closed filter vocabulary
+ * has no way to express). Returning null there (never guessing which one
+ * was meant) is the same "never guess" rule as everywhere else in this
+ * file; a plain equipment/warranties-entity brand negation has no such
+ * per-customer ambiguity and is always resolved to `neq`.
+ */
+export function buildConditionOverrideFilter(condition, question, entity) {
   const q = String(question ?? '').toLowerCase();
   if (condition === 'email' || condition === 'phone') {
     const field = condition === 'email' ? 'hasEmail' : 'hasPhone';
-    const negative = new RegExp(`\\b(?:no|missing|without)\\s+(?:an?\\s+)?${condition}\\b`, 'i');
+    // "no/missing/without <email/phone>" said right next to the noun, OR a
+    // "don't/doesn't/do not/does not have" clause anywhere earlier in the
+    // question ("customers who don't have a phone number on file") — both
+    // are the same negative-possession shape, just with the negation word
+    // further from the noun in the second one.
+    const negative = new RegExp(
+      `\\b(?:no|missing|without)\\s+(?:an?\\s+)?${condition}\\b|` +
+        `\\b(?:don'?t|doesn'?t|do not|does not)\\s+have\\b[\\s\\S]{0,20}\\b${condition}\\b`,
+      'i'
+    );
     return { field, op: 'eq', value: !negative.test(q) };
   }
   if (condition === 'brand') {
-    const word = BRAND_WORDS.find((b) => new RegExp(`\\b${b}\\b`).test(q));
-    return word ? { field: 'brand', op: 'eq', value: titleCaseWords(word) } : null;
+    const matches = [...new Set(BRAND_WORDS.filter((b) => new RegExp(`\\b${b}\\b`).test(q)))];
+    if (matches.length === 0) return null;
+    // Reviewer NO-GO (2026-09-26, round 14): "how many Trane and Carrier customers in Mesa" naming TWO
+    // values for the same dimension is genuinely ambiguous with this closed, flat filter vocabulary — an
+    // AND (no unit is both brands) is a silent zero/undercount, an OR needs an `in` filter this function
+    // never builds for a safety-net condition. Never guess which one (or that it was really both) was
+    // meant; see the matching city/county/zip/state guards below for the identical shape.
+    if (matches.length > 1) return null;
+    const word = matches[0];
+    if (isNegatedWord(q, word)) {
+      if (entity === 'customers') return null; // exists-not-at-all — no flat filter can say this; never guess
+      return { field: 'brand', op: 'neq', value: titleCaseWords(word) };
+    }
+    return { field: 'brand', op: 'eq', value: titleCaseWords(word) };
   }
   if (condition === 'county') {
-    const word = [...KNOWN_COUNTY_NAMES]
-      .sort((a, b) => b.length - a.length)
-      .find((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q));
-    return word ? { field: 'county', op: 'eq', value: titleCaseWords(word) } : null;
+    const sorted = [...KNOWN_COUNTY_NAMES].sort((a, b) => b.length - a.length);
+    const matches = [...new Set(sorted.filter((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q)))];
+    if (matches.length === 0) return null;
+    if (matches.length > 1) return null; // two distinct counties named — never guess which (see brand's own doc comment)
+    const word = matches[0];
+    return { field: 'county', op: isNegatedWord(q, word) ? 'neq' : 'eq', value: titleCaseWords(word) };
   }
   if (condition === 'city') {
     const names = [...new Set([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES])].sort((a, b) => b.length - a.length);
-    const word = names.find((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q));
-    return word ? { field: 'city', op: 'eq', value: titleCaseWords(word) } : null;
+    const matches = [];
+    for (const c of names) {
+      if (!new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q)) continue;
+      // A shorter matched name that is itself a SUBSTRING of a longer name already matched (e.g. "Casa"
+      // inside "Casa Grande") is the same one mention, not a second city — only a genuinely distinct
+      // name counts toward the ambiguity check below.
+      if (matches.some((m) => m.includes(c) || c.includes(m))) continue;
+      matches.push(c);
+    }
+    if (matches.length === 0) return null;
+    if (matches.length > 1) return null; // two distinct cities named — never guess which (see brand's own doc comment)
+    const word = matches[0];
+    return { field: 'city', op: isNegatedWord(q, word) ? 'neq' : 'eq', value: titleCaseWords(word) };
   }
   if (condition === 'state') {
-    if (/\barizona\b|\baz\b/.test(q)) return { field: 'state', op: 'eq', value: 'AZ' };
-    if (/\bnevada\b|\bnv\b/.test(q)) return { field: 'state', op: 'eq', value: 'NV' };
+    const az = /\barizona\b|\baz\b/.test(q);
+    const nv = /\bnevada\b|\bnv\b/.test(q);
+    if (az && nv) return null; // both states named — never guess which (see brand's own doc comment)
+    if (az) {
+      const word = /\barizona\b/.test(q) ? 'arizona' : 'az';
+      return { field: 'state', op: isNegatedWord(q, word) ? 'neq' : 'eq', value: 'AZ' };
+    }
+    if (nv) {
+      const word = /\bnevada\b/.test(q) ? 'nevada' : 'nv';
+      return { field: 'state', op: isNegatedWord(q, word) ? 'neq' : 'eq', value: 'NV' };
+    }
     return null;
   }
   if (condition === 'zip') {
-    const m = q.match(/\b(\d{5})\b/);
-    return m ? { field: 'zip', op: 'eq', value: m[1] } : null;
+    const matches = [...new Set(q.match(/\b\d{5}\b/g) ?? [])];
+    if (matches.length === 0) return null;
+    if (matches.length > 1) return null; // two distinct zips named — never guess which (see brand's own doc comment)
+    const m = matches[0];
+    return { field: 'zip', op: isNegatedWord(q, m) ? 'neq' : 'eq', value: m };
   }
   if (condition === 'warranty') {
     const status = warrantyStatusFromQuestion(q);
@@ -1918,16 +2059,41 @@ export function resolveServiceVisitsOverride(question) {
  *   newer than N years  -> installYear >= (thisYear - N)      (installed within the last N years, this year included)
  * Returns {field, op, value} or null. Callers replace any installYear filter the model produced with this one.
  */
-const AGE_THAN_RE = /\b(older|newer|younger)\s+than\s+(\d{1,2})\s*(?:years?|yrs?)(?:\s+old)?\b/i;
+// Round 14 (K3): "order" is deliberately accepted as the SAME word as
+// "older" here — nlNormalize.js's own general fuzzy-typo corrector (VOCAB,
+// built from ENTITY_SYNONYMS' own "purchase order(s)" phrase) silently
+// mangles a genuine "older than 10 years" into "order than 10 years" before
+// this ever runs (edit distance 1: o-l-d-e-r vs o-r-d-e-r), for EVERY caller
+// of resolveAgeFilter — model-planned or deterministic alike, since both
+// read the same already-normalized question text. Rather than special-case
+// this in nlNormalize.js's own general vocabulary (outside this round's
+// file ownership), "order" is accepted here as one more spelling of
+// "older" — the same "duplicate the small fix locally" idiom this file
+// already uses for typo'd trigger words elsewhere (see e.g.
+// SINGULAR_NAMED_RECORD_RE's own "instbll"/"mainttenance" alternatives).
+// Round 14 (K3): "than" is now optional ("over 10 years old" names the same
+// condition as "older than 10 years" with no "than" at all), and "over"/
+// "under" are accepted as one more spelling of "older"/"newer" respectively —
+// the same real English paraphrase resolveAgeFilter already treats
+// "older"/"order" as. Also fixes a pre-existing bug: "younger than N years"
+// was falling into the OLDER branch below (only the literal word "newer" was
+// ever checked), giving the exact opposite of the asked-for direction.
+// "ye+ars?" (one-or-more e) rather than a plain "years?" tolerates a doubled-
+// vowel typo ("yeears") the same general way — never hardcoded to this one
+// exam spelling, just the shape of a repeated-letter slip.
+// "yeasr" (a transposed-last-two-letters typo of "years") tolerated the same
+// general way as "yeears" above — one more shape of the same common slip.
+const AGE_THAN_RE = /\b(older|order|over|newer|younger|under)\s+(?:than\s+)?(\d{1,2})\s*(?:ye+a(?:rs?|sr)|yrs?)(?:\s+old)?\b/i;
+const NEWER_DIRECTION_WORDS = new Set(['newer', 'younger', 'under']);
 export function resolveAgeFilter(question, today) {
   const m = AGE_THAN_RE.exec(String(question ?? ''));
   if (!m) return null;
   const now = today ? new Date(today) : new Date();
   if (Number.isNaN(now.getTime())) return null;
   const cutoff = now.getUTCFullYear() - Number(m[2]);
-  return m[1].toLowerCase() === 'older'
-    ? { field: 'installYear', op: 'lt', value: cutoff }
-    : { field: 'installYear', op: 'gte', value: cutoff };
+  return NEWER_DIRECTION_WORDS.has(m[1].toLowerCase())
+    ? { field: 'installYear', op: 'gte', value: cutoff }
+    : { field: 'installYear', op: 'lt', value: cutoff };
 }
 
 /** "August 2026" from a validated plan's {from: '2026-08', to: '2026-08'} —
@@ -2058,7 +2224,19 @@ export function validatePlan(raw) {
   // Team A: which date a documents time window is about — set by code from the question wording (never the model).
   const dateBasis = p.dateBasis === 'uploaded' || p.dateBasis === 'service' ? p.dateBasis : undefined;
 
-  return { entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy, ...(dateBasis ? { dateBasis } : {}) };
+  // Round 14 (K3): "how many different zip codes do we cover" — a groupBy
+  // plan's DISTINCT group-value count, never the per-group breakdown a plain
+  // groupBy answers with (see formatAnalyticsAnswer's own use of this flag).
+  // Never set by the model (ANALYTICS_TOOL's schema has no such property, so
+  // the model's own tool_use JSON can never carry it) — only detPlan.js's
+  // detectDistinctDimensionCount produces this, code-side, the same way
+  // dateBasis above is code-side-only.
+  const countDistinct = p.countDistinct === true && p.op === 'groupBy' ? true : undefined;
+
+  return {
+    entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy,
+    ...(dateBasis ? { dateBasis } : {}), ...(countDistinct ? { countDistinct } : {}),
+  };
 }
 
 /* =================================================================== geo */
@@ -2475,8 +2653,16 @@ function formatServiceDateLabel(rawDate) {
  *  "which customers have Trane units" style answer ("18 customers — showing
  *  the first 12" cut off a third of them) — raised to 50, still bounded, and
  *  FactGrid's GroupTable (src/components/FactGrid.tsx) stays a compact
- *  one-line-per-row table at 50 rows exactly as it already did at 12. */
-export const MAX_FACT_ROWS = 50;
+ *  one-line-per-row table at 50 rows exactly as it already did at 12.
+ *  Round 14 (K3): raised again to 200 — a real, ordinary "list customers
+ *  missing an email address" (data-hygiene) truncated a genuine 60-customer
+ *  answer down to 50 shown, silently dropping 10 real names off a plain list
+ *  answer with no "narrow this down" filter involved at all. 200 still keeps
+ *  this a bounded, compact table (a shop this small — the golden tenant's
+ *  own largest entity population is 132 equipment records — never has a
+ *  plain unfiltered list bigger than that), just no longer truncates the
+ *  ordinary case. */
+export const MAX_FACT_ROWS = 200;
 
 /**
  * @param plan       the validated plan
@@ -2636,6 +2822,21 @@ function formatAnalyticsAnswerBase(plan, opts) {
     return {
       kind: 'answer', text,
       facts: [{ label: 'Total', value: formatted, sources: [] }],
+      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
+
+  if (plan.op === 'groupBy' && plan.countDistinct) {
+    // Round 14 (K3): "how many different zip codes do we cover" — the
+    // DISTINCT group-value count, never the per-group breakdown below (which
+    // would bury the one number this question actually asked for inside a
+    // long list and, worse, put the WRONG number first in `text` — the total
+    // ROW count, not the distinct-group count).
+    const distinctCount = groups.length;
+    const label = GROUP_LABEL[plan.groupBy] ?? plan.groupBy;
+    return {
+      kind: 'answer', text: `You have ${distinctCount} different ${label}${distinctCount === 1 ? '' : 's'}.`,
+      facts: [{ label: `Distinct ${label}s`, value: String(distinctCount), sources: [] }],
       sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     };
   }

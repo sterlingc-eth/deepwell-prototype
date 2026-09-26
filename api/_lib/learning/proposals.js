@@ -121,6 +121,17 @@ export const COMMON_WORDS = new Set([
  *  proper nouns and never appear on this list. */
 export const GENERIC_SYNONYM_WORDS = new Set(['brand', 'brands', 'model', 'models', 'unit', 'units', 'type', 'types']);
 
+/** ROUND 14 (brief item 4: "dedupe gaps by normalized title"): the same capability the shop is
+ *  missing gets proposed once per differently-WORDED example question ("filter by zip", "search by
+ *  zip code", "sort by zipcode"...), which is what turned "a handful of real gaps" into "71 pending".
+ *  Pure, exported so api/review.js's learningList can group by it and scripts/verify-provider-outage.mjs
+ *  can assert the grouping without a database. Lowercase, punctuation folded to spaces, whitespace
+ *  collapsed — deliberately NOT stemming/fuzzy matching (that risks merging two genuinely different
+ *  gaps); two titles only merge when they are the same words after trivial normalization. */
+export function normalizeGapTitle(title) {
+  return String(title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function isWordFormat(s) {
   return typeof s === 'string' && WORD_RE.test(s);
 }

@@ -76,6 +76,11 @@ export function DonovanLearningCard() {
   const [decisionNote, setDecisionNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
+  // ROUND 14 (brief item 4, owner: "71 pending" — most of it was informational "Can't do yet" notes
+  // that are pending forever by policy, not proposals awaiting a real decision): shown in their own
+  // collapsed section, never counted in the header's "pending" badge.
+  const [gapsOpen, setGapsOpen] = useState(false);
+  const [rejectingGroupKey, setRejectingGroupKey] = useState<string | null>(null);
 
   // TEAM H (2026-09-24): the autonomous per-tenant loop's own summary + the weekly gap report —
   // loaded lazily on first open (not on mount, unlike the proposal queue above) since both are
@@ -172,15 +177,21 @@ export function DonovanLearningCard() {
     setError(null);
     try {
       const summary = await reviewClient.learningRunNow();
-      if (summary.skipped) {
-        setRunStatus(`Skipped: ${summary.skipped}.`);
+      const gr = summary.gapAutoResolve;
+      const gapNote = gr && !gr.skipped && !gr.error && gr.checked > 0 ? ` ${gr.resolved} feature request(s) auto-resolved (answered now).` : '';
+      if (summary.providerStatus) {
+        // ROUND 14 (brief item 3): "Run learning now" must say why it did nothing model-related,
+        // never look like it silently did nothing at all.
+        setRunStatus(`${summary.providerStatus}.${gapNote}`);
+      } else if (summary.skipped) {
+        setRunStatus(`Skipped: ${summary.skipped}.${gapNote}`);
       } else if (summary.error) {
         setRunStatus(`Failed: ${summary.error}`);
       } else {
         const byStatus = Object.entries(summary.byStatus ?? {}).map(([k, n]) => `${n} ${k}`).join(', ') || 'no proposals';
         const rp = summary.replay;
         const replayNote = rp && !rp.skipped && !rp.error ? ` Re-ran ${rp.attempted ?? 0} miss(es): ${rp.answeredNow ?? 0} answered now, ${rp.stillFailing ?? 0} still failing.` : '';
-        setRunStatus(`${summary.totalMissGroups ?? 0} miss group(s), ${summary.modelCallsMade ?? 0} model call(s) — ${byStatus}.${replayNote}`);
+        setRunStatus(`${summary.totalMissGroups ?? 0} miss group(s), ${summary.modelCallsMade ?? 0} model call(s) — ${byStatus}.${replayNote}${gapNote}`);
       }
       load();
     } catch (e) {
@@ -220,7 +231,30 @@ export function DonovanLearningCard() {
     }
   };
 
+  const rejectAllGaps = async (ids?: string[]) => {
+    const key = ids ? ids.join(',') : 'all';
+    setRejectingGroupKey(key);
+    setError(null);
+    try {
+      const r = await reviewClient.learningRejectAllGaps(ids ? { ids } : undefined);
+      setRunStatus(`Rejected ${r.rejected} feature request${r.rejected === 1 ? '' : 's'}.`);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reject these feature requests.');
+    } finally {
+      setRejectingGroupKey(null);
+    }
+  };
+
   if (hidden || !checked) return null;
+
+  // ROUND 14 (brief item 4): "Can't do yet" (capability_gap) notes are informational by design — they
+  // sit pending until either an operator explicitly approves/replays one or it auto-resolves because
+  // its example is now answered (learning/replay.js's autoResolveCapabilityGaps). Split out of the main
+  // queue and the "pending" badge so the badge means "awaiting a real decision", not "everything Donovan
+  // has ever noted it can't do yet".
+  const nonGapProposals = (proposals ?? []).filter((p) => p.kind !== 'capability_gap');
+  const gapProposals = (proposals ?? []).filter((p) => p.kind === 'capability_gap');
 
   return (
     <div className="dw-card p-4 space-y-3">
@@ -228,7 +262,7 @@ export function DonovanLearningCard() {
         <span className="text-body font-medium text-ink flex items-center gap-2">
           <GraduationCap className="w-4 h-4" aria-hidden="true" />
           Donovan learning
-          {proposals && <span className="dw-pill-muted">{proposals.length} pending</span>}
+          {proposals && <span className="dw-pill-muted">{nonGapProposals.length} pending</span>}
         </span>
         {open ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
       </button>
@@ -278,12 +312,12 @@ export function DonovanLearningCard() {
 
           <div>
             <h3 className="text-caption font-medium text-ink-3 uppercase tracking-wide mb-2">Pending proposals</h3>
-            {proposals && proposals.length === 0 && (
+            {proposals && nonGapProposals.length === 0 && (
               <p className="text-body text-ink-3">Nothing pending — every recent proposal was auto-decided or already reviewed.</p>
             )}
-            {proposals && proposals.length > 0 && (
+            {nonGapProposals.length > 0 && (
               <ul className="divide-y divide-line">
-                {proposals.map((p) => {
+                {nonGapProposals.map((p) => {
                   const v = p.verification;
                   return (
                     <li key={p.id} className="py-2 space-y-1.5">
@@ -300,7 +334,7 @@ export function DonovanLearningCard() {
                             className="dw-btn-tertiary !min-h-[28px] !py-0"
                           >
                             {decidingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Check className="w-3.5 h-3.5" aria-hidden="true" />}
-                            {p.kind === 'capability_gap' ? 'Approve & replay' : 'Approve'}
+                            Approve
                           </button>
                           <button
                             type="button"
@@ -319,15 +353,92 @@ export function DonovanLearningCard() {
                           ? ` · same result seen ${Number(p.evidence?.seen ?? 1)}x${p.evidence?.thumbsUp ? ' · thumbs-up' : ''}`
                           : v && v.bankTotal != null ? ` · bank ${v.bankPass}/${v.bankTotal} · miss fixed ${v.missFixed?.fixed ?? 0}/${v.missFixed?.total ?? 0} · negatives ${v.negativesPass ? 'clean' : 'FAILED'}` : ''}
                       </p>
-                      {p.kind === 'capability_gap' && p.replay && (
-                        <p className="text-caption text-ink-2">
-                          {p.replay.outcome === 'answered_now' ? 'Its example is answered now ✓' : `Its example is still failing — ${p.replay.reason ?? 'no reason given'}`}
-                        </p>
-                      )}
                     </li>
                   );
                 })}
               </ul>
+            )}
+          </div>
+
+          <div className="border-t border-line pt-3">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between text-left"
+              onClick={() => setGapsOpen((v) => !v)}
+              aria-expanded={gapsOpen}
+            >
+              <span className="text-caption font-medium text-ink-3 uppercase tracking-wide">
+                Feature requests ({gapProposals.length})
+              </span>
+              {gapsOpen ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
+            </button>
+            <p className="text-caption text-ink-3 mt-1">
+              Things Donovan noted it can&apos;t do yet — informational, never counted as pending. One that
+              can already be answered auto-resolves the next time learning runs; the rest just sit here
+              until you approve (which replays and can turn a real fix into an active shortcut) or reject.
+            </p>
+            {gapsOpen && (
+              gapProposals.length === 0 ? (
+                <p className="text-body text-ink-3 mt-2">Nothing noted right now.</p>
+              ) : (
+                <>
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => void rejectAllGaps()}
+                      disabled={rejectingGroupKey === 'all'}
+                      className="dw-btn-tertiary !min-h-[28px] !py-0"
+                    >
+                      {rejectingGroupKey === 'all' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <X className="w-3.5 h-3.5" aria-hidden="true" />}
+                      Reject all feature requests
+                    </button>
+                  </div>
+                  <ul className="divide-y divide-line mt-2">
+                    {gapProposals.map((p) => {
+                      const groupKey = p.groupIds?.join(',') ?? p.id;
+                      return (
+                        <li key={p.id} className="py-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-body text-ink">
+                              <span className="dw-pill-muted">{kindLabel(p.kind)}</span> {payloadSummary(p.kind, p.payload)}
+                              {p.groupCount && p.groupCount > 1 && (
+                                <span className="dw-pill-muted ml-1" title="Proposed with this same title, worded differently each time">
+                                  ×{p.groupCount}
+                                </span>
+                              )}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => void decide(p.id, 'approved')}
+                                disabled={decidingId === p.id}
+                                className="dw-btn-tertiary !min-h-[28px] !py-0"
+                              >
+                                {decidingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Check className="w-3.5 h-3.5" aria-hidden="true" />}
+                                Approve &amp; replay
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void rejectAllGaps(p.groupIds ?? [p.id])}
+                                disabled={rejectingGroupKey === groupKey}
+                                className="dw-btn-tertiary !min-h-[28px] !py-0"
+                              >
+                                {rejectingGroupKey === groupKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <X className="w-3.5 h-3.5" aria-hidden="true" />}
+                                {p.groupCount && p.groupCount > 1 ? `Reject all ${p.groupCount}` : 'Reject'}
+                              </button>
+                            </div>
+                          </div>
+                          {p.replay && (
+                            <p className="text-caption text-ink-2">
+                              {p.replay.outcome === 'answered_now' ? 'Its example is answered now ✓ (resolves next learning run)' : `Its example is still failing — ${p.replay.reason ?? 'no reason given'}`}
+                            </p>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )
             )}
           </div>
 

@@ -17,6 +17,9 @@ import { listRuns, getRun } from "../scorecard/store.js";
 // and its per-category gap against the latest Donovan run. Its own module (api/_lib/scorecard/baseline.js);
 // this file only wires it into the operator actions, same split as the runner above.
 import { runBaselinePage, baselineBudgetUsd, baselineGapReport, DEFAULT_BASELINE_PAGE_SIZE } from "../scorecard/baseline.js";
+// ROUND 14: the current provider-outage flag (if any), so the strip can say plainly "paused — AI
+// credits are exhausted" even before/between runs, not only in a just-finished run's own stopReason.
+import { currentProviderOutage } from "../providerStatus.js";
 
 const todayUtc = () => new Date().toISOString().slice(0, 10);
 const TASK_KEY = "donovan-scorecard";
@@ -130,8 +133,10 @@ export async function scorecardStatusAction(ctx, payload = {}) {
   // (donovan - baseline). A category with no cached baseline yet reports baselineScore: null, never a
   // misleading 0 (see baseline.js's baselineGapReport).
   const baselineGap = run ? await baselineGapReport(ctx, run.examVersion ?? exam.version, results) : {};
+  const providerStatus = await currentProviderOutage();
   return {
     backend: detail?.backend ?? backend,
+    providerStatus,
     exam: { version: exam.version, questions: exam.questions.length, categories, personas },
     budgetUsd: scorecardBudgetUsd(),
     baselineBudgetUsd: baselineBudgetUsd(),

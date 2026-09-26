@@ -17,6 +17,7 @@
  */
 import { fetchUniverse, matchesCondition } from '../compose.js';
 import { fetchAllVisits, addDaysIso } from '../relations/timeline.js';
+import { TENANT_SQL } from '../scope.js';
 
 export const DEFAULT_CALLBACK_WINDOW_DAYS = 30;
 
@@ -55,7 +56,7 @@ export function qualifyingCallback(list, { days, scope, year }, today) {
   return null;
 }
 
-/** True when customer `c` (compose.js's fetchUniverse shape) satisfies `cond`, for the two condition
+/** True when customer `c` (compose.js's fetchUniverse shape) satisfies `cond`, for the condition
  *  types compose.js's own matchesCondition doesn't know. Falls through to matchesCondition for every
  *  other (shared) condition type. */
 function conditionMatches(c, cond, ctx) {
@@ -74,7 +75,25 @@ function conditionMatches(c, cond, ctx) {
     const cutoff = addDaysIso(ctx.today, -cond.days);
     return c.equipment.some((e) => e.installDate && /^\d{4}-\d{2}-\d{2}/.test(e.installDate) && e.installDate.slice(0, 10) <= cutoff);
   }
+  // R14 (K4): "...have email on file?" — the positive counterpart of compose.js's own 'noEmail'; reuses
+  // fetchUniverse's own `email` field (compose.js already fetches it), no new condition compose.js needs
+  // to learn.
+  if (cond.type === 'hasEmail') return Boolean(c.email && String(c.email).trim());
+  // "...don't have a phone number on file?" — compose.js's fetchUniverse carries no phone field at all
+  // (nothing else in that engine needs it), so this reads it from ctx.phoneByCust (a small, separate,
+  // tenant-scoped lookup evaluateFilterClauses fetches ONLY when a 'noPhone' condition is present — see
+  // that function's own comment) rather than widening compose.js's shared universe for one caller.
+  if (cond.type === 'noPhone') return !(ctx.phoneByCust?.get(c.id) ?? '').trim();
   return matchesCondition(c, cond, { today: ctx.today, thisYear: ctx.thisYear });
+}
+
+/** customer_id -> phone (raw), tenant-scoped — a lightweight, separate read from compose.js's own
+ *  fetchUniverse (which has no reason to carry a field only THIS engine's 'noPhone' condition needs). */
+async function fetchPhoneByCust(db) {
+  const { rows } = await db.raw(
+    `SELECT id, data->>'phone' AS phone FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`
+  );
+  return new Map(rows.map((r) => [r.id, r.phone ?? '']));
 }
 
 /**
@@ -89,9 +108,11 @@ export async function evaluateFilterClauses(db, conditions, { today }) {
   const universe = await fetchUniverse(db, today);
   const thisYear = Number(String(today).slice(0, 4));
   const needsCallback = conditions.some((c) => c.type === 'callback');
+  const needsPhone = conditions.some((c) => c.type === 'noPhone');
   let visitsByCust = null;
   if (needsCallback) visitsByCust = groupByCust(await fetchAllVisits(db, today));
-  const ctx = { today, thisYear, visitsByCust };
+  const phoneByCust = needsPhone ? await fetchPhoneByCust(db) : null;
+  const ctx = { today, thisYear, visitsByCust, phoneByCust };
 
   const matched = universe.filter((c) => conditions.every((cond) => conditionMatches(c, cond, ctx)));
 

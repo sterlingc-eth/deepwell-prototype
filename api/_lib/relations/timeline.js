@@ -192,3 +192,58 @@ export async function customerIdsForDocuments(db, documentIds) {
 function escapeLikeText(s) {
   return String(s).replace(/[\\%_]/g, (c) => `\\${c}`);
 }
+
+/* ==================================================================== R14 (K4): financials/quotes */
+
+/** "quoted a replacement" — a customer has a proposal/quote-type document whose page text names a
+ *  replacement job, never a repair. Same closed phrase list for every family in this module that needs
+ *  it (a text SHAPE, not any one document's or customer's own wording). */
+const REPLACEMENT_QUOTE_TEXT_RE =
+  "(replac\\w*\\s+(the\\s+)?(unit|system|equipment|condenser|furnace|ac)|new (unit|system)|full replacement|system replacement)";
+const QUOTE_TYPE_ALIASES = ['proposal-quote', 'proposal', 'quote'];
+
+/** Every customer with at least one proposal/quote document whose page text matches
+ *  REPLACEMENT_QUOTE_TEXT_RE, tenant-scoped: {custId, docId, quotedAt (documents.created_at date)}[]. One
+ *  row per (customer, matching document) — a customer with two such quotes appears twice, which is fine
+ *  since every caller here only checks "at least one" or takes the earliest. */
+export async function fetchReplacementQuotes(db) {
+  const { rows } = await db.raw(
+    `SELECT DISTINCT c.id AS cust_id, d.id AS doc_id, d.created_at::date AS quoted_at
+       FROM document_entity_links l
+       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+       JOIN document_pages p ON p.document_id = d.id AND p.${TENANT_SQL}
+       LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
+       JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer'
+                       AND c.merged_into IS NULL AND c.${TENANT_SQL}
+      WHERE lower(replace(d.document_type, '_', '-')) = ANY($1::text[]) AND l.${TENANT_SQL}
+        AND p.text ~* $2
+      LIMIT 20000`,
+    [QUOTE_TYPE_ALIASES, REPLACEMENT_QUOTE_TEXT_RE]
+  );
+  return rows.map((r) => ({ custId: r.cust_id, docId: r.doc_id, quotedAt: isoDate(r.quoted_at) }));
+}
+
+/**
+ * Every document_financials row reachable from a customer (directly or via the customer's own
+ * equipment — the same two-path join every family in this file uses), tenant-scoped:
+ * {custId, docId, finId, kind, direction, status, total, invoiceDate}[]. One row per (customer,
+ * financial document); a document linked to more than one customer (rare) appears once per customer,
+ * matching the oracle's own document_entity_links join.
+ */
+export async function fetchCustomerFinancials(db) {
+  const { rows } = await db.raw(
+    `SELECT DISTINCT c.id AS cust_id, f.document_id AS doc_id, f.id AS fin_id, f.doc_kind AS kind,
+            f.direction, f.status, f.total, f.invoice_date
+       FROM document_financials f
+       JOIN document_entity_links l ON l.document_id = f.document_id AND l.${TENANT_SQL}
+       LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
+       JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer'
+                       AND c.merged_into IS NULL AND c.${TENANT_SQL}
+      WHERE f.${TENANT_SQL}
+      LIMIT 40000`
+  );
+  return rows.map((r) => ({
+    custId: r.cust_id, docId: r.doc_id, finId: r.fin_id, kind: r.kind, direction: r.direction,
+    status: r.status, total: r.total == null ? null : Number(r.total), invoiceDate: isoDate(r.invoice_date),
+  }));
+}

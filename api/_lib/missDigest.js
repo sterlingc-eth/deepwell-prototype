@@ -46,6 +46,10 @@ import { capRecipients } from "./notify.js";
 // last night" beside "what Donovan missed last night" in one place. Tolerant
 // of migration 26 not being applied (listProposals returns [] on its own).
 import { listProposals } from "./learning/store.js";
+// ROUND 14 (brief item 5): the digest must say "AI credits exhausted since <time>" once, plainly,
+// instead of letting an exhausted-credits night quietly show up as a pile of ordinary misses (which,
+// as of M3-config/48's list_ask_misses_window, it no longer even can — those rows are excluded there).
+import { currentProviderOutage } from "./providerStatus.js";
 
 /** Cross-tenant aggregation window default: the last 24h. Exported so
  *  scripts/verify-miss-digest.mjs and callers can reason about it without
@@ -320,6 +324,8 @@ export async function buildMissDigest({ since } = {}) {
     now: now.toISOString(),
   });
   digest.learning = summarizeLearningProposals(proposalRows, digest.since);
+  // ROUND 14 (brief item 5): say it once, plainly, rather than a pile of miscounted "no answer" rows.
+  digest.providerStatus = await currentProviderOutage();
   return digest;
 }
 
@@ -336,8 +342,11 @@ function escapeHtml(s) {
  * @param {string} dateLabel e.g. "2026-09-22"
  */
 export function renderMissDigestEmail(digest, dateLabel) {
-  const { totals, groups, topQuestions, learning } = digest;
+  const { totals, groups, topQuestions, learning, providerStatus } = digest;
   const subject = `Donovan misses — ${dateLabel}: ${totals.newQuestionsCount} new, ${totals.totalMisses} total`;
+  // ROUND 14 (brief item 5): once, plainly — never buried among ordinary miss rows (which, as of
+  // M3-config/48, no longer even include outage-caused ones).
+  const providerLine = providerStatus ? `AI credits exhausted since ${new Date(providerStatus.since).toISOString()}.` : null;
 
   // Tier 2 Part B: a "Proposed fixes" section, only when there's anything to
   // show — a digest built before migration 26 or before the learning step
@@ -347,6 +356,7 @@ export function renderMissDigestEmail(digest, dateLabel) {
 
   const textLines = [
     subject,
+    ...(providerLine ? [providerLine] : []),
     `${totals.totalTenants} tenant(s), ${totals.totalQuestions} distinct question(s), ${groups.length} outcome bucket(s).`,
     "",
     "By outcome:",
@@ -363,6 +373,7 @@ export function renderMissDigestEmail(digest, dateLabel) {
 
   const html =
     `<p><strong>${escapeHtml(subject)}</strong></p>` +
+    (providerLine ? `<p><strong>${escapeHtml(providerLine)}</strong></p>` : "") +
     `<p>${totals.totalTenants} tenant(s), ${totals.totalQuestions} distinct question(s), ${groups.length} outcome bucket(s).</p>` +
     `<p><strong>By outcome</strong></p><ul>${groups.map((g) => `<li>${escapeHtml(g.outcome)}: ${g.count}</li>`).join("")}</ul>` +
     `<p><strong>Top ${topQuestions.length} question(s)</strong></p><table cellpadding="6" style="border-collapse:collapse;width:100%">` +
@@ -386,6 +397,7 @@ export function renderMissDigestEmail(digest, dateLabel) {
 async function writeFounderNotification(founderTenantKey, digest, dateLabel) {
   const title = `Donovan misses — ${dateLabel}: ${digest.totals.newQuestionsCount} new, ${digest.totals.totalMisses} total`;
   const body =
+    (digest.providerStatus ? `AI credits exhausted since ${new Date(digest.providerStatus.since).toISOString()}. ` : "") +
     `${digest.totals.totalTenants} tenant(s), ${digest.totals.totalQuestions} distinct question(s) in the last 24h.` +
     (digest.learning?.total ? ` ${digest.learning.total} learning proposal(s) proposed.` : "");
   try {
@@ -416,7 +428,10 @@ export async function sendMissDigest({ since, digest: given } = {}) {
   const digest = given ?? (await buildMissDigest({ since }));
   const dateLabel = digest.now.slice(0, 10);
 
-  if (digest.totals.totalMisses === 0) {
+  // ROUND 14: an active provider outage is worth telling the owner about even on a night with zero
+  // (countable) misses — that IS the reason there might be zero, or ten times the usual number
+  // tomorrow once it clears and the backlog replays.
+  if (digest.totals.totalMisses === 0 && !digest.providerStatus) {
     console.log(`miss-digest: 0 misses in window (${digest.since} to ${digest.now}) — skipping send.`);
     return { digest, emailed: false, notified: false, skippedReason: "no-misses" };
   }

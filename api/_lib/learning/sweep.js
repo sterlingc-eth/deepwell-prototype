@@ -20,12 +20,13 @@
  *     run, but still skipped when the migration isn't applied.
  */
 import { getPool, withTenant } from '../recordsStore.js';
+import { getProviderOutage } from '../claude.js';
 import { buildMissDigest } from '../missDigest.js';
 import { proposeFixesForMisses } from './proposer.js';
 import { verifyProposalLive } from './verify.js';
 import { decidePolicyStatus } from './policy.js';
 import * as store from './store.js';
-import { replayMisses } from './replay.js';
+import { replayMisses, autoResolveCapabilityGaps } from './replay.js';
 import { runExamGatedLearningPass } from './examGate.js';
 
 const TASK_KEY = 'donovan-learning';
@@ -168,12 +169,23 @@ export async function runLearningCore({ ctxArg, callModel } = {}) {
   // budget and its own cost ceiling. Runs even on a night with no new miss groups.
   const replayCtx = ctxArg ?? (process.env.DEEPWELL_FOUNDER_TENANT_ID ? { tenantKey: process.env.DEEPWELL_FOUNDER_TENANT_ID, tenantName: process.env.DEEPWELL_FOUNDER_TENANT_ID } : null);
   let replay = { skipped: 'no-founder-tenant' };
+  // ROUND 14 (brief item 4, owner: "71 pending" / "Run learning now does nothing"): capability_gap
+  // proposals are informational-only by policy (policy.js line ~71) and sit pending FOREVER unless
+  // something explicitly re-checks their example question — replayMisses above only re-runs OPEN
+  // MISSES (ask_misses), never the proposal queue, which is why the button never touched them before.
+  let gapAutoResolve = { skipped: 'no-founder-tenant' };
   if (replayCtx) {
     try {
       replay = await replayMisses({ ctxArg: replayCtx, source: ctxArg ? 'run-now' : 'nightly', callModel });
     } catch (err) {
       console.error('donovan-learning: replay failed (non-fatal):', err?.name);
       replay = { error: 'replay-failed' };
+    }
+    try {
+      gapAutoResolve = await autoResolveCapabilityGaps({ ctxArg: replayCtx });
+    } catch (err) {
+      console.error('donovan-learning: capability-gap auto-resolve failed (non-fatal):', err?.name);
+      gapAutoResolve = { error: 'auto-resolve-failed' };
     }
   }
 
@@ -185,7 +197,23 @@ export async function runLearningCore({ ctxArg, callModel } = {}) {
     byKind: {},
   };
   summary.replay = replay;
+  summary.gapAutoResolve = gapAutoResolve;
+  // ROUND 14 (brief item 3: "the loop must skip model steps and say 'AI credits exhausted — learning
+  // paused' instead of silently doing nothing"): checked AFTER the replay/gap-resolve steps above (both
+  // already skip their own model calls once they hit the outage — see replay.js) so this is an honest
+  // status message, not a guess made before anything actually ran.
+  if (getProviderOutage()) {
+    summary.providerStatus = 'AI credits exhausted — learning paused';
+  }
   if (!missGroups.length) return { ...summary, skipped: 'no-new-misses' };
+
+  if (getProviderOutage()) {
+    // The proposer (proposer.js) makes its own Haiku calls to draft typo/synonym/few-shot fixes from
+    // this run's miss groups — with the provider down every one of those would fail the exact same
+    // way replay/gap-resolve just did. Skip the whole model-billed step rather than spending the
+    // deadline on calls that cannot succeed, and say so plainly instead of silently proposing nothing.
+    return { ...summary, skipped: 'provider-unavailable' };
+  }
 
   const maxModelCalls = Number(process.env.DONOVAN_LEARN_MAX_CALLS) || 20;
   const { proposals, modelCallsMade, estimatedCostUsd } = await proposeFixesForMisses(missGroups, { maxModelCalls });

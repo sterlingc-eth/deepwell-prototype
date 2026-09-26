@@ -59,6 +59,116 @@ export class ConfigError extends Error {
   }
 }
 
+/**
+ * ROUND 14 (owner: 71 pending learning proposals, 36% scorecard, "405 misses, 153 proposals"): the
+ * Anthropic API credits are OUT — every model call fails, and until now every one of those failures
+ * was indistinguishable from Donovan genuinely not knowing an answer. That miscounts a billing problem
+ * as 351+ product failures across the scorecard, the miss log, and the learning queue.
+ *
+ * `classifyProviderError` recognizes the THREE shapes a provider outage takes (never a wrong answer,
+ * never a slow one — this is specifically "the account cannot call the model at all right now"):
+ *   - 'credits'    400 invalid_request_error whose message names a credit/balance/billing problem.
+ *   - 'auth'       401/403 — a bad or revoked API key, not a per-request auth failure.
+ *   - 'overloaded' 529/"overloaded_error" that SURVIVED withBackoff's own retries (a transient 529 is
+ *                  already retried there; classifying it here too only matters once retries are spent).
+ * A caller that gets a non-null result back should treat the run as UNANSWERABLE-BY-DESIGN right now,
+ * not as a wrong or missing answer: skip it, don't score it as a failure, don't log it as a miss, and
+ * say so plainly rather than guessing at "no answer found".
+ */
+export class ProviderUnavailableError extends Error {
+  constructor(reason, detail, cause) {
+    super(PROVIDER_UNAVAILABLE_MESSAGE[reason] ?? "The AI provider is temporarily unavailable.");
+    this.name = "ProviderUnavailableError";
+    this.reason = reason; // 'credits' | 'auth' | 'overloaded'
+    this.detail = detail ?? null;
+    this.cause = cause;
+  }
+}
+
+const PROVIDER_UNAVAILABLE_MESSAGE = {
+  credits: "The AI provider account is out of credits.",
+  auth: "The AI provider API key is invalid or was revoked.",
+  overloaded: "The AI provider is overloaded right now.",
+};
+
+// A 400 whose message says any of these is a billing/credit problem, never a malformed request from
+// our own code — Anthropic's own wording varies slightly release to release, so this matches on
+// substance ("credit balance", "insufficient credit", "billing") rather than one exact sentence.
+const CREDIT_ERROR_RE = /credit balance|insufficient credit|billing (?:issue|problem|hard limit)|has been suspended/i;
+
+/**
+ * @param {unknown} error  whatever the Anthropic SDK (or a mock of it) threw
+ * @returns {{reason: 'credits'|'auth'|'overloaded', detail: string}|null}  null when this is some OTHER
+ *   kind of failure (a timeout, a malformed request, a genuine 500) that callers should keep handling
+ *   exactly as they already do.
+ */
+export function classifyProviderError(error) {
+  if (!error) return null;
+  const status = Number(error.status ?? error.statusCode ?? 0);
+  const type = String(error.type ?? error.error?.type ?? "");
+  const message = String(error.message ?? error.error?.message ?? "");
+
+  if (status === 400 && (type === "invalid_request_error" || !type) && CREDIT_ERROR_RE.test(message)) {
+    return { reason: "credits", detail: message.slice(0, 300) };
+  }
+  if (status === 401 || status === 403) {
+    return { reason: "auth", detail: message.slice(0, 300) || `HTTP ${status}` };
+  }
+  if (status === 529 || type === "overloaded_error") {
+    return { reason: "overloaded", detail: message.slice(0, 300) || "overloaded_error" };
+  }
+  return null;
+}
+
+/**
+ * A short-lived, IN-PROCESS "the provider is down" flag. Deliberately not a queue or a circuit
+ * breaker — just enough state that the SAME request/process that just watched a model call fail with
+ * classifyProviderError doesn't have to re-derive that fact from a generic "no answer" a moment later
+ * (the scorecard runner, the miss logger and the learning replay loop all ask this instead of re-parsing
+ * errors themselves). `providerStatus.js` layers a best-effort DB-persisted marker on top of this for
+ * the cross-invocation case (a nightly cron run and a live request are different serverless instances);
+ * this in-process copy is the fast path every one of those callers checks first.
+ */
+const PROVIDER_OUTAGE_TTL_MS = 3 * 60 * 1000; // matches roughly one scorecard page / one replay batch
+let providerOutage = null; // {reason, detail, since (epoch ms), lastSeenAt (epoch ms)} | null
+
+/** Marks the provider as unavailable right now. `since` is kept from the FIRST sighting still inside
+ *  the TTL window, so "AI credits exhausted since <time>" names when the outage actually started, not
+ *  the most recent request that happened to hit it. */
+export function recordProviderOutage({ reason, detail } = {}, now = Date.now()) {
+  if (!reason) return;
+  const stillOpen = providerOutage && now - providerOutage.lastSeenAt <= PROVIDER_OUTAGE_TTL_MS;
+  providerOutage = { reason, detail: detail ?? null, since: stillOpen ? providerOutage.since : now, lastSeenAt: now };
+}
+
+/** A successful model call (or an operator/probe confirming credits are back) clears the flag immediately. */
+export function clearProviderOutage() {
+  providerOutage = null;
+}
+
+/** @returns {{reason: string, detail: string|null, since: number}|null} the CURRENT outage, or null when
+ *  none is recorded or the last sighting has aged out of the TTL window (a stale flag must never keep
+ *  quietly skipping work forever if nothing has actually retried the model since). */
+export function getProviderOutage(now = Date.now()) {
+  if (!providerOutage) return null;
+  if (now - providerOutage.lastSeenAt > PROVIDER_OUTAGE_TTL_MS) { providerOutage = null; return null; }
+  return { reason: providerOutage.reason, detail: providerOutage.detail, since: providerOutage.since };
+}
+
+/** Test-only reset (mirrors resetCatalogueCacheForTests / resetScorecardStoreForTests elsewhere). */
+export function resetProviderOutageForTests() { providerOutage = null; }
+
+/**
+ * Warms the in-process flag from a KNOWN start time (providerStatus.js's DB fallback, when this
+ * process has no local sighting but another process's persisted marker does) — `since` is the real
+ * first-sighting time, `lastSeenAt` is "confirmed just now" so the TTL clock starts fresh rather than
+ * already being most of the way to stale. Never overwrites a local sighting that is still fresh.
+ */
+export function seedProviderOutage({ reason, detail, since }, now = Date.now()) {
+  if (!reason || providerOutage) return;
+  providerOutage = { reason, detail: detail ?? null, since: Number.isFinite(since) ? since : now, lastSeenAt: now };
+}
+
 export function getApiKey() {
   const key = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
   if (!key || key.includes("YOUR_API_KEY")) {
@@ -293,6 +403,24 @@ export function handleError(res, error, req, extra = {}) {
   // and must never be reported as one.
   if (error?.name === "ConfigError") {
     return handleCors(res, req).status(503).json({ error: error.message });
+  }
+
+  // ROUND 14: the Anthropic account itself is out of credits/overloaded/misconfigured — record it
+  // (recordProviderOutage) so every other model-needing call in this process knows to skip rather than
+  // retry a call that cannot succeed, and tell the caller plainly rather than a generic 500. Checked
+  // before the 401 branch below: an outage classified as 'auth' is a SERVER key problem, same reasoning
+  // as the ConfigError branch above, never "your session expired".
+  const providerOutage = error?.name === "ProviderUnavailableError"
+    ? { reason: error.reason, detail: error.detail }
+    : classifyProviderError(error);
+  if (providerOutage) {
+    recordProviderOutage(providerOutage);
+    return handleCors(res, req).status(503).json({
+      error: "AI features are temporarily unavailable — the provider account " +
+        (providerOutage.reason === "credits" ? "is out of credits." : providerOutage.reason === "auth" ? "key is invalid." : "is overloaded."),
+      code: "provider_unavailable",
+      reason: providerOutage.reason,
+    });
   }
 
   // A Postgres "undefined column / table / function" error means a migration

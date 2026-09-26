@@ -626,12 +626,15 @@ export default async function handler(req, res) {
     }
     return streaming;
   };
+  // R14 integration fix: `todayResolved` is declared inside the try block below, invisible to this closure —
+  // every call threw a ReferenceError and the claim check was silently skipped on EVERY answer.
+  let claimsToday = null;
   const send = (status, body) => {
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
     // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
     if (body?.data && typeof body.data === "object") {
       if (body.data.claimCheck == null) {
-        try { checkAnswerClaimsSync(body.data, { today: todayResolved }); } catch (err) { console.error("checkAnswerClaimsSync failed, sending answer without it:", err?.message); }
+        try { checkAnswerClaimsSync(body.data, { today: claimsToday ?? new Date().toISOString().slice(0, 10) }); } catch (err) { console.error("checkAnswerClaimsSync failed, sending answer without it:", err?.message); }
       }
       try { finalizeCitations(body.data); } catch (err) { console.error("finalizeCitations failed, sending answer without it:", err?.message); }
       // R13H1: sentence-level citations (api/_lib/citations/sentences.js) — additive `data.sentences`,
@@ -876,6 +879,7 @@ export default async function handler(req, res) {
     // question block the model sees (buildQuestionBlock, below) — was
     // computed twice (inconsistently) before the cache needed it up front.
     const todayResolved = today ?? new Date().toISOString().slice(0, 10);
+    claimsToday = todayResolved;
     // Cache key (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): normalized so
     // near-identical phrasings ("What's the warranty?" / "whats the warranty")
     // share a cache entry — same normalization the meta-router already uses.
