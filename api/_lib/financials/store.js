@@ -16,6 +16,7 @@
 import {
   MONEY_FIELDS, EDITABLE_FIELDS, REVIEW_FLAGS, effectiveHeader, recomputeFlags, needsReview, validateCorrection,
 } from './normalize.js';
+import { jobCostingColumnsExist } from './jobCosting.js';
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const NEGATIVE_TTL_MS = 30_000;
@@ -95,6 +96,15 @@ export async function upsertFinancials(db, documentId, norm, { model } = {}) {
   );
   const financialId = r.rows[0]?.id;
   if (!financialId) return { written: false, reason: 'human_reviewed' };
+  // Job costing (M3-config/36): a separate UPDATE, not part of the main INSERT above, because
+  // the job_key/job_key_source/job_confidence/job_raw columns may not exist yet — tolerant of
+  // the migration not being pasted, exactly like financialsTableExists is for the whole feature.
+  if (h.job_key && (await jobCostingColumnsExist(db))) {
+    await db.raw(
+      'UPDATE document_financials SET job_key = $2, job_key_source = $3, job_confidence = $4::numeric, job_raw = $5 WHERE id = $1',
+      [financialId, h.job_key, h.job_key_source, h.job_confidence, h.job_raw]
+    );
+  }
   await db.raw('DELETE FROM document_financial_lines WHERE financial_id = $1', [financialId]);
   if (norm.lines.length) {
     await db.raw(

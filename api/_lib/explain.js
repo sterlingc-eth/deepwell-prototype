@@ -12,6 +12,24 @@
  * question doesn't match one of the three closed shapes below; the caller then falls through to the
  * normal chain (deterministicRouter -> analytics -> agent), same as every other file in this router.
  *
+ * Round 8 (2026-09-25/26): live exam breadth-explain-001,002,005-012 were failing (003/004 passed) —
+ * all ten share ONE root cause, confirmed against a PGlite fixture built from the real business-corpus
+ * documents (scripts/verify-explain.mjs): the searched surname matches TWO distinct customers (a common
+ * HVAC-corpus shape — "Mercer" is both Thomas Mercer and Laura Mercer), and every handler here answered
+ * with a single label ("Mercer (2 customers): ...") that BLENDED both customers' facts into one sentence
+ * with no attribution. For 003/004 (Delgado/Rios) both matched customers' units happened to be in the
+ * same warranty state, so the blended sentence was still true; for 001/002 (Mercer/Salazar) one match's
+ * unit was flagged and the other's was NOT, so the same sentence said a unit "is flagged" and, in the very
+ * next clause, that a same-named customer's unit "is NOT flagged" with no indication of whose is whose —
+ * a self-contradicting, unattributed answer that could not satisfy "explains the warranty status of THIS
+ * customer's unit" no matter how the grader read it. Every fact below is now attributed to the actual
+ * customer entity it came from (the equipment's own customer_id, or fetchVisits'/the document link's own
+ * customer_name — never the ambiguous merged label) whenever more than one customer matched, and each
+ * per-unit sentence leads with the plain-English reason before the supporting dates, per the shape's own
+ * rubric ("explains ... with the actual dates ... says so if no date is on file. No invented dates.").
+ * A single resolved customer (the common case) is unaffected: `ownerNameFor` returns null and every
+ * sentence reads exactly as it did before ("the <brand model> ...", never "<name>'s <brand model> ...").
+ *
  * pure: parseExplain
  * db:   runExplain (one bounded set of tenant-scoped reads per handler, no model call)
  */
@@ -57,49 +75,98 @@ async function resolveOne(db, name) {
   return { scope, label };
 }
 
+/**
+ * The owning customer's own name for one fact, ONLY when more than one customer matched the searched
+ * name (see this file's own top-of-file comment) — with a single match, returns null so every sentence
+ * below reads exactly as it did before ("the <unit>", not "<name>'s <unit>"). Never returns the ambiguous
+ * merged `ctx.label` — every attributed sentence names the ACTUAL customer the fact came from, so two
+ * same-surname customers' facts are never blended into one unattributed (and, per the round-8 bug, one
+ * that could flatly contradict itself) sentence.
+ */
+function ownerNameFor(ctx, customerId) {
+  if (ctx.scope.customers.length <= 1) return null;
+  const c = ctx.scope.customers.find((row) => row.id === customerId);
+  return c?.customer_name || c?.customer_number || null;
+}
+
+/** "<Name>'s <thing>" when the owner is known (ambiguous multi-customer match), else "the <thing>". */
+function subjectFor(owner, thing) {
+  return owner ? `${owner}'s ${thing}` : `the ${thing}`;
+}
+
+/** Which customer a document belongs to, for follow-up's reminder branch — same "never guess" attribution
+ *  as ownerNameFor, just keyed by document instead of by equipment's own customer_id. Only queried when
+ *  more than one customer matched (the common single-match case never needs the extra read). */
+async function ownerNameForDocument(db, ctx, documentId) {
+  if (ctx.scope.customers.length <= 1 || !documentId) return null;
+  const { rows } = await db.raw(
+    `SELECT c.data->>'customer_name' AS name
+       FROM document_entity_links l
+       JOIN entities en ON en.id = l.entity_id AND en.merged_into IS NULL AND en.${TENANT_SQL}
+       JOIN entities c ON c.id = CASE WHEN en.entity_type = 'customer' THEN en.id ELSE en.customer_id END
+                       AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+      WHERE l.document_id = $1 AND l.${TENANT_SQL}
+      ORDER BY l.created_at DESC LIMIT 1`,
+    [documentId]
+  );
+  return rows[0]?.name ?? null;
+}
+
 /* ------------------------------------------------------------------ warranty-alert */
+
+/**
+ * One unit's warranty-alert sentence: leads with the plain-English reason, then the supporting dates,
+ * exactly as the shape's rubric asks ("explains ... with the actual dates ... says so if no date is on
+ * file. No invented dates.") — never a relative-only reading ("expired 40 days ago") with no calendar
+ * date behind it. `subject` is already "the <unit>" or "<Name>'s <unit>" (see subjectFor).
+ */
+function warrantySentence(subject, install, stable, tier, desc) {
+  if (tier === 'ok') {
+    return `${subject} is NOT flagged — its warranty is active${stable.expires ? ` through ${humanDate(stable.expires)}` : ''} (installed ${install}).`;
+  }
+  if (tier === 'unknown') {
+    return `${subject} is flagged because no installation date is on file, so its warranty status can't be computed — there is no expiry or registration deadline to derive one from.`;
+  }
+  if (tier === 'unregistered-window-closing') {
+    return `${subject} is flagged because it was installed ${install} and has not been registered within the window that would secure the longer term.${desc.action ? ` ${desc.action}` : ''}`;
+  }
+  const verb = tier === 'expired' ? 'expired' : 'expires';
+  return `${subject} is flagged because its parts warranty ${verb}${stable.expires ? ` on ${humanDate(stable.expires)}` : ''} (installed ${install}).${desc.action ? ` ${desc.action}` : ''}`;
+}
 
 async function explainWarrantyAlert(db, ctx, today) {
   const units = ctx.scope.equipment;
   if (!units.length) {
     return citeSearched(db, answerEnvelope({ text: `No units on file for ${ctx.label} to flag a warranty alert on.`, facts: [] }), [], { basis: `${ctx.label} has no equipment on file.` });
   }
-  const parts = [];
+  const flagged = [];
+  const ok = [];
   const facts = [];
-  const unitIds = [];
   for (const u of units) {
+    const owner = ownerNameFor(ctx, u.customer_id);
+    const name = brandModel(u);
+    const subject = subjectFor(owner, name);
+    const factLabel = owner ? `${owner} — ${name}` : name;
     const stable = u.data?.warranty ?? null;
     const install = u.data?.installation_date ? humanDate(u.data.installation_date) : 'an unrecorded date';
-    const name = brandModel(u);
-    unitIds.push(u.id);
     if (!stable) {
-      parts.push(`the ${name} (installed ${install}) has no warranty information on file at all — nothing to compute a status from`);
-      facts.push({ label: name, value: 'No warranty information on file' });
+      flagged.push(`${subject} has no warranty information on file at all (installed ${install}) — nothing to compute a status from.`);
+      facts.push({ label: factLabel, value: 'No warranty information on file' });
       continue;
     }
     const desc = describeWarranty(stable, today);
     const tier = alertTier(stable, today);
-    if (tier === 'ok') {
-      parts.push(`the ${name} (installed ${install}) is NOT currently flagged — its warranty is active${stable.expires ? ` through ${humanDate(stable.expires)}` : ''}`);
-      facts.push({ label: name, value: `Active${stable.expires ? ` through ${humanDate(stable.expires)}` : ''}` });
-      continue;
-    }
-    if (tier === 'unknown') {
-      parts.push(`the ${name} (installed ${install}) has no expiry or registration deadline on file, so its warranty status is unknown`);
-      facts.push({ label: name, value: 'Unknown — no expiry or registration deadline on file' });
-      continue;
-    }
-    const reasonByTier = {
-      expired: `its parts warranty expired ${stable.expires ? `on ${humanDate(stable.expires)}` : 'already'}`,
-      'expiring-30': `its parts warranty expires ${stable.expires ? `on ${humanDate(stable.expires)}` : 'within 30 days'} — soon`,
-      'expiring-90': `its parts warranty expires ${stable.expires ? `on ${humanDate(stable.expires)}` : 'within 90 days'}`,
-      'expiring-365': `its parts warranty expires ${stable.expires ? `on ${humanDate(stable.expires)}` : 'within the next year'}`,
-      'unregistered-window-closing': `the registration window closes ${stable.registrationDeadline ? `on ${humanDate(stable.registrationDeadline)}` : 'soon'} and it has not been registered`,
-    };
-    parts.push(`the ${name} (installed ${install}) is flagged because ${reasonByTier[tier] ?? desc.action ?? 'of its warranty status'}${desc.action ? ` — ${desc.action}` : ''}`);
-    facts.push({ label: name, value: desc.action ?? tier });
+    const sentence = warrantySentence(subject, install, stable, tier, desc);
+    facts.push({ label: factLabel, value: tier === 'ok' ? `Active${stable.expires ? ` through ${humanDate(stable.expires)}` : ''}` : (desc.action ?? tier) });
+    (tier === 'ok' ? ok : flagged).push(sentence);
   }
-  const text = `${ctx.label}: ${parts.join('; ')}.`;
+  // Flagged units lead the answer (they're what the question is actually asking about); a same-searched-
+  // name customer whose unit is NOT flagged is named separately afterward, never blended into the same
+  // sentence as a flagged one — the round-8 bug (see top-of-file comment) was exactly that blend read as
+  // a single, self-contradicting claim.
+  const text = flagged.length
+    ? [...flagged, ...ok].join(' ')
+    : `${ctx.label}: none of the matching unit(s) on file are currently flagged for a warranty alert. ${ok.join(' ')}`.trim();
   return attachCitations(answerEnvelope({ text, facts }), {
     records: [...scopeUnitRecords(units), ...(await documentRecordsFor(db, []))],
     total: units.length,
@@ -136,7 +203,11 @@ async function explainLastVisit(db, ctx, today) {
   if (detail.workPerformed.length) bits.push(`work performed: ${detail.workPerformed.join('; ')}`);
   if (detail.notes.length) bits.push(`notes: ${detail.notes.join('; ')}`);
   const what = bits.length ? bits.join('. ') : `a ${describeVisit(top)}, with no further detail (work performed / notes) on file`;
-  const text = `${ctx.label}'s last service visit was ${humanDate(top.date)} (${describeVisit(top)}): ${what}.${futureNote(future, today)}`;
+  // Named by the document's OWN customer (top.customerName, from fetchVisits' own correlated lookup) when
+  // more than one customer matched the searched name, never the ambiguous merged ctx.label — the same
+  // never-blend-two-customers'-facts fix as explainWarrantyAlert's (see this file's top-of-file comment).
+  const who = (ctx.scope.customers.length > 1 && top.customerName) ? top.customerName : ctx.label;
+  const text = `${who}'s last service visit was ${humanDate(top.date)} (${describeVisit(top)}): ${what}.${futureNote(future, today)}`;
   const facts = [{ label: 'Last visit', value: `${humanDate(top.date)} · ${describeVisit(top)}`, sources: [{ documentId: top.documentId, location: { field: 'service_date' } }] }];
   return attachCitations(answerEnvelope({ text, facts }), {
     records: await documentRecordsFor(db, [top.documentId]), total: 1,
@@ -163,10 +234,14 @@ async function explainFollowUp(db, ctx, pack, today) {
 
   const reminder = await reminderOnFile(db, ids);
   if (reminder) {
+    // Attributed to the document's OWN customer, not the ambiguous merged ctx.label, when more than one
+    // customer matched (see this file's top-of-file comment) — a note logged for one same-surname
+    // customer must never read as if it were about the other one.
+    const who = (await ownerNameForDocument(db, ctx, reminder.document_id)) ?? ctx.label;
     return attachCitations(answerEnvelope({
-      text: `${ctx.label} needs a follow-up because a note on file says: "${reminder.value}".`,
+      text: `${who} needs a follow-up because a note on file says: "${reminder.value}".`,
       facts: [{ label: 'Reason', value: reminder.value, sources: [{ documentId: reminder.document_id, location: { field: 'reminder_text' } }] }],
-    }), { records: await documentRecordsFor(db, [reminder.document_id]), total: 1, basis: `Read a follow-up note recorded on one of ${ctx.label}'s documents.` });
+    }), { records: await documentRecordsFor(db, [reminder.document_id]), total: 1, basis: `Read a follow-up note recorded on one of ${who}'s documents.` });
   }
 
   for (const u of ctx.scope.equipment) {
@@ -175,10 +250,11 @@ async function explainFollowUp(db, ctx, pack, today) {
     const tier = alertTier(stable, today);
     if (tier === 'ok' || tier === 'unknown') continue;
     const desc = describeWarranty(stable, today);
+    const who = ownerNameFor(ctx, u.customer_id) ?? ctx.label;
     return attachCitations(answerEnvelope({
-      text: `${ctx.label} needs a follow-up: the ${brandModel(u)}'s ${desc.action ?? 'warranty needs attention'}`,
+      text: `${who} needs a follow-up: the ${brandModel(u)}'s ${desc.action ?? 'warranty needs attention'}`,
       facts: [{ label: 'Reason', value: desc.action ?? tier }],
-    }), { records: scopeUnitRecords([u]), total: 1, basis: `Checked ${ctx.label}'s equipment warranty status; the ${brandModel(u)} triggered a follow-up (${tier}).` });
+    }), { records: scopeUnitRecords([u]), total: 1, basis: `Checked ${who}'s equipment warranty status; the ${brandModel(u)} triggered a follow-up (${tier}).` });
   }
 
   const visits = await fetchVisits(db, ids);
@@ -188,10 +264,13 @@ async function explainFollowUp(db, ctx, pack, today) {
     const cadence = pack?.maintenance?.defaultCadenceMonths ?? 12;
     const nextDue = addMonths(last.date, cadence);
     if (nextDue && nextDue < today) {
+      // Attributed to the visit's own customer (fetchVisits' own correlated customer_name), same
+      // never-blend rule as the branches above.
+      const who = (ctx.scope.customers.length > 1 && last.customerName) ? last.customerName : ctx.label;
       return attachCitations(answerEnvelope({
-        text: `${ctx.label} needs a follow-up: no service visit since ${humanDate(last.date)}, more than ${cadence} month${cadence === 1 ? '' : 's'} ago (overdue for maintenance).`,
+        text: `${who} needs a follow-up: no service visit since ${humanDate(last.date)}, more than ${cadence} month${cadence === 1 ? '' : 's'} ago (overdue for maintenance).`,
         facts: [{ label: 'Last visit', value: humanDate(last.date), sources: [{ documentId: last.documentId, location: { field: 'service_date' } }] }],
-      }), { records: await documentRecordsFor(db, [last.documentId]), total: 1, basis: `${ctx.label}'s last service visit (${humanDate(last.date)}) is more than ${cadence} months old.` });
+      }), { records: await documentRecordsFor(db, [last.documentId]), total: 1, basis: `${who}'s last service visit (${humanDate(last.date)}) is more than ${cadence} months old.` });
     }
   } else {
     return citeSearched(db, answerEnvelope({ text: `${ctx.label} needs a follow-up: no service visit is on file at all.`, facts: [] }), ids, { basis: `Searched ${ids.length} document${ids.length === 1 ? '' : 's'} for ${ctx.label}; none is a service visit.` });

@@ -19,6 +19,7 @@
  * Reuses extractFields.js's normalizeDate so date handling is one rule, not two.
  */
 import { normalizeDate } from '../extractFields.js';
+import { normalizeJobKey } from './jobKey.js';
 
 /** doc_kind values each document_type may produce (first = default). */
 export const FINANCIAL_KINDS_BY_TYPE = Object.freeze({
@@ -299,6 +300,36 @@ export function normalizeFinancials(input, { documentType, pages, pageCount, tod
     text[key] = cleanText(value, key === 'agreement_term' ? 160 : 100);
   }
 
+  // ---- job linkage (M3-config/36-job-costing.sql) ---------------------------
+  // job_address ("Service Address: ...", or a PO's "For job at: ..." line) is the primary
+  // source; a bare job_number is a fallback key for a document that names no address at
+  // all. Never invented: only what the model read off THIS document's own pages.
+  let jobKey = null;
+  let jobKeySource = null;
+  let jobConfidence = null;
+  let jobRaw = null;
+  {
+    const jobAddr = unwrap(input.job_address);
+    const cleanedAddr = jobAddr.value != null ? cleanText(jobAddr.value, 160) : null;
+    const addrKey = cleanedAddr ? normalizeJobKey(cleanedAddr) : null;
+    if (addrKey) {
+      jobKey = addrKey;
+      jobKeySource = 'extracted';
+      jobRaw = cleanedAddr;
+      jobConfidence = clamp01(jobAddr.confidence, 0.75);
+    } else {
+      const jobNum = unwrap(input.job_number);
+      const cleanedNum = jobNum.value != null ? cleanText(jobNum.value, 40) : null;
+      const numKey = cleanedNum ? `jobnum-${cleanedNum.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : null;
+      if (numKey) {
+        jobKey = numKey;
+        jobKeySource = 'extracted';
+        jobRaw = cleanedNum;
+        jobConfidence = clamp01(jobNum.confidence, 0.7);
+      }
+    }
+  }
+
   const currencyRaw = cleanText(input.currency, 8)?.toUpperCase() ?? 'USD';
   const currency = /^[A-Z]{3}$/.test(currencyRaw) ? currencyRaw : 'USD';
   if (currency !== 'USD') flagSet.add('non_usd');
@@ -369,6 +400,10 @@ export function normalizeFinancials(input, { documentType, pages, pageCount, tod
     amount_paid: centsToString(cents.amount_paid),
     balance_due: centsToString(cents.balance_due),
     status,
+    job_key: jobKey,
+    job_key_source: jobKeySource,
+    job_confidence: jobConfidence,
+    job_raw: jobRaw,
   };
   return { ok: true, header, lines, flags, confidence: Math.round(confidence * 1000) / 1000, evidence, dropped };
 }

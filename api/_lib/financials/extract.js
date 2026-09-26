@@ -65,6 +65,8 @@ export const FINANCIALS_TOOL = {
       agreement_term: { type: 'string', description: 'For maintenance agreements: the term as printed, e.g. "12 months" or "01/01/2026 - 12/31/2026".' },
       customer_name: { type: 'string', description: 'The customer being billed ("Bill To") for receivables.' },
       vendor_name: { type: 'string', description: 'The vendor/supplier for payables and purchase orders.' },
+      job_address: { type: 'string', description: 'The property/service address where the JOB was done, exactly as printed — labels like "Service Address:", "Service Location:", "Job Address:", or a purchase order\'s "For job at: <address>" line. Never the shop\'s own letterhead address. Omit if no such address is printed on this document.' },
+      job_number: { type: 'string', description: 'An explicit job/ticket number printed on the document, ONLY if distinct from invoice_number/po_number (e.g. "Job #4471"). Omit otherwise.' },
       printed_status: { type: 'string', enum: ['paid', 'unpaid', 'partial', 'overdue', 'open', 'none'], description: 'ONLY what is stamped/printed (PAID, BALANCE DUE, PAST DUE). "none" if the document prints no payment status.' },
       subtotal: MONEY_PROP,
       tax: MONEY_PROP,
@@ -100,7 +102,8 @@ const RULES = `Rules:
 - printed_status reflects only a printed stamp or label (PAID, PAID IN FULL, BALANCE DUE, PAST DUE). No label means "none". Never infer paid from a zero or missing balance.
 - Dates as YYYY-MM-DD. Leave a date out if only a month/year or a term like "Net 30" is printed.
 - page_no must be the page (from the [page N] marker) where the amount is printed.
-- Return every printed line item in order with its own printed amount; leave qty/unit_price out when not printed.`;
+- Return every printed line item in order with its own printed amount; leave qty/unit_price out when not printed.
+- job_address is the JOB SITE, not the shop's own header address: copy it exactly as printed (e.g. "Service Address: 840 S Ellsworth Rd, Gilbert, AZ 85234" -> "840 S Ellsworth Rd, Gilbert, AZ 85234"; "For job at: 248 W Guadalupe Rd, Phoenix, AZ 85001 (Amy Isaacson)" -> "248 W Guadalupe Rd, Phoenix, AZ 85001"). Omit it rather than guess.`;
 
 /** Pure: the user prompt for one document. */
 export function buildFinancialsPrompt(pages, documentType) {

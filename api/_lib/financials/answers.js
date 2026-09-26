@@ -25,8 +25,11 @@ import { resolveContactCandidates, resolveAddressCandidates } from '../contactLo
 import { extractionsHaveUnitIndex } from '../recordsStore.js';
 import { buildViewsSql } from '../agent/tools.js';
 // TEAM C (citations everywhere): records come from the SAME rows each figure was summed from.
-import { attachCitations, customerRecord } from '../citations/records.js';
+import { attachCitations, customerRecord, documentRecord } from '../citations/records.js';
 import { financeRecords, aggregatedDocRecord } from '../citations/finance.js';
+// JOB COSTING (M3-config/36-job-costing.sql): groups the SAME document_financials rows by job.
+import { computeJobCosts, jobKeyFromQuestionAddress, normalizeJobKey, findJobForAddress } from './jobCosting.js';
+import { parseCents, centsToString } from './normalize.js';
 
 /* ---------------------------------------------------------------- formatting */
 
@@ -199,6 +202,20 @@ const AVG_AGREEMENT_FEE_RE = /\baverage\b[^?]*\b(?:annual\s+)?fee\b[^?]*\bagreem
 /** "Is Mercer all paid up?" - a per-customer yes/no, always naming the unknown-status count too. */
 const CUSTOMER_PAID_UP_RE = /^is\s+(.+?)\s+(?:all\s+)?paid\s+up\b/i;
 
+/*
+ * JOB COST & MARGIN (M3-config/36-job-costing.sql): a job groups an invoice (revenue) with
+ * the purchase order(s)/vendor bill(s) (cost) for the same address. Checked ahead of
+ * RE.avg/RE.totalInvoiced/RE.agreementFees below, which are broad enough to otherwise
+ * swallow a margin question ("average margin this year" contains "average"; "gross margin
+ * by job" contains no invoice/quote noun at all so nothing else here would catch it).
+ */
+const AVG_JOB_MARGIN_RE = /\b(?:average|avg)\b[^?]*\b(?:margin|profit)\b|\b(?:margin|profit)\b[^?]*\b(?:average|avg)\b/i;
+const JOBS_OVER_BUDGET_RE = /\bcost\w*\b[^?]*\bexceed(?:ed|s)?\b[^?]*\brevenue\b|\brevenue\b[^?]*\bexceed(?:ed|s)?\b[^?]*\bcost\w*\b|\blost\s+money\b[^?]*\bjob|\bjob\w*\b[^?]*\blost\s+money\b|\bover[\s-]?budget\b/i;
+const JOB_PROFIT_RANK_RE = /\b(most|least|highest|lowest|best|worst)\b[^?]*\bprofitable\b|\bprofitable\b[^?]*\b(most|least|highest|lowest|best|worst)\b/i;
+const JOB_COST_VS_REVENUE_RE = /\bcost\w*\b[^?]*\b(?:vs\.?|versus)\b[^?]*\brevenue\b|\brevenue\b[^?]*\b(?:vs\.?|versus)\b[^?]*\bcost\w*\b/i;
+const JOB_BY_JOB_RE = /\bby\s+job\b|\bper\s+job\b|\beach\s+job\b|\bjob\s+cost(?:ing)?\b|\bjob\s+profitab\w*\b/i;
+const JOB_MARGIN_WORD_RE = /\bmargin\b|\bprofit(?:able)?\b|\bgross\s+profit\b/i;
+
 /** "invoices" / "quotes or estimates" / "purchase orders" -> the financials `doc_kind` scope + noun. */
 function docKindFromWord(w) {
   const s = String(w ?? '').toLowerCase();
@@ -219,7 +236,17 @@ export function parseMoneyIntent(question, { today }) {
   // R7: the raw (lowercased) question text, so a handler can tell "how many invoices are unpaid"
   // (a plain count question) apart from "who owes us money" (a dollar-first narrative) even though
   // both parse to the same intent below.
-  const mk = (intent, extra = {}) => ({ intent, period, subject, raw: q, ...extra });
+  const mk = (intent, extra = {}) => ({ intent, period, subject, raw: q, rawOriginal: String(question ?? ''), ...extra });
+  // Job costing (M3-config/36), checked first (see the block comment above each regex above).
+  if (AVG_JOB_MARGIN_RE.test(q)) return mk('avg_job_margin', { subject: null });
+  if (JOBS_OVER_BUDGET_RE.test(q)) return mk('jobs_over_budget', { subject: null });
+  if (JOB_PROFIT_RANK_RE.test(q)) {
+    const word = q.match(JOB_PROFIT_RANK_RE)[1].toLowerCase();
+    return mk('job_profitability_rank', { subject: null, superlative: ['least', 'lowest', 'worst'].includes(word) ? 'min' : 'max' });
+  }
+  if (JOB_COST_VS_REVENUE_RE.test(q)) return mk('job_cost_vs_revenue', { subject });
+  if (JOB_BY_JOB_RE.test(q) && (JOB_MARGIN_WORD_RE.test(q) || /\bcost\w*\b/.test(q))) return mk('job_margin_by_job', { subject: null });
+  if (JOB_MARGIN_WORD_RE.test(q) && /\bjob\b/.test(q)) return mk('job_margin', { subject });
   // "Is Mercer all paid up?" - extractSubjectPhrase's patterns don't cover this shape at all.
   {
     const m = q.match(CUSTOMER_PAID_UP_RE);
@@ -359,6 +386,13 @@ function exclusionText({ noTotal = 0, undated = 0, foreign = 0, unknownStatus = 
 }
 
 const flaggedText = (n) => (n > 0 ? ` ${n === 1 ? '1 of them is' : `${n} of them are`} flagged for review (the printed numbers don't add up).` : '');
+
+/** Job costing's own currency exclusion note (jobCosting.js's f.currency = 'USD' scoping) —
+ *  same "never silently drop a document" disclosure as exclusionText, worded for a job's
+ *  revenue/cost documents rather than a single invoice list. */
+function currencyExclusionNote(n) {
+  return n ? ` ${plural(n, 'document')} in another currency ${n === 1 ? 'is' : 'are'} excluded from job costing.` : '';
+}
 
 async function foreignCount(db, hu) {
   const r = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind IN ('invoice','credit_memo') AND f.currency <> 'USD'`, [], hu);
@@ -1011,6 +1045,218 @@ async function customerPaidUp(db, intent, ctx) {
   });
 }
 
+/* ================================================================== job cost & margin */
+/*
+ * M3-config/36-job-costing.sql. Every number here comes from computeJobCosts (jobCosting.js),
+ * which groups the SAME document_financials rows every other answer in this file reads, by a
+ * job's printed address. Never guesses a link below JOB_MATCH_CONFIDENCE — an unresolved
+ * document is counted and named, never silently folded into a job or dropped.
+ */
+
+/** One job-costing doc ref (jobCosting.js's docRefOf shape) -> a citation record. */
+function jobDocRecord(d, { group } = {}) {
+  const kindLabel = d.docKind === 'invoice' ? 'Invoice' : d.docKind === 'credit_memo' ? 'Credit memo' : d.docKind === 'po' ? 'Purchase order' : 'Vendor bill';
+  const label = `${kindLabel}${d.invoiceNumber ? ` #${d.invoiceNumber}` : d.poNumber ? ` #${d.poNumber}` : ''} · ${d.customerName ?? d.vendorName ?? d.filename ?? 'unnamed'}`;
+  return documentRecord({ id: d.documentId, doc_kind: d.docKind }, {
+    type: d.docKind === 'invoice' ? 'invoice' : undefined, label, group,
+    sublabel: [fmt(d.total), d.invoiceDate].filter(Boolean).join(' · '),
+  });
+}
+
+/** "N purchase orders and M vendor bills" (only the sides that are non-zero, properly plural). */
+function costBreakdown(costDocs) {
+  const poCount = costDocs.filter((d) => d.docKind === 'po').length;
+  const billCount = costDocs.length - poCount;
+  return [poCount ? plural(poCount, 'purchase order') : null, billCount ? plural(billCount, 'vendor bill') : null].filter(Boolean).join(' and ');
+}
+
+/** Same ambiguity/ unresolved shape as subjectGate, but also returns the customer's address
+ *  (job costing needs it to pick a job; subjectGate alone only ever returns ids/name). */
+async function resolveJobSubject(db, phrase) {
+  if (!phrase) return null;
+  const cands = await resolveSubject(db, phrase);
+  if (!cands.length) return { unresolved: true };
+  if (cands.length > 1) {
+    const names = new Set(cands.map((c) => c.name.toLowerCase()));
+    if (names.size > 1 || cands.length > 5) {
+      return {
+        answer: baseAnswer(
+          `I found ${cands.length} customers that could be "${phrase}" - which one did you mean? ${cands.slice(0, 5).map((c) => c.name).join(', ')}.`,
+          cands.slice(0, 5).map((c) => ({ label: c.name, value: c.address ?? 'customer', entityId: c.id, sources: [] })),
+          { confidence: 0.5, cite: { records: cands.slice(0, 5).map((c) => customerRecord({ id: c.id, name: c.name, address: c.address })), total: cands.slice(0, 5).length, basis: `Several customers could be "${phrase}"; pick one.` } }),
+      };
+    }
+  }
+  return { id: cands[0].id, name: cands[0].name, address: cands[0].address ?? null };
+}
+
+/** "at 248 W Guadalupe Rd, Phoenix, AZ 85001" style questions -> a friendly address label
+ *  (display only; MATCHING is always done through normalizeJobKey, never this string). */
+function addressLabelFromQuestion(rawOriginal) {
+  const m = /\bat\s+(\d{1,6}[^,?.]*(?:,[^,?.]*){0,3})/i.exec(String(rawOriginal ?? ''));
+  return m ? m[1].trim().replace(/\s+/g, ' ') : null;
+}
+
+/** Shared by 'job_margin' (an address named directly) and 'job_cost_vs_revenue' (a customer
+ *  named; resolved to their on-file address) — both are "one job's revenue vs cost". */
+async function singleJobMargin(db, intent) {
+  let addressText = jobKeyFromQuestionAddress(intent.raw) ? intent.raw : null;
+  let label = addressText ? addressLabelFromQuestion(intent.rawOriginal) : null;
+  if (!addressText && intent.subject) {
+    const sub = await resolveJobSubject(db, intent.subject);
+    if (!sub) return null;
+    if (sub.unresolved) return null; // named someone we can't find - never substitute a shop-wide number
+    if (sub.answer) return sub.answer;
+    if (!sub.address) {
+      return baseAnswer(`I don't have a service address on file for ${sub.name}, so I can't match their job costs.`, [], { confidence: 1, ...zeroCite(`Looked up ${sub.name}'s on-file service address; none is recorded.`) });
+    }
+    if (!normalizeJobKey(sub.address)) return baseAnswer(`${sub.name}'s on-file address doesn't parse as a street address, so I can't match their job costs.`, [], { confidence: 1, ...zeroCite(`Tried to match ${sub.name}'s on-file address to a job; it didn't parse as a street address.`) });
+    addressText = sub.address;
+    label = sub.address;
+  }
+  if (!addressText) return null; // no address in the question and no resolvable customer name
+
+  const { jobs, unmatched, excludedCurrency } = await computeJobCosts(db, {});
+  const job = findJobForAddress(jobs, addressText);
+  const addrLabel = job?.address ?? label ?? 'that job';
+  if (!job) {
+    return baseAnswer(`I don't have any invoices or purchase orders on file linked to a job at ${addrLabel}.`, [],
+      { confidence: 1, ...zeroCite(`Searched every invoice, credit memo, purchase order and vendor bill for a job at ${addrLabel}; none matched.`) });
+  }
+  const docs = [...job.revenueDocs, ...job.costDocs];
+  const records = [...job.revenueDocs.map((d) => jobDocRecord(d, { group: 'revenue' })), ...job.costDocs.map((d) => jobDocRecord(d, { group: 'cost' }))];
+  const costDesc = costBreakdown(job.costDocs);
+  let text;
+  if (job.hasRevenue && job.hasCost) {
+    text = `The job at ${addrLabel} billed ${fmt(job.revenue)} across ${plural(job.revenueDocs.length, 'invoice')} and cost ${fmt(job.cost)} across ${costDesc}, for a gross margin of ${fmt(job.marginDollars)} (${job.marginPercent}%).`;
+  } else if (job.hasRevenue) {
+    text = `The job at ${addrLabel} billed ${fmt(job.revenue)} across ${plural(job.revenueDocs.length, 'invoice')}, but no purchase order or vendor bill is linked to it, so I can't compute a margin.`;
+  } else {
+    text = `No revenue is recorded yet for the job at ${addrLabel} — ${fmt(job.cost)} in cost is linked to it across ${costDesc}.`;
+  }
+  const currencyNote = currencyExclusionNote(excludedCurrency);
+  text += currencyNote;
+  const unmatchedNote = (unmatched.length ? ` (${plural(unmatched.length, 'other document')} shopwide couldn't be linked to any job and are not counted here.)` : '') + currencyNote;
+  const facts = [
+    { label: 'Revenue', value: job.hasRevenue ? fmt(job.revenue) : 'none on file', status: job.hasRevenue ? 'ok' : 'muted', sources: job.revenueDocs.map((d) => docSource(d.documentId)) },
+    { label: 'Cost', value: job.hasCost ? fmt(job.cost) : 'none on file', status: job.hasCost ? 'ok' : 'muted', sources: job.costDocs.map((d) => docSource(d.documentId)) },
+    ...(job.hasRevenue && job.hasCost ? [{ label: 'Gross margin', value: `${fmt(job.marginDollars)} (${job.marginPercent}%)`, status: Number(job.marginDollars) >= 0 ? 'ok' : 'bad', sources: [] }] : []),
+    ...docs.slice(0, 10).map((d) => ({
+      label: `${d.docKind === 'invoice' ? 'Invoice' : d.docKind === 'credit_memo' ? 'Credit memo' : d.docKind === 'po' ? 'Purchase order' : 'Vendor bill'}${d.invoiceNumber ? ` #${d.invoiceNumber}` : d.poNumber ? ` #${d.poNumber}` : ''}`,
+      value: fmt(d.total), status: 'ok', sources: [docSource(d.documentId)],
+    })),
+  ];
+  return baseAnswer(text, facts, {
+    sources: docs.map((d) => docSource(d.documentId)), interpretation: `job margin, ${addrLabel}`,
+    cite: { records, total: docs.length, claimedCount: docs.length, basis: `Matched ${plural(job.revenueDocs.length, 'invoice')} and ${costDesc || 'no cost documents'} to this job by its printed address.${unmatchedNote}` },
+  });
+}
+
+async function jobMarginByJob(db, intent) {
+  const p = intent.period;
+  const { jobs, unmatched, excludedCurrency } = await computeJobCosts(db, { from: p?.from ?? null, to: p?.to ?? null });
+  const currencyNote = currencyExclusionNote(excludedCurrency);
+  if (!jobs.length) {
+    return baseAnswer(`No jobs could be matched from the invoices and purchase orders on file${p ? ` for ${p.label}` : ''}.${unmatched.length ? ` ${plural(unmatched.length, 'document')} print no job address I can match.` : ''}${currencyNote}`,
+      [], { confidence: 1, ...zeroCite('Searched every invoice, credit memo, purchase order and vendor bill for a printed job address; none matched.') });
+  }
+  const sorted = [...jobs].sort((a, b) => Number(b.revenue) - Number(a.revenue));
+  const top = sorted.slice(0, 20);
+  const facts = top.map((j) => ({
+    label: j.address ?? j.jobKey,
+    value: `Revenue ${fmt(j.revenue)} · Cost ${fmt(j.cost)} · Margin ${j.hasRevenue && j.hasCost ? `${fmt(j.marginDollars)} (${j.marginPercent}%)` : j.hasRevenue ? 'no cost linked yet' : 'no revenue linked yet'}`,
+    status: !j.hasRevenue || !j.hasCost ? 'muted' : Number(j.marginDollars) >= 0 ? 'ok' : 'bad',
+    sources: [...j.revenueDocs, ...j.costDocs].slice(0, 4).map((d) => docSource(d.documentId)),
+  }));
+  const both = jobs.filter((j) => j.hasRevenue && j.hasCost).length;
+  const text = `${plural(jobs.length, 'job')} matched by printed address${p ? ` for ${p.label}` : ''}; ${plural(both, 'job')} ${both === 1 ? 'has' : 'have'} both revenue and cost on file so a margin can be computed.${unmatched.length ? ` ${plural(unmatched.length, 'document')} couldn't be matched to any job and ${unmatched.length === 1 ? 'is' : 'are'} left out.` : ''}${currencyNote}`;
+  const records = jobs.flatMap((j) => [...j.revenueDocs.map((d) => jobDocRecord(d, { group: j.jobKey })), ...j.costDocs.map((d) => jobDocRecord(d, { group: j.jobKey }))]);
+  return baseAnswer(text, facts, {
+    sources: top.flatMap((j) => [...j.revenueDocs, ...j.costDocs].map((d) => docSource(d.documentId))),
+    interpretation: 'gross margin by job',
+    cite: { records, total: records.length, claimedCount: records.length, basis: `Grouped every customer invoice/credit memo (revenue) and purchase order/vendor bill (cost) by its printed job address${p ? ` dated ${p.label}` : ''}.${currencyNote}` },
+  });
+}
+
+async function jobProfitabilityRank(db, intent) {
+  const p = intent.period;
+  const { jobs, excludedCurrency } = await computeJobCosts(db, { from: p?.from ?? null, to: p?.to ?? null });
+  const ranked = jobs.filter((j) => j.hasRevenue && j.hasCost);
+  const excluded = jobs.length - ranked.length;
+  const excludedNote = (excluded ? ` ${plural(excluded, 'other job')} on file ${excluded === 1 ? 'has' : 'have'} only revenue or only cost linked and ${excluded === 1 ? 'is' : 'are'} excluded from this ranking.` : '') + currencyExclusionNote(excludedCurrency);
+  if (!ranked.length) {
+    return baseAnswer(`No job has both revenue and cost documents linked yet, so I can't rank profitability${p ? ` for ${p.label}` : ''}.${excludedNote}`,
+      [], { confidence: 1, ...zeroCite('Searched every job for one with both revenue and cost documents linked; none had both.') });
+  }
+  const sorted = [...ranked].sort((a, b) => (intent.superlative === 'min' ? Number(a.marginPercent) - Number(b.marginPercent) : Number(b.marginPercent) - Number(a.marginPercent)));
+  const topN = sorted.slice(0, 5);
+  const best = topN[0];
+  const word = intent.superlative === 'min' ? 'least profitable' : 'most profitable';
+  const text = `The ${word} job on file is ${best.address ?? best.jobKey}: ${fmt(best.marginDollars)} margin (${best.marginPercent}% of ${fmt(best.revenue)} revenue)${p ? ` for ${p.label}` : ''}.${excludedNote}`;
+  const facts = topN.map((j, i) => ({
+    label: `${i + 1}. ${j.address ?? j.jobKey}`, value: `${fmt(j.marginDollars)} margin (${j.marginPercent}%) — revenue ${fmt(j.revenue)}, cost ${fmt(j.cost)}`,
+    status: Number(j.marginDollars) >= 0 ? 'ok' : 'bad', sources: [...j.revenueDocs, ...j.costDocs].slice(0, 4).map((d) => docSource(d.documentId)),
+  }));
+  const records = topN.flatMap((j) => [...j.revenueDocs.map((d) => jobDocRecord(d, { group: j.jobKey })), ...j.costDocs.map((d) => jobDocRecord(d, { group: j.jobKey }))]);
+  return baseAnswer(text, facts, {
+    sources: topN.flatMap((j) => [...j.revenueDocs, ...j.costDocs].map((d) => docSource(d.documentId))),
+    interpretation: `${word} jobs`,
+    cite: { records, total: records.length, claimedCount: records.length, basis: `Ranked jobs that have both revenue and cost documents linked, by margin percent${p ? ` dated ${p.label}` : ''}.${excludedNote}` },
+  });
+}
+
+async function jobsOverBudget(db, intent) {
+  const p = intent.period;
+  const { jobs, excludedCurrency } = await computeJobCosts(db, { from: p?.from ?? null, to: p?.to ?? null });
+  const currencyNote = currencyExclusionNote(excludedCurrency);
+  const over = jobs.filter((j) => j.hasRevenue && j.hasCost && Number(j.marginDollars) < 0).sort((a, b) => Number(a.marginDollars) - Number(b.marginDollars));
+  if (!over.length) {
+    return baseAnswer(`No job on file has cost exceeding revenue${p ? ` for ${p.label}` : ''}.${currencyNote}`, [], { confidence: 1, ...zeroCite('Compared revenue and cost for every job with both linked; none run negative.') });
+  }
+  const facts = over.map((j) => ({
+    label: j.address ?? j.jobKey, value: `Cost ${fmt(j.cost)} vs revenue ${fmt(j.revenue)} — ${fmt(j.marginDollars)} over`, status: 'bad',
+    sources: [...j.revenueDocs, ...j.costDocs].slice(0, 4).map((d) => docSource(d.documentId)),
+  }));
+  const text = `${plural(over.length, 'job')} cost more than they billed${p ? ` in ${p.label}` : ''}: ${over.slice(0, 5).map((j) => `${j.address ?? j.jobKey} (${fmt(j.marginDollars)} over)`).join(', ')}${over.length > 5 ? `, and ${over.length - 5} more` : ''}.${currencyNote}`;
+  const records = over.flatMap((j) => [...j.revenueDocs.map((d) => jobDocRecord(d, { group: j.jobKey })), ...j.costDocs.map((d) => jobDocRecord(d, { group: j.jobKey }))]);
+  return baseAnswer(text, facts, {
+    sources: over.flatMap((j) => [...j.revenueDocs, ...j.costDocs].map((d) => docSource(d.documentId))),
+    interpretation: 'jobs where cost exceeded revenue',
+    cite: { records, total: records.length, claimedCount: records.length, basis: `Compared summed revenue against summed cost for every job with both linked${p ? ` dated ${p.label}` : ''}; listing the ones where cost came in higher.${currencyNote}` },
+  });
+}
+
+async function avgJobMargin(db, intent) {
+  const p = intent.period;
+  const { jobs, excludedCurrency } = await computeJobCosts(db, { from: p?.from ?? null, to: p?.to ?? null });
+  const both = jobs.filter((j) => j.hasRevenue && j.hasCost);
+  const excluded = jobs.length - both.length;
+  if (!both.length) {
+    return baseAnswer(`No job has both revenue and cost documents linked${p ? ` for ${p.label}` : ''}, so there's no average margin to give.`,
+      [], { confidence: 1, ...zeroCite('Searched every job for one with both revenue and cost documents linked; none had both.') });
+  }
+  // Exact cents, never a float sum: same technique jobCosting.js's own grouping uses.
+  const totalRevenueCents = both.reduce((n, j) => n + parseCents(j.revenue), 0);
+  const totalCostCents = both.reduce((n, j) => n + parseCents(j.cost), 0);
+  const totalMarginCents = totalRevenueCents - totalCostCents;
+  const weightedPercent = totalRevenueCents !== 0 ? Math.round((totalMarginCents / totalRevenueCents) * 10000) / 100 : null;
+  const simplePercent = Math.round((both.reduce((n, j) => n + j.marginPercent, 0) / both.length) * 100) / 100;
+  const excludedNote = (excluded ? ` ${plural(excluded, 'other job')} on file ${excluded === 1 ? 'has' : 'have'} only revenue or only cost linked and ${excluded === 1 ? 'is' : 'are'} excluded.` : '') + currencyExclusionNote(excludedCurrency);
+  const text = `Across ${plural(both.length, 'job')} with both revenue and cost on file${p ? ` in ${p.label}` : ''}, the average margin is ${simplePercent}% per job (${weightedPercent}% overall, weighted by revenue) — ${fmt(centsToString(totalMarginCents))} margin on ${fmt(centsToString(totalRevenueCents))} revenue.${excludedNote}`;
+  const facts = [
+    { label: 'Average margin (per job)', value: `${simplePercent}%`, status: 'ok', sources: [] },
+    { label: 'Overall margin (weighted by revenue)', value: `${weightedPercent}%`, status: 'ok', sources: [] },
+    { label: 'Total revenue (jobs with both sides)', value: fmt(centsToString(totalRevenueCents)), status: 'info', sources: [] },
+    { label: 'Total cost (jobs with both sides)', value: fmt(centsToString(totalCostCents)), status: 'info', sources: [] },
+  ];
+  const records = both.flatMap((j) => [...j.revenueDocs.map((d) => jobDocRecord(d, { group: j.jobKey })), ...j.costDocs.map((d) => jobDocRecord(d, { group: j.jobKey }))]);
+  return baseAnswer(text, facts, {
+    sources: both.flatMap((j) => [...j.revenueDocs, ...j.costDocs].map((d) => docSource(d.documentId))),
+    interpretation: `average job margin${p ? `, ${p.label}` : ''}`,
+    cite: { records, total: records.length, claimedCount: records.length, basis: `Averaged margin across ${plural(both.length, 'job')} that have both revenue and cost documents linked${p ? ` dated ${p.label}` : ''}.${excludedNote}` },
+  });
+}
+
 /**
  * @param {object} db  recordsStore db (tenant transaction)
  * @param {{intent: string, period: object|null, subject: string|null}} intent
@@ -1046,6 +1292,11 @@ export async function runMoneyIntent(db, intent, { today }) {
     case 'document_count': return documentCount(db, intent, ctx);
     case 'customers_invoiced_count': return customersInvoicedCount(db, intent, ctx);
     case 'customer_paid_up': return customerPaidUp(db, intent, ctx);
+    case 'job_margin': case 'job_cost_vs_revenue': return singleJobMargin(db, intent);
+    case 'job_margin_by_job': return jobMarginByJob(db, intent);
+    case 'job_profitability_rank': return jobProfitabilityRank(db, intent);
+    case 'jobs_over_budget': return jobsOverBudget(db, intent);
+    case 'avg_job_margin': return avgJobMargin(db, intent);
     default: return null;
   }
 }

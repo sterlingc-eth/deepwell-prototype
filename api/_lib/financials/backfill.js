@@ -18,6 +18,7 @@ import { withTenant } from '../recordsStore.js';
 import { extractFinancialsForDocument } from './extract.js';
 import { FINANCIAL_DOCUMENT_TYPES } from './normalize.js';
 import { listBackfillCandidates, backfillCounts, financialsTableExists } from './store.js';
+import { runJobKeyBackfillBatch, jobKeyBackfillCounts } from './jobCosting.js';
 
 export const BACKFILL_DEFAULTS = Object.freeze({ maxCalls: 20, hardMaxCalls: 40, maxCostUsd: 0.15, deadlineMs: 45_000, concurrency: 4 });
 
@@ -78,4 +79,24 @@ export async function runFinancialsBackfill(ctx, opts = {}) {
 export async function financialsBackfillStatus(ctx, { withTenantFn } = {}) {
   const wt = withTenantFn ?? withTenant;
   return wt(ctx, (db) => backfillCounts(db, { documentTypes: [...FINANCIAL_DOCUMENT_TYPES] }));
+}
+
+/**
+ * Job costing (M3-config/36-job-costing.sql) — populate job_key on existing
+ * document_financials rows from data already on disk (a linked customer's on-file service
+ * address, or a regex read of the document's own stored page-1 text). NO model call, so
+ * unlike runFinancialsBackfill above there is no cost cap to enforce — only a wall-clock
+ * deadline, so one call over a large table stays bounded.
+ *
+ * @param {{tenantKey: string, tenantName?: string}} ctx
+ * @param {{afterId?: string|null, limit?: number, deadlineMs?: number, withTenantFn?: Function}} [opts]
+ */
+export async function runJobKeyBackfill(ctx, opts = {}) {
+  const wt = opts.withTenantFn ?? withTenant;
+  return wt(ctx, (db) => runJobKeyBackfillBatch(db, { afterId: opts.afterId ?? null, limit: opts.limit, deadlineMs: opts.deadlineMs }));
+}
+
+export async function jobKeyBackfillStatus(ctx, { withTenantFn } = {}) {
+  const wt = withTenantFn ?? withTenant;
+  return wt(ctx, (db) => jobKeyBackfillCounts(db));
 }

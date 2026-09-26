@@ -32,6 +32,11 @@ const FIN_STATUS_RE = /\b(?:overdue|past[\s-]?due|unpaid|outstanding|delinquent|
 // A bare money-domain word that is unambiguous on its own (no noun required).
 const FIN_MONEY_WORD_RE = /\b(?:revenue|balances?|receivables?|payables?|invoiced|billed|sales\s*tax|taxe?s?)\b/i;
 
+// JOB COSTING (M3-config/36-job-costing.sql, 2026-09-26): "margin"/"profit(able)" are
+// unambiguous money words even with no invoice/quote/PO noun in sight ("gross margin by
+// job", "which jobs lost money", "cost vs revenue for the Bracken job", "over budget").
+const FIN_JOB_COST_RE = /\bmargins?\b|\bprofit(?:able|ability)?\b|\bover[\s-]?budget\b|\bcost\w*\s+(?:vs\.?|versus)\s+revenue\b|\brevenue\s+(?:vs\.?|versus)\s+cost\w*\b|\bjob\s+cost(?:ing)?\b|\blost\s+money\b/i;
+
 // "owes us"/"owe us"/"owed to us"/"paid us"/"owe our vendors"/"is X all paid up" — a cluster
 // that names no invoice/bill noun at all ("which customer owes us the most", "is Mercer all
 // paid up", "how much do we owe vendors").
@@ -66,6 +71,7 @@ export function isFinancialQuestion(question) {
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return false;
   if (FIN_MONEY_WORD_RE.test(q)) return true;
+  if (FIN_JOB_COST_RE.test(q)) return true;
   if (FIN_STANDALONE_RE.test(q)) return true;
   if (FIN_QUOTE_WAITING_RE.test(q)) return true;
   if (FIN_THRESHOLD_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
@@ -81,4 +87,4 @@ export function isFinancialQuestion(question) {
   return false;
 }
 
-export const _internals = { FIN_NOUN_RE, FIN_STATUS_RE, FIN_MONEY_WORD_RE, FIN_STANDALONE_RE, FIN_QUOTE_WAITING_RE, FIN_THRESHOLD_RE, FIN_SUPERLATIVE_RE, FIN_COUNT_OR_AVG_RE };
+export const _internals = { FIN_NOUN_RE, FIN_STATUS_RE, FIN_MONEY_WORD_RE, FIN_JOB_COST_RE, FIN_STANDALONE_RE, FIN_QUOTE_WAITING_RE, FIN_THRESHOLD_RE, FIN_SUPERLATIVE_RE, FIN_COUNT_OR_AVG_RE };
