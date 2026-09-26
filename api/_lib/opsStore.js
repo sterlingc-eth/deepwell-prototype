@@ -8,8 +8,9 @@
  *      one column-allowlisted on purpose (see DOCUMENT_UPDATE_COLUMNS and the
  *      comment above it) — that curation is a security boundary for the
  *      product's normal read/write paths, and it is exactly what an ops tool
- *      needs to step around: exportTenant reads whole rows across five
- *      tables, and deleteTenantData deletes across eight. Bolting that onto
+ *      needs to step around: exportTenant reads whole rows across seven
+ *      tables (plus financials when present), and deleteTenantData deletes
+ *      across eight. Bolting that onto
  *      the product's store would mean widening a boundary that exists for a
  *      good reason, for the benefit of code that runs on a cron schedule
  *      and admin action, not a customer request.
@@ -213,6 +214,31 @@ export async function exportTenant(ctx) {
         [EXPORT_ROW_CAP + 1]
       )).rows
     );
+    // document_entity_links: which customer/unit each document belongs to. Every
+    // deterministic (no-model) answerer that groups documents by customer —
+    // fastPath, financials, relations, rankings, trends, the agent's own
+    // `doc_links` view (api/_lib/agent/tools.js) — joins through this table, so an
+    // export without it cannot reproduce those answers offline even though
+    // `entities` and `documents` are both present. Was missing entirely before
+    // this change (2026-09 offline-exam build).
+    const document_entity_links = capped(
+      (await client.query(
+        `SELECT * FROM document_entity_links WHERE ${TENANT} ORDER BY created_at LIMIT $1`,
+        [EXPORT_ROW_CAP + 1]
+      )).rows
+    );
+    // facets: raw OCR segments each extraction was mapped from (page_no, bbox,
+    // label/value_raw) — not read by any no-model answerer directly, but it is
+    // the source `extractions.source_facet_id` points at and is queried by the
+    // model-driven agent's own `facts` view (tools.js) for provenance. Cheap and
+    // has no secret columns, so it is included for a complete, self-consistent
+    // export rather than leaving that foreign key dangling.
+    const facets = capped(
+      (await client.query(
+        `SELECT * FROM facets WHERE ${TENANT} ORDER BY created_at LIMIT $1`,
+        [EXPORT_ROW_CAP + 1]
+      )).rows
+    );
     const audit_log = capped(
       (await client.query(
         `SELECT * FROM audit_log WHERE ${TENANT} ORDER BY created_at LIMIT $1`,
@@ -241,7 +267,8 @@ export async function exportTenant(ctx) {
 
     const truncated =
       documents.truncated || pages.truncated || extractions.truncated ||
-      entities.truncated || audit_log.truncated || Boolean(links?.truncated);
+      entities.truncated || audit_log.truncated || document_entity_links.truncated ||
+      facets.truncated || Boolean(links?.truncated);
 
     const out = {
       tenantKey: ctx.tenantKey,
@@ -250,6 +277,8 @@ export async function exportTenant(ctx) {
       pages: pages.rows,
       extractions: extractions.rows,
       entities: entities.rows,
+      document_entity_links: document_entity_links.rows,
+      facets: facets.rows,
       audit_log: audit_log.rows,
       truncated,
     };

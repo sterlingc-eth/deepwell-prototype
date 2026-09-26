@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { CreateOrganization, OrganizationProfile, useAuth, useOrganization } from '@clerk/clerk-react';
-import { Bell, Users } from 'lucide-react';
+import { Bell, Download, Loader2, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus } from '../services/teamClient';
 import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
+import { downloadTenantExportJson } from '../services/exportClient';
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { DonovanMissesCard } from '../components/DonovanMissesCard';
@@ -107,6 +108,44 @@ function NotificationsCard() {
   );
 }
 
+/**
+ * Admin-only "export your data" — the promise the marketing page already makes and, until this build, the
+ * app never delivered (api/_lib/routes/tenant-export.js): everything the shop's own documents, pages,
+ * extractions, entities, links and audit log hold, as one JSON file. Same download-a-blob pattern as
+ * CustomersScreen's CSV export (src/services/exportClient.ts), just a POST instead of a plain link since the
+ * route needs the Clerk token.
+ */
+function DataExportCard() {
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const runExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      await downloadTenantExportJson();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not download the data export.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div className="dw-card p-4 space-y-2">
+      <h2 className="text-body font-medium text-ink">Your data</h2>
+      <p className="text-caption text-ink-3">
+        Download every document, extraction, customer/unit record and audit-log entry this shop has on file,
+        as one JSON file.
+      </p>
+      <button type="button" className="dw-btn-secondary shrink-0" disabled={exporting} onClick={() => void runExport()}>
+        {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Download data export (JSON)
+      </button>
+      {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
+    </div>
+  );
+}
+
 export function TeamScreen() {
   const { orgRole } = useAuth();
   const admin = isAdminRole(orgRole ?? null);
@@ -156,6 +195,7 @@ export function TeamScreen() {
         {admin && <DonovanMissesCard />}
         {admin && <DonovanLearningCard />}
         {admin && <SemanticSearchCard />}
+        {admin && <DataExportCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

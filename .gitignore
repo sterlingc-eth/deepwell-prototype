@@ -39,3 +39,6 @@ dist-ssr
 # Local exports / scratch — a full second copy of the codebase lived here
 Claude outputs/
 *.zip
+
+# Local data exports for the offline exam (never commit customer data)
+exports/
