@@ -1486,8 +1486,20 @@ const LEARNED_FEW_SHOT_MAX_TOKENS = 500;
  * ANALYTICS_SYSTEM_PROMPT constant — so this is a pure widening, never a
  * mutation of the base prompt.
  */
-export function buildAnalyticsSystemPrompt({ extraFewShot } = {}) {
-  if (!Array.isArray(extraFewShot) || !extraFewShot.length) return ANALYTICS_SYSTEM_PROMPT;
+/**
+ * `vocabLines` (Round 11, literature #6 "schema linking"): an optional short, ALREADY question-relevant
+ * string (vocab/tenantVocab.js's schemaLinkedVocabLines) naming this tenant's own brand/document-type/
+ * city values that matter for the question actually being asked — grounding the planner in what THIS
+ * tenant's data contains instead of only the generic vocabulary every tenant's prompt otherwise shares.
+ * Purely additive: never removes or narrows a choice from ANALYTICS_TOOL's own closed enum, and omitted
+ * (every caller before this existed) returns byte-identical output.
+ */
+export function buildAnalyticsSystemPrompt({ extraFewShot, vocabLines } = {}) {
+  let prompt = ANALYTICS_SYSTEM_PROMPT;
+  if (typeof vocabLines === 'string' && vocabLines.trim()) {
+    prompt = `${prompt}\n\nTHIS TENANT'S OWN DATA (schema linking — prefer these exact values when the question matches them): ${vocabLines.trim()}`;
+  }
+  if (!Array.isArray(extraFewShot) || !extraFewShot.length) return prompt;
   const lines = [];
   let tokens = 0;
   for (const ex of extraFewShot) {
@@ -1501,8 +1513,8 @@ export function buildAnalyticsSystemPrompt({ extraFewShot } = {}) {
     lines.push(line);
     tokens += lineTokens;
   }
-  if (!lines.length) return ANALYTICS_SYSTEM_PROMPT;
-  return `${ANALYTICS_SYSTEM_PROMPT}\n\nLEARNED EXAMPLES (operator-approved, same format as above):\n${lines.join('\n')}`;
+  if (!lines.length) return prompt;
+  return `${prompt}\n\nLEARNED EXAMPLES (operator-approved, same format as above):\n${lines.join('\n')}`;
 }
 
 /* ============================================================ cache namespace

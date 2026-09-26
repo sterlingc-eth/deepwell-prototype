@@ -448,7 +448,10 @@ const run = (question, callModel) => runDonovanAgent({ withTenant, ctxArg: ctxA,
 /* ================================================================== 9. wiring + hygiene */
 {
   const ask = fs.readFileSync(path.join(ROOT, 'api', 'ask.js'), 'utf8');
-  check('ask.js: `send` finalizes citations on every response body', /if \(body\?\.data && typeof body\.data === "object"\) \{\s*try \{ finalizeCitations\(body\.data\)/.test(ask));
+  // R11 (E1 claims): send() now also runs checkAnswerClaimsSync (idempotent, flag-only) immediately
+  // before finalizeCitations on the same guarded body.data — the regex tolerates that insertion
+  // (any content, non-greedy) rather than requiring the two calls to sit back to back.
+  check('ask.js: `send` finalizes citations on every response body', /if \(body\?\.data && typeof body\.data === "object"\) \{[\s\S]*?try \{ finalizeCitations\(body\.data\)/.test(ask));
   const dir = path.join(ROOT, 'api', '_lib', 'citations');
   const src = fs.readdirSync(dir).map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
   check('citations modules never log question text (counters only)', !/console\.(log|error)\([^)]*question/.test(src));

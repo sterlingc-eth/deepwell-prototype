@@ -383,6 +383,31 @@ export function tablesForPack(pack) {
   return tables;
 }
 
+/**
+ * Round 11 (vocab/tenantVocab.js): widens `base` (normally tablesForPack's own result) with this
+ * tenant's own ACTUAL brand/model values (from equipment already on file — a superset of the generic
+ * pack brand list, never a replacement for it: a tenant may run a brand the pack itself doesn't name).
+ * Cached per tenant-vocab OBJECT identity (getTenantVocab already re-derives that object only when the
+ * tenant's own data-version key changes, so this never rebuilds on every request for a tenant whose data
+ * hasn't moved). Technician/customer NAMES are deliberately NOT folded in here — a full name is too easy
+ * to collide with an unrelated real word at edit-distance 1 (see correctTenantNameTypos in
+ * vocab/tenantVocab.js, which corrects those conservatively, restricted to a possessive/named-person
+ * phrase span instead of the whole-question fuzzy pass this file's own vocab powers).
+ */
+const tenantVocabTablesCache = new WeakMap();
+export function tablesForTenantVocab(pack, tenantVocab) {
+  const base = tablesForPack(pack);
+  if (!tenantVocab || (!tenantVocab.brands?.length && !tenantVocab.models?.length)) return base;
+  const cached = tenantVocabTablesCache.get(tenantVocab);
+  if (cached) return cached;
+  const vocab = new Set(base.vocab);
+  for (const b of tenantVocab.brands ?? []) for (const w of wordsOf(b)) vocab.add(w);
+  for (const m of tenantVocab.models ?? []) for (const w of wordsOf(m)) if (w.length >= 3) vocab.add(w);
+  const tables = { abbrev: base.abbrev, vocab, vocabByLen: buildVocabByLen(vocab) };
+  tenantVocabTablesCache.set(tenantVocab, tables);
+  return tables;
+}
+
 // Leading filler this project's dispatchers/owners actually type before the
 // real question (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md's sloppiness
 // variants). Deliberately excludes "give me"/"show me"/"pull up"/"list"/
@@ -480,7 +505,10 @@ export function normalizeQuestion(text, opts = {}) {
   // overlay is merged on top. Omitted (the default on every existing
   // caller), this resolves to BASE_TABLES — byte-identical to before packs
   // existed.
-  const packBase = tablesForPack(opts?.pack);
+  // Round 11: opts.tenantVocab (vocab/tenantVocab.js's getTenantVocab result) widens that further with
+  // this tenant's own brand/model values actually on file. Omitted (every existing caller), this is a
+  // no-op — tablesForTenantVocab returns tablesForPack(opts?.pack) unchanged.
+  const packBase = tablesForTenantVocab(opts?.pack, opts?.tenantVocab);
   const original = String(text ?? '');
   let q = original.toLowerCase().trim().replace(/\s+/g, ' ');
   q = q.replace(/[?!.]+$/, '').trim();

@@ -69,6 +69,31 @@ export interface GraphSearchResult {
   nodes: GraphNode[];
 }
 
+/** One hop of a Personalized-PageRank result path (graph/rank.js) — same shape as GraphEdge's own
+ *  `source`, just inlined per-hop since a path can cross several edges. */
+export interface GraphRankPathStep {
+  from: string;
+  to: string;
+  type: string;
+  documentId?: string | null;
+  page?: number | null;
+}
+
+export interface GraphRankedNode extends GraphNode {
+  /** Personalized PageRank score relative to the given seeds — higher is more connected. Not
+   *  comparable across different seed sets or depths. */
+  score: number;
+  /** Shortest hop-by-hop trail from the nearest seed to this node, provenance included on every
+   *  hop — the "why this ranked here" a plain graphClient.get() neighborhood doesn't provide. */
+  path: GraphRankPathStep[];
+}
+
+export interface GraphRankResult {
+  seeds: string[];
+  results: GraphRankedNode[];
+  truncated: boolean;
+}
+
 export type GraphDepth = 1 | 2 | 3;
 
 async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
@@ -110,5 +135,12 @@ export const graphClient = {
   /** Free-text search to pick a start node for the standalone Graph view. */
   search(q: string, signal?: AbortSignal): Promise<GraphSearchResult> {
     return getJson<GraphSearchResult>(`${GRAPH_URL}${buildQuery({ q })}`, signal);
+  },
+
+  /** Personalized PageRank (R11, graph/rank.js): the records most strongly connected to one or
+   *  more seeds, ranked, with the path that explains each one — not yet surfaced in
+   *  KnowledgeGraph.tsx's own UI, but available for a future "most related" panel. */
+  rank(seeds: string[], opts?: { limit?: number; alpha?: number }, signal?: AbortSignal): Promise<GraphRankResult> {
+    return getJson<GraphRankResult>(`${GRAPH_URL}${buildQuery({ seeds: seeds.join(','), limit: opts?.limit, alpha: opts?.alpha })}`, signal);
   },
 };

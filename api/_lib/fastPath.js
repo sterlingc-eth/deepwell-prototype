@@ -212,8 +212,19 @@ const CUSTOMER_NUMBER_RE = /\bC-(\d{5})\b/i;
 
 const STREET_SUFFIX_RE =
   '(?:st(?:reet)?|ave(?:nue)?|rd|road|dr(?:ive)?|ln|lane|blvd|boulevard|way|ct|court|pl(?:ace)?|cir(?:cle)?|pkwy|parkway)';
+// R11 fix (lookups-0010/0084, hvac-tech-0007/0036 — golden tenant): this used to stop capturing
+// right after the street-suffix word, so "137 W Southern Ave, Mesa, AZ 85201" and "137 W
+// Southern Ave, Phoenix, AZ 85001" (two DIFFERENT real addresses in this corpus that share a
+// house number and street name) became the identical subject.address "137 W Southern Ave" —
+// fastPathQuery.js's own ILIKE-ALL match then had no city/zip tokens to require and silently
+// answered the Phoenix customer's real record for a Mesa address that was never on file. The
+// trailing city/state/zip is optional (a bare "3247 Elm St" with no city still matches exactly
+// as before) but, when present, is now part of the captured address so its tokens flow through
+// significantAddressTokens/ILIKE ALL and a same-street-different-city collision can no longer
+// resolve to the wrong customer. State is [A-Za-z]{2,12} (not just 2 letters) because
+// normalizeQuestion.js may have already expanded "AZ" to "Arizona" upstream of this regex.
 const ADDRESS_RE = new RegExp(
-  `\\b(\\d{1,6}\\s+[A-Za-z0-9.']+(?:\\s+[A-Za-z0-9.']+){0,3}\\s+${STREET_SUFFIX_RE})\\b\\.?`,
+  `\\b(\\d{1,6}\\s+[A-Za-z0-9.']+(?:\\s+[A-Za-z0-9.']+){0,3}\\s+${STREET_SUFFIX_RE}(?:,?\\s+[A-Za-z][A-Za-z\\s]{1,24}?,?\\s+[A-Za-z]{2,12}\\s+\\d{5})?)\\b\\.?`,
   'i'
 );
 // A word that must never be swallowed into a loose address or mistaken for a
@@ -360,14 +371,44 @@ const ADDRESS_STOPWORDS = new Set([
   'pkwy', 'parkway', 'n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw', 'suite', 'ste', 'apt', 'unit',
 ]);
 
+// R11 (verify-doclookup.mjs item 9 regression): a full state NAME ("Arizona") is the same
+// disambiguating information as its abbreviation ("AZ") — the abbreviation was already never
+// required (2 letters, filtered by the length>=3 check below), so requiring the spelled-out form
+// only when the caller happened to spell it out was an inconsistency, not a real distinction, and
+// broke a same-address match where the query spelled the state out and the stored record didn't.
+// Single-word state names only (this corpus is Arizona-only; a two-word state name splits into
+// two regex tokens anyway and isn't worth the added risk of over-stripping a real street word).
+const STATE_NAME_WORDS = new Set([
+  'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware',
+  'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky',
+  'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi',
+  'missouri', 'montana', 'nebraska', 'nevada', 'ohio', 'oklahoma', 'oregon', 'pennsylvania',
+  'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington', 'wisconsin', 'wyoming',
+]);
+
+// R11 (verify-doclookup.mjs item 9 regression): a unit/suite/apartment NUMBER named on only one
+// side (a customer's own street address rarely repeats a caller's "Apt 101"/"Suite 200" in every
+// question, and the stored service_address may have been entered without it at all) is not
+// house-number-strength disambiguation the way a street name, city or zip is — it's exactly the
+// kind of over-specific token this file's own comment above warns about matching too strictly on.
+// The designator word itself was already an ADDRESS_STOPWORDS entry; this only additionally drops
+// the NUMBER immediately following one, so "Apt 101" contributes nothing to the required set
+// while the address's own house number (never preceded by a unit designator) still does.
+const UNIT_DESIGNATOR_WORDS = new Set(['apt', 'suite', 'ste', 'unit']);
+
 /** Pure: an address fragment -> the tokens worth requiring in an ILIKE match
  *  (each token becomes one `%token%` ANDed via ILIKE ALL — see
  *  fastPathQuery.js). Keeps the house number and any word of length >= 3 not
- *  in ADDRESS_STOPWORDS. Empty input -> empty list (caller must treat that as
- *  "can't resolve", never as "match everything"). */
+ *  in ADDRESS_STOPWORDS/STATE_NAME_WORDS, and drops a unit/suite/apt number
+ *  (see UNIT_DESIGNATOR_WORDS above). Empty input -> empty list (caller must
+ *  treat that as "can't resolve", never as "match everything"). */
 export function significantAddressTokens(address) {
   const words = String(address ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? [];
-  return words.filter((w) => (/^\d+$/.test(w) || w.length >= 3) && !ADDRESS_STOPWORDS.has(w));
+  const unitNumberIdx = new Set();
+  for (let i = 0; i < words.length - 1; i++) {
+    if (UNIT_DESIGNATOR_WORDS.has(words[i]) && /^\d+$/.test(words[i + 1])) unitNumberIdx.add(i + 1);
+  }
+  return words.filter((w, i) => !unitNumberIdx.has(i) && (/^\d+$/.test(w) || w.length >= 3) && !ADDRESS_STOPWORDS.has(w) && !STATE_NAME_WORDS.has(w));
 }
 
 /** Pure: does this list of candidate rows resolve to exactly one? Dedupes by

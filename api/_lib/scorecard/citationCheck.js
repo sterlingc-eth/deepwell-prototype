@@ -85,3 +85,73 @@ export async function checkCitationPrecision(withTenant, ctxArg, data) {
     return { citedCount: 0, supportedCount: 0, precision: null, unsupportedClaims: [] };
   }
 }
+
+/* ============================================================================================
+ * ADDITIVE (R11, build spec item 4): atomic-claim precision / unsupported-claim rate, from the new
+ * FActScore-style claim-check module (api/_lib/claims/**). Reported ALONGSIDE `citationPrecision` above,
+ * never replacing it or changing its numbers — this is a finer-grained, claim-TYPE-aware metric (dates
+ * format-normalized, names fuzzy-but-bounded, statuses derived from a companion date, counts checked
+ * against the answer's own records set) where `citationPrecision` is a blunter token-overlap check over
+ * facts only. Nothing above this line was modified.
+ * ============================================================================================ */
+import { splitIntoClaims } from "../claims/split.js";
+import { checkClaims } from "../claims/check.js";
+
+/** Adapter: `checkClaims` wants a `(documentId, location) => Promise<string|null>` fetcher; the map this
+ *  file already builds (one query, whole-document text, same granularity `citationPrecision` uses) is
+ *  keyed by documentId alone — location is ignored on purpose, matching `citationPrecision`'s own
+ *  whole-document granularity above, not verify.js's page-exact one. */
+function fetcherFromDocTextMap(pageTextByDocId) {
+  const fn = async (documentId) => pageTextByDocId?.get?.(documentId) ?? null;
+  fn.prefetch = async () => {}; // the map is already fully populated by the caller; nothing to batch
+  return fn;
+}
+
+/**
+ * Pure given `pageTextByDocId` (reuses whatever map the caller already fetched — no new query of its
+ * own). `unsupported-claim rate` = 1 - this precision, the same relationship `citationPrecision`'s own
+ * header comment already states for its metric.
+ * @param {object} data  an /api/ask-shaped answer
+ * @param {Map<string,string>} pageTextByDocId
+ * @param {{today?: string}} [opts]
+ * @returns {Promise<{checked:number, unsupportedCount:number, precision:number|null, unsupportedClaims:string[]}>}
+ */
+export async function claimPrecision(data, pageTextByDocId, { today } = {}) {
+  if (!data || data.kind !== "answer") return { checked: 0, unsupportedCount: 0, precision: null, unsupportedClaims: [] };
+  const { claims } = splitIntoClaims(data);
+  if (!claims.length) return { checked: 0, unsupportedCount: 0, precision: null, unsupportedClaims: [] };
+  const results = await checkClaims(claims, data, { fetchSourceText: fetcherFromDocTextMap(pageTextByDocId), today });
+  const unsupported = results.filter((r) => r.supported === false);
+  return {
+    checked: results.length,
+    unsupportedCount: unsupported.length,
+    precision: Math.round(((results.length - unsupported.length) / results.length) * 1000) / 1000,
+    unsupportedClaims: unsupported.slice(0, 5).map((r) => `${r.claim.kind}: ${String(r.claim.raw).slice(0, 60)}`),
+  };
+}
+
+/**
+ * DB-touching convenience wrapper with the SAME call signature as `checkCitationPrecision` above, for a
+ * caller (runner.js) that has not already fetched the doc-text map itself — a drop-in second call right
+ * beside the existing one. Runs its own query (never reuses/mutates `checkCitationPrecision`'s), so
+ * calling both simply reports two metrics; it never changes what the first one returns.
+ */
+export async function checkClaimPrecision(withTenant, ctxArg, data, { today } = {}) {
+  const ids = [...new Set([
+    ...(Array.isArray(data?.sources) ? data.sources.map((s) => s?.documentId) : []),
+    ...(Array.isArray(data?.records) ? data.records.map((r) => r?.documentId) : []),
+    ...(Array.isArray(data?.facts) ? data.facts.map((f) => f?.documentId) : []),
+  ].filter((id) => typeof id === "string" && id))];
+  if (!ids.length) return { checked: 0, unsupportedCount: 0, precision: null, unsupportedClaims: [] };
+  try {
+    const map = await withTenant(ctxArg, async (db) => {
+      const { rows } = await db.raw(
+        `SELECT document_id, string_agg(text, ' ') AS text FROM document_pages WHERE document_id = ANY($1::uuid[]) GROUP BY document_id`,
+        [ids]);
+      return new Map(rows.map((r) => [r.document_id, r.text ?? ""]));
+    });
+    return await claimPrecision(data, map, { today });
+  } catch {
+    return { checked: 0, unsupportedCount: 0, precision: null, unsupportedClaims: [] };
+  }
+}

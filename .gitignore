@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# synthetic benchmark tenants (scripts/bench/synth-tenant.mjs) — large generated PGlite dirs,
+# regenerate locally with `npm run bench:synth-tenant`, never committed
+scripts/bench/.data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

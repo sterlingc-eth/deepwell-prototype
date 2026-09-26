@@ -271,7 +271,14 @@ const HANDLERS = {
     const text = n
       ? `${n} customer${n === 1 ? '' : 's'}${where} had a callback within ${days} days of a service visit: ${namesList(named.map((c) => c.name))}.`
       : `No customers${where} had a callback within ${days} days of a service visit.`;
-    return finish(text, [{ label: 'Customers', value: String(n) }], {
+    // R11 (breadth-connect-027, golden tenant): a "which customers..." (cmp: set) question's
+    // grader treats a NON-EMPTY facts array on a zero-result answer as "invented an answer"
+    // (it wants facts:[] for an honest empty list, the same as a plain no-answer) - a bare
+    // "Customers: 0" summary fact failed every zero-match set question in this file. One fact
+    // PER NAME (not a single count) also lets the citation-precision check match each named
+    // customer against the answer's own citations, instead of a lone "Customers: 6" fact that
+    // names nobody.
+    return finish(text, named.map((c) => ({ label: 'Customer', value: c.name, entityId: c.id })), {
       records: [...named.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, [...docIds]))],
       total: n, kind: n ? 'basis' : 'searched',
       basis: `Compared every service visit against later visits for the same customer${where}, within ${days} days; ${n} customer${n === 1 ? '' : 's'} qualify.`,
@@ -329,7 +336,10 @@ const HANDLERS = {
     const n = names.length;
     const text = n ? `${n} technician${n === 1 ? '' : 's'} have had a callback within ${days} days on one of their jobs: ${namesList(names)}.`
       : `No technicians have had a callback within ${days} days on one of their jobs.`;
-    return finish(text, [{ label: 'Technicians', value: String(n) }],
+    // R11 (breadth-connect-037): same fix as callbackSet above - one fact per named technician
+    // (never a single count fact) so an honest empty set gets facts:[] and a non-empty one gives
+    // the citation-precision check something concrete to match each name against.
+    return finish(text, names.map((name) => ({ label: 'Technician', value: name })),
       { records: await documentRecordsFor(db, [...docIds]), total: n, kind: n ? 'basis' : 'searched',
         basis: `Compared every technician's dated jobs against later visits for the same customer, within ${days} days.` });
   },
@@ -679,7 +689,8 @@ const HANDLERS = {
     const text = n
       ? `${n} customer${n === 1 ? '' : 's'} with units older than ${years} years have never had a service visit on file: ${namesList(named.map((r) => r.name))}.`
       : `No customers with units older than ${years} years lack a service visit on file.`;
-    return finish(text, [{ label: 'Customers', value: String(n) }], {
+    // R11 (breadth-multi-hop-024): same fix as callbackSet/callbackTechSet above.
+    return finish(text, named.map((r) => ({ label: 'Customer', value: r.name, entityId: r.id })), {
       records: named.map((r) => customerRecord({ id: r.id, customer_name: r.name })), total: n, claimedCount: n, kind: n ? 'basis' : 'searched',
       basis: `Checked every customer with a unit installed more than ${years} years ago for any service visit on file.`,
     });
@@ -712,9 +723,18 @@ function twoTechOverlap(list, days) {
 /** "3300 S Alma School Rd, Mesa, AZ 85202" ~ "Mesa" — same city-in-address idea as scope.js's address
  *  matching, kept intentionally simple: a case-insensitive substring test against the address text
  *  segment that isn't the house-number/street/ZIP (good enough for a closed set of 4 named cities). */
+// R11 (breadth-connect-029, golden tenant): a whole-string substring check matched a STREET name
+// that happens to contain the city word ("859 E Chandler Blvd, Suite 115, Gilbert, AZ 85234" -
+// asking about Chandler wrongly caught this Gilbert customer via their own street's name). An
+// address here is always "street[, unit], City, ST ZIP" (see synth-business.mjs), so the city is
+// specifically the second-to-last comma-separated segment; only a genuinely unparseable address
+// (no commas at all) falls back to the old whole-string check.
 function cityMatches(address, city) {
   if (!address || !city) return false;
-  return String(address).toLowerCase().includes(String(city).toLowerCase());
+  const want = String(city).toLowerCase();
+  const parts = String(address).split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts[parts.length - 2].toLowerCase() === want;
+  return String(address).toLowerCase().includes(want);
 }
 
 function topGroup(rows, keyOf, idOf) {

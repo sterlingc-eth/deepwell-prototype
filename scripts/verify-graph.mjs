@@ -246,6 +246,82 @@ await lite.query("INSERT INTO entities (id, tenant_id, entity_type, data, custom
     && fromPo?.edge.from === B.nodeId.document(doc(2)) && fromPo?.from.type === 'document', JSON.stringify(bl));
 }
 
+/* ---------- 5a. R11: visit/warranty/agreement node types + new edges, provenance (materialized) ---------- */
+{
+  const visitNode = B.nodeId.visit(doc(1));
+  const d1 = await Q.getSubgraph({ withTenant, ctxArg: ctxA, node: B.nodeId.customer(cust(1)), depth: 1 });
+  const idsD1 = new Set(d1.nodes.map((n) => n.id));
+  check('D1 (an invoice with a service_date, VISIT_DOC_TYPES-eligible) also surfaces as a visit: node one hop from its customer', idsD1.has(visitNode), JSON.stringify([...idsD1]));
+
+  const visitedEdge = d1.edges.find((e) => e.type === 'visited' && e.from === B.nodeId.customer(cust(1)) && e.to === visitNode);
+  check('visited edge: customer -> visit, provenance cites the document', visitedEdge && visitedEdge.source.documentId === doc(1), JSON.stringify(visitedEdge));
+  const atSiteEdge = d1.edges.find((e) => e.type === 'at_site' && e.from === visitNode);
+  check('at_site edge: visit -> the same site node the customer itself is located_at', atSiteEdge && atSiteEdge.to === B.nodeId.site(SITE_KEY), JSON.stringify(atSiteEdge));
+
+  const visitNodeInfo = d1.nodes.find((n) => n.id === visitNode);
+  check('visit node hydrates as type "visit", labelled with its service date', visitNodeInfo?.type === 'visit' && /2026-06-01/.test(visitNodeInfo.label ?? ''), JSON.stringify(visitNodeInfo));
+
+  const d2 = await Q.getSubgraph({ withTenant, ctxArg: ctxA, node: B.nodeId.customer(cust(1)), depth: 3, today: '2026-09-26' });
+  const visitPerformedBy = d2.edges.find((e) => e.type === 'performed_by' && e.from === visitNode && e.to === B.nodeId.tech('Mike R.'));
+  check('performed_by is ALSO emitted from the visit node (not just the document) so a technician\'s own neighborhood reaches their visits directly', Boolean(visitPerformedBy), JSON.stringify(d2.edges.filter((e) => e.type === 'performed_by')));
+
+  const warrantyNode = B.nodeId.warranty(equip(1));
+  const hasWarrantyEdge = d2.edges.find((e) => e.type === 'has_warranty' && e.from === B.nodeId.unit(equip(1)) && e.to === warrantyNode);
+  check('has_warranty edge reaches a warranty: node from the unit at 2 hops', Boolean(hasWarrantyEdge), JSON.stringify(d2.edges.filter((e) => e.type === 'has_warranty')));
+  const warrantyNodeInfo = d2.nodes.find((n) => n.id === warrantyNode);
+  check('warranty node hydrates as type "warranty" and its subtitle agrees with the SAME warrantyStatusOf() the unit node subtitle uses (never disagreeing about "active"/"expired")',
+    warrantyNodeInfo?.type === 'warranty' && /active/.test(warrantyNodeInfo.subtitle ?? '') && /2030-01-01/.test(warrantyNodeInfo.subtitle ?? ''), JSON.stringify(warrantyNodeInfo));
+
+  const agreementNode = d1.nodes.find((n) => n.id === B.nodeId.document(doc(3)));
+  check('D3 (doc_kind=agreement) hydrates as node type "agreement", not the generic "document" — same document:<uuid> id, just re-typed', agreementNode?.type === 'agreement', JSON.stringify(agreementNode));
+  const nonAgreementDoc = d1.nodes.find((n) => n.id === B.nodeId.document(doc(1)));
+  check('D1 (a plain invoice) still hydrates as the generic "document" type — re-typing only applies to actual agreements', nonAgreementDoc?.type === 'document', JSON.stringify(nonAgreementDoc));
+
+  const liveVisit = await withTenant(ctxA, (db) => B.expandNode(db, B.nodeId.visit(doc(4))));
+  check('expandNode(visit:<doc>) standalone: returns its owner/site/tech edges', liveVisit.length > 0, JSON.stringify(liveVisit));
+  const liveWarranty = await withTenant(ctxA, (db) => B.expandNode(db, warrantyNode));
+  check('expandNode(warranty:<unit>) standalone: returns the has_warranty edge back to its unit', liveWarranty.some((e) => e.type === 'has_warranty'), JSON.stringify(liveWarranty));
+}
+
+/* ---------- 5b. R11: site key never collides across a different city or a different unit ---------- */
+{
+  const sameStreetDiffCity1 = JK.normalizeJobKey('500 N Center St, Mesa, AZ 85201');
+  const sameStreetDiffCity2 = JK.normalizeJobKey('500 N Center St, Chandler, AZ 85224');
+  check('same house+street, DIFFERENT city -> different site keys (never grouped as the same job/property)',
+    sameStreetDiffCity1 && sameStreetDiffCity2 && sameStreetDiffCity1 !== sameStreetDiffCity2, JSON.stringify([sameStreetDiffCity1, sameStreetDiffCity2]));
+
+  const sameAddrDiffUnit1 = JK.normalizeJobKey('3300 S Alma School Rd, Apt 1, Mesa, AZ 85210');
+  const sameAddrDiffUnit2 = JK.normalizeJobKey('3300 S Alma School Rd, Apt 2, Mesa, AZ 85210');
+  check('same address, DIFFERENT apartment/unit -> different site keys (an apartment complex never collapses into one site node)',
+    sameAddrDiffUnit1 && sameAddrDiffUnit2 && sameAddrDiffUnit1 !== sameAddrDiffUnit2, JSON.stringify([sameAddrDiffUnit1, sameAddrDiffUnit2]));
+
+  // end-to-end: two customers at the "same" street number/name but a different city never merge into one site node.
+  // expandNode (not getSubgraph) so this holds regardless of whether these two brand-new customers
+  // have been through a materialization pass yet — same live derivation either path ultimately uses.
+  await addCustomer(10, 'Center St Mesa', '500 N Center St, Mesa, AZ 85201', 'C-G-10');
+  await addCustomer(11, 'Center St Chandler', '500 N Center St, Chandler, AZ 85224', 'C-G-11');
+  const mesaEdges = await withTenant(ctxA, (db) => B.expandNode(db, B.nodeId.customer(cust(10))));
+  const chandlerEdges = await withTenant(ctxA, (db) => B.expandNode(db, B.nodeId.customer(cust(11))));
+  const mesaSite = mesaEdges.find((e) => e.type === 'located_at')?.to;
+  const chandlerSite = chandlerEdges.find((e) => e.type === 'located_at')?.to;
+  check('end-to-end: customers at "500 N Center St" in two different cities land on two DIFFERENT site nodes',
+    mesaSite && chandlerSite && mesaSite !== chandlerSite, JSON.stringify({ mesaSite, chandlerSite }));
+}
+
+/* ---------- 5c. R11: refreshGraphForDocument — incremental, idempotent, bounded to one document ---------- */
+{
+  const before = await withTenant(ctxA, (db) => db.raw('SELECT count(*)::int AS n FROM kg_edges', []));
+  const r1 = await B.refreshGraphForDocument({ withTenant, ctxArg: ctxA, documentId: doc(1) });
+  check('refreshGraphForDocument: enabled, writes at least the has_document/billed/visited edges for D1', r1.enabled && r1.edgesWritten >= 3, JSON.stringify(r1));
+  const r2 = await B.refreshGraphForDocument({ withTenant, ctxArg: ctxA, documentId: doc(1) });
+  eq('refreshGraphForDocument is idempotent: re-running it on the same document writes the identical edge count', r2.edgesWritten, r1.edgesWritten);
+  const after = await withTenant(ctxA, (db) => db.raw('SELECT count(*)::int AS n FROM kg_edges', []));
+  eq('refreshGraphForDocument never changes the total kg_edges row count for OTHER documents (delete-then-reinsert scoped to document_id = $1)', after.rows[0].n, before.rows[0].n);
+
+  const bad = await B.refreshGraphForDocument({ withTenant, ctxArg: ctxA, documentId: 'not-a-uuid' });
+  eq('refreshGraphForDocument: a malformed documentId is an honest no-op, never a crash', [bad.enabled, bad.edgesWritten], [false, 0]);
+}
+
 /* ---------- 6. RLS cross-tenant isolation ---------- */
 {
   const crossRead = await Q.getSubgraph({ withTenant, ctxArg: ctxB, node: B.nodeId.customer(cust(1)), depth: 2 });
@@ -328,6 +404,7 @@ await lite.query("INSERT INTO entities (id, tenant_id, entity_type, data, custom
 {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   check('package.json: verify:graph exists and is part of verify:all', pkg.scripts['verify:graph'] === 'node scripts/verify-graph.mjs' && /verify:graph\b/.test(pkg.scripts['verify:all']));
+  check('package.json: verify:graph-ppr exists and is part of verify:all', pkg.scripts['verify:graph-ppr'] === 'node scripts/verify-graph-ppr.mjs' && /verify:graph-ppr\b/.test(pkg.scripts['verify:all']));
   const apiFiles = fs.readdirSync(path.join(ROOT, 'api'), { withFileTypes: true }).filter((e) => e.isFile());
   eq('api/ top-level file count is unchanged (no new serverless function added for this feature)', apiFiles.length, 12);
 
@@ -339,7 +416,7 @@ await lite.query("INSERT INTO entities (id, tenant_id, entity_type, data, custom
   const guardSrc = fs.readFileSync(path.join(ROOT, 'api/_lib/agent/sqlGuard.js'), 'utf8');
   check('sqlGuard.js REAL_TABLES lists kg_edges (verify-agent.mjs\'s own cross-check would otherwise fail)', /"kg_edges"/.test(guardSrc));
 
-  const srcs = ['build', 'query'].map((f) => fs.readFileSync(path.join(ROOT, `api/_lib/graph/${f}.js`), 'utf8')).join('\n');
+  const srcs = ['build', 'query', 'rank'].map((f) => fs.readFileSync(path.join(ROOT, `api/_lib/graph/${f}.js`), 'utf8')).join('\n');
   check('no graph source logs question text, customer names or amounts', !/console\.(log|error|warn)\([^)]*(question|customerName|address|total|amount)\b/i.test(srcs));
 }
 

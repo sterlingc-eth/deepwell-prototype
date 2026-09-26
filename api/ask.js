@@ -21,6 +21,7 @@ import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED as ASK_CACHE_ENABLED_RAW } from "./_lib/askCache.js";
+import { lookupSemantic, storeSemantic } from "./_lib/cache/semanticCache.js";
 import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
 // Team A (2026-09-24): deterministic history/comparison/maintenance router (no model call, cited answers).
@@ -31,6 +32,7 @@ import { answerMoneyQuestion, moneyNoMatchAnswer } from "./_lib/financials/money
 import { isFinancialQuestion } from "./_lib/financials/classify.js";
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
+import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
 import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZeroCitations, searchedLibraryBasis } from "./_lib/citations/enrich.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled, applyExistenceShape } from "./_lib/routes/analytics.js";
@@ -41,7 +43,17 @@ import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHo
 // agent's own search_documents fallback which was silently undercounting. See contentCount.js's own doc comment.
 import { parseContentCountQuestion, runContentCount } from "./_lib/contentCount.js";
 import { classifyRelationsQuestion, answerRelationsQuestion } from "./_lib/relations/questions.js";
+// Round 11 (literature #2): deterministic query decomposition for multi-part/conjunctive/comparison
+// questions ("Which Trane customers with no agreement had a callback this year?", "Compare invoices vs
+// POs for the Rios job") — typed sub-queries over analytics/relations/financials building blocks,
+// intersected/compared by entity id. Tried after relations (0.35)/the deterministic history router (0.4),
+// before the analytics planner — see the "0.42 query decomposition" block below.
+import { classifyDecompose, runDecompose } from "./_lib/decompose/index.js";
 import { packForTenant } from "./_lib/industry/index.js";
+// Round 11 (literature #6/#7): per-tenant vocabulary (brands/models/technicians/customers actually on
+// file, cached per tenant by data-version) — widens normalization's fuzzy-typo correction beyond the
+// generic/pack vocabulary and grounds the analytics planner prompt in what THIS tenant's data contains.
+import { getTenantVocab, correctTenantNameTypos } from "./_lib/vocab/tenantVocab.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -548,6 +560,20 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, ques
           return { passages: [], extractions: [], cacheHit: true, cachedAnswer, questionHash, corpusStamp };
         }
 
+        // ---- semantic cache (R11 item 2): only tried on an EXACT-cache miss, using the SAME
+        // corpusStamp the exact-cache probe just computed above (never a second, independent stamp).
+        // Fails open (any error -> treated as a miss, retrieval/model runs exactly as before).
+        if (!noCache) {
+          try {
+            const semantic = await lookupSemantic(db, { question, corpusStamp });
+            if (semantic.hit) {
+              return { passages: [], extractions: [], cacheHit: true, cachedAnswer: semantic.answer, questionHash, corpusStamp };
+            }
+          } catch (err) {
+            console.error("Semantic cache lookup failed, answering without it:", err?.message);
+          }
+        }
+
         const [passages, extractions] = await Promise.all([
           db.searchPassages(question, MAX_PASSAGES, { documentIds: documentIdsFilter }),
           db.searchExtractions(question, 25, { documentIds: documentIdsFilter }),
@@ -603,6 +629,9 @@ export default async function handler(req, res) {
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
     // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
     if (body?.data && typeof body.data === "object") {
+      if (body.data.claimCheck == null) {
+        try { checkAnswerClaimsSync(body.data, { today: todayResolved }); } catch (err) { console.error("checkAnswerClaimsSync failed, sending answer without it:", err?.message); }
+      }
       try { finalizeCitations(body.data); } catch (err) { console.error("finalizeCitations failed, sending answer without it:", err?.message); }
     }
     if (streaming) {
@@ -693,6 +722,33 @@ export default async function handler(req, res) {
     // failure) — safe to await directly with no try/catch here.
     const pack = await timer.time("pack", () => packForTenant({ withTenant, ctxArg }));
 
+    // ---- tenant vocabulary (Round 11, literature #6/#7) --------------------
+    // This tenant's own brands/models/technicians/customers actually on file (vocab/tenantVocab.js),
+    // cached per tenant by a cheap data-version key (rebuilt only when this tenant's own rows actually
+    // changed, never on a blind timer alone). Widens normalizeQuestionForAnalytics's fuzzy-typo
+    // correction beyond the generic/pack vocabulary (below) and, for a genuine technician/customer NAME
+    // typo right before "'s jobs/units/..." or after "did/was/is" (a shape the general vocabulary
+    // correction never touches — see nlNormalize.js's own singleRecord guard), corrects it here the same
+    // conservative, unambiguous-winner-only way streetVocab.js already corrects a street name. Never
+    // throws — a probe failure degrades to no tenant vocab at all, same behavior as before this existed.
+    let tenantVocab = null;
+    try {
+      tenantVocab = await timer.time("tenantvocab", () => withTenant(ctxArg, (db) => getTenantVocab(db, auth.tenantId, pack)));
+    } catch (err) {
+      console.error("Tenant vocab lookup failed, using generic vocabulary only:", err?.message);
+    }
+    if (!meta && tenantVocab) {
+      try {
+        const { corrected, corrections } = correctTenantNameTypos(question, tenantVocab);
+        if (corrections.length) {
+          console.log(JSON.stringify({ route: "ask", tenant_name_corrections: corrections }));
+          question = corrected;
+        }
+      } catch (err) {
+        console.error("Tenant name-typo correction failed, using original question:", err?.message);
+      }
+    }
+
     // ---- street-name typo correction (live miss cluster 4, 2026-09-21) ----
     // "when was the unit at 766 n val ivsta dr, tucson installed" — the
     // ADDRESS SHAPE is fine (fastPath's own ADDRESS_RE needs only a number +
@@ -757,7 +813,14 @@ export default async function handler(req, res) {
     // coil issue on file" — pure shape detection only here (no DB); see contentCount.js. Tried after contact/doc
     // lookup (their own shapes take priority on any overlap) and, like them, never for a meta question.
     const contentCountIntent = !meta && !contactLookupIntent && !docLookupIntent ? parseContentCountQuestion(question, pack) : null;
-    const normalizedForAnalytics = normalizeQuestionForAnalytics(question, { overlay }).normalized;
+    // Round 11: query decomposition (decompose/index.js) — multi-part/conjunctive questions ("Which Trane
+    // customers with no agreement had a callback this year?") and job comparisons ("Compare invoices vs
+    // POs for the Rios job"). Pure shape detection only here (no DB; needs `pack` for brand/doc-type
+    // vocabulary, already resolved above) — answered in block 0.42, after relations/the deterministic
+    // history router and before the analytics planner. Tried after contact/doc/content-count lookup
+    // (their own shapes take priority on any overlap), same precedence idiom as every classifier above.
+    const decomposeIntent = !meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(question, { pack }) : null;
+    const normalizedForAnalytics = normalizeQuestionForAnalytics(question, { overlay, pack, tenantVocab }).normalized;
     // Money gate (live miss cluster 2, 2026-09-21): "what's the total dollar
     // amount of our open invoices" style questions have no honest answer yet
     // — there is no financials layer (handoffs/FINANCIALS_DESIGN_2026-09-21.md,
@@ -961,7 +1024,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || relationsIntent || detIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate
+    const retrievalPromise = meta || relationsIntent || detIntent || decomposeIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
@@ -1039,6 +1102,35 @@ export default async function handler(req, res) {
           }
         });
         return send(200, { success: true, data: detData });
+      }
+    }
+
+    // ---- 0.42 query decomposition (Round 11, no model, DB only) ------------
+    // Multi-part/conjunctive questions ("Which Trane customers with no agreement had a callback this
+    // year?", "customers in Mesa with units older than 10 years and no visit since 2024") and job
+    // comparisons ("Compare invoices vs POs for the Rios job") — decompose/index.js. Only ever claims a
+    // question when EVERY clause maps to a supported sub-query (classifyDecompose's own parse already
+    // enforces this); a null return here means the chain carries on exactly as it always has.
+    if (decomposeIntent) {
+      let decData = null;
+      try {
+        decData = await timer.time("decompose", () => withTenant(ctxArg, (db) => runDecompose(db, decomposeIntent, { today: todayResolved })));
+      } catch (err) {
+        console.error("Query decomposition failed, falling through:", err?.message);
+      }
+      console.log(JSON.stringify({ route: "ask", decompose_mode: decomposeIntent.mode, decompose_hit: Boolean(decData) }));
+      if (decData) {
+        await timer.time("bookkeeping", async () => {
+          try {
+            await withTenant(ctxArg, (db) => db.logAction({
+              action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+              changes: { question_hash: hashQuestion(question), documents: [...new Set((decData.sources ?? []).map((x) => x.documentId))], passages: 0, decompose: decomposeIntent.mode },
+            }));
+          } catch (err) {
+            console.error("Failed to write document.queried audit row (decompose):", err?.message);
+          }
+        });
+        return send(200, { success: true, data: decData });
       }
     }
 
@@ -1312,7 +1404,7 @@ export default async function handler(req, res) {
         // — or be shadowed by — a retrieval-cached row for the same question
         // text (2026-09-21 reviewer fix, handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md).
         analyticsResult = await timer.time("analytics_plan", () =>
-          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay, noCache: Boolean(scorecardCall) })
+          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay, tenantVocab, noCache: Boolean(scorecardCall) })
         );
       } catch (err) {
         // A tenant already over its daily model budget must not spend a
@@ -1753,6 +1845,9 @@ export default async function handler(req, res) {
               console.error("Failed to upsert ask cache row:", err?.message);
               await db.raw("ROLLBACK TO SAVEPOINT ask_cache_upsert", []).catch(() => {});
             }
+            await storeSemantic(db, { question, corpusStamp, answer: data }).catch((err) => {
+              console.error("Failed to store semantic cache row:", err?.message);
+            });
           }
         });
       } catch (err) {

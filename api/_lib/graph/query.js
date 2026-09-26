@@ -16,10 +16,12 @@
  *     at this corpus size (same "query-time is fine; a materialized table is the scale-out path"
  *     reasoning as relations/timeline.js's fetchAllVisits).
  *
- * "unit -> warranty status" from the design is deliberately NOT an edge (warranty status is not
- * one of the five node types) — it is folded into the unit node's own `subtitle` instead, via the
- * SAME warrantyStatusOf() the rest of the product uses (analytics.js), so the graph view never
- * disagrees with the warranty page about what "expired"/"active" means for a given unit.
+ * R11: "unit -> warranty status" is now ALSO a real node+edge (warranty:<unit uuid>,
+ * has_warranty) — see build.js's header for why that's still "no new table" (the warranty node
+ * reuses the unit's own entities row). It sits ALONGSIDE the unit node's own `subtitle`, which
+ * keeps showing warranty status too (unchanged from v1) — both read the SAME warrantyStatusOf()
+ * (analytics.js), so the two, and the warranty page itself, never disagree about what
+ * "expired"/"active" means for a given unit.
  */
 import { TENANT_SQL } from '../scope.js';
 import { warrantyStatusOf } from '../analytics.js';
@@ -34,9 +36,11 @@ function clampLimit(n) { return Math.max(1, Math.min(MAX_LIMIT, Math.trunc(Numbe
 /* ------------------------------------------------------------------ hydration */
 
 /** Node ids -> display info, batched per type (never one query per node). Unknown/deleted ids
- *  are simply left out of the result (never invented). */
-async function hydrateNodes(db, ids, today) {
-  const byType = { customer: [], unit: [], document: [], tech: [], site: [] };
+ *  are simply left out of the result (never invented). Exported (R11) so graph/rank.js's
+ *  Personalized PageRank can label its ranked results with the same hydration every other graph
+ *  read uses, instead of a second, possibly-drifting copy of these queries. */
+export async function hydrateNodes(db, ids, today) {
+  const byType = { customer: [], unit: [], document: [], tech: [], site: [], visit: [], warranty: [] };
   for (const id of ids) {
     const p = parseNodeId(id);
     if (p) byType[p.type]?.push(p.value);
@@ -68,14 +72,54 @@ async function hydrateNodes(db, ids, today) {
     }
   }
   if (byType.document.length) {
+    // LEFT JOIN document_financials so a maintenance-agreement document hydrates as its own
+    // 'agreement' node TYPE (R11) rather than the generic 'document' one — same row, same id
+    // (build.js deliberately gives 'agreement' no id space of its own; see that file's header).
     const { rows } = await db.raw(
-      `SELECT id, original_filename, document_type, stage FROM documents WHERE id = ANY($1::uuid[]) AND ${TENANT_SQL}`,
+      `SELECT d.id, d.original_filename, d.document_type, d.stage, df.doc_kind
+         FROM documents d LEFT JOIN document_financials df ON df.document_id = d.id AND df.${TENANT_SQL}
+        WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL}`,
       [byType.document]
     );
-    for (const r of rows) out.set(nodeId.document(r.id), { type: 'document', label: r.original_filename ?? r.document_type ?? 'Document', subtitle: r.document_type ?? null });
+    for (const r of rows) {
+      const type = r.doc_kind === 'agreement' ? 'agreement' : 'document';
+      out.set(nodeId.document(r.id), { type, label: r.original_filename ?? r.document_type ?? 'Document', subtitle: r.document_type ?? null });
+    }
   }
   for (const key of byType.tech) out.set(nodeId.tech(key), { type: 'tech', label: key, subtitle: 'Technician' });
   for (const key of byType.site) out.set(nodeId.site(key), { type: 'site', label: key, subtitle: 'Site' });
+
+  if (byType.visit.length) {
+    // A visit reuses its underlying document's own row (build.js's header) — label it with the
+    // service date the visit was matched on, same field relations/timeline.js's own visits key by.
+    const { rows } = await db.raw(
+      `SELECT d.id, d.document_type,
+              (SELECT COALESCE(NULLIF(y.corrected_value,''), y.value) FROM extractions y
+                WHERE y.document_id = d.id AND y.field_key = 'service_date' AND y.${TENANT_SQL} LIMIT 1) AS service_date
+         FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL}`,
+      [byType.visit]
+    );
+    for (const r of rows) {
+      out.set(nodeId.visit(r.id), {
+        type: 'visit',
+        label: r.service_date ? `Visit · ${r.service_date}` : (r.document_type ?? 'Visit'),
+        subtitle: r.document_type ?? null,
+      });
+    }
+  }
+  if (byType.warranty.length) {
+    // A warranty node reuses its unit's own row (build.js's header) — same warrantyStatusOf()
+    // the unit node's own subtitle uses, so the two never disagree about "expired"/"active".
+    const { rows } = await db.raw(
+      `SELECT id, data->'warranty' AS warranty FROM entities WHERE id = ANY($1::uuid[]) AND ${TENANT_SQL}`,
+      [byType.warranty]
+    );
+    for (const r of rows) {
+      const w = r.warranty && typeof r.warranty === 'object' ? r.warranty : null;
+      const status = warrantyStatusOf(w, today);
+      out.set(nodeId.warranty(r.id), { type: 'warranty', label: 'Warranty', subtitle: `${status}${w?.expires ? ` · expires ${w.expires}` : ''}` });
+    }
+  }
 
   return out;
 }

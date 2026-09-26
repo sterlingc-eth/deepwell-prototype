@@ -1021,13 +1021,17 @@ function escapeLikeText(s) {
 export async function resolveAddressCandidates(db, addressPhrase) {
   const tokens = significantAddressTokens(addressPhrase);
   if (!tokens.length) return [];
-  const houseNumber = tokens.find((t) => /^\d+$/.test(t));
-  const streetWord = tokens.find((t) => !/^\d+$/.test(t));
-  const patterns = [
-    houseNumber ? `${escapeLikeText(houseNumber)} %` : null,
-    streetWord ? `%${escapeLikeText(streetWord)}%` : null,
-  ].filter(Boolean);
-  if (!patterns.length) return [];
+  const houseNumberIdx = tokens.findIndex((t) => /^\d+$/.test(t));
+  if (houseNumberIdx === -1) return [];
+  // R11 fix (lookups-0010/0084, hvac-tech-0007/0036): every significant token must match, not
+  // just the house number plus ONE street word - two real addresses can share a house number
+  // and street name in different cities/zips ("137 W Southern Ave" exists in this very corpus
+  // in both Phoenix 85001 and, as a phrase with no matching customer at all, "Mesa 85201"), and
+  // matching on only the first street word silently answered a DIFFERENT customer's real
+  // record for an address that was never on file. The house-number token keeps its own
+  // "at the start of the address" pattern (house numbers don't float mid-string); every other
+  // token (remaining street words, city, zip) only needs to appear somewhere in the string.
+  const patterns = tokens.map((t, i) => (i === houseNumberIdx ? `${escapeLikeText(t)} %` : `%${escapeLikeText(t)}%`));
   const { rows } = await db.raw(
     `SELECT ${CUSTOMER_ROW_COLUMNS}
        FROM entities
@@ -1108,7 +1112,24 @@ export async function runContactLookup(db, question, opts = {}) {
 
   const candidates = await resolveContactCandidates(db, parsed.namePhrase);
   if (candidates.length === 0) return null;
-  if (candidates.length > 1) return buildAmbiguousContactAnswer(parsed.namePhrase, candidates);
+  if (candidates.length > 1) {
+    // Golden-tenant fix (2026-09-26): a shared LAST NAME on file is two different real
+    // customers, not a data error (a 120-customer corpus drawn from ~50 surnames guarantees
+    // some of this) — for a NAMED-UNIT-ATTRIBUTE question ("what's the serial on the Wyckoff
+    // unit", "is the Salazar unit under warranty") the question never says which Wyckoff, so
+    // the honest answer is EVERY matching customer's own value, not a bare "which one did you
+    // mean" that names nobody's actual serial/model/age/warranty at all. Small candidate counts
+    // only (same reasoning as docLookup.js's own MAX_AGGREGATE_CANDIDATES): past a handful of
+    // same-surname matches this stops being scannable and the plain disambiguation prompt below
+    // is the more honest answer.
+    if ((NAMED_UNIT_FIELDS.has(parsed.field) || parsed.field === "serial") && candidates.length <= NAMED_UNIT_AGGREGATE_MAX) {
+      return buildNamedUnitAmbiguousAnswer(db, parsed.field, parsed.namePhrase, candidates, today);
+    }
+    if ((parsed.field === "lastVisit" || parsed.field === "visitCount") && candidates.length <= NAMED_UNIT_AGGREGATE_MAX) {
+      return buildAggregateVisitAnswer(db, parsed.field, parsed.namePhrase, candidates, today);
+    }
+    return buildAmbiguousContactAnswer(parsed.namePhrase, candidates);
+  }
   return buildResolvedAnswer(db, parsed.field, candidates[0], { namePhrase: parsed.namePhrase, today });
 }
 
@@ -1199,6 +1220,53 @@ export function buildVisitAnswer(field, row, visits, today = null) {
     ],
     sources: top, confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
   };
+}
+
+/** R11 (live-misses "how many times have we been to Mercer's" / "when were we last at
+ *  Ellison's"): 2+ same-surname matches on a visit-history question. lastVisit/visitCount
+ *  aren't a NAMED_UNIT_FIELDS attribute (there's no single unit to name per-candidate), but the
+ *  same principle as buildNamedUnitAmbiguousAnswer applies — the question named a surname, not
+ *  a specific person, so the honest answer combines every matching customer's own visit history
+ *  (summed count; latest date across all of them) rather than blocking with "which one did you
+ *  mean" (matches financials/answers.js's own totalInvoiced/lastInvoice aggregation for the
+ *  identical ambiguity shape). Small candidate counts only — see NAMED_UNIT_AGGREGATE_MAX's own
+ *  doc comment for why a large match set stays blocked instead. */
+async function buildAggregateVisitAnswer(db, field, namePhrase, candidates, today) {
+  const perCustomer = [];
+  for (const row of candidates) perCustomer.push({ row, visits: await computeVisitHistory(db, row.id, today) });
+  const withVisits = perCustomer.filter((p) => p.visits.mostRecent);
+  const totalCount = perCustomer.reduce((s, p) => s + (p.visits.count || 0), 0);
+  const note = futureNote(perCustomer.flatMap((p) => p.visits.future ?? []), todayIso(today));
+  const records = candidates.map((row) => customerRecord(row));
+  const visitDocs = perCustomer.flatMap((p) => (p.visits.visits ?? []).map((v) => documentRecord(v, { label: `${documentTypeLabel(v.document_type)} · ${String(v.date ?? "").slice(0, 10) || "undated"}` })));
+  if (!withVisits.length) {
+    return attachCitations({
+      kind: "answer", text: `No service visits on file for anyone matching "${namePhrase}".${note}`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, { records, total: records.length, basis: `${candidates.length} customers match "${namePhrase}"; none have a service visit on file.` });
+  }
+  const latest = withVisits.reduce((best, p) => (!best || p.visits.mostRecent.date > best.visits.mostRecent.date ? p : best), null);
+  const latestName = latest.row.customer_name || latest.row.customer_number || "a customer";
+  if (field === "visitCount") {
+    const text = `${totalCount} visit${totalCount === 1 ? "" : "s"} on file across ${candidates.length} customers matching "${namePhrase}", the latest on ${humanVisitDate(latest.visits.mostRecent.date)} (${latestName}).${note}`;
+    return attachCitations({
+      kind: "answer", text,
+      facts: perCustomer.map((p) => ({ label: p.row.customer_name || "Customer", value: `${p.visits.count} visit${p.visits.count === 1 ? "" : "s"}`, sources: [] })),
+      sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
+    }, { records: [...records, ...visitDocs], total: records.length + visitDocs.length, claimedCount: totalCount, basis: `Counted service dates across every customer matching "${namePhrase}".` });
+  }
+  const dateLabel = formatVisitDateLabel(latest.visits.mostRecent.date);
+  const typeLabel = documentTypeLabel(latest.visits.mostRecent.documentType).toLowerCase();
+  const topSource = latest.visits.mostRecent.documentId ? [{ documentId: latest.visits.mostRecent.documentId, location: { field: "service_date" } }] : [];
+  const text = `Last visit matching "${namePhrase}": ${dateLabel} (${typeLabel}, ${latestName}). ${totalCount} visit${totalCount === 1 ? "" : "s"} on file across ${candidates.length} customers.${note}`;
+  return attachCitations({
+    kind: "answer", text,
+    facts: [
+      { label: "Last visit", value: dateLabel, sources: topSource },
+      ...perCustomer.map((p) => ({ label: p.row.customer_name || "Customer", value: p.visits.mostRecent ? formatVisitDateLabel(p.visits.mostRecent.date) : "no visits on file", sources: [] })),
+    ],
+    sources: topSource, confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
+  }, { records: [...records, ...visitDocs], total: records.length + visitDocs.length, basis: `Compared the most recent service date across every customer matching "${namePhrase}".` });
 }
 
 /** "M100017 · Trane XR16 · installed 2019-04-02 · warranty exp 2029-04-02" —
@@ -1346,6 +1414,52 @@ export function buildUnitAttributeAnswer(attribute, label, row, equipmentRows, t
     text: lines.join(" "),
     facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
   };
+}
+
+/** Past this many same-surname matches, buildNamedUnitAmbiguousAnswer's per-candidate listing
+ *  stops being scannable and plain disambiguation (buildAmbiguousContactAnswer) is the better
+ *  answer — same reasoning as docLookup.js's own MAX_AGGREGATE_CANDIDATES threshold. */
+const NAMED_UNIT_AGGREGATE_MAX = 4;
+
+/** A NAMED-UNIT-ATTRIBUTE question ("the Wyckoff unit") that matched 2-4 customers by surname:
+ *  answer with EVERY candidate's own value instead of asking which one — the question never
+ *  said which, so listing all of them (each clearly labeled by name) is the honest answer, and
+ *  whichever one the asker meant is right there in the reply. Never invents a value: a
+ *  candidate with no equipment on file says so, same as buildUnitAttributeAnswer's own
+ *  no-equipment case. */
+async function buildNamedUnitAmbiguousAnswer(db, field, namePhrase, candidates, today) {
+  // R11 (live-misses-2026-09-22b-0006, golden tenant): Shape 3b ("what's the serial/model on the
+  // Wyckoff unit") deliberately resolves to the plain customer-row field id "serial" for BOTH
+  // serial and model wording (see ON_THE_NAME_UNIT_RE's own doc comment) - never "unitSerial", so
+  // the reverse lookup below found nothing and this whole aggregate path was skipped for that
+  // exact phrasing, falling back to a bare "which one did you mean" that names no serial at all.
+  // "serial" is already a valid UNIT_ATTRIBUTE_RE/unitAttributeValueText key on its own, so it
+  // only needs a direct fallback, not a reverse-lookup entry.
+  const attribute = Object.keys(UNIT_ATTRIBUTE_FIELD).find((k) => UNIT_ATTRIBUTE_FIELD[k] === field) ?? (field === "serial" ? "serial" : null);
+  const records = [];
+  const lines = [];
+  const facts = [];
+  for (const row of candidates) {
+    const name = row.customer_name || row.customer_number || "Unnamed customer";
+    let equipmentRows = [];
+    try { equipmentRows = await db.listCustomerEquipment(row.id); } catch (err) {
+      console.error("buildNamedUnitAmbiguousAnswer: listCustomerEquipment failed, treating as no equipment on file:", err?.message);
+    }
+    records.push(customerRecord(row));
+    for (const u of equipmentRows) records.push(unitRecord(u, { customerId: row.id }));
+    const values = equipmentRows.length ? equipmentRows.map((u) => unitAttributeValueText(attribute, u, today)) : ["no equipment on file"];
+    lines.push(`${name} — ${values.join("; ")}`);
+    facts.push({ label: name, value: values.join("; "), sources: [] });
+  }
+  return attachCitations({
+    kind: "answer",
+    text: `I found ${candidates.length} matches for "${namePhrase}": ${lines.join(". ")}.`,
+    facts, sources: [], confidence: 1, verifiedCount: facts.length, unverifiedCount: 0, closest: [],
+    candidateCount: candidates.length,
+  }, {
+    records, total: records.length,
+    basis: `${candidates.length} customers match "${namePhrase}" by name; the question didn't say which, so every match's own ${attribute ?? "unit"} value is shown.`,
+  });
 }
 
 /** Resolves one candidate row to its final answer, dispatching on `field` —

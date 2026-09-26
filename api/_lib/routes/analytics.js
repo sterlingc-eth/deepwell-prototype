@@ -54,6 +54,8 @@ import {
   TOP_CUSTOMERS_LIMIT,
 } from '../analytics.js';
 import { normalizeQuestion } from '../nlNormalize.js';
+// Round 11 (literature #6/#7): per-tenant vocabulary schema-linking for the planner prompt (above).
+import { schemaLinkedVocabLines } from '../vocab/tenantVocab.js';
 // TEAM C (citations everywhere): records/basis come from the SAME rows the number was computed from.
 import { withAnalyticsCitations } from '../citations/analytics.js';
 // Team A (2026-09-24): time semantics (uploaded vs service date) and future-dated service records.
@@ -76,7 +78,7 @@ export function isAnalyticsEnabled(env = process.env) {
  * like a fast-path miss: run retrieval+model instead. `max_tokens` is small
  * (a plan is a handful of enum strings) — see the brief's cost note.
  */
-export async function planAnalyticsQuestion(question, { today, overlay } = {}) {
+export async function planAnalyticsQuestion(question, { today, overlay, tenantVocab } = {}) {
   try {
     const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
     const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
@@ -85,7 +87,11 @@ export async function planAnalyticsQuestion(question, { today, overlay } = {}) {
     // buildAnalyticsSystemPrompt's own doc comment for the 12-item/500-token
     // cap. No overlay (or none with few-shot items) returns the exact same
     // ANALYTICS_SYSTEM_PROMPT constant as before this existed.
-    const systemPrompt = buildAnalyticsSystemPrompt({ extraFewShot: overlay?.fewShot });
+    // Round 11 (literature #6, schema linking): `tenantVocab` (vocab/tenantVocab.js's getTenantVocab),
+    // when present, contributes a short, question-relevant subset of this tenant's own brand/document-
+    // type/city vocabulary — omitted (no tenantVocab, or none of it matches this question) leaves the
+    // prompt byte-identical to before this existed.
+    const systemPrompt = buildAnalyticsSystemPrompt({ extraFewShot: overlay?.fewShot, vocabLines: schemaLinkedVocabLines(question, tenantVocab) });
     const response = await withBackoff(
       () =>
         client.messages.create(
@@ -656,7 +662,7 @@ export function applyExistenceShape(data, question) {
  *                    stays easy to call from ask.js without a second import
  *                    cycle back through recordsStore.
  */
-export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today, overlay, noCache = false }) {
+export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today, overlay, tenantVocab, noCache = false }) {
   const EMPTY = { handled: false, data: null, cacheHit: false, modelCalled: false, writes: [] };
   // Day 1 training-plan normalization layer (nlNormalize.js): both the plan
   // and every cache key below key off the NORMALIZED text (more cache hits,
@@ -766,7 +772,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // after — that fallback's own model call is the one actually counted
     // for the question (see api/ask.js's own doc comment at its call site),
     // so this file never double-reports one question as two.
-    const plan = await planAnalyticsQuestion(question_n, { today, overlay });
+    const plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab });
     if (!plan) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a

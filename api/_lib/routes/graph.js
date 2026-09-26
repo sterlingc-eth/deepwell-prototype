@@ -6,6 +6,9 @@
  *
  *   { op: 'status' }                        -> {enabled, totalDocuments, edgeCount}   admin
  *   { op: 'refresh', afterId?, limit? }      -> one bounded materialization batch     admin
+ *   { op: 'refreshDocument', documentId }    -> refresh one document's kg_edges       admin
+ *                                              (R11: refreshGraphForDocument — the ingest hook,
+ *                                              wired for a person to trigger by hand too)
  *
  * Every op is tenant-scoped through recordsStore.withTenant (RLS). Nothing here logs question
  * text, names or amounts.
@@ -14,7 +17,7 @@ import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from "../auth.
 import { handleCors, handleError } from "../claude.js";
 import { withTenant } from "../recordsStore.js";
 import { limit as rateLimit } from "../rateLimit.js";
-import { refreshGraphBatch, graphRefreshStatus } from "../graph/build.js";
+import { refreshGraphBatch, refreshGraphForDocument, graphRefreshStatus } from "../graph/build.js";
 
 export const config = { api: { bodyParser: { sizeLimit: "16kb" } }, maxDuration: 60 };
 
@@ -48,7 +51,14 @@ export default async function handler(req, res) {
       const afterId = typeof body.afterId === "string" && UUID_RE.test(body.afterId) ? body.afterId : null;
       return ok(await withTenant(ctx, (db) => refreshGraphBatch(db, { afterId, limit: body.limit, deadlineMs: body.deadlineMs })));
     }
-    return res.status(400).json({ error: "op must be one of: status, refresh" });
+    if (op === "refreshDocument") {
+      requireAdmin();
+      if (typeof body.documentId !== "string" || !UUID_RE.test(body.documentId)) {
+        return res.status(400).json({ error: "documentId must be a uuid" });
+      }
+      return ok(await refreshGraphForDocument({ withTenant, ctxArg: ctx, documentId: body.documentId }));
+    }
+    return res.status(400).json({ error: "op must be one of: status, refresh, refreshDocument" });
   } catch (error) {
     if (error instanceof AuthError) return handleCors(res, req).status(error.status).json({ error: error.message });
     return handleError(res, error, req);

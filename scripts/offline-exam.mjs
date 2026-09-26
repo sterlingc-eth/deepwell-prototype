@@ -201,6 +201,19 @@ export async function loadExportIntoNewTenant(lite, exportData, { tenantKey = "o
   const financialLines = (Array.isArray(exportData.financial_lines) ? exportData.financial_lines : []).filter((l) => finIds.has(l.financial_id) && docIds.has(l.document_id));
   if (financialLines.length) await insertRows(lite, "document_financial_lines", withId(financialLines));
 
+  // ANALYZE (2026-09-26, golden-tenant perf fix): a fresh PGlite database has NO table
+  // statistics after a bulk INSERT (autovacuum never gets a chance to run before the exam
+  // starts asking questions), so the planner falls back to flat per-table row-count guesses
+  // and picks catastrophic nested-loop plans for any query joining several tables with an OR
+  // condition (exactly the shape every "connect"-family oracle question uses: "document links
+  // to EITHER the customer directly OR the customer's equipment"). Measured on the golden
+  // tenant (scripts/golden/): one such query went from ~58s to ~44ms after this ANALYZE alone
+  // — same rows back (this changes only the plan, never a result), so it is safe for every
+  // caller, not just the golden tenant. Runs once per loaded tenant, right after the data that
+  // needs statistics exists; a real Postgres would have this from autovacuum/pg_cron and never
+  // notices the difference.
+  await lite.exec("ANALYZE");
+
   return {
     ctx: { tenantKey, tenantName },
     tenantId,

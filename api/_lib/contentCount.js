@@ -246,9 +246,35 @@ const TIME_WINDOW_RE = /\b(?:this|last|past)\s+(?:year|month|quarter|week)\b/i;
 // the X <verb>ed", and matching it there would wrongly hijack a plain mention/issue question (e.g. "which
 // customers had a drain problem issue or repair on file?" — no proximity intended between "repair" and any
 // term) into this proximity-search shape instead of the mention shape it actually is.
-const REPLACED_VERB_RE = /\b(replaced|replacing|repaired|repairing|installed|installing|fixed|fixing|swapped|swapping|changed|changing|serviced|servicing)\b/i;
+// R11 (breadth-content-029, golden tenant): "How many jobs MENTION a compressor REPLACEMENT?" uses the
+// action as a NOUN ("replacement"), not one of the past-tense/gerund verb forms above — this fell through
+// this whole file's proximity-verb machinery entirely and instead matched the generic, unrestricted
+// "mention" path (any page containing the bare word "compressor", including a diagnosis note that never
+// mentions a replacement at all), overcounting 8 vs the oracle's 0 (whose own pattern only ever matches
+// the "replac" stem, exactly what buildProximityPattern already produces for the verb forms above — this
+// noun form just needed to reach it). "replacement(s)" is unambiguous (unlike a bare "repair"/"install"
+// noun, which the comment above REPLACED_VERB_RE explains is deliberately excluded as often NOT implying
+// proximity), so it's safe to add outright.
+const REPLACED_VERB_RE = /\b(replaced|replacing|repaired|repairing|installed|installing|fixed|fixing|swapped|swapping|changed|changing|serviced|servicing|replacements?)\b/i;
 const WHICH_CUSTOMERS_HEAD_RE = /^\s*(?:which\s+customers?|who)\b/i;
 const HOW_MANY_TIMES_RE = /^\s*how\s+many\s+times\b/i;
+// R11 (breadth-content-029): "how many jobs/calls/documents mention <term> replacement" is the same
+// count shape as "how many times have we replaced <term>" — just phrased around "mention" instead of
+// "times". Anchored to the same "how many ... mention" opening as the generic mention path (line ~344's
+// MENTION_RE) so this never widens beyond what already reaches this parser.
+const HOW_MANY_MENTION_RE = /^\s*how\s+many\s+(?:jobs?|calls?|documents?)\b.*\bmentions?\b/i;
+
+// A noun form's stem isn't a plain suffix-strip of ITSELF the way past-tense/gerund forms are (see
+// verbStem below) - "replacement" needs the same 6-letter "replac" stem as "replaced"/"replacing", not
+// the 7-letter "replace" a naive "-ment" strip would produce (which then fails to match "replacing",
+// whose 7th letter is "i", not "e"). Listed explicitly rather than guessed at, since it only ever
+// applies to the one noun form REPLACED_VERB_RE now recognizes.
+const NOUN_FORM_STEM = { replacement: 'replac', replacements: 'replac' };
+// Answer text reads a matched verb WORD back to the owner ("We've replaced a compressor 3 times") - a
+// noun-form match ("replacement") needs the equivalent past-tense word here too, or the sentence comes
+// out ungrammatical ("We've replacement a compressor..."). Distinct from NOUN_FORM_STEM (which is a regex
+// stem, not display text).
+const NOUN_FORM_DISPLAY_VERB = { replacement: 'replaced', replacements: 'replaced' };
 
 /** "replaced"/"replacing" -> "replac", "installed" -> "install", "repaired" -> "repair", ... — plain English
  *  verb morphology, not a lookup table of specific words: strips a gerund/past-tense suffix so the built
@@ -256,25 +282,38 @@ const HOW_MANY_TIMES_RE = /^\s*how\s+many\s+times\b/i;
  *  own hand-written 'replac' stem. */
 function verbStem(word) {
   const w = String(word ?? '').toLowerCase();
+  if (NOUN_FORM_STEM[w]) return NOUN_FORM_STEM[w];
   if (w.endsWith('ing')) return w.slice(0, -3);
   if (w.endsWith('ed')) return w.slice(0, -2);
   return w;
 }
 
-/** {verb, groupBy, mode} for a "replaced/repaired/installed X" question shape, or null. Deliberately narrow:
- *  the verb must be present AND the question must open with "which customers"/"who" (-> list customers) or
- *  "how many times" (-> count) — a differently-shaped question (e.g. "jobs ... where ... replaced", already
- *  handled below by hasListJobsWhere) is left to that path instead. */
+// R11 (breadth-connect-092, golden tenant): "Which customers have had the filter replaced MORE
+// THAN ONCE?" is a per-customer OCCURRENCE-COUNT condition, not a plain "did it happen at all"
+// membership question - parseReplacedQuestion previously had no way to express that, so this
+// answered with every customer who had a filter replaced even a single time (the corpus's every
+// AC maintenance visit mentions a filter, so this listed 77 of 120 customers when the true
+// answer, per the oracle's own per-customer HAVING count(*) > 1, is 0 - no customer in this
+// corpus has TWO separate filter-replacement documents on file).
+const MORE_THAN_ONCE_RE = /\bmore than once\b|\bat least twice\b|\btwice or more\b|\bmultiple times\b|\b(?:2|two) or more times\b|\bmore than one time\b/i;
+
+/** {verb, groupBy, mode, minPerCustomer?} for a "replaced/repaired/installed X" question shape, or
+ *  null. Deliberately narrow: the verb must be present AND the question must open with "which
+ *  customers"/"who" (-> list customers) or "how many times" (-> count) — a differently-shaped
+ *  question (e.g. "jobs ... where ... replaced", already handled below by hasListJobsWhere) is
+ *  left to that path instead. */
 function parseReplacedQuestion(lower) {
   if (TIME_WINDOW_RE.test(lower)) return null;
   const verbMatch = REPLACED_VERB_RE.exec(lower);
   if (!verbMatch) return null;
   const isWhich = WHICH_CUSTOMERS_HEAD_RE.test(lower);
-  const isHowManyTimes = HOW_MANY_TIMES_RE.test(lower);
+  const isHowManyTimes = HOW_MANY_TIMES_RE.test(lower) || HOW_MANY_MENTION_RE.test(lower);
   if (!isWhich && !isHowManyTimes) return null;
+  const rawVerbWord = verbMatch[1].toLowerCase();
   return {
-    verb: verbStem(verbMatch[1]), verbWord: verbMatch[1],
+    verb: verbStem(rawVerbWord), verbWord: NOUN_FORM_DISPLAY_VERB[rawVerbWord] ?? verbMatch[1],
     groupBy: isWhich ? 'customer' : null, mode: isWhich ? 'list' : 'count',
+    ...(isWhich && MORE_THAN_ONCE_RE.test(lower) ? { minPerCustomer: 2 } : {}),
   };
 }
 
@@ -288,7 +327,13 @@ export function buildProximityPattern(verb, variants, window = 100) {
   const { exact, stems } = splitStems(variants);
   const termAlts = [...exact, ...stems].sort((a, b) => b.length - a.length).map(escapeRegex).join('|');
   const v = escapeRegex(verb);
-  return `(\\y${v}\\w*[^.]{0,${window}}\\y(?:${termAlts})\\y|\\y(?:${termAlts})\\y[^.]{0,${window}}\\y${v}\\w*)`;
+  // R11 (breadth-content-029, golden tenant): a spec/nameplate line ("Compressor: Copeland
+  // ZP***") is a LABEL, never a replacement mention, even when some unrelated "replac..." word
+  // for a different part happens to fall within the window on the same label-heavy, period-free
+  // page (a spec sheet's fields are newline-, not sentence-, separated, so `[^.]` alone never
+  // bounds the window there) - excluded the same way the exam oracle's own hand-written pattern
+  // does, with a trailing negative lookahead for an immediately-following colon.
+  return `(\\y${v}\\w*[^.]{0,${window}}\\y(?:${termAlts})\\y|\\y(?:${termAlts})\\y[^.]{0,${window}}\\y${v}\\w*)(?!\\s*:)`;
 }
 
 /** The same pattern, as a JS RegExp (global, case-insensitive) — used client-side to build excerpts. */
@@ -317,9 +362,16 @@ export function parseContentCountQuestion(question, pack = null) {
   if (replaced) {
     const terms = extractKnownTerms(lower, pack);
     if (!terms.length) return null;
+    // R11 (breadth-content-029): only the new "how many JOBS/documents mention..." phrasing names its
+    // own scope explicitly - the pre-existing "which customers had X replaced"/"how many times have we
+    // replaced X" phrasings never do, and default to 'documents' exactly as before this change (so no
+    // already-passing question here changes scope).
+    const scopeMatch = HOW_MANY_SCOPE_RE.exec(lower);
+    const scope = scopeMatch ? (/^job/.test(scopeMatch[1]) ? 'jobs' : 'documents') : 'documents';
     return {
-      terms, scope: 'documents', groupBy: replaced.groupBy, mode: replaced.mode, question: q,
+      terms, scope, groupBy: replaced.groupBy, mode: replaced.mode, question: q,
       replaceVerb: replaced.verb, replaceVerbWord: replaced.verbWord,
+      ...(replaced.minPerCustomer ? { minPerCustomer: replaced.minPerCustomer } : {}),
     };
   }
 
@@ -458,12 +510,34 @@ export async function runContentCount(db, parsed, pack = null) {
   const customersById = new Map();
   for (const list of custMap.values()) for (const c of list) if (c.id && !customersById.has(c.id)) customersById.set(c.id, c);
 
+  // R11 (breadth-connect-092): "more than once" is a per-customer OCCURRENCE-COUNT floor, not a
+  // plain membership check - drop any customer whose count of matching documents falls short,
+  // BEFORE nCust is computed, so both the reported count and the listed names reflect only
+  // customers who actually clear the threshold. Only ever set for the groupBy:'customer' shape
+  // (parseReplacedQuestion never sets it otherwise), so this never touches the plain-count or
+  // mention-search paths.
+  if (parsed.minPerCustomer) {
+    const perCustomerDocCount = new Map();
+    for (const list of custMap.values()) for (const c of list) if (c.id) perCustomerDocCount.set(c.id, (perCustomerDocCount.get(c.id) ?? 0) + 1);
+    for (const id of [...customersById.keys()]) if ((perCustomerDocCount.get(id) ?? 0) < parsed.minPerCustomer) customersById.delete(id);
+  }
+
   const termsLabel = terms.length === 1 ? terms[0] : `${terms.slice(0, -1).join(', ')} or ${terms[terms.length - 1]}`;
   const noun = scope === 'jobs' ? 'job' : 'document';
   const nDocs = docIds.length;
   const nCust = customersById.size;
 
   if (replaceVerb) {
+    if (groupBy === 'customer' && parsed.minPerCustomer && nCust === 0) {
+      return attachCitations({
+        kind: 'answer',
+        text: `No customer on file has had a ${termsLabel} ${replaceVerbWord} more than once.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, {
+        records: [], total: 0, kind: 'searched',
+        basis: `Counted each customer's own documents recording a ${termsLabel} ${replaceVerbWord}; none has more than one.`,
+      });
+    }
     return buildReplacedAnswer({ termsLabel, verbWord: replaceVerbWord, groupBy, nDocs, nCust, docIds, byDoc, custMap, customersById, pack });
   }
 

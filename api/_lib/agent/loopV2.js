@@ -49,6 +49,7 @@ import { VIEW_PAGE_DOCS } from "./viewPage.js";
 import { packForTenant } from "../industry/index.js";
 import { runToolsBounded } from "./loop.js";
 import { verifyFacts, createDbSourceFetcher } from "./verify.js";
+import { verifyAnswerClaims } from "../claims/index.js";
 // Perf pass (2026-09-25, ask-latency): the same free, no-DB, no-model question-shape classifiers
 // router.js already reuses for telemetry — isEnumerationQuestion/isAgentFirstQuestion pick out the
 // "everything about X" / customer-file / enumeration shapes the prefetch step (below) targets.
@@ -450,9 +451,12 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
   // (or an answer with no sourced facts at all, filtered out above) never spends the extra model turn.
   let verifyDropped = 0;
   let verifySkipped = 0;
+  // Hoisted (not `const` inside the block below) so the claim-check pass right after it — same DB
+  // connection, same per-request cache — can reuse it instead of paying for a second fetcher/cache.
+  let fetchSourceText = null;
   if (shaped?.answered && shaped.data?.kind === "answer" && shaped.data.facts?.length) {
     emit("verify", "Cross-checking each fact against its source…");
-    const fetchSourceText = createDbSourceFetcher({ withTenant, ctxArg });
+    fetchSourceText = createDbSourceFetcher({ withTenant, ctxArg });
     const first = await verifyFacts(shaped.data, fetchSourceText);
     verifyDropped = first.droppedCount;
     verifySkipped += first.skippedCount ?? 0;
@@ -478,6 +482,27 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     }
   }
 
+  // ---- claim check (build spec item 3, R11 — api/_lib/claims/**): a finer-grained pass than the fact-
+  // level verify step above — it also catches an unsupported claim sitting in the free-form prose `text`
+  // (a sentence verifyFacts never looks at, since it only checks each fact's own `value`), and applies
+  // type-aware matching (format-normalized dates, fuzzy-but-bounded names, derived warranty/invoice
+  // status) instead of verify.js's blunter "does this token appear anywhere in the cited text" check.
+  // Reuses the SAME fetchSourceText this run already built for verifyFacts — its cache means any
+  // citation verifyFacts already fetched costs nothing further here, and its own `.prefetch` still
+  // batches whatever is new into one extra round trip. `agentWritten: true` is this file's policy
+  // choice (build spec item 3: "unsupported claims in model-written (agent) answers -> remove/rewrite").
+  let claimCheckResult = null;
+  if (shaped?.answered && shaped.data?.kind === "answer") {
+    const claimFetcher = fetchSourceText || createDbSourceFetcher({ withTenant, ctxArg });
+    try {
+      const { data, claimCheck } = await verifyAnswerClaims(shaped.data, { fetchSourceText: claimFetcher, today, agentWritten: true });
+      shaped = { ...shaped, data };
+      claimCheckResult = claimCheck;
+    } catch (err) {
+      console.error("claim check failed, keeping the answer as verifyFacts left it:", err?.message);
+    }
+  }
+
   if (shaped?.answered) shaped.data = await citeAgentData({ withTenant, ctxArg, data: shaped.data, ledger: toolbox.ledger, input: finalInput });
   await Promise.allSettled(records);
   costUsd = Math.round(costUsd * 1_000_000) / 1_000_000;
@@ -493,6 +518,9 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       // Perf pass diagnostics (build spec items 2-4) — counts only, never question/answer content.
       verify_skipped: verifySkipped, prefetch_used: prefetchUsed, memo_hits: toolbox.memoHits,
       early_exit: earlyExitReason, run_ms: Date.now() - runStartedAt,
+      // Claim-check diagnostics (R11 build spec item 3) — counts only.
+      claim_checked: claimCheckResult?.checked ?? 0, claim_unsupported: claimCheckResult?.unsupported?.length ?? 0,
+      claim_removed: (claimCheckResult?.removedSentences ?? 0) + (claimCheckResult?.removedFacts ?? 0),
     })
   );
 
@@ -508,7 +536,8 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     modelCallsMs,
     queries: toolbox.queries,
     examplesInjected: examples ? examples.split("\nQ: ").length - 1 : 0,
-    dropped: shaped ? { ...shaped.dropped, verify: verifyDropped, verifySkipped } : null,
+    dropped: shaped ? { ...shaped.dropped, verify: verifyDropped, verifySkipped, claims: (claimCheckResult?.removedSentences ?? 0) + (claimCheckResult?.removedFacts ?? 0) } : null,
+    claimCheck: claimCheckResult,
     // Perf pass diagnostics (build spec items 2-4): a prefetch that ran before the first turn, and how
     // many tool calls this run served from the per-request memo instead of re-querying.
     prefetchUsed,

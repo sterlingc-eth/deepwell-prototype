@@ -12,6 +12,7 @@ import { DonovanMissesCard } from '../components/DonovanMissesCard';
 import { DonovanLearningCard } from '../components/DonovanLearningCard';
 import { SemanticSearchCard } from '../components/SemanticSearchCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
+import { DuplicateCustomersCard } from '../components/DuplicateCustomersCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -195,6 +196,7 @@ export function TeamScreen() {
         {admin && <DonovanMissesCard />}
         {admin && <DonovanLearningCard />}
         {admin && <SemanticSearchCard />}
+        {admin && <DuplicateCustomersCard />}
         {admin && <DataExportCard />}
 
         {admin && seats.atCap && (

@@ -51,6 +51,7 @@ import { mapReduceAnswer } from "../search/mapReduce.js";
 // agent can follow typed links (customer/site/unit/document/tech) with provenance, instead of
 // chaining follow_links/timeline calls by hand for a "how does X connect to Y" question.
 import { getSubgraph } from "../graph/query.js";
+import { GRAPH_RANK_TOOL_NAME, GRAPH_RANK_TOOL_DEF, executeGraphRankTool } from "../graph/rank.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const t = (alias) => `${alias}.tenant_id = ${TENANT}`;
@@ -99,7 +100,7 @@ equipment AS (
     LEFT JOIN jsonb_to_recordset(COALESCE($1::jsonb->'e', '[]'::jsonb)) AS g(id uuid, city text, state text, zip text, warranty_status text, warranty_tier text, warranty_expires text) ON g.id = e.id
    WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND ${t("e")}
 ),
-doc_links AS (
+doc_links AS NOT MATERIALIZED (
   SELECT l.document_id, l.entity_id, e.entity_type,
          CASE e.entity_type WHEN 'customer' THEN e.id WHEN 'equipment' THEN e.customer_id END AS customer_id,
          'link'::text AS via
@@ -437,12 +438,12 @@ export const GRAPH_TRAVERSE_TOOL_NAME = "graph_traverse";
 export const GRAPH_TRAVERSE_TOOL_DEF = {
   name: GRAPH_TRAVERSE_TOOL_NAME,
   description:
-    "Walk the knowledge graph from one seed node — a customerId/equipmentId/documentId returned by another tool (given bare, e.g. the uuid itself; this tool adds the customer:/unit:/document: prefix), a technician name, or a 'site:<address key>' id from another graph_traverse result. Returns every node and typed edge (owns, located_at, has_unit, has_document, billed, has_agreement, performed_by, same_job) within a bounded number of hops, each edge citing the document and page it came from. Use this for 'how is X connected to Y', 'what else is linked to this unit/invoice/technician', or to find the PO that matches an invoice (same_job) — instead of several follow_links/timeline calls.",
+    "Walk the knowledge graph from one seed node — a customerId/equipmentId/documentId returned by another tool (given bare, e.g. the uuid itself; this tool adds the customer:/unit:/document: prefix), a technician name, a visit or warranty id, or a 'site:<address key>' id from another graph_traverse result. Returns every node and typed edge (owns, located_at, has_unit, has_document, billed, has_agreement, visited, at_site, has_warranty, performed_by, same_job) within a bounded number of hops, each edge citing the document and page it came from. A maintenance agreement has no id space of its own — it's the same document node, just labeled type 'agreement' in the results when its has_agreement edge marks it as one. Use this for 'how is X connected to Y', 'what else is linked to this unit/invoice/technician/visit', or to find the PO that matches an invoice (same_job) — instead of several follow_links/timeline calls.",
   input_schema: {
     type: "object",
     properties: {
-      node: { type: "string", description: "A bare id from another tool (a customerId/equipmentId/documentId) or an already-typed node id ('tech:mike r.', 'site:...') from a prior graph_traverse call." },
-      nodeType: { type: "string", enum: ["customer", "unit", "document", "tech", "site"], description: "Required when `node` is a bare uuid/name with no type prefix yet — customer, unit (equipment), document, tech, or site." },
+      node: { type: "string", description: "A bare id from another tool (a customerId/equipmentId/documentId) or an already-typed node id ('tech:mike r.', 'site:...', 'visit:...', 'warranty:...') from a prior graph_traverse call." },
+      nodeType: { type: "string", enum: ["customer", "unit", "document", "tech", "site", "visit", "warranty"], description: "Required when `node` is a bare uuid/name with no type prefix yet — customer, unit (equipment), document, tech, site, visit, or warranty." },
       depth: { type: "integer", description: "1-3 hops (default 2)." },
       edgeTypes: { type: "array", items: { type: "string" }, description: "Optional filter, e.g. ['same_job'] to jump straight from an invoice to its PO." },
     },
@@ -450,7 +451,7 @@ export const GRAPH_TRAVERSE_TOOL_DEF = {
   },
 };
 
-export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF, RELATIONS_TOOL_DEF, GRAPH_TRAVERSE_TOOL_DEF];
+export const TOOL_DEFS_V2 = [...TOOL_DEFS, READ_DOCUMENT_TOOL_DEF, GET_UNIT_TOOL_DEF, FOLLOW_LINKS_TOOL_DEF, TIMELINE_TOOL_DEF, COMPUTE_TOOL_DEF, GET_DOSSIER_TOOL_DEF, SYNTHESIZE_TOOL_DEF, RELATIONS_TOOL_DEF, GRAPH_TRAVERSE_TOOL_DEF, GRAPH_RANK_TOOL_DEF];
 export const ALL_TOOL_DEFS_V2 = [...TOOL_DEFS_V2, VIEW_PAGE_TOOL_DEF, ANSWER_TOOL_DEF];
 
 /* ----------------------------------------------------------------- ledger */
@@ -1174,8 +1175,8 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
   async function graphTraverseTool(input) {
     const raw = typeof input?.node === "string" ? input.node.trim() : "";
     if (!raw) return fail("node is required", "graph_traverse");
-    const typed = /^(customer|unit|document|tech|site):/.test(raw) ? raw
-      : input?.nodeType && ["customer", "unit", "document", "tech", "site"].includes(input.nodeType) ? `${input.nodeType}:${raw}`
+    const typed = /^(customer|unit|document|tech|site|visit|warranty):/.test(raw) ? raw
+      : input?.nodeType && ["customer", "unit", "document", "tech", "site", "visit", "warranty"].includes(input.nodeType) ? `${input.nodeType}:${raw}`
       : null;
     if (!typed) return fail("node must already be typed ('customer:<id>', 'tech:<name>', ...) or nodeType must be given alongside a bare id", "graph_traverse");
     const depth = Math.max(1, Math.min(3, Math.trunc(Number(input?.depth)) || 2));
@@ -1299,6 +1300,10 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
         else if (name === "filter_records") r = await filterRecords(input ?? {});
         else if (name === RELATIONS_TOOL_NAME) r = await relationsQuery(input ?? {});
         else if (name === GRAPH_TRAVERSE_TOOL_NAME) r = await graphTraverseTool(input ?? {});
+        else if (name === GRAPH_RANK_TOOL_NAME) {
+          r = await executeGraphRankTool(input ?? {}, { withTenant, ctxArg, today });
+          if (r.ok) { ledger.addShown(r.content); for (const m of r.content.match(UUID_G) ?? []) ledger.ids.add(m.toLowerCase()); }
+        }
         else if (name === READ_DOCUMENT_TOOL_NAME) r = await readDocument(input ?? {});
         else if (name === GET_UNIT_TOOL_NAME) r = await getUnit(input ?? {});
         else if (name === FOLLOW_LINKS_TOOL_NAME) r = await followLinks(input ?? {});

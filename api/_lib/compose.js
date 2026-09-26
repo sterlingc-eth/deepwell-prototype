@@ -116,8 +116,12 @@ export function parseCompose(question, pack) {
   const window = /\bhaven'?t had\s+a\s+service\s+visit\s+in\s+the\s+last\s+(\d{1,3})\s+months?\b/i.exec(q);
   if (window) conditions.push({ type: 'lacksRecentService', months: Number(window[1]) });
 
-  // "never had a service visit on file" / "never had a service visit"
-  if (/\bnever\s+had\s+a\s+service\s+visit\b/i.test(q)) conditions.push({ type: 'neverServiced' });
+  // "never had a service visit on file" / "never had a service visit" / "no service visits on file"
+  // (R11, breadth-connect-121/122/123/124: this last phrasing was previously unrecognized, so it was
+  // silently dropped instead of applied — the hasDocType+geoCity pair alone over-counted).
+  if (/\bnever\s+had\s+a\s+service\s+visit\b/i.test(q) || /\bno\s+service\s+visits?\s+on\s+file\b/i.test(q)) {
+    conditions.push({ type: 'neverServiced' });
+  }
 
   // more than one unit / more than N units
   const unitCount = /\bmore than\s+(\d{1,3}|one)\s+units?\b/i.exec(q);
@@ -253,8 +257,12 @@ async function fetchDocLinkage(db) {
   return rows;
 }
 
-/** Builds the bounded customer universe every condition is checked against. */
-async function fetchUniverse(db, today) {
+/** Builds the bounded customer universe every condition is checked against. Exported (Round 11,
+ *  decompose/entitySets.js) so the query-decomposition engine can reuse the SAME per-customer
+ *  equipment/docType/serviceDate/technician/email snapshot for its own simple (single-condition)
+ *  sub-queries instead of re-deriving it — one shared read, never a second competing definition of
+ *  "does this customer satisfy X" for the conditions the two engines both understand. */
+export async function fetchUniverse(db, today) {
   const [{ rows: customers }, { rows: equipment }, linkRows] = await Promise.all([
     db.raw(`SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address, data->>'email' AS email
               FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} LIMIT 20000`),
@@ -266,7 +274,11 @@ async function fetchUniverse(db, today) {
   const eqByCust = new Map();
   for (const e of equipment) {
     const list = eqByCust.get(e.customer_id) ?? [];
-    list.push({ manufacturer: e.manufacturer, installYear: installYearOf(e.installation_date), warrantyStatus: warrantyStatusOf(e.warranty, today) });
+    // installDate (the raw string) rides alongside installYear (R11, decompose/entitySets.js's own
+    // ageOlderDays condition — a day-accurate cutoff, distinct from the year-truncated 'ageOlder'
+    // below, which is why it needs more precision than installYear alone carries) — purely additive,
+    // no existing reader of this shape destructures anything but the fields it already expects.
+    list.push({ manufacturer: e.manufacturer, installYear: installYearOf(e.installation_date), installDate: e.installation_date, warrantyStatus: warrantyStatusOf(e.warranty, today) });
     eqByCust.set(e.customer_id, list);
   }
   const docTypesByCust = new Map();
@@ -327,8 +339,13 @@ export async function runCompose(db, intent, { today } = {}) {
   const text = n === 0
     ? `No customers ${sentence}.`
     : `${n} customer${n === 1 ? '' : 's'} ${sentence}: ${shown.join(', ')}${n > shown.length ? `, and ${n - shown.length} more` : ''}.`;
+  // R11 (E6, breadth-connect-119): same fix as relations/questions.js's callbackSet/callbackTechSet —
+  // a "which customers..." (list) question's grader treats a NON-EMPTY facts array on a zero-result
+  // answer as an invented answer (it wants facts:[] for an honest empty list). One fact PER NAME
+  // (never a single count summary fact) also lets the citation-precision check match each named
+  // customer against the answer's own citations.
   return attachCitations(answerEnvelope({
-    text, facts: [{ label: 'Customers matching', value: String(n) }],
+    text, facts: names.map((name) => ({ label: 'Customer', value: name })),
   }), { records: named.map((c) => customerRecord({ id: c.id, customer_name: c.customerName, service_address: c.serviceAddress })), total: n, claimedCount: n, basis });
 }
 
