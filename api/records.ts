@@ -18,10 +18,89 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth, denyAuth } from './_lib/auth.js';
 import { withTenant } from './_lib/recordsStore.js';
+import { PLAN_LIMITS, planStateFor } from './_lib/plan.js';
+import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
 };
+
+const BOOTSTRAP_RECORDS_LIMIT = 20;
+const BOOTSTRAP_NOTIFICATIONS_LIMIT = 10;
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+const TENANT_PRED = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+
+/**
+ * Startup performance (see handoffs/STARTUP_PERF_R13.md): everything the app
+ * shell needs to show a real (non-skeleton) header + Ask screen + nav badges
+ * in ONE round trip instead of the five staggered ones (billing, records x2,
+ * review, document-status, account) the browser used to fire in sequence.
+ * Runs inside the SAME withTenant transaction/connection as every other
+ * action — the reads below are independent of each other (none depends on
+ * another's result), so they run concurrently via Promise.all rather than
+ * one-at-a-time, while still only ever holding open the one connection
+ * `withTenant` already checked out for this request.
+ *
+ * Deliberately skips anything expensive, or that nothing on the client
+ * actually consumes yet:
+ *   - billing's aiCostEstimateUsd (a second, separate pool connection in
+ *     billing.js's handleStatus) — BillingScreen fetches full status itself.
+ *   - Records Browse's facets/financials joins — this returns plain
+ *     `documents.*` rows (same shape usePostgresSync's DocumentRow already
+ *     expects), enough to paint a first page while the fuller sync (with
+ *     extractions/links/corrections) fills in behind it.
+ *   - a documents-by-stage summary (reviewer NO-GO 2026-09-26): an earlier
+ *     version of this endpoint computed one and returned it as
+ *     `documentStatus`, but nothing on the client reads that field — dead
+ *     work on every single bootstrap call. Add it back, consumed, the day
+ *     a header pill or similar actually wants it.
+ * A failure in any ONE of the reads must not take down the others — see the
+ * `.catch` on each below — so this degrades exactly like the old
+ * per-endpoint calls did when one of them failed.
+ */
+async function runBootstrap(db: any, auth: any, payload: any): Promise<any> {
+  const recordsLimit = Math.min(Math.max(Number(payload?.recordsLimit) || BOOTSTRAP_RECORDS_LIMIT, 1), 100);
+  const monthStartIso = new Date(Date.now() - MONTH_MS).toISOString();
+
+  const [tenantRow, documentsStored, pagesThisMonth, asksThisMonth, recordsRows, notifRows] = await Promise.all([
+    db.raw(
+      `SELECT plan, billing_status, trial_ends_at, current_period_end, cancel_at_period_end, limits
+         FROM tenants WHERE id = $1`,
+      [db.tenantId]
+    ).then((r: any) => r.rows[0] ?? null).catch(() => null),
+    db.countDocuments().catch(() => 0),
+    db.countPagesSince(monthStartIso).catch(() => 0),
+    getAsksThisMonth(db).catch(() => 0),
+    db.raw(`SELECT * FROM documents WHERE ${TENANT_PRED} ORDER BY created_at DESC LIMIT $1`, [recordsLimit])
+      .then((r: any) => r.rows).catch(() => []),
+    db.raw(
+      `WITH items AS (
+         SELECT id, kind, title, body, link, created_at, read_at FROM notifications
+          ORDER BY (read_at IS NULL) DESC, created_at DESC LIMIT $1
+       ), unread AS (SELECT COUNT(*) AS n FROM notifications WHERE read_at IS NULL)
+       SELECT (SELECT COALESCE(json_agg(i ORDER BY (i.read_at IS NULL) DESC, i.created_at DESC), '[]'::json) FROM items i) AS items,
+              (SELECT n FROM unread) AS unread_count`,
+      [BOOTSTRAP_NOTIFICATIONS_LIMIT]
+    ).then((r: any) => r.rows[0] ?? { items: [], unread_count: 0 }).catch(() => ({ items: [], unread_count: 0 })),
+  ]);
+
+  return {
+    billing: {
+      plan: tenantRow?.plan ?? null,
+      status: planStateFor(tenantRow ?? {}),
+      trialEndsAt: tenantRow?.trial_ends_at ?? null,
+      currentPeriodEnd: tenantRow?.current_period_end ?? null,
+      cancelAtPeriodEnd: !!tenantRow?.cancel_at_period_end,
+      limits: {
+        ...(tenantRow?.limits ?? (PLAN_LIMITS as any)[tenantRow?.plan] ?? {}),
+        asksPerMonth: (PLAN_LIMITS as any)[tenantRow?.plan]?.asksPerMonth ?? null,
+      },
+      usage: { documentsStored, pagesThisMonth, asksThisMonth, resetsOn: resetsOnIso() },
+    },
+    notifications: { items: notifRows.items ?? [], unreadCount: Number(notifRows.unread_count) || 0 },
+    records: { rows: recordsRows, total: documentsStored },
+  };
+}
 
 export default async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== 'POST') {
@@ -106,6 +185,11 @@ export default async (req: VercelRequest, res: VercelResponse) => {
           case 'getSchemaVersion': return { version: await db.getSchemaVersion() };
           case 'incrementSchemaVersion':
             return { version: await db.incrementSchemaVersion(payload.description, payload.changeKind) };
+
+          // ---- bootstrap (perf: one round trip / one tenant transaction for
+          // everything the app shell needs before it can show anything real —
+          // see handoffs/STARTUP_PERF_R13.md) ----
+          case 'bootstrap': return await runBootstrap(db, auth, payload);
 
           default:
             return { __unknownAction: true };

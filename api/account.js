@@ -11,6 +11,8 @@ import financials from "./_lib/routes/financials.js";
 import graph from "./_lib/routes/graph.js";
 import entityMerge from "./_lib/routes/entity-merge.js";
 import naming from "./_lib/routes/naming.js";
+import intake from "./_lib/routes/intake-resolve.js";
+import grid from "./_lib/grid/route.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -28,6 +30,9 @@ import naming from "./_lib/routes/naming.js";
  *   POST entity-merge         -> ?action=entity-merge (duplicate-customer clusters: list/accept/reject/undo; admin)
  *   POST naming               -> ?action=naming   (document display names: status/backfill/assign
  *                                                   admin, rename any member — round 12)
+ *   POST intake               -> ?action=intake   (clean exception queue: resolve/dismiss/snooze
+ *                                                   one open question — any member — round 13)
+ *   POST grid                 -> ?action=grid     (Grid view: documentCells/units — round 13)
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
@@ -39,7 +44,7 @@ import naming from "./_lib/routes/naming.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

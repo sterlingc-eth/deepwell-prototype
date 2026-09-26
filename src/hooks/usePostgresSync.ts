@@ -54,7 +54,7 @@ const IDLE: PostgresSyncState = { status: 'idle', error: null, isEmpty: false, r
  * column comes back as an ISO string over JSON despite what that type
  * claims; `toDateOrNull` below is what actually parses them.
  */
-interface DocumentRow {
+export interface DocumentRow {
   id: string;
   batch_id?: string | null;
   original_filename: string;
@@ -407,6 +407,61 @@ function addAmbiguousNameLinkIssues(docs: Doc[], entityRows: ApiEntity[], linksB
  *   token regardless of what is sent here.
  * @returns whether the tenant genuinely has nothing ingested yet.
  */
+/**
+ * Startup performance (handoffs/STARTUP_PERF_R13.md): true once
+ * `loadGraphFromServer`'s full pass (extractions/links/corrections/
+ * completeness, everything the rest of the app needs) has completed at least
+ * once for this page load — `seedDocsPartial` below checks this so a slow
+ * bootstrap response arriving AFTER the full sync already ran can never
+ * clobber the fuller data with the partial page it fetched in one round trip.
+ */
+let fullSyncCompleted = false;
+
+/**
+ * Cross-tenant isolation (reviewer NO-GO, 2026-09-26): wipes the graph store
+ * and every module-level "have we already loaded for this tenant" flag.
+ * Startup performance made this necessary — the Ask screen now renders
+ * (and reads `useGraph`) before the full sync finishes, so a same-tab
+ * tenant switch (Clerk's OrganizationSwitcher, no page reload — the one
+ * case `tenantKey` changes without the whole app remounting) has a real
+ * window where the PREVIOUS tenant's customers/serials/documents would
+ * otherwise still be sitting in the store. `usePostgresSync` calls this
+ * synchronously, in the same effect tick that detects the tenantKey change
+ * and BEFORE it starts that tenant's own fetch — never on an ordinary
+ * same-tenant `refresh()` (DataHealthStrip's "Re-check all documents"),
+ * which calls `run` directly and must keep showing the old data until the
+ * new seed lands, not flash empty for no reason.
+ * Exported for scripts/verify-tenant-isolation.mjs.
+ */
+export function resetGraphForTenantSwitch(): void {
+  fullSyncCompleted = false;
+  linkSweepRanForTenant = null;
+  useGraph.setState({ entities: {}, docs: {}, batches: {}, conflicts: {} });
+}
+
+/**
+ * Fast partial paint (handoffs/STARTUP_PERF_R13.md): seeds the graph with a
+ * first page of `documents` rows straight from POST /api/records
+ * action=bootstrap — no extractions/links/corrections/completeness (that's
+ * still four more round trips, see `loadGraphFromServer` below) — so a
+ * screen that reads `useGraph` has *something* real to paint before the
+ * fuller sync finishes, instead of an empty state. `toDoc` is reused as-is
+ * with empty extraction/link/correction lists; every field that depends on
+ * them (facts, links, completeness) is simply absent until the full sync's
+ * own `seed()` call replaces this wholesale, same as any other reseed.
+ * No-ops once `fullSyncCompleted` is true, and best-effort — a malformed
+ * response here must never crash the app that's trying to load fast.
+ */
+export function seedDocsPartial(rows: DocumentRow[]): void {
+  if (fullSyncCompleted || !rows || !rows.length) return;
+  try {
+    const docs = rows.map((r) => toDoc(r, [], [], []));
+    useGraph.getState().seed(hvacSchema, [], docs, buildBatches(docs), []);
+  } catch {
+    /* best-effort fast paint only — loadGraphFromServer is authoritative */
+  }
+}
+
 export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: boolean }> {
   await recordsStore.connect(tenantKey);
   const [docRows, entityRows] = await Promise.all([
@@ -485,6 +540,7 @@ export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: bo
   const entities = entityRows.map(toEntity);
   addAmbiguousNameLinkIssues(docs, entityRows, linksByDoc);
   useGraph.getState().seed(hvacSchema, entities, docs, buildBatches(docs), []);
+  fullSyncCompleted = true;
 
   return { isEmpty: docs.length === 0 && entities.length === 0 };
 }
@@ -541,12 +597,20 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null, opts
   const linkSweep = opts.linkSweep !== false;
   const [state, setState] = useState<PostgresSyncState>(IDLE);
   const requestId = useRef(0);
+  // Cross-tenant isolation: the last tenantKey this hook actually started a
+  // load for — see resetGraphForTenantSwitch's doc comment above.
+  const lastTenantKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       setState(IDLE);
       return;
     }
+
+    if (lastTenantKeyRef.current !== null && lastTenantKeyRef.current !== tenantKey) {
+      resetGraphForTenantSwitch();
+    }
+    lastTenantKeyRef.current = tenantKey;
 
     const id = ++requestId.current;
     let cancelled = false;

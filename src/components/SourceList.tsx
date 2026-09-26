@@ -2,6 +2,7 @@ import { FileText, Image as ImageIcon, Table2, FileType2 } from 'lucide-react';
 import type { Doc, SourceRef } from '../core/types';
 import { useGraph } from '../core/entityGraph';
 import { StagePill } from './StagePill';
+import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 
 const FILE_ICON: Record<Doc['fileType'], typeof FileText> = {
   pdf: FileText,
@@ -32,7 +33,6 @@ interface SourceListProps {
  */
 export function SourceList({ sources, onOpen, title = 'Sources', emptyText = 'No documents cited.' }: SourceListProps) {
   const docs = useGraph((s) => s.docs);
-  const schema = useGraph((s) => s.schema);
 
   // Group refs by document, keep citation order
   const grouped = new Map<string, SourceRef[]>();
@@ -55,7 +55,6 @@ export function SourceList({ sources, onOpen, title = 'Sources', emptyText = 'No
             const doc = docs[docId];
             if (!doc) return null;
             const Icon = FILE_ICON[doc.fileType];
-            const typeLabel = schema.documentTypes.find((t) => t.id === doc.typeId)?.label ?? 'Document';
             const first = refs[0];
             return (
               <li key={docId}>
@@ -71,11 +70,13 @@ export function SourceList({ sources, onOpen, title = 'Sources', emptyText = 'No
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-medium text-ink truncate">
                         <span className="text-ink-3 font-mono text-data mr-1.5">[{i + 1}]</span>
-                        {typeLabel}
+                        {documentName(doc)}
                       </span>
                       <StagePill stage={doc.stage} />
                     </span>
-                    <span className="block text-body text-ink-3 truncate font-mono">{doc.filename}</span>
+                    {hasFriendlyName(doc) && (
+                      <span className="block text-body text-ink-3 truncate font-mono">{originalFilename(doc)}</span>
+                    )}
                     <span className="block text-body text-ink-2 mt-1">
                       {refs
                         .map((r) => locationLabel(r.location))

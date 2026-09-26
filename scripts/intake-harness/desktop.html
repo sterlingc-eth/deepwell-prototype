@@ -1,0 +1,20 @@
+<!doctype html>
+<!--
+  Dev-only harness for scripts/verify-intake-ui.mjs: mounts IntakeQueuePanel
+  alone (no Clerk, no AppShell) against a mocked GET /api/v1/intake-status
+  and POST /api/account?action=intake, so Playwright can render it via the
+  project's own `vite` dev server (real Tailwind pipeline) without a
+  signed-in session. Not part of any production build entry, so it never
+  ships. See scripts/records-harness/ for the same pattern.
+-->
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IntakeQueuePanel harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

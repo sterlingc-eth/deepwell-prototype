@@ -12,8 +12,8 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { answerLayout, claimCheckNote, claimCheckOf, followupChips, shareText } from '../src/core/answerLayout';
-import { FIXTURES, LAYOUT_ORDER } from './answer-harness/fixtures';
+import { answerLayout, claimCheckNote, claimCheckOf, followupChips, isModelWritten, numberCitations, sentencesOf, shareText } from '../src/core/answerLayout';
+import { CITATION_FIXTURE, FIXTURES, LAYOUT_ORDER } from './answer-harness/fixtures';
 
 const SHOT_DIR = process.argv[2] ?? '/tmp/claude-0/-home-claude/c8b456ad-32a9-5305-923e-589d73c65629/scratchpad';
 mkdirSync(SHOT_DIR, { recursive: true });
@@ -92,6 +92,23 @@ check('claimCheckNote: null when there is nothing to check', claimCheckNote({ ..
   eq('claimCheckNote: counts the answer\'s own distinct source documents', claimCheckNote(withClaims), 'Checked against 2 documents');
 }
 
+// R13H1 — sentencesOf / isModelWritten / numberCitations (src/core/answerLayout.ts's defensive readers
+// for api/_lib/citations/sentences.js's additive `sentences`/`claimCheck` fields).
+check('sentencesOf: undefined on a plain mock Answer (no server field)', sentencesOf(FIXTURES.money) === undefined, '');
+check('sentencesOf: reads a well-formed sentences array', sentencesOf(CITATION_FIXTURE)?.length === 3, '');
+check('sentencesOf: rejects a malformed shape (no throw)', sentencesOf({ sentences: [{ text: 1 }] }) === undefined, '');
+check('isModelWritten: true for an agent-policy claimCheck', isModelWritten(CITATION_FIXTURE) === true, '');
+check('isModelWritten: false with no claimCheck at all', isModelWritten(FIXTURES.money) === false, '');
+check('isModelWritten: false for a deterministic-policy claimCheck', isModelWritten({ claimCheck: { policy: 'deterministic' } }) === false, '');
+{
+  const sentences = sentencesOf(CITATION_FIXTURE) ?? [];
+  const { numbered, order } = numberCitations(sentences);
+  check('numberCitations: numbers by unique source in first-appearance order', order.length === 2 && order[0] === 'warr1' && order[1] === 'inv1', JSON.stringify(order));
+  check('numberCitations: the warranty sentence carries marker [1]', numbered[0]?.citations[0]?.n === 1, JSON.stringify(numbered[0]));
+  check('numberCitations: the invoice sentence carries marker [2] (not a fresh [1])', numbered[1]?.citations[0]?.n === 2, JSON.stringify(numbered[1]));
+  check('numberCitations: the unsupported sentence keeps its flag with zero citations', numbered[2]?.supported === false && numbered[2]?.citations.length === 0, JSON.stringify(numbered[2]));
+}
+
 // followupChips — deterministic, never repeats the question or an on-screen fact label.
 {
   const chips = followupChips(FIXTURES.status, 'Is the furnace under warranty?');
@@ -123,8 +140,12 @@ console.log(`\nUnit tests: ${passes} passed, ${failures} failed so far.\n`);
  * Part 2 — Playwright harness: render every layout, both components, both widths, both themes.    *
  * ============================================================================================== */
 
-const PORT = 5184;
-const url = (view) => `http://localhost:${PORT}/scripts/answer-harness/index.html?view=${view}`;
+// R13H1/R13H2: multiple engineers' worktrees run this harness concurrently on the same machine — ANY
+// fixed port can already be bound by another worktree's server. `--strictPort` on a fixed port either
+// fails loudly (good) or, worse, silently serves THIS test the OTHER worktree's stale build. `--port 0`
+// asks vite for whatever port the OS has free right now and the real one is read back out of its own
+// "Local: http://localhost:NNNNN/" startup line — no guessing, no collision, ever.
+let url = () => { throw new Error('url() called before the dev server reported its port'); };
 
 function relLuminance({ r, g, b }) {
   const [R, G, B] = [r, g, b].map((c) => {
@@ -175,8 +196,33 @@ async function contrastChecks(page, selector) {
 
 let server;
 try {
-  server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
-  await new Promise((r) => setTimeout(r, 1800));
+  // R13H1/R13H2: `--port 0` lets the OS hand vite whatever port is free RIGHT NOW — no fixed number to
+  // collide with another worktree's already-running harness server (a fixed `--strictPort` either fails
+  // loudly when taken, or, worse, quietly serves this test the OTHER worktree's stale build — both
+  // observed in practice on this shared machine). The real port is read back out of vite's own
+  // "Local: http://localhost:NNNNN/" startup line.
+  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  let port = null;
+  server.stdout.on('data', (d) => { out += String(d); });
+  server.stderr.on('data', (d) => { out += String(d); });
+  const ready = await Promise.race([
+    new Promise((resolve) => {
+      const check = () => {
+        const m = /https?:\/\/(?:localhost|127\.0\.0\.1):(\d+)\//.exec(out);
+        if (m) { port = Number(m[1]); resolve(true); }
+      };
+      server.stdout.on('data', check);
+      check();
+    }),
+    new Promise((resolve) => server.once('exit', () => resolve(false))),
+    new Promise((resolve) => setTimeout(() => resolve(false), 8000)),
+  ]);
+  if (!ready || !port) {
+    throw new Error(`vite dev server did not report a listening port within 8s:\n${out}`);
+  }
+  url = (view) => `http://localhost:${port}/scripts/answer-harness/index.html?view=${view}`;
+  await new Promise((r) => setTimeout(r, 400));
 
   const browser = await chromium.launch();
   const shot = (page, name) => page.screenshot({ path: `${SHOT_DIR}/answer-${name}.png`, fullPage: true });
@@ -244,6 +290,66 @@ try {
         await chip.click();
         const opens = await page.evaluate(() => window.__dwOpens ?? []);
         check(`${label}: a follow-up chip fires onAsk`, opens.some((o) => o.startsWith('ask:')), opens.join(', '));
+      }
+    }
+
+    /* ========================================================================================== *
+     * R13H1 — sentence-level citations: markers, the compact Sources strip, the "not found" mark, *
+     * and the popover's open/close/focus/keyboard behavior.                                       *
+     * ========================================================================================== */
+    {
+      const citTestId = view === 'mobile' ? 'm-fixture-citations' : 'fixture-citations';
+      const citSection = page.locator(`[data-testid="${citTestId}"]`);
+      if (await citSection.count()) {
+        const markers = citSection.getByRole('button', { name: /^Source \d/ });
+        const markerCount = await markers.count();
+        check(`${label}: citation markers ([1][2] superscripts) rendered`, markerCount >= 2, `found ${markerCount}`);
+        check(
+          `${label}: the unsupported sentence is subtly marked (model-written answer only)`,
+          (await citSection.getByText(/not found in your records/i).count()) > 0
+        );
+        check(`${label}: the compact Sources strip is rendered`, (await citSection.locator('[data-testid="citation-source-strip"]').count()) > 0);
+
+        await citSection.screenshot({ path: `${SHOT_DIR}/citations-${label}-${view}-closed.png` });
+
+        await markers.first().click();
+        await page.waitForTimeout(150);
+        const popover = page.locator('[role="dialog"][aria-label^="Citation:"]');
+        check(`${label}: tapping a marker opens its citation popover`, (await popover.count()) > 0);
+
+        if (await popover.count()) {
+          const quoteEl = popover.locator('blockquote');
+          check(`${label}: popover shows a quoted passage`, (await quoteEl.count()) > 0 && ((await quoteEl.textContent())?.length ?? 0) > 0);
+          const openDocBtn = popover.getByRole('button', { name: 'Open document' });
+          const openDocBox = await openDocBtn.boundingBox();
+          check(`${label}: popover's "Open document" control is >=44px`, Boolean(openDocBox && openDocBox.width >= 44 && openDocBox.height >= 44));
+          const closeBtn = popover.getByRole('button', { name: 'Close' });
+          const closeBox = await closeBtn.boundingBox();
+          check(`${label}: popover's Close control is >=44px`, Boolean(closeBox && closeBox.width >= 44 && closeBox.height >= 44));
+
+          await page.screenshot({ path: `${SHOT_DIR}/citations-${label}-${view}-popover.png` });
+
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(150);
+          check(`${label}: Escape closes the popover`, (await popover.count()) === 0);
+          const focusReturnedToMarker = await page.evaluate(
+            () => document.activeElement?.getAttribute('aria-label')?.startsWith('Source ') ?? false
+          );
+          check(`${label}: closing returns focus to the marker that opened it`, focusReturnedToMarker);
+        }
+
+        const citOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+        check(`${label}: citations fixture causes no horizontal overflow`, !citOverflow);
+
+        const citContrastRuns = await contrastChecks(page, `[data-testid="${citTestId}"] .text-accent-ink, [data-testid="${citTestId}"] .italic`);
+        let citContrastFail = 0;
+        for (const r of citContrastRuns) {
+          if (!r.fg) continue;
+          const ratio = contrastRatio(r.fg, r.bg);
+          const isLarge = r.fontSize >= 24 || (r.fontSize >= 18.66 && r.fontWeight >= 700);
+          if (ratio < (isLarge ? 3 : 4.5)) citContrastFail++;
+        }
+        check(`${label}: citation markers/"not found" text pass AA contrast`, citContrastRuns.length > 0 && citContrastFail === 0, `${citContrastFail} of ${citContrastRuns.length} failed`);
       }
     }
 

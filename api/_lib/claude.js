@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHash } from "crypto";
 import { captureException } from "./telemetry.js";
 
 // --- Load .env.local manually (no dotenv dependency needed) ---
@@ -237,6 +238,40 @@ export function handleCors(res, req) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   return res;
+}
+
+/**
+ * Startup performance (handoffs/STARTUP_PERF_R13.md): a handful of GETs this
+ * app polls repeatedly (billing status every reload + Stripe-return poll,
+ * notifications every 5 minutes) are per-tenant reads that don't change on
+ * every request — a short PRIVATE cache (never shared/CDN — this is
+ * per-tenant data behind a bearer token) plus an ETag lets an unchanged poll
+ * come back as a 304 with no body, instead of re-shipping the same JSON.
+ * `maxAgeSeconds` should stay short (seconds, not minutes) — this is a
+ * courtesy for a browser re-fetching its own last response seconds later, not
+ * a substitute for real invalidation (there is none here: a write elsewhere,
+ * e.g. the billing webhook, does not bust this).
+ */
+export function sendPrivateCacheableJson(res, req, body, maxAgeSeconds = 15) {
+  const json = JSON.stringify(body);
+  const etag = 'W/"' + createHash("sha1").update(json).digest("hex") + '"';
+  res.setHeader("Cache-Control", `private, max-age=${maxAgeSeconds}, must-revalidate`);
+  res.setHeader("ETag", etag);
+  // Reviewer NO-GO (2026-09-26): the response varies on the caller's
+  // identity (the tenant/org is derived from this bearer token — see
+  // auth.js's requireAuth), so a cache sitting in front of this response
+  // (a shared proxy, or the browser's own HTTP cache keyed loosely) must
+  // never reuse one caller's cached body for a request carrying a
+  // different token. There is no separate org/tenant header today — the
+  // JWT itself is the only thing that varies the answer — but if one is
+  // ever added (a header the client sends alongside Authorization to pick
+  // an active org), it MUST be added to this Vary list too.
+  res.setHeader("Vary", "Authorization");
+  if (req?.headers?.["if-none-match"] === etag) {
+    return res.status(304).end();
+  }
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  return res.status(200).send(json);
 }
 
 export function handleError(res, error, req, extra = {}) {

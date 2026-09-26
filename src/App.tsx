@@ -3,16 +3,34 @@ import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { authHeader, setAuthTokenProvider } from './services/authToken';
 import { fetchDocumentStatus, isProcessingTerminal, pollDocumentStatusChunked } from './services/ingestClient';
-import { billingClient } from './services/billingClient';
 import { useAppStore } from './store/appStore';
 import { DEFAULT_CUSTOMER_FILTERS } from './core/customerFilters';
+import { billingClient } from './services/billingClient';
 import { usePostgresSync } from './hooks/usePostgresSync';
+import { useBootstrap } from './hooks/useBootstrap';
 import { useDeepLink, clearPersistedDeepLinkSearch } from './hooks/useDeepLink';
-import { AskScreen, BillingScreen, BrowseScreen, CustomerProfileScreen, DashboardScreen, EntityScreen, InboxScreen, LoginScreen, TeamScreen } from './screens';
+import { ScreenLoadBoundary } from './components/ScreenLoadBoundary';
+// Startup performance (handoffs/STARTUP_PERF_R13.md): AskScreen is the ONE
+// screen that must be interactive the instant Clerk resolves — imported
+// eagerly, statically, so there is no extra chunk fetch between "signed in"
+// and "can type a question". Login is the same story for a signed-out
+// visitor. Every OTHER screen is reached by navigating away from Ask first,
+// so it's lazy: this is what actually keeps GridView/BrowseScreen's records
+// grid and the knowledge-graph screens out of the bundle that has to load
+// before first paint (they used to all be one static import in this file).
+import { AskScreen } from './screens/AskScreen';
+import { LoginScreen } from './screens/LoginScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { isAdminRole } from './services/teamClient';
 import './index.css';
 
+const BillingScreen = lazy(() => import('./screens/BillingScreen').then((m) => ({ default: m.BillingScreen })));
+const BrowseScreen = lazy(() => import('./screens/BrowseScreen').then((m) => ({ default: m.BrowseScreen })));
+const CustomerProfileScreen = lazy(() => import('./screens/CustomerProfileScreen').then((m) => ({ default: m.CustomerProfileScreen })));
+const DashboardScreen = lazy(() => import('./screens/DashboardScreen').then((m) => ({ default: m.DashboardScreen })));
+const EntityScreen = lazy(() => import('./screens/EntityScreen').then((m) => ({ default: m.EntityScreen })));
+const InboxScreen = lazy(() => import('./screens/InboxScreen').then((m) => ({ default: m.InboxScreen })));
+const TeamScreen = lazy(() => import('./screens/TeamScreen').then((m) => ({ default: m.TeamScreen })));
 // The claim-packet export pulls in jspdf + html2canvas (~60 KB gzipped); only load it when opened.
 const WarrantyExportScreen = lazy(() => import('./screens/WarrantyExportScreen').then((m) => ({ default: m.WarrantyExportScreen })));
 // Reached from the Dashboard or a deep link only (not primary nav) — lazy same as WarrantyExportScreen.
@@ -166,34 +184,22 @@ function App() {
   // display, and — HARD GATE (owner decision, 2026-09-21) — whether this
   // tenant gets the app at all: a tenant whose status is 'none' or
   // 'canceled' sees only Billing until they pick a plan (see the render
-  // guards below). Fetched once here (not per-screen). `billingStatusLoaded`
-  // flips true whether the fetch succeeds or fails so a broken endpoint
-  // can't hang the app on the blank/busy screen forever — a failed fetch
-  // just means `billingStatus` stays null, which the gate below treats as
-  // "not gated" (fails open, same best-effort spirit as the banner always
-  // had).
+  // guards below).
+  //
+  // Startup performance (handoffs/STARTUP_PERF_R13.md): this used to be its own
+  // effect blocking the whole app behind a blank screen until the fetch
+  // settled (`billingStatusLoaded`). `useBootstrap` now fetches it (bundled
+  // into the one bootstrap round trip, with a sessionStorage-cached
+  // last-known value seeded immediately) and the gate below simply fails
+  // OPEN whenever `billingStatus` is still null — never fetched, the fetch
+  // failed, or it just hasn't resolved yet — same best-effort spirit the
+  // banner always had, except the app is never held on a blank screen
+  // waiting to find out: it renders now and gates itself the moment a
+  // status (cached or fresh) actually says none/canceled.
   const billingStatus = useAppStore((s) => s.billingStatus);
   const setBillingStatus = useAppStore((s) => s.setBillingStatus);
   const setBillingConfirming = useAppStore((s) => s.setBillingConfirming);
-  const [billingStatusLoaded, setBillingStatusLoaded] = useState(false);
-  useEffect(() => {
-    if (DEMO_MODE || !isSignedIn || !orgId) return;
-    let cancelled = false;
-    void billingClient
-      .status()
-      .then((status) => {
-        if (!cancelled) setBillingStatus(status);
-      })
-      .catch(() => {
-        /* best effort — see comment above */
-      })
-      .finally(() => {
-        if (!cancelled) setBillingStatusLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isSignedIn, orgId, setBillingStatus]);
+  useBootstrap(!DEMO_MODE && isLoaded && isSignedIn, orgId, userId);
 
   // Reviewer NO-GO (2026-09-21), belt-and-suspenders alongside useDeepLink's
   // TTL and its own ready-gated clear: once billing status itself confirms
@@ -330,31 +336,30 @@ function App() {
     return <OnboardingScreen />;
   }
 
-  // HARD GATE (owner decision, 2026-09-21): don't decide "full app or
-  // paywall" until billing status has actually loaded once — same blank/busy
-  // treatment as the auth guard above, so a never-subscribed tenant never
-  // sees the real app flash before the gate below yanks it away.
-  if (!DEMO_MODE && !billingStatusLoaded) {
-    return <div className="min-h-screen bg-bg" aria-busy="true" />;
-  }
-
   // A tenant with no active subscription — never subscribed ('none') or a
   // canceled one — gets ONLY Billing (plus Team/Sign out in AppShell's nav)
   // until they pick a plan. No free preview any more; api/_lib/plan.js's
   // FREE_PREVIEW_DOCUMENTS enforces the same rule server-side on upload/ask
   // so this is UI convenience, not the actual security boundary.
-  // `billingStatus` staying null (never fetched, or the fetch failed) fails
-  // OPEN — consistent with the banner's existing best-effort handling above.
+  //
+  // Startup performance (handoffs/STARTUP_PERF_R13.md): `billingStatus` staying
+  // null — never fetched yet, cache empty, or the fetch failed — fails OPEN,
+  // same as it always did; the difference is there is no blank screen
+  // waiting to find out any more (see useBootstrap.ts). The gate flips on
+  // the instant a status — cached-from-last-visit or freshly fetched —
+  // actually says none/canceled, whether or not that took a full render.
   const billingGateActive = !DEMO_MODE && !!billingStatus && (billingStatus.status === 'none' || billingStatus.status === 'canceled');
 
-  // Block on real data the same way we already block on auth: a screen
-  // rendered mid-fetch would show zero documents for a beat and look exactly
-  // like a fake "empty tenant", which is the one thing this bridge must never
-  // do. Demo mode skips this — `sync` never leaves 'idle' there, and the
-  // fixture bootstrap in main.tsx already ran synchronously before render.
-  // Skipped while the billing gate is active — a gated tenant never sees
-  // synced document data, so there's nothing worth waiting on here.
-  if (!billingGateActive && !DEMO_MODE && (sync.status === 'idle' || sync.status === 'loading')) {
+  // Startup performance (handoffs/STARTUP_PERF_R13.md): the Ask screen (the
+  // app's default landing screen) renders immediately once signed in — it
+  // doesn't need the full records sync, since answering a question is a
+  // server round trip against Postgres, not a read of this browser's local
+  // graph; AskScreen's own empty-state handles `entities`/`docs` still being
+  // empty. Every OTHER screen genuinely needs the synced graph (customers,
+  // equipment, extracted facts) to mean anything, so those still wait here —
+  // same blank/busy treatment as before, just scoped to when it's actually
+  // needed instead of blocking every screen including Ask.
+  if (!billingGateActive && !DEMO_MODE && currentScreen !== 'ask' && (sync.status === 'idle' || sync.status === 'loading')) {
     return <div className="min-h-screen bg-bg" aria-busy="true" />;
   }
 
@@ -443,7 +448,9 @@ function App() {
           </p>
         </div>
       )}
-      {screen}
+      <ScreenLoadBoundary>
+        <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>{screen}</Suspense>
+      </ScreenLoadBoundary>
     </>
   );
 }

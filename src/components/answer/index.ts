@@ -11,3 +11,6 @@ export { StatusHero } from './StatusHero';
 export { SingleFactHero } from './SingleFactHero';
 export { TimelineList } from './TimelineList';
 export { NotOnFileBadge } from './NotOnFileBadge';
+export { CitationPopover } from './CitationPopover';
+export { CitationMarkers } from './CitationMarkers';
+export { CitationSourceStrip } from './CitationSourceStrip';

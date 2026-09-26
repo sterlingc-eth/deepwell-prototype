@@ -39,7 +39,7 @@
  * rollup refresh. All best-effort: nothing here may ever fail ingest.
  */
 import { withTenant, findCustomerNameCandidates, normalizeMatchText } from "../recordsStore.js";
-import { completenessFor, fieldLabel, documentTypeLabel, AI_VERIFY_MIN_CONFIDENCE } from "../documentTypes.js";
+import { completenessFor, fieldLabel, documentTypeLabel, AI_VERIFY_MIN_CONFIDENCE, toCompletenessFields } from "../documentTypes.js";
 import { refreshGraphForDocument } from "../graph/build.js";
 import { refreshAllRollups } from "../rollups/refresh.js";
 import { TENANT_SQL } from "../scope.js";
@@ -68,7 +68,7 @@ export function _resetIntakeTableProbesForTests() {
   needsInfoKnown = null;
 }
 
-async function inferencesTableExists(db) {
+export async function inferencesTableExists(db) {
   if (inferencesKnown != null) return inferencesKnown;
   try {
     const r = await db.raw("SELECT to_regclass('public.intake_field_inferences') IS NOT NULL AS ok", []);
@@ -79,7 +79,7 @@ async function inferencesTableExists(db) {
   return inferencesKnown;
 }
 
-async function needsInfoTableExists(db) {
+export async function needsInfoTableExists(db) {
   if (needsInfoKnown != null) return needsInfoKnown;
   try {
     const r = await db.raw("SELECT to_regclass('public.intake_needs_info') IS NOT NULL AS ok", []);
@@ -365,6 +365,58 @@ async function resolveNeedsInfo(db, { documentId, fieldKey, value, resolvedBy })
   );
 }
 
+/**
+ * Public name for `resolveNeedsInfo` (Round 13, H2 — the intake exception queue's UI/API): a
+ * PERSON resolving a question via api/_lib/routes/intake-resolve.js calls this with
+ * `resolvedBy: 'human:<name>'` after writing the actual field correction / entity link that
+ * answers the question (reviewStore.js's correctField/linkDocument/assignDocumentCustomer — see
+ * that route's own doc comment for which one, per question kind). Kept as a thin re-export
+ * (rather than moving the function) so the internal ai:autofill callers above stay unchanged.
+ */
+export async function markNeedsInfoResolved(db, args) {
+  return resolveNeedsInfo(db, args);
+}
+
+/**
+ * A person decided this question doesn't need an answer (the field genuinely doesn't apply, or
+ * they'll deal with it later some other way) — distinct from `resolved`, which always carries a
+ * `resolved_value` a later completeness check can act on. A dismissed row never re-verifies its
+ * document and is never re-raised by reexamineSiblingNeedsInfo (that loop only ever touches
+ * `status = 'open'` rows).
+ */
+export async function dismissNeedsInfo(db, { documentId, fieldKey, resolvedBy }) {
+  const r = await db.raw(
+    `UPDATE intake_needs_info SET status = 'dismissed', resolved_by = $3, resolved_at = NOW(), updated_at = NOW()
+      WHERE ${TENANT_SQL} AND document_id = $1 AND field_key = $2 AND status = 'open'
+      RETURNING id`,
+    [documentId, fieldKey, resolvedBy]
+  );
+  return r.rowCount > 0;
+}
+
+/**
+ * Come back to this one later: the row STAYS 'open' (so a later document's own arrival can still
+ * resolve it via reexamineSiblingNeedsInfo, and so nothing here duplicates the 'dismissed' state
+ * above) but `snoozed_until` (M3-config/45) hides it from listIntakeQueue's default listing until
+ * that time passes. Tolerant of migration 45 not being pasted yet: the column write is a no-op
+ * failure the caller (intake-resolve.js) reports as `snoozed: false` rather than throwing, same
+ * tolerance idiom as the rest of this module.
+ */
+export async function snoozeNeedsInfo(db, { documentId, fieldKey, until }) {
+  try {
+    const r = await db.raw(
+      `UPDATE intake_needs_info SET snoozed_until = $3, updated_at = NOW()
+        WHERE ${TENANT_SQL} AND document_id = $1 AND field_key = $2 AND status = 'open'
+        RETURNING id`,
+      [documentId, fieldKey, until]
+    );
+    return r.rowCount > 0;
+  } catch (err) {
+    if (/snoozed_until/.test(err?.message ?? '')) return false; // migration 45 not pasted yet
+    throw err;
+  }
+}
+
 /* --------------------------------------------------------------- ambiguous-customer detection */
 
 /**
@@ -412,12 +464,22 @@ export async function runIntakeAutofill(ctx, documentId, info = {}) {
   }
 }
 
-async function loadDocumentContext(db, documentId) {
+/**
+ * Exported (Round 13, H2) so intake/queue.js's read-only listing can build the exact same
+ * entity/customer/facts view this module's own autofill pass reasons from, rather than a second,
+ * possibly-diverging re-derivation of "what is this document about".
+ */
+export async function loadDocumentContext(db, documentId) {
   const doc = await db.raw(`SELECT id, document_type FROM documents WHERE id = $1 AND ${TENANT_SQL}`, [documentId]);
   const row = doc.rows[0];
   if (!row) return null;
+  // toCompletenessFields (documentTypes.js), not a bare COALESCE here: a human correction (Round
+  // 13's resolve route writes exactly one, via reviewStore.js's correctField) is not a guess and
+  // must count as fully confident, same as everywhere else in the app that reads completeness —
+  // otherwise a corrected_value row with no confidence of its own (correctField never sets one)
+  // reads as confidence 0, and a document a person just answered would fail its OWN re-verify.
   const fieldsRes = await db.raw(
-    `SELECT field_key, COALESCE(corrected_value, value) AS value, confidence
+    `SELECT field_key, value, corrected_value, confidence
        FROM extractions WHERE document_id = $1 AND ${TENANT_SQL}`,
     [documentId]
   );
@@ -425,6 +487,19 @@ async function loadDocumentContext(db, documentId) {
     `SELECT entity_id FROM extractions WHERE document_id = $1 AND ${TENANT_SQL} AND entity_id IS NOT NULL LIMIT 1`,
     [documentId]
   );
+  // Fallback (Round 13 reviewer note): a document that resolved an 'equipment_unit' needs-info
+  // question is linked to its unit ONLY via document_entity_links — its own extractions never got
+  // an entity_id (nothing on the document itself named the unit; that was the whole reason the
+  // question existed). Without this, the very next autofill pass would see entityId: null again
+  // and re-raise the same ambiguity it was just told the answer to.
+  const equipLinkRes = entityRes.rows[0]?.entity_id
+    ? { rows: [] }
+    : await db.raw(
+        `SELECT e.id FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+          WHERE l.document_id = $1 AND l.${TENANT_SQL} AND e.entity_type = 'equipment' AND e.merged_into IS NULL
+          ORDER BY l.created_at DESC LIMIT 1`,
+        [documentId]
+      );
   const custRes = await db.raw(
     `SELECT e.id FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
       WHERE l.document_id = $1 AND l.${TENANT_SQL} AND e.entity_type = 'customer' LIMIT 1`,
@@ -432,8 +507,8 @@ async function loadDocumentContext(db, documentId) {
   );
   return {
     resolvedType: row.document_type,
-    fields: fieldsRes.rows.map((r) => ({ field_key: r.field_key, value: r.value, confidence: r.confidence })),
-    entityId: entityRes.rows[0]?.entity_id ?? null,
+    fields: toCompletenessFields(fieldsRes.rows),
+    entityId: entityRes.rows[0]?.entity_id ?? equipLinkRes.rows[0]?.id ?? null,
     customerId: custRes.rows[0]?.id ?? null,
   };
 }
@@ -539,10 +614,25 @@ async function runIntakeAutofillTx(db, documentId, info) {
     }
   }
 
-  // ---- 3. re-verify with the fills applied, if that now clears the bar ----
-  if (acceptedFills.length) {
-    result.verified = await verifyIfComplete(db, { documentId, resolvedType, pack, fields: [...extractedFields, ...acceptedFills] });
+  // ---- 3. re-verify, if the document clears the bar now ----
+  // Deliberately NOT gated on `acceptedFills.length` (Round 13 reviewer note): a document can
+  // become complete this pass with no NEW sibling fill at all — the resolve route's most common
+  // case is a person directly answering the one open question (reviewStore.js's correctField),
+  // which already made `completeness` above show nothing missing before this loop ever ran. Also
+  // folds in fields this document already had inferred in an EARLIER pass (intake_field_inferences
+  // rows this run didn't touch), so a document one field short of complete before this call and
+  // now handed its last piece re-verifies correctly either way.
+  if (haveInferences) {
+    const priorInferred = await db.raw(
+      `SELECT field_key, value, confidence FROM intake_field_inferences WHERE document_id = $1 AND ${TENANT_SQL}`,
+      [documentId]
+    );
+    for (const r of priorInferred.rows) {
+      if (acceptedFills.some((f) => f.field_key === r.field_key)) continue; // this pass's own fresh fill wins
+      acceptedFills.push({ field_key: r.field_key, value: r.value, confidence: Number(r.confidence ?? 0) });
+    }
   }
+  result.verified = await verifyIfComplete(db, { documentId, resolvedType, pack, fields: [...extractedFields, ...acceptedFills] });
 
   // ---- 4. bounded re-examination of siblings' own open questions ----
   if (haveNeedsInfo && (entityId || customerId)) {

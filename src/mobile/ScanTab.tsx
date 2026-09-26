@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Camera, CheckCircle2, FileUp, Loader2, Trash2 } from 'lucide-react'
 import { ingestFiles, type IngestProgress, type IngestResult } from '../services/ingestClient'
+import { fetchDocumentIntakeSummaries, type DocumentIntakeSummary } from '../services/intakeClient'
 import { combineToPdf, preparePhoto, scanFilename, type PreparedPage } from './imagePrep'
 
 interface Picked {
@@ -33,6 +34,11 @@ export function ScanTab({ onUploaded, onOpenDocs }: { onUploaded: () => void; on
   const [prepMessage, setPrepMessage] = useState<string | null>(null)
   const [progress, setProgress] = useState<Record<string, IngestProgress>>({})
   const [results, setResults] = useState<IngestResult[]>([])
+  // Live post-upload status (Round 13, H2, research #7): once a document is uploaded, straight-
+  // through autofill keeps working in the background — this is a best-effort, short-lived poll of
+  // that progress, not a persistent tracker (a field tech scanning paperwork typically moves on
+  // within seconds; Records/the Inbox is where the fuller picture lives after that).
+  const [intake, setIntake] = useState<Record<string, DocumentIntakeSummary>>({})
   const cameraRef = useRef<HTMLInputElement>(null)
   const filesRef = useRef<HTMLInputElement>(null)
   const nextId = useRef(1)
@@ -121,7 +127,48 @@ export function ScanTab({ onUploaded, onOpenDocs }: { onUploaded: () => void; on
     setPicked([])
     setResults([])
     setProgress({})
+    setIntake({})
     setPhase('pick')
+  }
+
+  // Poll each uploaded document's intake status a few times (autofill runs right after the read
+  // step commits) — best-effort: a failed poll just leaves whatever status was last shown, never
+  // an error the person has to deal with mid-scan.
+  useEffect(() => {
+    if (phase !== 'done') return
+    const ids = results.filter((r) => !!r.documentId && !r.error).map((r) => r.documentId as string)
+    if (!ids.length) return
+    let cancelled = false
+    let attempts = 0
+    const poll = async () => {
+      if (cancelled) return
+      try {
+        const rows = await fetchDocumentIntakeSummaries(ids)
+        if (!cancelled) setIntake((prev) => ({ ...prev, ...Object.fromEntries(rows.map((r) => [r.documentId, r])) }))
+      } catch {
+        /* best-effort only */
+      }
+      attempts += 1
+      const allSettled = ids.every((id) => intake[id]?.read || intake[id]?.verified)
+      if (!cancelled && attempts < 6 && !allSettled) setTimeout(poll, 2500)
+    }
+    void poll()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, results])
+
+  /** "Reading… / Filled 7 of 8 fields… / Needs 1 answer" — the one line the owner asked for. */
+  function intakeStatusText(documentId: string | undefined): string | null {
+    if (!documentId) return null
+    const s = intake[documentId]
+    if (!s) return 'Reading…'
+    if (!s.read) return 'Reading…'
+    const filled = `Filled ${s.filledCount} of ${s.totalRequired} field${s.totalRequired === 1 ? '' : 's'}`
+    if (s.openQuestion) return `${filled} — needs 1 answer`
+    if (s.verified || s.totalRequired === 0) return `${filled} — all set`
+    return `${filled}…`
   }
 
   const failed = results.filter((r) => r.error)
@@ -219,17 +266,30 @@ export function ScanTab({ onUploaded, onOpenDocs }: { onUploaded: () => void; on
                   </li>
                 ))}
                 {phase === 'done' &&
-                  results.map((r, i) => (
-                    <li key={`${r.filename}-${i}`} className="flex items-center gap-3 py-3">
-                      {r.error ? <AlertTriangle className="w-5 h-5 text-bad shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-ok shrink-0" />}
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-body text-ink truncate">{r.filename}</span>
-                        <span className="block text-caption text-ink-3">
-                          {r.error ?? (r.duplicate ? 'Already in DeepWell — nothing new to add' : r.queued ? 'Uploaded — still being read' : 'Uploaded and read')}
+                  results.map((r, i) => {
+                    const status = !r.error && !r.duplicate ? intakeStatusText(r.documentId) : null
+                    const needsAnswer = Boolean(r.documentId && intake[r.documentId]?.openQuestion)
+                    return (
+                      <li key={`${r.filename}-${i}`} className="flex items-center gap-3 py-3">
+                        {r.error ? <AlertTriangle className="w-5 h-5 text-bad shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-ok shrink-0" />}
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-body text-ink truncate">{r.filename}</span>
+                          <span className="block text-caption text-ink-3">
+                            {r.error ?? (r.duplicate ? 'Already in DeepWell — nothing new to add' : r.queued ? 'Uploaded — still being read' : 'Uploaded and read')}
+                          </span>
+                          {status && (
+                            needsAnswer ? (
+                              <button type="button" onClick={onOpenDocs} className="block text-caption text-accent font-semibold underline mt-0.5 text-left">
+                                {status}
+                              </button>
+                            ) : (
+                              <span className="block text-caption text-ink-3 mt-0.5">{status}</span>
+                            )
+                          )}
                         </span>
-                      </span>
-                    </li>
-                  ))}
+                      </li>
+                    )
+                  })}
               </ul>
               {billingUrl && (
                 <a href={billingUrl} className="text-body font-semibold underline text-accent">

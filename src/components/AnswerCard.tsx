@@ -2,14 +2,24 @@ import { useMemo, useState } from 'react';
 import { ShieldCheck, ShieldQuestion } from 'lucide-react';
 import type { Answer, AnswerRecord, SourceRef } from '../core/types';
 import { recordGroups, showRecordsPanel, splitAnswerHeadline } from '../core/citations';
-import { answerLayout, claimCheckNote, followupChips, shareText } from '../core/answerLayout';
+import { answerLayout, claimCheckNote, followupChips, isModelWritten, numberCitations, sentencesOf, shareText } from '../core/answerLayout';
 import { documentName } from '../core/documentName';
 import { useGraph } from '../core/entityGraph';
 import { RecordsPanel } from './RecordsPanel';
 import { FactGrid } from './FactGrid';
 import { SourceList } from './SourceList';
 import { AnswerFeedback } from './AnswerFeedback';
-import { FollowupChips, MoneyHero, NotOnFileBadge, ShareButton, SingleFactHero, StatusHero, TimelineList } from './answer';
+import {
+  CitationMarkers,
+  CitationSourceStrip,
+  FollowupChips,
+  MoneyHero,
+  NotOnFileBadge,
+  ShareButton,
+  SingleFactHero,
+  StatusHero,
+  TimelineList,
+} from './answer';
 
 export interface AnswerCardProps {
   answer: Answer;
@@ -88,6 +98,16 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
   // giant, confusing headline. Split so the headline states ONE plain claim and anything after it
   // (a caveat, a unit-count aside) reads as a small muted line underneath instead.
   const { headline, secondary } = splitAnswerHeadline(answer.text);
+  // R13H1: server-computed per-sentence citations (api/_lib/citations/sentences.js) — when present,
+  // every sentence renders with its own [1][2] markers instead of the coarse headline/secondary split
+  // above; an older/cached answer with no `sentences` still falls back to that split unchanged.
+  const sentenceData = useMemo(() => sentencesOf(answer), [answer]);
+  const modelWritten = useMemo(() => isModelWritten(answer), [answer]);
+  const { numbered: numberedSentences, order: citationOrder } = useMemo(
+    () => (sentenceData ? numberCitations(sentenceData) : { numbered: [], order: [] }),
+    [sentenceData]
+  );
+  const openCitationDoc = (documentId: string, page?: number) => onOpenSource({ documentId, location: page != null ? { page } : {} });
   // The verified/unverified control is about DOCUMENT staging (a citation contract concept) — it has
   // nothing to say, and nothing to change, for a record-grounded answer (an analytics/agent count with
   // no document sources at all: "0 verified records" next to "Based on 13 customers" read as a flat
@@ -109,15 +129,42 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
             <NotOnFileBadge />
           </div>
         )}
-        <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] field:text-[30px] field:leading-[38px]'].join(' ')}>
-          {headline}
-        </p>
-        {/* A second sentence (a caveat, a unit-count aside) never shares headline size with the main
-            claim — it reads as ordinary muted context underneath it instead. */}
-        {secondary && (
-          <p className="mt-1 text-body text-ink-2" data-testid="answer-secondary">
-            {secondary}
-          </p>
+        {numberedSentences.length > 0 ? (
+          <>
+            <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] field:text-[30px] field:leading-[38px]'].join(' ')}>
+              {numberedSentences[0]!.text}
+              <CitationMarkers citations={numberedSentences[0]!.citations} onOpenDocument={openCitationDoc} />
+              {modelWritten && !numberedSentences[0]!.supported && (
+                <span className="ml-2 align-middle text-caption font-normal italic text-ink-2" data-testid="answer-unsupported">
+                  (not found in your records)
+                </span>
+              )}
+            </p>
+            {numberedSentences.slice(1).map((s, i) => (
+              <p key={i} className="mt-1 text-body text-ink-2" data-testid={i === 0 ? 'answer-secondary' : undefined}>
+                {s.text}
+                <CitationMarkers citations={s.citations} onOpenDocument={openCitationDoc} />
+                {modelWritten && !s.supported && (
+                  <span className="ml-2 text-caption italic text-ink-2" data-testid="answer-unsupported">
+                    (not found in your records)
+                  </span>
+                )}
+              </p>
+            ))}
+          </>
+        ) : (
+          <>
+            <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] field:text-[30px] field:leading-[38px]'].join(' ')}>
+              {headline}
+            </p>
+            {/* A second sentence (a caveat, a unit-count aside) never shares headline size with the main
+                claim — it reads as ordinary muted context underneath it instead. */}
+            {secondary && (
+              <p className="mt-1 text-body text-ink-2" data-testid="answer-secondary">
+                {secondary}
+              </p>
+            )}
+          </>
         )}
         {/* How it was computed, one muted sentence: every answer states its basis (citation contract). */}
         {answer.basis && (
@@ -131,6 +178,13 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
           <p className="mt-1 text-caption text-ink-3" data-testid="answer-claimcheck">
             {claimNote}
           </p>
+        )}
+        {/* R13H1: compact numbered strip tying [1][2] markers above to real document names — the
+            "visible sources" trust signal, one glance under the sentences that cite them. */}
+        {citationOrder.length > 0 && (
+          <div className="mt-3">
+            <CitationSourceStrip order={citationOrder} onOpenDocument={(documentId) => openCitationDoc(documentId)} />
+          </div>
         )}
 
         {showVerifiedControl && (

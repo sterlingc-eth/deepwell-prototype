@@ -44,8 +44,19 @@ const COUNT_NOUN_RE = /customers?|units?|records?|invoices?|documents?|results?|
 let nextId = 0;
 const mkClaim = (partial) => ({ id: `c${nextId++}`, sources: [], meta: {}, ...partial });
 
+// (R13H1) Common abbreviations whose trailing "." is not a sentence end, even though it IS followed by
+// a space and a capitalized word next ("Mr. Smith", "Model No. 2000.5") — the one case the plain
+// "followed by whitespace" heuristic below can't tell apart from a real sentence boundary on its own.
+const ABBREVIATIONS = new Set([
+  "mr", "mrs", "ms", "mx", "dr", "jr", "sr", "st", "no", "vs", "etc", "inc", "ltd", "co", "corp",
+  "ave", "blvd", "ft", "rd", "mt", "prof", "capt", "gen", "sgt", "rev", "hon", "esq", "dept", "univ",
+  "assn", "approx", "fig", "vol", "pg", "pp", "apt", "bldg", "ste",
+]);
+
 /** Split `text` into trimmed sentences. Avoids splitting mid-decimal ("$1,250.00") — a '.' only ends a
- *  sentence when it is followed by whitespace/end-of-string, never by another digit. */
+ *  sentence when it is followed by whitespace/end-of-string, never by another digit — and after a
+ *  common abbreviation ("Mr.", "Dr.", "No.", a single-letter initial like "J."), so "Mr. Smith" or
+ *  "Model No. 2000.5" never reads as its own one-word sentence ("Mr.", "Model No."). */
 export function splitSentences(text) {
   const s = String(text ?? "").trim();
   if (!s) return [];
@@ -58,6 +69,14 @@ export function splitSentences(text) {
     let j = i + 1;
     while (j < s.length && /["')\]]/.test(s[j])) j++;
     if (j < s.length && s[j] !== " ") continue; // e.g. "Mr." mid-word — not a sentence end
+    if (ch === "." && j < s.length) {
+      const wordMatch = /[A-Za-z]+$/.exec(s.slice(start, i));
+      const word = wordMatch?.[0] ?? "";
+      const isAbbrev = word.length === 1 // a bare initial: "J. Smith"
+        ? /[A-Z]/.test(word)
+        : ABBREVIATIONS.has(word.toLowerCase());
+      if (isAbbrev) continue; // "Mr.", "No.", "Dr." etc — not a sentence end
+    }
     out.push(s.slice(start, j).trim());
     while (j < s.length && s[j] === " ") j++;
     start = j;

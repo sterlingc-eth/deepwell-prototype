@@ -9,6 +9,7 @@ import type {
   Batch,
   Conflict,
   Doc,
+  DocCompleteness,
   DocumentId,
   DomainSchema,
   Entity,
@@ -20,7 +21,10 @@ import type {
   SourceRef,
 } from './types';
 import { PIPELINE_STAGES } from './types';
-import { reviewClient } from '../services/reviewClient';
+import { reviewClient, type Correction, type DocumentLink } from '../services/reviewClient';
+import { recordsStore } from '../services/recordsStoreClient';
+import { authHeader } from '../services/authToken';
+import { normalizeDocumentType } from '../domains/hvac/documentTypes';
 
 /**
  * Demo mode keeps the whole graph in memory on purpose (its own fixture data
@@ -97,6 +101,21 @@ interface GraphActions {
   reclassifyDocs: (docIds: DocumentId[]) => Promise<{ changed: number; remaining: number }>;
   /** Review: drop a document locally after its server-side delete succeeded. */
   removeDoc: (docId: DocumentId) => void;
+  /**
+   * Insert or replace one document in the graph, recomputing its issues and
+   * (if linked/verified) applying its fields onto its entities — same
+   * bookkeeping every other graph-mutating action does. This is the write
+   * side of the beyond-500-documents fix: usePostgresSync's initial sync
+   * caps at 500 documents (recordsStore.js's listDocuments LIMIT 500), but
+   * Records Browse (round 12/13) queries the server directly and can return
+   * a row for ANY document. `ensureDocLoaded` below calls this once it has
+   * fetched a document the graph never loaded, so DocumentPreview.tsx (which
+   * just reads `useGraph(s => s.docs[documentId])`) renders it like any
+   * other document — no new UI path required. Also creates/extends a
+   * placeholder Batch for the document if its batch isn't in the graph yet,
+   * mirroring usePostgresSync.ts's buildBatches.
+   */
+  upsertDoc: (doc: Doc) => void;
   /** Intake: create a batch. */
   createBatch: (input: { name: string; source: IntakeSource; from: Date; to: Date; by: string }) => string;
   /** Intake: add received documents to a batch (mock upload). */
@@ -457,6 +476,30 @@ export const useGraph = create<GraphStore>((set, get) => ({
       return { docs, batches };
     }),
 
+  upsertDoc: (doc) =>
+    set((s) => {
+      const next = recomputeIssues(doc, s.schema);
+      const docs = { ...s.docs, [next.id]: next };
+      const existingBatch = s.batches[next.batchId];
+      const batches = existingBatch
+        ? existingBatch.documentIds.includes(next.id)
+          ? s.batches
+          : { ...s.batches, [next.batchId]: { ...existingBatch, documentIds: [...existingBatch.documentIds, next.id] } }
+        : {
+            ...s.batches,
+            [next.batchId]: {
+              id: next.batchId,
+              name: next.batchId === 'synced' ? 'Ingested documents' : `Batch ${next.batchId.slice(0, 8)}`,
+              source: next.source,
+              dateRange: { from: next.receivedAt, to: next.receivedAt },
+              createdAt: next.receivedAt,
+              createdBy: 'system',
+              documentIds: [next.id],
+            },
+          };
+      return { docs, batches, entities: applyDocToEntities({ ...s, docs }, next) };
+    }),
+
   receiveDocs: (batchId, files) => {
     const ids: DocumentId[] = [];
     set((s) => {
@@ -553,4 +596,216 @@ export function conflictDocs(g: GraphSnapshot): Doc[] {
 }
 export function duplicateDocs(g: GraphSnapshot): Doc[] {
   return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'duplicate'));
+}
+
+// ---------------------------------------------------------------------------
+// Fetch-on-demand: a document past usePostgresSync's 500-document sync cap
+// ---------------------------------------------------------------------------
+
+const DOC_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** api/_lib/extractDocument.js's equipment field keys -> the hvac schema's
+ *  camelCase keys. Deliberately duplicated from usePostgresSync.ts's
+ *  EQUIPMENT_FIELD_MAP (a private, un-exported const in a hook this worktree
+ *  doesn't own) rather than imported — same "small, intentionally-duplicated
+ *  copy" convention that file itself already uses for clientNormalizeSurname.
+ *  IDEAL FIX for whoever next owns usePostgresSync.ts: export `toDoc` (and
+ *  its EQUIPMENT_FIELD_MAP/fileTypeOf/toDateOrNull helpers) so this becomes a
+ *  straight import instead of a hand-kept copy. */
+const EQUIPMENT_FIELD_MAP: Record<string, string> = {
+  serial_number: 'serial',
+  model: 'model',
+  manufacturer: 'manufacturer',
+  equipment_type: 'equipmentType',
+  installation_date: 'installDate',
+  tonnage: 'tonnage',
+  refrigerant: 'refrigerant',
+  service_address: 'address',
+  customer_name: 'customerName',
+  warranty_expires: 'warrantyExpiry',
+  installed_by: 'installedByName',
+};
+
+function toDateOrNull(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function fileTypeOfRow(row: { content_type?: string | null; original_filename: string }): Doc['fileType'] {
+  const ct = (row.content_type ?? '').toLowerCase();
+  const name = row.original_filename.toLowerCase();
+  if (ct.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
+  if (ct.startsWith('image/') || /\.(png|jpe?g|gif|webp|heic|tiff?)$/.test(name)) return 'image';
+  if (ct.includes('sheet') || ct.includes('csv') || /\.(xlsx?|xls|csv)$/.test(name)) return 'spreadsheet';
+  return 'text';
+}
+
+/** One `documents` row, as returned by POST /api/records { action: 'getDocument' }
+ *  (api/_lib/recordsStore.js's plain `SELECT * FROM documents WHERE id = $1 AND …`
+ *  — no join, no derived fields; that's what the extractions/links/corrections/
+ *  completeness fetched alongside it in `ensureDocLoaded` are for). */
+interface FetchedDocumentRow {
+  id: string;
+  batch_id?: string | null;
+  original_filename: string;
+  document_type?: string | null;
+  stage: 'received' | 'read' | 'mapped' | 'linked' | 'verified';
+  created_at: unknown;
+  content_type?: string | null;
+  page_count?: number | null;
+  extract_error?: string | null;
+  verified_by?: string | null;
+  verified_at?: unknown;
+  display_name?: string | null;
+  uploaded_by?: string | null;
+}
+
+interface FetchedExtractionRow {
+  id: string;
+  document_id: string;
+  entity_id: string | null;
+  field_key: string;
+  value: string | null;
+  confidence: number | null;
+  unit_index?: number | null;
+}
+
+/**
+ * Maps one fetched document (+ its extractions/links/corrections/completeness)
+ * onto the shape `useGraph` expects — a smaller, standalone twin of
+ * usePostgresSync.ts's `toDoc`/`deriveStage` (see the EQUIPMENT_FIELD_MAP
+ * comment above for why this isn't a straight import). `maxStageFor` (this
+ * module, not duplicated) is what lets a document at backend 'read'/'mapped'
+ * with every required field present show as further along than "just past
+ * received", same rule the real sync hook applies.
+ */
+function docFromFetchedRow(
+  row: FetchedDocumentRow,
+  extractions: FetchedExtractionRow[],
+  links: DocumentLink[],
+  corrections: Correction[],
+  schema: DomainSchema,
+  completeness?: DocCompleteness,
+): Doc {
+  const receivedAt = toDateOrNull(row.created_at) ?? new Date();
+  const preview = row.extract_error
+    ? `${row.original_filename}\n\nExtraction failed: ${row.extract_error}`
+    : row.page_count
+      ? `${row.original_filename}\n\n${row.page_count} page(s) read.`
+      : `${row.original_filename}\n\nReceived.`;
+
+  const correctionByField = new Map(corrections.map((c) => [c.field_key, c]));
+  const linkedFromLinks = links.map((l) => l.entity_id);
+  const linkedFromExtractions = extractions.map((x) => x.entity_id).filter((id): id is string => !!id);
+  const facts = Object.fromEntries(extractions.filter((x) => x.value != null && x.value !== '').map((x) => [x.field_key, x.value]));
+  const typeId = normalizeDocumentType(row.document_type, facts);
+
+  const doc: Doc = {
+    id: row.id,
+    filename: row.original_filename,
+    displayName: row.display_name ?? undefined,
+    fileType: fileTypeOfRow(row),
+    pages: row.page_count ?? 0,
+    batchId: row.batch_id ?? 'synced',
+    source: 'drive',
+    receivedAt,
+    uploadedBy: row.uploaded_by ?? undefined,
+    typeId,
+    stage: 'received', // placeholder — replaced below
+    extracted: extractions.map((x) => {
+      const field = EQUIPMENT_FIELD_MAP[x.field_key];
+      const correction = correctionByField.get(x.field_key);
+      return {
+        name: x.field_key,
+        value: x.value ?? '',
+        confidence: x.confidence ?? 0,
+        location: {},
+        target: x.entity_id && field ? { entityId: x.entity_id, field } : undefined,
+        unitIndex: x.unit_index ?? undefined,
+        ...(correction
+          ? { correctedValue: correction.corrected_value, correctedBy: correction.corrected_by ?? undefined, correctedAt: toDateOrNull(correction.corrected_at) ?? undefined }
+          : {}),
+      };
+    }),
+    linkedEntityIds: [...new Set([...linkedFromExtractions, ...linkedFromLinks])],
+    linkConfidence: linkedFromExtractions.length > 0 || linkedFromLinks.length > 0 ? 1 : 0,
+    issues: [],
+    linkedFromBodyName: links.find((l) => l.linked_by === 'name-in-body')?.entity_id,
+    verifiedBy: row.verified_by ?? undefined,
+    verifiedAt: toDateOrNull(row.verified_at) ?? undefined,
+    completeness,
+    preview,
+  };
+
+  const withIssues = recomputeIssues(doc, schema);
+  const stage: PipelineStage =
+    row.stage === 'verified' ? 'verified' : row.stage === 'received' ? 'received' : (() => {
+      const ceiling = maxStageFor(withIssues, schema);
+      return ceiling === 'verified' ? 'linked' : ceiling;
+    })();
+  return { ...withIssues, stage };
+}
+
+/** In-flight fetches by document id, so a doc rendered by two components at
+ *  once (or two rapid clicks) never fires the request twice. */
+const fetchesInFlight = new Map<DocumentId, Promise<void>>();
+
+/**
+ * Fetch one document's full details from the server and upsert it into the
+ * graph — the fetch-on-demand half of the beyond-500-documents fix (see
+ * `upsertDoc`'s doc comment). No-op when the doc is already in the graph,
+ * when the id isn't a real (synced) document id, or in demo mode (nothing
+ * server-side to fetch). Best-effort: a failed fetch leaves the graph as it
+ * was — DocumentPreview.tsx's own `if (!doc) return null` is the existing,
+ * correct behaviour for "this id truly isn't available".
+ */
+export async function ensureDocLoaded(docId: DocumentId): Promise<void> {
+  if (DEMO_MODE) return;
+  if (!DOC_ID_RE.test(docId)) return;
+  if (useGraph.getState().docs[docId]) return;
+
+  const existing = fetchesInFlight.get(docId);
+  if (existing) return existing;
+
+  const run = (async () => {
+    try {
+      const [row, extractions, linksRes, correctionsRes] = await Promise.all([
+        recordsStore.getDocument(docId) as unknown as Promise<FetchedDocumentRow | null>,
+        recordsStore.listExtractionsByDocument(docId).catch(() => []) as unknown as Promise<FetchedExtractionRow[]>,
+        reviewClient.listLinks([docId]).catch(() => ({ links: [] as DocumentLink[] })),
+        reviewClient.listCorrections([docId]).catch(() => ({ corrections: [] as Correction[] })),
+      ]);
+      if (!row) return; // wrong tenant, deleted, or not yet synced anywhere
+
+      let completeness: DocCompleteness | undefined;
+      try {
+        const res = await fetch('/api/document-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+          body: JSON.stringify({ documentIds: [docId] }),
+        });
+        if (res.ok) {
+          const { documents } = (await res.json()) as { documents: { id: string; completeness?: DocCompleteness }[] };
+          completeness = documents.find((d) => d.id === docId)?.completeness;
+        }
+      } catch {
+        /* completeness is an enhancement (why-AI-verified), not a precondition */
+      }
+
+      // Re-check: a slower rival call (or a real sync finishing) may have
+      // already landed this doc while these round trips were in flight.
+      if (useGraph.getState().docs[docId]) return;
+      const doc = docFromFetchedRow(row, extractions, linksRes.links, correctionsRes.corrections, useGraph.getState().schema, completeness);
+      useGraph.getState().upsertDoc(doc);
+    } finally {
+      fetchesInFlight.delete(docId);
+    }
+  })();
+  fetchesInFlight.set(docId, run);
+  return run;
 }

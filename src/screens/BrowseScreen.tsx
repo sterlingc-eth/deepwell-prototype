@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Download, FolderOpen, Loader2, Network, Search, Trash2, Users } from 'lucide-react';
+import { ArrowRight, Download, FolderOpen, Grid3x3, Loader2, Network, Search, Trash2, Users } from 'lucide-react';
 import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
+import { DocumentPreview } from '../components/DocumentPreview';
 import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { WarrantyStatusBadge } from '../components/WarrantyStatusBadge';
 import { entitiesOfType, useGraph } from '../core/entityGraph';
@@ -11,6 +12,7 @@ import { deleteDocuments } from '../services/documentClient';
 import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
 import { RecordsBrowser } from '../components/records/RecordsBrowser';
+import { GridView } from '../components/grid/GridView';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -45,13 +47,23 @@ function haystack(e: Entity, g: ReturnType<typeof useGraph.getState>): string {
  * NOT carried over: it doesn't compose with server-side paging (a checked
  * row can scroll out of the loaded page) — "Empty this shop" below still
  * covers the one bulk-delete case the owner actually asked for. A single
- * document still deletes from inside its own preview (ReviewScreen).
+ * document still deletes from inside its own preview (DocumentPreview,
+ * rendered in place below — see the round 13 note on `previewDocId`).
  */
 function DocumentsTab() {
   const docs = useGraph((s) => s.docs);
   const removeDoc = useGraph((s) => s.removeDoc);
   const openDocument = useAppStore((s) => s.openDocument);
-  const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+
+  // Round 13 (H3): a Records Browse row can name a document past
+  // usePostgresSync's 500-doc sync cap (see appStore.ts's openDocument /
+  // entityGraph.ts's ensureDocLoaded+upsertDoc), so opening it navigates
+  // nowhere — it renders in place, same pattern as CustomerProfileScreen's
+  // "opens in place" fix (owner defect report, 2026-09-22), rather than
+  // routing into the Inbox's review queue, whose "no doc selected -> jump to
+  // queue[0]" effect (ReviewScreen.tsx) would otherwise hijack a document
+  // that has no reason to be in that queue at all (e.g. it's already verified).
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [emptyText, setEmptyText] = useState('');
@@ -70,7 +82,7 @@ function DocumentsTab() {
     }
   };
 
-  const onOpenDocument = (id: string) => { openDocument(id); setCurrentScreen('review'); };
+  const onOpenDocument = (id: string) => { openDocument(id); setPreviewDocId(id); };
 
   const runEmpty = async () => {
     setEmptying(true);
@@ -131,6 +143,8 @@ function DocumentsTab() {
           </div>
         </div>
       )}
+
+      {previewDocId && <DocumentPreview documentId={previewDocId} onClose={() => setPreviewDocId(null)} />}
     </div>
   );
 }
@@ -145,7 +159,7 @@ export function BrowseScreen() {
   const openEntity = useAppStore((s) => s.openEntity);
   const askQuestion = useAppStore((s) => s.askQuestion);
   // Customers first (owner, 2026-09-20): the shop's people are the entry point; documents hang off them.
-  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search' | 'graph'>('customers');
+  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'search' | 'grid' | 'graph'>('customers');
   const [kind, setKind] = useState<Kind>('all');
   const [debounced, setDebounced] = useState(query);
   useEffect(() => {
@@ -214,6 +228,7 @@ export function BrowseScreen() {
             { id: 'documents' as const, label: 'Documents', Icon: FolderOpen },
             { id: 'customers' as const, label: 'Customers', Icon: Users },
             { id: 'search' as const, label: 'Search', Icon: Search },
+            { id: 'grid' as const, label: 'Grid', Icon: Grid3x3 },
             { id: 'graph' as const, label: 'Graph', Icon: Network },
           ]).map((t) => (
             <button
@@ -232,6 +247,8 @@ export function BrowseScreen() {
           <DocumentsTab />
         ) : mainTab === 'customers' ? (
           <CustomersScreen />
+        ) : mainTab === 'grid' ? (
+          <GridView />
         ) : mainTab === 'graph' ? (
           <KnowledgeGraph showSearch heading="DeepWell knowledge graph" />
         ) : (

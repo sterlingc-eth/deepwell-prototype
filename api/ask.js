@@ -33,6 +33,7 @@ import { isFinancialQuestion } from "./_lib/financials/classify.js";
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
 import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
+import { attachSentenceCitationsSync } from "./_lib/citations/sentences.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
 import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZeroCitations, searchedLibraryBasis } from "./_lib/citations/enrich.js";
 import { runAnalyticsQuestion, isAnalyticsEnabled, applyExistenceShape } from "./_lib/routes/analytics.js";
@@ -633,6 +634,14 @@ export default async function handler(req, res) {
         try { checkAnswerClaimsSync(body.data, { today: todayResolved }); } catch (err) { console.error("checkAnswerClaimsSync failed, sending answer without it:", err?.message); }
       }
       try { finalizeCitations(body.data); } catch (err) { console.error("finalizeCitations failed, sending answer without it:", err?.message); }
+      // R13H1: sentence-level citations (api/_lib/citations/sentences.js) — additive `data.sentences`,
+      // independent of the claimCheck guard above so an answer that already carried its own claimCheck
+      // (the agent path) still gets it here unless attachSentenceCitations already ran with real source
+      // text (see that module's header for the richer, DB-backed hook loopV2.js can add). Sync, no DB:
+      // attribution (documentId/page) only, never a quote — safe to call unconditionally on every answer.
+      if (body.data.sentences == null) {
+        try { attachSentenceCitationsSync(body.data); } catch (err) { console.error("attachSentenceCitationsSync failed, sending answer without it:", err?.message); }
+      }
     }
     if (streaming) {
       try {

@@ -28,7 +28,12 @@ function doc(id: string, typeId: string, filename: string, displayName?: string)
 }
 
 export const DOCS: Record<string, Doc> = {
-  inv1: doc('inv1', 'invoice', '48219-scan.pdf', 'Invoice · Dana Reyes · Jun 2, 2025'),
+  inv1: {
+    ...doc('inv1', 'invoice', '48219-scan.pdf', 'Invoice · Dana Reyes · Jun 2, 2025'),
+    // Non-empty so CitationPopover's client-side fallback (a citation with no server-computed `quote`)
+    // has something real to excerpt from — same shape DocumentPreview.tsx already reads.
+    preview: 'invoice_number: 48219\ncustomer_name: Dana Reyes\ntotal: 620.00\nbalance_due: 420.00',
+  },
   inv2: doc('inv2', 'invoice', '48311-scan.pdf', 'Invoice · Dana Reyes · Jul 14, 2025'),
   warr1: doc('warr1', 'warranty-registration', '90212.pdf', 'Warranty · Carrier XR16 · Mar 15, 2024'),
   wo1: doc('wo1', 'work-order', 'wo-9021.pdf', 'Work order · Spring tune-up · Mar 14, 2026'),
@@ -182,6 +187,41 @@ export const FIXTURES: Record<string, Answer> = {
 };
 
 export const LAYOUT_ORDER = ['money', 'status', 'list', 'timeline', 'comparison', 'single-fact', 'explain', 'prose', 'not-on-file'] as const;
+
+// R13H1 — sentence-level citations (api/_lib/citations/sentences.js). A separate fixture, NOT part of
+// LAYOUT_ORDER (citations are an overlay on top of any layout, not a layout of their own) — exercised
+// directly by name in scripts/verify-answer-ui.mjs's own citations section. Shaped exactly as the
+// server would send it (`sentences`/`claimCheck` are additive fields core/types.ts's Answer does not
+// declare — see answerLayout.ts's sentencesOf/claimCheckOf), which is also why this is NOT typed
+// `: Answer` — that would trip TypeScript's excess-property check on a literal with extra fields.
+export const CITATION_FIXTURE = {
+  kind: 'answer',
+  text: 'The furnace at 2847 N 24th St is still under warranty. It was serviced by Jordan Alvarez last spring, per the invoice on file. This detail could not be matched to anything on file.',
+  facts: [{ label: 'Warranty status', value: 'Active', status: 'ok', sources: [src('warr1', 1)] }],
+  sources: [src('warr1', 1), src('inv1', 1)],
+  confidence: 0.87,
+  verifiedCount: 2,
+  unverifiedCount: 0,
+  closest: [],
+  interpretation: 'Warranty status for the unit at 2847 N 24th St',
+  basis: 'Warranty expiry taken from the registration on file.',
+  // Model-written (agent) policy — only an agent-written answer shows the subtle "not found" mark.
+  claimCheck: { policy: 'agent', checked: 3, supported: 2, unsupported: [{ kind: 'name', claim: 'Jordan Alvarez', origin: 'text', reason: 'source-mismatch' }], rate: 0.33 },
+  sentences: [
+    {
+      text: 'The furnace at 2847 N 24th St is still under warranty.',
+      citations: [{ documentId: 'warr1', page: 1, quote: 'Warranty active through March 15, 2029 per the registration on file.', score: 0.9 }],
+      supported: true,
+    },
+    {
+      // No server-computed `quote` — exercises CitationPopover's client-side fallback (doc.preview).
+      text: 'It was serviced by Jordan Alvarez last spring, per the invoice on file.',
+      citations: [{ documentId: 'inv1', page: 1, score: 0.5 }],
+      supported: true,
+    },
+    { text: 'This detail could not be matched to anything on file.', citations: [], supported: false },
+  ],
+};
 
 declare global {
   interface Window {

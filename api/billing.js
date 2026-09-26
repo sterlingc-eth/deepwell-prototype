@@ -1,5 +1,5 @@
 import { requireAuth, denyAuth, hasShop, requireRole } from "./_lib/auth.js";
-import { handleCors, handleError } from "./_lib/claude.js";
+import { handleCors, handleError, sendPrivateCacheableJson } from "./_lib/claude.js";
 import { withTenant, getPool, bustTenantCache } from "./_lib/recordsStore.js";
 import {
   getStripe,
@@ -162,7 +162,11 @@ async function handleStatus(req, res, auth) {
       usage: { documentsStored, pagesThisMonth, asksThisMonth, aiCostEstimateUsd, resetsOn: resetsOnIso() },
     };
   });
-  return handleCors(res, req).status(200).json(result);
+  handleCors(res, req);
+  // Startup performance (handoffs/STARTUP_PERF_R13.md): private, short-lived
+  // cache + ETag — this is polled on every load plus the post-checkout
+  // confirmation loop above, and doesn't change on most of those polls.
+  return sendPrivateCacheableJson(res, req, result, 15);
 }
 
 /** No Clerk auth: identified by Stripe customer id via the SECURITY DEFINER

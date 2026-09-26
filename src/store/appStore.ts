@@ -4,6 +4,7 @@ import { summarizeProgress, type BulkFileState } from '../services/bulkImport';
 import type { BillingInterval, BillingStatus } from '../services/billingClient';
 import { DEFAULT_CUSTOMER_FILTERS, type CustomerFilters } from '../core/customerFilters';
 import type { WorkFilterChoice } from '../core/workFilter';
+import { ensureDocLoaded } from '../core/entityGraph';
 
 export type Screen =
   | 'ask'
@@ -247,6 +248,17 @@ interface AppState {
   // and preselect it.
   billingStatus: BillingStatus | null;
   setBillingStatus: (status: BillingStatus | null) => void;
+
+  // Startup performance (handoffs/STARTUP_PERF_R13.md): status of the one
+  // POST /api/records action=bootstrap round trip useBootstrap.ts fires on
+  // load. NotificationsPanel reads `notificationsUnread` for an instant
+  // badge (and, on 'error', falls back to fetching its own count eagerly
+  // instead of waiting for the user to open the bell).
+  bootstrapStatus: 'idle' | 'loading' | 'ready' | 'error';
+  setBootstrapStatus: (status: 'idle' | 'loading' | 'ready' | 'error') => void;
+  notificationsUnread: number;
+  setNotificationsUnread: (n: number) => void;
+
   pendingPlan: PendingPlan | null;
   setPendingPlan: (plan: PendingPlan | null) => void;
   clearPendingPlan: () => void;
@@ -360,7 +372,16 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   selectedDocumentId: null,
-  openDocument: (id) => set({ selectedDocumentId: id }),
+  // Beyond-500-documents fix: usePostgresSync's initial load caps at 500 docs
+  // (recordsStore.js's listDocuments LIMIT 500), but Records Browse queries
+  // the server directly and can hand back a row for any document. If the
+  // graph doesn't already have it, fetch it and upsert it — fire-and-forget,
+  // since every reader of `docs[id]` (DocumentPreview.tsx, ReviewScreen.tsx)
+  // is a reactive store subscription and picks it up the moment it lands.
+  openDocument: (id) => {
+    set({ selectedDocumentId: id });
+    void ensureDocLoaded(id);
+  },
   selectedEntityId: null,
   openEntity: (id) => set({ selectedEntityId: id, currentScreen: 'entity' }),
   customerRef: null,
@@ -387,6 +408,11 @@ export const useAppStore = create<AppState>((set) => ({
 
   billingStatus: null,
   setBillingStatus: (status) => set({ billingStatus: status }),
+
+  bootstrapStatus: 'idle',
+  setBootstrapStatus: (status) => set({ bootstrapStatus: status }),
+  notificationsUnread: 0,
+  setNotificationsUnread: (n) => set({ notificationsUnread: n }),
   pendingPlan: null,
   setPendingPlan: (plan) => set({ pendingPlan: plan }),
   clearPendingPlan: () => set({ pendingPlan: null }),

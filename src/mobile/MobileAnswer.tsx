@@ -3,12 +3,22 @@ import { ThumbsDown, ThumbsUp } from 'lucide-react'
 import type { Answer, Fact } from '../core/types'
 import { useGraph } from '../core/entityGraph'
 import { filterRecords, recordGroups, recordsHeading, recordTarget, showRecordsPanel, splitAnswerHeadline } from '../core/citations'
-import { answerLayout, claimCheckNote, followupChips, shareText } from '../core/answerLayout'
+import { answerLayout, claimCheckNote, followupChips, isModelWritten, numberCitations, sentencesOf, shareText } from '../core/answerLayout'
 import { documentName } from '../core/documentName'
 import { reviewClient } from '../services/reviewClient'
 import { contactHref, statusClasses } from './format'
 import { typeLabel } from './docUtils'
-import { FollowupChips, MoneyHero, NotOnFileBadge, ShareButton, SingleFactHero, StatusHero, TimelineList } from '../components/answer'
+import {
+  CitationMarkers,
+  CitationSourceStrip,
+  FollowupChips,
+  MoneyHero,
+  NotOnFileBadge,
+  ShareButton,
+  SingleFactHero,
+  StatusHero,
+  TimelineList,
+} from '../components/answer'
 
 type Panel = 'details' | 'records' | 'sources' | null
 const RECORDS_PAGE = 25
@@ -158,6 +168,14 @@ export const MobileAnswer = memo(function MobileAnswer({
   const hasHero = layout === 'money' || layout === 'status' || layout === 'single-fact' || layout === 'timeline'
 
   const { headline, secondary } = splitAnswerHeadline(answer.text)
+  // R13H1: same server-computed per-sentence citations AnswerCard reads — see its own comment.
+  const sentenceData = useMemo(() => sentencesOf(answer), [answer])
+  const modelWritten = useMemo(() => isModelWritten(answer), [answer])
+  const { numbered: numberedSentences, order: citationOrder } = useMemo(
+    () => (sentenceData ? numberCitations(sentenceData) : { numbered: [], order: [] }),
+    [sentenceData]
+  )
+  const openCitationDoc = (documentId: string) => onOpenDoc(documentId)
   const textLower = answer.text.toLowerCase()
   // Lead with the first fact only when it adds something the sentence doesn't already say — moot
   // once a hero is already showing the facts, so this stays empty for those layouts.
@@ -188,10 +206,32 @@ export const MobileAnswer = memo(function MobileAnswer({
     <div className="rounded-2xl bg-surface p-4 grid grid-cols-1 gap-2">
       {answer.interpretation && <p className="m-0 text-caption text-ink-3 truncate">Donovan · {answer.interpretation}</p>}
       {noAnswer && <NotOnFileBadge />}
-      <p className="m-0 text-body-lg text-ink font-medium">{headline}</p>
-      {secondary && <p className="m-0 text-body text-ink-2 whitespace-pre-line">{secondary}</p>}
+      {numberedSentences.length > 0 ? (
+        <>
+          <p className="m-0 text-body-lg text-ink font-medium">
+            {numberedSentences[0]!.text}
+            <CitationMarkers citations={numberedSentences[0]!.citations} onOpenDocument={openCitationDoc} />
+            {modelWritten && !numberedSentences[0]!.supported && (
+              <span className="ml-2 text-caption italic text-ink-2">(not found in your records)</span>
+            )}
+          </p>
+          {numberedSentences.slice(1).map((s, i) => (
+            <p key={i} className="m-0 text-body text-ink-2">
+              {s.text}
+              <CitationMarkers citations={s.citations} onOpenDocument={openCitationDoc} />
+              {modelWritten && !s.supported && <span className="ml-2 text-caption italic text-ink-2">(not found in your records)</span>}
+            </p>
+          ))}
+        </>
+      ) : (
+        <>
+          <p className="m-0 text-body-lg text-ink font-medium">{headline}</p>
+          {secondary && <p className="m-0 text-body text-ink-2 whitespace-pre-line">{secondary}</p>}
+        </>
+      )}
       {answer.basis && <p className="m-0 text-caption text-ink-3">{answer.basis}</p>}
       {claimNote && <p className="m-0 text-caption text-ink-3">{claimNote}</p>}
+      {citationOrder.length > 0 && <CitationSourceStrip order={citationOrder} onOpenDocument={openCitationDoc} />}
 
       {layout === 'money' && <MoneyHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
       {layout === 'status' && <StatusHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}

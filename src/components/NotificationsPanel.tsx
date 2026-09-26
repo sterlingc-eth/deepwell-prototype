@@ -35,7 +35,18 @@ function timeAgo(iso: string): string {
 export function NotificationsPanel() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Startup performance (handoffs/STARTUP_PERF_R13.md): seeded from the one
+  // bootstrap round trip App.tsx already fires on load (useBootstrap.ts) —
+  // an instant, real badge count instead of waiting on this component's own
+  // GET /api/account?action=notifications, which used to fire immediately
+  // on mount as one more of the five staggered startup requests.
+  const bootstrapUnread = useAppStore((s) => s.notificationsUnread);
+  const bootstrapStatus = useAppStore((s) => s.bootstrapStatus);
+  // null until this panel's own fetch (or a local mark-read/mark-all-read)
+  // sets a real count — rendered as `bootstrapUnread` until then, derived
+  // during render rather than mirrored into state via an effect.
+  const [ownUnreadCount, setOwnUnreadCount] = useState<number | null>(null);
+  const unreadCount = ownUnreadCount ?? bootstrapUnread;
   const [loaded, setLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const openEntity = useAppStore((s) => s.openEntity);
@@ -48,7 +59,7 @@ export function NotificationsPanel() {
     fetchNotifications()
       .then((res) => {
         setItems(res.items);
-        setUnreadCount(res.unreadCount);
+        setOwnUnreadCount(res.unreadCount);
         setLoaded(true);
       })
       .catch(() => {
@@ -56,13 +67,55 @@ export function NotificationsPanel() {
       });
   }, []);
 
+  // Cross-tenant isolation (reviewer NO-GO, 2026-09-26): useBootstrap.ts
+  // flips `bootstrapStatus` back to 'idle' the instant it detects a
+  // same-tab tenant switch (OrganizationSwitcher, no reload — see its own
+  // doc comment). This panel's OWN item list must clear right along with
+  // it, or a previous tenant's notification titles/bodies would sit in
+  // this component's state until its next poll/open. Genuinely
+  // synchronizing with that external signal, not deriving it during
+  // render, hence the effect.
   useEffect(() => {
-    refresh();
+    if (bootstrapStatus === 'idle') {
+      // eslint-disable-next-line react/set-state-in-effect
+      setItems([]);
+      // eslint-disable-next-line react/set-state-in-effect
+      setOwnUnreadCount(null);
+      // eslint-disable-next-line react/set-state-in-effect
+      setLoaded(false);
+    }
+  }, [bootstrapStatus]);
+
+  // Fetch the full item list the moment the tray is actually opened, if it
+  // hasn't loaded yet.
+  useEffect(() => {
+    if (open && !loaded) refresh();
+  }, [open, loaded, refresh]);
+
+  // Lazy, not eager (handoffs/STARTUP_PERF_R13.md): the badge already has a
+  // real count from bootstrap, so this only needs to fetch the full list on
+  // its own if nobody ever opens the tray. Two fallbacks keep this from
+  // silently staying empty forever: bootstrap itself failing outright (an
+  // older deployed API without the bootstrap action — same eager fetch this
+  // component always did before this change), or, belt-and-suspenders, a
+  // few seconds of nobody opening it.
+  useEffect(() => {
+    if (loaded) return;
+    if (bootstrapStatus === 'error') {
+      refresh();
+      return;
+    }
+    const t = window.setTimeout(refresh, 4000);
+    return () => window.clearTimeout(t);
+  }, [loaded, bootstrapStatus, refresh]);
+
+  useEffect(() => {
+    if (!loaded) return; // first load is handled above (on open, on error, or the timeout fallback)
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') refresh();
     }, POLL_MS);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [loaded, refresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +136,7 @@ export function NotificationsPanel() {
   const handleItemClick = (item: NotificationItem) => {
     if (!item.readAt) {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, readAt: new Date().toISOString() } : i)));
-      setUnreadCount((n) => Math.max(0, n - 1));
+      setOwnUnreadCount((n) => Math.max(0, (n ?? bootstrapUnread) - 1));
       markNotificationsRead([item.id]).catch(() => {});
     }
     // Mirrors useDeepLink.ts's own branching so every notification kind
@@ -103,7 +156,7 @@ export function NotificationsPanel() {
 
   const handleMarkAllRead = () => {
     setItems((prev) => prev.map((i) => ({ ...i, readAt: i.readAt ?? new Date().toISOString() })));
-    setUnreadCount(0);
+    setOwnUnreadCount(0);
     markAllNotificationsRead().catch(() => {});
   };
 

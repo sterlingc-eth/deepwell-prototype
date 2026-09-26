@@ -1,5 +1,5 @@
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
-import { handleCors, handleError } from "../claude.js";
+import { handleCors, handleError, sendPrivateCacheableJson } from "../claude.js";
 import { getPool, getTenantContext } from "../recordsStore.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { startTimer } from "../timing.js";
@@ -123,7 +123,11 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       const out = await timer.time("handler", () => withTenantTx(ctx, (client, tenantId) => listNotifications(client, tenantId)));
       statusSent = 200;
-      return handleCors(res, req).status(200).json(out);
+      handleCors(res, req);
+      // Startup performance (handoffs/STARTUP_PERF_R13.md): NotificationsPanel
+      // polls this every 5 minutes — private cache + ETag so an unchanged
+      // poll comes back as a 304 instead of the same item list every time.
+      return sendPrivateCacheableJson(res, req, out, 20);
     }
 
     const body = req.body ?? {};

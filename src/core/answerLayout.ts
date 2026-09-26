@@ -166,6 +166,66 @@ export function claimCheckNote(answer: Answer): string | null {
 }
 
 // ---------------------------------------------------------------------------------------------------
+// Sentence citations (R13H1) — attached by the server (api/_lib/citations/sentences.js) but not
+// declared on core/types.ts's Answer (a types.ts change is outside this round's ownership, same rule
+// claimCheckOf above already follows). Read defensively; an older/cached answer with no `sentences`
+// degrades to "render the plain text, no markers" rather than throwing.
+// ---------------------------------------------------------------------------------------------------
+
+export interface SentenceCitation {
+  documentId: string;
+  page?: number;
+  quote?: string;
+  score: number;
+}
+
+export interface AnswerSentence {
+  text: string;
+  citations: SentenceCitation[];
+  supported: boolean;
+}
+
+export function sentencesOf(answer: unknown): AnswerSentence[] | undefined {
+  const s = (answer as { sentences?: unknown } | null)?.sentences;
+  if (!Array.isArray(s) || s.length === 0) return undefined;
+  const ok = s.every(
+    (x): x is AnswerSentence =>
+      Boolean(x) && typeof x === 'object' && typeof (x as AnswerSentence).text === 'string' && Array.isArray((x as AnswerSentence).citations)
+  );
+  return ok ? (s as AnswerSentence[]) : undefined;
+}
+
+/** True only for a MODEL-written answer (the research agent) — the "not found in your records" mark on
+ *  an unsupported sentence means something different for a deterministic answer (computed straight from
+ *  SQL, never model prose) than for one the agent wrote, so it is shown only here. */
+export function isModelWritten(answer: unknown): boolean {
+  return claimCheckOf(answer)?.policy === 'agent';
+}
+
+/** Assigns each sentence's citations a stable [n] marker number, numbered by unique source (documentId)
+ *  in first-appearance order across the WHOLE answer — so citation [1] always means the same document
+ *  everywhere it appears, the same convention SourceList's own numbering already uses for `sources`. */
+export function numberCitations(sentences: readonly AnswerSentence[]): {
+  numbered: { text: string; supported: boolean; citations: (SentenceCitation & { n: number })[] }[];
+  order: string[]; // documentId, in [1][2][3]... order
+} {
+  const order: string[] = [];
+  const numbered = sentences.map((s) => ({
+    text: s.text,
+    supported: s.supported,
+    citations: s.citations.map((c) => {
+      let n = order.indexOf(c.documentId);
+      if (n === -1) {
+        order.push(c.documentId);
+        n = order.length - 1;
+      }
+      return { ...c, n: n + 1 };
+    }),
+  }));
+  return { numbered, order };
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Follow-up chips — deterministic, generated from the answer's own shape (never hard-coded exam text).
 // ---------------------------------------------------------------------------------------------------
 
