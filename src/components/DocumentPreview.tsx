@@ -8,6 +8,7 @@ import { StagePill } from './StagePill';
 import { locationLabel } from './SourceList';
 import { getOriginalUrl, type OriginalUrl } from '../services/documentClient';
 import { requirementLabel } from '../domains/hvac/schema';
+import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 
 // Server document ids are Postgres uuids; local ids minted before a sync
 // completes look like "doc-<base36>-<base36>" (entityGraph.ts's newId). Only
@@ -114,8 +115,11 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
           <div className="min-w-0 flex-1">
             <p className="dw-label">{typeLabel}</p>
             <h2 id="preview-title" className="font-sans font-semibold text-h3 truncate">
-              {doc.filename}
+              {documentName(doc)}
             </h2>
+            {hasFriendlyName(doc) && (
+              <p className="text-caption text-ink-3 truncate">{originalFilename(doc)}</p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-body text-ink-2">
               <StagePill stage={doc.stage} />
               {batch && <span>· {batch.name}</span>}

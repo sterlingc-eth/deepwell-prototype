@@ -137,6 +137,10 @@ export type DocumentIssue =
 export interface Doc {
   id: DocumentId;
   filename: string;
+  /** Human-readable name set once the document is classified, e.g. "Warranty · Carol Rios · Trane XR16 · Jun 12, 2025"
+   *  (server documents.display_name, M3-config/41). Always render via documentName() in src/core/documentName.ts,
+   *  never this field directly — it falls back to a client-derived name, then the original filename. */
+  displayName?: string;
   fileType: FileType;
   pages: number;
   batchId: BatchId;

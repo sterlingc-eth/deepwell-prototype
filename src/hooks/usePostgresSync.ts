@@ -67,6 +67,11 @@ interface DocumentRow {
   /** Written by api/_lib/reviewStore.js's verifyDocument (M3-config/08-review.sql). */
   verified_by?: string | null;
   verified_at?: unknown;
+  /** Written by api/_lib/naming/assign.js (M3-config/41) — undefined on a database that hasn't
+   *  applied that migration yet, or on a document not yet classified confidently enough to be
+   *  named. Round 12: `documentName()` (src/core/documentName.ts) is the ONE place that reads
+   *  this — never render `original_filename` directly as a title. */
+  display_name?: string | null;
   /** Clerk user id of whoever uploaded this document (M3-config/20) —
    *  undefined on a database that hasn't applied that migration yet. */
   uploaded_by?: string | null;
@@ -174,6 +179,7 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
   const doc: Doc = {
     id: row.id,
     filename: row.original_filename,
+    displayName: row.display_name ?? undefined,
     fileType: fileTypeOf(row),
     pages: row.page_count ?? 0,
     batchId: row.batch_id ?? 'synced',

@@ -5,6 +5,7 @@ import { getOriginalUrl, type OriginalUrl } from '../services/documentClient'
 import { fieldLabel, requirementLabel } from '../domains/hvac/documentTypes'
 import { customerAddress, customerName, customerOf, fieldValue, formatDate, typeLabel } from './docUtils'
 import { Sheet } from './Sheet'
+import { documentName, hasFriendlyName, originalFilename } from '../core/documentName'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -32,10 +33,13 @@ export function DocSheet({ documentId, graphLoading, onClose }: { documentId: st
   const fields = (doc?.extracted ?? []).filter((f) => fieldValue(f) && f.name !== 'raw_text')
   const missing = (doc?.issues ?? []).flatMap((i) => (i.kind === 'missing-field' ? [requirementLabel(i.field)] : []))
   const isImage = !!original?.contentType?.startsWith('image/')
-  const title = doc?.filename ?? original?.filename ?? 'Document'
+  const title = doc ? documentName(doc) : (original?.filename ?? 'Document')
 
   return (
     <Sheet eyebrow={doc ? typeLabel(doc.typeId) : undefined} title={title} onClose={onClose}>
+      {doc && hasFriendlyName(doc) && (
+        <p className="m-0 -mt-2 text-caption text-ink-3 truncate">{originalFilename(doc)}</p>
+      )}
       {(cust || missing.length > 0) && (
         <div className="rounded-xl bg-surface-2 p-3 grid gap-1">
           {cust && (

@@ -303,6 +303,7 @@ export function AskScreen() {
               onOpenSource={setPreview}
               onOpenEntity={openFactEntity}
               onOpenRecord={openRecord}
+              onAsk={(q) => void submit(q)}
             />
           </>
         )}

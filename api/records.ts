@@ -58,6 +58,12 @@ export default async (req: VercelRequest, res: VercelResponse) => {
           case 'createDocument': return { id: (await db.createDocument(payload))?.id };
           case 'getDocument': return await db.getDocument(payload.id);
           case 'listDocuments': return await db.listDocuments(payload.filters);
+          // Records Browse (round 12 contract): the paginated/filtered/faceted
+          // list behind the records screen. `payload.filters` is caller input,
+          // normalized and validated inside browseDocuments itself — nothing
+          // here is trusted directly. `currentUserId` comes from the verified
+          // token (never the payload) so "My uploads" can't be spoofed.
+          case 'browseDocuments': return await db.browseDocuments(payload.filters, { currentUserId: auth.userId });
           case 'updateDocument':
             await db.updateDocument(payload.id, payload.updates); return { success: true };
 

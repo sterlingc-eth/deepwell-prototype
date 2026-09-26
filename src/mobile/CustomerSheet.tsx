@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
 import { FileText, Loader2, Mail, MapPin, Phone } from 'lucide-react'
-import { customerClient, type CustomerDetail } from '../services/customerClient'
+import { customerClient, type CustomerDetail, type CustomerDocument } from '../services/customerClient'
 import { typeLabel } from './docUtils'
 import { Sheet } from './Sheet'
+
+/** customerClient's CustomerDocument doesn't declare `displayName` yet — round 12 hook for
+ *  whoever owns api/_lib/routes/customers.js + src/services/customerClient.ts: map
+ *  `displayName: d.display_name` alongside the existing `filename: d.original_filename` (see
+ *  that route's own document-list mapping) and add `displayName?: string | null` to
+ *  CustomerDocument. Read loosely here (rather than left unused) so this screen picks the real
+ *  name up the moment that lands, with zero UI change needed on that side. */
+type NamedCustomerDocument = CustomerDocument & { displayName?: string | null }
 
 function warrantyStatus(daysLeft: number | null, expires: string | null): { text: string; cls: string } | null {
   if (!expires) return null
@@ -88,19 +96,22 @@ export function CustomerSheet({ customerRef, onOpenDoc, onClose }: { customerRef
         <section>
           <h3 className="m-0 mb-1 text-caption text-ink-3 font-semibold uppercase tracking-wide">Recent documents</h3>
           <ul className="list-none p-0 m-0 divide-y divide-line/60">
-            {detail.documents.slice(0, 12).map((d) => (
-              <li key={d.id}>
-                <button type="button" onClick={() => onOpenDoc(d.id)} className="w-full min-h-touch py-2 text-left flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-body text-ink truncate">{typeLabel(d.type)}</span>
-                    <span className="block text-caption text-ink-3 truncate">
-                      {[d.serviceDate ?? d.createdAt?.slice(0, 10), d.filename].filter(Boolean).join(' · ')}
+            {detail.documents.slice(0, 12).map((d) => {
+              const title = (d as NamedCustomerDocument).displayName || typeLabel(d.type)
+              return (
+                <li key={d.id}>
+                  <button type="button" onClick={() => onOpenDoc(d.id)} className="w-full min-h-touch py-2 text-left flex items-center gap-3">
+                    <FileText className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-body text-ink truncate">{title}</span>
+                      <span className="block text-caption text-ink-3 truncate">
+                        {[d.serviceDate ?? d.createdAt?.slice(0, 10), d.filename].filter(Boolean).join(' · ')}
+                      </span>
                     </span>
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </section>
       )}

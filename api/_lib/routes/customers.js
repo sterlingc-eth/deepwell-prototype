@@ -500,6 +500,7 @@ export async function customer(req, res) {
         return {
           id: d.id,
           filename: d.original_filename,
+          displayName: d.display_name ?? null,
           type: d.document_type,
           stage: d.stage,
           verifiedBy: d.verified_by,

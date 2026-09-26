@@ -5,6 +5,7 @@ import customerEquipment from "./_lib/routes/customer-equipment.js";
 import { customers, customer } from "./_lib/routes/customers.js";
 import exportCsv from "./_lib/routes/export-csv.js";
 import graph from "./_lib/routes/v1-graph.js";
+import intakeStatus from "./_lib/routes/intake-status.js";
 
 /**
  * The public API surface, behind one function.
@@ -20,6 +21,7 @@ import graph from "./_lib/routes/v1-graph.js";
  *   GET  /api/v1/customers?q=&sort=&limit=
  *   GET  /api/v1/customer?id=|number=
  *   GET  /api/v1/graph?node=<id>&depth=<n>   (Knowledge Graph v1 — see v1-graph.js)
+ *   GET  /api/v1/intake-status                (straight-through-processing rate — see intake/status.js)
  *
  * `customer-equipment` is the RETIRED api/customer-equipment.js (billing
  * brief, 2026-09-20): same handler, same body shape, reachable at the old
@@ -31,7 +33,10 @@ import graph from "./_lib/routes/v1-graph.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "16kb" } }, maxDuration: 60 };
 
-const RESOURCES = { equipment, warranty, ingest, "customer-equipment": customerEquipment, customers, customer, export: exportCsv, graph };
+const RESOURCES = {
+  equipment, warranty, ingest, "customer-equipment": customerEquipment, customers, customer,
+  export: exportCsv, graph, "intake-status": intakeStatus,
+};
 
 export default async function handler(req, res) {
   const resource = String(req.query?.resource ?? "");

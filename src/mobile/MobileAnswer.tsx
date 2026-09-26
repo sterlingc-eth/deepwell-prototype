@@ -3,9 +3,12 @@ import { ThumbsDown, ThumbsUp } from 'lucide-react'
 import type { Answer, Fact } from '../core/types'
 import { useGraph } from '../core/entityGraph'
 import { filterRecords, recordGroups, recordsHeading, recordTarget, showRecordsPanel, splitAnswerHeadline } from '../core/citations'
+import { answerLayout, claimCheckNote, followupChips, shareText } from '../core/answerLayout'
+import { documentName } from '../core/documentName'
 import { reviewClient } from '../services/reviewClient'
 import { contactHref, statusClasses } from './format'
 import { typeLabel } from './docUtils'
+import { FollowupChips, MoneyHero, NotOnFileBadge, ShareButton, SingleFactHero, StatusHero, TimelineList } from '../components/answer'
 
 type Panel = 'details' | 'records' | 'sources' | null
 const RECORDS_PAGE = 25
@@ -101,6 +104,7 @@ function Feedback({ question }: { question: string }) {
         type="button"
         className={btn}
         aria-label="This answer was right"
+        data-tap-target="true"
         disabled={upSending}
         onClick={async () => {
           setUpSending(true)
@@ -114,7 +118,7 @@ function Feedback({ question }: { question: string }) {
       >
         <ThumbsUp className="w-4 h-4" />
       </button>
-      <button type="button" className={btn} aria-label="This answer was wrong" onClick={() => setStep('asking')}>
+      <button type="button" className={btn} aria-label="This answer was wrong" data-tap-target="true" onClick={() => setStep('asking')}>
         <ThumbsDown className="w-4 h-4" />
       </button>
     </span>
@@ -133,22 +137,36 @@ export const MobileAnswer = memo(function MobileAnswer({
   answer,
   onOpenDoc,
   onOpenCustomer,
+  onAsk,
 }: {
   question: string
   answer: Answer
   onOpenDoc: (id: string) => void
   onOpenCustomer: (ref: string) => void
+  /** Send a follow-up chip as the next question — omitted, the chip row just doesn't render. */
+  onAsk?: (question: string) => void
 }) {
   const docs = useGraph((s) => s.docs)
   const [panel, setPanel] = useState<Panel>(null)
   const [group, setGroup] = useState<string | null>(null)
   const [recordLimit, setRecordLimit] = useState(RECORDS_PAGE)
 
+  // Round 12: same layout decision as desktop AnswerCard (src/core/answerLayout.ts) — a money/
+  // status/single-fact/timeline shape gets that shared hero component instead of the generic
+  // headline-fact-then-Details fold below.
+  const layout = useMemo(() => answerLayout(answer), [answer])
+  const hasHero = layout === 'money' || layout === 'status' || layout === 'single-fact' || layout === 'timeline'
+
   const { headline, secondary } = splitAnswerHeadline(answer.text)
   const textLower = answer.text.toLowerCase()
-  // Lead with the first fact only when it adds something the sentence doesn't already say.
-  const keyFact = answer.facts.find((f, i) => i === 0 && (f.status || f.basis === 'computed' || !textLower.includes(f.value.toLowerCase())))
-  const restFacts = keyFact ? answer.facts.slice(1) : answer.facts
+  // Lead with the first fact only when it adds something the sentence doesn't already say — moot
+  // once a hero is already showing the facts, so this stays empty for those layouts.
+  const keyFact = hasHero ? undefined : answer.facts.find((f, i) => i === 0 && (f.status || f.basis === 'computed' || !textLower.includes(f.value.toLowerCase())))
+  const restFacts = hasHero ? [] : keyFact ? answer.facts.slice(1) : answer.facts
+
+  const claimNote = claimCheckNote(answer)
+  const chips = onAsk ? followupChips(answer, question) : []
+  const resolveDocName = (id: string) => { const d = docs[id]; return d ? documentName(d) : undefined }
 
   const records = useMemo(() => answer.records ?? [], [answer.records])
   const hasRecords = showRecordsPanel(answer)
@@ -169,8 +187,16 @@ export const MobileAnswer = memo(function MobileAnswer({
   return (
     <div className="rounded-2xl bg-surface p-4 grid grid-cols-1 gap-2">
       {answer.interpretation && <p className="m-0 text-caption text-ink-3 truncate">Donovan · {answer.interpretation}</p>}
+      {noAnswer && <NotOnFileBadge />}
       <p className="m-0 text-body-lg text-ink font-medium">{headline}</p>
       {secondary && <p className="m-0 text-body text-ink-2 whitespace-pre-line">{secondary}</p>}
+      {answer.basis && <p className="m-0 text-caption text-ink-3">{answer.basis}</p>}
+      {claimNote && <p className="m-0 text-caption text-ink-3">{claimNote}</p>}
+
+      {layout === 'money' && <MoneyHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
+      {layout === 'status' && <StatusHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
+      {layout === 'single-fact' && answer.facts[0] && <SingleFactHero fact={answer.facts[0]} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
+      {layout === 'timeline' && <TimelineList facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
 
       {keyFact && (
         <dl className="m-0">
@@ -179,7 +205,7 @@ export const MobileAnswer = memo(function MobileAnswer({
       )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        {(restFacts.length > 0 || answer.basis) && (
+        {restFacts.length > 0 && (
           <button type="button" aria-expanded={panel === 'details'} className={pill(panel === 'details')} onClick={() => toggle('details')}>
             Details{restFacts.length ? ` · ${restFacts.length}` : ''}
           </button>
@@ -194,10 +220,13 @@ export const MobileAnswer = memo(function MobileAnswer({
             {noAnswer ? 'Closest' : 'Sources'} · {citedIds.length}
           </button>
         )}
-        <span className="ml-auto shrink-0">
+        <span className="ml-auto shrink-0 inline-flex items-center gap-1">
+          <ShareButton text={shareText(question, answer, resolveDocName)} />
           <Feedback question={question} />
         </span>
       </div>
+
+      {chips.length > 0 && onAsk && <FollowupChips chips={chips} onPick={onAsk} />}
 
       {panel === 'details' && (
         <div className="grid grid-cols-1 gap-1">
@@ -208,7 +237,6 @@ export const MobileAnswer = memo(function MobileAnswer({
               ))}
             </dl>
           )}
-          {answer.basis && <p className="m-0 text-caption text-ink-3">{answer.basis}</p>}
         </div>
       )}
 

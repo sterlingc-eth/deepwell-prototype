@@ -10,6 +10,7 @@ import expenses from "./_lib/routes/expenses.js";
 import financials from "./_lib/routes/financials.js";
 import graph from "./_lib/routes/graph.js";
 import entityMerge from "./_lib/routes/entity-merge.js";
+import naming from "./_lib/routes/naming.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -25,6 +26,8 @@ import entityMerge from "./_lib/routes/entity-merge.js";
  *   POST expenses             -> ?action=expenses (DeepWell's own business expenses; platform-operator only)
  *   POST graph                -> ?action=graph   (Knowledge Graph v1: kg_edges backfill/refresh status; admin)
  *   POST entity-merge         -> ?action=entity-merge (duplicate-customer clusters: list/accept/reject/undo; admin)
+ *   POST naming               -> ?action=naming   (document display names: status/backfill/assign
+ *                                                   admin, rename any member — round 12)
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
@@ -36,7 +39,7 @@ import entityMerge from "./_lib/routes/entity-merge.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

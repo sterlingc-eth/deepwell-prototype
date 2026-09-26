@@ -178,6 +178,8 @@ export interface CustomerEquipment {
 export interface CustomerDocument {
   id: string;
   filename: string | null;
+  /** documents.display_name (M3-config/41) when set; render via documentName(). */
+  displayName?: string | null;
   type: string | null;
   stage: string;
   verifiedBy: string | null;

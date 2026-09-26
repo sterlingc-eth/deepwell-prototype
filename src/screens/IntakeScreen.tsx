@@ -5,6 +5,7 @@ import { docCountsByStage, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
+import { documentName, hasFriendlyName } from '../core/documentName';
 import { ingestFiles, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
 import {
   startBulkImport,
@@ -695,8 +696,8 @@ export function IntakeBody() {
                           <button type="button" onClick={() => review(d.id)} className="w-full text-left flex items-center gap-3 px-4 py-3 min-h-touch hover:bg-surface-2 transition-colors duration-quick">
                             <StagePill stage={d.stage} compact />
                             <span className="min-w-0 flex-1">
-                              <span className="block font-mono text-data text-ink truncate">{d.filename}</span>
-                              <span className="block text-body text-ink-3">{typeLabel}{d.linkedEntityIds.length ? ` · linked to ${d.linkedEntityIds.length}` : ''}</span>
+                              <span className="block font-mono text-data text-ink truncate">{documentName(d)}</span>
+                              <span className="block text-body text-ink-3 truncate">{[typeLabel, hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · ')}{d.linkedEntityIds.length ? ` · linked to ${d.linkedEntityIds.length}` : ''}</span>
                             </span>
                             {issue && <span className="dw-pill-warn shrink-0">{issue}</span>}
                             <ChevronRight className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" />

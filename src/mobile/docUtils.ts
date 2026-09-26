@@ -1,6 +1,7 @@
 import type { Doc, Entity, EntityId } from '../core/types'
 import { customerForDocument } from '../core/customer'
 import { DOCUMENT_TYPES } from '../domains/hvac/documentTypes'
+import { documentName } from '../core/documentName'
 
 const TYPE_LABELS = new Map(DOCUMENT_TYPES.map((t) => [t.id, t.label]))
 
@@ -32,12 +33,15 @@ export function fieldValue(f: Doc['extracted'][number]): string {
   return (f.correctedValue ?? f.value ?? '').trim()
 }
 
-/** Lower-cased blob the Docs search matches against. */
+/** Lower-cased blob the Docs search matches against. Includes BOTH the display name (round 12:
+ *  "Warranty · Carol Rios · Trane XR16 · Jun 12, 2025" now matches "warranty rios") and the
+ *  original filename — a tech who still remembers "34534895.pdf" must keep finding it too. */
 export function searchText(doc: Doc, entities: Record<EntityId, Entity>): string {
   const c = customerOf(doc, entities)
   const cust = c ? Object.values(c.fields).map(str).join(' ') : ''
   const fields = doc.extracted.map(fieldValue).join(' ')
-  return `${doc.filename} ${typeLabel(doc.typeId)} ${cust} ${fields}`.toLowerCase()
+  const name = documentName(doc)
+  return `${doc.filename} ${name} ${typeLabel(doc.typeId)} ${cust} ${fields}`.toLowerCase()
 }
 
 export function formatDate(d: Date | null | undefined): string {

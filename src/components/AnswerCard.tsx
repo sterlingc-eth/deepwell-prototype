@@ -2,10 +2,14 @@ import { useMemo, useState } from 'react';
 import { ShieldCheck, ShieldQuestion } from 'lucide-react';
 import type { Answer, AnswerRecord, SourceRef } from '../core/types';
 import { recordGroups, showRecordsPanel, splitAnswerHeadline } from '../core/citations';
+import { answerLayout, claimCheckNote, followupChips, shareText } from '../core/answerLayout';
+import { documentName } from '../core/documentName';
+import { useGraph } from '../core/entityGraph';
 import { RecordsPanel } from './RecordsPanel';
 import { FactGrid } from './FactGrid';
 import { SourceList } from './SourceList';
 import { AnswerFeedback } from './AnswerFeedback';
+import { FollowupChips, MoneyHero, NotOnFileBadge, ShareButton, SingleFactHero, StatusHero, TimelineList } from './answer';
 
 export interface AnswerCardProps {
   answer: Answer;
@@ -16,6 +20,8 @@ export interface AnswerCardProps {
   onOpenEntity?: (entityId: string) => void;
   /** Open a record from the "Based on N records" list: customer profile, unit's customer, document at its cited page. */
   onOpenRecord?: (record: AnswerRecord) => void;
+  /** Send a follow-up chip (or a "Warranty status?"-style suggestion) as the next question. */
+  onAsk?: (question: string) => void;
 }
 
 /**
@@ -26,10 +32,26 @@ export interface AnswerCardProps {
  *
  * Embeddable: it depends only on the Answer object and three callbacks.
  */
-export function AnswerCard({ answer, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity, onOpenRecord }: AnswerCardProps) {
-  // Citation contract: the drill-down list is collapsed until asked for; a breakdown row can filter it.
-  const [recordsOpen, setRecordsOpen] = useState(false);
+export function AnswerCard({ answer, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity, onOpenRecord, onAsk }: AnswerCardProps) {
+  const docs = useGraph((s) => s.docs);
+  // Round 12: which of the small set of layouts this answer's own shape (facts/records/basis) calls
+  // for — see src/core/answerLayout.ts. Desktop and mobile both derive it the same way.
+  const layout = useMemo(() => answerLayout(answer), [answer]);
+  // 'list' is the "long list of records, needs sort/filter/find" shape the owner called out — its
+  // whole point is the drill-down list, so it starts open instead of behind a "view" disclosure.
+  const [recordsOpen, setRecordsOpen] = useState(layout === 'list');
   const [recordsGroup, setRecordsGroup] = useState<string | null>(null);
+  // AnswerCard isn't remounted between questions (no key), so a new answer must reset these itself —
+  // otherwise a 'list' answer that starts open would stay stuck open (or closed) for whatever the
+  // PREVIOUS question happened to leave it as. Adjusted during render (React's own pattern for
+  // "reset state when a prop changes"), not an effect, so there is no extra render pass.
+  const answerKey = `${question}|${answer.text}`;
+  const [seenKey, setSeenKey] = useState(answerKey);
+  if (answerKey !== seenKey) {
+    setSeenKey(answerKey);
+    setRecordsOpen(layout === 'list');
+    setRecordsGroup(null);
+  }
   const records = useMemo(() => answer.records ?? [], [answer.records]);
   const groupKeys = useMemo(() => new Set(recordGroups(records)), [records]);
   const selectGroup = (label: string) => {
@@ -72,6 +94,9 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
   // contradiction). Shown only when it can actually mean something: an empty/no-answer state, or an
   // answer that cites real documents.
   const showVerifiedControl = isEmpty || answer.sources.length > 0;
+  const claimNote = claimCheckNote(answer);
+  const chips = onAsk ? followupChips(answer, question) : [];
+  const resolveDocName = (id: string) => { const d = docs[id]; return d ? documentName(d) : undefined; };
 
   return (
     <article className="dw-card overflow-hidden animate-rise" aria-live="polite" aria-labelledby="answer-text">
@@ -79,6 +104,11 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
         <p className="text-caption text-ink-3 mb-2 truncate">
           <span className="font-medium text-ink-2">Donovan</span> · {answer.interpretation ? answer.interpretation : `Asked: “${question}”`}
         </p>
+        {isEmpty && (
+          <div className="mb-2">
+            <NotOnFileBadge />
+          </div>
+        )}
         <p id="answer-text" className={['font-display text-ink', isEmpty ? 'text-h2' : 'text-h2 sm:text-[28px] sm:leading-[36px] field:text-[30px] field:leading-[38px]'].join(' ')}>
           {headline}
         </p>
@@ -93,6 +123,13 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
         {answer.basis && (
           <p className="mt-2 text-caption text-ink-3" data-testid="answer-basis">
             {answer.basis}
+          </p>
+        )}
+        {/* Claim-check (api/_lib/claims): subtle, never a new alarm — just where the number "3
+            documents" is worth saying out loud alongside the basis sentence above. */}
+        {claimNote && (
+          <p className="mt-1 text-caption text-ink-3" data-testid="answer-claimcheck">
+            {claimNote}
           </p>
         )}
 
@@ -130,11 +167,23 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
           </>
         ) : (
           <>
-            <FactGrid
-              facts={answer.facts} citation={citation} onOpenSource={onOpenSource} sourceLabel={sourceLabel}
-              {...(onOpenEntity ? { onOpenEntity } : {})}
-              {...(panel ? { groupKeys, activeGroup: recordsGroup, onSelectGroup: selectGroup } : {})}
-            />
+            {/* Round 12: a layout-specific hero for the shapes that most benefit from one (a dollar
+                figure, a warranty/maintenance state, one plain value, a dated history). Its own
+                "rest of the facts" section replaces FactGrid for money/status/single-fact so the same
+                fact never renders twice; timeline replaces it outright. Every other layout (list,
+                comparison, explain, prose) keeps the existing FactGrid — already a good fit for a
+                breakdown/grid of many facts. */}
+            {layout === 'money' && <MoneyHero facts={answer.facts} onOpenSource={onOpenSource} />}
+            {layout === 'status' && <StatusHero facts={answer.facts} onOpenSource={onOpenSource} />}
+            {layout === 'single-fact' && answer.facts[0] && <SingleFactHero fact={answer.facts[0]} onOpenSource={onOpenSource} />}
+            {layout === 'timeline' && <TimelineList facts={answer.facts} onOpenSource={onOpenSource} />}
+            {layout !== 'money' && layout !== 'status' && layout !== 'single-fact' && layout !== 'timeline' && (
+              <FactGrid
+                facts={answer.facts} citation={citation} onOpenSource={onOpenSource} sourceLabel={sourceLabel}
+                {...(onOpenEntity ? { onOpenEntity } : {})}
+                {...(panel ? { groupKeys, activeGroup: recordsGroup, onSelectGroup: selectGroup } : {})}
+              />
+            )}
             {panel}
             {/* Owner report (2026-09-25): "SOURCES · 0 — No documents cited" showed even when the
                 RecordsPanel above already cites 13 real customer records — read as a flat
@@ -146,7 +195,11 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
             )}
           </>
         )}
-        <AnswerFeedback key={`${question}|${answer.text}`} question={question} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <AnswerFeedback key={`${question}|${answer.text}`} question={question} />
+          <ShareButton text={shareText(question, answer, resolveDocName)} />
+        </div>
+        {chips.length > 0 && onAsk && <FollowupChips chips={chips} onPick={onAsk} />}
       </div>
     </article>
   );

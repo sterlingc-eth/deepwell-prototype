@@ -37,17 +37,19 @@ export function AnswerFeedback({ question }: { question: string }) {
     setStep('done');
   };
 
-  const btn = 'inline-flex items-center justify-center w-8 h-8 rounded-md text-ink-3 hover:text-ink hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-50';
+  // Round 12 tech-ergonomics pass: was w-8 h-8 (32px) — under the 44px minimum tap target every other
+  // control in this round meets. Bumped to match MobileAnswer's own (already-44px) feedback buttons.
+  const btn = 'inline-flex items-center justify-center w-11 h-11 rounded-md text-ink-3 hover:text-ink hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-50';
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-caption text-ink-3" data-testid="answer-feedback">
       {step === 'idle' && (
         <>
           <span>Was this right?</span>
-          <button type="button" className={btn} aria-label="Yes, this answer was right" onClick={() => void thumbsUp()}>
+          <button type="button" className={btn} aria-label="Yes, this answer was right" onClick={() => void thumbsUp()} data-tap-target="true">
             <ThumbsUp className="w-4 h-4" aria-hidden="true" />
           </button>
-          <button type="button" className={btn} aria-label="No, this answer was wrong" onClick={() => setStep('asking')}>
+          <button type="button" className={btn} aria-label="No, this answer was wrong" onClick={() => setStep('asking')} data-tap-target="true">
             <ThumbsDown className="w-4 h-4" aria-hidden="true" />
           </button>
         </>

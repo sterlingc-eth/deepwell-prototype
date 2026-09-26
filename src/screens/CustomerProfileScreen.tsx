@@ -9,14 +9,25 @@ import { WarrantyStatusBadge, type AlertTier } from '../components/WarrantyStatu
 import { formatYmd, normalize } from '../core/answer';
 import { customerNodeId } from '../core/graphNodeId';
 import { useGraph } from '../core/entityGraph';
+import { documentName } from '../core/documentName';
 import {
   customerClient,
   type CustomerDetail,
+  type CustomerDocument,
   type CustomerPatch,
   type CustomerReminder,
   type CustomerTimelineEntry,
 } from '../services/customerClient';
 import { useAppStore } from '../store/appStore';
+
+/** customerClient's CustomerDocument/CustomerReminder don't declare `displayName` yet — round 12
+ *  hook for whoever owns api/_lib/routes/customers.js + src/services/customerClient.ts: map
+ *  `displayName: d.display_name` alongside each place that already maps `filename:
+ *  d.original_filename` (the documents list AND the reminders list, both in that route's customer
+ *  detail response), and add `displayName?: string | null` to both types. Read loosely here so
+ *  this screen picks the real name up the moment that lands, with no UI change needed on that side. */
+type NamedCustomerDocument = CustomerDocument & { displayName?: string | null };
+type NamedCustomerReminder = CustomerReminder & { displayName?: string | null };
 
 /** Chronological, most-recent-first — the same ordering rule the API's own
  *  timeline uses (api/_lib/routes/customers.js's `timeline.sort`), applied
@@ -264,7 +275,7 @@ export function CustomerProfileScreen() {
     const q = normalize(assignQuery);
     const already = new Set((detail?.documents ?? []).map((d) => d.id));
     return Object.values(docs)
-      .filter((d) => !already.has(d.id) && (!q || normalize(d.filename).includes(q)))
+      .filter((d) => !already.has(d.id) && (!q || normalize(d.filename).includes(q) || normalize(documentName(d)).includes(q)))
       .slice(0, 20);
   }, [docs, assignQuery, detail]);
   const runAssign = async (documentId: string) => {
@@ -410,7 +421,12 @@ export function CustomerProfileScreen() {
             <ul className="divide-y divide-line border border-line rounded-lg max-h-64 overflow-y-auto">
               {assignCandidates.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="font-mono text-data truncate">{d.filename}</span>
+                  <span className="min-w-0 truncate">
+                    <span className="block text-data text-ink truncate">{documentName(d)}</span>
+                    {d.filename && documentName(d) !== d.filename && (
+                      <span className="block font-mono text-caption text-ink-3 truncate">{d.filename}</span>
+                    )}
+                  </span>
                   <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 shrink-0" disabled={assignBusy === d.id} onClick={() => void runAssign(d.id)}>
                     {assignBusy === d.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : 'Assign'}
                   </button>
@@ -465,7 +481,7 @@ export function CustomerProfileScreen() {
                         className="underline hover:text-ink"
                         onClick={() => setPreviewDocId(r.documentId)}
                       >
-                        {r.filename ?? 'source document'}
+                        {(r as NamedCustomerReminder).displayName ?? r.filename ?? 'source document'}
                       </button>
                     </span>
                   </span>
@@ -527,7 +543,7 @@ export function CustomerProfileScreen() {
                 >
                   <FileText className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-mono text-data text-ink truncate">{d.filename ?? d.id}</span>
+                    <span className="block font-mono text-data text-ink truncate">{(d as NamedCustomerDocument).displayName ?? d.filename ?? d.id}</span>
                     <span className="block text-caption text-ink-3">{d.type ?? 'Unclassified'} · {STAGE_TEXT[d.stage] ?? d.stage}</span>
                   </span>
                   <span className="dw-pill-muted shrink-0">{viaLabel(d.via)}</span>

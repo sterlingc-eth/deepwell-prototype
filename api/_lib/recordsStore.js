@@ -29,6 +29,10 @@ import {
 import { TTLCache, memoAsync, logStage, registerTenantCache, bustTenantCaches } from './perf.js';
 // Search by meaning (api/_lib/search/*): inert unless VOYAGE_API_KEY is set and M3-config/31 has run.
 import { startSemantic, keywordCandidateLimit, finishHybrid } from './search/hybrid.js';
+// Records Browse (round 12, G2): read-only reuse of the financials layer's own
+// "is the table there yet" probe, so browseDocuments never needs a second copy
+// of that memoization — see financials/store.js's own doc comment.
+import { financialsTableExists } from './financials/store.js';
 
 let pool;
 
@@ -277,6 +281,262 @@ export function _resetTenantContextCache() {
 }
 
 const TENANT = 'tenant_id = (current_setting(\'app.tenant_id\', true))::uuid';
+
+/* ============================================================================
+ * RECORDS BROWSE (round 12 contract) — server-side filter/sort/paging/search/
+ * facets behind the records screen, replacing listDocuments' LIMIT 500 with
+ * real (offset) cursor paging. See browseDocuments() below for the DB half;
+ * everything in this section is pure — no db, no I/O — so it's directly
+ * testable from scripts/verify-records-browse.mjs with no database.
+ *
+ * Data model this queries against (no new tables):
+ *   - documents            — the row itself (filename, type, stage, dates).
+ *   - document_entity_links -> entities — a document's linked customer
+ *     (name + service_address) and equipment (manufacturer/"brand" +
+ *     warranty.expires). There is no separate 'property' or 'technician'
+ *     entity in this schema (see BrowseScreen.tsx's Kind comment) — "site" is
+ *     the linked customer's (falling back to a linked equipment's own)
+ *     service_address, and "technician" is the extracted field below, not a
+ *     linked record.
+ *   - extractions           — field_key = 'service_date' | 'technician'
+ *     (extractFields.js), highest-confidence value per document.
+ *   - document_financials   — amount/status/balance, LEFT JOINed (M3-config/22,
+ *     may not exist — see documentsHaveFinancials-style guards elsewhere;
+ *     browseDocuments probes it the same way).
+ *
+ * A document linked to more than one equipment unit (a multi-unit service
+ * ticket) picks an arbitrary one for brand/warranty via MAX() — a browse
+ * list's job is to help a person FIND the document, not stand in for its
+ * full detail view.
+ * ============================================================================ */
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Sort id -> {expr, dir}. `expr` is a column on the `base` CTE (see
+ *  sharedBrowseCtes below), never user input — safe to embed literally. */
+export const BROWSE_SORTS = {
+  'service-date': { expr: 'service_date', dir: 'DESC' },
+  'upload-date': { expr: 'created_at', dir: 'DESC' },
+  customer: { expr: 'customer_name', dir: 'ASC' },
+  type: { expr: 'document_type', dir: 'ASC' },
+  amount: { expr: 'amount', dir: 'DESC' },
+};
+export const DEFAULT_BROWSE_SORT = 'upload-date';
+
+export const STAGE_BUCKETS = ['verified', 'needs-review', 'missing-info'];
+export const WARRANTY_BUCKETS = ['expired', 'expiring', 'active', 'unknown'];
+
+/** Same "verified / needs a person" split as isAttention (ReviewScreen.tsx),
+ *  expressed from server-only signals — there is no server-side `issues`
+ *  computation (that's a client graph derivation), so this is a deliberately
+ *  simpler, DB-native approximation: nothing extracted yet (or never
+ *  classified) is 'missing-info'; anything short of verified beyond that is
+ *  'needs-review'. Safe to embed literally: no user input inside it. */
+const STAGE_BUCKET_CASE = `
+  CASE
+    WHEN d.stage = 'verified' THEN 'verified'
+    WHEN d.stage = 'received' OR d.document_type IS NULL THEN 'missing-info'
+    ELSE 'needs-review'
+  END`;
+
+/** TEXT comparison against ISO 'YYYY-MM-DD' strings (not a ::date cast) —
+ *  same "never let one malformed value 500 the whole list" rule as
+ *  listWarrantyAttention above; lexicographic order matches chronological
+ *  order for zero-padded ISO dates. $1/$2 are always today / today+90d,
+ *  reserved at the front of every browse query's param list (see
+ *  renderBrowseFragments). */
+const WARRANTY_BUCKET_CASE = `
+  CASE
+    WHEN linked.warranty_expiry IS NULL THEN 'unknown'
+    WHEN linked.warranty_expiry < $1 THEN 'expired'
+    WHEN linked.warranty_expiry <= $2 THEN 'expiring'
+    ELSE 'active'
+  END`;
+
+/** today+days as an ISO 'YYYY-MM-DD' string, UTC — pure, so a fixed `today`
+ *  makes every bucket boundary reproducible in tests. */
+export function isoPlusDays(todayIso, days) {
+  const d = new Date(`${todayIso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Whitelists/validates raw filter input into a clean, DB-safe shape. Never
+ * trusts a caller-supplied enum value into SQL text (every value below is
+ * only ever used as a bound $n parameter — see renderBrowseFragments/
+ * buildBrowseFragments) — this function's job is predictable behavior (a
+ * bogus value is dropped, not a crash), not injection safety, which comes
+ * from parameterization regardless of what passes through here.
+ */
+export function normalizeBrowseFilters(raw = {}) {
+  const f = {};
+  const str = (v, max = 200) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+  const bool = (v) => (v === true ? true : v === false ? false : null);
+  const isoDate = (v) => (typeof v === 'string' && ISO_DATE_RE.test(v) ? v : null);
+
+  f.documentType = str(raw.documentType);
+  f.customerId = str(raw.customerId, 100);
+  f.site = str(raw.site, 300);
+  f.technician = str(raw.technician, 200);
+  f.brand = str(raw.brand, 200);
+  f.stageBucket = STAGE_BUCKETS.includes(raw.stageBucket) ? raw.stageBucket : null;
+  f.warrantyBucket = WARRANTY_BUCKETS.includes(raw.warrantyBucket) ? raw.warrantyBucket : null;
+  f.hasMoney = bool(raw.hasMoney);
+  f.openBalance = bool(raw.openBalance);
+  f.uploadedByMe = raw.uploadedByMe === true ? true : null;
+  f.serviceDateFrom = isoDate(raw.serviceDateFrom);
+  f.serviceDateTo = isoDate(raw.serviceDateTo);
+  f.uploadDateFrom = isoDate(raw.uploadDateFrom);
+  f.uploadDateTo = isoDate(raw.uploadDateTo);
+  f.q = str(raw.q, 200);
+  f.sort = Object.prototype.hasOwnProperty.call(BROWSE_SORTS, raw.sort) ? raw.sort : DEFAULT_BROWSE_SORT;
+  f.limit = Number.isFinite(Number(raw.limit)) && Number(raw.limit) >= 1 ? Math.min(Math.trunc(Number(raw.limit)), 200) : 50;
+  f.cursor = typeof raw.cursor === 'string' && raw.cursor ? raw.cursor : null;
+  return f;
+}
+
+/** Stable string key for a normalized filters+sort combo — used to detect a
+ *  cursor being replayed against a DIFFERENT filter/sort (stale tab, edited
+ *  URL); a mismatch just restarts at offset 0 rather than returning a
+ *  confusing page. Not a security boundary — just a "did the query change"
+ *  check, so a plain sorted JSON string is enough. Excludes `limit` (a page
+ *  size change shouldn't invalidate a cursor) and `cursor` itself. */
+export function browseFiltersKey(filters) {
+  const { limit: _limit, cursor: _cursor, ...rest } = filters;
+  return JSON.stringify(rest, Object.keys(rest).sort());
+}
+
+export function encodeBrowseCursor(offset, filtersKey) {
+  return Buffer.from(JSON.stringify({ o: offset, f: filtersKey }), 'utf8').toString('base64url');
+}
+
+/** Returns the offset to resume at, or 0 if the cursor is missing, malformed,
+ *  or was minted for a different filters/sort combination. */
+export function decodeBrowseCursor(cursor, filtersKey) {
+  if (typeof cursor !== 'string' || !cursor) return 0;
+  try {
+    const obj = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (Number.isInteger(obj?.o) && obj.o >= 0 && obj.f === filtersKey) return obj.o;
+  } catch {
+    /* fall through */
+  }
+  return 0;
+}
+
+/**
+ * One WHERE fragment, keyed by the filter dimension it came from so a facet
+ * count for that SAME dimension can be computed with every filter EXCEPT it
+ * (so picking "Invoice" never makes "Invoice" disappear from the Type
+ * facet's own options). `template` uses `??` placeholders, filled in order
+ * from `values` — see renderBrowseFragments.
+ */
+function buildBrowseFragments(f, hasDisplayName, hasFinancials) {
+  const frags = [];
+  const add = (dim, template, ...values) => frags.push({ dim, template, values });
+
+  if (f.documentType) add('documentType', 'd.document_type = ??', f.documentType);
+  if (f.stageBucket) add('stageBucket', `(${STAGE_BUCKET_CASE}) = ??`, f.stageBucket);
+  if (f.warrantyBucket) add('warrantyBucket', `(${WARRANTY_BUCKET_CASE}) = ??`, f.warrantyBucket);
+  if (f.customerId) add('customerId', 'linked.customer_id = ??', f.customerId);
+  if (f.site) add('site', 'linked.site_address = ??', f.site);
+  if (f.technician) add('technician', 'fields.technician_name = ??', f.technician);
+  if (f.brand) add('brand', 'linked.brand = ??', f.brand);
+  // document_financials (M3-config/22) may not exist yet — these two filters
+  // degrade to "not offered" rather than a 42P01 on a database that hasn't
+  // pasted that migration (see hasFinancials below and financialsTableExists).
+  if (hasFinancials && f.hasMoney !== null) add('hasMoney', '(df.id IS NOT NULL) = ??', f.hasMoney);
+  if (hasFinancials && f.openBalance !== null) add('openBalance', '(COALESCE(df.balance_due, 0) > 0) = ??', f.openBalance);
+  if (f.uploadedByMe && f.currentUserId) add('uploadedByMe', 'd.uploaded_by = ??', f.currentUserId);
+  if (f.serviceDateFrom) add('serviceDateFrom', 'fields.service_date >= ??', f.serviceDateFrom);
+  if (f.serviceDateTo) add('serviceDateTo', 'fields.service_date <= ??', f.serviceDateTo);
+  if (f.uploadDateFrom) add('uploadDateFrom', 'd.created_at::date >= ??::date', f.uploadDateFrom);
+  if (f.uploadDateTo) add('uploadDateTo', 'd.created_at::date <= ??::date', f.uploadDateTo);
+  if (f.q) {
+    const like = `%${f.q}%`;
+    // d.display_name only when M3-config/41 has been pasted (see hasDisplayName) —
+    // referencing a column that doesn't exist yet would 42703 the whole query,
+    // not just quietly skip it.
+    add(
+      'q',
+      `(d.original_filename ILIKE ?? ${hasDisplayName ? 'OR d.display_name ILIKE ??' : ''} OR linked.customer_name ILIKE ??
+         OR linked.site_address ILIKE ?? OR fields.technician_name ILIKE ?? OR linked.brand ILIKE ??
+         OR EXISTS (SELECT 1 FROM document_pages dp WHERE dp.document_id = d.id AND ${TENANT.replace('tenant_id', 'dp.tenant_id')}
+                      AND dp.tsv @@ websearch_to_tsquery('english', ??)))`,
+      like, ...(hasDisplayName ? [like] : []), like, like, like, like, f.q
+    );
+  }
+  return frags;
+}
+
+/** Renders a subset of fragments (already excluding whichever dim a facet
+ *  count is being computed for) into one WHERE-safe SQL string plus its OWN
+ *  freshly-numbered params array — `baseParams` (today/today+90d, always)
+ *  come first so $1/$2 stay stable across every query variant. */
+function renderBrowseFragments(fragments, baseParams) {
+  const params = [...baseParams];
+  const clauses = fragments.map((f) => {
+    let i = 0;
+    return f.template.replace(/\?\?/g, () => {
+      params.push(f.values[i++]);
+      return `$${params.length}`;
+    });
+  });
+  return { sql: clauses.length ? clauses.join(' AND ') : 'TRUE', params };
+}
+
+/** The shared CTEs every browse query (list + every facet) is built on top
+ *  of. `hasDisplayName`: M3-config/41 (owned by G3) may not be pasted yet —
+ *  same "detect once" contract as documentsHaveUpdatedAt. `wherePart` is the
+ *  already-rendered fragment SQL (see renderBrowseFragments) for THIS
+ *  particular query (full set for the list, N-1 for a facet count). */
+function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart) {
+  return `
+    WITH linked AS (
+      SELECT del.document_id,
+             MAX(CASE WHEN e.entity_type = 'customer' THEN e.id::text END) AS customer_id,
+             MAX(CASE WHEN e.entity_type = 'customer' THEN e.data->>'customer_name' END) AS customer_name,
+             COALESCE(
+               MAX(CASE WHEN e.entity_type = 'customer' THEN e.data->>'service_address' END),
+               MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->>'service_address' END)
+             ) AS site_address,
+             MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->>'manufacturer' END) AS brand,
+             MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->'warranty'->>'expires' END) AS warranty_expiry
+        FROM document_entity_links del
+        JOIN entities e ON e.id = del.entity_id AND ${TENANT.replace('tenant_id', 'e.tenant_id')} AND e.merged_into IS NULL
+       WHERE ${TENANT.replace('tenant_id', 'del.tenant_id')}
+       GROUP BY del.document_id
+    ),
+    fields AS (
+      SELECT document_id,
+             MAX(value) FILTER (WHERE field_key = 'service_date') AS service_date,
+             MAX(value) FILTER (WHERE field_key = 'technician') AS technician_name
+        FROM (
+          SELECT DISTINCT ON (document_id, field_key) document_id, field_key, value
+            FROM extractions
+           WHERE ${TENANT} AND field_key IN ('service_date', 'technician')
+           ORDER BY document_id, field_key, confidence DESC NULLS LAST, id
+        ) best
+       GROUP BY document_id
+    ),
+    base AS (
+      SELECT d.id, d.original_filename,
+             ${hasDisplayName ? 'd.display_name' : 'NULL::text AS display_name'},
+             d.document_type, d.stage, d.created_at, d.verified_by, d.uploaded_by,
+             linked.customer_id, linked.customer_name, linked.site_address, linked.brand, linked.warranty_expiry,
+             fields.service_date, fields.technician_name,
+             ${hasFinancials
+               ? "df.total AS amount, df.balance_due, df.status AS money_status, (df.id IS NOT NULL) AS has_money,"
+               : 'NULL::numeric AS amount, NULL::numeric AS balance_due, NULL::text AS money_status, FALSE AS has_money,'}
+             (${STAGE_BUCKET_CASE}) AS stage_bucket,
+             (${WARRANTY_BUCKET_CASE}) AS warranty_bucket
+        FROM documents d
+        LEFT JOIN linked ON linked.document_id = d.id
+        LEFT JOIN fields ON fields.document_id = d.id
+        ${hasFinancials ? `LEFT JOIN document_financials df ON df.document_id = d.id AND ${TENANT.replace('tenant_id', 'df.tenant_id')}` : ''}
+       WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND ${wherePart}
+    )`;
+}
 
 /**
  * Marks the facets this extractor owns, so a re-read replaces its own rows and
@@ -687,6 +947,27 @@ export async function documentsHaveUploadedBy(db) {
   return documentsUploadedBy;
 }
 export function _resetDocumentsUploadedByProbe() { documentsUploadedBy = null; }
+
+/** Same contract as documentsHaveUpdatedAt, for documents.display_name
+ *  (M3-config/41, owned by G3 — round 12 contract). browseDocuments below
+ *  SELECTs it (as `displayName`) only once this is true; before that, every
+ *  browse row's name falls back client-side to documentName()'s next rule
+ *  (a derived name from type + fields, then the original filename) exactly
+ *  as the contract requires. */
+let documentsDisplayName = null;
+export async function documentsHaveDisplayName(db) {
+  if (documentsDisplayName !== null) return documentsDisplayName;
+  try {
+    const r = await db.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'documents' AND column_name = 'display_name'`
+    );
+    documentsDisplayName = r.rowCount > 0;
+  } catch {
+    return false;
+  }
+  return documentsDisplayName;
+}
+export function _resetDocumentsDisplayNameProbe() { documentsDisplayName = null; }
 
 /**
  * Builds the `{tenantAddressKey, letterheadCounts}` isLikelyShopAddress needs
@@ -1142,6 +1423,161 @@ function makeStore(db, tenantId) {
       }
       return many(`SELECT * FROM documents WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 500`, vals);
     },
+
+    /**
+     * Records Browse (round 12 contract) — the paginated, filtered, faceted,
+     * sortable, searchable replacement for the records screen's old "every
+     * doc, capped at 500" list. See the big doc comment above TENANT (search
+     * "RECORDS BROWSE") for the data model and every pure helper this calls.
+     *
+     * `rawFilters` is caller input, normalized here (never trusted directly);
+     * `currentUserId` powers the `uploadedByMe` filter/facet only — nothing
+     * else about the caller reaches SQL except through a bound parameter.
+     *
+     * Returns `{ rows, total, hasMore, nextCursor, facets }`. `facets` is one
+     * entry per filterable dimension: `{ key, options: [{value, label, count}] }`
+     * for an enumerated one, `{ key, trueCount }` for a boolean toggle — each
+     * counted with every OTHER active filter applied but never its own, so
+     * picking a facet option never removes it (or its siblings) from view.
+     */
+    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null}} [opts] */
+    browseDocuments: async (rawFilters = {}, { currentUserId = null } = {}) => {
+      const f = normalizeBrowseFilters(rawFilters);
+      f.currentUserId = f.uploadedByMe ? currentUserId : null;
+      const hasDisplayName = await documentsHaveDisplayName(db);
+      // financialsTableExists expects a store-shaped object with `.raw`
+      // (that's how api/_lib/financials/store.js's own callers use it, via
+      // the makeStore() return value below) — this function receives the
+      // low-level driver instead, which only has `.query`, so adapt it.
+      const hasFinancials = await financialsTableExists({ raw: (sql, params) => db.query(sql, params) });
+
+      const today = new Date().toISOString().slice(0, 10);
+      const baseParams = [today, isoPlusDays(today, 90)];
+      const filtersKey = browseFiltersKey(f);
+      const offset = decodeBrowseCursor(f.cursor, filtersKey);
+      const allFrags = buildBrowseFragments(f, hasDisplayName, hasFinancials);
+
+      // `buildSelect(nextIndex)` returns the SELECT SQL text; `nextIndex` is
+      // where ITS OWN extra params (if any) start — after baseParams and every
+      // rendered fragment's own bound values — so nothing here ever falls
+      // back to string-interpolating a value into SQL text (the exact thing
+      // scripts/verify-records-browse.mjs's injection checks are for).
+      const runFiltered = (fragsSubset, buildSelect, extraParams = []) => {
+        const { sql: wherePart, params } = renderBrowseFragments(fragsSubset, baseParams);
+        const selectSql = buildSelect(params.length + 1);
+        return db.query(`${sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart)}\n${selectSql}`, [...params, ...extraParams]);
+      };
+
+      const sortDef = BROWSE_SORTS[f.sort] ?? BROWSE_SORTS[DEFAULT_BROWSE_SORT];
+      const limit = f.limit;
+      const listPromise = runFiltered(
+        allFrags,
+        () => `SELECT *, count(*) OVER() AS total_matching FROM base
+          ORDER BY ${sortDef.expr} ${sortDef.dir} NULLS LAST, id ${sortDef.dir}
+          OFFSET ${offset} LIMIT ${limit}`
+      );
+
+      // Facet dimensions: enumerated ones (grouped, top N by count) and
+      // boolean ones (a single "how many are true" count) — each rendered
+      // with every fragment EXCEPT the one for its own dimension.
+      const without = (dim) => allFrags.filter((x) => x.dim !== dim);
+      const enumerated = [
+        ['documentType', 'document_type AS value, document_type AS label', 'document_type IS NOT NULL', 30],
+        ['stageBucket', 'stage_bucket AS value, stage_bucket AS label', 'TRUE', 10],
+        ['warrantyBucket', 'warranty_bucket AS value, warranty_bucket AS label', 'TRUE', 10],
+        ['site', 'site_address AS value, site_address AS label', 'site_address IS NOT NULL', 20],
+        ['technician', 'technician_name AS value, technician_name AS label', 'technician_name IS NOT NULL', 20],
+        ['brand', 'brand AS value, brand AS label', 'brand IS NOT NULL', 20],
+      ];
+      const facetPromises = enumerated.map(([dim, cols, having, cap]) =>
+        runFiltered(without(dim), () => `SELECT ${cols}, count(*)::int AS n FROM base WHERE ${having} GROUP BY value, label ORDER BY n DESC, label ASC LIMIT ${cap}`)
+          .then((r) => [dim, r.rows])
+      );
+      // Customer is the one enumerated facet with a real id separate from its label.
+      facetPromises.push(
+        runFiltered(
+          without('customerId'),
+          () => `SELECT customer_id AS value, customer_name AS label, count(*)::int AS n FROM base
+            WHERE customer_id IS NOT NULL GROUP BY customer_id, customer_name ORDER BY n DESC, label ASC LIMIT 20`
+        ).then((r) => ['customerId', r.rows])
+      );
+      const booleans = [
+        ['hasMoney', hasFinancials ? '(has_money)' : 'FALSE'],
+        ['openBalance', hasFinancials ? '(COALESCE(balance_due, 0) > 0)' : 'FALSE'],
+      ];
+      for (const [dim, expr] of booleans) {
+        facetPromises.push(
+          runFiltered(without(dim), () => `SELECT count(*) FILTER (WHERE ${expr})::int AS n FROM base`)
+            .then((r) => [dim, r.rows[0]?.n ?? 0])
+        );
+      }
+      if (currentUserId) {
+        facetPromises.push(
+          runFiltered(
+            without('uploadedByMe'),
+            (i) => `SELECT count(*) FILTER (WHERE uploaded_by = $${i})::int AS n FROM base`,
+            [currentUserId]
+          ).then((r) => ['uploadedByMe', r.rows[0]?.n ?? 0])
+        );
+      }
+
+      const [listResult, ...facetResults] = await Promise.all([listPromise, ...facetPromises]);
+      const rows = listResult.rows;
+      const total = rows[0]?.total_matching != null ? Number(rows[0].total_matching) : 0;
+      // Zero rows on this page doesn't mean zero total (a cursor past the end,
+      // or filters just changed) — the window count above is only present on
+      // an actual row, so re-ask cheaply when the page itself came back empty.
+      const trueTotal = rows.length
+        ? total
+        : (await runFiltered(allFrags, () => 'SELECT count(*)::int AS n FROM base')).rows[0]?.n ?? 0;
+
+      const facets = [];
+      for (const [dim, data] of facetResults) {
+        if (dim === 'hasMoney' || dim === 'openBalance' || dim === 'uploadedByMe') {
+          facets.push({ key: dim, trueCount: data });
+        } else {
+          facets.push({
+            key: dim,
+            options: data
+              .filter((r) => r.value !== null && r.value !== '')
+              .map((r) => ({ value: String(r.value), label: r.label != null ? String(r.label) : String(r.value), count: Number(r.n) })),
+          });
+        }
+      }
+
+      return {
+        rows: rows.map((r) => ({
+          id: r.id,
+          filename: r.original_filename,
+          displayName: r.display_name ?? null,
+          documentType: r.document_type,
+          stage: r.stage,
+          stageBucket: r.stage_bucket,
+          verifiedBy: r.verified_by,
+          uploadedBy: r.uploaded_by,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+          serviceDate: r.service_date ?? null,
+          customerId: r.customer_id,
+          customerName: r.customer_name,
+          siteAddress: r.site_address,
+          technician: r.technician_name,
+          brand: r.brand,
+          warrantyExpiry: r.warranty_expiry,
+          warrantyBucket: r.warranty_bucket,
+          amount: r.amount != null ? Number(r.amount) : null,
+          balanceDue: r.balance_due != null ? Number(r.balance_due) : null,
+          moneyStatus: r.money_status,
+          hasMoney: r.has_money,
+        })),
+        total: trueTotal,
+        hasMore: offset + rows.length < trueTotal,
+        nextCursor: offset + rows.length < trueTotal ? encodeBrowseCursor(offset + rows.length, filtersKey) : null,
+        facets,
+        sort: f.sort,
+        limit,
+      };
+    },
+
     // ---- billing read helpers (api/_lib/billing.js, api/_lib/plan.js) -------
     // Real COUNT queries, not listDocuments' capped-at-500 rows — billing caps
     // (tenants.limits.documentsStored / pagesPerMonth) need the true total.
@@ -2309,7 +2745,7 @@ function makeStore(db, tenantId) {
       const ids = [...new Set((documentIds ?? []).filter((x) => typeof x === 'string'))].slice(0, 500);
       if (!ids.length) return Promise.resolve([]);
       return many(
-        `SELECT d.id, d.original_filename, d.document_type, d.stage, d.verified_by, d.created_at,
+        `SELECT d.id, d.original_filename, to_jsonb(d)->>'display_name' AS display_name, d.document_type, d.stage, d.verified_by, d.created_at,
                 (SELECT x.value FROM extractions x
                   WHERE x.document_id = d.id AND x.field_key = 'service_date' AND ${TENANT.replace('tenant_id', 'x.tenant_id')}
                   ORDER BY x.confidence DESC NULLS LAST, x.id LIMIT 1) AS service_date

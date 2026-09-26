@@ -51,6 +51,7 @@ export const REAL_TABLES = Object.freeze([
   "kg_edges", // M3-config/37-knowledge-graph.sql (Knowledge Graph v1) — read only via graph_traverse
   "entity_merge_suggestions", // M3-config/39-entity-resolution.sql (R11: entity resolution)
   "ask_semantic_cache", "tenant_rollups", // M3-config/40-rollups-and-semantic-cache.sql (R11: semantic cache + rollups)
+  "intake_field_inferences", "intake_needs_info", // M3-config/43-intake-autofill.sql (R12: straight-through intake)
 ]);
 
 const DENY_TOKENS = new Set([

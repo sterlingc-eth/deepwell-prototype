@@ -10,6 +10,7 @@ import { groupExtractionsByUnit } from '../domains/hvac/units';
 import { normalize, str } from '../core/answer';
 import { customerForDocument, matchesCustomerScope } from '../core/customer';
 import { shopRecordTechnician } from '../core/shopRecords';
+import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
 import { reviewClient } from '../services/reviewClient';
@@ -709,8 +710,8 @@ export function ReviewBody() {
                   <button type="button" onClick={() => openDocument(d.id)} aria-current={active ? 'true' : undefined} className={['w-full text-left flex items-center gap-3 px-4 py-3 min-h-touch transition-colors duration-quick', active ? 'bg-forest-50 dark:bg-forest-800' : 'hover:bg-surface-2'].join(' ')}>
                     <StagePill stage={d.stage} compact />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-data text-ink truncate">{d.filename}</span>
-                      <span className="block text-body text-ink-3">{typeLabel}</span>
+                      <span className="block font-mono text-data text-ink truncate">{documentName(d)}</span>
+                      <span className="block text-body text-ink-3 truncate">{[typeLabel, hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · ')}</span>
                     </span>
                     {/* Owner defect report (2026-09-22): this used to also
                         require work.choice === 'everyone', so switching to
@@ -920,8 +921,10 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
             </>
           )}
         </div>
-        <h2 className="font-mono font-semibold text-h3 break-all">{doc.filename}</h2>
+        <h2 className="font-sans font-semibold text-h3 break-all">{documentName(doc)}</h2>
         <p className="text-body text-ink-3">
+          {hasFriendlyName(doc) && <span className="font-mono">{originalFilename(doc)}</span>}
+          {hasFriendlyName(doc) && ' · '}
           {graph.batches[doc.batchId]?.name} · received {doc.receivedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </p>
         {doc.verifiedBy === 'ai' && (
@@ -983,7 +986,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       {duplicate && duplicate.kind === 'duplicate' && (
         <section className="p-5 space-y-3">
           <h3 className="flex items-center gap-2 text-h4"><Copy className="w-4 h-4" aria-hidden="true" /> Duplicate</h3>
-          <p className="text-ink-2">This is the same document as <span className="font-mono text-data">{graph.docs[duplicate.of]?.filename ?? duplicate.of}</span>. Merging keeps the original and drops this copy — nothing is double-counted.</p>
+          <p className="text-ink-2">This is the same document as <span className="font-mono text-data">{(() => { const o = graph.docs[duplicate.of]; return o ? documentName(o) : duplicate.of; })()}</span>. Merging keeps the original and drops this copy — nothing is double-counted.</p>
           <button type="button" className="dw-btn-primary" onClick={onMerge}><GitMerge className="w-4 h-4" aria-hidden="true" /> Merge into original</button>
         </section>
       )}
@@ -1057,7 +1060,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               {c.candidates.map((cand) => (
                 <button key={cand.documentId} type="button" onClick={() => onResolve(c.id, cand.value)} className="dw-card text-left p-3 min-w-0 hover:shadow-lift transition-shadow duration-quick">
                   <p className="font-mono font-semibold text-body-lg break-all">{cand.value}</p>
-                  <p className="text-caption text-ink-3 mt-1 truncate">{graph.docs[cand.documentId]?.filename} · p. {cand.location.page}{cand.location.field ? ` · ${cand.location.field}` : ''}</p>
+                  <p className="text-caption text-ink-3 mt-1 truncate">{(() => { const o = graph.docs[cand.documentId]; return o ? documentName(o) : undefined; })()} · p. {cand.location.page}{cand.location.field ? ` · ${cand.location.field}` : ''}</p>
                 </button>
               ))}
             </div>

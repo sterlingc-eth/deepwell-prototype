@@ -25,6 +25,7 @@ import {
 } from "./documentTypes.js";
 import { integrityFixDocument } from "./routes/integrity.js";
 import { applyBodyNameLinks } from "./bodyNameLink.js";
+import { completeIntake } from "./intake/autofill.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -518,6 +519,16 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // never throws (the document is already fully ingested either way) and is inert without an API key or
   // before migration 33 is pasted; the nightly catch-up (cron-sweep.js) picks up anything this misses.
   await updateDossierForDocument(ctx, documentId).catch(() => {});
+
+  // STRAIGHT-THROUGH INTAKE (TEAM G4, Round 12): fills missing required fields from sibling
+  // documents already linked to the same unit/customer, raises one precise needs-info question
+  // when a fill is genuinely ambiguous, auto-verifies once the fills clear completenessFor's bar,
+  // and wires the naming/graph/rollup post-ingest hooks. Deterministic, no model call; never
+  // throws (see intake/autofill.js's own doc comment) — a failure here can never fail ingest,
+  // which has already fully succeeded by this point.
+  await completeIntake(ctx, documentId, {
+    facts, fields, resolvedType, pack, entityId: written.entityId, customerId: written.customerId,
+  }).catch(() => {});
 
   return {
     documentId,

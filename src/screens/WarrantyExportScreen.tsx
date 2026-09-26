@@ -8,6 +8,7 @@ import { docsLinkedTo, entitiesOfType, useGraph } from '../core/entityGraph';
 import { dateOf, fmtDate, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { useAppStore } from '../store/appStore';
+import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 
 /**
  * Warranty claim packet. Pulls the selected units from the entity graph
@@ -173,7 +174,11 @@ export function WarrantyExportScreen() {
                       <p className="text-[11px] uppercase tracking-wide text-stone-500 mt-4 mb-1">Supporting documents (verified)</p>
                       <ol className="text-[12px] text-stone-700 list-decimal pl-5 space-y-0.5">
                         {verifiedDocs.map((d) => (
-                          <li key={d.id}><span className="font-mono">{d.filename}</span> — {graph.schema.documentTypes.find((t) => t.id === d.typeId)?.label ?? 'Document'}{d.verifiedAt ? `, verified ${fmtDate(d.verifiedAt)}` : ''}</li>
+                          <li key={d.id}>
+                            <span className="font-medium">{documentName(d)}</span>
+                            {hasFriendlyName(d) && <span className="font-mono text-stone-500"> ({originalFilename(d)})</span>}
+                            {' — '}{graph.schema.documentTypes.find((t) => t.id === d.typeId)?.label ?? 'Document'}{d.verifiedAt ? `, verified ${fmtDate(d.verifiedAt)}` : ''}
+                          </li>
                         ))}
                         {verifiedDocs.length === 0 && <li>None yet — verify the registration in Intake before submitting.</li>}
                       </ol>

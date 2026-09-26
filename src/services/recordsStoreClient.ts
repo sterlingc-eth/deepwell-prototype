@@ -16,6 +16,7 @@ import type {
 } from '../services/postgresRecordsStore';
 
 import { authHeader } from './authToken';
+import type { BrowseFilters, BrowseResponse } from '../components/records/types';
 
 const API_URL = '/api/records';
 
@@ -75,6 +76,15 @@ export class RecordsStoreClient implements RecordsStore {
 
   async updateDocument(id: string, updates: Partial<Document>): Promise<void> {
     await this.call('updateDocument', { id, updates });
+  }
+
+  /** Records Browse (round 12 contract): the paginated/filtered/faceted list
+   *  behind the records screen — see api/_lib/recordsStore.js's
+   *  browseDocuments for the server side. Never capped at 500: pass the
+   *  previous response's `nextCursor` back in `filters.cursor` for the next
+   *  page. */
+  async browseDocuments(filters: BrowseFilters): Promise<BrowseResponse> {
+    return this.call('browseDocuments', { filters });
   }
 
   // Facets

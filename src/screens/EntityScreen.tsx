@@ -11,6 +11,7 @@ import { dateOf, fmtValue, str } from '../core/answer';
 import { entityNodeId } from '../core/graphNodeId';
 import type { Entity, Fact, SourceRef } from '../core/types';
 import { useAppStore } from '../store/appStore';
+import { documentName } from '../core/documentName';
 
 function entityLabel(e: Entity, labelField: string): string {
   return str(e, labelField) || e.id;
@@ -143,7 +144,7 @@ export function EntityScreen() {
           </section>
         )}
 
-        <FactGrid facts={facts} citation={citation} onOpenSource={setPreview} sourceLabel={(r) => graph.docs[r.documentId]?.filename} />
+        <FactGrid facts={facts} citation={citation} onOpenSource={setPreview} sourceLabel={(r) => { const d = graph.docs[r.documentId]; return d ? documentName(d) : undefined; }} />
 
         {related.map((group) => (
           <section key={group.title} aria-label={group.title} className="space-y-2">

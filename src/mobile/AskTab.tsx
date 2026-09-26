@@ -158,16 +158,18 @@ const TurnView = memo(function TurnView({
   onOpenDoc,
   onOpenCustomer,
   onRetry,
+  onAsk,
 }: {
   turn: Turn
   onOpenDoc: (id: string) => void
   onOpenCustomer: (ref: string) => void
   onRetry: (q: string) => void
+  onAsk: (q: string) => void
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 min-w-0 scroll-mt-3" data-turn={turn.id}>
       <div className="justify-self-end max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-forest-600 text-stone-0 text-body-lg break-words">{turn.question}</div>
-      {turn.answer && <MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} />}
+      {turn.answer && <MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onAsk={onAsk} />}
       {turn.error && (
         <div role="alert" className="rounded-2xl bg-bad-bg text-bad-ink p-4 text-body grid gap-2">
           <span>{turn.error}</span>
@@ -293,7 +295,7 @@ export function AskTab({
           ) : (
             <div className="grid grid-cols-1 gap-5">
               {turns.map((t) => (
-                <TurnView key={t.id} turn={t} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onRetry={send} />
+                <TurnView key={t.id} turn={t} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onRetry={send} onAsk={send} />
               ))}
             </div>
           )}
