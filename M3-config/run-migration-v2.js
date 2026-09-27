@@ -5,9 +5,12 @@
  * Uses manual connection parameters instead of connection string
  */
 
-const { Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
+import { Client } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const connString = process.env.NEON_CONNECTION_STRING;
 const schemaFile = process.env.SCHEMA_FILE || path.join(__dirname, '01-create-schema.sql');

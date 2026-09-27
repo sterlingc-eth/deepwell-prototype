@@ -374,6 +374,20 @@ runChecks('[full]', [], 'test-docs/business', {
   requireAllCounties: true, requireOutOfState: true, requireAllBrands: true, requireAllDocTypes: true, requireMixedWarranty: true,
 });
 
+// The [small] corpus's own "every customer with a key phone/email has it
+// printed somewhere" check (below, inside runChecks) falls through to
+// `${outDir}-topup/` for the customers this frozen base intentionally
+// doesn't print contact info for (see that check's own comment). On a
+// fresh clone nothing has generated that topup dir yet, so without this
+// it fails deterministically on the first run and only passes once someone
+// happens to have run --contacts-topup before (the flake this generates
+// deterministically, up front, exists to close). --contacts-topup only ever
+// writes to the sibling `-topup` dir (verified below by the [small-topup]
+// block's own "base dir file list/content is unchanged" checks), so doing
+// it here first doesn't affect anything runChecks('[small]', ...) itself
+// checks about test-docs/business-small.
+execFileSync('node', [GEN, '--customers', '30', '--out', 'test-docs/business-small', '--contacts-topup'], { cwd: ROOT, stdio: 'ignore' });
+
 runChecks('[small]', ['--customers', '30', '--out', 'test-docs/business-small'], 'test-docs/business-small', {
   minCustomers: 25, minDocuments: 100, questionTotal: 47, analyticsCount: 21, lookupCount: 26,
   requireAllCounties: true, requireOutOfState: true, requireAllBrands: true, requireAllDocTypes: true, requireMixedWarranty: true,

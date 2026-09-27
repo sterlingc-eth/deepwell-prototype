@@ -33,8 +33,7 @@ import { installYearOf, warrantyStatusOf, deriveGeo } from './analytics.js';
 import { packForTenant } from './industry/index.js';
 import { attachCitations } from './citations/records.js';
 import { customerRecord } from './citations/records.js';
-
-const reEscape = (s) => String(s ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+import { escapeRegex as reEscape } from './util/escape.js';
 
 // Doc types too generic/ambiguous to safely pattern-match in free text (never asked about this way in
 // this corpus, and "other"/"internal" are common enough words to false-positive on unrelated questions).

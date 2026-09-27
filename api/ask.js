@@ -21,11 +21,10 @@ import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
 import { getCacheEntry, isCacheHit, upsertCacheEntry, shouldCache, ASK_CACHE_ENABLED as ASK_CACHE_ENABLED_RAW } from "./_lib/askCache.js";
 import { lookupSemantic, storeSemantic } from "./_lib/cache/semanticCache.js";
-import { classifyFastPath, isFastPathEnabled } from "./_lib/fastPath.js";
 import { runFastPath } from "./_lib/fastPathQuery.js";
 // Team A (2026-09-24): deterministic history/comparison/maintenance router (no model call, cited answers).
-import { classifyDeterministic, runDeterministic } from "./_lib/deterministicRouter.js";
-import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
+import { runDeterministic } from "./_lib/deterministicRouter.js";
+import { looksLikeSingleRecordReference, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
 // R16 (F2 hook): oldest/newest-unit questions now have a deterministic, cited planner — keep them off the agent-first gates.
 import { isInstallDateExtremeQuestion } from "./_lib/analytics/detPlan.js";
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): answers money questions from SQL over document_financials.
@@ -34,7 +33,7 @@ import { isInstallDateExtremeQuestion } from "./_lib/analytics/detPlan.js";
 // @anthropic-ai/sdk (the agent tool-use loop these share) — loaded lazily below
 // (loadMoneyGateModule), gated on the exact same `moneyQuestion` condition that used
 // to just call these functions directly, so a non-money question never touches it.
-import { isFinancialQuestion } from "./_lib/financials/classify.js";
+// (isFinancialQuestion itself is now only called from classifyAll.js — see the router import below.)
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
 import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
@@ -45,19 +44,19 @@ import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZ
 // at module scope (its one-Haiku-tool-use-call planner) — loaded lazily
 // below (loadAnalyticsRouteModule) instead of statically, so a request a
 // deterministic pre-router answers never pays for it.
-import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
-import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
+import { runContactLookup } from "./_lib/contactLookup.js";
+import { runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
 // TEAM E (2026-09-24): full-corpus content-count questions ("how many jobs mention a capacitor", "which customers had
 // a coil issue on file") — a deterministic scan of document_pages.text (all of it, not a top-K search), never the
 // agent's own search_documents fallback which was silently undercounting. See contentCount.js's own doc comment.
-import { parseContentCountQuestion, runContentCount } from "./_lib/contentCount.js";
-import { classifyRelationsQuestion, answerRelationsQuestion } from "./_lib/relations/questions.js";
+import { runContentCount } from "./_lib/contentCount.js";
+import { answerRelationsQuestion } from "./_lib/relations/questions.js";
 // Round 11 (literature #2): deterministic query decomposition for multi-part/conjunctive/comparison
 // questions ("Which Trane customers with no agreement had a callback this year?", "Compare invoices vs
 // POs for the Rios job") — typed sub-queries over analytics/relations/financials building blocks,
 // intersected/compared by entity id. Tried after relations (0.35)/the deterministic history router (0.4),
 // before the analytics planner — see the "0.42 query decomposition" block below.
-import { classifyDecompose, runDecompose } from "./_lib/decompose/index.js";
+import { runDecompose } from "./_lib/decompose/index.js";
 import { packForTenant } from "./_lib/industry/index.js";
 // Round 11 (literature #6/#7): per-tenant vocabulary (brands/models/technicians/customers actually on
 // file, cached per tenant by data-version) — widens normalization's fuzzy-typo correction beyond the
@@ -87,7 +86,7 @@ import { getActiveOverlayForTenant } from "./_lib/learning/overlay.js";
 // pre-router / the analytics planner / retrieval+model could not answer. DONOVAN_AGENT=0 disables it.
 // Round 16 D1 #7 (cold start): agent/loop.js imports @anthropic-ai/sdk at
 // module scope — loaded lazily below (loadAgentModule) instead of statically.
-import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion, isReasoningQuestion } from "./_lib/agent/intents.js";
+import { isAgentFirstQuestion, isEnumerationQuestion } from "./_lib/agent/intents.js";
 // Round 16 D1 #7 (cold start): fastReplay.js -> agent/tools.js -> viewPage.js/search/
 // dossier.js/search/mapReduce.js transitively pull @anthropic-ai/sdk — loaded lazily
 // below (loadFastReplayModule), only reached from inside tryAgent (see loadAgentModule).
@@ -98,6 +97,9 @@ import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion, isR
 // routes/analytics.js's ANALYTICS_MODEL) at module scope — loaded lazily
 // below (loadResearchAgentModule) instead of statically.
 import { logRouteDecision } from "./_lib/agent/router.js";
+// Round 18 (H3): the unified pre-router classification (relations through analytics) — see this
+// module's own header and its call site below ("unified pre-router classification").
+import { classifyAll } from "./_lib/router/classifyAll.js";
 // Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
 import { findExactRecipe, matchParametricExamples } from "./_lib/learning/recipes.js";
 // Round 16 D1 #7 (cold start): learning/replay.js itself statically imports
@@ -789,7 +791,7 @@ export default async function handler(req, res) {
     if (conversationContext) {
       try {
         const convo = validateConversationContext(conversationContext);
-        if (convo.turns.length && isFollowupContinuation(question)) {
+        if (convo.turns.length && isFollowupContinuation(question, convo)) {
           const composed = composeFollowup(convo, question).query;
           if (composed && composed.length <= MAX_QUESTION) question = composed;
         }
@@ -875,101 +877,34 @@ export default async function handler(req, res) {
       }
     }
 
-    // Fast path (handoffs/FAST_PATH_2026-09-20.md): a model-free field lookup
-    // straight from `extractions`, tried after the meta-router and before
-    // retrieval/the answer cache — see the block below. Never attempted for a
-    // meta question (the meta-router already owns those) or when
-    // ASK_FAST_PATH=0. classifyFastPath is pure (no DB) so this costs nothing
-    // when it returns null, which most non-meta questions still will.
-    const fastPathIntent = !meta && isFastPathEnabled() ? classifyFastPath(question) : null;
-    // Team A: comparison / maintenance-due / address-history questions (pure shape detection, no DB) - see block 0.4.
-    const detIntent = !meta ? classifyDeterministic(question, { overlay }) : null;
-    // Round 7 relations engine: visit-timeline questions (repeat visits after install, callbacks within N days,
-    // technician performance, rankings, multi-hop conjunctions). Pure shape detection here; answered in block 0.35.
-    const relationsIntent = !meta ? classifyRelationsQuestion(question) : null;
-    // Contact-lookup-by-name pre-router (live miss cluster 1, 2026-09-21):
-    // "what's the phone number on file for donna thornton" — a lowercase
-    // name with no HVAC anchor satisfies neither of fastPath's own gates
-    // (extractSubject's name regexes require capitalization; hasAnchor needs
-    // an HVAC-specific word) so fastPath itself never claims these. Pure
-    // shape detection only here (no DB) — see contactLookup.js.
-    const contactLookupIntent = !meta ? parseContactLookupQuestion(question, { overlay }) : null;
-    // Document-lookup-by-customer/address pre-router (100-question persona
-    // sample, item 1, 2026-09-22): "do we have a maintenance agreement on file
-    // for the Bracken job" / "list the invoices for 214 Mercer St" — resolved
-    // straight from documents/document_entity_links, no model call, no
-    // citation-worthy passage needed. Only tried when contact-lookup itself
-    // didn't already claim the question (its own field-lookup shapes are
-    // checked first and take priority on any overlap). Pure shape detection
-    // only here (no DB) — see docLookup.js.
-    const docLookupIntent = !meta && !contactLookupIntent ? parseDocLookupQuestion(question, { overlay }) : null;
-    // Content-count pre-router (Team E, 2026-09-24): "how many jobs mention a capacitor" / "which customers had a
-    // coil issue on file" — pure shape detection only here (no DB); see contentCount.js. Tried after contact/doc
-    // lookup (their own shapes take priority on any overlap) and, like them, never for a meta question.
-    const contentCountIntent = !meta && !contactLookupIntent && !docLookupIntent ? parseContentCountQuestion(question, pack) : null;
-    // Round 11: query decomposition (decompose/index.js) — multi-part/conjunctive questions ("Which Trane
-    // customers with no agreement had a callback this year?") and job comparisons ("Compare invoices vs
-    // POs for the Rios job"). Pure shape detection only here (no DB; needs `pack` for brand/doc-type
-    // vocabulary, already resolved above) — answered in block 0.42, after relations/the deterministic
-    // history router and before the analytics planner. Tried after contact/doc/content-count lookup
-    // (their own shapes take priority on any overlap), same precedence idiom as every classifier above.
-    const decomposeIntent = !meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(question, { pack }) : null;
-    const normalizedForAnalytics = normalizeQuestionForAnalytics(question, { overlay, pack, tenantVocab }).normalized;
-    // Money gate (live miss cluster 2, 2026-09-21): "what's the total dollar
-    // amount of our open invoices" style questions have no honest answer yet
-    // — there is no financials layer (handoffs/FINANCIALS_DESIGN_2026-09-21.md,
-    // not built) and the analytics `sum` op has no real currency support, so
-    // answering anyway produces a confident, fabricated "$0.00 across N
-    // documents." Checked here, before the analytics pre-router, so a money
-    // question NEVER reaches the Haiku planner at all — see
-    // isMoneyQuestion/moneyFallbackAnswer (analytics.js).
-    // R3_FAILS.md 2026-09-24: isMoneyQuestion alone missed "overdue"/"past due", bare
-    // "paid"/"owe(s) us", a dollar threshold ("over $5,000") and a superlative ("biggest
-    // invoice") entirely, so those 27 financial questions fell into the analytics
-    // pre-router below and got a bare document count instead. isFinancialQuestion
-    // (financials/classify.js) is deliberately broader and OR'd in here — see its own
-    // doc comment for why a false positive here is harmless.
-    // Team E: a content-count question ("how many jobs mention a capacitor") is never a money question.
-    const moneyQuestion = !meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(normalizedForAnalytics) || isFinancialQuestion(normalizedForAnalytics));
-    // Analytics pre-router (handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md): a
-    // cheap deterministic regex gate (preClassifyAnalytics, no DB/model cost)
-    // decides whether this question is even WORTH the one Haiku planner call
-    // below — most questions still won't match and pay nothing extra. Tried
-    // after meta, fast path, contact lookup and the money gate (all of which
-    // already own their own question shapes) and, like fast path, never
-    // fired for a meta question.
-    // looksLikeSingleRecordReference is checked against the RAW question, not
-    // the normalized one: SINGULAR_NAMED_RECORD_RE (analytics.js) keys off a
-    // capitalized proper noun ("the Whitmore unit") to catch a named-record
-    // question with no address/identifier — a signal normalization's own
-    // lowercasing necessarily destroys. Checking it here, before
-    // normalization, keeps that exclusion working for input that arrives
-    // capitalized, on top of whatever preClassifyAnalytics(normalized) itself
-    // already re-checks (redundant on lowercased text, never wrong).
-    // Round 16 D1 #7 (cold start): restructured from one `&&`-chained boolean
-    // expression into this if-gated form so isAnalyticsEnabled()/isAgentEnabled()
-    // — both of which now live behind a lazy dynamic import (loadAnalyticsRouteModule/
-    // loadAgentModule) — are only ever loaded when the SAME condition that used to
-    // just call them directly actually holds; the boolean RESULT is identical to the
-    // original expression (De Morgan on `!(agentEnabled && unitRanking) && !(agentEnabled
-    // && reasoning)` collapses to the single `agentEnabled` read below), so a meta/
-    // fast-path/contact/doc/content-count/money-classified question still never touches
-    // the analytics or agent modules at all.
-    let analyticsCandidate = false;
-    if (!meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !contentCountIntent && !moneyQuestion) {
-      const analyticsRouteModule = await loadAnalyticsRouteModule();
-      if (analyticsRouteModule.isAnalyticsEnabled() && !looksLikeSingleRecordReference(question)) {
-        const agentModuleForGate = await loadAgentModule();
-        const agentEnabledForGate = agentModuleForGate.isAgentEnabled();
-        // "newest/oldest unit": ranking the whole fleet needs an ORDER BY, which the closed-vocabulary planner
-        // does not have (it would list every unit) - the agent answers these (agent-first, below).
-        // Team A: comparison / why / trend questions the deterministic router could not parse go to the agent (Sonnet-
-        // escalated by the hard-question classifier) instead of a planner that flattens them into one count.
-        if (!(agentEnabledForGate && isUnitRankingQuestion(question) && !isInstallDateExtremeQuestion(question)) && !(agentEnabledForGate && isReasoningQuestion(question))) {
-          analyticsCandidate = preClassifyAnalytics(normalizedForAnalytics, { overlay });
-        }
-      }
-    }
+    // ---- unified pre-router classification (Round 18, H3) ------------------
+    // Every classifier from fast path through analytics — relations (0.35), the deterministic history
+    // router (0.4), query decomposition (0.42), fast path (0.5), contact lookup (0.6), doc lookup
+    // (0.62), content count (0.63), the money gate (0.65) and the analytics pre-router (0.7) — used to
+    // be ~90 lines of scattered `const xIntent = !meta && ... ? classifyX(question) : null` right here,
+    // each one's gate written out by hand. That's now api/_lib/router/classifyAll.js: ONE call that
+    // runs every one of those pure classifiers, applies the exact same gating (PRECEDENCE_TABLE, with
+    // each gate's reason documented there — see r16_d1_pipeline.json D1 #1/#3 for why computation-order
+    // gating and TRIAL order are not the same thing here), and returns the same values these locals used
+    // to hold, plus (D1 #10) every classifier's own raw claim + timing for logRouteDecision below.
+    // loadAnalyticsRouteModule/loadAgentModule are THIS file's own memoized loaders (unchanged from
+    // before this existed) — passed in so the analytics stage's lazy import happens at the exact same
+    // point production always reached it, never earlier (verify-cold-start.mjs is unaffected).
+    const preRouter = await classifyAll(question, { meta, overlay, pack, tenantVocab, loadAnalyticsRouteModule, loadAgentModule });
+    const { normalizedForAnalytics, gated } = preRouter;
+    const relationsIntent = gated.relations;
+    const detIntent = gated.deterministic;
+    const decomposeIntent = gated.decompose;
+    const fastPathIntent = gated.fastPath;
+    const contactLookupIntent = gated.contactLookup;
+    const docLookupIntent = gated.docLookup;
+    const contentCountIntent = gated.contentCount;
+    const moneyQuestion = gated.money;
+    const analyticsCandidate = gated.analytics;
+    // D1 #10: one structured line per request, BEFORE any pre-router branch runs — so a question a fast
+    // branch fully answers (never reaching the agent) is now in the route log too, not only the ones
+    // that fall all the way through to tryAgent's own call below (route/reasons there stay unchanged).
+    logRouteDecision(question, {}, preRouter);
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was

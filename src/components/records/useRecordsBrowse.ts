@@ -13,7 +13,7 @@ const SAVED_VIEWS_KEY = 'dw.records.savedViews.v1';
 const URL_KEYS = [
   'q', 'documentType', 'customerId', 'site', 'technician', 'brand', 'stageBucket', 'warrantyBucket',
   'hasMoney', 'openBalance', 'uploadedByMe', 'serviceDateFrom', 'serviceDateTo', 'uploadDateFrom', 'uploadDateTo',
-  'sort', 'groupBy', 'view',
+  'audience', 'sort', 'groupBy', 'view',
 ] as const;
 
 function filtersFromUrl(): { filters: BrowseFilters; groupBy: GroupBy; viewMode: ViewMode } {
@@ -34,6 +34,8 @@ function filtersFromUrl(): { filters: BrowseFilters; groupBy: GroupBy; viewMode:
     const v = params.get(k);
     if (v) filters[k] = v;
   }
+  const audience = params.get('audience');
+  if (audience === 'customer' || audience === 'internal' || audience === 'all') filters.audience = audience;
   const sort = params.get('sort');
   if (sort) filters.sort = sort as BrowseSort;
   const groupBy = (params.get('groupBy') as GroupBy) || 'none';
@@ -60,6 +62,7 @@ function urlFromState(filters: BrowseFilters, groupBy: GroupBy, viewMode: ViewMo
   setIf('serviceDateTo', filters.serviceDateTo);
   setIf('uploadDateFrom', filters.uploadDateFrom);
   setIf('uploadDateTo', filters.uploadDateTo);
+  if (filters.audience && filters.audience !== 'customer') params.set('audience', filters.audience); else params.delete('audience');
   setIf('sort', filters.sort);
   if (groupBy !== 'none') params.set('groupBy', groupBy); else params.delete('groupBy');
   if (viewMode !== 'table') params.set('view', viewMode); else params.delete('view');
@@ -102,7 +105,7 @@ export function resolveBuiltInFilters(view: Omit<SavedView, 'id'>): BrowseFilter
   return view.filters;
 }
 
-const EMPTY_FILTERS: BrowseFilters = { sort: 'upload-date' };
+const EMPTY_FILTERS: BrowseFilters = { sort: 'upload-date', audience: 'customer' };
 
 /**
  * Data + view-state for the records browser, shared by the desktop workspace
@@ -181,7 +184,14 @@ export function useRecordsBrowse() {
   const clearAll = useCallback(() => setFiltersState({ sort: filters.sort }), [filters.sort]);
 
   const activeCount = useMemo(
-    () => Object.entries(filters).filter(([k, v]) => k !== 'sort' && k !== 'cursor' && k !== 'limit' && v !== undefined && v !== null && v !== '').length,
+    () => Object.entries(filters).filter(([k, v]) => {
+      if (k === 'sort' || k === 'cursor' || k === 'limit') return false;
+      // The audience chip's own default ('customer') isn't a filter someone actively applied —
+      // only 'internal'/'all' count, same "don't show the default as an active chip" rule the
+      // toolbar's segmented control itself follows (see RecordsBrowser.tsx's chipLabel).
+      if (k === 'audience') return v === 'internal' || v === 'all';
+      return v !== undefined && v !== null && v !== '';
+    }).length,
     [filters]
   );
 

@@ -152,6 +152,38 @@ const TODAY = '2026-09-23';
   check('classify: an ordinary non-financial question is not claimed', !C.isFinancialQuestion('how many customers are in gilbert') && !C.isFinancialQuestion('what unit is installed at the Bracken house') && !C.isFinancialQuestion(''));
   eq('period: ytd / last quarter / in march / last 30 days', [parsePeriod('ytd', TODAY)?.from, parsePeriod('last quarter', TODAY)?.label, parsePeriod('in march', TODAY)?.to, parsePeriod('last 30 days', TODAY)?.from], ['2026-01-01', 'Q2 2026', '2026-03-31', '2026-08-24']);
   eq('subject phrase: "last invoice for Bracken" / "bill karen abernathy this year" / none', [extractSubjectPhrase('last invoice for Bracken'), extractSubjectPhrase('how much did we bill karen abernathy this year'), extractSubjectPhrase('how much did we invoice last month')], ['bracken', 'karen abernathy', null]);
+  // R18 (H1, breadth-financials-006/010/018): whole-portfolio aggregate questions with NO real
+  // customer name - the generic "for|to|from|of|with <phrase>" regex used to over-capture trailing
+  // words like "due right now"/"open"/"receivables is current not yet due" as a fake subject,
+  // making subjectGate try (and fail) to resolve a customer instead of letting receivables()'s own
+  // aggregate run at all (TIME_STOP fix).
+  eq(
+    'subject phrase: whole-portfolio aggregates capture no fake subject',
+    [
+      extractSubjectPhrase('How many of our invoices are past due right now?'),
+      extractSubjectPhrase("What's the total dollar amount of our open invoices?"),
+      extractSubjectPhrase('How much of our receivables is current, not yet due?'),
+    ],
+    [null, null, null],
+  );
+  // Decoy: a REAL customer name sitting right next to one of the newly-added stop words must still
+  // be captured - the fix only removes FAKE subjects made entirely of those words, never a real name.
+  eq(
+    'subject phrase: a real name next to the new stop words is still captured (decoy)',
+    [
+      extractSubjectPhrase('What is the total amount past due for Bracken?'),
+      extractSubjectPhrase('How much is open for Karen Abernathy right now?'),
+    ],
+    ['bracken', 'karen abernathy'],
+  );
+  check(
+    'classify: the 3 whole-portfolio aggregate phrasings are still recognized as financial/money questions (the TIME_STOP fix only changes the subject, never the intent classification)',
+    [
+      'How many of our invoices are past due right now?',
+      "What's the total dollar amount of our open invoices?",
+      'How much of our receivables is current, not yet due?',
+    ].every((q) => C.isFinancialQuestion(q.toLowerCase()) || analyticsMod.isMoneyQuestion(q.toLowerCase()))
+  );
   eq('fmt: exact currency text from NUMERIC strings', [fmt('1240.5'), fmt('-45'), fmt('0'), fmt(null)], ['$1,240.50', '-$45.00', '$0.00', '—']);
   const sqlGuardMod = await import('../api/_lib/agent/sqlGuard.js');
   check('guard: the new tables are deny-listed and the new views are queryable', sqlGuardMod.REAL_TABLES.includes('document_financials') && sqlGuardMod.REAL_TABLES.includes('document_financial_lines') && sqlGuardMod.VIEW_NAMES.includes('financials') && sqlGuardMod.VIEW_NAMES.includes('invoice_lines') && !sqlGuardMod.guardSql('SELECT * FROM document_financials').ok && sqlGuardMod.guardSql("SELECT to_char(invoice_date, 'YYYY-MM') AS m, sum(total) FILTER (WHERE status IN ('unpaid','partial')) FROM financials WHERE days_past_due > 0 GROUP BY 1").ok);

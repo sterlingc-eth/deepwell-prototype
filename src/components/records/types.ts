@@ -32,6 +32,18 @@ export const WARRANTY_BUCKET_LABEL: Record<WarrantyBucket, string> = {
 export type GroupBy = 'none' | 'customer' | 'type' | 'month' | 'site';
 export type ViewMode = 'table' | 'cards';
 
+/** Round 18, part 2 (owner ask (a)): "some of the correspondence and service tickets are
+ *  specifically for the techs and have nothing to do with the customer" — every document is
+ *  either an ordinary customer-facing record or a shop-only, tech-addressed one. 'customer' is
+ *  the browser's own default (see EMPTY_FILTERS in useRecordsBrowse.ts) so a plain, unfiltered
+ *  browse never mingles the two; 'all' is the one explicit way to see both together. */
+export type AudienceFilter = 'customer' | 'internal' | 'all';
+export const AUDIENCE_FILTER_LABEL: Record<AudienceFilter, string> = {
+  customer: 'Customer',
+  internal: 'Internal',
+  all: 'All',
+};
+
 /** Everything a browse request can carry. Every field optional/omittable —
  *  the server treats a missing/invalid value as "not filtered", never a
  *  crash (see recordsStore.js's normalizeBrowseFilters). */
@@ -51,6 +63,7 @@ export interface BrowseFilters {
   serviceDateTo?: string;
   uploadDateFrom?: string;
   uploadDateTo?: string;
+  audience?: AudienceFilter;
   sort?: BrowseSort;
   cursor?: string | null;
   limit?: number;
@@ -78,6 +91,8 @@ export interface BrowseRow {
   balanceDue: number | null;
   moneyStatus: string | null;
   hasMoney: boolean;
+  /** Always 'customer' or 'internal', never null (see recordsStore.js's AUDIENCE_EXPR). */
+  audience: 'customer' | 'internal';
 }
 
 export interface FacetOption { value: string; label: string; count: number }

@@ -16,6 +16,15 @@
  *
  * logRouteDecision logs COUNTS ONLY: a route id and a list of short reason codes, never question text,
  * never an answer, never a row value — same rule every other log line in this codebase follows.
+ *
+ * Round 18 (H3, D1 #10): an optional 3rd argument, `preRouter` — router/classifyAll.js's own return
+ * value — folds the WHOLE pre-router classification into the SAME structured line: every classifier
+ * that raw-claimed the question (`claimed`), which one actually won (`winner`), and each classifier's
+ * own timing (`stageTimingsMs`). Still counts/names only (a classifier name, a stage timing in ms — no
+ * question text, no field value, no citation). ask.js calls this once per request, right after
+ * classifyAll() resolves — BEFORE any DB branch runs, so a question a fast pre-router branch fully
+ * answers (never reaching the agent) is now visible in the log too, not just the ones that fall all the
+ * way through to the research agent (this function's ORIGINAL, still-unchanged call site below).
  */
 import { isEnumerationQuestion, isRepairHistoryQuestion, isUnitRankingQuestion, isReasoningQuestion } from "./intents.js";
 import { classifyQuestionDifficulty } from "./escalation.js";
@@ -43,13 +52,19 @@ export function classifyRoute(question) {
 // dashboard reading the log lines below, not in this process's memory).
 const counts = new Map();
 
-/** Logs ONE JSON line: {route: 'donovan_route', decision: 'research'|'simple', reasons: [...]}. No
- *  question text, no answer content. Also keeps an in-process running count for a cheap /debug surface. */
-export function logRouteDecision(question, extra = {}) {
+/** Logs ONE JSON line: {route: 'donovan_route', decision: 'research'|'simple', reasons: [...], ...}. No
+ *  question text, no answer content. Also keeps an in-process running count for a cheap /debug surface.
+ *  `preRouter` (optional, router/classifyAll.js's return value) additionally logs `claimed` (every
+ *  classifier that raw-claimed the question), `winner` (which one actually gets to answer), and
+ *  `stageTimingsMs` (each classifier's own timing) — see this file's own header. */
+export function logRouteDecision(question, extra = {}, preRouter = null) {
   const { route, reasons } = classifyRoute(question);
   const key = `${route}:${reasons.join(",")||"none"}`;
   counts.set(key, (counts.get(key) ?? 0) + 1);
-  console.log(JSON.stringify({ route: "donovan_route", decision: route, reasons, ...extra }));
+  const preRouterFields = preRouter
+    ? { claimed: preRouter.claimed, winner: preRouter.winner?.name ?? null, stageTimingsMs: preRouter.timingsMs }
+    : {};
+  console.log(JSON.stringify({ route: "donovan_route", decision: route, reasons, ...preRouterFields, ...extra }));
   return { route, reasons };
 }
 

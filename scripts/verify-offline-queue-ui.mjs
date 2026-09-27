@@ -91,7 +91,7 @@ let url = () => {
 
 let server;
 try {
-  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let out = '';
   let port = null;
   server.stdout.on('data', (d) => (out += String(d)));
@@ -200,7 +200,7 @@ try {
 
   await browser.close();
 } finally {
-  server?.kill();
+  try { process.kill(-server.pid, 'SIGKILL'); } catch { server?.kill(); }
 }
 
 console.log(`\n${passes} passed, ${failures} failed.`);

@@ -39,3 +39,40 @@ export function DidYouMeanChips({ chips, onPick }: { chips: DidYouMeanChip[]; on
     </div>
   );
 }
+
+// Reasonable, deliberately varied footprints for the skeleton bars below — never a real (guessed)
+// question, since a guess rendering here first and then getting replaced by the real one is exactly the
+// flicker Round 18 P2 fixes (src/core/suggestions.ts's useSamplePrompts). Tuned to sit close to typical
+// sample-prompt chip widths so there's little to no jump once real content lands; not a pixel-exact
+// promise for arbitrarily long future text, but a stable, fixed-size stand-in in the meantime.
+const PLACEHOLDER_CHIP_WIDTHS = ['w-64', 'w-72', 'w-56'];
+
+/** Fixed-height stand-in for SamplePromptChips, shown only while the very first fetch for this
+ *  tenant+role is still in flight (no cache yet — see useSamplePrompts' `loading`). Same chip footprint
+ *  (min-h-11, same gap) as the real thing so nothing shifts once it arrives. `aria-hidden` + no text:
+ *  never announced, never mistaken for real content by anything (including a screenshot diff or a
+ *  mutation observer watching for suggestion text changing after first paint). */
+export function SamplePromptsPlaceholder({ count = PLACEHOLDER_CHIP_WIDTHS.length }: { count?: number }) {
+  return (
+    <ul className="flex flex-wrap gap-2" aria-hidden="true" data-testid="sample-prompts-placeholder">
+      {Array.from({ length: count }, (_, i) => (
+        <li key={i}>
+          <div className={`min-h-11 h-11 ${PLACEHOLDER_CHIP_WIDTHS[i % PLACEHOLDER_CHIP_WIDTHS.length]} rounded-full border border-line-2 bg-surface-2/70 animate-pulse`} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Same idea as SamplePromptsPlaceholder, shaped for the mobile Ask tab's stacked full-width rows
+ *  instead of desktop's wrapped pills — one skeleton bar per row, `min-h-touch` matching the real
+ *  buttons exactly. */
+export function SamplePromptRowsPlaceholder({ count = 3 }: { count?: number }) {
+  return (
+    <div className="w-full grid grid-cols-1 gap-2" aria-hidden="true" data-testid="sample-prompts-placeholder">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="w-full min-h-touch rounded-xl bg-surface-2/70 animate-pulse" />
+      ))}
+    </div>
+  );
+}

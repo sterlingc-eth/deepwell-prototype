@@ -228,7 +228,7 @@ export function MobileApp() {
         {/* All three stay mounted so an upload keeps going and the Ask
             thread survives while the tech flips between tabs. */}
         <div className={tab === 'ask' ? 'h-full' : 'hidden'}>
-          <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} billing={billing} />
+          <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} billing={billing} tenantKey={orgId ?? userId ?? null} />
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
           <ScanTab

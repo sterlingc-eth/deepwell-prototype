@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { ArrowRight, Camera, Clock, Loader2, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DonovanMark } from '../components/DonovanMark';
 import { AnswerCard } from '../components/AnswerCard';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SerialCapture } from '../components/SerialCapture';
-import type { Answer, AnswerRecord, ConversationTurn, SourceRef } from '../core/types';
+import type { Answer, AnswerRecord, SourceRef } from '../core/types';
 import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
-import { PreflightPill, SamplePromptChips, DidYouMeanChips, TypeaheadDropdown } from '../components/ask';
+import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, type ThreadTurn } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
 import { asksUsedFraction, resetsOnShortLabel } from '../services/billingClient';
 import { useAppStore } from '../store/appStore';
+
+// TEAM T2 / Round 18 P2: matches api/_lib/conversation.js's own MAX_CONTEXT_TURNS (that module isn't
+// importable into the client bundle — it pulls in server-only deps — so the cap is kept in sync here by
+// hand, same as this screen already did before this round).
+const MAX_CONTEXT_TURNS = 4;
 
 // Shown only when the account has nothing ingested yet, so there is nothing
 // real to suggest. Clearly labelled "e.g." — never presented as though they
@@ -66,9 +72,14 @@ export function AskScreen() {
   // the question in flight — so "and last year?" / "just the Trane ones" / "who
   // was the tech?" compose with what was just asked (api/_lib/conversation.js
   // validates this same shape server-side). "New question" below just empties it.
-  // Capped at 4, matching conversation.js's own MAX_CONTEXT_TURNS.
-  const [thread, setThread] = useState<ConversationTurn[]>([]);
+  // Capped at MAX_CONTEXT_TURNS. Round 18 P2: each turn also carries the resolvedEntities/
+  // pendingClarification the follow-up engine reads (src/components/ask/conversationTurn.ts).
+  const [thread, setThread] = useState<ThreadTurn[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Round 18 P2: per-tenant, per-role sample-prompt cache key (src/core/suggestions.ts's
+  // useSamplePrompts) — never another tenant's, even on a same-tab org switch.
+  const { orgId, userId } = useAuth();
+  const tenantKey = orgId ?? userId ?? null;
 
   // Round 14 K1: role-based sample prompts (tech vs office) for the empty screen, seeded with this
   // tenant's own real data and pre-validated server-side to answer without a model call — preferred over
@@ -77,11 +88,7 @@ export function AskScreen() {
   // showed). Typeahead completions + the preflight hint for whatever is currently typed, and "Did you
   // mean…" chips once a question has actually come back with no answer.
   const askRole = fieldMode ? 'tech' : 'office';
-  const samplePrompts = useSamplePrompts(askRole, !asked);
-  const displaySuggestions = useMemo(
-    () => (samplePrompts.length ? samplePrompts.map((p) => p.text) : suggestions),
-    [samplePrompts, suggestions],
-  );
+  const { prompts: samplePrompts, loading: samplesLoading } = useSamplePrompts(askRole, !asked, tenantKey);
   const { completions, hint } = useTypeahead(input);
   const didYouMean = useDidYouMean(answer?.kind === 'no-answer' ? asked : null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -134,7 +141,7 @@ export function AskScreen() {
         });
         if (id === requestId.current) {
           setAnswer(a);
-          if (opts.record !== false) setThread((t) => [...t, { question: q, askedAt: new Date().toISOString() }].slice(-4));
+          if (opts.record !== false) setThread((t) => [...t, turnFrom(q, a)].slice(-MAX_CONTEXT_TURNS));
         }
       } catch (e) {
         if (id === requestId.current) {
@@ -377,13 +384,20 @@ export function AskScreen() {
         {!asked && (
           <section aria-labelledby="suggested-heading" className="space-y-3">
             <h2 id="suggested-heading" className="dw-label">
-              {displaySuggestions.length > 0 ? 'Try asking' : 'For example'}
+              {/* Round 18 P2: while the server's own samples are still loading (no cache yet), the
+                  heading and body both stay in the "Try asking" state — no client-only guess (Round 14's
+                  buildSuggestions) is shown ahead of it any more; that instant guess getting replaced by
+                  the real thing a beat later was exactly the reported flicker. buildSuggestions is now
+                  only ever a fallback for once loading has genuinely finished with nothing server-side
+                  to offer, same as the truly-empty EXAMPLE_QUESTIONS case below it always was. */}
+              {samplesLoading || samplePrompts.length > 0 || suggestions.length > 0 ? 'Try asking' : 'For example'}
             </h2>
-            {displaySuggestions.length > 0 ? (
-              <SamplePromptChips
-                prompts={samplePrompts.length ? samplePrompts : displaySuggestions.map((q) => ({ id: q, text: q, category: 'client' }))}
-                onPick={(q) => void submit(q)}
-              />
+            {samplesLoading ? (
+              <SamplePromptsPlaceholder />
+            ) : samplePrompts.length > 0 ? (
+              <SamplePromptChips prompts={samplePrompts} onPick={(q) => void submit(q)} />
+            ) : suggestions.length > 0 ? (
+              <SamplePromptChips prompts={suggestions.map((q) => ({ id: q, text: q, category: 'client' }))} onPick={(q) => void submit(q)} />
             ) : (
               <>
                 <ul className="flex flex-wrap gap-2">

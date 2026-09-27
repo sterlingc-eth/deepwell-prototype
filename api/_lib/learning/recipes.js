@@ -21,6 +21,7 @@ import { normalizeQuestion } from '../nlNormalize.js';
 import { guardSql } from '../agent/sqlGuard.js';
 import { isMoneyQuestion, looksLikeSingleRecordReference, WARRANTY_STATUSES, KNOWN_US_CITY_NAMES, KNOWN_AZ_CITY_NAMES } from '../analytics.js';
 import { DOCUMENT_TYPE_IDS } from '../documentTypes.js';
+import { escapeRegex } from '../util/escape.js';
 import { BRAND_RULES } from '../warrantyRules.js';
 import { STOPWORDS } from './proposals.js';
 import { loadRoutingBank } from './verify.js';
@@ -357,7 +358,7 @@ export function buildParametricRecipe({ question, sql }) {
   const litLower = lit.toLowerCase();
   if (!litLower) return null;
   const qNorm = normalizeRecipeQuestion(question);
-  const wordRe = new RegExp(`\\b${litLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+  const wordRe = new RegExp(`\\b${escapeRegex(litLower)}\\b`);
   if (!wordRe.test(qNorm)) return null;
 
   for (const type of PARAM_TYPES) {

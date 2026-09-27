@@ -24,6 +24,7 @@ import { createPageViewer, VIEW_PAGE_TOOL_DEF, VIEW_TOOL_NAME } from "./viewPage
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): the `financials` / `invoice_lines` views live in
 // financeViews.js; the table probe + catalogue block live in financials/store.js. Hooked in below with small hunks.
 import { financeViewsSql, FINANCE_VIEW_DOCS } from "./financeViews.js";
+import { escapeLikePattern } from "../util/escape.js";
 import { financialsTableExists, financialsCatalogue } from "../financials/store.js";
 // TEAM C (citations everywhere): capture the customer / unit / document each run_query row IS, and what search_documents searched.
 import { collectQueryIdentities, noteQueryIdentities, noteSearch } from "../citations/agent.js";
@@ -800,7 +801,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
       if (name) base = await resolveContactCandidates(db, name);
       else if (address) base = await resolveAddressCandidates(db, address);
       else {
-        const like = [city, zip].filter(Boolean).map((s) => `%${s.replace(/[\\%_]/g, "\\$&")}%`);
+        const like = [city, zip].filter(Boolean).map((s) => `%${escapeLikePattern(s)}%`);
         base = (await db.raw(
           `SELECT id, customer_number, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address,
                   data->>'phone' AS phone, data->>'email' AS email

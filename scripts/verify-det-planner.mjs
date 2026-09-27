@@ -176,10 +176,11 @@ eq(
 check('empty question -> null', detectAnalyticsPlan('') === null);
 check('whitespace-only question -> null', detectAnalyticsPlan('   ') === null);
 
-check(
-  'self-join "duplicate customers" -> null (no flat filter can express this)',
-  detectAnalyticsPlan('do we have any duplicate customers') === null
-);
+// R18 (H1, breadth-data-quality-017/018/019/023): this self-join family now DOES build a real
+// plan — isDuplicateName/sharesAddress/isDuplicateSerial (analytics.js's DATA_QUALITY_FIELD_ENTITY),
+// a cross-row frequency map computed by routes/analytics.js's attachDuplicateFlag — moved to the
+// positive-shapes section below (with a still-null case for a duplicate-ish phrasing none of the
+// three recognizes, preserving the "never guess" safety net for anything outside them).
 
 check(
   'content-search "mention a rattling noise" -> null (free-text search, not a closed filter)',
@@ -309,21 +310,43 @@ check(
   'data-quality: "no readable text extracted" still declines — no reliable proxy for this one (see READABLE_TEXT_DENY_RE)',
   detectAnalyticsPlan('how many documents have no readable text extracted') === null
 );
-check(
-  'data-quality (negative, self-join): "do we have any duplicate customers" -> null (unchanged from round 14)',
-  detectAnalyticsPlan('do we have any duplicate customers') === null
+// R18 (H1, breadth-data-quality-017/018/019/023): the self-join family — see
+// isDuplicateName/sharesAddress/isDuplicateSerial's own doc comment (DATA_QUALITY_FIELD_ENTITY,
+// analytics.js). op comes from opFromShape exactly like every other dedicated shape above: "which"
+// -> list, "how many" -> count, a bare "do we have"/"are any" existence phrasing -> count (its
+// existence/no-existence reading then comes from the answer text's own Yes/No lead-in, not the op).
+eq(
+  'data-quality (self-join, name): "do we have any duplicate customers"',
+  detectAnalyticsPlan('do we have any duplicate customers'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'isDuplicateName', op: 'eq', value: true }] }
+);
+eq(
+  'data-quality (self-join, name): "which customers appear more than once in our records" -> list op (LIST_VERB_RE)',
+  detectAnalyticsPlan('which customers appear more than once in our records'),
+  { entity: 'customers', op: 'list', filters: [{ field: 'isDuplicateName', op: 'eq', value: true }] }
+);
+eq(
+  'data-quality (self-join, address): "how many customers share an address with another customer"',
+  detectAnalyticsPlan('how many customers share an address with another customer'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'sharesAddress', op: 'eq', value: true }] }
+);
+eq(
+  'data-quality (self-join, serial): "are any serial numbers used by more than one unit"',
+  detectAnalyticsPlan('are any serial numbers used by more than one unit'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'isDuplicateSerial', op: 'eq', value: true }] }
+);
+// A paraphrase of the serial shape — never a bare exam sentence, the shape's own wording.
+eq(
+  'data-quality (self-join, serial paraphrase): "does any serial number appear under more than one customer"',
+  detectAnalyticsPlan('does any serial number appear under more than one customer'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'isDuplicateSerial', op: 'eq', value: true }] }
 );
 check(
-  'data-quality (negative, self-join): "which customers appear more than once in our records" -> null',
-  detectAnalyticsPlan('which customers appear more than once in our records') === null
-);
-check(
-  'data-quality (negative, self-join): "how many customers share an address with another customer" -> null',
-  detectAnalyticsPlan('how many customers share an address with another customer') === null
-);
-check(
-  'data-quality (negative, self-join): "are any serial numbers used by more than one unit" -> null',
-  detectAnalyticsPlan('are any serial numbers used by more than one unit') === null
+  'data-quality (negative, self-join): a duplicate-ish shape none of the three field mappings ' +
+    'recognizes ("is the same phone number used by more than one customer" — no "duplicate"/' +
+    '"once"/"address"/"serial" wording) still falls through to the SELF_DUPLICATE_RE decline — ' +
+    'never guesses which field it must mean',
+  detectAnalyticsPlan('is the same phone number used by more than one customer') === null
 );
 check(
   'data-quality (negative, dropped condition): a bare "how many documents are there" must NOT be mistaken for the ' +
@@ -615,6 +638,87 @@ eq(
 check(
   'install-date-extreme: never fires with no equipment/install noun at all ("whats our newest customer") - no ranking query exists for that entity',
   detectAnalyticsPlan('whats our newest customer') === null
+);
+
+/* -- (g) R18 PART 2 (P4, blind generalization round): every detected condition must be represented
+ * in the plan (multi-hop AND-drop, h090/h099-h105), a central time-window parser reused for
+ * warranty expiry (h047-h074), negation must be applied or bail (h125/h127/h128/h134/h189), and
+ * reverse "customers by <geo>"/"how many different <geo>"/data-quality-missing-<geo> shapes must
+ * NOT be swept into that same merge (own paraphrases, not exam text). -- */
+
+eq(
+  'multi-hop AND-drop: "how many trane customers needed a repair visit" keeps BOTH the brand and the service-type condition (was silently dropping the second)',
+  detectAnalyticsPlan('how many trane customers needed a repair visit'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasServiceType', op: 'eq', value: 'Repair' }, { field: 'brand', op: 'eq', value: 'Trane' }] }
+);
+eq(
+  'multi-hop AND-drop, negated: "how many carrier customers have never had a preventive maintenance visit" keeps brand + lacksServiceType, with no contradictory hasServiceType also present',
+  detectAnalyticsPlan('how many carrier customers have never had a preventive maintenance visit'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'lacksServiceType', op: 'eq', value: 'Preventive Maintenance' }, { field: 'brand', op: 'eq', value: 'Carrier' }] }
+);
+eq(
+  'multi-hop AND-drop: brand + doc-type + service-type can all three ride the same plan ("how many trane customers have a service ticket for a repair job")',
+  detectAnalyticsPlan('how many trane customers have a service ticket for a repair job'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasDocType', op: 'eq', value: 'service-ticket' }, { field: 'brand', op: 'eq', value: 'Trane' }, { field: 'hasServiceType', op: 'eq', value: 'Repair' }] }
+);
+
+eq(
+  'time-window (own paraphrase): "how many units have their warranty expiring since january 1st" resolves a real gte/lte warrantyExpires window, not the unfiltered portfolio',
+  detectAnalyticsPlan('how many units have their warranty expiring since january 1st'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-01-01' }, { field: 'warrantyExpires', op: 'lte', value: '2026-09-27' }] }
+);
+eq(
+  'time-window (own paraphrase): "how many units warranty expires this spring" resolves the season to a month range',
+  detectAnalyticsPlan('how many units warranty expires this spring'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-03-01' }, { field: 'warrantyExpires', op: 'lte', value: '2026-05-31' }] }
+);
+eq(
+  'time-window (own paraphrase): "how many units warranty expires by end of year" resolves today..year-end',
+  detectAnalyticsPlan('how many units warranty expires by end of year'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-09-27' }, { field: 'warrantyExpires', op: 'lte', value: '2026-12-31' }] }
+);
+eq(
+  'time-window (own paraphrase): "how many units warranty expires in the next 90 days" resolves today..+90d',
+  detectAnalyticsPlan('how many units warranty expires in the next 90 days'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-09-27' }, { field: 'warrantyExpires', op: 'lte', value: '2026-12-26' }] }
+);
+eq(
+  'distinct-count (own paraphrase): "how many different years do we have service records on file" groups serviceVisits by year, countDistinct',
+  detectAnalyticsPlan('how many different years do we have service records on file'),
+  { entity: 'serviceVisits', op: 'groupBy', groupBy: 'year', countDistinct: true }
+);
+
+eq(
+  'negation guard (own paraphrase of h189 shape): "how many customers arent even in arizona" flips to neq, never double-negates or drops the filter',
+  detectAnalyticsPlan('how many customers arent even in arizona'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'state', op: 'neq', value: 'AZ' }] }
+);
+eq(
+  'data-quality (own paraphrase of h134 shape): "how many customers have zero equipment on file" builds hasAnyEquipment=false, not a bare unfiltered count',
+  detectAnalyticsPlan('how many customers have zero equipment on file'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasAnyEquipment', op: 'eq', value: false }] }
+);
+
+// Regression guard for the merge-dedup bug this round's own mergeDetectedConditions introduced and
+// this round then fixed: scoping mergeDetectedConditions to ONLY the two cross-doc customer
+// detectors (hasDocType/hasServiceType) must never make a genuine groupBy/distinct-count/data-
+// quality shape that merely MENTIONS a safety-net keyword (county/zip) with no extractable value
+// come back null (buildConditionOverrideFilter has nothing to build for a bare "by county" and used
+// to report the whole plan unresolved).
+eq(
+  'merge-dedup scope regression: "customers by county" (a bare groupBy, no county NAMED) still resolves — must never be swept into the cross-doc safety-net merge',
+  detectAnalyticsPlan('customers by county'),
+  { entity: 'customers', op: 'groupBy', groupBy: 'county' }
+);
+eq(
+  'merge-dedup scope regression: "how many different zip codes do we cover" (a bare distinct-count, no zip NAMED) still resolves',
+  detectAnalyticsPlan('how many different zip codes do we cover'),
+  { entity: 'customers', op: 'groupBy', groupBy: 'zip', countDistinct: true }
+);
+eq(
+  'merge-dedup scope regression: "how many customer addresses are missing a zip code" (data-quality, no zip NAMED) still resolves',
+  detectAnalyticsPlan('how many customer addresses are missing a zip code'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasZip', op: 'eq', value: false }] }
 );
 
 console.log('');

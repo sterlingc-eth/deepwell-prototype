@@ -27,7 +27,10 @@ let url;
 try {
   // --port 0: let the OS pick a free port (same rationale as verify-answer-ui.mjs — a fixed port
   // can collide with, or silently serve, another worktree's dev server on a shared machine).
-  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  // detached + killing the whole process group on the way out (see the `finally` below): `npx`
+  // spawns vite as a grandchild, and a plain server.kill() only kills npx itself, leaving vite
+  // listening forever (same fix as verify-records-ui.mjs/verify-grid-ui.mjs/verify-intake-ui.mjs).
+  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let out = '';
   let port = null;
   const check2 = () => {
@@ -116,7 +119,7 @@ try {
 
   await browser.close();
 } finally {
-  server?.kill();
+  try { process.kill(-server.pid, 'SIGKILL'); } catch { server?.kill(); }
 }
 
 console.log(`\n${passes} checks passed, ${failures} failed. Screenshots in ${SHOT_DIR}`);

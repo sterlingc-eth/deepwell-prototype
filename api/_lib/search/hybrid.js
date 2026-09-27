@@ -128,7 +128,7 @@ function finalize(rows) {
  * @param {*} db  the tenant-scoped pg client searchPassages is already using
  * @param {ReturnType<typeof startSemantic>} sem
  */
-export async function finishHybrid(db, sem, { tenantId, question, limit, documentIds, keywordRows, identifierPageIds = new Set() }) {
+export async function finishHybrid(db, sem, { tenantId, question, limit, documentIds, keywordRows, identifierPageIds = new Set(), teamScoped = false }) {
   const isPinned = (r) => identifierPageIds.has(r.id) || String(r.matched_by ?? '').startsWith('identifier:');
   const keywordOnly = () => keywordRows.slice(0, limit);
   if (!sem) return keywordOnly();
@@ -140,7 +140,7 @@ export async function finishHybrid(db, sem, { tenantId, question, limit, documen
     let vectorRows;
     try {
       vectorRows = await nearestChunks(db, {
-        vector: q.vector, model: sem.cfg.model, k: SEM_CANDIDATES, documentIds, minSim: sem.cfg.minSimilarity,
+        vector: q.vector, model: sem.cfg.model, k: SEM_CANDIDATES, documentIds, minSim: sem.cfg.minSimilarity, teamScoped,
       });
     } catch (err) {
       tripSemanticBreaker();

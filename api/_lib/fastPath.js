@@ -22,7 +22,7 @@
  */
 import { describeWarranty, alertTier } from './warrantyRules.js';
 // TEAM C (citations everywhere): equipment / document lists cite the exact rows they list.
-import { attachCitations, unitRecord, documentRecord } from './citations/records.js';
+import { attachCitations, unitRecord, documentRecord, customerRecord } from './citations/records.js';
 // R17 (G4, consolidation): canonical street-suffix list — see geo/streetSuffix.js. Pure data, no
 // runtime dependency chain (geo/streetSuffix.js imports nothing), so this never risks the
 // analytics.js -> scope.js -> fastPath.js -> nlNormalize.js cycle documented below.
@@ -125,8 +125,11 @@ export const FIELD_BY_INTENT = {
 export const NO_FIELD_INTENTS = new Set(['seer', 'filter_size']);
 
 /** Computed (not a bare extraction field) — resolved via warrantyRules.js
- *  against the equipment entity's already-derived `data.warranty`. */
-export const WARRANTY_INTENTS = new Set(['warranty_expires', 'warranty_status']);
+ *  against the equipment entity's already-derived `data.warranty`. `warranty_out` is the same
+ *  underlying fact as `warranty_status`, just asked in the INVERTED "is it out of warranty yet"
+ *  framing (R18 H1: field-phrasing g036/g040/g044) — see buildWarrantyAnswer's own doc comment for
+ *  why this needs its own intent rather than reusing warranty_status's text template. */
+export const WARRANTY_INTENTS = new Set(['warranty_expires', 'warranty_status', 'warranty_out']);
 
 /** Multi-row list answers, not a single fact. */
 export const LIST_INTENTS = new Set(['equipment_list', 'document_list_for_subject']);
@@ -157,6 +160,12 @@ export const ALL_INTENTS = [
  * these.
  */
 const TRIGGERS = [
+  // R18 (H1, field-phrasing g036/g040/g044): "is <Name> out of warranty yet" — the INVERTED framing
+  // of warranty_status ("yes" means expired, not "yes, still covered"). Checked before the plain
+  // warranty_status trigger below since both would otherwise match on "warranty" + is/are, and the
+  // wording ("out of", not "under"/"still covered") decides which template answers correctly (see
+  // buildWarrantyAnswer's own doc comment).
+  ['warranty_out', /\b(?:is|are|was|were)\b[^?.!]*\bout of warranty\b/i],
   ['warranty_status', /\b(is|are)\b[^?.!]*\b(under warranty|still covered|in warranty|warranty status)\b/i],
   ['warranty_status', /\bstill (covered|under warranty|good|valid)\b/i],
   ['warranty_status', /\bdoes\b[^?.!]*\bhave (?:a )?warranty\b/i],
@@ -398,6 +407,10 @@ const THE_NAME_NOUN_RE =
   /\bthe\s+([A-Z][A-Za-z'-]+(?:\s+[A-Za-z'-]+){0,2})\s+(?:unit|account|job|customer|install(?:ation)?|condenser|furnace|job site)\b/i;
 // "does Henderson have/need/take" — a name with no leading preposition at all.
 const DOES_NAME_HAVE_RE = new RegExp(`\\bdoes\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2})\\s+(?:have|need|take)\\b`);
+// R18 (H1, field-phrasing g036/g040/g044): "is Matthew Whitfield out of warranty yet" — same
+// no-leading-preposition shape as DOES_NAME_HAVE_RE above, just for the warranty_out/warranty_status
+// is/are phrasing instead of "does ... have".
+const IS_NAME_WARRANTY_RE = new RegExp(`\\b(?:is|are|was|were)\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2})\\s+(?:out of warranty|still under warranty|under warranty|still covered)\\b`);
 
 // R16 (F1, field-phrasing "ambiguous_multiunit"/"two_value" — a commercial customer's own BUSINESS
 // NAME used as the location, typed exactly as a dispatcher would ("at holy trinity church", "at
@@ -480,6 +493,10 @@ export function extractSubject(question) {
   if (!name) {
     const doesHave = q.match(DOES_NAME_HAVE_RE);
     if (doesHave && !isJunkName(doesHave[1])) name = doesHave[1].trim();
+  }
+  if (!name) {
+    const isWarranty = q.match(IS_NAME_WARRANTY_RE);
+    if (isWarranty && !isJunkName(isWarranty[1])) name = isWarranty[1].trim();
   }
   if (!name) {
     const biz = q.match(BUSINESS_NAME_RE);
@@ -889,6 +906,20 @@ export function buildWarrantyAnswer({ intent, resolution, stable, today, citatio
         : '';
       text = `Yes — ${label} is still under warranty${daysNote}, valid through ${dateHuman}${computedNote}.`;
     }
+  } else if (intent === 'warranty_out') {
+    // R18 (H1, field-phrasing g036/g040/g044): "is X out of warranty yet" is the INVERTED framing
+    // of warranty_status — "Yes" here means the warranty HAS expired (out of warranty), never "yes,
+    // still covered" (warranty_status's own "Yes" meaning). Getting the leading word backwards for
+    // this phrasing would answer confidently and exactly opposite, so this is its own template
+    // rather than a relabeled warranty_status one.
+    if (tier === 'expired') {
+      text = `Yes — ${label}'s warranty is out; it expired ${dateHuman}${computedNote}.`;
+    } else {
+      const daysNote = described.daysToExpiry != null && tier !== 'ok'
+        ? `, expiring in ${described.daysToExpiry} day(s)`
+        : '';
+      text = `No — ${label} is still under warranty${daysNote}, valid through ${dateHuman}${computedNote}.`;
+    }
   } else {
     text = tier === 'expired'
       ? `${label}'s warranty expired ${dateHuman}${computedNote}.`
@@ -916,6 +947,98 @@ export function buildWarrantyAnswer({ intent, resolution, stable, today, citatio
     closest: [],
     fastIntent: intent,
   };
+}
+
+/**
+ * R18 (H1, field-phrasing g038/g046/warranty-0006-canonical): the equipment entity's own
+ * `data.warranty` (deriveWarranty's output, warrantyRules.js) exists — the brand is known — but no
+ * expiry date was ever computed (`stable.expires` is null: an unverified brand's rule, or a printed
+ * expiry that never parsed). This is DIFFERENT from "nothing on file at all": we genuinely know the
+ * unit and its brand, just not a date, so this is a real, honest "unknown" fact, not a decline with
+ * nothing to say. `warranty_status` gets an explicit "unknown" answer (cited to the unit itself,
+ * matching the exam's own 4-way active/expiring/expired/unknown value contract); every other
+ * warranty intent (warranty_expires/warranty_out both ask for a date or a yes/no this file cannot
+ * honestly compute) gets a clean, uncited "not on file" decline instead — see
+ * buildWarrantyNoExpiryDecline just below.
+ */
+export function buildWarrantyUnknownAnswer({ intent, resolution, labelOverride }) {
+  const equipment = resolution?.equipment;
+  if (!equipment) return null;
+  const label = labelOverride ?? subjectLabel(resolution);
+  const text = `${label}'s warranty status is unknown — the brand's terms haven't been verified, so no expiration date has been computed yet.`;
+  const fact = { label: 'Warranty', value: 'Unknown', status: 'muted', basis: 'computed' };
+  return attachCitations({
+    kind: 'answer',
+    text,
+    facts: [fact],
+    sources: [],
+    confidence: 0.6,
+    interpretation: label,
+    verifiedCount: 0,
+    unverifiedCount: 1,
+    closest: [],
+    fastIntent: intent,
+  }, {
+    records: [unitRecord({ ...equipment.data, id: equipment.id, customer_id: equipment.customer_id })],
+    total: 1, claimedCount: 1,
+    basis: `Found the unit on file for ${label}; its warranty status is unknown.`,
+  });
+}
+
+/** See buildWarrantyUnknownAnswer's own doc comment — the "no computed expiry" case for every
+ *  warranty intent OTHER than warranty_status (a date or a yes/no this file cannot honestly
+ *  produce). `facts` stays empty so this reads as a genuine "not on file" (compareHonestZero/
+ *  compareValue's empty-alts branch both treat a no-answer with no facts as a pass, never a
+ *  fabrication), never a fabricated date. */
+export function buildWarrantyNoExpiryDecline({ intent, resolution, labelOverride }) {
+  const label = labelOverride ?? subjectLabel(resolution);
+  return {
+    kind: 'no-answer',
+    text: `I don't have a computed warranty expiration on file for ${label} — the brand's terms haven't been verified yet.`,
+    facts: [], sources: [], confidence: 0,
+    verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent,
+  };
+}
+
+/**
+ * R18 (H1): does `question` use the "the <Name> unit/account/job/..." phrasing (THE_NAME_NOUN_RE)?
+ * contactLookup.js's own NAMED_UNIT_RE already owns that EXACT surface form for an ambiguous
+ * surname ("Is the Salazar unit still under warranty?" -> lists each matching Salazar's own
+ * individual warranty state, richer than a bare "which one?" decline) — runFastPath's own
+ * ambiguous-name branch below must never intercept it ahead of that (fastPathIntent is checked
+ * before contactLookupIntent in api/ask.js), only the surname/no-noun phrasings contactLookup
+ * doesn't itself recognize ("warranty status on Winslow", "is Matthew Whitfield out of warranty
+ * yet"). Exported so fastPathQuery.js's runFastPath can gate on it without re-exporting
+ * THE_NAME_NOUN_RE itself. */
+export function isNamedUnitPhrasing(question) {
+  return THE_NAME_NOUN_RE.test(String(question ?? ''));
+}
+
+/**
+ * R18 (H1, field-phrasing g035/g039/g043 — "warranty status on Winslow"): a bare surname resolved
+ * (fastPathQuery.js's resolveFastPathSubject, `subject.name` branch) to MORE THAN ONE customer, not
+ * via an address. Never guesses which one was meant (same "never guess" rule as
+ * buildAddressFieldDecline's own 'multi-customer' case for an address with several customers on
+ * it) — but unlike that address case, the right answer here is not a bare, cited-to-nothing
+ * decline: the exam's own `set` comparison expects the matching customers to be named, so this
+ * lists them (never their individual field values — picking one customer's warranty/tonnage/etc. to
+ * state would be exactly the guess this file refuses to make) with a citation to each of their own
+ * customer record. */
+export function buildAmbiguousNameFieldDecline({ intent, name, customers }) {
+  const fieldLabel = ADDRESS_FIELD_LABEL[intent] ?? 'that';
+  const names = (customers ?? []).map((c) => c.customer_name).filter(Boolean);
+  const who = names.length ? `: ${names.slice(0, 8).join(', ')}${names.length > 8 ? `, and ${names.length - 8} more` : ''}` : '';
+  const text = `There's more than one customer on file named ${name}${who} — let me know which one you mean and I can look up the ${fieldLabel}.`;
+  return attachCitations({
+    kind: 'answer',
+    text,
+    facts: [], sources: [], confidence: 0,
+    interpretation: name, verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent,
+  }, {
+    records: (customers ?? []).map((c) => customerRecord({ id: c.id, customer_name: c.customer_name, service_address: c.service_address })),
+    total: (customers ?? []).length, claimedCount: (customers ?? []).length,
+    basis: `Found ${(customers ?? []).length} customers on file named ${name}.`,
+  });
 }
 
 /** equipment_list: `units` is recordsStore.js's listCustomerEquipment() rows. */

@@ -16,6 +16,7 @@ import grid from "./_lib/grid/route.js";
 import askSuggest from "./_lib/routes/ask-suggest.js";
 import unitAddress from "./_lib/routes/unit-address-backfill.js";
 import insights from "./_lib/routes/insights.js";
+import audience from "./_lib/audience/route.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -43,6 +44,9 @@ import insights from "./_lib/routes/insights.js";
  *   POST insights             -> ?action=insights   (proactive "needs attention" list: warranty,
  *                                                      money, repeat-failure, data-gap detectors;
  *                                                      no model call — any member — round 17)
+ *   POST audience             -> ?action=audience   (customer/internal doc classification: get one
+ *                                                      document's audience, one-tap override — any
+ *                                                      member — round 18, owner ask (a))
  *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
@@ -54,7 +58,7 @@ import insights from "./_lib/routes/insights.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

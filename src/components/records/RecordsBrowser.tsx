@@ -10,8 +10,8 @@ import type { PipelineStage } from '../../core/types';
 import { WarrantyStatusBadge } from '../WarrantyStatusBadge';
 import { useRecordsBrowse } from './useRecordsBrowse';
 import {
-  BROWSE_SORT_OPTIONS, STAGE_BUCKET_LABEL, WARRANTY_BUCKET_LABEL,
-  type BrowseFacet, type BrowseFilters, type BrowseRow, type GroupBy,
+  BROWSE_SORT_OPTIONS, STAGE_BUCKET_LABEL, WARRANTY_BUCKET_LABEL, AUDIENCE_FILTER_LABEL,
+  type AudienceFilter, type BrowseFacet, type BrowseFilters, type BrowseRow, type GroupBy,
 } from './types';
 
 const DOCUMENT_TYPE_LABEL = new Map(DOCUMENT_TYPES.map((t) => [t.id, t.label]));
@@ -233,6 +233,7 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
             <LayoutGrid className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
+        <AudienceControl value={b.filters.audience ?? 'customer'} onChange={(v) => b.patchFilters({ audience: v })} />
       </div>
 
       {activeChips.length > 0 && (
@@ -335,7 +336,10 @@ function GroupRows({ group, groupBy, collapsed, onToggle, onOpen, activeId }: {
       {!collapsed && group.rows.map((r) => (
         <tr key={r.id} className={`hover:bg-surface-2 cursor-pointer ${activeId === r.id ? 'bg-surface-2' : ''}`} tabIndex={0} onClick={() => onOpen(r.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(r.id); }}>
           <td className="px-3 py-2 max-w-[16rem]" title={rowName(r)}>
-            <span className="block truncate font-medium text-ink">{rowName(r)}</span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate font-medium text-ink">{rowName(r)}</span>
+              {r.audience === 'internal' && <TeamOnlyBadge />}
+            </span>
             {r.displayName && <span className="block truncate text-caption text-ink-3">{r.filename}</span>}
           </td>
           <td className="px-3 py-2 text-ink-2">{typeLabel(r.documentType)}</td>
@@ -358,6 +362,7 @@ function RecordCard({ row: r, onOpen }: { row: BrowseRow; onOpen: (id: string) =
         <span className="font-medium text-ink truncate">{rowName(r)}</span>
         <StagePill stage={toPipelineStage(r.stage)} ai={r.verifiedBy === 'ai'} compact />
       </div>
+      {r.audience === 'internal' && <TeamOnlyBadge />}
       <p className="text-caption text-ink-3">{typeLabel(r.documentType)}</p>
       {r.customerName && <p className="text-body text-ink-2 truncate">{r.customerName}</p>}
       {r.siteAddress && <p className="text-caption text-ink-3 truncate">{r.siteAddress}</p>}
@@ -371,6 +376,45 @@ function RecordCard({ row: r, onOpen }: { row: BrowseRow; onOpen: (id: string) =
           the day near a timezone boundary. */}
       {r.warrantyBucket !== 'unknown' && <WarrantyStatusBadge warranty={{ warrantyExpiry: r.warrantyExpiry ? new Date(r.warrantyExpiry) : null }} />}
     </button>
+  );
+}
+
+/**
+ * Owner ask (a): "some of the correspondence and service tickets are specifically for the techs
+ * and have nothing to do with the customer... how do we ... not mingle with the normal documents
+ * strictly for customers?" This is the answer on the records browser's side — a always-visible,
+ * three-way segmented control (Customer default / Internal / All), same visual pattern as the
+ * table/cards view toggle right next to it, so switching to Internal is one click, not a trip
+ * into the filter panel.
+ */
+function AudienceControl({ value, onChange }: { value: AudienceFilter; onChange: (v: AudienceFilter) => void }) {
+  const options: AudienceFilter[] = ['customer', 'internal', 'all'];
+  return (
+    <div className="flex items-center rounded-lg border border-line overflow-hidden" role="tablist" aria-label="Audience">
+      {options.map((o) => (
+        <button
+          key={o}
+          type="button"
+          role="tab"
+          aria-selected={value === o}
+          className={`px-3 py-2 min-h-[40px] text-body whitespace-nowrap ${value === o ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface text-ink-2'}`}
+          onClick={() => onChange(o)}
+        >
+          {AUDIENCE_FILTER_LABEL[o]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** "Team only" badge — an internal (tech-only) document, wherever a document shows in the
+ *  browser. Never shown for an ordinary customer document (the common case), so it reads as a
+ *  deliberate flag, not visual noise. */
+function TeamOnlyBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-caption font-medium bg-brass-100 text-forest-900 dark:bg-forest-800 dark:text-brass-200">
+      Team only
+    </span>
   );
 }
 

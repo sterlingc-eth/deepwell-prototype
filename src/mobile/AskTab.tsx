@@ -4,13 +4,17 @@ import { ask, AskApiError } from '../services/answerService'
 import { authHeader } from '../services/authToken'
 import { asksUsedFraction, resetsOnShortLabel, type BillingStatus } from '../services/billingClient'
 import { buildSuggestions, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
-import { PreflightPill, TypeaheadDropdown, DidYouMeanChips } from '../components/ask'
+import { PreflightPill, TypeaheadDropdown, DidYouMeanChips, SamplePromptRowsPlaceholder, turnFrom, type ThreadTurn } from '../components/ask'
 import { useGraph } from '../core/entityGraph'
 import { DonovanMark } from '../components/DonovanMark'
 import type { Answer } from '../core/types'
 import { MobileAnswer } from './MobileAnswer'
 import { InsightsCard } from '../components/insights/InsightsCard'
 import { canPromptInstall, isIos, isStandalone, onInstallAvailabilityChange, promptInstall } from './pwa'
+
+// TEAM T2 / Round 18 P2: same cap as AskScreen's own (api/_lib/conversation.js's MAX_CONTEXT_TURNS —
+// not importable into the client bundle, so kept in sync here by hand).
+const MAX_CONTEXT_TURNS = 4
 
 interface Turn {
   id: number
@@ -242,10 +246,13 @@ export function AskTab({
   onOpenDoc,
   onOpenCustomer,
   billing,
+  tenantKey = null,
 }: {
   onOpenDoc: (id: string) => void
   onOpenCustomer: (ref: string) => void
   billing: BillingStatus | null
+  /** orgId ?? userId from MobileApp (a prop, like ScanTab's, so this tab renders without a ClerkProvider in tests). */
+  tenantKey?: string | null
 }) {
   const [turns, setTurns] = useState<Turn[]>([])
   // Counter, not a boolean: a "Try again" can start while another ask is still in flight.
@@ -255,17 +262,32 @@ export function AskTab({
   const composerRef = useRef<ComposerHandle>(null)
   const nextId = useRef(1)
 
+  // Round 18 P2: per-tenant, per-role sample-prompt cache (src/core/suggestions.ts's useSamplePrompts) —
+  // never another tenant's, even on a same-tab org switch.
+
   // Real suggestions from this shop's own records once they've loaded. Round 14 K1: the server's own
   // role-based ("tech" — this is the field app) sample prompts come first when it has any — pre-validated
   // to answer without a model call, same as the desktop Ask screen's own "Try asking" — falling back to
   // the client-only entity-graph suggestions, then the generic fill-in templates, exactly as before.
+  //
+  // Round 18 P2 fix: the client-only/template fallback used to render INSTANTLY (it's synchronous), then
+  // get replaced the moment the server's own samples arrived a beat later — that swap was the reported
+  // flicker. It's now only ever used once loading has genuinely finished with nothing server-side to
+  // offer (`suggestions === null` means "still loading — show a placeholder instead").
   const entities = useGraph((s) => s.entities)
-  const serverPrompts = useSamplePrompts('tech', turns.length === 0)
+  const { prompts: serverPrompts, loading: samplesLoading } = useSamplePrompts('tech', turns.length === 0, tenantKey)
   const suggestions = useMemo(() => {
     if (serverPrompts.length) return serverPrompts.map((p) => ({ label: p.text, fill: p.text, send: true }))
+    if (samplesLoading) return null
     const real = buildSuggestions(Object.values(entities), 3)
     return real.length ? real.map((q) => ({ label: q, fill: q, send: true })) : TEMPLATES.map((t) => ({ label: t.endsWith(' ') ? `${t}…` : t, fill: t, send: !t.endsWith(' ') }))
-  }, [entities, serverPrompts])
+  }, [entities, serverPrompts, samplesLoading])
+
+  // TEAM T2 / Round 18 P2: the running conversation context sent alongside each new question, so
+  // "and last year?" / "who was the tech?" compose with the prior turn (api/_lib/conversation.js). Kept
+  // separate from the visible `turns` chat log (never cleared) so "New topic" below can reset what the
+  // follow-up engine sees without wiping the conversation the tech can still scroll back through.
+  const [contextTurns, setContextTurns] = useState<ThreadTurn[]>([])
 
   const update = (id: number, patch: Partial<Turn>) => setTurns((t) => t.map((x) => (x.id === id ? { ...x, ...patch } : x)))
 
@@ -287,9 +309,12 @@ export function AskTab({
     const controller = new AbortController()
     const slowTimer = window.setTimeout(() => update(id, { slow: true }), SLOW_HINT_MS)
     const killTimer = window.setTimeout(() => controller.abort(), ASK_TIMEOUT_MS)
+    // Captured before this turn is added — prior turns only, per composeFollowup's contract.
+    const priorTurns = contextTurns
     try {
-      const answer = await ask(question, { signal: controller.signal })
+      const answer = await ask(question, { signal: controller.signal, conversationContext: { turns: priorTurns } })
       update(id, { answer })
+      setContextTurns((t) => [...t, turnFrom(question, answer)].slice(-MAX_CONTEXT_TURNS))
     } catch (err) {
       const aborted = controller.signal.aborted
       const message = aborted
@@ -306,7 +331,7 @@ export function AskTab({
       window.clearTimeout(killTimer)
       setInFlight((n) => n - 1)
     }
-  }, [])
+  }, [contextTurns])
 
   const send = useCallback((q: string) => void submit(q), [submit])
 
@@ -326,18 +351,22 @@ export function AskTab({
               <h2 className="text-h3 font-semibold mt-3 short:mt-0 mb-1">Ask Donovan</h2>
               <p className="text-body text-ink-2 m-0 max-w-xs short:hidden">A customer, an address, a serial number, or any question about your records.</p>
               <div className="mt-4 short:mt-2 w-full short:hidden"><InsightsCard onAsk={send} /></div>
-              <div className="mt-5 short:mt-2 w-full grid grid-cols-1 gap-2">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    onClick={() => (s.send ? void submit(s.fill) : composerRef.current?.fill(s.fill))}
-                    className={`w-full min-h-touch text-left px-4 py-2.5 rounded-xl bg-surface text-body text-ink-2 ${i >= 2 ? 'short:hidden' : ''}`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+              {suggestions === null ? (
+                <div className="mt-5 short:mt-2 w-full"><SamplePromptRowsPlaceholder /></div>
+              ) : (
+                <div className="mt-5 short:mt-2 w-full grid grid-cols-1 gap-2">
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => (s.send ? void submit(s.fill) : composerRef.current?.fill(s.fill))}
+                      className={`w-full min-h-touch text-left px-4 py-2.5 rounded-xl bg-surface text-body text-ink-2 ${i >= 2 ? 'short:hidden' : ''}`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <InstallHint />
             </div>
           ) : (
@@ -349,6 +378,20 @@ export function AskTab({
           )}
         </div>
       </div>
+      {/* TEAM T2 / Round 18 P2: resets the conversation CONTEXT the follow-up engine sees, not the
+          visible chat log above — "New topic" for the next question, same intent as the desktop Ask
+          screen's own "New question" button, adapted to a running chat thread that never clears itself. */}
+      {contextTurns.length > 0 && (
+        <div className="max-w-2xl mx-auto w-full px-4 pb-1 flex justify-end short:hidden">
+          <button
+            type="button"
+            onClick={() => setContextTurns([])}
+            className="min-h-11 px-2 text-caption text-ink-3 underline underline-offset-2"
+          >
+            New topic
+          </button>
+        </div>
+      )}
       <Composer ref={composerRef} busy={busy} onSubmit={send} usageNote={usageNote} />
     </div>
   )

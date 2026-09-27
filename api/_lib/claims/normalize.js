@@ -3,6 +3,7 @@
  * check.js. No DB, no model, no I/O: every function here is a plain string/number transform so it is
  * directly unit-testable and safe to call from a hot request path.
  */
+import { escapeRegex as escapeRe } from "../util/escape.js";
 
 /** "$1,250.00" | "1,250" | "1250.00" | "1250" all normalize to the string "1250" (or "1250.00" trimmed
  *  of trailing zeros is NOT collapsed — money is compared as a numeric VALUE, not a formatted string,
@@ -67,8 +68,6 @@ export function digitTokens(s) {
     .map((tok) => tok.replace(/[.,:/-]+$/, ""))
     .filter((tok) => /\d/.test(tok));
 }
-
-function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 /** Does an exact/normalized-amount token appear as a whole token inside `haystack` (already lowercased)? */
 export function amountTokenIn(haystack, needle) {

@@ -42,10 +42,13 @@ const {
 
 /* ================================================================== 1. pure */
 {
+  // Round 18, part 2 (owner ask (a)): `audience` now also defaults — to 'customer', never null —
+  // same "never leak internal-only documents by omission" discipline as every other browse default.
   const f = normalizeBrowseFilters({});
-  eq('normalizeBrowseFilters: empty input -> default sort/limit, everything else null', f, {
+  eq('normalizeBrowseFilters: empty input -> default sort/limit/audience, everything else null', f, {
     documentType: null, customerId: null, site: null, technician: null, brand: null,
     stageBucket: null, warrantyBucket: null, hasMoney: null, openBalance: null, uploadedByMe: null,
+    audience: 'customer',
     serviceDateFrom: null, serviceDateTo: null, uploadDateFrom: null, uploadDateTo: null,
     q: null, sort: DEFAULT_BROWSE_SORT, limit: 50, cursor: null,
   });

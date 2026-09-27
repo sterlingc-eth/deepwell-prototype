@@ -41,6 +41,9 @@ import {
   warrantyStatusFromQuestion,
   hasAmbiguousWarrantyStatusNegation,
   isExistenceQuestion,
+  resolveAnyTimeRange,
+  SERVICE_TYPE_PHRASE_RE,
+  serviceTypeValueOf,
 } from '../analytics.js';
 import { docTypeFromWord, docTypeSynonymAlternation } from '../documentTypes.js';
 
@@ -131,7 +134,13 @@ function opFromShape(q) {
  *  whenever a customers list/count plan has NO filters at all and the
  *  question names a 2+-digit number (a zip, most ages) — so a filter this
  *  function can build must be built here, before that gate ever runs. */
-const SAFETY_NET_CONDITIONS = ['email', 'phone', 'brand', 'county', 'city', 'state', 'zip', 'warranty'];
+// R18 P4 (C2, multi-hop AND-drop): 'serviceType' added — "how many trane customers needed a
+// repair visit" names TWO conditions (brand + a repair-visit condition); buildConditionOverrideFilter
+// resolves it via SERVICE_TYPE_PHRASE_RE the same way it resolves brand/city/etc, and a plan
+// that can't resolve it (buildConditionOverrideFilter returning null for a genuinely detected
+// condition) makes buildSafetyNetFilters' own `unresolved` flag bail the WHOLE plan, same as
+// every other safety-net condition.
+const SAFETY_NET_CONDITIONS = ['email', 'phone', 'brand', 'county', 'city', 'state', 'zip', 'warranty', 'serviceType'];
 
 /** Returns {filters, unresolved} — `unresolved` is true when a REAL condition was detected in the
  *  question text (detectedConditions) but buildConditionOverrideFilter declined to turn it into a filter
@@ -424,6 +433,130 @@ function detectCustomersHasDocType(q) {
   };
 }
 
+/**
+ * R18 P4 (blind generalization round 18 part 2, C2 multi-hop AND-drop / C4 negation): "how many
+ * trane customers needed a repair visit" / "how many carrier customers have had a repair call" /
+ * "how many customers have never had a preventive maintenance visit" / "customers who have had
+ * only preventive maintenance, never a repair" — a customer existentially linked to a service
+ * VISIT of a given type (extractions.service_type — see SERVICE_TYPE_FILTER_FIELDS' own doc
+ * comment, analytics.js), the event-level sibling of detectCustomersHasDocType just above (a
+ * document TYPE). Every SERVICE_TYPE_PHRASE_RE match in the question is read independently for its
+ * own nearby negation (never just the first one), so "only X, never Y" builds BOTH a hasServiceType
+ * AND a lacksServiceType filter in the same plan — the one shape a single safety-net condition
+ * (buildConditionOverrideFilter, which only ever returns ONE filter) could never express.
+ */
+function detectCustomersHasServiceType(q) {
+  if (entityFromNouns(q) !== 'customers') return null;
+  const matches = [...q.matchAll(new RegExp(SERVICE_TYPE_PHRASE_RE.source, 'gi'))];
+  if (!matches.length) return null;
+  let hasValue = null;
+  let lacksValue = null;
+  for (const m of matches) {
+    const value = serviceTypeValueOf(m[1]);
+    if (hasNearbyNegation(q.slice(0, m.index), 4)) {
+      if (!lacksValue) lacksValue = value;
+    } else if (!hasValue) {
+      hasValue = value;
+    }
+  }
+  if (!hasValue && !lacksValue) return null;
+  const filters = [];
+  if (hasValue) filters.push({ field: 'hasServiceType', op: 'eq', value: hasValue });
+  if (lacksValue && lacksValue !== hasValue) filters.push({ field: 'lacksServiceType', op: 'eq', value: lacksValue });
+  return { entity: 'customers', op: opFromShape(q), filters };
+}
+
+/**
+ * R18 P4 (C2): the general "every detected condition must be represented in the plan" guard —
+ * applied to any dedicated shape detector's plan whose entity is 'customers' (the shapes this bug
+ * class actually hit: detectCustomersHasDocType/detectCustomersHasServiceType dropped a SECOND
+ * condition — brand, city, ... — the dedicated detector itself never looks for, exactly the "how
+ * many mitsubishi customers have a maintenance agreement on file" bug: the doc-type filter was
+ * right, but "mitsubishi" vanished). Reuses buildSafetyNetFilters — the SAME detector
+ * detectAnalyticsPlan's own generic path already trusts — so a condition it can't confidently turn
+ * into a filter bails the WHOLE plan (never a partial, silently-wrong one) rather than being
+ * merged in half-built. Filters already present on the dedicated plan are left alone (never
+ * duplicated or overridden) — this only ever ADDS a condition the dedicated detector didn't
+ * already cover. Scoped to `entity === 'customers'` because that's the only entity every
+ * SAFETY_NET_CONDITIONS field (brand/city/county/state/zip/warranty/serviceType) is actually
+ * meaningful for via the customer-equipment join (routes/analytics.js's
+ * EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN) or a customer-scoped cross-doc query — a dedicated plan for
+ * any OTHER entity (documents/equipment/serviceVisits) is left untouched.
+ */
+// Fields that share ONE semantic "slot" for merge-dedup purposes even though they are different
+// filter field names — a plan that already carries EITHER side of the pair has already fully
+// resolved that condition (has/lacks, negation included), so the safety net's own (negation-blind)
+// version of the same condition must never be added alongside it. Without this, "how many carrier
+// customers have never had a preventive maintenance visit" — already correctly resolved by
+// detectCustomersHasServiceType to lacksServiceType=PM — got a SECOND, contradictory
+// hasServiceType=PM filter bolted on by the safety net's own 'serviceType' condition (which has no
+// idea the dedicated detector already read the negation).
+const MERGE_DEDUP_SLOT = {
+  hasServiceType: 'serviceType', lacksServiceType: 'serviceType',
+  hasDocType: 'docType', lacksDocType: 'docType',
+};
+
+function mergeDetectedConditions(plan, q) {
+  if (!plan || plan.entity !== 'customers') return plan;
+  const { filters: extra, unresolved } = buildSafetyNetFilters(q, plan.entity);
+  if (unresolved) return null;
+  if (!extra.length) return plan;
+  const existingFields = new Set((plan.filters ?? []).map((f) => f.field));
+  const existingSlots = new Set(
+    (plan.filters ?? []).map((f) => MERGE_DEDUP_SLOT[f.field]).filter(Boolean)
+  );
+  const merged = [...(plan.filters ?? [])];
+  for (const f of extra) {
+    if (existingFields.has(f.field)) continue;
+    if (MERGE_DEDUP_SLOT[f.field] && existingSlots.has(MERGE_DEDUP_SLOT[f.field])) continue;
+    merged.push(f);
+    existingFields.add(f.field);
+  }
+  return { ...plan, filters: merged };
+}
+
+/**
+ * R18 P4 (C3, time-window drop): "how many units had their warranty expire in the past year" /
+ * "any warranties expiring in the next 90 days" / "how many warranties expire by the end of this
+ * calendar year" / "how many units warranty has expired so far this year" — a real calendar
+ * WINDOW on the unit's own warranty.expires date, distinct from the fixed warrantyStatus bucket
+ * (impliedWarrantyStatus, below — a fixed <=365-day-out slice) and unlike every other timeRange
+ * consumer (documents/serviceVisits), never wired through plan.timeRange (equipment/warranties
+ * questions never read plan.timeRange at all — see executeAnalyticsPlan, routes/analytics.js) —
+ * this builds the concrete warrantyExpires filter bounds directly, reusing resolveAnyTimeRange
+ * (the SAME central date-range parser reconcileTimeRange already applies to every other entity)
+ * so a phrasing that function recognizes is honored here too, with no second date-math
+ * implementation. Requires an explicit "expire(s)/expired" word (never a bare "under warranty" —
+ * that's impliedWarrantyStatus's own, non-time-windowed territory) so this never fires for a
+ * question that named no real window at all.
+ */
+const WARRANTY_EXPIRE_WORD_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,20}\bexpir\w*\b|\bexpir\w*\b[\s\S]{0,20}\bwarrant(?:y|ies)\b/i;
+
+function detectWarrantyExpiryWindow(q) {
+  if (!WARRANTY_EXPIRE_WORD_RE.test(q)) return null;
+  const range = resolveAnyTimeRange(q);
+  if (!range) return null;
+  const filters = [];
+  if (range.from) filters.push({ field: 'warrantyExpires', op: 'gte', value: range.from });
+  if (range.to) filters.push({ field: 'warrantyExpires', op: 'lte', value: range.to });
+  if (!filters.length) return null;
+  return { entity: 'equipment', op: opFromShape(q), filters };
+}
+
+/** "how many different years do we have customers on file for" — a DISTINCT-year count over
+ *  service_date records (extractions.field_key='service_date'), forced to entity 'serviceVisits'
+ *  the same way detectTechnicianGroupBy/detectDistinctDimensionCount force an entity a bare noun
+ *  reading would get wrong ("customers" is the earliest noun here, but there is no customer-level
+ *  "year" column — the years on file are the service visits' own dates). `year` is a groupBy
+ *  dimension keyOf/GROUP_BY_FIELDS (analytics.js/routes/analytics.js) derive from each visit's own
+ *  month string, never a real stored column. */
+const DIFFERENT_YEARS_RE = /\bhow many different years?\b|\bhow many years?\b[\s\S]{0,20}\bon file\b/i;
+
+function detectDistinctYearsCount(q) {
+  if (!DIFFERENT_YEARS_RE.test(q)) return null;
+  return { entity: 'serviceVisits', op: 'groupBy', groupBy: 'year', countDistinct: true };
+}
+
 /* ============================================================ main entry point */
 
 /**
@@ -454,6 +587,40 @@ function detectCustomersHasDocType(q) {
 // than silently falling into the generic bare-count path below.
 const SELF_DUPLICATE_RE =
   /\b(duplicate\s+customers?|appear\s+more\s+than\s+once|share\s+an?\s+address|used\s+by\s+more\s+than\s+one\s+unit|more\s+than\s+once\s+in\s+our\s+records|appear\s+under\s+more\s+than\s+one|more\s+than\s+one\s+customer\b|under\s+more\s+than\s+one\s+(?:customer|account))\b/i;
+
+/**
+ * R18 (H1, breadth-data-quality-017/018/019/023): SELF_DUPLICATE_RE's own doc comment above says
+ * "No plan feature for this exists yet" - that changed this round. isDuplicateName/sharesAddress/
+ * isDuplicateSerial (analytics.js's DATA_QUALITY_FIELD_ENTITY) are computed exactly like the flat
+ * count(*) > 1 self-join the comment describes, just via a cross-row frequency map attached to
+ * every already-fetched row (routes/analytics.js's attachDuplicateFlag) instead of a SQL HAVING
+ * clause - the executor never fetches a FILTERED set for an unrecognized boolean field (see
+ * buildAnalyticsSQL's own doc comment), so every row for the entity is already there to compute
+ * the frequency over. Three concrete, narrow mappings (never a generic catch-all) so a
+ * duplicate-shaped question none of these three recognizes still falls through to
+ * SELF_DUPLICATE_RE's honest decline below, exactly as before this round.
+ */
+const DUPLICATE_ADDRESS_RE = /\bshare\s+an?\s+address\b/i;
+const DUPLICATE_SERIAL_RE =
+  /\bserial\s+numbers?\b[\s\S]{0,40}\bmore\s+than\s+one\s+(?:unit|equipment)\b|\bused\s+by\s+more\s+than\s+one\s+unit\b|\bappear(?:s)?\s+under\s+more\s+than\s+one\s+(?:customer|account)\b|\bunder\s+more\s+than\s+one\s+(?:customer|account)\b/i;
+const DUPLICATE_NAME_RE =
+  /\bduplicate\s+customers?\b|\bappear(?:s)?\s+more\s+than\s+once(?:\s+in\s+our\s+records)?\b|\bcustomers?\b[\s\S]{0,20}\bmore\s+than\s+once\b/i;
+
+function detectDuplicateCondition(q) {
+  // Checked in this order (address / serial before the generic "name" one) so the address and
+  // serial phrasings, which never mention "once", can't be shadowed by a broader name match — and
+  // so they get their own field even though they also loosely fit "duplicate ... records".
+  if (DUPLICATE_ADDRESS_RE.test(q)) {
+    return { entity: 'customers', op: opFromShape(q), filters: [{ field: 'sharesAddress', op: 'eq', value: true }] };
+  }
+  if (DUPLICATE_SERIAL_RE.test(q)) {
+    return { entity: 'equipment', op: opFromShape(q), filters: [{ field: 'isDuplicateSerial', op: 'eq', value: true }] };
+  }
+  if (DUPLICATE_NAME_RE.test(q)) {
+    return { entity: 'customers', op: opFromShape(q), filters: [{ field: 'isDuplicateName', op: 'eq', value: true }] };
+  }
+  return null;
+}
 
 /** Content-search shapes ("did any jobs involve/mention X", symptom words) —
  *  the real distinguishing condition is free-text search inside a document/
@@ -569,8 +736,25 @@ const MISSING_FIELD_RULES = [
     re: /\b(?:don'?t|doesn'?t|do\s+not|does\s+not)\s+have\s+a?\s*model\s*(?:numbers?)?\s*(?:recorded)?\b|\bno\s+model\s*(?:numbers?)?\s+(?:recorded|on\s+file)\b|\bmissing\s+a?\s*model\s*(?:numbers?)?\b/i,
   },
   {
+    // R18 P4 (blind generalization round 18 part 2, h128): "how many units have no tonnage
+    // listed" — the same condition as "no tonnage on file", just a paraphrase ("listed" for "on
+    // file") this regex didn't cover yet.
     entity: 'equipment', field: 'hasTonnage', value: false,
-    re: /\bno\s+tonnage\s+on\s+file\b|\bmissing\s+(?:a\s+|the\s+)?tonnage\b/i,
+    re: /\bno\s+tonnage\s+(?:on\s+file|listed)\b|\bmissing\s+(?:a\s+|the\s+)?tonnage\b|\btonnage\s+(?:is\s+)?(?:not\s+listed|missing)\b/i,
+  },
+  {
+    // R18 P4 (h053): "how many units are actually registered for warranty" — data.warranty.
+    // registrationState === 'on_file' (see WARRANTY_REGISTERED_ROW_KEY, routes/analytics.js),
+    // never the warrantyStatus coverage bucket (a unit can be registered AND expired, or
+    // unregistered AND still active — the two are independent facts).
+    entity: 'equipment', field: 'warrantyRegistered', value: true,
+    re: /\b(?:actually\s+)?registered\s+for\s+warranty\b|\bwarranty\s+registration\s+(?:is\s+)?on\s+file\b/i,
+  },
+  {
+    // R18 P4 (C4, negation, h134): "how many customers have zero equipment on file" — the
+    // customers-side mirror of hasAnyDocument.
+    entity: 'customers', field: 'hasAnyEquipment', value: false,
+    re: /\bzero\s+equipment\s+on\s+file\b|\bno\s+equipment\s+on\s+file\b|\b(?:don'?t|do\s+not)\s+have\s+(?:any\s+)?equipment\b/i,
   },
   // "no warranty information AT ALL" -> warrantyStatus 'unknown', not a new
   // hasWarrantyInfo boolean: deriveWarranty (warrantyRules.js) always writes
@@ -713,6 +897,10 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     const q = String(question ?? '').trim();
     if (!q) return null;
     if (tenantVocab && questionNamesKnownCustomer(q, tenantVocab)) return null;
+    // R18 (H1): checked BEFORE the generic SELF_DUPLICATE_RE decline just below — see
+    // detectDuplicateCondition's own doc comment for why this specific family can now be answered.
+    const dup = detectDuplicateCondition(q);
+    if (dup) return dup;
     if (SELF_DUPLICATE_RE.test(q)) return null;
     if (CONTENT_SEARCH_DENY_RE.test(q)) return null;
     if (CONNECT_DENY_RE.test(q)) return null;
@@ -727,10 +915,28 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     if (READABLE_TEXT_DENY_RE.test(q)) return null;
 
     // ---- dedicated shapes, most specific first --------------------------
+    const missingField = detectMissingFieldCondition(q);
+    if (missingField) return missingField;
+    const lockedDocType = detectLockedIntoDocType(q);
+    if (lockedDocType) return lockedDocType;
+
+    // R18 P4 (multi-hop AND-drop): mergeDetectedConditions is ONLY applied to the two cross-doc
+    // customer detectors (hasDocType/hasServiceType) below, whose whole job is "count customers with
+    // THIS condition" and so are exactly the shape a second, brand/geo/contact-info condition rides
+    // along with unnoticed (h090, h099-h105) — every OTHER dedicated detector (groupBy, distinct-count,
+    // technician, install-date ranking, brand comparison) has its own complete, self-contained filter
+    // semantics, and merging arbitrary safety-net filters into those risks a false "unresolved" bail
+    // the moment the question merely mentions a safety-net keyword (county/zip/city/state) with no
+    // extractable value of its own — e.g. "customers by county" (a groupBy, no county NAMED) or "how
+    // many different zip codes do we cover" (a distinct-count, no zip NAMED) used to come back null
+    // because buildConditionOverrideFilter('zip'|'county', ...) has nothing to build and reports
+    // unresolved. Keep those detectors' results exactly as they build them.
+    const crossDocDedicated = detectCustomersHasDocType(q) ?? detectCustomersHasServiceType(q);
+    if (crossDocDedicated) return mergeDetectedConditions(crossDocDedicated, q);
+
     const dedicated =
-      detectMissingFieldCondition(q) ??
-      detectLockedIntoDocType(q) ??
-      detectCustomersHasDocType(q) ??
+      detectWarrantyExpiryWindow(q) ??
+      detectDistinctYearsCount(q) ??
       detectTechnicianAction(q) ??
       detectTechnicianGroupBy(q) ??
       detectInstallDateExtreme(q) ??
@@ -745,6 +951,21 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     const { filters, unresolved } = buildSafetyNetFilters(q, entity);
     if (unresolved) return null;
 
+    // R18 P4 (C2, multi-hop AND-drop): captured BEFORE the entity is possibly forced to
+    // 'customers' just below, and used for every equipment-level condition after that point —
+    // "how many trane units in mesa are still under warranty" (h091) used to force entity to
+    // 'customers' (for the geo join) and then check `entity === 'equipment'` for the
+    // installYear/warrantyStatus/refrigerant conditions right after, so none of them were ever
+    // applied once the geo filter was present — the SAME "warrantyStatus" the question plainly
+    // named silently vanished. queryCustomersByEquipmentFilter (routes/analytics.js) already joins
+    // in every one of these equipment-level filters when they ride along with a customers-entity
+    // plan, so building them is always safe regardless of which entity ends up on the final plan.
+    const equipmentLike = entity === 'equipment' || entity === 'warranties';
+    // impliedWarrantyStatus's own "relaxed" fallback (no literal "warrant" word at all — "units
+    // expiring soon") is only meaningful for the unit's OWN entity, never the customers entity a
+    // geo join may force `entity` to just below — captured here, before that reassignment.
+    const warrantyStatusEntity = entity;
+
     // Equipment/warranties rows carry NO address of their own in this corpus
     // (only the CUSTOMER row does) — a geo filter (city/county/state/zip) can
     // only ever be resolved by joining back to the customer, so force the
@@ -752,7 +973,7 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     // (routes/analytics.js) already joins in any equipment-level filters
     // (brand/warrantyStatus/installYear/...) that ride along with it.
     if (
-      (entity === 'equipment' || entity === 'warranties') &&
+      equipmentLike &&
       filters.some((f) => f.field === 'city' || f.field === 'county' || f.field === 'state' || f.field === 'zip')
     ) {
       entity = 'customers';
@@ -772,7 +993,7 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     // concept in this domain) — resolveAgeFilter (analytics.js) only ever
     // parses "older/newer than N years", never a literal calendar year, so
     // this is this file's own job to build.
-    if (entity === 'equipment' && !filters.some((f) => f.field === 'installYear')) {
+    if (equipmentLike && !filters.some((f) => f.field === 'installYear')) {
       const sm = SINCE_YEAR_RE.exec(q);
       if (sm) filters.push({ field: 'installYear', op: 'gte', value: Number(sm[1]) });
     }
@@ -787,8 +1008,8 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     // covers this via the safety-net loop above for ANY entity, but harmless
     // to be explicit and it saves a round trip through missingConditions for
     // the common "how many units are out of warranty" shape.
-    if ((entity === 'equipment' || entity === 'warranties') && !filters.some((f) => f.field === 'warrantyStatus')) {
-      const status = impliedWarrantyStatus(q, entity);
+    if (equipmentLike && !filters.some((f) => f.field === 'warrantyStatus')) {
+      const status = impliedWarrantyStatus(q, warrantyStatusEntity);
       if (status === WARRANTY_STATUS_AMBIGUOUS) return null; // never guess which bucket a negation meant
       if (status) filters.push({ field: 'warrantyStatus', op: 'eq', value: status });
     }
@@ -799,7 +1020,7 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     // to turn into a filter is never silently dropped: better to fall
     // through to the model than confidently count every unit when the
     // question named one specific refrigerant.
-    if ((entity === 'equipment' || entity === 'warranties') && detectRefrigerantMention(q)) {
+    if (equipmentLike && detectRefrigerantMention(q)) {
       const rf = buildRefrigerantFilter(q);
       if (!rf) return null;
       if (!filters.some((f) => f.field === 'refrigerant')) filters.push(rf);

@@ -26,6 +26,7 @@ import {
 import { integrityFixDocument } from "./routes/integrity.js";
 import { applyBodyNameLinks } from "./bodyNameLink.js";
 import { completeIntake } from "./intake/autofill.js";
+import { classifyDocumentAudience } from "./audience/store.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -494,6 +495,23 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         ...(classification.source === 'shop-internal' ? { no_customer: true } : {}),
       },
     });
+
+    // AUDIENCE (round 18, part 2, owner ask (a)): right after the type and fields this pass
+    // resolved are persisted, and deliberately AFTER every customer/equipment link above rather
+    // than gating them — "classify before linking and skip linking" and "undo the links in the
+    // same step" are the two ordering options the contract allows, and undoing here is the
+    // lower-risk one against this function's own dense, heavily-tested linking logic. Same
+    // transaction as everything above: an internal document is never externally observable as
+    // customer-linked even for an instant. classifyDocumentAudience is itself idempotent — a
+    // retried extraction (same or updated fields) just re-classifies and re-writes; the
+    // notification step underneath (notify.js's markNotifiedOnce) is what actually de-dupes, so a
+    // retry never sends a second one. Works before M3-config/57 is pasted (the extractions
+    // fallback probes below).
+    await classifyDocumentAudience({ query: (sql, p) => db.raw(sql, p) }, documentId, {
+      documentType: resolvedType, text: pages.map((p) => p.text || '').join('\n\n'),
+      fields: facts, orgId: ctx.tenantName,
+    });
+
     return {
       counts,
       documentType: resolvedType ?? null,

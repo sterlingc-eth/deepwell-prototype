@@ -19,13 +19,12 @@
  *   - anything that leaves nothing is the honest no-answer (NO_ANSWER_TEXT).
  */
 import { buildAllowed, shapeAnswer, NO_ANSWER_TEXT } from "../answer.js";
+import { escapeRegex as escapeRe } from "../util/escape.js";
 
 const NONE_FOUND_TEXT = "Nothing in your records matches that.";
 const STATUSES = new Set(["ok", "warn", "bad", "info", "muted"]);
 /** A list answer returns every row up to this cap (live defect: a 13-customer list was cut to 5). */
 export const MAX_FACTS = 40;
-
-function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 /** Tokens that carry a digit ("1,250.00", "2026-09-14", "GSX140361K", "85201"). */
 function digitTokens(s) {

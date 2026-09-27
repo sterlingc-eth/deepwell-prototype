@@ -9,7 +9,7 @@
  *
  * Output is also recorded in handoffs/COST_REPORT_2026-09-20.md.
  */
-import { estimateTokens, minTokensFor, cacheable, CACHE_MIN_TOKENS } from '../api/_lib/promptCache.js';
+import { estimateTokens, minTokensFor, cacheable } from '../api/_lib/promptCache.js';
 import { SYSTEM_PROMPT as ASK_SYSTEM_PROMPT, ANSWER_TOOL, CONTEXT_TOKEN_BUDGET } from '../api/_lib/answer.js';
 import { ASK_MODEL } from '../api/ask.js';
 import { splitExtractPrompt, EXTRACT_MODEL } from '../api/_lib/extractDocument.js';

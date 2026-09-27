@@ -822,6 +822,13 @@ console.log('');
   const { classifyQuestionDifficulty } = await import('../api/_lib/agent/escalation.js');
   const { isReasoningQuestion, isAgentFirstQuestion } = await import('../api/_lib/agent/intents.js');
   const askSrc = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'api', 'ask.js'), 'utf8');
+  // Round 18 (H3): the reasoning-exclusion gate and the deterministic/fast-path trial order both moved
+  // out of ask.js's own inline gating into api/_lib/router/classifyAll.js's PRECEDENCE_TABLE (one
+  // explicit table for the whole pre-router chain, in place of the ~90 lines this used to check the
+  // TEXT of directly) — see that module's own header. Re-pointed at the new location rather than
+  // dropped: same intent, same two facts checked, now checked against where they actually live.
+  const { PRECEDENCE_TABLE: teamATable, TRIAL_ORDER: teamATrialOrder } = await import('../api/_lib/router/classifyAll.js');
+  const analyticsGateSrc = teamATable.find((s) => s.name === 'analytics').gate.toString();
   check('teamA agent prompt :: created_at vs service_date semantics', /created_at/.test(AGENT_SYSTEM_PROMPT) && /service_date/.test(AGENT_SYSTEM_PROMPT) && /uploaded/.test(AGENT_SYSTEM_PROMPT));
   check('teamA agent prompt :: a future service_date is never the last service', /later than today/.test(AGENT_SYSTEM_PROMPT));
   check('teamA agent prompt :: single fields never fabricated (not on file)', /not on file/.test(AGENT_SYSTEM_PROMPT) && /install date is not recorded/.test(AGENT_SYSTEM_PROMPT));
@@ -836,8 +843,8 @@ console.log('');
   // reasoning checks below — De Morgan-equivalent to the old inline `!(isAgentEnabled() && ...)` form,
   // just no longer calling isAgentEnabled() a second time (which would have forced the eager top-level
   // import this round removes it for).
-  check('teamA ask.js :: the analytics planner does not take reasoning questions', /!\(agentEnabledForGate && isReasoningQuestion\(question\)\)/.test(askSrc));
-  check('teamA ask.js :: the deterministic history router runs before the fast path', askSrc.indexOf('classifyDeterministic') > 0 && askSrc.indexOf('runDeterministic') > 0);
+  check('teamA classifyAll :: the analytics planner does not take reasoning questions', /flags\.agentEnabled && flags\.reasoning/.test(analyticsGateSrc));
+  check('teamA ask.js :: the deterministic history router runs before the fast path', askSrc.indexOf('runDeterministic') > 0 && teamATrialOrder.indexOf('deterministic') < teamATrialOrder.indexOf('fastPath'));
 }
 
 if (failures) {

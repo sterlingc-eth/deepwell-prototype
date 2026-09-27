@@ -20,6 +20,8 @@ import {
   buildChunkContextHeader, withContextHeader, NO_CONTEXT_VERSION, CURRENT_CONTEXT_VERSION,
   estimateEmbedCostUsd,
 } from './embed.js';
+import { documentsHaveAudience } from '../audience/probe.js';
+import { audienceFilterSql } from '../audience/sql.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -450,13 +452,21 @@ async function tenantAnnEfSearch(db, now = Date.now()) {
  * @param {number} [efSearch]  explicit hnsw.ef_search override (tests only);
  *   omitted, it is chosen automatically from this tenant's own chunk count
  *   (annEfSearchForScale) — see the per-tenant ANN tuning note above.
+ * @param {boolean} [teamScoped]  owner ask (a): the question itself is about internal/team
+ *   documents ("any memos for Carlos this week") — skips the audience exclusion below entirely.
+ *   Defaults false, so every OTHER caller of this, the one common choke point every semantic
+ *   retrieval path in this codebase runs through (hybrid.js's finishHybrid, in turn
+ *   recordsStore.js's searchPassages and search/knowledge.js's searchKnowledge), gets internal
+ *   documents excluded from customer answers for free with no change of its own.
  * @returns {Promise<{id: string, document_id: string, page_no: number, original_filename: string, document_type: string, stage: string, chunk_text: string, sim: number}[]>}
  */
-export async function nearestChunks(db, { vector, model, k = 30, documentIds = null, minSim = 0.25, efSearch } = {}) {
+export async function nearestChunks(db, { vector, model, k = 30, documentIds = null, minSim = 0.25, efSearch, teamScoped = false } = {}) {
   const ef = Math.max(10, Math.min(1000, Math.trunc(Number(efSearch)) || (await tenantAnnEfSearch(db))));
   const params = [toVectorLiteral(vector), model, k];
   let scope = '';
   if (documentIds) { params.push(documentIds); scope = ` AND c.document_id = ANY($${params.length}::uuid[])`; }
+  const hasAudienceColumn = await documentsHaveAudience(db);
+  const audienceClause = audienceFilterSql({ docAlias: 'd', hasAudienceColumn, teamScoped });
   const sql =
     `WITH nn AS MATERIALIZED (
        SELECT c.document_id, c.page_no, c.text AS chunk_text, (c.embedding <=> $1::vector) AS dist
@@ -468,6 +478,7 @@ export async function nearestChunks(db, { vector, model, k = 30, documentIds = n
        FROM nn
        JOIN document_pages p ON p.document_id = nn.document_id AND p.page_no = nn.page_no AND p.${TENANT}
        JOIN documents d ON d.id = nn.document_id AND d.${TENANT}
+      WHERE ${audienceClause}
       ORDER BY nn.dist`;
 
   const attempt = async (useIterative) => {

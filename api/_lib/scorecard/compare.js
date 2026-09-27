@@ -24,6 +24,7 @@
  *
  * Nothing here logs anything; the summaries it returns are short and go to the operator's own scorecard.
  */
+import { escapeRegex } from '../util/escape.js';
 
 const MAX_SUMMARY = 300;
 
@@ -171,7 +172,7 @@ function itemPresent(item, view) {
 
 function hasToken(hay, needle) {
   if (!needle) return false;
-  return new RegExp(`(?:^| )${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: |$)`).test(hay);
+  return new RegExp(`(?:^| )${escapeRegex(needle)}(?: |$)`).test(hay);
 }
 
 function compareSet(expectedItems, view) {

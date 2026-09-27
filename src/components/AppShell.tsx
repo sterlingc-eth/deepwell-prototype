@@ -131,7 +131,15 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
                         : 'text-forest-100 hover:text-stone-0 hover:bg-forest-800',
                     ].join(' ')}
                   >
-                    <Icon className="w-[18px] h-[18px]" active={active} />
+                    {/* Only AskMark's svg reads `active` (for its ripple) - lucide's icon
+                        components forward unrecognized props straight to the DOM <svg>,
+                        so passing `active` to them warned "Received `false` for a
+                        non-boolean attribute `active`" every render. */}
+                    {Icon === AskMark ? (
+                      <Icon className="w-[18px] h-[18px]" active={active} />
+                    ) : (
+                      <Icon className="w-[18px] h-[18px]" />
+                    )}
                     <span className="hidden sm:inline">{label}</span>
                     <span className="sr-only sm:hidden">{label}</span>
                     {screen === 'ingest' && inboxBadge > 0 && (

@@ -18,6 +18,7 @@
  */
 import { significantAddressTokens, formatDateHuman } from './fastPath.js';
 import { documentTypeLabel, DOCUMENT_TYPE_ALIASES } from './documentTypes.js';
+import { escapeRegex, escapeLikePattern as escapeLike } from './util/escape.js';
 
 export const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -166,12 +167,10 @@ export function extractUnitDesignator(text) {
   return m ? m[1].toLowerCase() : null;
 }
 
-const escapeLike = (s) => String(s ?? '').replace(/[\\%_]/g, '\\$&');
-
 /** Does an address string carry this unit designator ("... Apt 104, Mesa")? */
 export function addressHasUnit(address, unit) {
   if (!unit) return true;
-  const re = new RegExp(`(?:apt|apartment|suite|ste|unit|#)\\.?\\s*#?\\s*${unit.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  const re = new RegExp(`(?:apt|apartment|suite|ste|unit|#)\\.?\\s*#?\\s*${escapeRegex(unit)}\\b`, 'i');
   return re.test(String(address ?? ''));
 }
 

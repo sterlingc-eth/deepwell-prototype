@@ -21,6 +21,8 @@
  * as shape.js already decided, so a transient DB hiccup degrades to today's behavior, never to a worse
  * one — the ledger check is a tightening, not a new trust boundary shape.js doesn't already have.
  */
+import { escapeRegex as escapeRe } from "../util/escape.js";
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -48,8 +50,6 @@ export const DETERMINISTIC_FIELD_KEYS = new Set([
 function isDeterministicField(location) {
   return typeof location?.field === "string" && DETERMINISTIC_FIELD_KEYS.has(location.field);
 }
-
-function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 function digitTokens(s) {
   return (String(s).toLowerCase().match(/[a-z0-9$#][a-z0-9$#.,:/-]*/g) ?? [])

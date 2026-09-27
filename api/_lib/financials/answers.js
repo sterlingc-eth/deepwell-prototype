@@ -129,6 +129,15 @@ const TIME_STOP = new Set([
   // customers and totalInvoiced refused to answer the shop-wide YTD total at all. "date" can never be a
   // real customer-name token on its own, so it belongs in this list exactly like "day"/"days" already are.
   'date',
+  // R18 (H1, breadth-financials-006/010/018): whole-portfolio aggregate questions with NO real
+  // customer name ("How many of our invoices are past due right now?", "What's the total dollar
+  // amount of our open invoices?", "How much of our receivables is current, not yet due?") - the
+  // generic "for|to|from|of|with <phrase>" regex in extractSubjectPhrase over-captures trailing
+  // words like "due right now"/"open"/"receivables is current not yet due" as if they were a
+  // customer-name phrase, so subjectGate tries (and fails) to resolve a customer instead of
+  // letting receivables()'s own already-correct overdue/open aggregate run. None of these words can
+  // ever be a real customer-name fragment on their own, exactly like 'since'/'ago'/'been'/'date' above.
+  'due', 'now', 'right', 'current', 'yet', 'receivable', 'receivables', 'open', 'overdue', 'outstanding', 'unpaid', 'paid',
 ]);
 
 /** A candidate name phrase is usable only if it has at least one non-stop word. */

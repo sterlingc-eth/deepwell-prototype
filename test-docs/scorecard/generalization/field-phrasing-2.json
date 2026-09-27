@@ -1,0 +1,2833 @@
+{
+  "version": "2026-09-26.field-phrasing-2-r18",
+  "category": "field-phrasing-2",
+  "source": "Round 18 (H2) blind generalization set - 200 new questions, written without reading exam.json/field-phrasing.json question texts or engine regexes; grounded only in scripts/golden/golden-export.json + the exam file format",
+  "questions": [
+    {
+      "id": "h001",
+      "text": "whose unit has serial Y100007",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "Y100007"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "Y100007"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h002",
+      "text": "got a serial LX100005 here, who's that for",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "LX100005"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "LX100005"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h003",
+      "text": "who's serial number 2R100006 belong to",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "2R100006"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "2R100006"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h004",
+      "text": "customer for serial M100009",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "M100009"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "M100009"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h005",
+      "text": "serial 2C100011 - whose account is this",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "2C100011"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "2C100011"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h006",
+      "text": "trying to id serial 2G100004, whose job is it",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "2G100004"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "2G100004"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h007",
+      "text": "who owns the unit serial F100018",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "F100018"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "F100018"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h008",
+      "text": "serial D100016, who's the customer",
+      "category": "field-phrasing-2",
+      "shape": "lookup_serial",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "D100016"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1",
+          "params": [
+            "D100016"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h009",
+      "text": "whos calling from 480 555 0112",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550112"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550112"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h010",
+      "text": "caller id says 480-555-0113, who is that",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550113"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550113"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h011",
+      "text": "who's number is (480) 555-0114",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550114"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550114"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h012",
+      "text": "got a call from 4805550119, whose account",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550119"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550119"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h013",
+      "text": "who is 480.555.0121",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550121"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550121"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h014",
+      "text": "customer with phone 480 555 0124",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550124"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550124"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h015",
+      "text": "whose phone number is 480-555-0129",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550129"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550129"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h016",
+      "text": "480.555.0132 - who's this",
+      "category": "field-phrasing-2",
+      "shape": "lookup_phone",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1)\nSELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "4805550132"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1",
+          "params": [
+            "4805550132"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h017",
+      "text": "whats the address on file for vance",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Vance%"
+        ]
+      }
+    },
+    {
+      "id": "h018",
+      "text": "phone number for the alvarez account",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Alvarez%"
+        ]
+      }
+    },
+    {
+      "id": "h019",
+      "text": "serial on nakamura's unit",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Nakamura%"
+        ]
+      }
+    },
+    {
+      "id": "h020",
+      "text": "model number for zimmerman",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Zimmerman%"
+        ]
+      }
+    },
+    {
+      "id": "h021",
+      "text": "whats lombardi's service address",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Lombardi%"
+        ]
+      }
+    },
+    {
+      "id": "h022",
+      "text": "wyckoff account, whats their phone",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Wyckoff%"
+        ]
+      }
+    },
+    {
+      "id": "h023",
+      "text": "unit installed for villegas",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Villegas%"
+        ]
+      }
+    },
+    {
+      "id": "h024",
+      "text": "garrison job, whats the serial",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Garrison%"
+        ]
+      }
+    },
+    {
+      "id": "h025",
+      "text": "tovar account phone number",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Tovar%"
+        ]
+      }
+    },
+    {
+      "id": "h026",
+      "text": "whats on file for keller",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Keller%"
+        ]
+      }
+    },
+    {
+      "id": "h027",
+      "text": "address for the rios account",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Rios%"
+        ]
+      }
+    },
+    {
+      "id": "h028",
+      "text": "phone number for salazar",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_name",
+      "cmp": "set",
+      "note": "bare surname matches 2+ distinct customers in this tenant - must ask which one, never silently pick",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Salazar%"
+        ]
+      }
+    },
+    {
+      "id": "h029",
+      "text": "whos the manufacturer on the unit at 581 West Thomas Road",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+        "params": [
+          "581 W Thomas Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "581 W Thomas Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h030",
+      "text": "model # at 1062 e university dr, phoenix az",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'model', '') <> ''",
+        "params": [
+          "1062 E University Dr%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1062 E University Dr%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h031",
+      "text": "serial for 1099 W Guadalupe Road, 85001",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'serial_number', '') <> ''",
+        "params": [
+          "1099 W Guadalupe Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1099 W Guadalupe Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h032",
+      "text": "whos the mfr at 1136 East Elliot Rd, Phoenix, AZ",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+        "params": [
+          "1136 E Elliot Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1136 E Elliot Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h033",
+      "text": "model number on the unit at 1173 N Greenfield Road",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'model', '') <> ''",
+        "params": [
+          "1173 N Greenfield Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1173 N Greenfield Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h034",
+      "text": "serial number for 1247 West Baseline Rd",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'serial_number', '') <> ''",
+        "params": [
+          "1247 W Baseline Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1247 W Baseline Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h035",
+      "text": "tonnage on the unit at 1358 N Dobson Road, Phoenix",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'tonnage' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'tonnage', '') <> ''",
+        "params": [
+          "1358 N Dobson Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1358 N Dobson Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h036",
+      "text": "whats installed at 1469 North Power Rd",
+      "category": "field-phrasing-2",
+      "shape": "field_lookup_variant_address",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+        "params": [
+          "1469 N Power Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "1469 N Power Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h037",
+      "text": "when does the warranty run out at 1691 s ellsworth rd",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+        "params": [
+          "1691 S Ellsworth Rd%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h038",
+      "text": "warranty expiration date for 2135 S Alma School Rd",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+        "params": [
+          "2135 S Alma School Rd%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h039",
+      "text": "whens the warranty expire at 2172 e chandler blvd",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+        "params": [
+          "2172 E Chandler Blvd%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h040",
+      "text": "warranty end date on file for 3282 W Camelback Rd",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+        "params": [
+          "3282 W Camelback Rd%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h041",
+      "text": "is Amy Isaacson still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+        "params": [
+          "@today",
+          "%Amy Isaacson%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h042",
+      "text": "is Rebecca Montoya's system still covered",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+        "params": [
+          "@today",
+          "%Rebecca Montoya%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h043",
+      "text": "is Jessica Bennett still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+        "params": [
+          "@today",
+          "%Jessica Bennett%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h044",
+      "text": "is Steven Ellison still covered under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+        "params": [
+          "@today",
+          "%Steven Ellison%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h045",
+      "text": "warranty status on larkin",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "set",
+      "note": "bare surname matches 2 distinct customers - must ask which one",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Larkin%"
+        ]
+      }
+    },
+    {
+      "id": "h046",
+      "text": "is redwine still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "set",
+      "note": "bare surname matches 2 distinct customers - must ask which one",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Redwine%"
+        ]
+      }
+    },
+    {
+      "id": "h047",
+      "text": "how many units had their warranty expire in the past year",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND (data#>>'{warranty,expires}')::date > ($1::date - interval '365 days')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h048",
+      "text": "any warranties expiring in the next 90 days",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND (data#>>'{warranty,expires}')::date <= ($1::date + interval '90 days')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h049",
+      "text": "how many warranties expire by the end of this calendar year",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND (data#>>'{warranty,expires}')::date <= date_trunc('year', $1::date) + interval '1 year' - interval '1 day'",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h050",
+      "text": "how many carrier units are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'carrier' AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h051",
+      "text": "how many units warranty has expired so far this year",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date >= date_trunc('year', $1::date) AND (data#>>'{warranty,expires}')::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h052",
+      "text": "how many units have no warranty registration on file",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,registrationState}' = 'unknown'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h053",
+      "text": "how many units are actually registered for warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,registrationState}' = 'on_file'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h054",
+      "text": "whats the earliest warranty expiration we have on file",
+      "category": "field-phrasing-2",
+      "shape": "warranty_time_range",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h055",
+      "text": "last time we were out at 3171 n power rd",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT x.value AS v FROM extractions x\nWHERE x.field_key = 'service_date' AND x.value IS NOT NULL\n  AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY x.value DESC LIMIT 1",
+        "params": [
+          "3171 N Power Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h056",
+      "text": "who went out to 3282 W Camelback Rd last",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1),\ndocs AS (SELECT x.document_id, x.value AS service_date FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL\n         AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m)))\nSELECT t.value AS v FROM extractions t\nWHERE t.field_key='technician' AND t.document_id = (SELECT document_id FROM docs ORDER BY service_date DESC LIMIT 1)\n  AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "3282 W Camelback Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h057",
+      "text": "when were we last at 3393 s ellsworth rd",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT x.value AS v FROM extractions x\nWHERE x.field_key = 'service_date' AND x.value IS NOT NULL\n  AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY x.value DESC LIMIT 1",
+        "params": [
+          "3393 S Ellsworth Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h058",
+      "text": "who was the last tech out at 3467 N Recker Rd",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1),\ndocs AS (SELECT x.document_id, x.value AS service_date FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL\n         AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m)))\nSELECT t.value AS v FROM extractions t\nWHERE t.field_key='technician' AND t.document_id = (SELECT document_id FROM docs ORDER BY service_date DESC LIMIT 1)\n  AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "3467 N Recker Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h059",
+      "text": "when did we last go out for alvarez",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT x.value AS v FROM extractions x\nWHERE x.field_key = 'service_date' AND x.value IS NOT NULL\n  AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\nORDER BY x.value DESC LIMIT 1",
+        "params": [
+          "%Alvarez%"
+        ]
+      }
+    },
+    {
+      "id": "h060",
+      "text": "last time we serviced 3541 w southern ave",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT x.value AS v FROM extractions x\nWHERE x.field_key = 'service_date' AND x.value IS NOT NULL\n  AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY x.value DESC LIMIT 1",
+        "params": [
+          "3541 W Southern Ave%"
+        ]
+      }
+    },
+    {
+      "id": "h061",
+      "text": "whos the last tech that went to 3689 E Elliot Rd",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1),\ndocs AS (SELECT x.document_id, x.value AS service_date FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL\n         AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m)))\nSELECT t.value AS v FROM extractions t\nWHERE t.field_key='technician' AND t.document_id = (SELECT document_id FROM docs ORDER BY service_date DESC LIMIT 1)\n  AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "3689 E Elliot Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h062",
+      "text": "when was our last visit to 3763 e broadway rd",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT x.value AS v FROM extractions x\nWHERE x.field_key = 'service_date' AND x.value IS NOT NULL\n  AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY x.value DESC LIMIT 1",
+        "params": [
+          "3763 E Broadway Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h063",
+      "text": "who installed the unit at 3800 w baseline rd",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('installer')) AS n",
+        "params": []
+      },
+      "note": "no document in this corpus ever carries an installer field"
+    },
+    {
+      "id": "h064",
+      "text": "whens the last time we serviced someone named osborn",
+      "category": "field-phrasing-2",
+      "shape": "history",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT x.value AS v FROM extractions x\nWHERE x.field_key = 'service_date' AND x.value IS NOT NULL\n  AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\nORDER BY x.value DESC LIMIT 1",
+        "params": [
+          "%Osborn%"
+        ]
+      }
+    },
+    {
+      "id": "h065",
+      "text": "how many jobs have we done since january 1st",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= date_trunc('year', $1::date) AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h066",
+      "text": "any service calls in the last 90 days",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '90 days') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h067",
+      "text": "how many service visits did we log this past summer",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND extract(year from value::date) = extract(year from $1::date) AND extract(month from value::date) IN (6,7,8)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h068",
+      "text": "did we do any work at 285 e elliot rd in the last 90 days",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (\n    SELECT 1 FROM extractions x\n    WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date\n      AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '285 E Elliot Rd%')\n  ) AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h069",
+      "text": "how many jobs have we done this spring",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND extract(year from value::date) = extract(year from $1::date) AND extract(month from value::date) IN (3,4,5)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h070",
+      "text": "have we had any repair calls in the past week",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (\n    SELECT 1 FROM extractions x\n    WHERE x.field_key='service_type' AND x.value='Repair'\n      AND EXISTS (SELECT 1 FROM extractions s WHERE s.document_id = x.document_id AND s.field_key='service_date' AND s.value IS NOT NULL AND s.value::date >= ($1::date - interval '7 days') AND s.value::date <= $1::date)\n  ) AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h071",
+      "text": "how many maintenance agreements have we signed since 2020",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT d.id) AS n FROM documents d\nWHERE d.document_type='maintenance-agreement' AND EXISTS (\n  SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.field_key='service_date' AND x.value IS NOT NULL AND x.value::date >= '2020-01-01'::date\n)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h072",
+      "text": "how many invoices did we send out last quarter",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL\nAND invoice_date >= (date_trunc('quarter', $1::date) - interval '3 months') AND invoice_date < date_trunc('quarter', $1::date)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h073",
+      "text": "has there been any activity at all this month",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND date_trunc('month', value::date) = date_trunc('month', $1::date)) AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h074",
+      "text": "how many different years do we have customers on file for",
+      "category": "field-phrasing-2",
+      "shape": "history_time_range",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT extract(year from value::date)) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h075",
+      "text": "how much did the job at 803 e pecos rd come to",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "number",
+      "tolerance": 0.5,
+      "anyNumber": true,
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT df.total AS n FROM document_financials df\nWHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY df.invoice_date DESC NULLS LAST LIMIT 1",
+        "params": [
+          "803 E Pecos Rd%"
+        ],
+        "requires": {
+          "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM document_financials df WHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))",
+          "params": [
+            "803 E Pecos Rd%"
+          ]
+        }
+      }
+    },
+    {
+      "id": "h076",
+      "text": "last invoice total for 877 w ocotillo rd",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "number",
+      "tolerance": 0.5,
+      "anyNumber": true,
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT df.total AS n FROM document_financials df\nWHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY df.invoice_date DESC NULLS LAST LIMIT 1",
+        "params": [
+          "877 W Ocotillo Rd%"
+        ],
+        "requires": {
+          "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM document_financials df WHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))",
+          "params": [
+            "877 W Ocotillo Rd%"
+          ]
+        }
+      }
+    },
+    {
+      "id": "h077",
+      "text": "what did we bill at 914 n recker rd",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "number",
+      "tolerance": 0.5,
+      "anyNumber": true,
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT df.total AS n FROM document_financials df\nWHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY df.invoice_date DESC NULLS LAST LIMIT 1",
+        "params": [
+          "914 N Recker Rd%"
+        ],
+        "requires": {
+          "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM document_financials df WHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))",
+          "params": [
+            "914 N Recker Rd%"
+          ]
+        }
+      }
+    },
+    {
+      "id": "h078",
+      "text": "how much was the job at 951 e main st",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "number",
+      "tolerance": 0.5,
+      "anyNumber": true,
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT df.total AS n FROM document_financials df\nWHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY df.invoice_date DESC NULLS LAST LIMIT 1",
+        "params": [
+          "951 E Main St%"
+        ],
+        "requires": {
+          "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM document_financials df WHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))",
+          "params": [
+            "951 E Main St%"
+          ]
+        }
+      }
+    },
+    {
+      "id": "h079",
+      "text": "invoice total for 618 n power rd",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "number",
+      "tolerance": 0.5,
+      "anyNumber": true,
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT df.total AS n FROM document_financials df\nWHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))\n  AND (SELECT count(*) FROM m) = 1\nORDER BY df.invoice_date DESC NULLS LAST LIMIT 1",
+        "params": [
+          "618 N Power Rd%"
+        ],
+        "requires": {
+          "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM document_financials df WHERE df.doc_kind='invoice' AND df.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))",
+          "params": [
+            "618 N Power Rd%"
+          ]
+        }
+      }
+    },
+    {
+      "id": "h080",
+      "text": "hows the balance looking on accounts that havent paid",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE balance_due IS NOT NULL) AS n",
+        "params": []
+      },
+      "note": "balance_due is NULL on every document_financials row in this tenant"
+    },
+    {
+      "id": "h081",
+      "text": "whats still owed on the norwood account",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE balance_due IS NOT NULL) AS n",
+        "params": []
+      },
+      "note": "balance_due is NULL on every document_financials row in this tenant"
+    },
+    {
+      "id": "h082",
+      "text": "any invoices from last quarter thats still open",
+      "category": "field-phrasing-2",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+        "params": []
+      },
+      "note": "every invoice's status is 'unknown' - none is knowably 'open'"
+    },
+    {
+      "id": "h083",
+      "text": "how many trane customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'trane'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h084",
+      "text": "how many carrier customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'carrier'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h085",
+      "text": "how many goodman customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'goodman'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h086",
+      "text": "how many lennox customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'lennox'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h087",
+      "text": "how many rheem customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'rheem'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h088",
+      "text": "how many york customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'york'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h089",
+      "text": "how many daikin customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'daikin'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h090",
+      "text": "how many mitsubishi customers have a maintenance agreement on file",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'mitsubishi'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id\n    WHERE d.document_type = 'maintenance-agreement' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h091",
+      "text": "how many trane units in mesa are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'trane'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Mesa,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h092",
+      "text": "how many carrier units in chandler are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'carrier'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Chandler,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h093",
+      "text": "how many goodman units in gilbert are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'goodman'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Gilbert,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h094",
+      "text": "how many lennox units in tempe are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'lennox'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Tempe,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h095",
+      "text": "how many rheem units in tucson are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'rheem'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Tucson,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h096",
+      "text": "how many york units in scottsdale are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'york'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Scottsdale,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h097",
+      "text": "how many daikin units in casa grande are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'daikin'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Casa Grande,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h098",
+      "text": "how many mitsubishi units in maricopa are still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id = e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'mitsubishi'\n  AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Maricopa,%'\n  AND (e.data#>>'{warranty,expires}') IS NOT NULL AND (e.data#>>'{warranty,expires}')::date > $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h099",
+      "text": "how many trane customers needed a repair visit",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'trane'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h100",
+      "text": "how many carrier customers have had a repair call",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'carrier'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h101",
+      "text": "how many goodman customers needed a repair visit",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'goodman'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h102",
+      "text": "how many lennox customers have had a repair call",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'lennox'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h103",
+      "text": "how many rheem customers needed a repair visit",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'rheem'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h104",
+      "text": "how many york customers have had a repair call",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'york'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h105",
+      "text": "how many daikin customers needed a repair visit",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT e.customer_id) AS n\nFROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'daikin'\n  AND EXISTS (\n    SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n    WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id = e.customer_id OR l.entity_id = e.id)\n  )",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h106",
+      "text": "which trane customers had a callback",
+      "category": "field-phrasing-2",
+      "shape": "multi_hop",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('callback', 'callback_reason', 'return_visit_reason')) AS n",
+        "params": []
+      },
+      "note": "'callback' is never a recorded concept in this corpus (no such field key exists) - only service_type Repair/Preventive Maintenance is on file, which is not the same claim"
+    },
+    {
+      "id": "h107",
+      "text": "which manufacturer do we have the most units of",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT data->>'manufacturer' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL GROUP BY data->>'manufacturer' ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h108",
+      "text": "which city do we have the most customers in",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT substring(data->>'service_address' from ', ([A-Za-z ]+), [A-Z]{2} ') AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h109",
+      "text": "whos our busiest technician",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' AND value IS NOT NULL GROUP BY value ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h110",
+      "text": "whats the oldest trane unit we have on file",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT data->>'installation_date' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'trane' AND data->>'installation_date' IS NOT NULL ORDER BY data->>'installation_date' ASC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h111",
+      "text": "which zip code do we have the most customers in",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT substring(data->>'service_address' from '(\\d{5})$') AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h112",
+      "text": "how many customers are in our single biggest city",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM (SELECT substring(data->>'service_address' from ', ([A-Za-z ]+), [A-Z]{2} ') AS city FROM entities WHERE entity_type='customer' AND merged_into IS NULL) t GROUP BY city ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h113",
+      "text": "which manufacturer do we have the fewest units of",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT data->>'manufacturer' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL GROUP BY data->>'manufacturer' ORDER BY count(*) ASC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h114",
+      "text": "whats our newest mitsubishi install",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT data->>'installation_date' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'mitsubishi' AND data->>'installation_date' IS NOT NULL ORDER BY data->>'installation_date' DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h115",
+      "text": "which tech has done the fewest visits",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' AND value IS NOT NULL GROUP BY value ORDER BY count(*) ASC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h116",
+      "text": "how many different technicians do we have on file",
+      "category": "field-phrasing-2",
+      "shape": "ranking",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(DISTINCT value) AS n FROM extractions WHERE field_key='technician' AND value IS NOT NULL",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h117",
+      "text": "do we have more customers in mesa than in tucson",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '%, Mesa,%') > (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '%, Tucson,%') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h118",
+      "text": "do we have more mitsubishi units installed than trane",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'mitsubishi') > (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'trane') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h119",
+      "text": "does tempe have more customers than peoria",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '%, Tempe,%') > (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '%, Peoria,%') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h120",
+      "text": "has Rebecca Montoya had more documents on file than Charles Montoya",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.data->>'customer_name' ILIKE '%Rebecca Montoya%')\n      > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.data->>'customer_name' ILIKE '%Charles Montoya%') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h121",
+      "text": "was the job at 803 e pecos rd bigger than the job at 877 w ocotillo rd",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (\n    (SELECT df.total FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id WHERE df.doc_kind='invoice' AND c.data->>'service_address' ILIKE '803 E Pecos Rd%' ORDER BY df.invoice_date DESC NULLS LAST LIMIT 1)\n    >\n    (SELECT df.total FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id WHERE df.doc_kind='invoice' AND c.data->>'service_address' ILIKE '877 W Ocotillo Rd%' ORDER BY df.invoice_date DESC NULLS LAST LIMIT 1)\n  ) AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h122",
+      "text": "do we have more registered warranties than unregistered ones",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,registrationState}'='on_file') > (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,registrationState}'='unknown') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h123",
+      "text": "has copper sky dental had more jobs than canyon view dental",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.data->>'customer_name' ILIKE '%Copper Sky Dental%')\n      > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.data->>'customer_name' ILIKE '%Canyon View Dental%') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h124",
+      "text": "is daikin more common than goodman in our records",
+      "category": "field-phrasing-2",
+      "shape": "comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'daikin') > (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'goodman') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h125",
+      "text": "how many customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (\n  SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id = l.document_id\n  WHERE x.field_key='service_type' AND x.value='Preventive Maintenance'\n    AND (l.entity_id = c.id OR l.entity_id IN (SELECT id FROM entities e WHERE e.entity_type='equipment' AND e.customer_id=c.id))\n)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h126",
+      "text": "have we ever installed a bryant system",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'bryant') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h127",
+      "text": "how many customers have had only preventive maintenance, never a repair",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL\n  AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=c.id OR l.entity_id IN (SELECT id FROM entities e WHERE e.entity_type='equipment' AND e.customer_id=c.id)))\n  AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=c.id OR l.entity_id IN (SELECT id FROM entities e WHERE e.entity_type='equipment' AND e.customer_id=c.id)))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h128",
+      "text": "how many units have no tonnage listed",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND coalesce(data->>'tonnage','')=''",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h129",
+      "text": "which manufacturer has the most units with no warranty registration on file",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT data->>'manufacturer' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,registrationState}'='unknown' GROUP BY data->>'manufacturer' ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h130",
+      "text": "who hasnt paid their invoice yet",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status = 'unpaid') AS n",
+        "params": []
+      },
+      "note": "no invoice is ever marked 'unpaid' in this tenant's status field - all are 'unknown'"
+    },
+    {
+      "id": "h131",
+      "text": "everyone except the hutchins family who had a repair done this year",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "rubric",
+      "rubric": "Every customer with a Repair-type service visit in the current calendar year, excluding every Hutchins customer by name; must apply both the time filter and the exclusion, not just one.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h132",
+      "text": "how many units are not currently under warranty",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h133",
+      "text": "do we have any amana equipment in this tenant",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'amana') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h134",
+      "text": "how many customers have zero equipment on file",
+      "category": "field-phrasing-2",
+      "shape": "negation",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id=c.id)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "h135",
+      "text": "how many units total does canyon view dental have",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_multiunit",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Canyon View Dental%'",
+        "params": []
+      },
+      "tolerance": 0
+    },
+    {
+      "id": "h136",
+      "text": "what manufacturers are on file at mesquite table restaurant",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_multiunit",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT DISTINCT e.data->>'manufacturer' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Mesquite Table Restaurant%'",
+        "params": []
+      }
+    },
+    {
+      "id": "h137",
+      "text": "list every serial number on file for sunrise valley elementary",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_multiunit",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT e.data->>'serial_number' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Sunrise Valley Elementary%'",
+        "params": []
+      }
+    },
+    {
+      "id": "h138",
+      "text": "whats the refrigerant situation at copper sky dental",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_multiunit",
+      "cmp": "rubric",
+      "rubric": "2 units at Copper Sky Dental (Trane/Carrier) - only the Trane has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one, and must not invent a value for the Carrier.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h139",
+      "text": "tonnage on the units at sonoran grill restaurant",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_multiunit",
+      "cmp": "rubric",
+      "rubric": "2 units at Sonoran Grill Restaurant (Carrier/Goodman) - only the Carrier has a tonnage on file (3 ton); must not silently report just one unit as if it were the only one.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h140",
+      "text": "when were the units at canyon view dental installed",
+      "category": "field-phrasing-2",
+      "shape": "ambiguous_multiunit",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT e.data->>'installation_date' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Canyon View Dental%'",
+        "params": []
+      }
+    },
+    {
+      "id": "h141",
+      "text": "whats the btu rating on the unit at 803 e pecos rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('btu_rating', 'btu')) AS n",
+        "params": []
+      },
+      "note": "BTU rating is never an extracted field in this corpus"
+    },
+    {
+      "id": "h142",
+      "text": "duct size for the unit at 877 w ocotillo rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('duct_size')) AS n",
+        "params": []
+      },
+      "note": "duct size is never an extracted field in this corpus"
+    },
+    {
+      "id": "h143",
+      "text": "whats the thermostat brand at 914 n recker rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('thermostat_brand', 'thermostat_model')) AS n",
+        "params": []
+      },
+      "note": "thermostat brand/model is never an extracted field in this corpus"
+    },
+    {
+      "id": "h144",
+      "text": "capacitor size on the unit at 951 e main st",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('capacitor_size')) AS n",
+        "params": []
+      },
+      "note": "capacitor size is never an extracted field in this corpus"
+    },
+    {
+      "id": "h145",
+      "text": "whats the breaker size for 618 n power rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('breaker_size')) AS n",
+        "params": []
+      },
+      "note": "breaker size is never an extracted field in this corpus"
+    },
+    {
+      "id": "h146",
+      "text": "energy star rating on the unit at 692 s higley rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('energy_star_rating')) AS n",
+        "params": []
+      },
+      "note": "energy star rating is never an extracted field in this corpus"
+    },
+    {
+      "id": "h147",
+      "text": "sound rating in decibels for 507 n dobson rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('sound_rating', 'sound_rating_db')) AS n",
+        "params": []
+      },
+      "note": "sound rating is never an extracted field in this corpus"
+    },
+    {
+      "id": "h148",
+      "text": "condenser location for the unit at 433 s alma school rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('condenser_location')) AS n",
+        "params": []
+      },
+      "note": "condenser location is never an extracted field in this corpus"
+    },
+    {
+      "id": "h149",
+      "text": "whats the filter brand on the unit at 581 w thomas rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('filter_brand')) AS n",
+        "params": []
+      },
+      "note": "filter brand is never an extracted field in this corpus"
+    },
+    {
+      "id": "h150",
+      "text": "gps coordinates for the job at 359 e broadway rd",
+      "category": "field-phrasing-2",
+      "shape": "unanswerable",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key IN ('gps_coordinates', 'latitude', 'longitude')) AS n",
+        "params": []
+      },
+      "note": "gps coordinates are never an extracted field in this corpus"
+    },
+    {
+      "id": "h151",
+      "text": "whats the weather like today",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no HVAC record could ever answer this"
+    },
+    {
+      "id": "h152",
+      "text": "can you write me a poem about air conditioning",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "not a records question at all"
+    },
+    {
+      "id": "h153",
+      "text": "whats 47 times 12",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "arithmetic, not a records lookup"
+    },
+    {
+      "id": "h154",
+      "text": "who won the world series last year",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no HVAC content, no anchor"
+    },
+    {
+      "id": "h155",
+      "text": "tell me a joke",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "not a records question"
+    },
+    {
+      "id": "h156",
+      "text": "how do i reset my email password",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "not an HVAC records question, must not fish for a 'reset'-adjacent field"
+    },
+    {
+      "id": "h157",
+      "text": "wheres the nearest gas station",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "not a records question - must not confuse for a service-address lookup"
+    },
+    {
+      "id": "h158",
+      "text": "translate 'under warranty' into spanish",
+      "category": "field-phrasing-2",
+      "shape": "out_of_domain",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "must not trigger the warranty intent on the word 'warranty' appearing in a translation request"
+    },
+    {
+      "id": "h159",
+      "text": "quick one, whats the model and serial at 803 e pecos rd",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "set",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS item FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1\nUNION ALL\nSELECT e.data->>'serial_number' AS item FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+        "params": [
+          "803 E Pecos Rd%"
+        ]
+      }
+    },
+    {
+      "id": "h160",
+      "text": "model and serial for 951 e main st please",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "set",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS item FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1\nUNION ALL\nSELECT e.data->>'serial_number' AS item FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+        "params": [
+          "951 E Main St%"
+        ]
+      }
+    },
+    {
+      "id": "h161",
+      "text": "whats the customer name and phone for 618 n power rd",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '618 N Power Rd%'\nUNION ALL SELECT data->>'phone' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '618 N Power Rd%'",
+        "params": []
+      }
+    },
+    {
+      "id": "h162",
+      "text": "name and phone number for 692 s higley rd",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '692 S Higley Rd%'\nUNION ALL SELECT data->>'phone' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '692 S Higley Rd%'",
+        "params": []
+      }
+    },
+    {
+      "id": "h163",
+      "text": "can you tell me who installed it and when for 803 e pecos rd",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "rubric",
+      "rubric": "Installer (not on file - no document ever carries one) AND the install date for 803 E Pecos Rd (Joseph Norwood); both parts must be addressed, not just the date.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h164",
+      "text": "quick q, is nakamura still under warranty and whos the tech that did the install",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "rubric",
+      "rubric": "Warranty status AND installer for 'Nakamura' - the bare surname is ambiguous (3 distinct Nakamura customers) and installer is never on file; both parts need honest handling, not a single confident answer.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h165",
+      "text": "hows the mesquite table restaurant units looking, both of them still good?",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "rubric",
+      "rubric": "Vague colloquial status check across 2 units at Mesquite Table Restaurant with no field named - must not silently report on only one.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h166",
+      "text": "manufacturer and tonnage for the unit at 692 s higley rd",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "rubric",
+      "rubric": "The unit at 692 S Higley Rd (Carol Rios, Trane) has a manufacturer on file (Trane) but no tonnage on file - both parts must be addressed, must not invent a tonnage.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h167",
+      "text": "quick one - warranty status and last visit date for 3282 w camelback rd",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "rubric",
+      "rubric": "Warranty status (expired - registered 2022, expires 2022-11-19) AND the most recent service_date for 3282 W Camelback Rd (Angela Ibarra); both parts must be addressed.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h168",
+      "text": "wheres the trane unit installed in 2017, not the copper sky dental one",
+      "category": "field-phrasing-2",
+      "shape": "compound",
+      "cmp": "rubric",
+      "rubric": "More than one Trane unit was installed in 2017 in this tenant besides Copper Sky Dental's, so 'the 2017 one' is itself still ambiguous even after that one exclusion - must not silently pick a single remaining unit without checking.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "h169",
+      "text": "and what was the serial number again",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h170",
+      "text": "ok what about the one in chandler instead",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h171",
+      "text": "same question but for last quarter",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h172",
+      "text": "and her husband's account, same thing",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h173",
+      "text": "what about the one before that",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h174",
+      "text": "can you check the other unit too",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h175",
+      "text": "and whats the total for that one",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h176",
+      "text": "put me through to whoever handled it",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h177",
+      "text": "make that the other address instead",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h178",
+      "text": "what about the second one on the list",
+      "category": "field-phrasing-2",
+      "shape": "conversational_followup",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h179",
+      "text": "wuts teh moddel number four 803 e pecos rd",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'model', '') <> ''",
+        "params": [
+          "803 E Pecos Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "803 E Pecos Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h180",
+      "text": "serial num fore 951 e main st",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'serial_number', '') <> ''",
+        "params": [
+          "951 E Main St%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "951 E Main St%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h181",
+      "text": "hoo makes the unit at seven fifty three w guadalupe rd",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '753%guadalupe%') AS n",
+        "params": []
+      },
+      "note": "753 W Guadalupe Rd is Copper Sky Dental, a multi-unit site - 'the unit' is ambiguous between 2 units, must not silently pick one"
+    },
+    {
+      "id": "h182",
+      "text": "is the unit at to fourteen mercer under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL THEN 'unknown'\n             WHEN (e.data#>>'{warranty,expires}')::date > $1::date THEN 'active' ELSE 'expired' END) AS v\nFROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "@today",
+          "214 Mercer%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h183",
+      "text": "wats teh tonnage @ 618 n power rd",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '618 N Power Rd%') AS n",
+        "params": []
+      },
+      "note": "618 N Power Rd (Barbara Delgado, Daikin) has no tonnage on file - genuinely not on file, not a lookup miss"
+    },
+    {
+      "id": "h184",
+      "text": "who's the manufaturer on the unit @ 951 main st",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+        "params": [
+          "951 E Main St%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "951 E Main St%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h185",
+      "text": "seriel numbr on the smith account",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE '%smith%') AS n",
+        "params": []
+      },
+      "note": "no customer named Smith exists in this tenant"
+    },
+    {
+      "id": "h186",
+      "text": "wuts the seer raiting on 692 s higley",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='seer_rating') AS n",
+        "params": []
+      },
+      "note": "SEER is never an extracted field in this corpus"
+    },
+    {
+      "id": "h187",
+      "text": "installd date on the unit at 877 w ocotilo rd",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'installation_date', '') <> ''",
+        "params": [
+          "877 W Ocotillo Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "877 W Ocotillo Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h188",
+      "text": "hows warranty look on the one we did too days ago",
+      "category": "field-phrasing-2",
+      "shape": "voice_dictation",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no address/name subject named at all in a 120-customer tenant"
+    },
+    {
+      "id": "h189",
+      "text": "list every customer whose service address isnt even in arizona",
+      "category": "field-phrasing-2",
+      "shape": "data_quality",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' !~ ', AZ \\d{5}$'",
+        "params": []
+      }
+    },
+    {
+      "id": "h190",
+      "text": "whats the phone number on file for ronald dominguez",
+      "category": "field-phrasing-2",
+      "shape": "data_quality",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+        "params": [
+          "%Ronald Dominguez%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h191",
+      "text": "is thomas osborn's unit still under warranty",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+        "params": [
+          "@today",
+          "%Thomas Osborn%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h192",
+      "text": "whats the service address on file for donna vance",
+      "category": "field-phrasing-2",
+      "shape": "data_quality",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'service_address' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'service_address', '') <> ''",
+        "params": [
+          "%Donna Vance%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h193",
+      "text": "phone number on file for linda hutchins",
+      "category": "field-phrasing-2",
+      "shape": "data_quality",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+        "params": [
+          "%Linda Hutchins%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h194",
+      "text": "whats the serial number on the unit at 3837 s alma school rd",
+      "category": "field-phrasing-2",
+      "shape": "data_quality",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'serial_number', '') <> ''",
+        "params": [
+          "3837 S Alma School Rd%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+          "params": [
+            "3837 S Alma School Rd%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h195",
+      "text": "what city is the customer at 3911 n dobson rd actually in, per our records",
+      "category": "field-phrasing-2",
+      "shape": "data_quality",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'service_address' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'service_address', '') <> ''",
+        "params": [
+          "%Ronald Dominguez%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h196",
+      "text": "hows the warranty looking for our customer over in albuquerque",
+      "category": "field-phrasing-2",
+      "shape": "warranty",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL THEN 'unknown'\n             WHEN (e.data#>>'{warranty,expires}')::date > $1::date THEN 'active' ELSE 'expired' END) AS v\nFROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "@today",
+          "%Albuquerque%"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "h197",
+      "text": "who do we have going out today",
+      "category": "field-phrasing-2",
+      "shape": "dispatcher_schedule",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h198",
+      "text": "whats on the schedule for tomorrow",
+      "category": "field-phrasing-2",
+      "shape": "dispatcher_schedule",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h199",
+      "text": "is anybody free this afternoon",
+      "category": "field-phrasing-2",
+      "shape": "dispatcher_schedule",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    },
+    {
+      "id": "h200",
+      "text": "who's out on calls right now",
+      "category": "field-phrasing-2",
+      "shape": "dispatcher_schedule",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT 0 AS n",
+        "params": []
+      },
+      "note": "no subject named at all in a 120-customer tenant - a standalone follow-up with nothing to resolve against"
+    }
+  ]
+}

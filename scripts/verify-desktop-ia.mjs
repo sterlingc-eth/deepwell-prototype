@@ -70,10 +70,7 @@ async function main() {
     page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));
     page.on('console', (m) => {
       const t = m.text();
-      // Pre-existing warning (nav icon `active` prop reaching an <svg>, AppShell.tsx:113
-      // on HEAD before this round's changes) — not something this IA build touched or
-      // introduced; left for whoever owns AppShell's icon rendering.
-      if (m.type() === 'error' && !t.includes('Failed to load resource') && !t.includes('404') && !t.includes('non-boolean attribute')) {
+      if (m.type() === 'error' && !t.includes('Failed to load resource') && !t.includes('404')) {
         consoleErrors.push(`console: ${t}`);
       }
     });

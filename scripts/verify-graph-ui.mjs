@@ -99,7 +99,10 @@ const check = (name, ok, detail = '') => {
   if (!ok) failures++;
 };
 
-const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// detached + killing the whole process group on the way out (see the `finally` below): `npx`
+// spawns vite as a grandchild, and a plain server.kill() only kills npx itself, leaving vite
+// listening forever (same fix as verify-records-ui.mjs/verify-grid-ui.mjs/verify-intake-ui.mjs).
+const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
 await new Promise((r) => setTimeout(r, 1800));
 
 const browser = await chromium.launch();
@@ -152,7 +155,7 @@ try {
   await runViewport('phone-field', { width: 390, height: 844 }, true);
 } finally {
   await browser.close();
-  server.kill();
+  try { process.kill(-server.pid, 'SIGKILL'); } catch { server.kill(); }
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');

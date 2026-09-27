@@ -225,8 +225,13 @@ await lite.query(`INSERT INTO extractions (tenant_id, document_id, field_key, va
 
 /* ================================================================== resolveFilterDocumentIds */
 {
+  // Round 18, part 2 (owner ask (a)): "unrestricted" no longer means literally null — an internal
+  // (tech-only) document is now always excluded unless filters.teamScoped is set, so with no other
+  // filter active this resolves to "every non-internal document in the tenant" (here, all of them:
+  // none of this fixture's documents are internal).
   const r0 = await withTenant(ctxA, (db) => knowledge.resolveFilterDocumentIds(db, {}));
-  eq('resolveFilterDocumentIds: no filters -> unrestricted (null)', r0.documentIds, null);
+  eq('resolveFilterDocumentIds: no filters -> every non-internal document (none here are internal)',
+    [...r0.documentIds].sort(), [D.svc2023, D.svc2024, D.invoice, D.other].sort());
 
   const rCust = await withTenant(ctxA, (db) => knowledge.resolveFilterDocumentIds(db, { customerIds: [C.plaza] }));
   eq('resolveFilterDocumentIds: customerIds -> exactly that customer\'s documents', [...rCust.documentIds].sort(), [D.invoice, D.svc2023, D.svc2024].sort());

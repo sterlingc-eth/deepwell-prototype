@@ -177,6 +177,59 @@ const KNOWN_WRONG_IDS = new Set([
   // separating coverage status (warrantyStatusOf, by expiry date only) from registration-action-needed
   // (registrationActionNeededOf, new) in api/_lib/warrantyRules.js/analytics.js; removed from this list
   // now that they measure correct. g135 above is left in deliberately - see its own comment.
+
+  // R18 (H2) BLIND GENERALIZATION SET BASELINE — 45 wrong ids from test-docs/scorecard/generalization/
+  // field-phrasing-2.json (200 new questions, written blind: no exam.json/field-phrasing.json question
+  // text and no engine regex were read while writing them — see that file's own header). This is a
+  // MEASURED FLOOR, not a target: these are the residual gaps a genuinely blind test surfaces once a
+  // category stops being tuned against, and they are next round's backlog (clustered in
+  // ../r18_blind_clusters.json).
+  //
+  // R18 PART 2 (P4): 21 of the 45 fixed at ROOT CAUSE (by shape, never by exam text — see api/_lib/
+  // analytics.js, analytics/detPlan.js, routes/analytics.js's own doc comments for each): h047 h048 h049
+  // h051 h053 h065 h067 h069 h074 (central time-window parser: "since <month>", "this <season>", "next N
+  // days", "so far this year", "by end of year", bare "past year", + warrantyExpires field + distinct-
+  // years groupBy); h090 h099 h100 h101 h102 h103 h104 h105 (multi-hop AND-drop: a brand/model filter
+  // combined with a hasDocType/hasServiceType cross-doc condition now resolves BOTH, see
+  // executeAnalyticsPlan's combined-branch logic); h127 h128 h134 (negation/missing-field: dual has/
+  // lacks service-type detection, broadened "no tonnage" regex, new hasAnyEquipment field); h189
+  // (negation-immediately-before filler-word fix, "isnt even in arizona"). Removed from this list.
+  //
+  // Tried and REVERTED (see warrantyStatusFromQuestion's own doc comment in analytics.js): folding
+  // "still"/"under warranty"/"in warranty"/"covered" into a coarser not-yet-expired bucket fixed g135/
+  // h050 but broke the frozen base-exam id counts-warranty-0004-canonical, which has an oracle for this
+  // exact same phrasing (no other filter) that is literally the strict 'active' bucket — a global
+  // text-based rule can't give both answers, and the frozen id wins; g135/h050 stay wrong.
+  //
+  // Root causes, by cluster, for the 24 STILL open (see ../r18_blind_clusters.json for full detail):
+  //   - reverse identity lookup (serial->customer, phone->customer) has no deterministic path at all —
+  //     out of scope this part (item 4, "as time allows", not reached): h002 h003 h005 h006 h014
+  //   - geo + warrantyStatus combined with a brand filter still answers the bare brand+geo count,
+  //     dropping warrantyStatus (the executeAnalyticsPlan branch for this shape needs its own fix,
+  //     not yet found): h091 h093 h094 h095 h097
+  //   - "still under warranty" without a brand/geo filter riding along wants the coarser not-yet-expired
+  //     bucket that the frozen base exam's bare phrasing does NOT want (see revert note above): g135 h050
+  //   - a time-window qualifier not covered by the new parser: h071
+  //   - a negation/exclusion clause collapses to "count everything": h125
+  //   - a superlative/ranking question ("fewest", "biggest", "newest of manufacturer X") drops its own
+  //     filter or answers a different fact than asked: h112 h113 h114 h115
+  //   - a yes/no comparison is never actually evaluated - a fabricated "yes" with an unrelated count:
+  //     h122
+  //   - a multi-unit "list every X" either over-declines (treats a plural list request as the same
+  //     single-value ambiguity as "the" unit) or silently drops a unit: h136 h137 h140
+  //   - an out-of-domain request anchors on a bare keyword ("warranty" inside a translation ask) and
+  //     fabricates an unrelated number instead of declining: h158
+  //   - a voice-dictated house number ("to fourteen" = 214) or a city-only reference fails to resolve
+  //     the actual field asked, falling back to an unrelated generic count: h182 h196
+  "h002", "h003", "h005", "h006", "h014",
+  "h050", "h071",
+  "h091", "h093", "h094", "h095", "h097",
+  "h112", "h113", "h114", "h115",
+  "h122",
+  "h125",
+  "h136", "h137", "h140",
+  "h158",
+  "h182", "h196",
 ]);
 
 if (examExport) {
@@ -266,8 +319,28 @@ if (examExport) {
     // this file's own fixed date) → floor RAISED to 770/685 (a little below measured, same margin
     // convention as every floor above).
     // R16 integration (F1+F2+F3+F4 + ask.js install-date-extreme hook): measured 817/727, wrong 5 → floor 800/710.
-    check(`no-model coverage floor: answeredWithoutModel ≥ 800 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 800, JSON.stringify(overall));
-    check(`no-model coverage floor: correct ≥ 710 (got ${overall.correct})`, overall.correct >= 710, JSON.stringify(overall));
+    // R18 (H1): 13 of the 39 needsModel rows converted to deterministic, cited handlers (9 warranty-
+    // phrasing shapes — warranty_out/unknown-expiry/ambiguous-name-with-set-listing — in fastPath.js/
+    // fastPathQuery.js; 3 financials TIME_STOP fixes in financials/answers.js; 1 analytics
+    // missingConditions hasZip/zip fix) plus 4 more (the duplicate-customer/address/serial self-join
+    // family — isDuplicateName/sharesAddress/isDuplicateSerial — in analytics.js/detPlan.js/
+    // routes/analytics.js), wrong unchanged at 5. Measured 834/744 → floor raised to 820/730 (same
+    // margin convention as every floor above).
+    //
+    // R18 (H2): test-docs/scorecard/generalization/field-phrasing-2.json adds 200 BLIND questions (see
+    // KNOWN_WRONG_IDS's own R18 comment above) on top of that base. This is a coverage-widening addition,
+    // not a code change to the base categories, so the floor is raised by exactly what the new category
+    // itself measures (never by re-deriving the whole number from today's total, which would silently let
+    // a REAL base-category regression hide behind the new category's own gain): base 800/710 + this
+    // category's own measured 108 answered-without-model / 58 correct (out of 200) → 908/768, a few points
+    // below the measured 925/785 combined total, same margin convention as every floor above.
+    // R18 integration (H1 + H2 merged): measured 943/803 on 1104 q (wrong 50 = 5 base + 45 blind baseline) → floor 930/790.
+    // R18 PART 2 (P4, generalization fixes by shape — see KNOWN_WRONG_IDS's own comment above for what
+    // moved and what didn't): measured 942/823, wrong 29 (down from 50, zero new wrong ids anywhere,
+    // including the base exam) → floor RAISED to 938/818 (a little below measured, same margin
+    // convention as every floor above).
+    check(`no-model coverage floor: answeredWithoutModel ≥ 938 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 938, JSON.stringify(overall));
+    check(`no-model coverage floor: correct ≥ 818 (got ${overall.correct})`, overall.correct >= 818, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 
     realLog(`NOTE  golden offline exam: ${JSON.stringify(overall)}`);

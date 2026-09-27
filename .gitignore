@@ -47,3 +47,13 @@ Claude outputs/
 
 # Local data exports for the offline exam (never commit customer data)
 exports/
+
+# Generated business-corpus fixtures (scripts/synth-business.mjs, regenerated fresh every
+# run by scripts/verify-business-corpus.mjs) — only the small *_KEY.json specs are
+# committed, never the bulky generated documents themselves.
+test-docs/business/*.pdf
+test-docs/business/*.txt
+test-docs/business-small/*.pdf
+test-docs/business-small/*.txt
+test-docs/business-small-topup/*.pdf
+test-docs/business-small-topup/*.txt

@@ -81,10 +81,6 @@ try {
       if (m.type() !== 'error') return;
       const text = m.text();
       if (text.includes('Failed to load resource')) return;
-      // Pre-existing, outside UX-D1's ownership (AppShell.tsx's nav icons pass a boolean
-      // `active` prop straight to lucide-react's underlying <svg>) — present on r17base
-      // before this round's changes too. Not this round's regression; don't fail on it.
-      if (text.includes('non-boolean attribute `active`') || text.includes('non-boolean attribute `%s`')) return;
       consoleErrors.push(`console: ${text}`);
     });
     page.__consoleErrors = consoleErrors;

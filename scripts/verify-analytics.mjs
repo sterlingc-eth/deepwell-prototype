@@ -85,6 +85,9 @@ import {
   ANALYTICS_FEW_SHOT_BLOCK,
   FILTER_FIELDS,
   DOC_TYPE_FILTER_FIELDS,
+  isExistenceQuestion,
+  existenceWrap,
+  warrantyStatusFromQuestion,
 } from '../api/_lib/analytics.js';
 import { DOCUMENT_TYPE_IDS } from '../api/_lib/documentTypes.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan, runAnalyticsQuestion } from '../api/_lib/routes/analytics.js';
@@ -787,7 +790,7 @@ eq('validatePlan: sortBy caps the limit to TOP_CUSTOMERS_LIMIT even if a larger 
 {
   // documentCount variant uses the document_entity_links join and says "N documents".
   const mockDb = {
-    raw: async (sql, params) => {
+    raw: async (sql, _params) => {
       if (sql.includes('document_entity_links')) {
         return { rows: [{ id: 'c1', customer_name: 'Plaza Dental', service_address: '1 Main St', metric: 7 }] };
       }
@@ -1034,6 +1037,35 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
   const plan = { entity: 'customers', op: 'count', filters: [{ field: 'hasEmail', op: 'eq', value: true }] };
   const missing = missingConditions(plan, 'how many customers have an email on file');
   eq('round 5 item 3: email condition present in the plan -> nothing missing', missing.size, 0);
+}
+
+/* ======================================================================
+ * R18 (H1, breadth-data-quality-009): "How many customer addresses are missing a zip code?" —
+ * detectAnalyticsPlan already builds the CORRECT plan (a `hasZip: false` boolean presence filter,
+ * the data-quality shape), but CONDITION_PLAN_FIELD's 'zip' entry only ever named the literal
+ * `zip` VALUE filter (the "customers in zip 85201" shape), so this otherwise-correct plan was
+ * flagged as having dropped the 'zip' condition and replaced with the honest-but-wrong "I can't
+ * filter by zip yet" fallback.
+ * ====================================================================== */
+{
+  const plan = { entity: 'customers', op: 'count', filters: [{ field: 'hasZip', op: 'eq', value: false }] };
+  const missing = missingConditions(plan, 'How many customer addresses are missing a zip code?');
+  check('R18 H1: a plan carrying hasZip satisfies the "zip" condition (not flagged as dropped)', !missing.has('zip'));
+}
+{
+  // Decoy/negative: a plan that drops the zip condition ENTIRELY (no hasZip, no zip filter) must
+  // still be flagged missing - the fix only widens WHAT counts as satisfying it, never loosens the
+  // check itself into never firing.
+  const plan = { entity: 'customers', op: 'count', filters: [] };
+  const missing = missingConditions(plan, 'How many customer addresses are missing a zip code?');
+  check('R18 H1 (negative): a plan with NEITHER hasZip nor zip is still flagged as dropping "zip"', missing.has('zip'));
+}
+{
+  // The literal `zip` VALUE filter ("customers in zip 85201") must still satisfy the condition too -
+  // this fix is additive, never a replacement of the pre-existing behavior.
+  const plan = { entity: 'customers', op: 'count', filters: [{ field: 'zip', op: 'eq', value: '85201' }] };
+  const missing = missingConditions(plan, 'how many customers are in zip 85201');
+  check('R18 H1: the pre-existing literal `zip` value filter still satisfies the "zip" condition (unchanged)', !missing.has('zip'));
 }
 
 /* ======================================================================
@@ -1930,6 +1962,169 @@ for (const q of [
   'count of customers under warranty',
 ]) {
   check(`warranty routing (fast path) :: "${q}" reaches analytics, not the agent`, wouldTakeAnalyticsPath(q));
+}
+
+/* ======================================================================
+ * R18 (H1, breadth-data-quality-017/018/019/023): the "does this row
+ * duplicate another row" self-join family — isDuplicateName/sharesAddress
+ * (customers), isDuplicateSerial (equipment). The golden tenant itself has
+ * no real duplicates (every one of these questions' oracle answer is a
+ * genuine "no"/0/empty list there), so this is the only place the POSITIVE
+ * ("yes, here they are") path actually gets exercised at all — a mock db
+ * with real duplicate rows, run end to end through executeAnalyticsPlan.
+ * ====================================================================== */
+{
+  const customerRows = [
+    { id: 'c1', customer_name: 'Karen Abernathy', service_address: '123 Main St, Mesa, AZ 85201', email: null, phone: null, updated_at: '2026-01-01', has_any_document: false },
+    // Same name, different casing/whitespace — still the same duplicate group (lower(btrim(...))).
+    { id: 'c2', customer_name: '  karen abernathy  ', service_address: '55 Oak Ave, Gilbert, AZ 85234', email: null, phone: null, updated_at: '2026-01-01', has_any_document: false },
+    { id: 'c3', customer_name: 'Bob Smith', service_address: '123 main st, mesa, az 85201', email: null, phone: null, updated_at: '2026-01-01', has_any_document: false },
+    // Two customers with NO address at all must never count as "sharing" a blank address.
+    { id: 'c4', customer_name: 'No Address One', service_address: '', email: null, phone: null, updated_at: '2026-01-01', has_any_document: false },
+    { id: 'c5', customer_name: 'No Address Two', service_address: null, email: null, phone: null, updated_at: '2026-01-01', has_any_document: false },
+  ];
+  const mockDb = { raw: async () => ({ rows: customerRows }) };
+
+  const namePlan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'isDuplicateName', op: 'eq', value: true }] });
+  check('duplicate-name: plan validates (closed vocabulary)', namePlan !== null);
+  const nameAnswer = await executeAnalyticsPlan(mockDb, namePlan, { today: '2026-09-26' });
+  eq('duplicate-name: exactly the two "Karen Abernathy" rows match (Bob Smith excluded)', nameAnswer.facts[0].value, '2');
+  check(
+    'duplicate-name: existence wrap reads "Yes" for "Do we have any duplicate customers?"',
+    isExistenceQuestion('Do we have any duplicate customers?') && /^Yes,/.test(existenceWrap(nameAnswer.text, nameAnswer.facts.length > 0))
+  );
+
+  const nameListPlan = validatePlan({ entity: 'customers', op: 'list', filters: [{ field: 'isDuplicateName', op: 'eq', value: true }] });
+  const nameListAnswer = await executeAnalyticsPlan(mockDb, nameListPlan, { today: '2026-09-26' });
+  check(
+    'duplicate-name (list): both matching rows are named in the answer (set comparator needs the names present)',
+    nameListAnswer.facts.every((f) => /karen abernathy/i.test(f.label))
+  );
+
+  const addrPlan = validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'sharesAddress', op: 'eq', value: true }] });
+  const addrAnswer = await executeAnalyticsPlan(mockDb, addrPlan, { today: '2026-09-26' });
+  eq('shares-address: exactly the two "123 Main St" rows match (case-insensitive, trimmed)', addrAnswer.facts[0].value, '2');
+
+  const addrListPlan = validatePlan({ entity: 'customers', op: 'list', filters: [{ field: 'sharesAddress', op: 'eq', value: true }] });
+  const addrListAnswer = await executeAnalyticsPlan(mockDb, addrListPlan, { today: '2026-09-26' });
+  check(
+    'shares-address (list): two customers with NO address on file never count as sharing one',
+    !addrListAnswer.facts.some((f) => f.entityId === 'c4' || f.entityId === 'c5')
+  );
+
+  const noDupCustomerRows = [{ id: 'c1', customer_name: 'Solo Customer', service_address: '9 Unique Rd', email: null, phone: null, updated_at: '2026-01-01', has_any_document: false }];
+  const noDupDb = { raw: async () => ({ rows: noDupCustomerRows }) };
+  const noDupAnswer = await executeAnalyticsPlan(noDupDb, namePlan, { today: '2026-09-26' });
+  eq('duplicate-name: zero duplicates -> a real 0, not a crash', noDupAnswer.facts[0].value, '0');
+  check(
+    'duplicate-name: existence wrap reads "No" when there are none',
+    /^No,/.test(existenceWrap(noDupAnswer.text, noDupAnswer.facts[0].value !== '0'))
+  );
+}
+{
+  const equipmentRows = [
+    { id: 'e1', customer_id: 'c1', model: 'A1', manufacturer: 'Trane', equipment_type: 'RTU', tonnage: '3', refrigerant: null, installation_date: null, serial_number: 'SN-42', service_address: null, warranty: null, updated_at: '2026-01-01' },
+    // Same serial, different case — still the same duplicate group (upper(...)).
+    { id: 'e2', customer_id: 'c2', model: 'B2', manufacturer: 'Goodman', equipment_type: 'Condenser', tonnage: '2', refrigerant: null, installation_date: null, serial_number: 'sn-42', service_address: null, warranty: null, updated_at: '2026-01-01' },
+    { id: 'e3', customer_id: 'c3', model: 'C3', manufacturer: 'Carrier', equipment_type: 'RTU', tonnage: '4', refrigerant: null, installation_date: null, serial_number: 'SN-99', service_address: null, warranty: null, updated_at: '2026-01-01' },
+    // Two units with NO serial recorded at all must never count as "sharing" a blank serial.
+    { id: 'e4', customer_id: 'c4', model: 'D4', manufacturer: 'Lennox', equipment_type: 'RTU', tonnage: '5', refrigerant: null, installation_date: null, serial_number: '', service_address: null, warranty: null, updated_at: '2026-01-01' },
+    { id: 'e5', customer_id: 'c5', model: 'E5', manufacturer: 'Rheem', equipment_type: 'RTU', tonnage: '1', refrigerant: null, installation_date: null, serial_number: null, service_address: null, warranty: null, updated_at: '2026-01-01' },
+  ];
+  const mockDb = { raw: async () => ({ rows: equipmentRows }) };
+  const serialPlan = validatePlan({ entity: 'equipment', op: 'count', filters: [{ field: 'isDuplicateSerial', op: 'eq', value: true }] });
+  check('duplicate-serial: plan validates (closed vocabulary, equipment-only)', serialPlan !== null);
+  const serialAnswer = await executeAnalyticsPlan(mockDb, serialPlan, { today: '2026-09-26' });
+  eq('duplicate-serial: exactly the two "SN-42" units match (case-insensitive)', serialAnswer.facts[0].value, '2');
+  const serialListPlan = validatePlan({ entity: 'equipment', op: 'list', filters: [{ field: 'isDuplicateSerial', op: 'eq', value: true }] });
+  const serialListAnswer = await executeAnalyticsPlan(mockDb, serialListPlan, { today: '2026-09-26' });
+  check(
+    'duplicate-serial (list): two units with NO serial on file never count as sharing one',
+    !serialListAnswer.facts.some((f) => f.entityId === 'e4' || f.entityId === 'e5')
+  );
+  check(
+    'duplicate-serial: existence wrap reads "Yes" for "Are any serial numbers used by more than one unit?"',
+    isExistenceQuestion('Are any serial numbers used by more than one unit?') &&
+      /^Yes,/.test(existenceWrap(serialAnswer.text, serialAnswer.facts[0].value !== '0'))
+  );
+  // isDuplicateSerial is equipment-only — the entity restriction (DATA_QUALITY_FIELD_ENTITY) must
+  // reject it on customers, same as every other single-entity data-quality field.
+  check(
+    'duplicate-serial: rejected on customers (entity-restricted, same as hasSerial/hasTonnage/etc)',
+    validatePlan({ entity: 'customers', op: 'count', filters: [{ field: 'isDuplicateSerial', op: 'eq', value: true }] }) === null
+  );
+}
+
+{
+  // R18 PART 2 (P4, multi-hop AND-drop root cause): executeAnalyticsPlan's hasDocTypeFilter/
+  // hasEquipmentJoinFilter branches used to be if/else-if — a plan combining brand (an
+  // EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN field) with hasServiceType (a cross-doc customer
+  // condition) only ever ran ONE of the two dedicated queries, silently dropping the other
+  // condition (h090, h099-h105). Mock two customers who own a Trane unit (c1, c2) and two
+  // customers with a Repair service record (c1, c3) — only c1 satisfies BOTH.
+  const equipmentRows = [
+    { id: 'e1', customer_id: 'c1', model: 'X1', manufacturer: 'Trane', equipment_type: 'RTU', tonnage: null, refrigerant: null, installation_date: null, serial_number: null, service_address: null, warranty: null, updated_at: '2026-01-01' },
+    { id: 'e2', customer_id: 'c2', model: 'X2', manufacturer: 'Trane', equipment_type: 'RTU', tonnage: null, refrigerant: null, installation_date: null, serial_number: null, service_address: null, warranty: null, updated_at: '2026-01-01' },
+    { id: 'e3', customer_id: 'c3', model: 'X3', manufacturer: 'Carrier', equipment_type: 'RTU', tonnage: null, refrigerant: null, installation_date: null, serial_number: null, service_address: null, warranty: null, updated_at: '2026-01-01' },
+  ];
+  const customerRows = [
+    { id: 'c1', customer_name: 'Alpha Co', service_address: '1 A St', email: null, phone: null },
+    { id: 'c2', customer_name: 'Beta Co', service_address: '2 B St', email: null, phone: null },
+    { id: 'c3', customer_name: 'Gamma Co', service_address: '3 C St', email: null, phone: null },
+  ];
+  const repairCustomerIds = new Set(['c1', 'c3']);
+  const mockDb = {
+    raw: async (sql, params) => {
+      if (sql.includes("field_key = 'service_type'")) {
+        return { rows: params[0] === 'Repair' ? [...repairCustomerIds].map((id) => customerRows.find((c) => c.id === id)) : [] };
+      }
+      if (sql.includes("entity_type = 'equipment'")) return { rows: equipmentRows };
+      if (sql.includes("entity_type = 'customer'")) {
+        const ids = new Set(params[0]);
+        return { rows: customerRows.filter((c) => ids.has(c.id)) };
+      }
+      return { rows: [] };
+    },
+  };
+  const plan = validatePlan({
+    entity: 'customers', op: 'count',
+    filters: [{ field: 'hasServiceType', op: 'eq', value: 'Repair' }, { field: 'brand', op: 'eq', value: 'Trane' }],
+  });
+  check('multi-hop AND-drop fix: plan validates (brand + hasServiceType together)', plan !== null);
+  const answer = await executeAnalyticsPlan(mockDb, plan, { today: '2026-09-26' });
+  eq('multi-hop AND-drop fix: only c1 (Trane AND a Repair visit) is counted — was silently counting both Trane customers (2)', answer.facts[0].value, '1');
+
+  // Same shape, hasDocType instead of hasServiceType (doc-type cross-query + equipment join).
+  const docCustomerRows = [customerRows[0], customerRows[2]]; // c1, c3
+  const mockDbDoc = {
+    raw: async (sql, params) => {
+      if (sql.includes('document_type = $1')) return { rows: params[0] === 'invoice' ? docCustomerRows : [] };
+      if (sql.includes("entity_type = 'equipment'")) return { rows: equipmentRows };
+      if (sql.includes("entity_type = 'customer'")) {
+        const ids = new Set(params[0]);
+        return { rows: customerRows.filter((c) => ids.has(c.id)) };
+      }
+      return { rows: [] };
+    },
+  };
+  const docPlan = validatePlan({
+    entity: 'customers', op: 'count',
+    filters: [{ field: 'hasDocType', op: 'eq', value: 'invoice' }, { field: 'brand', op: 'eq', value: 'Trane' }],
+  });
+  const docAnswer = await executeAnalyticsPlan(mockDbDoc, docPlan, { today: '2026-09-26' });
+  eq('multi-hop AND-drop fix (hasDocType variant): only c1 (Trane AND an invoice) is counted', docAnswer.facts[0].value, '1');
+}
+
+{
+  // R18 PART 2 (P4): "still under warranty" tried mapping to a coarser not-yet-expired bucket
+  // (active OR expiring) and was REVERTED — see warrantyStatusFromQuestion's own doc comment. It
+  // must fold back to the exact same strict 'active' bucket as the literal word "active", never a
+  // distinct value, so a frozen oracle for this bare phrasing (counts-warranty-0004-canonical)
+  // never regresses.
+  eq('warrantyStatusFromQuestion: "still under warranty" is the strict active bucket (not a coarser value)', warrantyStatusFromQuestion('how many units are still under warranty'), 'active');
+  eq('warrantyStatusFromQuestion: "under warranty" (no "still") is also the strict active bucket', warrantyStatusFromQuestion('is this unit under warranty'), 'active');
+  eq('warrantyStatusFromQuestion: "covered" is also the strict active bucket', warrantyStatusFromQuestion('is the warranty covered on this unit'), 'active');
+  eq('warrantyStatusFromQuestion: literal "active" is unchanged', warrantyStatusFromQuestion('how many warranties are active'), 'active');
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

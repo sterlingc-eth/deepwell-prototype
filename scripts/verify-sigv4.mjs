@@ -6,7 +6,6 @@
  * the canonical-request/string-to-sign/signing-key chain is byte-identical
  * across services, so if this matches, the presigner is correct.
  */
-import crypto from 'node:crypto';
 import { presign, __internals } from '../api/_lib/r2.js';
 
 let failures = 0;

@@ -17,6 +17,8 @@
  *       docTypes: ['service-ticket'],   // documents.document_type values
  *       dateFrom: '2024-01-01', dateTo: '2024-12-31', // see TIME SEMANTICS below
  *       technician: 'Maria',            // extractions.field_key='technician'
+ *       teamScoped: false,              // owner ask (a): true to include internal/tech-only
+ *                                        // documents in the result — see resolveFilterDocumentIds
  *     },
  *     k: 10,
  *     rerank: true,                     // default true; Voyage rerank when VOYAGE_API_KEY is set
@@ -91,6 +93,8 @@ import { significantAddressTokens } from '../fastPath.js';
 import { resolveAnyTimeRange } from '../analytics.js';
 import { embedConfig } from './embed.js';
 import { rerankDocuments } from './rerank.js';
+import { documentsHaveAudience } from '../audience/probe.js';
+import { audienceFilterSql } from '../audience/sql.js';
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -238,11 +242,32 @@ async function documentIdsForTechnician(db, technician) {
 }
 
 /**
+ * Owner ask (a): every document id that is NOT an internal (tech-only) document — always
+ * intersected into resolveFilterDocumentIds' result below unless `teamScoped` (the question
+ * itself is about internal/team documents — "any memos for Carlos this week", "what did dispatch
+ * send the techs"). `db.raw` is the same `{query}`-shaped adapter ../audience/store.js's probes
+ * already accept (this file's own `db` exposes `.raw`, not `.query` — see the file header).
+ */
+async function documentIdsExcludingInternal(db) {
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, p) => db.raw(sql, p) });
+  const clause = audienceFilterSql({ docAlias: 'd', hasAudienceColumn, teamScoped: false });
+  const { rows } = await db.raw(`SELECT id AS document_id FROM documents d WHERE ${TENANT_SQL.replace('tenant_id', 'd.tenant_id')} AND ${clause}`, []);
+  return rows.map((r) => r.document_id);
+}
+
+/**
  * Resolves `filters` to a single document-id list (intersection across every
  * filter dimension supplied), or `null` when no filter restricts anything
  * (searchPassages then searches the whole tenant, as it always has).
  * Exported for mapReduceAnswer, which needs the same document set to select
  * what it maps over.
+ *
+ * Owner ask (a): unless `filters.teamScoped` is true, an internal (tech-only) document is ALWAYS
+ * excluded here — one more intersected dimension, same as every filter above, so a customer
+ * question never surfaces shop-only correspondence just because it named no other filter. The
+ * caller (relations/questions.js et al. — not this engineer's file this round) sets
+ * `teamScoped: true` once it recognizes the question itself is about internal/team documents; see
+ * the final report for exactly where that hook belongs.
  * @returns {Promise<{documentIds: string[]|null, truncated: boolean}>}
  */
 export async function resolveFilterDocumentIds(db, filters = {}) {
@@ -252,6 +277,7 @@ export async function resolveFilterDocumentIds(db, filters = {}) {
   if (filters.docTypes?.length) parts.push(await documentIdsForDocTypes(db, filters.docTypes));
   if (filters.dateFrom) parts.push(await documentIdsForDateRange(db, filters.dateFrom, filters.dateTo));
   if (filters.technician) parts.push(await documentIdsForTechnician(db, filters.technician));
+  if (!filters.teamScoped) parts.push(await documentIdsExcludingInternal(db));
 
   const active = parts.filter((p) => p !== null);
   if (!active.length) return { documentIds: null, truncated: false };

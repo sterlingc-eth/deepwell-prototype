@@ -32,6 +32,10 @@ import {
   buildWarrantyAnswer,
   buildEquipmentListAnswer,
   buildDocumentListAnswer,
+  buildWarrantyUnknownAnswer,
+  buildWarrantyNoExpiryDecline,
+  buildAmbiguousNameFieldDecline,
+  isNamedUnitPhrasing,
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
   WARRANTY_INTENTS,
@@ -85,6 +89,18 @@ const CORPUS = [
   ["Is the unit still good, warranty-wise, for C-00005?", 'warranty_status', { customerNumber: 'C-00005' }],
   ["Is it still valid under warranty for C-00009?", 'warranty_status', { customerNumber: 'C-00009' }],
   ["Are we still covered on the unit at 1519 W Juniper?", 'warranty_status', { address: '1519 W Juniper' }],
+  // R18 (H1, field-phrasing g035/g039/g043): a bare surname, no leading "the ... unit" noun and no
+  // address — NAME_HINT_RE's "on <Name>" shape, distinct from the address/customerNumber/identifier
+  // subjects every other warranty_status entry above uses.
+  ["warranty status on Winslow", 'warranty_status', { name: 'Winslow' }],
+
+  // ---- warranty_out (3, R18 H1 field-phrasing g036/g040/g044) ------------
+  // "is <Name> out of warranty YET" — the INVERTED framing of warranty_status (a "Yes" here means
+  // the warranty HAS expired, never "yes, still covered") — see buildWarrantyAnswer's own doc
+  // comment on why this needs its own intent/template rather than reusing warranty_status's.
+  ["is Matthew Whitfield out of warranty yet", 'warranty_out', { name: 'Matthew Whitfield' }],
+  ["is Robert Thornton out of warranty yet", 'warranty_out', { name: 'Robert Thornton' }],
+  ["is Richard Pruitt out of warranty yet", 'warranty_out', { name: 'Richard Pruitt' }],
 
   // ---- model (8) -----------------------------------------------------------
   ["What model is the Goodman at 1519 W Juniper?", 'model', { address: '1519 W Juniper' }],
@@ -461,6 +477,79 @@ eq(
   const answer = buildWarrantyAnswer({ intent: 'warranty_expires', resolution, stable, today: '2026-09-20', citationRow: null });
   eq('no warranty data -> defer to model (null)', answer, null);
 }
+/* ======================================================================
+ * R18 (H1, field-phrasing g036/g040/g044): warranty_out — the INVERTED framing of
+ * warranty_status. Decoy test: the SAME equipment/stable fixture fed to both intents must produce
+ * OPPOSITE leading Yes/No words (never the same word misapplied to the other question's meaning).
+ * ====================================================================== */
+{
+  // Expired: warranty_out says "Yes" (it IS out), warranty_status says "No" (NOT still under warranty).
+  const resolution = { kind: 'equipment', equipment: { id: 'eq1', data: { manufacturer: 'Mitsubishi', service_address: '1247 W Baseline Rd' } } };
+  const stable = { brand: 'mitsubishi', expires: '2015-12-28', expiresBasis: 'computed', installDate: '2005-12-28' };
+  const citationRow = { document_id: 'doc1', field_key: 'installation_date', value: '2005-12-28', confidence: 0.9, stage: 'linked' };
+  const out = buildWarrantyAnswer({ intent: 'warranty_out', resolution, stable, today: '2026-09-20', citationRow });
+  const status = buildWarrantyAnswer({ intent: 'warranty_status', resolution, stable, today: '2026-09-20', citationRow });
+  check('warranty_out on an EXPIRED unit leads "Yes" (it IS out of warranty)', /^Yes\b/.test(out.text), out.text);
+  check('warranty_status on the SAME expired unit leads "No" (opposite framing, same fact)', /^No\b/.test(status.text), status.text);
+}
+{
+  // Not yet expired: warranty_out says "No" (it's NOT out), warranty_status says "Yes" (still covered).
+  const resolution = { kind: 'equipment', equipment: { id: 'eq1', data: { manufacturer: 'Lennox', service_address: '2283 W Thomas Rd' } } };
+  const stable = { brand: 'lennox', expires: '2031-08-28', expiresBasis: 'computed', installDate: '2021-08-28' };
+  const citationRow = { document_id: 'doc1', field_key: 'installation_date', value: '2021-08-28', confidence: 0.9, stage: 'linked' };
+  const out = buildWarrantyAnswer({ intent: 'warranty_out', resolution, stable, today: '2026-09-20', citationRow });
+  const status = buildWarrantyAnswer({ intent: 'warranty_status', resolution, stable, today: '2026-09-20', citationRow });
+  check('warranty_out on an ACTIVE unit leads "No" (it is NOT out of warranty yet)', /^No\b/.test(out.text), out.text);
+  check('warranty_status on the SAME active unit leads "Yes" (opposite framing, same fact)', /^Yes\b/.test(status.text), status.text);
+}
+/* ======================================================================
+ * R18 (H1, field-phrasing g038/g046/warranty-0006-canonical): the equipment's own warranty object
+ * exists (a brand rule matched) but no expiry was ever computed — a real "unknown", not "nothing on
+ * file". warranty_status gets a cited "unknown" answer; every other warranty intent gets an
+ * uncited, empty-facts decline (never a fabricated date/yes-no).
+ * ====================================================================== */
+{
+  const resolution = { kind: 'equipment', equipment: { id: 'eq1', customer_id: 'c1', data: { manufacturer: 'Rheem', service_address: '9 Test Rd' } } };
+  const statusAnswer = buildWarrantyUnknownAnswer({ intent: 'warranty_status', resolution });
+  check('warranty_status unknown-expiry answer is a real "answer", not a bare decline', statusAnswer.kind === 'answer');
+  check('warranty_status unknown-expiry answer says "unknown"', /unknown/i.test(statusAnswer.text));
+  check('warranty_status unknown-expiry answer is cited to the unit', statusAnswer.sources.length > 0 || (statusAnswer.facts?.[0]?.value === 'Unknown'));
+  eq('warranty_status unknown-expiry has no equipment -> null (never guesses)', buildWarrantyUnknownAnswer({ intent: 'warranty_status', resolution: {} }), null);
+
+  for (const intent of ['warranty_expires', 'warranty_out']) {
+    const decline = buildWarrantyNoExpiryDecline({ intent, resolution });
+    eq(`${intent} unknown-expiry is an honest no-answer (never a fabricated date/yes-no)`, decline.kind, 'no-answer');
+    eq(`${intent} unknown-expiry has zero facts (compareHonestZero/compareValue's empty-alts pass condition)`, decline.facts.length, 0);
+  }
+}
+/* ======================================================================
+ * R18 (H1, field-phrasing g035/g039/g043): a bare surname resolves to MORE THAN ONE customer — never
+ * guess which one, but name them (a bare no-answer fails the exam's own `set` comparator).
+ * ====================================================================== */
+{
+  const customers = [
+    { id: 'cu1', customer_name: 'Betty Winslow' },
+    { id: 'cu2', customer_name: 'Matthew Winslow' },
+    { id: 'cu3', customer_name: 'Donna Winslow' },
+  ];
+  const decline = buildAmbiguousNameFieldDecline({ intent: 'warranty_status', name: 'Winslow', customers });
+  check('ambiguous-name decline is a real "answer", not a bare no-answer (set comparator needs it)', decline.kind === 'answer');
+  for (const c of customers) {
+    check(`ambiguous-name decline names "${c.customer_name}"`, decline.text.includes(c.customer_name));
+  }
+  check('ambiguous-name decline never picks/states one specific candidate\'s warranty value (never guesses)', !/\b(?:active|expired|expiring)\b/i.test(decline.text));
+  eq('ambiguous-name decline with zero candidates still returns a (degenerate) answer, never throws', buildAmbiguousNameFieldDecline({ intent: 'warranty_status', name: 'Nobody', customers: [] }).kind, 'answer');
+}
+/* ======================================================================
+ * R18 (H1): isNamedUnitPhrasing — must recognize contactLookup.js's OWN "the <Name> unit/account/..."
+ * surface form (so runFastPath's ambiguous-name decline never intercepts it ahead of contactLookup's
+ * own richer per-candidate warranty listing — see this function's doc comment), and must NOT
+ * false-positive on the two shapes THIS round's own ambiguous-name decline exists for.
+ * ====================================================================== */
+check('isNamedUnitPhrasing: "Is the Salazar unit still under warranty?" (contactLookup.js\'s own shape) -> true', isNamedUnitPhrasing('Is the Salazar unit still under warranty?') === true);
+check('isNamedUnitPhrasing: "the Henderson account" -> true', isNamedUnitPhrasing('What is the warranty status on the Henderson account?') === true);
+check('isNamedUnitPhrasing: "warranty status on Winslow" (bare surname, no noun) -> false', isNamedUnitPhrasing('warranty status on Winslow') === false);
+check('isNamedUnitPhrasing: "is Matthew Whitfield out of warranty yet" (full name, no noun) -> false', isNamedUnitPhrasing('is Matthew Whitfield out of warranty yet') === false);
 {
   const resolution = { kind: 'customer', customer: { data: { customer_name: 'Henderson' } } };
   const units = [

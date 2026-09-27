@@ -39,6 +39,7 @@ import {
   CONDITION_CROSS_VISIT_RELATION,
   CONDITION_RATIO,
   DOC_TYPE_FILTER_FIELDS,
+  SERVICE_TYPE_FILTER_FIELDS,
   validatePlan,
   deriveGeo,
   normalizeStateValue,
@@ -213,6 +214,12 @@ function shapeCustomerRow(r) {
     hasServiceAddress: present(r.service_address),
     hasZip: present(geo.zip),
     hasAnyDocument: pgBool(r.has_any_document),
+    // R18 P4 (C4, negation, h134): "how many customers have zero equipment on file" — the
+    // customers-side mirror of hasAnyDocument, via buildAnalyticsSQL's own correlated EXISTS.
+    hasAnyEquipment: pgBool(r.has_any_equipment),
+    // R18 (H1): raw value for attachDuplicateFlag's sharesAddress computation just below — every
+    // other field here is already derived/boolean, but the frequency map needs the actual string.
+    serviceAddress: r.service_address,
   };
 }
 
@@ -233,6 +240,12 @@ function shapeEquipmentRow(r, today) {
     brand: r.manufacturer, model: r.model, equipmentType: r.equipment_type, tonnage: r.tonnage,
     refrigerant: r.refrigerant, installYear: installYearOf(r.installation_date),
     warrantyStatus: warrantyStatusOf(r.warranty, today),
+    // R18 P4 (C3): warrantyExpires (a raw date string, for the warrantyExpires filter field —
+    // detPlan.js's detectWarrantyExpiryWindow) and warrantyRegistered (registration paperwork on
+    // file — MISSING_FIELD_RULES' own warrantyRegistered rule) both read the SAME `warranty` JSON
+    // column warrantyStatusOf already reads just above, never a new SQL column.
+    warrantyExpires: r.warranty?.expires ?? null,
+    warrantyRegistered: r.warranty?.registrationState === 'on_file',
     city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
     // Round 15 (A, data-quality): see shapeCustomerRow's own comment above —
     // same DATA_QUALITY_ROW_KEY map. No hasWarrantyInfo here: "no warranty
@@ -251,7 +264,38 @@ function shapeEquipmentRow(r, today) {
     hasRefrigerant: present(r.refrigerant),
     hasCustomerLink: present(r.customer_id),
     installDateInFuture,
+    // R18 (H1): raw value for attachDuplicateFlag's isDuplicateSerial computation just below —
+    // see shapeCustomerRow's own serviceAddress comment above for why this needs the raw string.
+    serialNumber: r.serial_number,
   };
+}
+
+/**
+ * R18 (H1, breadth-data-quality-017/018/019/023): sets `flagKey` true on every row whose
+ * (case-insensitive, trimmed) `key` value is shared with at least one OTHER already-fetched row
+ * for the same entity — the "does this row duplicate another row" condition
+ * analytics.js's DATA_QUALITY_FIELD_ENTITY doc comment (isDuplicateName/sharesAddress/
+ * isDuplicateSerial) describes. Must run on the FULL row set fetched for the entity, before
+ * applyEntityFilters narrows anything down (a filter can only ever shrink the set being
+ * compared, silently hiding a real duplicate's partner) — every call site below adds it
+ * immediately after the `raw.map(...)` shape step and before any filtering. Blank values never
+ * count as duplicates of each other (a customer/unit with no name/address/serial on file isn't
+ * "the same" as another blank one) — matches every oracle's own `coalesce(...) <> ''`/lower-btrim
+ * shape exactly. Mutates `rows` in place (cheap: one pass to count, one pass to flag) and returns
+ * it for convenience.
+ */
+function attachDuplicateFlag(rows, key, flagKey) {
+  const counts = new Map();
+  for (const r of rows) {
+    const v = String(r[key] ?? '').trim().toLowerCase();
+    if (!v) continue;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  for (const r of rows) {
+    const v = String(r[key] ?? '').trim().toLowerCase();
+    r[flagKey] = Boolean(v) && (counts.get(v) ?? 0) > 1;
+  }
+  return rows;
 }
 
 function shapeDocumentRow(r, dateBasis) {
@@ -302,12 +346,22 @@ const ENTITY_SUPPORTED_FIELDS = {
   customers: new Set([
     'state', 'county', 'city', 'zip', 'customerName', 'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType',
     'hasServiceAddress', 'hasZip', 'hasAnyDocument',
+    // R18 (H1, breadth-data-quality-017/018/019): see attachDuplicateFlag's own doc comment.
+    'isDuplicateName', 'sharesAddress',
+    // R18 P4 (C2/C4): hasServiceType/lacksServiceType (queryCustomersByServiceTypeCondition,
+    // below) and hasAnyEquipment (the customers-side mirror of hasAnyDocument).
+    'hasServiceType', 'lacksServiceType', 'hasAnyEquipment',
   ]),
   equipment: new Set([
     'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
     'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage', 'hasRefrigerant', 'hasCustomerLink', 'installDateInFuture',
+    // R18 (H1, breadth-data-quality-023): see attachDuplicateFlag's own doc comment.
+    'isDuplicateSerial',
+    // R18 P4 (C3): warrantyExpires (a raw date-range test) and warrantyRegistered (registration
+    // paperwork on file) — see analytics.js's own doc comments on each.
+    'warrantyExpires', 'warrantyRegistered',
   ]),
-  warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus']),
+  warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus', 'warrantyExpires']),
   documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink']),
   serviceVisits: new Set(['technician']),
 };
@@ -622,9 +676,50 @@ async function queryCustomersByDocTypeCondition(db, plan) {
   return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
 }
 
+/**
+ * R18 P4 (blind generalization round 18 part 2, C2/C4): "how many trane customers needed a
+ * repair visit" / "how many customers have never had a preventive maintenance visit" —
+ * hasServiceType/lacksServiceType filters, the event-level sibling of
+ * queryCustomersByDocTypeCondition just above. A customer counts when a document linked either
+ * DIRECTLY to them OR to one of THEIR units (see the oracle's own `l.entity_id = e.customer_id OR
+ * l.entity_id = e.id` join — a service ticket is often linked to the specific unit worked on, not
+ * the customer record) carries an extractions.service_type value matching the filter.
+ */
+async function queryCustomersByServiceTypeCondition(db, plan) {
+  const hasFilter = (plan.filters ?? []).find((f) => f.field === 'hasServiceType');
+  const lacksFilter = (plan.filters ?? []).find((f) => f.field === 'lacksServiceType');
+  if (!hasFilter) return { rows: [] };
+
+  const serviceTypeCustomerSql = `
+    SELECT DISTINCT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address,
+           c.data->>'email' AS email, c.data->>'phone' AS phone
+      FROM entities c
+     WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+       AND EXISTS (
+             SELECT 1 FROM document_entity_links l
+             JOIN extractions x ON x.document_id = l.document_id AND x.${TENANT_SQL}
+            WHERE l.${TENANT_SQL} AND x.field_key = 'service_type' AND x.value = $1
+              AND (l.entity_id = c.id OR l.entity_id IN (
+                    SELECT e.id FROM entities e
+                     WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
+                       AND e.customer_id = c.id AND e.${TENANT_SQL}
+                  ))
+           )`;
+
+  const { rows: hasRows } = await db.raw(serviceTypeCustomerSql, [hasFilter.value]);
+  if (!lacksFilter) return { rows: hasRows.map((r) => shapeCustomerRow(r)) };
+
+  const { rows: lacksRows } = await db.raw(serviceTypeCustomerSql, [lacksFilter.value]);
+  const lacksIds = new Set(lacksRows.map((r) => r.id));
+  return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+}
+
 function keyOf(groupBy) {
   return (row) => {
     if (groupBy === 'warrantyStatus') return row.warrantyStatus ?? UNKNOWN_BUCKET;
+    // R18 P4 (h074): 'year' is never a stored column — derived from the serviceVisits row's own
+    // `month` (YYYY-MM) string, see detPlan.js's detectDistinctYearsCount.
+    if (groupBy === 'year') return row.month ? String(row.month).slice(0, 4) : UNKNOWN_BUCKET;
     const v = row[groupBy];
     return v == null || v === '' ? UNKNOWN_BUCKET : String(v);
   };
@@ -666,6 +761,11 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   // nothing either way.
   const hasDocTypeFilter =
     plan.entity === 'customers' && (plan.filters ?? []).some((f) => DOC_TYPE_FILTER_FIELDS.includes(f.field));
+  // R18 P4 (h090, h099-h105): a service-type condition ("needed a repair visit",
+  // "never had a preventive maintenance visit") is its own cross-doc query,
+  // same shape as hasDocTypeFilter above — see queryCustomersByServiceTypeCondition.
+  const hasServiceTypeFilter =
+    plan.entity === 'customers' && (plan.filters ?? []).some((f) => SERVICE_TYPE_FILTER_FIELDS.includes(f.field));
 
   let rows;
   // Set only in the serviceVisits branch below, from the SAME already-fetched
@@ -677,8 +777,31 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   // the future (excluded from "jobs done"/"last service").
   let unitCount = null;
   let futureVisitCount = 0;
-  if (hasDocTypeFilter) {
+  if ((hasDocTypeFilter || hasServiceTypeFilter) && hasEquipmentJoinFilter) {
+    // R18 P4 (multi-hop AND-drop, e.g. "how many Trane customers needed a
+    // repair visit"): hasDocTypeFilter/hasServiceTypeFilter and
+    // hasEquipmentJoinFilter each resolve via their OWN dedicated query
+    // (neither buildAnalyticsSQL nor queryCustomersByEquipmentFilter alone
+    // knows about the other condition) — so when a plan carries both, run
+    // both and intersect by customer id rather than silently picking one
+    // and dropping the other.
+    let crossIds = null;
+    if (hasDocTypeFilter) {
+      const { rows: docRows } = await queryCustomersByDocTypeCondition(db, plan);
+      crossIds = new Set(docRows.map((r) => r.id));
+    }
+    if (hasServiceTypeFilter) {
+      const { rows: svcRows } = await queryCustomersByServiceTypeCondition(db, plan);
+      const svcIds = new Set(svcRows.map((r) => r.id));
+      crossIds = crossIds ? new Set([...crossIds].filter((id) => svcIds.has(id))) : svcIds;
+    }
+    const eqResult = await queryCustomersByEquipmentFilter(db, plan, { today });
+    rows = eqResult.rows.filter((r) => crossIds.has(r.id));
+    unitCount = eqResult.unitCount;
+  } else if (hasDocTypeFilter) {
     ({ rows } = await queryCustomersByDocTypeCondition(db, plan));
+  } else if (hasServiceTypeFilter) {
+    ({ rows } = await queryCustomersByServiceTypeCondition(db, plan));
   } else if (hasEquipmentJoinFilter) {
     // Gaps 1 + 3: "which customers have Trane units" — a customer filtered
     // by an equipment-level attribute. queryCustomersByEquipmentFilter already
@@ -690,10 +813,16 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeCustomerRow(r));
+    // R18 (H1): see attachDuplicateFlag's own doc comment — must run on the full fetched set,
+    // before applyEntityFilters (below) narrows it down.
+    attachDuplicateFlag(rows, 'customerName', 'isDuplicateName');
+    attachDuplicateFlag(rows, 'serviceAddress', 'sharesAddress');
   } else if (plan.entity === 'equipment' || plan.entity === 'warranties') {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeEquipmentRow(r, today));
+    // R18 (H1): see attachDuplicateFlag's own doc comment.
+    attachDuplicateFlag(rows, 'serialNumber', 'isDuplicateSerial');
   } else if (plan.entity === 'documents') {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
@@ -765,14 +894,18 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     rows = plan.timeRange ? visitRowsToUse.filter((r) => withinTimeRange(r, plan.timeRange)) : visitRowsToUse;
   }
 
-  // hasDocType/lacksDocType are already fully resolved by
-  // queryCustomersByDocTypeCondition's own two queries above — matchesFilter
-  // has no notion of either field (row[field] is always undefined for them),
-  // so re-applying them here would zero out every row. Every OTHER filter in
-  // the plan (a geo filter combined with the doc-type condition, say) still
-  // needs this pass, same as hasEquipmentJoinFilter's own rows above.
-  const filtersToApply = hasDocTypeFilter
-    ? (plan.filters ?? []).filter((f) => !DOC_TYPE_FILTER_FIELDS.includes(f.field))
+  // hasDocType/lacksDocType (and, R18 P4, hasServiceType/lacksServiceType) are
+  // already fully resolved by their own dedicated query above — matchesFilter
+  // has no notion of any of these fields (row[field] is always undefined for
+  // them), so re-applying them here would zero out every row. Every OTHER
+  // filter in the plan (a geo filter, or brand/model via the equipment-join
+  // branch above, combined with the cross-doc condition) still needs this
+  // pass, same as hasEquipmentJoinFilter's own rows above.
+  const crossDocFilterUsed = hasDocTypeFilter || hasServiceTypeFilter;
+  const filtersToApply = crossDocFilterUsed
+    ? (plan.filters ?? []).filter(
+        (f) => !DOC_TYPE_FILTER_FIELDS.includes(f.field) && !SERVICE_TYPE_FILTER_FIELDS.includes(f.field)
+      )
     : plan.filters;
   const filtered = applyEntityFilters(rows, filtersToApply);
   const total = filtered.length;

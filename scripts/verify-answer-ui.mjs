@@ -201,7 +201,7 @@ try {
   // loudly when taken, or, worse, quietly serves this test the OTHER worktree's stale build — both
   // observed in practice on this shared machine). The real port is read back out of vite's own
   // "Local: http://localhost:NNNNN/" startup line.
-  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn('npx', ['vite', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let out = '';
   let port = null;
   server.stdout.on('data', (d) => { out += String(d); });
@@ -365,7 +365,7 @@ try {
 
   await browser.close();
 } finally {
-  server?.kill();
+  try { process.kill(-server.pid, 'SIGKILL'); } catch { server?.kill(); }
 }
 
 console.log(failures ? `\n${failures} FAILED, ${passes} passed` : `\nall ${passes} passed`);

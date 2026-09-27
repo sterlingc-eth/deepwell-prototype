@@ -37,7 +37,11 @@ import {
   subjectLabel,
   buildFieldAnswer,
   buildWarrantyAnswer,
+  buildWarrantyUnknownAnswer,
+  buildWarrantyNoExpiryDecline,
   buildAddressFieldDecline,
+  buildAmbiguousNameFieldDecline,
+  isNamedUnitPhrasing,
   buildEquipmentListAnswer,
   buildDocumentListAnswer,
 } from './fastPath.js';
@@ -155,7 +159,13 @@ export async function resolveFastPathSubject(db, subject) {
     );
     const unique = pickUnique(rows);
     if (unique) return { kind: 'customer', customer: unique };
-    if (rows.length > 1) return { kind: 'ambiguous' };
+    // R18 (H1, field-phrasing g035/g039/g043): the matched rows themselves (id/name/address), not
+    // just the bare 'ambiguous' kind — runFastPath's ADDRESS_ENTITY_FIELD_INTENTS branch below uses
+    // these to name who matched instead of guessing which one was meant (buildAmbiguousNameFieldDecline,
+    // fastPath.js). Harmless for every other caller, which only ever reads `.kind`.
+    if (rows.length > 1) {
+      return { kind: 'ambiguous', customers: rows.map((r) => ({ id: r.id, customer_name: r.data?.customer_name, service_address: r.data?.service_address })) };
+    }
   }
 
   if (!subject.hasAny) {
@@ -370,7 +380,22 @@ async function runWarranty(db, resolution, intent, today, labelOverride) {
   }
 
   const stable = equipment.data?.warranty;
-  if (!stable || !stable.expires) return null;
+  if (!stable) return null;
+  // R18 (H1, field-phrasing g038/g046/warranty-0006-canonical): the equipment's own warranty object
+  // exists (a brand rule was matched) but no expiry was ever computed — this is real, known
+  // information ("unknown", not "nothing on file"), so answer it instead of deferring; see
+  // buildWarrantyUnknownAnswer/buildWarrantyNoExpiryDecline's own doc comments for the value/intent
+  // split. Only for an EQUIPMENT resolution (a single already-identified unit) — the customer-level
+  // branch above already requires exactly one unit WITH a computed expiry before reaching here, a
+  // stricter, deliberately unchanged rule for "which of several units did you mean" ambiguity this
+  // round's own oracles never exercise.
+  if (!stable.expires) {
+    if (resolution.kind !== 'equipment') return null;
+    if (intent === 'warranty_status') {
+      return buildWarrantyUnknownAnswer({ intent, resolution: { kind: 'equipment', equipment }, labelOverride });
+    }
+    return buildWarrantyNoExpiryDecline({ intent, resolution: { kind: 'equipment', equipment }, labelOverride });
+  }
 
   const equipmentResolution = { kind: 'equipment', equipment };
   const citationField = stable.expiresBasis === 'computed' ? 'installation_date' : 'warranty_expires';
@@ -782,6 +807,18 @@ export async function runFastPath(db, fp, { today } = {}) {
   // multi-unit ambiguity to guard against, so the plain field fetch below is already correct for it).
   if (!resolution.viaAddress && resolution.kind === 'customer' && ADDRESS_ENTITY_FIELD_INTENTS.has(intent)) {
     return runCustomerEntityFieldPolicy(db, { intent, resolution, raw, today });
+  }
+
+  // R18 (H1, field-phrasing g035/g039/g043 — "warranty status on Winslow"): a bare surname matched
+  // MORE THAN ONE customer (resolveFastPathSubject's own `subject.name` branch), not via an address —
+  // never guess which one was meant, but name them instead of a bare, cited-to-nothing decline (see
+  // buildAmbiguousNameFieldDecline's own doc comment for why this differs from the address-ambiguous
+  // case just above).
+  if (
+    resolution.kind === 'ambiguous' && !resolution.viaAddress && subject.name &&
+    ADDRESS_ENTITY_FIELD_INTENTS.has(intent) && !isNamedUnitPhrasing(raw)
+  ) {
+    return buildAmbiguousNameFieldDecline({ intent, name: subject.name, customers: resolution.customers ?? [] });
   }
 
   if (resolution.kind !== 'customer' && resolution.kind !== 'equipment') return null;

@@ -33,6 +33,10 @@ import { startSemantic, keywordCandidateLimit, finishHybrid } from './search/hyb
 // "is the table there yet" probe, so browseDocuments never needs a second copy
 // of that memoization — see financials/store.js's own doc comment.
 import { financialsTableExists } from './financials/store.js';
+// Records Browse audience filter chip (round 18, part 2, owner ask (a)): leaf probe only (see
+// audience/probe.js's own header on why this imports THAT file and never audience/store.js).
+import { documentsHaveAudience } from './audience/probe.js';
+import { AUDIENCE_FALLBACK_FIELD_KEY } from './audience/sql.js';
 
 let pool;
 
@@ -353,6 +357,15 @@ const WARRANTY_BUCKET_CASE = `
     ELSE 'active'
   END`;
 
+/** Round 18, part 2 (owner ask (a)): the browse query's own audience expression — `d.audience`
+ *  once M3-config/57 is pasted (probed once via documentsHaveAudience, same "detect, don't
+ *  assume" contract as every other optional column here), else the pre-migration fallback
+ *  (`fields.audience_fallback`, the newest '_audience' extractions row for this document — see
+ *  the `fields` CTE below and audience/sql.js's own AUDIENCE_FALLBACK_FIELD_KEY). Safe to embed
+ *  literally: `hasAudienceColumn` is a boolean this file computed itself, never user input — same
+ *  trust model as STAGE_BUCKET_CASE/WARRANTY_BUCKET_CASE above. */
+const AUDIENCE_EXPR = (hasAudienceColumn) => (hasAudienceColumn ? "COALESCE(d.audience, 'customer')" : "COALESCE(fields.audience_fallback, 'customer')");
+
 /** today+days as an ISO 'YYYY-MM-DD' string, UTC — pure, so a fixed `today`
  *  makes every bucket boundary reproducible in tests. */
 export function isoPlusDays(todayIso, days) {
@@ -385,6 +398,10 @@ export function normalizeBrowseFilters(raw = {}) {
   f.hasMoney = bool(raw.hasMoney);
   f.openBalance = bool(raw.openBalance);
   f.uploadedByMe = raw.uploadedByMe === true ? true : null;
+  // Round 18, part 2 (owner ask (a)): the records browser's audience chip. 'customer' is the
+  // default (matches the chip's own default state) so an omitted/invalid value never accidentally
+  // surfaces internal (tech-only) documents in a plain, unfiltered browse.
+  f.audience = ['customer', 'internal', 'all'].includes(raw.audience) ? raw.audience : 'customer';
   f.serviceDateFrom = isoDate(raw.serviceDateFrom);
   f.serviceDateTo = isoDate(raw.serviceDateTo);
   f.uploadDateFrom = isoDate(raw.uploadDateFrom);
@@ -431,10 +448,13 @@ export function decodeBrowseCursor(cursor, filtersKey) {
  * facet's own options). `template` uses `??` placeholders, filled in order
  * from `values` — see renderBrowseFragments.
  */
-function buildBrowseFragments(f, hasDisplayName, hasFinancials) {
+function buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn) {
   const frags = [];
   const add = (dim, template, ...values) => frags.push({ dim, template, values });
 
+  // Round 18, part 2 (owner ask (a)): 'all' means no restriction at all (the exact same "no
+  // fragment for this dimension" idiom every other filter here already uses when unset).
+  if (f.audience !== 'all') add('audience', `(${AUDIENCE_EXPR(hasAudienceColumn)}) = ??`, f.audience);
   if (f.documentType) add('documentType', 'd.document_type = ??', f.documentType);
   if (f.stageBucket) add('stageBucket', `(${STAGE_BUCKET_CASE}) = ??`, f.stageBucket);
   if (f.warrantyBucket) add('warrantyBucket', `(${WARRANTY_BUCKET_CASE}) = ??`, f.warrantyBucket);
@@ -490,7 +510,7 @@ function renderBrowseFragments(fragments, baseParams) {
  *  same "detect once" contract as documentsHaveUpdatedAt. `wherePart` is the
  *  already-rendered fragment SQL (see renderBrowseFragments) for THIS
  *  particular query (full set for the list, N-1 for a facet count). */
-function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart) {
+function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn) {
   return `
     WITH linked AS (
       SELECT del.document_id,
@@ -510,11 +530,14 @@ function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart) {
     fields AS (
       SELECT document_id,
              MAX(value) FILTER (WHERE field_key = 'service_date') AS service_date,
-             MAX(value) FILTER (WHERE field_key = 'technician') AS technician_name
+             MAX(value) FILTER (WHERE field_key = 'technician') AS technician_name,
+             ${hasAudienceColumn
+               ? 'NULL::text AS audience_fallback'
+               : `MAX(value) FILTER (WHERE field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}') AS audience_fallback`}
         FROM (
           SELECT DISTINCT ON (document_id, field_key) document_id, field_key, value
             FROM extractions
-           WHERE ${TENANT} AND field_key IN ('service_date', 'technician')
+           WHERE ${TENANT} AND field_key IN ('service_date', 'technician'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`})
            ORDER BY document_id, field_key, confidence DESC NULLS LAST, id
         ) best
        GROUP BY document_id
@@ -525,6 +548,7 @@ function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart) {
              d.document_type, d.stage, d.created_at, d.verified_by, d.uploaded_by,
              linked.customer_id, linked.customer_name, linked.site_address, linked.brand, linked.warranty_expiry,
              fields.service_date, fields.technician_name,
+             (${AUDIENCE_EXPR(hasAudienceColumn)}) AS audience,
              ${hasFinancials
                ? "df.total AS amount, df.balance_due, df.status AS money_status, (df.id IS NOT NULL) AS has_money,"
                : 'NULL::numeric AS amount, NULL::numeric AS balance_due, NULL::text AS money_status, FALSE AS has_money,'}
@@ -1450,12 +1474,14 @@ function makeStore(db, tenantId) {
       // the makeStore() return value below) — this function receives the
       // low-level driver instead, which only has `.query`, so adapt it.
       const hasFinancials = await financialsTableExists({ raw: (sql, params) => db.query(sql, params) });
+      // Round 18, part 2 (owner ask (a)): same "detect once" contract, for the audience chip.
+      const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.query(sql, params) });
 
       const today = new Date().toISOString().slice(0, 10);
       const baseParams = [today, isoPlusDays(today, 90)];
       const filtersKey = browseFiltersKey(f);
       const offset = decodeBrowseCursor(f.cursor, filtersKey);
-      const allFrags = buildBrowseFragments(f, hasDisplayName, hasFinancials);
+      const allFrags = buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn);
 
       // `buildSelect(nextIndex)` returns the SELECT SQL text; `nextIndex` is
       // where ITS OWN extra params (if any) start — after baseParams and every
@@ -1465,7 +1491,7 @@ function makeStore(db, tenantId) {
       const runFiltered = (fragsSubset, buildSelect, extraParams = []) => {
         const { sql: wherePart, params } = renderBrowseFragments(fragsSubset, baseParams);
         const selectSql = buildSelect(params.length + 1);
-        return db.query(`${sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart)}\n${selectSql}`, [...params, ...extraParams]);
+        return db.query(`${sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn)}\n${selectSql}`, [...params, ...extraParams]);
       };
 
       const sortDef = BROWSE_SORTS[f.sort] ?? BROWSE_SORTS[DEFAULT_BROWSE_SORT];
@@ -1485,6 +1511,7 @@ function makeStore(db, tenantId) {
         ['documentType', 'document_type AS value, document_type AS label', 'document_type IS NOT NULL', 30],
         ['stageBucket', 'stage_bucket AS value, stage_bucket AS label', 'TRUE', 10],
         ['warrantyBucket', 'warranty_bucket AS value, warranty_bucket AS label', 'TRUE', 10],
+        ['audience', 'audience AS value, audience AS label', 'TRUE', 2],
         ['site', 'site_address AS value, site_address AS label', 'site_address IS NOT NULL', 20],
         ['technician', 'technician_name AS value, technician_name AS label', 'technician_name IS NOT NULL', 20],
         ['brand', 'brand AS value, brand AS label', 'brand IS NOT NULL', 20],
@@ -1568,6 +1595,10 @@ function makeStore(db, tenantId) {
           balanceDue: r.balance_due != null ? Number(r.balance_due) : null,
           moneyStatus: r.money_status,
           hasMoney: r.has_money,
+          // Round 18, part 2 (owner ask (a)): drives the "Team only" badge (src/components/
+          // records/RecordsBrowser.tsx) — always 'customer' or 'internal', never null (AUDIENCE_EXPR's
+          // own COALESCE).
+          audience: r.audience === 'internal' ? 'internal' : 'customer',
         })),
         total: trueTotal,
         hasMore: offset + rows.length < trueTotal,

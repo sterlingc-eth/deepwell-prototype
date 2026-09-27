@@ -95,7 +95,10 @@ export const KNOWN_US_CITY_NAMES = Object.keys(zipCounty.usCityCounty ?? {}).map
 
 export const ENTITIES = ['customers', 'equipment', 'documents', 'serviceVisits', 'warranties'];
 export const OPS = ['count', 'list', 'groupBy', 'sum'];
-export const GROUP_BY_FIELDS = ['city', 'county', 'state', 'zip', 'brand', 'documentType', 'month', 'technician', 'warrantyStatus'];
+// R18 P4 (h074): 'year' — "how many different years do we have customers on file for" — a
+// distinct-year count derived from a serviceVisits row's own `month` string (YYYY-MM), never a
+// real stored column; see detPlan.js's detectDistinctYearsCount and routes/analytics.js's keyOf.
+export const GROUP_BY_FIELDS = ['city', 'county', 'state', 'zip', 'brand', 'documentType', 'month', 'year', 'technician', 'warrantyStatus'];
 /** Closed field vocabulary a filter's `field` must be one of — see the brief. */
 export const FILTER_FIELDS = [
   'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage',
@@ -113,6 +116,34 @@ export const FILTER_FIELDS = [
   // warranty-registration-only field, ~53% coverage in this corpus by
   // design), just the one boolean field that pattern didn't cover yet.
   'hasRefrigerant',
+  // R18 (H1, breadth-data-quality-017/018/019/023): the self-join "does this row duplicate
+  // another row" shapes ("duplicate customers", "share an address", "used by more than one
+  // unit") — see DATA_QUALITY_FIELD_ENTITY's own doc comment on isDuplicateName/sharesAddress/
+  // isDuplicateSerial for how these are actually computed (a cross-row frequency map, not a
+  // single column's presence, unlike every other data-quality field above).
+  'isDuplicateName', 'sharesAddress', 'isDuplicateSerial',
+  // R18 P4 (blind generalization round 18 part 2, C2/C4): "customers who needed a repair
+  // visit"/"have had a repair call"/"had only preventive maintenance, never a repair" — a
+  // cross-document EVENT condition (extractions.service_type), the same "has X but no Y" shape
+  // hasDocType/lacksDocType already cover for a document TYPE, just keyed to a service_type
+  // VALUE instead — see SERVICE_TYPE_FILTER_FIELDS' own doc comment just below.
+  'hasServiceType', 'lacksServiceType',
+  // R18 P4 (C3, time-window drop): a raw date-range test directly on a unit's OWN warranty expiry
+  // date (data.warranty.expires) — "warranties expire by end of year"/"expired in the past
+  // year"/"expiring in the next 90 days" name a real calendar WINDOW the existing warrantyStatus
+  // bucket (active/expiring/expired/unknown) can't express (that's a fixed <=365-day bucket, not
+  // an arbitrary caller-given window) — see detPlan.js's detectWarrantyExpiryWindow.
+  'warrantyExpires',
+  // R18 P4 (C3): "how many units are actually registered for warranty" — whether the
+  // registration PAPERWORK is on file (data.warranty.registrationState === 'on_file'), a
+  // different question from warrantyStatus (coverage expiry) or hasWarrantyInfo (deliberately
+  // absent — see DATA_QUALITY_FIELD_ENTITY's own doc comment). Listed in DATA_QUALITY_BOOLEAN_FIELDS
+  // below, same boolean-only/op-eq-only shape as hasSerial/hasModel/etc.
+  'warrantyRegistered',
+  // R18 P4 (C4, negation): "how many customers have zero equipment on file" — the customers-side
+  // mirror of hasAnyDocument, computed the same correlated-EXISTS way (buildAnalyticsSQL's
+  // customers branch).
+  'hasAnyEquipment',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -132,6 +163,26 @@ export const BOOLEAN_FILTER_FIELDS = ['hasEmail', 'hasPhone'];
  *  "the model never contributes anything outside FILTER_FIELDS" — still
  *  holds for a plan built by this file's own code, not just the model's.*/
 export const DOC_TYPE_FILTER_FIELDS = ['hasDocType', 'lacksDocType'];
+/**
+ * R18 P4 (blind generalization round 18 part 2, clusters C2/C4): "how many trane customers
+ * needed a repair visit"/"have had a repair call", "how many customers have never had a
+ * preventive maintenance visit", "customers who have had only preventive maintenance, never a
+ * repair" — a cross-document EVENT condition keyed to extractions.field_key='service_type'
+ * (see extractFields.js FIELD_SPECS' own service_type description), the exact same "has X but no
+ * Y" shape as hasDocType/lacksDocType just keyed to a service_type VALUE instead of a document
+ * TYPE — customers-only, op 'eq' only, value one of SERVICE_TYPE_VALUES below. Both a hasServiceType
+ * and a lacksServiceType filter can appear in the SAME plan (routes/analytics.js's
+ * queryCustomersByServiceTypeCondition resolves both, same as queryCustomersByDocTypeCondition
+ * already does for hasDocType/lacksDocType).
+ */
+export const SERVICE_TYPE_FILTER_FIELDS = ['hasServiceType', 'lacksServiceType'];
+/** Canonical extractions.field_key='service_type' values this corpus stores (extractFields.js's
+ *  own field description) — the closed vocabulary a hasServiceType/lacksServiceType filter's
+ *  value must be one of. Only 'Repair' and 'Preventive Maintenance' have a detector today
+ *  (detPlan.js's detectCustomersHasServiceType); the rest are listed so a plan naming one some
+ *  future detector builds is never rejected by validatePlan for a reason unrelated to that
+ *  detector's own confidence. */
+export const SERVICE_TYPE_VALUES = ['Preventive Maintenance', 'Repair', 'Emergency', 'Installation', 'Inspection', 'Startup'];
 /**
  * Round 15 (A, data-quality cluster — "how many documents aren't linked to
  * any customer", "units missing a serial number", "customers with no service
@@ -165,6 +216,28 @@ export const DATA_QUALITY_FIELD_ENTITY = {
   // (already correct, already tested, no new field needed).
   installDateInFuture: 'equipment',
   hasServiceDate: 'documents',
+  // R18 (H1, breadth-data-quality-017/018/019/023): unlike every field above (a single column's
+  // own presence on ITS OWN row), these three are true only relative to every OTHER row for the
+  // same entity — "does another customer share this name/address", "does another unit share this
+  // serial number". detectDuplicateCondition (detPlan.js) maps the self-join question family
+  // SELF_DUPLICATE_RE names (that regex's own doc comment) to these; routes/analytics.js's
+  // attachDuplicateFlag computes the actual boolean (a case-insensitive, trimmed frequency count
+  // over ALL of the tenant's rows for the entity, right after fetching them and before any filter
+  // narrows the set down) and stores it on the row under this same field name, so matchesFilter's
+  // existing DATA_QUALITY_ROW_KEY lookup (below) reads it exactly like any other boolean field —
+  // no special case needed there.
+  isDuplicateName: 'customers',
+  sharesAddress: 'customers',
+  isDuplicateSerial: 'equipment',
+  // R18 P4 (C4): "how many customers have zero equipment on file" — customers-side mirror of
+  // hasAnyDocument (buildAnalyticsSQL's customers branch adds the matching correlated EXISTS).
+  hasAnyEquipment: 'customers',
+  // R18 P4 (C3): "actually registered for warranty" — data.warranty.registrationState === 'on_file',
+  // computed in shapeEquipmentRow (routes/analytics.js) directly from the same `warranty` JSON
+  // column warrantyStatusOf already reads; deliberately its own field, never folded into
+  // warrantyStatus (a coverage-expiry bucket) or a hasWarrantyInfo boolean (see this map's own
+  // doc comment on why that one stays absent).
+  warrantyRegistered: 'equipment',
 };
 export const DATA_QUALITY_BOOLEAN_FIELDS = Object.keys(DATA_QUALITY_FIELD_ENTITY);
 export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'in'];
@@ -1211,6 +1284,24 @@ export function moneyFallbackAnswer() {
 const MAINTENANCE_DUE_RE =
   /\b(overdue for (?:a )?(?:maintenance|service)|due for (?:a )?(?:fall |spring |annual |seasonal )?(?:tune-?up|maintenance|service|checkup)|haven'?t been serviced|not had service|no (?:maintenance|service) in \d+\s*months?|needs?\s+(?:a )?service)\b/i;
 
+/**
+ * R18 P4 (C2, multi-hop AND-drop; C4, negation collapse): "needed a repair visit"/"have had a
+ * repair call"/"a preventive maintenance visit"/"only preventive maintenance, never a repair" — a
+ * mention of a real extractions.field_key='service_type' VALUE (see SERVICE_TYPE_FILTER_FIELDS'
+ * own doc comment), distinct from MAINTENANCE_DUE_RE just above (which is about a customer being
+ * OVERDUE — a scheduling concern with no filter field at all — never about whether a past visit of
+ * a given type already happened, which this IS a real, answerable filter for). Longest/most
+ * specific phrase first so "preventive maintenance visit" is read as one phrase, not "maintenance"
+ * (MAINTENANCE_DUE_RE's own word) plus a stray "visit".
+ */
+export const SERVICE_TYPE_PHRASE_RE =
+  /\b(preventive maintenance visits?|preventive maintenance|repair visits?|repair calls?|repair jobs?|a repair)\b/i;
+
+/** The canonical SERVICE_TYPE_VALUES member a single SERVICE_TYPE_PHRASE_RE match names. */
+export function serviceTypeValueOf(phrase) {
+  return /^preventive maintenance/i.test(phrase) ? 'Preventive Maintenance' : 'Repair';
+}
+
 /** A dumb, self-contained scan of the question TEXT for a handful of
  *  conditions a plan might drop: 'email'/'phone' (the hasEmail/hasPhone
  *  shape), 'brand' (a known manufacturer name), 'county' (the word "county"
@@ -1241,6 +1332,12 @@ export function detectedConditions(question) {
   if (/\bwarrant/.test(q) && WARRANTY_STATUS_WORD_RE.test(q)) found.add('warranty');
   if (CROSS_VISIT_RELATION_RE.test(q)) found.add(CONDITION_CROSS_VISIT_RELATION);
   if (RATIO_RE.test(q)) found.add(CONDITION_RATIO);
+  // R18 P4 (C2, multi-hop AND-drop): "needed a repair visit"/"have had a repair call"/"only
+  // preventive maintenance, never a repair" — see SERVICE_TYPE_FILTER_FIELDS' own doc comment.
+  // Detected here (independent of detPlan.js's own dedicated detector) so a MODEL plan that drops
+  // this condition is caught by the exact same missing-condition safety net every other condition
+  // already gets, never just the deterministic planner's own path.
+  if (SERVICE_TYPE_PHRASE_RE.test(q)) found.add('serviceType');
   return found;
 }
 
@@ -1310,6 +1407,19 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
   });
 }
 
+/**
+ * R18 P4 (C2/C3, blind generalization round 18 part 2): tried folding "still"/"under
+ * warranty"/"in warranty"/"covered" into a coarser 'not_expired' bucket (active OR
+ * expiring) instead of the strict >365-day 'active' bucket, to fix g135/h050 ("how many
+ * trane/carrier units are still under warranty"). REVERTED: the frozen base-exam id
+ * counts-warranty-0004-canonical ("How many units have still under warranty?") has an
+ * oracle that is literally the strict 'active' bucket for this exact same phrasing with
+ * no other filter, and floors only go up in this round — a global text-based rule can't
+ * give both answers, and the frozen id wins. "still"/"under warranty"/"in warranty"/
+ * "covered" fold back into the same strict 'active' bucket as "active"/"current"/"valid".
+ */
+const STRICT_ACTIVE_STATUS_RE = /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/;
+
 /** The warrantyStatus bucket a question names, or null. Pure. */
 export function warrantyStatusFromQuestion(question) {
   const q = String(question ?? '').toLowerCase();
@@ -1323,7 +1433,7 @@ export function warrantyStatusFromQuestion(question) {
   m = /\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/.exec(q);
   if (m) return statusNegatedAt(q, m.index) ? null : 'expired';
   if (/\bunknown\b/.test(q)) return 'unknown';
-  m = /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/.exec(q);
+  m = STRICT_ACTIVE_STATUS_RE.exec(q);
   if (m) return statusNegatedAt(q, m.index) ? null : 'active';
   return null;
 }
@@ -1359,6 +1469,22 @@ export function missingConditions(plan, question) {
     }
     const field = CONDITION_PLAN_FIELD[c];
     if (field !== undefined && plan?.groupBy === field) continue;
+    // R18 (H1, breadth-data-quality-009): "How many customer addresses are missing a zip code?"
+    // detectAnalyticsPlan already builds the CORRECT plan for this - a `hasZip: false` boolean
+    // presence-filter (the data-quality shape), not a literal `zip` value filter (the "customers
+    // in zip 85201" shape) - but CONDITION_PLAN_FIELD's 'zip' entry only ever names the latter, so
+    // this otherwise-correct plan was flagged as having silently dropped the 'zip' condition and
+    // replaced with the honest-but-wrong "I can't filter by zip yet" fallback. Both field names are
+    // valid satisfiers of the same 'zip' condition; only 'zip' (c === 'zip') gets the extra check,
+    // everything else keeps checking its one CONDITION_PLAN_FIELD name exactly as before.
+    if (c === 'zip' && plan?.filters?.some((f) => f.field === 'hasZip')) continue;
+    // R18 P4 (C2): 'serviceType' has no single CONDITION_PLAN_FIELD name — a plan can satisfy it
+    // with EITHER hasServiceType or lacksServiceType (or both — see SERVICE_TYPE_FILTER_FIELDS'
+    // own doc comment), so this checks the pair directly rather than one fixed field name.
+    if (c === 'serviceType') {
+      if (!plan?.filters?.some((f) => f.field === 'hasServiceType' || f.field === 'lacksServiceType')) missing.add(c);
+      continue;
+    }
     if (!plan?.filters?.some((f) => f.field === field)) missing.add(c);
   }
   return missing;
@@ -1396,8 +1522,16 @@ function titleCaseWords(s) {
 // unrelated "don't have a phone" elsewhere in the same sentence flipping an
 // unrelated city/brand word) — a real, common negation idiom directly
 // governing THIS SPECIFIC matched word, nothing else.
+// R18 P4 (C4, negation collapse/inversion): "list every customer whose service address isnt even
+// in arizona" (h189) inverted — the negation word ("isn't") was there, right before "arizona", but
+// the intensifier "even" sitting between "isnt" and "in" broke the fixed-filler-word match this
+// regex required, so isNegatedWord silently returned false and built the exact opposite (an `eq`,
+// not `neq`) filter. "even"/"really"/"actually" are common intensifiers a real negation phrasing
+// inserts right there ("isn't even in Arizona", "doesn't actually have a Trane unit") — added to
+// the filler-word alternation (not a separate rule) so every existing caller (brand/city/county/
+// state/zip negation) gets the same tolerance for free.
 const NEGATION_IMMEDIATELY_BEFORE_RE =
-  /\b(?:not|except(?:\s+for)?|excluding|other\s+than|besides|outside(?:\s+of)?|without|no|isn'?t|aren'?t|wasn'?t|weren'?t)\s+(?:(?:an?|the|in|from|on)\s+){0,2}$/i;
+  /\b(?:not|except(?:\s+for)?|excluding|other\s+than|besides|outside(?:\s+of)?|without|no|isn'?t|aren'?t|wasn'?t|weren'?t)\s+(?:(?:an?|the|in|from|on|even|really|actually)\s+){0,3}$/i;
 
 function isNegatedWord(q, word) {
   const esc = escapeRegExp(word);
@@ -1506,6 +1640,17 @@ export function buildConditionOverrideFilter(condition, question, entity) {
   if (condition === 'warranty') {
     const status = warrantyStatusFromQuestion(q);
     return status ? { field: 'warrantyStatus', op: 'eq', value: status } : null;
+  }
+  // R18 P4 (C2): safety-net path for a MODEL plan that dropped a service_type condition —
+  // customers-only (validatePlan enforces this), builds only the single filter this simple
+  // condition->filter mapping can express (a has OR a lacks, from whichever polarity the nearest
+  // match reads); detPlan.js's own detectCustomersHasServiceType handles the richer "has X, never
+  // Y" combo directly (both filters in one plan) since it can look at every phrase, not just one.
+  if (condition === 'serviceType') {
+    const m = SERVICE_TYPE_PHRASE_RE.exec(q);
+    if (!m) return null;
+    const value = serviceTypeValueOf(m[1]);
+    return isNegatedWord(q, m[1]) ? { field: 'lacksServiceType', op: 'eq', value } : { field: 'hasServiceType', op: 'eq', value };
   }
   return null;
 }
@@ -1999,6 +2144,14 @@ const MONTH_NAMES = [
 // year was silently dropped. "[\s,]+" swallows any run of spaces/commas
 // between the month and the year, and an optional "of " before the digits.
 const MONTH_NAME_RE = new RegExp(`\\b(${MONTH_NAMES.join('|')})\\b(?:[\\s,]+(?:of\\s+)?(\\d{4}))?`, 'i');
+// R18 P4 (C3, time-window drop): "how many jobs have we done since january 1st" (h065) used to be
+// caught by MONTH_NAME_RE below (it matches the bare word "january" anywhere in the sentence,
+// "since" or not) and mis-read as a single "in January" MONTH, not a "from January 1st through
+// today" RANGE — undercounting even that one misread month. A month name directly preceded by
+// "since" names a starting DATE, never a bare single-month reference; resolveQuestionTimeRange
+// bails (null) whenever this matches so resolveExtendedTimeRange's own since-month-name handling
+// (below) gets it instead, the same day-grain range family "since <year>" already uses.
+const SINCE_MONTH_RE = new RegExp(`\\bsince\\s+(${MONTH_NAMES.join('|')})\\b(?:\\s+(\\d{1,2})(?:st|nd|rd|th)?)?`, 'i');
 
 function monthRange(year, month1to12) {
   const ym = `${year}-${String(month1to12).padStart(2, '0')}`;
@@ -2026,6 +2179,9 @@ export function resolveQuestionTimeRange(question, today) {
     const m = now.getUTCMonth(); // 0-indexed current month
     return m === 0 ? monthRange(now.getUTCFullYear() - 1, 12) : monthRange(now.getUTCFullYear(), m);
   }
+  // R18 P4: "since january 1st" — see SINCE_MONTH_RE's own doc comment; defer to
+  // resolveExtendedTimeRange rather than misreading this as a bare month.
+  if (SINCE_MONTH_RE.test(q)) return null;
 
   const m = q.match(MONTH_NAME_RE);
   if (!m) return null;
@@ -2070,6 +2226,27 @@ export function resolveExtendedTimeRange(question, today) {
 
   if (/\byear[\s-]?to[\s-]?date\b|\bytd\b/.test(q)) {
     return { from: `${now.getUTCFullYear()}-01-01`, to: todayISO, label: 'year to date' };
+  }
+  // R18 P4 (C3): "how many units warranty has expired so far this year" (h051) — year START
+  // through TODAY, distinct from "this year" (below), which is the full Jan1-Dec31 calendar year
+  // regardless of where today falls in it.
+  if (/\bso\s+far\s+this\s+year\b/.test(q)) {
+    const y = now.getUTCFullYear();
+    return { from: `${y}-01-01`, to: todayISO, label: `so far in ${y}` };
+  }
+  // R18 P4 (C3): "how many warranties expire by the end of this calendar year" (h049) — TODAY
+  // through Dec 31, a forward-looking window, distinct from "this year" (below), which also
+  // includes everything already past since Jan 1.
+  if (/\bby\s+(?:the\s+)?end\s+of\s+(?:this\s+)?(?:calendar\s+)?year\b|\bby\s+year[\s-]?end\b/.test(q)) {
+    const y = now.getUTCFullYear();
+    return { from: todayISO, to: `${y}-12-31`, label: `by the end of ${y}` };
+  }
+  // R18 P4 (C3): "how many units had their warranty expire in the past year" (h047) — a bare,
+  // numberless "past year" (365 trailing days from today), never confused with the NUMBERED "in
+  // the last N years" family (lastNMatch, below) or with "last year"/"this year" (a fixed Jan1-Dec31
+  // calendar year) just below.
+  if (/\b(?:in\s+the\s+|over\s+the\s+)?past\s+year\b/.test(q) && !/\d+\s*ye?a?rs?\b/.test(q)) {
+    return { from: iso(addDays(now, -365)), to: todayISO, label: 'in the past year' };
   }
   // Reviewer NO-GO (2026-09-22): Monday-anchored, not Sunday-anchored —
   // getUTCDay() is 0=Sunday..6=Saturday, so (getUTCDay()+6)%7 is the number
@@ -2136,6 +2313,71 @@ export function resolveExtendedTimeRange(question, today) {
       unitLabel = 'month';
     }
     return { from: iso(fromDate), to: todayISO, label: `in the last ${n} ${unitLabel}${n === 1 ? '' : 's'}` };
+  }
+  // R18 P4 (C3): "any warranties expiring in the next 90 days" (h048) — the forward-looking
+  // mirror of lastNMatch just above (TODAY forward, not TODAY backward).
+  const nextNMatch = q.match(/\b(?:in\s+the\s+next|next)\s+(\d+)\s+(day|days|week|weeks|month|months)\b/);
+  if (nextNMatch) {
+    const n = Number(nextNMatch[1]);
+    const unit = nextNMatch[2];
+    let toDate;
+    let unitLabel;
+    if (unit.startsWith('day')) {
+      toDate = addDays(now, n);
+      unitLabel = 'day';
+    } else if (unit.startsWith('week')) {
+      toDate = addDays(now, n * 7);
+      unitLabel = 'week';
+    } else {
+      toDate = new Date(now);
+      toDate.setUTCMonth(toDate.getUTCMonth() + n);
+      unitLabel = 'month';
+    }
+    return { from: todayISO, to: iso(toDate), label: `in the next ${n} ${unitLabel}${n === 1 ? '' : 's'}` };
+  }
+  // R18 P4 (C3): "how many jobs have we done since january 1st" (h065) — a month name right after
+  // "since" names a starting DATE (see SINCE_MONTH_RE's own doc comment, above
+  // resolveQuestionTimeRange), never a bare month reference. No day given defaults to the 1st (the
+  // common "since <month>" == "since the start of <month>" reading); a date that would fall in the
+  // future means last year's occurrence, not one that hasn't happened yet (same rule
+  // resolveQuestionTimeRange's own bare-month-name handling already follows).
+  const sinceMonthMatch = q.match(SINCE_MONTH_RE);
+  if (sinceMonthMatch) {
+    const monthNum = MONTH_NAMES.indexOf(sinceMonthMatch[1].toLowerCase()) + 1;
+    const day = sinceMonthMatch[2] ? Number(sinceMonthMatch[2]) : 1;
+    let year = now.getUTCFullYear();
+    let from = new Date(Date.UTC(year, monthNum - 1, day));
+    if (from.getTime() > now.getTime()) {
+      year -= 1;
+      from = new Date(Date.UTC(year, monthNum - 1, day));
+    }
+    return { from: iso(from), to: todayISO, label: `since ${sinceMonthMatch[1]} ${day}` };
+  }
+  // R18 P4 (C3): "how many service visits did we log this past summer" (h067) / "how many jobs
+  // have we done this spring" (h069) — a season word resolves to its 3-month calendar range.
+  // `referenceYear` picks the most recent occurrence of that season that isn't still in the
+  // future: if the season's own end month has already passed (or the season is the one we're
+  // currently in), it's THIS year's occurrence; otherwise it's last year's (the same "don't name a
+  // month/season that hasn't happened yet" rule resolveQuestionTimeRange's bare-month handling
+  // already follows). Winter's cross-year span (Dec of one year into Feb of the next) is handled by
+  // anchoring `referenceYear` to the FEBRUARY end, same idea, just with the start month a year
+  // earlier — not exercised by any known question today, so treat as best-effort.
+  const SEASON_MONTHS = { winter: [12, 1, 2], spring: [3, 4, 5], summer: [6, 7, 8], fall: [9, 10, 11], autumn: [9, 10, 11] };
+  const seasonMatch = q.match(/\b(?:this\s+past|this|last|past)\s+(winter|spring|summer|fall|autumn)\b/);
+  if (seasonMatch) {
+    const months = SEASON_MONTHS[seasonMatch[1].toLowerCase()];
+    const isWinter = months[0] === 12;
+    const currentMonth = now.getUTCMonth() + 1;
+    const currentYear = now.getUTCFullYear();
+    const endMonth = months[months.length - 1];
+    const inSeasonNow = isWinter ? (currentMonth === 12 || currentMonth <= 2) : months.includes(currentMonth);
+    let referenceYear = currentYear;
+    if (!inSeasonNow && endMonth > currentMonth) referenceYear = currentYear - 1;
+    const startYear = isWinter ? referenceYear - 1 : referenceYear;
+    const from = `${startYear}-${String(months[0]).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(referenceYear, endMonth, 0)).getUTCDate();
+    const to = `${referenceYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { from, to, label: seasonMatch[0] };
   }
   return null;
 }
@@ -2410,6 +2652,18 @@ export function validatePlan(raw) {
       filters.push({ field: f.field, op: f.op, value: String(f.value) });
       continue;
     }
+    if (SERVICE_TYPE_FILTER_FIELDS.includes(f.field)) {
+      // hasServiceType/lacksServiceType (R18 P4, C2/C4): customers-only, op "eq" only, value one
+      // of SERVICE_TYPE_VALUES — same closed shape as hasDocType/lacksDocType above, just against
+      // extractions.service_type instead of documents.document_type. Case-insensitive match,
+      // stored in its own canonical casing (a model or detector might hand back "repair"
+      // lowercased).
+      if (p.entity !== 'customers' || f.op !== 'eq') return null;
+      const canonical = SERVICE_TYPE_VALUES.find((v) => v.toLowerCase() === String(f.value).toLowerCase());
+      if (!canonical) return null;
+      filters.push({ field: f.field, op: f.op, value: canonical });
+      continue;
+    }
     if (DATA_QUALITY_BOOLEAN_FIELDS.includes(f.field)) {
       // Round 15 (A): boolean-only, op "eq" only, entity restricted per
       // DATA_QUALITY_FIELD_ENTITY (one entity, or one of a short allowed
@@ -2421,6 +2675,15 @@ export function validatePlan(raw) {
       const s = String(f.value).toLowerCase();
       if (f.value !== true && f.value !== false && s !== 'true' && s !== 'false') return null;
       filters.push({ field: f.field, op: f.op, value: f.value === true || s === 'true' });
+      continue;
+    }
+    if (f.field === 'warrantyExpires') {
+      // R18 P4 (C3): a raw YYYY-MM-DD (or YYYY-MM/YYYY) date-range test on the unit's own
+      // warranty.expires — equipment/warranties only, gte/lte/eq only (a direction-less
+      // date comparison; "in"/"contains" make no sense for a single date bound).
+      if ((p.entity !== 'equipment' && p.entity !== 'warranties') || !['gte', 'lte', 'eq'].includes(f.op)) return null;
+      if (!/^\d{4}(-\d{2}(-\d{2})?)?$/.test(String(f.value))) return null;
+      filters.push({ field: f.field, op: f.op, value: String(f.value) });
       continue;
     }
     filters.push({ field: f.field, op: f.op, value: f.value });
@@ -2613,6 +2876,13 @@ const HAS_FIELD_ROW_KEY = { hasEmail: 'email', hasPhone: 'phone' };
  *  express correctly. One row key per field, same name. */
 const DATA_QUALITY_ROW_KEY = Object.fromEntries(DATA_QUALITY_BOOLEAN_FIELDS.map((f) => [f, f]));
 
+// R18 P4 (C3): warrantyExpires is a raw date string (YYYY-MM-DD, sometimes YYYY-MM/YYYY) —
+// lexicographic order agrees with calendar order at whatever precision is on file, the same
+// convention installDateInFuture/queryInstallDateExtreme (routes/analytics.js) already rely on for
+// every other date-shaped string field in this corpus, so a plain string compare is correct here
+// too (never coerceNumber's numeric parse, which would just see NaN for a date string).
+const DATE_STRING_FIELDS = new Set(['warrantyExpires']);
+
 export function matchesFilter(row, filter) {
   const { field, op, value } = filter;
   if (field in HAS_FIELD_ROW_KEY) {
@@ -2624,6 +2894,18 @@ export function matchesFilter(row, filter) {
     return Boolean(row[DATA_QUALITY_ROW_KEY[field]]) === (value === true);
   }
   const actual = row[field];
+  if (DATE_STRING_FIELDS.has(field)) {
+    if (actual === null || actual === undefined || actual === '') return false;
+    const a = String(actual);
+    const b = String(value);
+    if (op === 'eq') return a === b;
+    if (op === 'neq') return a !== b;
+    if (op === 'gt') return a > b;
+    if (op === 'gte') return a >= b;
+    if (op === 'lt') return a < b;
+    if (op === 'lte') return a <= b;
+    return false;
+  }
   if (op === 'in') {
     const arr = Array.isArray(value) ? value : [value];
     return arr.some((v) => matchesFilter(row, { field, op: 'eq', value: v }));
@@ -2737,7 +3019,12 @@ export function buildAnalyticsSQL(plan) {
                    data->>'service_address' AS service_address,
                    data->>'email' AS email, data->>'phone' AS phone, updated_at,
                    (EXISTS (SELECT 1 FROM document_entity_links l
-                             WHERE l.entity_id = entities.id AND l.${TENANT_SQL})) AS has_any_document
+                             WHERE l.entity_id = entities.id AND l.${TENANT_SQL})) AS has_any_document,
+                   -- R18 P4 (C4, negation, h134): "how many customers have zero equipment on
+                   -- file" — the customers-side mirror of has_any_document just above.
+                   (EXISTS (SELECT 1 FROM entities e
+                             WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
+                               AND e.customer_id = entities.id AND e.${TENANT_SQL})) AS has_any_equipment
               FROM entities
              WHERE entity_type = 'customer' AND merged_into IS NULL AND ${where.join(' AND ')}
              ORDER BY updated_at DESC
@@ -2877,7 +3164,13 @@ export function groupRows(rows, keyOf) {
  * cached answer itself — see existenceWrap's own doc comment for why). Never for an ordinary "how many" — those
  * keep their plain wording, and a false-positive match here only adds a "Yes,"/"No," lead-in a plain
  * count-comparison ignores. */
-export const EXISTENCE_QUESTION_RE = /^\s*(?:do|does|is|are|did|have|has)\s+(?:we|there|you|our\s+shop)\b/i;
+// R18 (H1, breadth-data-quality-023): "any" added alongside we/there/you/our shop — "Are any
+// serial numbers used by more than one unit?" is the same existence shape (compareYesNo reads the
+// leading Yes/No cue exactly like the other four lead-ins already here), just naming the subject
+// right after the verb instead of "we/there/you". Checked against the exam's own full "is/are any"
+// question set — every other match is a rubric question the analytics existence-wrap never runs
+// for, so this can't flip an already-passing plain count.
+export const EXISTENCE_QUESTION_RE = /^\s*(?:do|does|is|are|did|have|has)\s+(?:we|there|you|our\s+shop|any)\b/i;
 export function isExistenceQuestion(question) {
   return EXISTENCE_QUESTION_RE.test(String(question ?? ''));
 }
