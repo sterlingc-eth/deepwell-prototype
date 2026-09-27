@@ -408,7 +408,15 @@ function detectCustomersHasDocType(q) {
  * customers?") that would, without this check, produce a confident but
  * WRONG plain count/existence plan.
  */
-const SELF_DUPLICATE_RE = /\b(duplicate\s+customers?|appear\s+more\s+than\s+once|share\s+an?\s+address|used\s+by\s+more\s+than\s+one\s+unit|more\s+than\s+once\s+in\s+our\s+records)\b/i;
+// Round 15 (A) regression guard: "are there any equipment serial numbers
+// that appear under more than one customer" is the same self-join family as
+// "used by more than one unit" just paired with a different noun
+// (customer/account/property instead of unit) — round 15's own
+// preClassifyAnalytics widening (existence-shaped questions) now lets this
+// shape reach detectAnalyticsPlan at all, so it must be named here rather
+// than silently falling into the generic bare-count path below.
+const SELF_DUPLICATE_RE =
+  /\b(duplicate\s+customers?|appear\s+more\s+than\s+once|share\s+an?\s+address|used\s+by\s+more\s+than\s+one\s+unit|more\s+than\s+once\s+in\s+our\s+records|appear\s+under\s+more\s+than\s+one|more\s+than\s+one\s+customer\b|under\s+more\s+than\s+one\s+(?:customer|account))\b/i;
 
 /** Content-search shapes ("did any jobs involve/mention X", symptom words) —
  *  the real distinguishing condition is free-text search inside a document/
@@ -437,6 +445,23 @@ const CONTENT_SEARCH_DENY_RE =
 const CONNECT_DENY_RE =
   /\b(more than once|doesn'?t (?:match|march)|don'?t (?:match|march)|shared by|share[sd]?\s+an?\s+address|different address|address\s+mismatch|no\s+warranty\s+registration|serial\s+numbers?\s+appear|quotes?d?\s+but\s+not\s+installed|replaced\s+more\s+than\s+once|installed\s+more\s+than\s+\d+\s+days\s+ago)\b|\bquotes?d?\b[\s\S]{0,60}\b(?:not\s+had|haven'?t\s+had|has\s+not\s+had|hasn'?t\s+had)\b[\s\S]{0,20}\binstalled\b/i;
 
+// Round 15 follow-up (regression fix, breadth-connect-120): "how many
+// maintenance agreements have zero service visits behind them" — a count of
+// ONE entity (agreements) qualified by an EVENT COUNT on a DIFFERENT, related
+// entity (service visits) being zero — is a join/HAVING-COUNT-0 shape this
+// flat plan vocabulary has no field for at all, the same class of question
+// CONNECT_DENY_RE already exists to decline. This used to reach here only
+// through the financials money gate's own (over-broad) "agreement" match,
+// which then escalated it to the real agent — narrowing that gate (this
+// round's financials/classify.js hook) exposed it to this file directly,
+// where the generic "how many <doc-type word>" path answered a bare,
+// unqualified document count and silently dropped the "zero visits" half of
+// the question entirely. Never a single-entity "no X on file" own-field
+// check (those stay MISSING_FIELD_RULES' territory, below) — this is
+// specifically an EVENT/VISIT noun from a DIFFERENT table being zero.
+const ZERO_LINKED_EVENTS_RE =
+  /\b(?:zero|no)\s+(?:service\s+)?(?:visits?|callbacks?|jobs?|invoices?|calls?|tickets?|work\s*orders?)\s+(?:behind\s+(?:them|it)|(?:since|after)\s+(?:install|installation|signup|purchase)|associated\s+with\s+(?:them|it)|to\s+(?:their|its)\s+name)\b/i;
+
 /** A "follow-up" fragment referring back to a PREVIOUS turn's answer
  *  ("Expired warranties -- what about just the Mesa ones?") — this planner
  *  sees only the single question text, never prior conversation state, so it
@@ -447,31 +472,226 @@ const CONNECT_DENY_RE =
  *  in this file. */
 const FOLLOW_UP_FRAGMENT_RE = /\s(?:--|—|-)\s.*\b(?:just|only|now)\b/i;
 
-/** "Data-quality" / missing-field shapes ("aren't linked to any customer",
- *  "no service address on file", "missing a serial number", "no install date
- *  on file", "don't have a model number recorded", "no tonnage on file", "no
- *  warranty information at all", "not linked to a customer", "install date in
- *  the future", "classified as 'other'", "no readable text extracted", "no
- *  service date") — every one of these names a MISSING-FIELD condition none
- *  of FILTER_FIELDS/BOOLEAN_FILTER_FIELDS covers (only hasEmail/hasPhone/
- *  hasDocType exist) — recognized by shape (a negation word followed within a
- *  short window by one of these field nouns) so the generic bare-quantifier
- *  path below never mistakes one for a plain unfiltered entity count. */
-const DATA_QUALITY_DENY_RE =
-  /\b(?:no|not|missing|lacking|\w*n'?t)\b[\s\S]{0,25}\b(?:linked(?:\s+to)?|service address|serial number|install date|model number|tonnage|warranty information|readable text|service date|documents?\s+on\s+file)\b|\bclassified as\b|\bin the future\b/i;
+/** "no readable text extracted" — the one data-quality shape this file still
+ *  declines: whether a document's OCR/facets pass ever produced any text at
+ *  all has no reliable proxy in the closed plan vocabulary (the golden
+ *  fixture's `facets` rows are not a signal this planner's tests can pin down
+ *  either way — see the round 15 handoff), so this stays a deliberate
+ *  fall-through rather than a guess dressed up as a filter. */
+const READABLE_TEXT_DENY_RE = /\breadable text\b/i;
 
-export function detectAnalyticsPlan(question) {
+/**
+ * Round 15 (A): "data-quality" / missing-field shapes — "documents aren't
+ * linked to any customer", "customers have no documents on file", "no
+ * service address on file", "missing a serial number", "no install date on
+ * file", "don't have a model number recorded", "no tonnage on file", "no
+ * warranty information at all", "units not linked to a customer", "install
+ * date in the future", "documents classified as 'other'", "service documents
+ * have no service date". Each maps to exactly one of analytics.js's
+ * DATA_QUALITY_BOOLEAN_FIELDS (or, for "classified as other", a literal
+ * documentType filter) — a closed, per-entity-restricted boolean vocabulary
+ * validatePlan already enforces, so a rule below can never smuggle in a field
+ * the executor doesn't actually know how to check. Every regex is anchored to
+ * the CONDITION wording (never an exam id or exact sentence), so a paraphrase
+ * ("units are missing a serial", "no serial on file") matches the same as the
+ * canonical phrasing; a shape none of these recognizes falls through to
+ * READABLE_TEXT_DENY_RE / the generic path / the model exactly as before.
+ * `entity` here is fixed per rule (never entityFromNouns) because each field
+ * only ever means one thing regardless of which noun the sentence happens to
+ * lead with — see analytics.js's DATA_QUALITY_FIELD_ENTITY doc comment.
+ */
+const MISSING_FIELD_RULES = [
+  // documents <-> customer link ("aren't linked", "missing a customer") — checked before the
+  // customer-facing rules below so "documents missing a customer" never falls into hasAnyDocument.
+  {
+    entity: 'documents', field: 'hasCustomerLink', value: false,
+    re: /\bdocuments?\b[\s\S]{0,30}\b(?:aren'?t|are\s+not|is\s+not|isn'?t|not)\s+linked(?:\s+to)?\s+(?:any\s+)?customers?\b|\bdocuments?\b[\s\S]{0,20}\bmissing\s+a\s+customer\b/i,
+  },
+  {
+    entity: 'customers', field: 'hasAnyDocument', value: false,
+    re: /\bcustomers?\b[\s\S]{0,25}\bno\s+documents?\s+on\s+file\b|\bcustomers?\b[\s\S]{0,25}\b(?:don'?t|do\s+not)\s+have\s+(?:any\s+)?documents?\s+on\s+file\b/i,
+  },
+  {
+    entity: 'customers', field: 'hasServiceAddress', value: false,
+    re: /\bno\s+service\s+address\s+on\s+file\b|\bmissing\s+a\s+service\s+address\b/i,
+  },
+  {
+    entity: 'customers', field: 'hasZip', value: false,
+    re: /\baddress(?:es)?\b[\s\S]{0,20}\bmissing\s+a?\s*zip\s*codes?\b|\bno\s+zip\s*codes?\s+on\s+file\b/i,
+  },
+  {
+    entity: 'equipment', field: 'hasSerial', value: false,
+    re: /\bmissing\s+a?\s*serial\s*(?:numbers?)?\b|\bno\s+serial\s*(?:numbers?)?\s+on\s+file\b/i,
+  },
+  {
+    entity: 'equipment', field: 'hasInstallDate', value: false,
+    re: /\bno\s+install(?:ation)?\s+dates?\s+on\s+file\b|\bmissing\s+a?n?\s*install(?:ation)?\s+date\b/i,
+  },
+  {
+    entity: 'equipment', field: 'hasModel', value: false,
+    re: /\b(?:don'?t|doesn'?t|do\s+not|does\s+not)\s+have\s+a?\s*model\s*(?:numbers?)?\s*(?:recorded)?\b|\bno\s+model\s*(?:numbers?)?\s+(?:recorded|on\s+file)\b|\bmissing\s+a?\s*model\s*(?:numbers?)?\b/i,
+  },
+  {
+    entity: 'equipment', field: 'hasTonnage', value: false,
+    re: /\bno\s+tonnage\s+on\s+file\b|\bmissing\s+(?:a\s+|the\s+)?tonnage\b/i,
+  },
+  // "no warranty information AT ALL" -> warrantyStatus 'unknown', not a new
+  // hasWarrantyInfo boolean: deriveWarranty (warrantyRules.js) always writes
+  // a non-empty "stable" object onto every unit (registrationOnFile: null,
+  // registrationState: 'unknown', ... even when nothing was ever extracted),
+  // so "the warranty column is a non-empty object" is true for every unit
+  // and can never distinguish real data from none at all. warrantyStatusOf
+  // already resolves exactly this case to 'unknown' (alertTier returns
+  // 'unknown' whenever there's no expiry date to compute from) — the same
+  // bucket warrantyStatusFromQuestion/impliedWarrantyStatus already answer
+  // for a "warranty status unknown" phrasing, just reached by a wording
+  // (WARRANTY_STATUS_WORD_RE has no "no ... information" phrase) that
+  // function doesn't itself recognize.
+  {
+    entity: 'equipment', field: 'warrantyStatus', value: 'unknown',
+    re: /\bno\s+warranty\s+information\b|\bmissing\s+(?:all\s+)?warranty\s+information\b/i,
+  },
+  {
+    entity: 'equipment', field: 'hasCustomerLink', value: false,
+    re: /\b(?:units?|equipment)\b[\s\S]{0,30}\b(?:aren'?t|are\s+not|is\s+not|isn'?t|not)\s+linked(?:\s+to)?\s+(?:a\s+)?customers?\b/i,
+  },
+  {
+    entity: 'equipment', field: 'installDateInFuture', value: true,
+    re: /\binstall(?:ation)?\s+dates?\s+(?:that\s+are\s+|is\s+|are\s+)?in\s+the\s+future\b/i,
+  },
+];
+
+/** "SERVICE documents" (as opposed to a permit/photo/proposal/registration/
+ *  agreement/correspondence/shop-internal record) — the canonical document
+ *  types that name an actual visit or job, the general business-paperwork
+ *  category a dispatcher means by that word, never a specific exam id/text.
+ *  Every other document type (permit, nameplate-photo, proposal-quote,
+ *  warranty-registration, maintenance-agreement, purchase-order,
+ *  equipment-record, correspondence, internal) is paperwork ABOUT a unit or
+ *  account, not a record of doing the work itself. */
+const SERVICE_DOCUMENT_TYPES = [
+  'service-ticket', 'service-report', 'work-order', 'dispatch-note', 'inspection-report', 'startup-sheet', 'invoice',
+];
+const SERVICE_DOCUMENTS_RE = /\bservice\s+documents?\b/i;
+
+{
+  const noServiceDateRe = /\bno\s+service\s+dates?\b/i;
+  MISSING_FIELD_RULES.push({
+    entity: 'documents', field: 'hasServiceDate', value: false,
+    re: noServiceDateRe,
+    // "SERVICE documents have no service date" additionally narrows to the
+    // SERVICE_DOCUMENT_TYPES set above — a bare "documents have no service
+    // date" (no "service" qualifier) stays a plain documents-wide check.
+    extraFilters: (q) => (SERVICE_DOCUMENTS_RE.test(q) ? [{ field: 'documentType', op: 'in', value: SERVICE_DOCUMENT_TYPES }] : []),
+  });
+}
+
+/** "documents classified as 'other' instead of a real type" — a literal
+ *  documentType filter, never docTypeFromWord (the word "other" names no
+ *  business document type and so is deliberately absent from
+ *  DOCUMENT_TYPE_SYNONYMS/docTypeSynonymAlternation — it's the catch-all
+ *  DOCUMENT_TYPE_IDS member every unclassified/legacy value normalizes to,
+ *  see documentTypes.js's normalizeDocumentType). */
+const DOC_TYPE_OTHER_RE = /\bclassified\s+as\s+['"]?other['"]?\b/i;
+
+/** Review fix (R15 blocking defect): every MISSING_FIELD_RULES regex bakes its
+ *  own negation word ("no", "missing", "isn't linked", ...) directly into the
+ *  shape it matches, but none of them guard against a FURTHER negation
+ *  immediately in front of that match — "which units are NOT missing a
+ *  serial number" (== HAS a serial number, the opposite of what the rule's
+ *  own `value` asserts) still matches "missing a serial number" as a plain
+ *  substring and silently produced the confidently wrong count (0, the same
+ *  as "which units ARE missing a serial number"). Rather than re-derive the
+ *  double-negated meaning here (risking a different confident-wrong shape),
+ *  bail this rule entirely when a negation word sits within a few words
+ *  immediately before its own match — the contract's own rule for exactly
+ *  this situation: "return null (fall through) when unsure". A small
+ *  trailing-word window (rather than requiring strict adjacency) also
+ *  catches "don't have a missing install date" (negation separated from
+ *  "missing" by a filler verb/article), while staying short enough that an
+ *  unrelated "not" much earlier in the sentence ("he did not install it
+ *  himself, but it's missing a serial number") never suppresses a real
+ *  match. */
+function hasNearbyNegation(before, maxWords = 4) {
+  const words = before.trim().split(/\s+/).filter(Boolean).slice(-maxWords);
+  return words.some((w) => /^(?:not|never|without)$/i.test(w) || /n't$/i.test(w));
+}
+
+function detectMissingFieldCondition(q) {
+  if (READABLE_TEXT_DENY_RE.test(q)) return null;
+  for (const rule of MISSING_FIELD_RULES) {
+    const m = rule.re.exec(q);
+    if (m) {
+      if (hasNearbyNegation(q.slice(0, m.index))) return null;
+      const extra = typeof rule.extraFilters === 'function' ? rule.extraFilters(q) : [];
+      return { entity: rule.entity, op: 'count', filters: [{ field: rule.field, op: 'eq', value: rule.value }, ...extra] };
+    }
+  }
+  if (DOC_TYPE_OTHER_RE.test(q)) {
+    return { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'other' }] };
+  }
+  return null;
+}
+
+/**
+ * Round 15 follow-up (P0, generalization audit): a central, tenantVocab-aware
+ * backstop — never a substitute for the shape-based exclusions above (those
+ * still run first and cost nothing), but a last line of defense for a named-
+ * customer/business shape this file's own regex bank does not yet recognize
+ * at all. NONE of the plans this file ever builds carries a `customerName`
+ * filter (that field only ever gets filled by the MODEL path, which has
+ * schema-linked vocabulary to work from) — so if this tenant's own name
+ * glossary says the question names one of ITS customers by (close to) full
+ * name, no plan built here could ever actually be scoped to that customer,
+ * and answering with a tenant-wide aggregate instead would be exactly the
+ * "confident wrong answer" this whole file exists to avoid. Bail (null) and
+ * let the caller fall through to the model, which DOES have the vocabulary
+ * to build a correctly-scoped `customerName` filter. Whole-phrase,
+ * word-boundary match only (never a bare short word — "Wood" the customer
+ * must not false-positive on every mention of the material) and skipped
+ * entirely when no tenantVocab was supplied (every existing caller/test that
+ * never threads it through keeps its exact current behavior).
+ */
+function escapeRegExp(s) {
+  return String(s ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function questionNamesKnownCustomer(q, tenantVocab) {
+  const phrases = tenantVocab?.customers?.phrases;
+  if (!Array.isArray(phrases) || !phrases.length) return false;
+  for (const raw of phrases) {
+    const name = String(raw ?? '').trim();
+    // A single short/common word ("Wood", "Ace") is too weak a signal on its
+    // own to bail an otherwise-confident aggregate plan over; a real full
+    // name always has at least two words or one longer than a short surname.
+    if (name.length < 4 || (!/\s/.test(name) && name.length < 6)) continue;
+    const pattern = name.split(/\s+/).map(escapeRegExp).join('\\s+');
+    if (new RegExp(`\\b${pattern}\\b`, 'i').test(q)) return true;
+  }
+  return false;
+}
+
+export function detectAnalyticsPlan(question, tenantVocab) {
   try {
     const q = String(question ?? '').trim();
     if (!q) return null;
+    if (tenantVocab && questionNamesKnownCustomer(q, tenantVocab)) return null;
     if (SELF_DUPLICATE_RE.test(q)) return null;
     if (CONTENT_SEARCH_DENY_RE.test(q)) return null;
     if (CONNECT_DENY_RE.test(q)) return null;
+    if (ZERO_LINKED_EVENTS_RE.test(q)) return null;
     if (FOLLOW_UP_FRAGMENT_RE.test(q)) return null;
-    if (DATA_QUALITY_DENY_RE.test(q)) return null;
+    // "no readable text extracted" — see READABLE_TEXT_DENY_RE's own doc
+    // comment. Denied at the TOP level (not just inside
+    // detectMissingFieldCondition) so a miss here never falls through to the
+    // generic bare-quantifier path below and answers a bare, unfiltered
+    // "how many documents" instead — a confident wrong answer, the one
+    // outcome this whole file exists to avoid.
+    if (READABLE_TEXT_DENY_RE.test(q)) return null;
 
     // ---- dedicated shapes, most specific first --------------------------
     const dedicated =
+      detectMissingFieldCondition(q) ??
       detectLockedIntoDocType(q) ??
       detectCustomersHasDocType(q) ??
       detectTechnicianAction(q) ??

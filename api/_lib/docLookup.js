@@ -22,7 +22,7 @@
  */
 import { correctTriggerWordTypos, normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
-import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel, DOCUMENT_TYPE_SYNONYMS } from "./documentTypes.js";
+import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
 import { mergeDocumentVia } from "./routes/customers.js";
 // TEAM C (citations everywhere): every branch below states what it searched / read.
 import { attachCitations, customerRecord, documentRecord } from "./citations/records.js";
@@ -43,7 +43,11 @@ import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitD
 // vocabulary correctTriggerWordTypos (nlNormalize.js) exists for (see deterministicRouter.js's own use of it for
 // the same class of bug) — applied here, before normalizeQuestion, so a customer name later in the question is
 // still left completely alone.
-const DOCTYPE_TRIGGER_WORDS = [...new Set(Object.values(DOCUMENT_TYPE_SYNONYMS).flat().flatMap((phrase) => phrase.split(' ')))];
+// R15 (Team C): re-exported here for anything already importing it from this file — the
+// canonical definition now lives in documentTypes.js (see that file's own doc comment for why:
+// this file already imports from contactLookup.js, so defining it here too and having
+// contactLookup.js import it from here would create a genuine circular import).
+export { DOCTYPE_TRIGGER_WORDS };
 
 const DOCTYPE_ALT = docTypeSynonymAlternation();
 // A trailing plural "s" is optional and NOT part of the alternation itself
@@ -66,7 +70,14 @@ const DOCTYPE_RE_SRC = `(?:${DOCTYPE_ALT})`;
 // real word char), and the repetition cap is raised from 4 to 7 trailing
 // words so a full "street, city, state zip" span (up to 8 words total) still
 // fits before the lazy quantifier gives up and backtracks.
-const NAME_OR_ADDRESS_SRC = `[A-Za-z0-9][A-Za-z0-9',.-]*(?:\\s+[A-Za-z0-9',.-]+){0,7}?`;
+// R15 fix (Team C): an apartment/unit-numbered address adds TWO more words
+// ("... Rd, Apt 101, Mesa, AZ 85201" is 10, not 8) that the 7-cap above
+// silently dropped the whole match for (a real, on-file address with an
+// apartment number never matched any SHAPE at all, unlike the same street
+// with no apartment — see hvac-tech-0080/hvac-tech-0009 in scripts/verify-doclookup.mjs's
+// negative cases). Raised to 9 trailing words (10 total) so a full "street,
+// apt N, city, state zip" span still fits.
+const NAME_OR_ADDRESS_SRC = `[A-Za-z0-9][A-Za-z0-9',.-]*(?:\\s+[A-Za-z0-9',.-]+){0,9}?`;
 const TRAILING_JOB_RE_SRC = `(?:\\s+(?:job|install))?`;
 
 const SHAPES = [
@@ -146,7 +157,16 @@ const AGGREGATE_WORD_RE = new RegExp(
   "i"
 );
 
-function isRealNameOrAddressPhrase(phrase) {
+// R15 fix (Team C): "Do we have a PO on file for the Holbrook job?" — Holbrook is BOTH a real
+// customer surname in this corpus AND a real Arizona town (KNOWN_AZ_CITY_NAMES), so the
+// single-word-city guard below rejected it as a geo scope, same as it should for a bare "for
+// Gilbert"/"for Chandler". The trailing "job"/"install" this file's own SHAPES capture separately
+// (TRAILING_JOB_RE_SRC) is the tell: nobody asks for a PO/permit/invoice "on file for the
+// <city> job" about a whole town, only about one customer's job — so a phrase followed by that
+// marker is never the geo-scope reading, whatever it also happens to spell.
+const TRAILING_JOB_WORD_RE = /\b(?:job|install)\s*\??\s*$/i;
+
+function isRealNameOrAddressPhrase(phrase, { trailingJob = false } = {}) {
   const p = String(phrase ?? "").trim();
   if (!p) return false;
   // Strip a trailing possessive/contraction ("what's" -> "what") before the
@@ -160,8 +180,10 @@ function isRealNameOrAddressPhrase(phrase) {
   if (AGGREGATE_WORD_RE.test(p)) return false;
   // A bare, single-word phrase that's a known city name is a geo scope, not a
   // customer/address — "for Gilbert"/"for Chandler" — never a customer named
-  // after their own city, so this errs toward the far more common case.
-  if (p.split(/\s+/).length === 1 && KNOWN_CITY_NAMES.has(firstWord)) return false;
+  // after their own city, so this errs toward the far more common case —
+  // UNLESS a trailing "job"/"install" marker already says this is about one
+  // customer's job, not the whole town (see this function's own doc comment).
+  if (!trailingJob && p.split(/\s+/).length === 1 && KNOWN_CITY_NAMES.has(firstWord)) return false;
   return true;
 }
 
@@ -196,7 +218,8 @@ export function parseDocLookupQuestion(question, opts = {}) {
     const m = q.match(re);
     if (!m) continue;
     const namePhrase = m[1].trim();
-    if (!isRealNameOrAddressPhrase(namePhrase)) continue;
+    const trailingJob = TRAILING_JOB_WORD_RE.test(m[0]);
+    if (!isRealNameOrAddressPhrase(namePhrase, { trailingJob })) continue;
     const doctypeWordMatch = m[0].match(DOCTYPE_WORD_RE);
     const doctype = doctypeWordMatch ? docTypeFromWord(doctypeWordMatch[0]) : null;
     if (!doctype) continue;

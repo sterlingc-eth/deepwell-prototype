@@ -76,7 +76,30 @@ export function isFinancialQuestion(question) {
   if (FIN_QUOTE_WAITING_RE.test(q)) return true;
   if (FIN_THRESHOLD_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
   if (FIN_SUPERLATIVE_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
-  if (FIN_NOUN_RE.test(q) && FIN_COUNT_OR_AVG_RE.test(q)) return true;
+  if (FIN_NOUN_RE.test(q) && FIN_COUNT_OR_AVG_RE.test(q)) {
+    // Round 15 follow-up (P0 hook, generalization audit): "how many maintenance agreements are
+    // there" / "how many customers are locked into a maintenance agreement" are a plain DOCUMENT
+    // count — analytics.js's own detPlan already answers these deterministically via
+    // detectLockedIntoDocType/DOC_TYPE_WORD_RE — but FIN_NOUN_RE's "agreements?" plus this
+    // branch's bare "how many" stole them into the money gate before analytics ever saw them,
+    // where they got declined (no dollar/fee data to report). Guarded narrowly, on "how many"
+    // specifically (never "average"/"total value"/"annual fee"/"bring in"/"spent" — those other
+    // FIN_COUNT_OR_AVG_RE triggers are already inherently amount/revenue questions, e.g. "how
+    // much do our maintenance agreements bring in" must stay financial even with no other money
+    // word in sight): a bare "how many <agreement noun only>" with no OTHER money-document noun
+    // and no money word (fee, $, amount, invoice, bill, balance, owed…) is a document count, not
+    // a money question. "how many invoices/quotes/POs..." (any OTHER money-document noun) is
+    // unaffected: onlyAgreement is false for those, so they still return true exactly as before.
+    const onlyAgreement = !/\b(?:invoic\w*|quote[sd]?|quoting|estimat\w*|proposal\w*|purchase\s*orders?|\bpos\b|receipts?|bill(?:s|ed|ing)?)\b/i.test(q);
+    const bareHowMany = /\bhow many\b/i.test(q) && !/\$|\b(?:fees?|amounts?|dollars?|totals?|balances?|owe[sd]?|owing|money|cost)\b/i.test(q);
+    if (onlyAgreement && bareHowMany) {
+      // fall through to the other branches (FIN_STATUS_RE etc.) rather than returning early -
+      // "how many agreements are overdue" (a real status word alongside "how many") must still
+      // be checked below, same as it always was.
+    } else {
+      return true;
+    }
+  }
   if (FIN_NOUN_RE.test(q) && FIN_STATUS_RE.test(q)) {
     // Review r3: "which customers have paid for a maintenance agreement" is a coverage/list question, not money.
     // An agreement noun with a status word needs a money word too (fee, $, amount, invoice, bill, balance, owed…).

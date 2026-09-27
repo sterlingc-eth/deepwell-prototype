@@ -45,6 +45,11 @@ import {
   documentsOfType, fetchReplacementQuotes, fetchCustomerFinancials,
 } from './timeline.js';
 import { tenantHasFinancialRows } from '../financials/store.js';
+// Round 15 (Workstream B): the largest remaining `connect` cluster (../R15_CONTRACT.md) — part-replaced-
+// per-unit, address mismatch, duplicate serial numbers, zero-visit maintenance agreements, and two rubric
+// narratives — lives in its own module (connect2.js's own header explains why) and is merged into this
+// file's own classify/answer entry points below, so ask.js needs no change at all.
+import { classifyConnect2, HANDLERS as CONNECT2_HANDLERS } from './connect2.js';
 
 /* ------------------------------------------------------------------ small pure helpers */
 
@@ -292,7 +297,9 @@ export function classifyRelationsQuestion(question) {
   // R14 (K4): tries the raw question first (byte-identical to before), then a couple of typo/abbreviation-
   // normalized candidates — see relations/normalize.js's own doc comment for why this lives here rather
   // than depending on an ask.js change out of this file's scope.
-  return classifyWithTypoTolerance(q, matchFamilies);
+  // R15: falls back to connect2.js's own closed family set (never tried first, so nothing this file
+  // already recognizes can change meaning) after the same typo/paraphrase candidates are exhausted.
+  return classifyWithTypoTolerance(q, (candidate) => matchFamilies(candidate) ?? classifyConnect2(candidate));
 }
 
 /* ==================================================================== HANDLERS (db) */
@@ -1500,7 +1507,7 @@ async function topEquipmentAnswer(db, rows, sentence, sublabelField) {
 export async function answerRelationsQuestion({ withTenant, ctxArg, question, today }) {
   const intent = classifyRelationsQuestion(question);
   if (!intent) return null;
-  const fn = HANDLERS[intent.family];
+  const fn = HANDLERS[intent.family] ?? CONNECT2_HANDLERS[intent.family];
   if (!fn) return null;
   try {
     return await withTenant(ctxArg, (db) => fn(db, intent.params, todayIso(today)));

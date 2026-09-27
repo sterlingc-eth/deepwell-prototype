@@ -106,7 +106,12 @@ async function insertEquipment(e) {
     [eId(e.n), tenId, 'equipment', cId(e.customer), JSON.stringify({
       manufacturer: e.mfr, installation_date: e.installed,
       ...(e.warrantyExpires ? { warranty: { expires: e.warrantyExpires } } : {}),
+      ...(e.serial ? { serial_number: e.serial } : {}),
     })]);
+}
+/** A page of raw OCR'd text for a document — used by the Round-15 part-replacement/proximity checks below. */
+async function docPage(docN, text, pageNo = 1) {
+  await lite.query('INSERT INTO document_pages (document_id, tenant_id, page_no, text) VALUES ($1,$2,$3,$4)', [dId(docN), tenId, pageNo, text]);
 }
 async function doc(n, { type, customer, unit, serviceDate, technician }) {
   await lite.query('INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -474,6 +479,204 @@ const oracleQ = (sql, params) => lite.query(sql, params.map((p) => (p === '@toda
 
   const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Does Nobody Special\'s invoice match what was quoted for the job?', today: TODAY });
   check('connect :: invoice-vs-quote yes/no for an unknown customer returns null (never guesses)', missing === null);
+}
+
+/* ================================================================== R15 (Workstream B): connect2.js
+ * — part-replaced-per-unit, address mismatch, duplicate serial numbers, zero-visit maintenance
+ * agreements, and the two rubric narratives (see connect2.js's own header). Every DB-backed number here
+ * is cross-checked against the SAME oracle SQL text the scorecard exam ships, exactly like every other
+ * block in this file — never a hand-computed expectation. */
+{
+  const exam = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-docs/scorecard/exam.json'), 'utf8'));
+  const byId = new Map(exam.questions.map((q) => [q.id, q]));
+
+  /* ---- classify (pure) --------------------------------------------------------------------------- */
+  const yes = (q) => check(`classify recognizes: "${q}"`, Boolean(classifyRelationsQuestion(q)), q);
+  const no = (q) => check(`classify correctly ignores: "${q}"`, classifyRelationsQuestion(q) === null, q);
+  yes('How many units have had the capacitor replaced more than once?');
+  yes('How many units have had the coil replaced more than once?');
+  yes('Has Mercer had any part replaced more than once on the same unit?');
+  yes('Which customers have a different address on one of their documents than what\'s on file?');
+  yes('How many customers have a document with an address that doesn\'t match what\'s on file?');
+  yes('How many Mesa customers have a document address that doesn\'t match their record?');
+  yes('What is the correct current address for Mercer, and why?');
+  yes('Are there any equipment serial numbers that appear under more than one customer?');
+  yes('Which serial numbers appear under more than one customer?');
+  yes('How many equipment serial numbers are shared by more than one customer?');
+  yes('How many maintenance agreements have zero service visits behind them?');
+  yes('How many maintenance agreements are there for Trane customers with zero service visits?');
+  yes('Walk me through what happened at Mercer\'s property this year, in order.');
+  yes('Do any of Holbrook\'s documents disagree with our records, and if so which is right?');
+  // negative controls — negation / two-values / dropped-condition / ambiguous-name shapes must never
+  // silently match one of the R15 families above.
+  no('How many units have had the capacitor NOT replaced?');
+  no('Has Mercer had a capacitor or a contactor replaced?'); // two conditions in one clause, not this family's shape
+  no('How many units have had the capacitor replaced?'); // dropped "more than once" — a different (unhandled) shape
+  no('What is the current address for Mercer?'); // dropped "correct ... and why" — value question, not this rubric shape
+  no('Which customers have a different address?'); // dropped "on one of their documents than what's on file"
+
+  /* ---- fixture: part-replaced-per-unit + any-part yes/no ----------------------------------------- */
+  await insertCustomer({ n: 60, name: 'Nolan Partsy', address: '60 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 60, customer: 60, mfr: 'Trane', installed: '2020-01-01' });
+  await doc(60, { type: 'service-ticket', customer: 60, unit: 60, serviceDate: '2026-01-01' });
+  await docPage(60, 'Technician replaced the capacitor today; unit cooling normally again.');
+  await doc(61, { type: 'service-ticket', customer: 60, unit: 60, serviceDate: '2026-02-01' });
+  await docPage(61, 'Capacitor was replaced again after a second failure this year.');
+  await insertCustomer({ n: 61, name: 'Olive Onepart', address: '61 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 61, customer: 61, mfr: 'Trane', installed: '2020-01-01' });
+  await doc(62, { type: 'service-ticket', customer: 61, unit: 61, serviceDate: '2026-01-01' });
+  await docPage(62, 'Replaced the capacitor; no further visits since.'); // only ONE matching document — must not count
+
+  {
+    const oracle = byId.get('breadth-connect-087').oracle; // "the capacitor", window 60/40
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many units have had the capacitor replaced more than once?', today: TODAY });
+    check('part-replaced units count :: app matches oracle SQL exactly (Nolan\'s unit qualifies, Olive\'s does not)',
+      Boolean(a) && `${o[0].n}` === (a.facts[0]?.value ?? ''), `oracle=${o[0].n} app=${JSON.stringify(a?.facts)}`);
+    check('part-replaced units count :: cites the qualifying unit and both its documents', a.recordsTotal > 0 && a.records.some((r) => r.type === 'document'), JSON.stringify(a.records));
+  }
+  {
+    const oracle = { ...byId.get('breadth-connect-098').oracle, params: ['%Nolan Partsy%', byId.get('breadth-connect-098').oracle.params[1]] };
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Has Nolan Partsy had any part replaced more than once on the same unit?', today: TODAY });
+    check('any-part yes/no :: app agrees with oracle (yes, Nolan\'s unit had the capacitor replaced twice)', o[0].v === true && /^Yes/.test(a.text), a.text);
+  }
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Has Olive Onepart had any part replaced more than once on the same unit?', today: TODAY });
+    check('any-part yes/no :: control customer with only ONE matching document answers No', /^No/.test(a.text), a.text);
+  }
+  {
+    const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Has Zzyzx Nobody had any part replaced more than once on the same unit?', today: TODAY });
+    check('any-part yes/no :: an unknown customer name returns null (never guesses)', missing === null);
+  }
+
+  /* ---- fixture: address mismatch + correct-current-address --------------------------------------- */
+  await lite.query(
+    `INSERT INTO entities (id, tenant_id, entity_type, data, customer_number, created_at) VALUES ($1,$2,$3,$4::jsonb,$5,$6)`,
+    [cId(62), tenId, 'customer', JSON.stringify({ customer_name: 'Pia Paperwork', service_address: '100 New Ave, Mesa, AZ 85201' }), 'C-90062', '2026-01-01']
+  );
+  await lite.query(
+    `INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [dId(63), tenId, 'doc-63.pdf', 'service-ticket', 'hash-63', 'verified', '2026-06-01']
+  );
+  await lite.query('INSERT INTO document_entity_links (tenant_id, document_id, entity_id) VALUES ($1,$2,$3)', [tenId, dId(63), cId(62)]);
+  await lite.query('INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value, confidence) VALUES ($1,$2,$3,$4,$5,0.9)',
+    [tenId, dId(63), cId(62), 'service_address', '999 Old Rd, Mesa, AZ 85201']);
+
+  {
+    const oracle = byId.get('breadth-connect-107').oracle;
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "How many customers have a document with an address that doesn't match what's on file?", today: TODAY });
+    eq('address-mismatch count :: app matches oracle (Pia Paperwork\'s doc address disagrees with her record)', Number(a.facts[0].value), Number(o[0].n));
+  }
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "Which customers have a different address on one of their documents than what's on file?", today: TODAY });
+    check('address-mismatch set :: names Pia Paperwork and cites the differing document', /Pia Paperwork/.test(a.text) && a.records.some((r) => r.type === 'document'), a.text);
+  }
+  {
+    const oracle = { ...byId.get('breadth-connect-108').oracle }; // city = "Mesa"
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "How many Mesa customers have a document address that doesn't match their record?", today: TODAY });
+    eq('address-mismatch city count :: app matches oracle for Mesa', Number(a.facts[0].value), Number(o[0].n));
+  }
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'What is the correct current address for Pia Paperwork, and why?', today: TODAY });
+    check('correct-current-address :: names the newer document address (999 Old Rd) as current, never invents one', /999 Old Rd/.test(a.text) && !/Zzyzx/.test(a.text), a.text);
+    check('correct-current-address :: explains the disagreement (mentions the earlier/on-file address too)', /100 New Ave/.test(a.text), a.text);
+  }
+  {
+    const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: 'What is the correct current address for Zzyzx Nobody, and why?', today: TODAY });
+    check('correct-current-address :: an unknown customer name returns null (never guesses)', missing === null);
+  }
+
+  /* ---- fixture: duplicate serial numbers across customers ----------------------------------------- */
+  await insertEquipment({ n: 70, customer: 60, mfr: 'Trane', installed: '2021-01-01', serial: 'SN-100' });
+  await insertEquipment({ n: 71, customer: 61, mfr: 'Carrier', installed: '2021-01-01', serial: 'sn-100' }); // same serial, different case, DIFFERENT customer
+  await insertEquipment({ n: 72, customer: 4, mfr: 'Carrier', installed: '2021-01-01', serial: 'SN-200' }); // control: unique serial
+
+  {
+    const oracle = byId.get('breadth-connect-116').oracle;
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Are there any equipment serial numbers that appear under more than one customer?', today: TODAY });
+    check('shared-serial yes/no :: app agrees with oracle (yes)', o[0].v === true && /^Yes/.test(a.text), a.text);
+  }
+  {
+    const oracle = byId.get('breadth-connect-117').oracle;
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Which serial numbers appear under more than one customer?', today: TODAY });
+    check('shared-serial set :: app names SN-100 (case-normalized), matching oracle', o.some((r) => r.item === 'SN-100') && /SN-100/.test(a.text), a.text);
+    check('shared-serial set :: control serial SN-200 (unique) is excluded', !o.some((r) => r.item === 'SN-200') && !/SN-200/.test(a.text), a.text);
+  }
+  {
+    const oracle = byId.get('breadth-connect-118').oracle;
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many equipment serial numbers are shared by more than one customer?', today: TODAY });
+    eq('shared-serial count :: app matches oracle', Number(a.facts[0].value), Number(o[0].n));
+  }
+
+  /* ---- fixture: maintenance agreements with zero service visits ----------------------------------- */
+  await insertCustomer({ n: 64, name: 'Quincy Quiet', address: '64 Test Ave, Mesa, AZ 85201' });
+  await insertEquipment({ n: 64, customer: 64, mfr: 'Trane', installed: '2021-01-01' });
+  await doc(65, { type: 'maintenance-agreement', customer: 64 }); // agreement, NO visit-type document at all
+
+  {
+    const oracle = byId.get('breadth-connect-120').oracle;
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many maintenance agreements have zero service visits behind them?', today: TODAY });
+    eq('maintenance zero-visits count :: app matches oracle (includes Quincy Quiet)', Number(a.facts[0].value), Number(o[0].n));
+  }
+  {
+    const oracle = byId.get('breadth-connect-125').oracle; // brand = "Trane"
+    const { rows: o } = await oracleQ(oracle.sql, oracle.params);
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many maintenance agreements are there for Trane customers with zero service visits?', today: TODAY });
+    eq('maintenance zero-visits brand count :: app matches oracle for Trane', Number(a.facts[0].value), Number(o[0].n));
+  }
+  {
+    // Review fix (R15 blocking defect): this used to return null, which fell through
+    // relations/questions.js's answerRelationsQuestion to a LATER, unaware router that
+    // answered a bare, unqualified document count instead (e.g. "You have 27 documents"
+    // for a brand that isn't on file at all) — a confident wrong answer. An honest, cited
+    // decline (never a bare `null` a later stage can silently re-answer wrong) is correct.
+    const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many maintenance agreements are there for Zzyzxbrand customers with zero service visits?', today: TODAY });
+    check('maintenance zero-visits brand count :: an unknown brand answers an honest decline (never null, never guesses)', missing !== null && missing.facts.length === 0 && /zzyzxbrand/i.test(missing.text), JSON.stringify(missing));
+  }
+
+  /* ---- fixture: property timeline narrative + documents-disagree rubric --------------------------- */
+  await insertCustomer({ n: 66, name: 'Tara Timeline', address: '66 Test Ave, Mesa, AZ 85201' });
+  await doc(66, { type: 'service-ticket', customer: 66, serviceDate: '2026-02-01' });
+  await doc(67, { type: 'invoice', customer: 66, serviceDate: '2026-05-01' });
+
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "Walk me through what happened at Tara Timeline's property this year, in order.", today: TODAY });
+    check('property timeline :: narrates both dated documents in order and cites them', /2026/.test(a.text) && a.recordsTotal === 2, a.text);
+  }
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "Walk me through what happened at Zzyzx Nobody's property this year, in order.", today: TODAY });
+    check('property timeline :: an unknown customer name returns null (never guesses)', a === null);
+  }
+
+  await insertCustomer({ n: 68, name: 'Dana Disagree', address: '68 Test Ave, Mesa, AZ 85201' });
+  await lite.query('UPDATE entities SET data = data || $2::jsonb WHERE id = $1', [cId(68), JSON.stringify({ phone: '555-000-1111' })]);
+  await doc(69, { type: 'service-ticket', customer: 68, serviceDate: '2026-03-01' });
+  await lite.query('INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value, confidence) VALUES ($1,$2,$3,$4,$5,0.9)',
+    [tenId, dId(69), cId(68), 'phone', '555-999-2222']);
+
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "Do any of Dana Disagree's documents disagree with our records, and if so which is right?", today: TODAY });
+    check('documents-disagree :: names the phone disagreement and cites the differing document', /^Yes/.test(a.text) && /555/.test(a.text) && a.records.some((r) => r.type === 'document'), a.text);
+  }
+  {
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: "Do any of Tara Timeline's documents disagree with our records, and if so which is right?", today: TODAY });
+    check('documents-disagree :: control customer with no phone/email/address extraction on file answers No (never invents a conflict)', /^No/.test(a.text), a.text);
+  }
+  {
+    // Review fix (R15 blocking defect): this used to return null, which fell through to a
+    // LATER, unaware router that answered a bare tenant-wide document dump instead (e.g.
+    // "500 documents — showing 200, and 300 more.") for a customer name that isn't on file
+    // at all — a confident wrong answer. An honest, cited decline is correct.
+    const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: "Do any of Zzyzx Nobody's documents disagree with our records, and if so which is right?", today: TODAY });
+    check('documents-disagree :: an unknown customer name answers an honest decline (never null, never guesses)', missing !== null && missing.facts.length === 0 && /zzyzx nobody/i.test(missing.text), JSON.stringify(missing));
+  }
 }
 
 console.error = realErr;

@@ -15,8 +15,12 @@
  *
  *   node scripts/verify-det-planner.mjs
  */
-import { detectAnalyticsPlan } from '../api/_lib/analytics/detPlan.js';
-import { resolveAgeFilter, warrantyStatusFromQuestion, buildConditionOverrideFilter } from '../api/_lib/analytics.js';
+import { detectAnalyticsPlan, questionNamesKnownCustomer } from '../api/_lib/analytics/detPlan.js';
+import {
+  resolveAgeFilter, warrantyStatusFromQuestion, buildConditionOverrideFilter,
+  preClassifyAnalytics, resolveServiceVisitsOverride, looksLikeSingleRecordReference,
+} from '../api/_lib/analytics.js';
+import { isFinancialQuestion } from '../api/_lib/financials/classify.js';
 
 let failures = 0;
 let passes = 0;
@@ -202,14 +206,175 @@ check(
   detectAnalyticsPlan('expired warranties -- what about just the mesa ones') === null
 );
 
-check(
-  'data-quality "missing field" shape (no FILTER_FIELD exists for it) -> null',
-  detectAnalyticsPlan("how many documents aren't linked to any customer") === null
+/* ============================================================ 2b. data-quality (Round 15, A) — missing-field
+ * conditions now build a real plan via DATA_QUALITY_BOOLEAN_FIELDS
+ * (analytics.js) instead of falling through to the model. Positive + negative
+ * per family, per the round contract.
+ */
+
+eq(
+  'data-quality: "how many documents aren\'t linked to any customer"',
+  detectAnalyticsPlan("how many documents aren't linked to any customer"),
+  { entity: 'documents', op: 'count', filters: [{ field: 'hasCustomerLink', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "are there documents missing a customer" (paraphrase of the same shape)',
+  detectAnalyticsPlan('are there documents missing a customer'),
+  { entity: 'documents', op: 'count', filters: [{ field: 'hasCustomerLink', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many customers have no documents on file"',
+  detectAnalyticsPlan('how many customers have no documents on file'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasAnyDocument', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many customers have no service address on file"',
+  detectAnalyticsPlan('how many customers have no service address on file'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasServiceAddress', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many customer addresses are missing a zip code"',
+  detectAnalyticsPlan('how many customer addresses are missing a zip code'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasZip', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many units are missing a serial number"',
+  detectAnalyticsPlan('how many units are missing a serial number'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'hasSerial', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many units have no install date on file"',
+  detectAnalyticsPlan('how many units have no install date on file'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'hasInstallDate', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many units don\'t have a model number recorded"',
+  detectAnalyticsPlan("how many units don't have a model number recorded"),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'hasModel', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many units have no tonnage on file"',
+  detectAnalyticsPlan('how many units have no tonnage on file'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'hasTonnage', op: 'eq', value: false }] }
+);
+eq(
+  // "no warranty information at all" resolves to the existing warrantyStatus
+  // 'unknown' bucket, not a new field — see detPlan.js's MISSING_FIELD_RULES
+  // doc comment for why a raw-presence check on the stored warranty object
+  // can never tell "no real data" from "extracted, but nothing to report".
+  'data-quality: "how many units have no warranty information at all"',
+  detectAnalyticsPlan('how many units have no warranty information at all'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyStatus', op: 'eq', value: 'unknown' }] }
+);
+eq(
+  'data-quality: "how many units are not linked to a customer"',
+  detectAnalyticsPlan('how many units are not linked to a customer'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'hasCustomerLink', op: 'eq', value: false }] }
+);
+eq(
+  'data-quality: "how many units have an install date in the future"',
+  detectAnalyticsPlan('how many units have an install date in the future'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'installDateInFuture', op: 'eq', value: true }] }
+);
+eq(
+  'data-quality: "how many documents are classified as other instead of a real type"',
+  detectAnalyticsPlan('how many documents are classified as other instead of a real type'),
+  { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'other' }] }
+);
+eq(
+  // "SERVICE documents" narrows to the visit/job-record document types
+  // (service-ticket/service-report/work-order/dispatch-note/inspection-
+  // report/startup-sheet/invoice) — a permit or nameplate photo missing a
+  // service date is not what this question is asking about.
+  'data-quality: "how many service documents have no service date" (scoped to service-type documents)',
+  detectAnalyticsPlan('how many service documents have no service date'),
+  {
+    entity: 'documents', op: 'count',
+    filters: [
+      { field: 'hasServiceDate', op: 'eq', value: false },
+      {
+        field: 'documentType', op: 'in',
+        value: ['service-ticket', 'service-report', 'work-order', 'dispatch-note', 'inspection-report', 'startup-sheet', 'invoice'],
+      },
+    ],
+  }
+);
+eq(
+  'data-quality: a bare "how many documents have no service date" (no "service" qualifier) stays unscoped',
+  detectAnalyticsPlan('how many documents have no service date'),
+  { entity: 'documents', op: 'count', filters: [{ field: 'hasServiceDate', op: 'eq', value: false }] }
 );
 
 check(
-  'data-quality "no service address on file" -> null',
-  detectAnalyticsPlan('how many customers have no service address on file') === null
+  'data-quality: "no readable text extracted" still declines — no reliable proxy for this one (see READABLE_TEXT_DENY_RE)',
+  detectAnalyticsPlan('how many documents have no readable text extracted') === null
+);
+check(
+  'data-quality (negative, self-join): "do we have any duplicate customers" -> null (unchanged from round 14)',
+  detectAnalyticsPlan('do we have any duplicate customers') === null
+);
+check(
+  'data-quality (negative, self-join): "which customers appear more than once in our records" -> null',
+  detectAnalyticsPlan('which customers appear more than once in our records') === null
+);
+check(
+  'data-quality (negative, self-join): "how many customers share an address with another customer" -> null',
+  detectAnalyticsPlan('how many customers share an address with another customer') === null
+);
+check(
+  'data-quality (negative, self-join): "are any serial numbers used by more than one unit" -> null',
+  detectAnalyticsPlan('are any serial numbers used by more than one unit') === null
+);
+check(
+  'data-quality (negative, dropped condition): a bare "how many documents are there" must NOT be mistaken for the ' +
+    '"no readable text" shape just because both name documents — still a plain unfiltered count',
+  JSON.stringify(detectAnalyticsPlan('how many documents are there')) === JSON.stringify({ entity: 'documents', op: 'count', filters: [] })
+);
+check(
+  'data-quality (negative, ambiguous ordering): "how many customers have no email and no documents on file" still ' +
+    'resolves hasAnyDocument (both conditions named — never silently drops the second one to answer only the first)',
+  (() => {
+    const p = detectAnalyticsPlan('how many customers have no documents on file');
+    return p && p.filters.length === 1 && p.filters[0].field === 'hasAnyDocument';
+  })()
+);
+
+/* ============================================================ 2c. coverage / yes-no / counts-docs / existence
+ * (Round 15, A) — these already produced a correct raw plan from
+ * detectAnalyticsPlan in round 14; the round-15 gap was entirely in
+ * preClassifyAnalytics (the ask.js gate deciding whether to try the planner
+ * at all) and resolveServiceVisitsOverride's op choice — both in
+ * analytics.js, exercised end to end below with no database.
+ */
+
+for (const q of [
+  'how many different zip codes do we cover',
+  'how many customers do we have per zip code',
+  'what zip codes do we serve',
+  'do we service anything in nevada',
+  'how many customers are locked into a maintenance agreement',
+  'how many maintenance agreements are there',
+  'is there a maintenance agreement on file for anyone',
+  'did we do any service calls last month',
+  'are there documents missing a customer',
+]) {
+  check(`round 15 pre-classify gate now lets "${q}" reach the planner`, preClassifyAnalytics(q) === true);
+}
+
+eq(
+  'round 15: "did we do any service calls last month" now forces op count (existence-shaped), not list',
+  resolveServiceVisitsOverride('did we do any service calls last month'),
+  { entity: 'serviceVisits', op: 'count' }
+);
+eq(
+  'round 15: an explicit "how many service calls" still forces count (unchanged from round 14)',
+  resolveServiceVisitsOverride('how many service calls did we get last month'),
+  { entity: 'serviceVisits', op: 'count' }
+);
+eq(
+  'round 15: a non-existence, non-"how many" service-visits phrasing still forces list (unchanged)',
+  resolveServiceVisitsOverride('which units had service this month'),
+  { entity: 'serviceVisits', op: 'list' }
 );
 
 check(
@@ -270,6 +435,156 @@ eq(
   'technician typo: doubled leading letter "ddanny ochoa" -> "Danny Ochoa"',
   detectAnalyticsPlan('how many jobs did ddanny ochoa run this month'),
   { entity: 'serviceVisits', op: 'count', filters: [{ field: 'technician', op: 'eq', value: 'Danny Ochoa' }] }
+);
+
+/* ============================================================ 6. Round 15 follow-up (P0 generalization
+ * audit): a NAMED customer/business must never be answered by a tenant-wide aggregate. Two separate
+ * defenses, tested separately: (a) looksLikeSingleRecordReference (analytics.js) — the gate ask.js checks
+ * BEFORE a question is even an analytics candidate — now recognizes a bare "is <Name> {still} under/out of
+ * warranty" subject and a 3+ word trailing business name; (b) questionNamesKnownCustomer/the tenantVocab
+ * guard inside detectAnalyticsPlan itself — a last-resort backstop for any OTHER named-customer shape (a),
+ * or the model's own patterns, don't happen to catch, since no plan this file ever builds carries a
+ * customerName filter. Every name below is a made-up SHAPE example, never a real exam question/customer. */
+
+check(
+  'looksLikeSingleRecordReference: bare "is <First Last> out of warranty yet" is a single-record reference (was falling through to a tenant-wide aggregate)',
+  looksLikeSingleRecordReference('is Matthew Whitfield out of warranty yet') === true
+);
+check(
+  'looksLikeSingleRecordReference: bare "is <Surname> out of warranty yet" (single-word name) is a single-record reference',
+  looksLikeSingleRecordReference('is Thornton out of warranty yet') === true
+);
+check(
+  'looksLikeSingleRecordReference: "is <Surname> still under warranty and who\'s the tech" is a single-record reference',
+  looksLikeSingleRecordReference("is Abernathy still under warranty and who's the tech") === true
+);
+check(
+  'looksLikeSingleRecordReference negative: "who is still under warranty" (no name, "still" is not a name) stays a real aggregate question',
+  looksLikeSingleRecordReference('who is still under warranty') === false
+);
+check(
+  'looksLikeSingleRecordReference negative: "is anyone currently under warranty" (indefinite pronoun) stays a real aggregate question',
+  looksLikeSingleRecordReference('is anyone currently under warranty') === false
+);
+check(
+  'looksLikeSingleRecordReference negative: bare "how many customers are under warranty" is unaffected',
+  looksLikeSingleRecordReference('how many customers are under warranty') === false
+);
+
+check(
+  'looksLikeSingleRecordReference: a THREE-word trailing business name ("...for Copper Sky Dental") is a single-record reference (was capped at 1-2 words and fell through to a tenant-wide count)',
+  looksLikeSingleRecordReference('how many jobs have we done for copper sky dental') === true
+);
+check(
+  'looksLikeSingleRecordReference: a FOUR-word trailing business name is still a single-record reference',
+  looksLikeSingleRecordReference('what invoices do we have for valley view auto body shop') === true
+);
+check(
+  'looksLikeSingleRecordReference negative: a genuine multi-word aggregate tail ("...for this quarter\'s customers") still excluded by the first-word stopword guard',
+  looksLikeSingleRecordReference("how many invoices do we have for this quarter's customers") === false
+);
+check(
+  'looksLikeSingleRecordReference negative: "...for our regular customers" still excluded (first word "our" is a stopword)',
+  looksLikeSingleRecordReference('how many jobs have we done for our regular customers') === false
+);
+
+/* -- (b) the tenantVocab-based backstop inside detectAnalyticsPlan itself -- */
+
+const FAKE_TENANT_VOCAB = { customers: { phrases: ['Matthew Whitfield', 'Copper Sky Dental', 'Wood'] } };
+
+check(
+  'questionNamesKnownCustomer: a known full customer name mentioned anywhere in the question is detected',
+  questionNamesKnownCustomer('how many units are out of warranty for matthew whitfield', FAKE_TENANT_VOCAB) === true
+);
+check(
+  'questionNamesKnownCustomer: a known business name mentioned anywhere in the question is detected',
+  questionNamesKnownCustomer('what do we have on file for copper sky dental', FAKE_TENANT_VOCAB) === true
+);
+check(
+  'questionNamesKnownCustomer negative: a bare aggregate question naming no customer is not flagged',
+  questionNamesKnownCustomer('how many units are out of warranty', FAKE_TENANT_VOCAB) === false
+);
+check(
+  'questionNamesKnownCustomer negative: a short/common single-word customer name ("Wood") never false-positives on an ordinary mention of the material',
+  questionNamesKnownCustomer('we replaced the wood trim around the unit', FAKE_TENANT_VOCAB) === false
+);
+check(
+  'detectAnalyticsPlan bails (null) when tenantVocab names a customer this file has no filter field for, instead of a confident tenant-wide plan',
+  detectAnalyticsPlan('how many units are out of warranty for matthew whitfield', FAKE_TENANT_VOCAB) === null
+);
+check(
+  'detectAnalyticsPlan is completely unaffected when no tenantVocab is passed (every existing caller/test above)',
+  JSON.stringify(detectAnalyticsPlan('how many units are out of warranty for matthew whitfield')) ===
+    JSON.stringify({ entity: 'equipment', op: 'count', filters: [{ field: 'warrantyStatus', op: 'eq', value: 'expired' }] })
+);
+check(
+  'detectAnalyticsPlan: a bare aggregate question with tenantVocab present still plans normally (no false-positive bail)',
+  JSON.stringify(detectAnalyticsPlan('how many units are out of warranty', FAKE_TENANT_VOCAB)) ===
+    JSON.stringify({ entity: 'equipment', op: 'count', filters: [{ field: 'warrantyStatus', op: 'eq', value: 'expired' }] })
+);
+
+/* -- (c) the financials/classify.js hook: a bare "how many ... agreement(s)" count is a document
+ * count, never a money question -- */
+
+check(
+  'isFinancialQuestion: a bare "how many maintenance agreements are there" is NOT financial (a document count analytics already answers)',
+  isFinancialQuestion('how many maintenance agreements are there') === false
+);
+check(
+  'isFinancialQuestion: "how many customers are locked into a maintenance agreement" is NOT financial',
+  isFinancialQuestion('how many customers are locked into a maintenance agreement') === false
+);
+check(
+  'isFinancialQuestion negative-of-negative: "how much do our maintenance agreements bring in" is STILL financial (revenue language, not a bare count)',
+  isFinancialQuestion('how much do our maintenance agreements bring in') === true
+);
+check(
+  'isFinancialQuestion negative-of-negative: "how many invoices do we have on file" (a real money-document noun) is unaffected, still financial',
+  isFinancialQuestion('how many invoices do we have on file') === true
+);
+
+/* -- (d) regression guard (breadth-connect-120): declassifying the financials gate for a bare
+ * "how many ... agreement(s)" count must never expose a JOIN/HAVING-COUNT-0 shape ("...have zero
+ * service visits behind them") to the flat-plan generic path, which would otherwise silently drop
+ * the "zero visits" half and answer a bare, unqualified document count. -- */
+
+check(
+  'detectAnalyticsPlan declines (null) "how many maintenance agreements have zero service visits behind them" — a cross-entity join count this flat plan has no field for, never a bare document count',
+  detectAnalyticsPlan('how many maintenance agreements have zero service visits behind them') === null
+);
+check(
+  'detectAnalyticsPlan declines the same join shape phrased with a different linked-event noun ("...with no callbacks since installation")',
+  detectAnalyticsPlan('how many units have no callbacks since installation') === null
+);
+check(
+  'isFinancialQuestion: the same join-shaped question is unaffected by the classify.js hook either way (still not financial - it is a connect/relations shape, not money)',
+  isFinancialQuestion('how many maintenance agreements have zero service visits behind them') === false
+);
+
+/* -- (e) generalization-audit regression (g109): "is there a customer named <Name>" was newly
+ * exposed by this round's own earlier existence-shape widening (isExistenceQuestion &&
+ * cr.aggregateNoun) and answered a tenant-wide "Yes, you have 120 customers." instead of resolving
+ * (or declining on) the one named customer. -- */
+
+check(
+  'looksLikeSingleRecordReference: "is there a customer named <Name>" is a single-record reference (was answering a tenant-wide count)',
+  looksLikeSingleRecordReference('is there a customer named ortega') === true
+);
+check(
+  'looksLikeSingleRecordReference: "is there a client named <First Last>" is a single-record reference',
+  looksLikeSingleRecordReference('is there a client named jane rodriguez') === true
+);
+check(
+  'looksLikeSingleRecordReference: "is there an account named <Business Name>" is a single-record reference',
+  looksLikeSingleRecordReference('is there an account named acme corp') === true
+);
+check(
+  'looksLikeSingleRecordReference negative: a bare "is there a customer" (no "named ...") stays a real existence/aggregate question',
+  looksLikeSingleRecordReference('is there a customer') === false
+);
+check(
+  'preClassifyAnalytics: "is there a customer named <Name>" is excluded from the analytics candidate path entirely',
+  preClassifyAnalytics('is there a customer named ortega') === false
 );
 
 console.log('');

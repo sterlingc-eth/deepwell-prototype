@@ -38,6 +38,10 @@
 import { logOnce } from "./rateLimit.js";
 import { createHash } from "node:crypto";
 import { SYSTEM_PROMPT, ANSWER_TOOL } from "./answer.js";
+// R15 (Team C, follow-up round): read-only — the same tolerant to_regclass probe
+// financials/moneyGate.js already uses, reused here (not reimplemented) so this file's own
+// "before any migration" tolerance can never disagree with financials/store.js's own.
+import { financialsTableExists } from "./financials/store.js";
 
 /** Any change to the prompt, the tool schema, or the model invalidates every
  *  cached answer: a cached "no-answer" from an older prompt outlived the fix
@@ -61,19 +65,44 @@ export const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
-const STAMP_EXPR = `md5(concat_ws('|',
-  (SELECT count(*)::text || ':' || count(*) FILTER (WHERE stage = 'verified')::text || ':' || coalesce(max(updated_at)::text,'') FROM documents WHERE ${TENANT_SQL}),
-  (SELECT count(*)::text || ':' || coalesce(max(coalesce(corrected_at, created_at))::text,'') FROM extractions WHERE ${TENANT_SQL}),
-  (SELECT count(*)::text || ':' || coalesce(max(created_at)::text,'') FROM document_entity_links WHERE ${TENANT_SQL}),
-  (SELECT count(*)::text || ':' || coalesce(max(updated_at)::text,'') FROM entities WHERE ${TENANT_SQL})
-))`;
+// R15 (Team C, follow-up round): document_financials/document_financial_lines added — a human
+// correction to a financial field (financials/store.js correctFinancialField) writes
+// corrections/corrected_at on document_financials and NOTHING on the four tables the stamp
+// already covered (extractions.corrected_at only ever reflects an EXTRACTION correction, never a
+// financials-review one — a different review screen, a different table), so a cached dollar
+// answer used to survive a correction for up to 24h with no way to invalidate it early. Built as
+// a FUNCTION (not a fixed string, unlike the four tables above) because — unlike
+// ask_answer_cache's own SAVEPOINT-probe tolerance below — this SQL sits inside the SAME
+// combined query as ask_answer_cache, so a missing document_financials table would abort that
+// whole query, not just this clause; hasFinancials is decided in JS first (financialsTableExists,
+// the same to_regclass probe financials/store.js already uses) and only a query text that matches
+// what's actually there is ever sent. document_financial_lines has no timestamp column at all
+// (checked directly against M3-config's own schema) — a line is only ever written alongside its
+// parent document_financials row and never corrected on its own, so its count alone is enough to
+// catch a re-extraction adding/removing lines; the parent row's own corrected_at/extracted_at
+// already covers correction timing for both.
+function stampExpr(hasFinancials) {
+  const parts = [
+    `(SELECT count(*)::text || ':' || count(*) FILTER (WHERE stage = 'verified')::text || ':' || coalesce(max(updated_at)::text,'') FROM documents WHERE ${TENANT_SQL})`,
+    `(SELECT count(*)::text || ':' || coalesce(max(coalesce(corrected_at, created_at))::text,'') FROM extractions WHERE ${TENANT_SQL})`,
+    `(SELECT count(*)::text || ':' || coalesce(max(created_at)::text,'') FROM document_entity_links WHERE ${TENANT_SQL})`,
+    `(SELECT count(*)::text || ':' || coalesce(max(updated_at)::text,'') FROM entities WHERE ${TENANT_SQL})`,
+  ];
+  if (hasFinancials) {
+    parts.push(
+      `(SELECT count(*)::text || ':' || coalesce(max(GREATEST(coalesce(corrected_at, '-infinity'::timestamptz), coalesce(extracted_at, created_at)))::text,'') FROM document_financials WHERE ${TENANT_SQL})`,
+      `(SELECT count(*)::text FROM document_financial_lines WHERE ${TENANT_SQL})`
+    );
+  }
+  return `md5(concat_ws('|', ${parts.join(',\n    ')}))`;
+}
 
-const STAMP_ONLY_SQL = `SELECT ${STAMP_EXPR} AS corpus_stamp`;
+const stampOnlySql = (hasFinancials) => `SELECT ${stampExpr(hasFinancials)} AS corpus_stamp`;
 
 // LEFT JOIN off a dummy single-row source: `corpus_stamp` must come back even
 // when no cache row matches (a real miss), not just when one does.
-const COMBINED_SQL = `
-  SELECT ${STAMP_EXPR} AS corpus_stamp, c.corpus_stamp AS cached_stamp, c.answer, c.created_at
+const combinedSql = (hasFinancials) => `
+  SELECT ${stampExpr(hasFinancials)} AS corpus_stamp, c.corpus_stamp AS cached_stamp, c.answer, c.created_at
     FROM (SELECT 1) AS dummy
     LEFT JOIN ask_answer_cache c
       ON c.question_hash = $1 AND c.today = $2::date AND c.${TENANT_SQL}`;
@@ -111,13 +140,17 @@ export function _resetTableExistsForTests() {
 export async function getCacheEntry(db, { questionHash, today, promptVersion = PROMPT_VERSION }) {
   if (!ASK_CACHE_ENABLED) return { corpusStamp: null, row: null };
 
+  // Memoized itself (financials/store.js), so this costs nothing extra in steady state — one
+  // more in-process check, not one more round trip.
+  const hasFinancials = await financialsTableExists(db);
+
   if (tableExists === false) {
-    const { rows } = await db.raw(STAMP_ONLY_SQL, []);
+    const { rows } = await db.raw(stampOnlySql(hasFinancials), []);
     return { corpusStamp: withPromptVersion(rows[0].corpus_stamp, promptVersion), row: null };
   }
 
   const run = async () => {
-    const { rows } = await db.raw(COMBINED_SQL, [questionHash, today]);
+    const { rows } = await db.raw(combinedSql(hasFinancials), [questionHash, today]);
     const row = rows[0];
     return { corpusStamp: withPromptVersion(row.corpus_stamp, promptVersion), row: row.cached_stamp != null ? row : null };
   };
@@ -138,7 +171,7 @@ export async function getCacheEntry(db, { questionHash, today, promptVersion = P
       await db.raw("ROLLBACK TO SAVEPOINT ask_cache_probe", []).catch(() => {});
       tableExists = false;
       logOnce("ask_answer_cache", err);
-      const { rows } = await db.raw(STAMP_ONLY_SQL, []);
+      const { rows } = await db.raw(stampOnlySql(hasFinancials), []);
       return { corpusStamp: withPromptVersion(rows[0].corpus_stamp, promptVersion), row: null };
     }
     throw err;

@@ -259,7 +259,18 @@ async function installDate(db, intent, ctx) {
       const alt = rows.find((r) => r.entity_id === u.id && r.field_key === 'installation_date' && normalizeTypeId(r.document_type) !== 'warranty-registration');
       if (alt) { date = String(alt.value).slice(0, 10); src = alt; }
     }
-    if (date) found.push({ unit: u, date, src });
+    // R15 (Team C, follow-up round): `date` alone is not enough to state as an answer — the
+    // equipment entity's own data.installation_date is only as trustworthy as the genuine
+    // per-document extraction that backs it (`src`). Before this fix, a unit whose data blob
+    // carried an installation_date with NOTHING behind it (no installation_date extraction
+    // anywhere for that unit — confirmed against the golden corpus: zero installation_date
+    // extractions exist for ANY unit) still got stated here as a confident, cited-looking answer,
+    // which is exactly the fabrication the offline exam's oracle flags as wrong for a single-unit
+    // install-date lookup (its ground truth for "when was THIS unit installed" requires either the
+    // unit's own on-file address to match — equipment entities never carry one — or a genuine
+    // extraction; a bare entity field backs neither). Requiring src turns that into the honest
+    // "No install date is recorded..." decline below instead of a wrong, unsupported date.
+    if (date && src) found.push({ unit: u, date, src });
   }
   if (found.length) {
     const facts = found.map((f, i) => ({

@@ -34,6 +34,8 @@ const content = await import('../api/_lib/contentCount.js');
 const {
   HVAC_TERM_SYNONYMS, expandTerms, buildTermPattern, extractKnownTerms, canonicalizeTerm, parseContentCountQuestion,
 } = content;
+const jobSummaryMod = await import('../api/_lib/content/jobSummary.js');
+const { parseJobSummaryQuestion, extractFindingSentences } = jobSummaryMod;
 
 /* ================================================================== 1. pure: vocabulary + expansion */
 {
@@ -48,6 +50,12 @@ const {
   const known = extractKnownTerms('replaced the cap and cleared a leak');
   check('extractKnownTerms: finds every group mentioned (capacitor via "cap", leak), none it is not', known.length === 2 && known.every((g) => ['capacitor', 'leak'].includes(g)), JSON.stringify(known));
   eq('extractKnownTerms: no known term -> empty', extractKnownTerms('what is the weather like today'), []);
+
+  // Round 15: new HVAC synonym groups (breadth-content-030/031).
+  check('vocab: txv group includes txv and expansion valve (singular + plural)', ['txv', 'txvs', 'expansion valve', 'expansion valves'].every((w) => HVAC_TERM_SYNONYMS.txv.includes(w)));
+  check('vocab: heat exchanger group includes singular + plural', ['heat exchanger', 'heat exchangers'].every((w) => HVAC_TERM_SYNONYMS['heat exchanger'].includes(w)));
+  eq('extractKnownTerms: "involved a TXV or expansion valve" finds txv', extractKnownTerms('how many jobs involved a txv or expansion valve'), ['txv']);
+  eq('extractKnownTerms: "heat exchanger crack" finds heat exchanger', extractKnownTerms('how many jobs mention a heat exchanger crack'), ['heat exchanger']);
 }
 
 /* ================================================================== 2. pure: question shape (never-hijack) */
@@ -59,6 +67,9 @@ const {
     ['which customers had a capacitor issue or repair on file', { scope: 'documents', mode: 'list', groupBy: 'customer', terms: ['capacitor'] }],
     ['list jobs where we replaced the compressor', { scope: 'jobs', mode: 'list', groupBy: null, terms: ['compressor'] }],
     ['any complaints about noise', { scope: 'documents', mode: 'list', groupBy: null, terms: ['noise'] }],
+    // Round 15 (breadth-content-030/031): new vocabulary, same pre-existing "how many jobs ..." shape.
+    ['How many jobs involved a TXV or expansion valve?', { scope: 'jobs', mode: 'count', groupBy: null, terms: ['txv'] }],
+    ['How many jobs mention a heat exchanger crack?', { scope: 'jobs', mode: 'count', groupBy: null, terms: ['heat exchanger'] }],
   ];
   for (const [q, want] of cases) {
     const got = parseContentCountQuestion(q);
@@ -106,6 +117,45 @@ const {
     const got = parseContentCountQuestion(q);
     check(`semantic parse: "${q}" -> parses and finds "${term}"`, Boolean(got) && got.terms.includes(term), JSON.stringify(got));
   }
+}
+
+/* ================================================================== 2b. job-summary question shape (Round 15) */
+{
+  // The standalone module, called directly (not just through parseContentCountQuestion's delegation).
+  eq('parseJobSummaryQuestion: direct call parses the shape', parseJobSummaryQuestion('What was found or done on the Mercer job?'), { mode: 'jobSummary', customerName: 'Mercer', question: 'What was found or done on the Mercer job?' });
+  eq('parseJobSummaryQuestion: direct call rejects a non-matching question', parseJobSummaryQuestion('How many jobs mention a capacitor?'), null);
+
+  const positives = [
+    ['What was found or done on the Mercer job?', 'Mercer'],
+    ['What was found or done on the Salazar job?', 'Salazar'],
+    ['What was done or found on the Rios job?', 'Rios'], // order swapped
+    ['What was found on the Holbrook job?', 'Holbrook'], // "or done" omitted
+    ['What was found or done for the Thornton job?', 'Thornton'], // "for" instead of "on"
+    ['What was found or done on Delgado job?', 'Delgado'], // no "the"
+    ["What was found or done on the O'Malley job?", "O'Malley"],
+  ];
+  for (const [q, name] of positives) {
+    const got = parseContentCountQuestion(q);
+    check(`job-summary parse: "${q}" -> mode jobSummary, name "${name}"`, got?.mode === 'jobSummary' && got.customerName === name, JSON.stringify(got));
+  }
+
+  // Negative tests (R15_CONTRACT.md): every new family needs negation / two-values / dropped-condition /
+  // ambiguous-name coverage. Ambiguous names are a DB-backed concern (ambiguity is resolved against real
+  // rows) and are covered in the PGlite harness section below; the rest are pure shape exclusions.
+  const negatives = [
+    'What was NOT found on the Mercer job?', // negation: "not" breaks the was/were->found/done adjacency
+    'What was found or done on the Mercer and Salazar jobs?', // two values for one dimension + plural "jobs"
+    'What was found or done on the Mercer job last month?', // dropped/added condition: trailing time window
+    'What was found or done on the Mercer job, other than the compressor?', // trailing qualifier
+    'What is the Mercer job?', // no found/done verb at all
+    'How many jobs mention a capacitor?', // a completely different content shape
+  ];
+  for (const q of negatives) check(`job-summary parse: does not hijack "${q}"`, parseContentCountQuestion(q) === null || parseContentCountQuestion(q)?.mode !== 'jobSummary');
+
+  // extractFindingSentences: pure, extractive-only (never invents words).
+  const sentences = extractFindingSentences('Found a refrigerant leak at the evaporator coil.\nRecommend replacing the contactor next visit.\nCustomer signature on file.', 5);
+  check('extractFindingSentences: pulls only the finding-bearing lines, verbatim', sentences.length === 2 && sentences[0].startsWith('Found a refrigerant leak') && sentences[1].startsWith('Recommend replacing'), JSON.stringify(sentences));
+  eq('extractFindingSentences: a page with no finding word -> empty', extractFindingSentences('Customer signature on file. Payment received.', 5), []);
 }
 
 /* ================================================================== harness: real Postgres via PGlite */
@@ -182,6 +232,12 @@ const worldA = {
     { n: 3, name: 'Donna Thornton', address: '17 Cactus Ln, Tucson, AZ 85701' },
     { n: 4, name: 'Plaza Dental Group', address: '2210 E Main St, Gilbert, AZ 85234' },
     { n: 5, name: 'Old Timer', address: '5 Oak Rd, Phoenix, AZ 85001' },
+    // Round 15: job-summary fixtures.
+    { n: 6, name: 'Elena Salazar', address: '61 Cinder Rd, Mesa, AZ 85204' },
+    { n: 7, name: 'Marco Rios', address: '9 Palo Verde Dr, Mesa, AZ 85205' }, // ambiguous with #8 (both match "%Rios%")
+    { n: 8, name: 'Rios Boulevard Apartments', address: '400 Rios Blvd, Mesa, AZ 85205' },
+    { n: 9, name: 'Janet Holloway', address: '22 Holloway Dr, Mesa, AZ 85205' }, // on file, no finding text
+    { n: 10, name: 'Greg Palmer', address: '5 Palmer Ct, Mesa, AZ 85201' }, // "filter change", no "replac" word at all
   ],
   equipment: [{ n: 4, customer: 4, mfr: 'Carrier' }],
   docs: [
@@ -191,6 +247,10 @@ const worldA = {
     // linked only through its equipment, never a direct customer link — exercises the equipment->customer join.
     { n: 4, file: 'plaza-workorder.pdf', type: 'work-order', links: [uid('a', 'e', 4)], pages: ['Found a refrigerant leak at the evaporator coil, recharged with R-410A.'] },
     { n: 5, file: 'oldtimer-permit.pdf', type: 'permit', links: [uid('a', 'c', 5)], pages: ['City permit for a water heater replacement, nothing HVAC-related here.'] },
+    { n: 6, file: 'salazar-workorder.pdf', type: 'work-order', links: [uid('a', 'c', 6)], pages: ['Found a cracked heat exchanger during inspection.\nRecommend replacement before next heating season.\nCustomer signature obtained.'] },
+    { n: 7, file: 'rios-workorder.pdf', type: 'work-order', links: [uid('a', 'c', 7)], pages: ['Found a loose duct connection near the attic access. Resealed it and recommend a follow-up next season.'] },
+    { n: 9, file: 'holloway-invoice.pdf', type: 'invoice', links: [uid('a', 'c', 9)], pages: ['Invoice total $220. Payment received in full.'] },
+    { n: 10, file: 'palmer-service.pdf', type: 'service-ticket', links: [uid('a', 'c', 10)], pages: ['Performed a filter change during the visit. No other issues noted.'] },
   ],
 };
 const worldB = {
@@ -262,6 +322,65 @@ const run = (parsed) => withTenant(ctxA, (db) => runContentCount(db, parsed));
 
   const rBad = await toolbox.execute('count_documents_mentioning', { terms: [] });
   check('agent tool: no terms -> a clear error, not a crash', !rBad.ok && /terms/i.test(rBad.content));
+}
+
+/* ================================================================== 8b. new HVAC vocabulary, DB-backed (Round 15) */
+{
+  // The Salazar work-order (a job doc type) mentions "heat exchanger" - counted as a job mention.
+  const r = await run({ terms: ['heat exchanger'], scope: 'jobs', groupBy: null });
+  eq('jobs scope: "heat exchanger" finds the Salazar work-order', r.recordsTotal, 1);
+  // Nothing in this corpus mentions a TXV/expansion valve at all - an honest zero, not an error.
+  const rZero = await run({ terms: ['txv'], scope: 'documents', groupBy: null });
+  eq('documents scope: "txv" - honest zero when nothing on file mentions it', rZero.recordsTotal, 0);
+  check('documents scope: "txv" zero-answer names the term, never blank', /txv/i.test(rZero.text));
+}
+
+/* ================================================================== 8c. "filter change" standalone phrase (Round 15, breadth-content-028) */
+{
+  // Palmer's own document says "filter change" with NO "replac"/"repair"/etc. word anywhere on the page -
+  // the verb-proximity pattern alone would miss it; the standalone-phrase addition must still count it.
+  const r = await run({ terms: ['filter'], scope: 'documents', groupBy: null, replaceVerb: 'replac', replaceVerbWord: 'replaced' });
+  check('replaceVerb "filter": a standalone "filter change" (no verb nearby at all) is still counted', r.records.some((x) => /palmer/i.test(x.sublabel ?? '') || /filter change/i.test(x.sublabel ?? '')), JSON.stringify(r.records));
+  check('replaceVerb "filter": Karen\'s "replaced the dual run capacitor" (a different part) is NOT counted', !r.records.some((x) => /karen/i.test(x.sublabel ?? '')));
+
+  // "oil change" is a different phrase entirely - must not be swept in by a loose match.
+  const rNeg = await run({ terms: ['motor'], scope: 'documents', groupBy: null, replaceVerb: 'replac', replaceVerbWord: 'replaced' });
+  eq('replaceVerb "motor": no standalone phrase configured for this term - behaves exactly as before', rNeg.recordsTotal, 0);
+}
+
+/* ================================================================== 9. job-summary (Round 15) */
+{
+  // End-to-end: parse the real question text, then run it through the real pre-router entry point
+  // (runContentCount), exactly as api/ask.js's block 0.63 does.
+  const parsed = parseContentCountQuestion('What was found or done on the Salazar job?');
+  check('job-summary: parses as mode jobSummary', parsed?.mode === 'jobSummary' && parsed.customerName === 'Salazar', JSON.stringify(parsed));
+  const r = await withTenant(ctxA, (db) => content.runContentCount(db, parsed));
+  check('job-summary: answers (never null) for a single, unambiguous match', Boolean(r));
+  check('job-summary: quotes the ACTUAL sentence from the source page, verbatim', r.text.includes('Found a cracked heat exchanger during inspection'), r.text);
+  check('job-summary: a second real sentence from the same page is also surfaced, not invented', r.text.includes('Recommend replacement before next heating season'), r.text);
+  check('job-summary: never includes the throwaway "Customer signature obtained" line (no finding word in it)', !r.text.includes('Customer signature obtained'));
+  check('job-summary: cites the source document + page', r.records.some((x) => x.documentId && x.page === 1));
+  check('job-summary: includes a customer record for Elena Salazar', r.records.some((x) => x.type === 'customer' && /Salazar/.test(x.label)));
+
+  // Ambiguous name: "Rios" matches BOTH Marco Rios and Rios Boulevard Apartments - never silently merged
+  // into one answer; each is reported separately, under its own name.
+  const rAmbiguous = await withTenant(ctxA, (db) => content.runContentCount(db, { mode: 'jobSummary', customerName: 'Rios' }));
+  check('job-summary: an ambiguous name names BOTH matching customers, never guesses one', /Marco Rios/.test(rAmbiguous.text) && /Rios Boulevard Apartments/.test(rAmbiguous.text), rAmbiguous.text);
+  check('job-summary: both ambiguous customers get a customer record (never merged into one)', rAmbiguous.records.filter((x) => x.type === 'customer').length === 2, JSON.stringify(rAmbiguous.records));
+  check('job-summary: Marco Rios\'s real finding is quoted, attributed to him, not to the other match', rAmbiguous.text.includes('Found a loose duct connection near the attic access'), rAmbiguous.text);
+  check('job-summary: the OTHER matching customer (no docs) is named as having nothing on file, not silently dropped', /Nothing on file for Rios Boulevard Apartments/.test(rAmbiguous.text), rAmbiguous.text);
+
+  // Customer on file, but no document contains a finding/work word - honest "nothing on file", never invented.
+  const rNoFindings = await withTenant(ctxA, (db) => content.runContentCount(db, { mode: 'jobSummary', customerName: 'Holloway' }));
+  check('job-summary: on file with no finding text -> honest zero, not a fabricated summary', rNoFindings.recordsKind === 'searched' && /no documents/i.test(rNoFindings.text), rNoFindings.text);
+
+  // No customer at all on file by that name.
+  const rNoCustomer = await withTenant(ctxA, (db) => content.runContentCount(db, { mode: 'jobSummary', customerName: 'Fictional Nobody' }));
+  check('job-summary: no customer on file by that name -> honest "not on file", not a guess', rNoCustomer.recordsTotal === 0 && /not|no customer/i.test(rNoCustomer.text), rNoCustomer.text);
+
+  // Tenant isolation: tenant B's own "Zed Competitor" is invisible to tenant A's job-summary lookup.
+  const rCrossTenant = await withTenant(ctxA, (db) => content.runContentCount(db, { mode: 'jobSummary', customerName: 'Zed Competitor' }));
+  check('job-summary: tenant isolation - another tenant\'s customer is invisible', rCrossTenant.recordsTotal === 0);
 }
 
 console.log('');

@@ -85,6 +85,13 @@ export const FILTER_FIELDS = [
   'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage',
   'refrigerant', 'installYear', 'warrantyStatus', 'documentType', 'technician', 'customerName',
   'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType',
+  // Round 15 (A, data-quality): "missing field"/"not linked" shapes — see
+  // DATA_QUALITY_FIELD_ENTITY's own doc comment just below for the per-field
+  // entity restriction and DATA_QUALITY_ROW_KEY (further down) for how each
+  // one is actually matched against an already-shaped row.
+  'hasAnyDocument', 'hasServiceAddress', 'hasZip', 'hasCustomerLink',
+  'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage',
+  'installDateInFuture', 'hasServiceDate',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -104,6 +111,40 @@ export const BOOLEAN_FILTER_FIELDS = ['hasEmail', 'hasPhone'];
  *  "the model never contributes anything outside FILTER_FIELDS" — still
  *  holds for a plan built by this file's own code, not just the model's.*/
 export const DOC_TYPE_FILTER_FIELDS = ['hasDocType', 'lacksDocType'];
+/**
+ * Round 15 (A, data-quality cluster — "how many documents aren't linked to
+ * any customer", "units missing a serial number", "customers with no service
+ * address on file", ...): a MISSING-FIELD condition, closed-vocabulary and
+ * boolean-only exactly like hasEmail/hasPhone above, but never restricted to
+ * customers — each field here is only ever meaningful for the ONE entity a
+ * dispatcher would actually ask it about (a document's own customer link, a
+ * unit's own serial/install-date/model/tonnage/warranty, a customer's own
+ * address/zip/any-document-at-all). validatePlan (below) enforces this
+ * per-field entity restriction; matchesFilter reads each one off the row
+ * field DATA_QUALITY_ROW_KEY (further down) already carries, computed once
+ * at shape time (routes/analytics.js's shapeCustomerRow/shapeEquipmentRow/
+ * shapeDocumentRow) rather than re-derived per filter check.
+ */
+export const DATA_QUALITY_FIELD_ENTITY = {
+  hasAnyDocument: 'customers',
+  hasServiceAddress: 'customers',
+  hasZip: 'customers',
+  hasCustomerLink: ['documents', 'equipment'],
+  hasSerial: 'equipment',
+  hasInstallDate: 'equipment',
+  hasModel: 'equipment',
+  hasTonnage: 'equipment',
+  // Round 15 (A): deliberately no hasWarrantyInfo — deriveWarranty
+  // (warrantyRules.js) always writes a non-empty "stable" object onto every
+  // unit's data.warranty, even one with no real warranty data at all, so
+  // "the column is a non-empty object" can never distinguish real data from
+  // none — see detPlan.js's MISSING_FIELD_RULES doc comment for why "no
+  // warranty information at all" maps to warrantyStatus 'unknown' instead
+  // (already correct, already tested, no new field needed).
+  installDateInFuture: 'equipment',
+  hasServiceDate: 'documents',
+};
+export const DATA_QUALITY_BOOLEAN_FIELDS = Object.keys(DATA_QUALITY_FIELD_ENTITY);
 export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'in'];
 export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown'];
 export const MAX_LIMIT = 500;
@@ -597,6 +638,74 @@ function hasSingularNamedRecord(q) {
   }
   return false;
 }
+
+/**
+ * Round 15 follow-up (P0, generalization audit): "is Matthew Whitfield out of
+ * warranty yet" / "is Abernathy still under warranty and who's the tech" both
+ * returned the tenant-wide unit count ("You have 79 units (of 132 total).")
+ * instead of declining or scoping to that one customer — this exact shape
+ * ("is <bare name subject> {still} under/out of warranty") had no pattern
+ * anywhere in this file at all: POSSESSIVE_SINGLE_RE only covers "does/did
+ * NAME have/has/need", never a bare "is NAME ...". A named subject here is a
+ * single customer's own warranty status, never a fleet-wide aggregate — the
+ * same class of bug SINGULAR_NAMED_RECORD_RE/POSSESSIVE_SINGLE_RE already
+ * exist to prevent, just a shape neither of them happened to cover. Guarded
+ * the same way hasTrailingNameReference already is: the captured subject's
+ * FIRST word must not be one of TRAILING_NAME_STOPWORD_RE's closed list (so
+ * "is there still a warranty" / "is anyone still under warranty" — a real
+ * existence/aggregate question, not a named subject — is never mistaken for
+ * one), and the whole subject must not itself be one of this domain's own
+ * nouns (TRAILING_NAME_DOMAIN_WORD_RE) so "is the maintenance agreement still
+ * under warranty" (never a customer name) is excluded too.
+ */
+const NAMED_WARRANTY_SUBJECT_RE =
+  /\bis\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,3})\s+(?:still\s+|currently\s+)?(?:under|out\s+of)\s+warranty\b/i;
+
+// "who is still under warranty" / "is anyone currently under warranty" — the
+// optional still/currently token in NAMED_WARRANTY_SUBJECT_RE is meant to
+// come AFTER a real name ("is Abernathy still under warranty"), but with no
+// name there at all (the true subject is "who", already consumed before
+// "is") the same optional slot can swallow "still"/"currently" itself as if
+// it were the captured name. Excluded here rather than folded into the
+// shared TRAILING_NAME_STOPWORD_RE list (used by unrelated shapes too) since
+// this ambiguity is specific to this one pattern's own optional-adverb slot.
+const WARRANTY_SUBJECT_ADVERB_RE = /^(?:still|currently|already|yet)$/i;
+
+function hasNamedWarrantySubject(q) {
+  const m = NAMED_WARRANTY_SUBJECT_RE.exec(q);
+  if (!m) return false;
+  const subject = m[1].trim();
+  const firstWord = subject.split(/\s+/)[0];
+  if (TRAILING_NAME_STOPWORD_RE.test(firstWord)) return false;
+  if (WARRANTY_SUBJECT_ADVERB_RE.test(firstWord)) return false;
+  return !TRAILING_NAME_DOMAIN_WORD_RE.test(subject);
+}
+
+/**
+ * Round 15 follow-up (generalization audit, g109): "is there a customer
+ * named ortega" answered "Yes, you have 120 customers." — a tenant-wide
+ * aggregate — instead of resolving (or declining on) that ONE named
+ * customer. Root cause: preClassifyAnalytics's own existence-shape widening
+ * (isExistenceQuestion(q) && cr.aggregateNoun.test(q)) never checked for a
+ * trailing "named <Name>" clause, which unambiguously names a single record
+ * regardless of the "is there a/an <noun>" existence phrasing wrapped around
+ * it — the same class of bug NAMED_WARRANTY_SUBJECT_RE/hasTrailingNameReference
+ * already exist to catch, just a shape neither covers ("named" introduces
+ * the name, not "for"/"at"/a bare "is <Name>"). Guarded the same way: the
+ * captured name's first word must clear TRAILING_NAME_STOPWORD_RE (so "is
+ * there a customer named after the street" - a hypothetical non-name "named"
+ * use - stays excludable) and must not itself be a domain noun.
+ */
+const NAMED_RECORD_CLAUSE_RE =
+  /\b(?:customer|client|account|business|company)\s+named\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,3})\b/i;
+
+function hasNamedRecordClause(q) {
+  const m = NAMED_RECORD_CLAUSE_RE.exec(q);
+  if (!m) return false;
+  const subject = m[1].trim();
+  if (TRAILING_NAME_STOPWORD_RE.test(subject.split(/\s+/)[0])) return false;
+  return !TRAILING_NAME_DOMAIN_WORD_RE.test(subject);
+}
 /** An alnum token >= 8 chars with at least one digit — the same serial/model
  *  shape fastPath.js's own IDENTIFIER_RE looks for (see its file for why:
  *  that's the printed shape of a real HVAC serial/model number, and a bare
@@ -635,8 +744,15 @@ const AT_POSSESSIVE_RE = /\bat\s+[a-z][a-z']*'s\b/i;
  *  quantifiers TRAILING_NAME_RE (below) actually needs to reject that
  *  contactLookup's own list never had to worry about ("in Mesa", "our Trane
  *  jobs", "last month's work"). */
+// Round 15 (A): "is there a maintenance agreement on file for ANYONE" — an
+// indefinite pronoun ("anyone"/"everyone"/"someone"/...), never a proper
+// name, was missing from this list entirely (only the determiner "any" was
+// covered) — TRAILING_NAME_RE's own "for/at <name>" shape wrongly read
+// "anyone" as a trailing customer surname, making looksLikeSingleRecordReference
+// (and so preClassifyAnalytics) misclassify a genuine aggregate/existence
+// question as a single-record one.
 const TRAILING_NAME_STOPWORD_RE =
-  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have|in|on|at|of|for|with|without|and|or|no|not|any|some|all|last|next|first|second|third|most|many|few|several|day|days|today|week|weeks|month|months|year|years|end)$/i;
+  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have|in|on|at|of|for|with|without|and|or|no|not|any|anyone|anybody|everyone|everybody|someone|somebody|no one|nobody|all|last|next|first|second|third|most|many|few|several|day|days|today|week|weeks|month|months|year|years|end)$/i;
 
 /** A captured "name" that is actually one of this domain's own nouns
  *  ("maintenance", "warranty", "service", "file", ...) is never a real
@@ -671,7 +787,21 @@ const TRAILING_NAME_DOMAIN_WORD_RE =
  * TRAILING_NAME_STOPWORD_RE/TRAILING_NAME_DOMAIN_WORD_RE above for the two
  * halves of that guard.
  */
-const TRAILING_NAME_RE = /\b(?:for|at)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*)?)\s*[?!.]*\s*$/;
+// Round 15 follow-up (P0, generalization audit): "how many jobs have we done
+// for copper sky dental" — a genuine 3-word BUSINESS name (this domain's
+// customer_name field holds businesses as often as people) never matched at
+// all with the old 1-2-word cap, since the captured group has to reach all
+// the way to the end of the string: "for" was never immediately followed by
+// the (too-short) captured phrase, so the whole regex missed, and the
+// question fell through to the generic aggregate path with no name filter to
+// give it — a confident tenant-wide wrong answer. Widened to up to 6 words
+// (a full business name like "Valley View Auto Body Shop"); still guarded by
+// the same TRAILING_NAME_STOPWORD_RE (first word) / TRAILING_NAME_DOMAIN_WORD_RE
+// (whole phrase) checks below, so a genuine multi-word aggregate tail ("for
+// our regular customers", "for the ac units") is still excluded the same way
+// it always was — those guards check the CONTENT of the captured phrase, not
+// its length.
+const TRAILING_NAME_RE = /\b(?:for|at)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,5})\s*[?!.]*\s*$/;
 
 // HVAC persona bank (2026-09-21): "List invoices for Fitzgerald so I can call
 // them" / "...for Bracken for the file" / "...for Delgado, thanks" — a
@@ -777,6 +907,8 @@ export function looksLikeSingleRecordReference(question) {
     POSSESSIVE_SINGLE_RE.test(q) ||
     hasTrailingNameReference(q) ||
     hasNamedActionObject(q) ||
+    hasNamedWarrantySubject(q) ||
+    hasNamedRecordClause(q) ||
     STREET_ONLY_RE.test(stripLeadingNoiseForStreetCheck(q))
   );
 }
@@ -892,7 +1024,17 @@ export function preClassifyAnalytics(question, opts = {}) {
       (cr.aggregateNoun.test(q) && (GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q) || ZIP_VALUE_RE.test(q))) ||
       (WE_YES_NO_RE.test(q) && (cr.weYesNoNoun.test(q) || BRAND_RE.test(q) || GEO_WORD_RE.test(q) || ZIP_CODE_WORD_RE.test(q))) ||
       (QUANTIFIER.test(q) && COVERAGE_NOUN_RE.test(q)) ||
-      (/\bwhat\b/i.test(q) && COVERAGE_NOUN_RE.test(q) && /\bdo we\b/i.test(q))
+      (/\bwhat\b/i.test(q) && COVERAGE_NOUN_RE.test(q) && /\bdo we\b/i.test(q)) ||
+      // Round 15 (A): "is there a maintenance agreement on file for anyone",
+      // "are there documents missing a customer", "did we do any service
+      // calls last month" — WE_YES_NO_RE above only ever covers "do/does/have/
+      // has we"; isExistenceQuestion (below, hoisted) is the broader
+      // "do/does/is/are/did/have/has we/there/you/our shop" existence shape
+      // R7's own existenceWrap already answers correctly once a plan reaches
+      // it — paired with a real aggregate noun so a genuinely single-record
+      // "is there a warranty on the Whitmore unit" still falls to
+      // looksLikeSingleRecordReference's own exclusion above, never here.
+      (isExistenceQuestion(q) && cr.aggregateNoun.test(q))
     ) {
       return true;
     }
@@ -1155,7 +1297,21 @@ const CONDITION_PLAN_FIELD = {
 
 /** Conditions detectedConditions(question) found that the validated PLAN has
  *  no corresponding filter (or, for 'month', no timeRange) for — the plan
- *  silently dropped something the question actually asked for. */
+ *  silently dropped something the question actually asked for.
+ *
+ *  Round 15 (A) BUG FIX: a condition is also satisfied when the plan
+ *  expresses it as `groupBy` rather than a `filters[].field` — "how many
+ *  different zip codes do we cover" / "customers by county" validly answer
+ *  the "zip"/"county" condition a groupBy plan carries (GROUP_BY_FIELDS and
+ *  CONDITION_PLAN_FIELD share the same field names for city/county/state/
+ *  zip/brand/warrantyStatus), but this used to only ever check `filters`,
+ *  never `groupBy` — so EVERY valid groupBy/countDistinct coverage plan was
+ *  flagged as having silently dropped the very condition it was built to
+ *  answer, and routes/analytics.js's runAnalyticsQuestion (see its own
+ *  missingConditions check) replaced a correct answer with the honest-
+ *  decline "I can count customers, but I can't filter by zip yet." — worse
+ *  than simply answering, since ask.js then still spends a model call on
+ *  top of that decline. */
 export function missingConditions(plan, question) {
   const missing = new Set();
   for (const c of detectedConditions(question)) {
@@ -1164,6 +1320,7 @@ export function missingConditions(plan, question) {
       continue;
     }
     const field = CONDITION_PLAN_FIELD[c];
+    if (field !== undefined && plan?.groupBy === field) continue;
     if (!plan?.filters?.some((f) => f.field === field)) missing.add(c);
   }
   return missing;
@@ -2028,9 +2185,24 @@ const SERVICE_VISITS_OVERRIDE_RE =
   /\b(?:had|got|were|received)\s+service(?:d|s)?\b|\b(?:did|do)\s+we\s+service\b|\bwe\s+service(?:d)?\b|\bservice\s+calls?\b/i;
 
 /** True for any question this session's live-miss cluster named — exported
- *  so scripts/verify-analytics.mjs can pin the exact shapes down directly. */
+ *  so scripts/verify-analytics.mjs can pin the exact shapes down directly.
+ *
+ *  Round 15 (A) BUG FIX ("do we service anything in Nevada" answered "You
+ *  have 317 service visits." — coverage, not existence): "do/did we service"
+ *  is ALSO the ordinary English verb for "cover this area" ("do we service
+ *  Nevada", "do we service anything out there"), a genuine coverage/existence
+ *  question about CUSTOMERS, never a service-VISIT event — and serviceVisits
+ *  has no geo dimension at all (ENTITY_SUPPORTED_FIELDS, routes/analytics.js)
+ *  to honor a location this shape names anyway. A state/city/county/zip word
+ *  right there in the question is the deciding signal: every one of the
+ *  SERVICE_VISITS_LIVE_MISSES phrasings this override exists for names a
+ *  TIME window or a unit/customer, never a place, so excluding a geo-bearing
+ *  sentence here costs that cluster nothing. */
 export function isServiceVisitsQuestion(question) {
-  return SERVICE_VISITS_OVERRIDE_RE.test(String(question ?? ''));
+  const q = String(question ?? '');
+  if (!SERVICE_VISITS_OVERRIDE_RE.test(q)) return false;
+  if (GEO_WORD_RE.test(q) || ZIP_VALUE_RE.test(q) || ZIP_CODE_WORD_RE.test(q)) return false;
+  return true;
 }
 
 /**
@@ -2047,7 +2219,16 @@ export function isServiceVisitsQuestion(question) {
  */
 export function resolveServiceVisitsOverride(question) {
   if (!isServiceVisitsQuestion(question)) return null;
-  const op = /\bhow many\b/i.test(String(question ?? '')) ? 'count' : 'list';
+  // Round 15 (A): "did we do any service calls last month" is existence-
+  // shaped (isExistenceQuestion, below — hoisted), not a request to enumerate
+  // rows; forcing 'count' here (same as an explicit "how many") lets
+  // formatAnalyticsAnswer's plain count branch produce a numeric fact that
+  // R7's own existenceWrap (routes/analytics.js's applyExistenceShape) can
+  // read, and its zero-result serviceVisits branch already leads with a
+  // literal "No ..." either way — never a bare, unlabelled row list for a
+  // yes/no question.
+  const q = String(question ?? '');
+  const op = /\bhow many\b/i.test(q) || isExistenceQuestion(q) ? 'count' : 'list';
   return { entity: 'serviceVisits', op };
 }
 
@@ -2189,6 +2370,19 @@ export function validatePlan(raw) {
       if (p.entity !== 'customers' || f.op !== 'eq') return null;
       if (!DOCUMENT_TYPE_IDS.has(String(f.value))) return null;
       filters.push({ field: f.field, op: f.op, value: String(f.value) });
+      continue;
+    }
+    if (DATA_QUALITY_BOOLEAN_FIELDS.includes(f.field)) {
+      // Round 15 (A): boolean-only, op "eq" only, entity restricted per
+      // DATA_QUALITY_FIELD_ENTITY (one entity, or one of a short allowed
+      // list) — same closed shape as hasEmail/hasPhone above, just not
+      // hard-coded to customers.
+      const allowed = DATA_QUALITY_FIELD_ENTITY[f.field];
+      const entityOk = Array.isArray(allowed) ? allowed.includes(p.entity) : allowed === p.entity;
+      if (!entityOk || f.op !== 'eq') return null;
+      const s = String(f.value).toLowerCase();
+      if (f.value !== true && f.value !== false && s !== 'true' && s !== 'false') return null;
+      filters.push({ field: f.field, op: f.op, value: f.value === true || s === 'true' });
       continue;
     }
     filters.push({ field: f.field, op: f.op, value: f.value });
@@ -2361,12 +2555,24 @@ function coerceNumber(v) {
  *  carries these two properties at all. */
 const HAS_FIELD_ROW_KEY = { hasEmail: 'email', hasPhone: 'phone' };
 
+/** Round 15 (A, data-quality): unlike HAS_FIELD_ROW_KEY above (a raw string
+ *  column, presence/non-blankness decides "has"), every DATA_QUALITY_BOOLEAN_FIELDS
+ *  field reads a REAL boolean the row already carries, computed once at shape
+ *  time (routes/analytics.js) — some from a plain column's presence, some
+ *  (installDateInFuture, hasCustomerLink/hasAnyDocument via a correlated-
+ *  subquery column) from something a raw-string presence check could never
+ *  express correctly. One row key per field, same name. */
+const DATA_QUALITY_ROW_KEY = Object.fromEntries(DATA_QUALITY_BOOLEAN_FIELDS.map((f) => [f, f]));
+
 export function matchesFilter(row, filter) {
   const { field, op, value } = filter;
   if (field in HAS_FIELD_ROW_KEY) {
     const raw = row[HAS_FIELD_ROW_KEY[field]];
     const has = raw != null && String(raw).trim() !== '';
     return has === (value === true);
+  }
+  if (field in DATA_QUALITY_ROW_KEY) {
+    return Boolean(row[DATA_QUALITY_ROW_KEY[field]]) === (value === true);
   }
   const actual = row[field];
   if (op === 'in') {
@@ -2472,9 +2678,17 @@ export function buildAnalyticsSQL(plan) {
 
   if (plan.entity === 'customers') {
     return {
+      // Round 15 (A): has_any_document (data-quality: "customers with no
+      // documents on file at all") — a correlated EXISTS-style scalar
+      // subquery, same tenant scope as the outer query, same idiom the
+      // documents branch's own service_date lookup already uses below. Any
+      // direct link at all counts (any document type), unlike hasDocType/
+      // lacksDocType (DOC_TYPE_FILTER_FIELDS) which name one specific type.
       sql: `SELECT id, customer_number, data->>'customer_name' AS customer_name,
                    data->>'service_address' AS service_address,
-                   data->>'email' AS email, data->>'phone' AS phone, updated_at
+                   data->>'email' AS email, data->>'phone' AS phone, updated_at,
+                   (EXISTS (SELECT 1 FROM document_entity_links l
+                             WHERE l.entity_id = entities.id AND l.${TENANT_SQL})) AS has_any_document
               FROM entities
              WHERE entity_type = 'customer' AND merged_into IS NULL AND ${where.join(' AND ')}
              ORDER BY updated_at DESC
@@ -2484,9 +2698,17 @@ export function buildAnalyticsSQL(plan) {
   }
   if (plan.entity === 'equipment' || plan.entity === 'warranties') {
     return {
+      // Round 15 (A): serial_number added for the hasSerial data-quality
+      // filter ("units missing a serial number") — every other column here
+      // already existed for a different reason (model/manufacturer for
+      // brand/model filters, installation_date for age/installYear,
+      // warranty for warrantyStatus) and now also feeds hasModel/
+      // hasInstallDate/installDateInFuture (shapeEquipmentRow,
+      // routes/analytics.js) — no new column needed for those.
       sql: `SELECT id, customer_id, data->>'model' AS model, data->>'manufacturer' AS manufacturer,
                    data->>'equipment_type' AS equipment_type, data->>'tonnage' AS tonnage,
                    data->>'refrigerant' AS refrigerant, data->>'installation_date' AS installation_date,
+                   data->>'serial_number' AS serial_number,
                    data->>'service_address' AS service_address, data->'warranty' AS warranty, updated_at
               FROM entities
              WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${where.join(' AND ')}
@@ -2508,11 +2730,19 @@ export function buildAnalyticsSQL(plan) {
     // outer query, most-recent value per document. shapeDocumentRow (below)
     // falls back to created_at only for a document with no service_date
     // extraction at all, so a doc-count with no time filter is unaffected.
+    // Round 15 (A): has_customer_link (data-quality: "documents aren't linked
+    // to any customer") — the same DIRECT document_entity_links -> customer
+    // link the frontend itself treats as "linked" (see routes/integrity.js's
+    // loadUnlinkedCandidates doc comment on why this is the one link that
+    // counts, not a transitive one via a linked unit's own customer_id).
     return {
       sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at,
                    (SELECT x.value FROM extractions x
                      WHERE x.document_id = d.id AND x.field_key = 'service_date' AND x.${TENANT_SQL}
-                     ORDER BY x.created_at DESC LIMIT 1) AS service_date
+                     ORDER BY x.created_at DESC LIMIT 1) AS service_date,
+                   (EXISTS (SELECT 1 FROM document_entity_links l
+                             JOIN entities ce ON ce.id = l.entity_id AND ce.entity_type = 'customer' AND ce.merged_into IS NULL AND ce.${TENANT_SQL}
+                            WHERE l.document_id = d.id AND l.${TENANT_SQL})) AS has_customer_link
               FROM documents d
              WHERE ${where.join(' AND ')}
              ORDER BY d.created_at DESC

@@ -89,7 +89,7 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // post-processing a model plan gets below; the model is only ever
     // called when detectAnalyticsPlan returns null (an unrecognized shape —
     // see that file's own "never guess" doc comment).
-    let rawInput = detectAnalyticsPlan(question);
+    let rawInput = detectAnalyticsPlan(question, tenantVocab);
     if (!rawInput) {
       const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
       const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
@@ -172,6 +172,23 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
 // (name · city)" is the requested shape, so a plain customer-list row shows
 // just the city here (still the full address on the row itself in the app
 // once opened via entityId).
+// Round 15 (A): a plain boolean column that arrived from `EXISTS (...)`
+// (has_any_document, has_customer_link) — pg/PGlite both hand this back as a
+// real JS boolean, but 't'/'f' is tolerated too (defense in depth, same
+// reason matchesFilter's own hasEmail/hasPhone check never trusts a driver's
+// exact type).
+function pgBool(v) {
+  return v === true || v === 't';
+}
+
+// Round 15 (A): non-blank presence of a raw column value — the same
+// "has this field been recorded at all" check every hasSerial/hasModel/
+// hasTonnage/hasInstallDate/hasServiceAddress/hasServiceDate data-quality
+// filter needs, computed once here rather than four times inline below.
+function present(v) {
+  return v != null && String(v).trim() !== '';
+}
+
 function shapeCustomerRow(r) {
   const geo = deriveGeo(r.service_address);
   return {
@@ -182,11 +199,28 @@ function shapeCustomerRow(r) {
     // HAS_FIELD_ROW_KEY map (analytics.js) — buildAnalyticsSQL's customers
     // SELECT already carries both columns.
     email: r.email, phone: r.phone,
+    // Round 15 (A, data-quality): read via matchesFilter's own
+    // DATA_QUALITY_ROW_KEY map (analytics.js) — hasServiceAddress/hasZip are
+    // plain presence checks on columns this row already carries (service_address
+    // itself, and zip already derived above by deriveGeo); hasAnyDocument comes
+    // from buildAnalyticsSQL's own correlated EXISTS subquery.
+    hasServiceAddress: present(r.service_address),
+    hasZip: present(geo.zip),
+    hasAnyDocument: pgBool(r.has_any_document),
   };
 }
 
 function shapeEquipmentRow(r, today) {
   const geo = deriveGeo(r.service_address);
+  // Round 15 (A): "install date in the future" — a real, parseable
+  // installation_date whose value sorts AFTER today's date string. Plain
+  // string comparison is safe here because every format this corpus stores
+  // (YYYY-MM-DD, YYYY-MM, YYYY) is left-zero-padded and a prefix of the next-
+  // finer one, so lexicographic order always agrees with calendar order at
+  // whatever precision is actually on file. A blank/unparseable date is never
+  // "in the future" — only a real, comparable value can be.
+  const installRaw = r.installation_date == null ? '' : String(r.installation_date).trim();
+  const installDateInFuture = /^\d{4}(-\d{2}(-\d{2})?)?$/.test(installRaw) && installRaw > String(today ?? '');
   return {
     id: r.id, label: [r.manufacturer, r.equipment_type].filter(Boolean).join(' ') || 'Equipment',
     value: r.model || r.id, entityId: r.customer_id || r.id,
@@ -194,6 +228,17 @@ function shapeEquipmentRow(r, today) {
     refrigerant: r.refrigerant, installYear: installYearOf(r.installation_date),
     warrantyStatus: warrantyStatusOf(r.warranty, today),
     city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
+    // Round 15 (A, data-quality): see shapeCustomerRow's own comment above —
+    // same DATA_QUALITY_ROW_KEY map. No hasWarrantyInfo here: "no warranty
+    // information at all" is answered via the existing warrantyStatus filter
+    // (value 'unknown') instead — see detPlan.js's MISSING_FIELD_RULES doc
+    // comment for why a raw-presence check on `warranty` can't work.
+    hasSerial: present(r.serial_number),
+    hasInstallDate: present(r.installation_date),
+    hasModel: present(r.model),
+    hasTonnage: present(r.tonnage),
+    hasCustomerLink: present(r.customer_id),
+    installDateInFuture,
   };
 }
 
@@ -225,6 +270,15 @@ function shapeDocumentRow(r, dateBasis) {
   return {
     id: r.id, label: documentTypeLabel(r.document_type), value: r.original_filename || r.id,
     entityId: undefined, documentType: r.document_type, month, date,
+    // Round 15 (A, data-quality): hasServiceDate is the RAW extraction's
+    // presence (before dateBasis/upload-date fallback ever applies) —
+    // "service documents have no service date" asks whether a service date
+    // was ever extracted at all, not what `date`/`month` above resolved to
+    // display. hasCustomerLink comes from buildAnalyticsSQL's own correlated
+    // EXISTS subquery, same "direct link" semantics as shapeCustomerRow's own
+    // hasAnyDocument (analytics.js's DATA_QUALITY_ROW_KEY reads both).
+    hasServiceDate: present(r.service_date),
+    hasCustomerLink: pgBool(r.has_customer_link),
   };
 }
 
@@ -233,10 +287,16 @@ function shapeDocumentRow(r, dateBasis) {
  *  entity. Rather than silently ignoring it (answering a DIFFERENT question
  *  than what was asked), treat it as a fall-through, same as an invalid plan. */
 const ENTITY_SUPPORTED_FIELDS = {
-  customers: new Set(['state', 'county', 'city', 'zip', 'customerName', 'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType']),
-  equipment: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus']),
+  customers: new Set([
+    'state', 'county', 'city', 'zip', 'customerName', 'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType',
+    'hasServiceAddress', 'hasZip', 'hasAnyDocument',
+  ]),
+  equipment: new Set([
+    'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
+    'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage', 'hasCustomerLink', 'installDateInFuture',
+  ]),
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus']),
-  documents: new Set(['documentType']),
+  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink']),
   serviceVisits: new Set(['technician']),
 };
 

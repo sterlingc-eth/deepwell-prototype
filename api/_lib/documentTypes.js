@@ -286,6 +286,18 @@ export function docTypeSynonymAlternation() {
     .join('|');
 }
 
+// R15 (Team C): every individual word across DOCUMENT_TYPE_SYNONYMS, flattened — used by BOTH
+// docLookup.js and contactLookup.js to typo-correct a doctype word before either file's own
+// shape-matching runs (a typo'd "invoides" must not be swallowed as a person name ahead of
+// docLookup.js ever getting a turn). Defined here rather than in either of those two files
+// because docLookup.js already imports from contactLookup.js — a reverse import of one from the
+// other creates a real circular dependency that, depending on which file's own verify script (or
+// api/ask.js) happens to import which one first, can evaluate one module's top-level code (e.g.
+// nlNormalize.js's own module-level VOCAB build, several hops away) before the other side of the
+// cycle has finished initializing. documentTypes.js has zero imports of its own, so it can never
+// be part of a cycle.
+export const DOCTYPE_TRIGGER_WORDS = [...new Set(Object.values(DOCUMENT_TYPE_SYNONYMS).flat().flatMap((phrase) => phrase.split(' ')))];
+
 export const AI_VERIFY_MIN_CONFIDENCE = 0.85;
 
 /**

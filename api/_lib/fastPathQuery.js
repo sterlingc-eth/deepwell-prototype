@@ -15,18 +15,24 @@
  */
 import { normalizeMatchText } from './recordsStore.js';
 import { documentTypeLabel } from './documentTypes.js';
-import { isoDate } from './scope.js';
+import { isoDate, extractUnitDesignator, addressHasUnit } from './scope.js';
+// R15 (Team C, follow-up round): read-only — financialsTableExists is the same tolerant probe
+// financials/moneyGate.js and financials/store.js already use (to_regclass, never a failing
+// SELECT) so this file behaves identically before migration 22 is pasted.
+import { financialsTableExists } from './financials/store.js';
 import {
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
   WARRANTY_INTENTS,
   LIST_INTENTS,
+  ADDRESS_ENTITY_FIELD_INTENTS,
   pickUnique,
   pickBestExtraction,
   pickMostRecent,
-  significantAddressTokens,
+  houseStreetTokens,
   buildFieldAnswer,
   buildWarrantyAnswer,
+  buildAddressFieldDecline,
   buildEquipmentListAnswer,
   buildDocumentListAnswer,
 } from './fastPath.js';
@@ -50,8 +56,10 @@ const UNIT_SCOPED_FIELD_KEYS = new Set([
 /**
  * Resolve a subject (fastPath.js's extractSubject output) to exactly one
  * customer or equipment row, tenant-scoped. Returns:
- *   {kind: 'customer', customer}  |  {kind: 'equipment', equipment}
- *   {kind: 'ambiguous'}  — more than one candidate; never guessed through
+ *   {kind: 'customer', customer}  |  {kind: 'equipment', equipment}  (address-sourced ones also carry `viaAddress: true`)
+ *   {kind: 'ambiguous', viaAddress?}   — more than one candidate; never guessed through
+ *   {kind: 'no-address', viaAddress}   — an address subject that matches NOTHING on file at all
+ *   {kind: 'no-unit', viaAddress, unit} — the street is on file, but not the apartment/unit the caller named
  *   {kind: 'none'}       — no candidate at all
  *
  * Checked in order: customer number (exact, authoritative) -> identifier
@@ -84,25 +92,51 @@ export async function resolveFastPathSubject(db, subject) {
   }
 
   if (subject.address) {
-    const tokens = significantAddressTokens(subject.address);
+    // R15 (Team C): match on the house number + street name ALONE first — never require the
+    // caller's stated city/zip up front (see fastPath.js's ADDRESS_RE/houseStreetTokens doc
+    // comments: it is real-world noise, not a different address, and requiring it turned a
+    // real on-file record into a false "nothing on file" for a whole family of warranty/
+    // manufacturer/tonnage/refrigerant-by-address questions). An apartment/unit number the
+    // caller DID name (extractUnitDesignator, scope.js) is applied as narrowing afterward,
+    // the same way scope.js's own resolveAddressScope narrows an apartment complex — so
+    // "3300 S Alma School Rd, Apt 103" still resolves to exactly Apt 103's own customer/unit,
+    // never a guess across all 8 apartments on that street.
+    const tokens = houseStreetTokens(subject.address);
     if (tokens.length) {
       const patterns = tokens.map((t) => `%${t}%`);
       const { rows } = await db.raw(
-        `SELECT id, entity_type, customer_id, data FROM entities
+        `SELECT id, entity_type, customer_id, data->>'service_address' AS service_address, data FROM entities
           WHERE merged_into IS NULL AND ${TENANT_SQL}
             AND entity_type IN ('customer', 'equipment')
             AND data->>'service_address' ILIKE ALL($1::text[])
-          LIMIT 10`,
+          LIMIT 20`,
         [patterns]
       );
-      const equipmentRows = rows.filter((r) => r.entity_type === 'equipment');
-      const uniqueEquip = pickUnique(equipmentRows);
-      if (uniqueEquip) return { kind: 'equipment', equipment: uniqueEquip };
-      if (equipmentRows.length === 0) {
-        const uniqueCust = pickUnique(rows.filter((r) => r.entity_type === 'customer'));
-        if (uniqueCust) return { kind: 'customer', customer: uniqueCust };
+      if (!rows.length) return { kind: 'no-address', viaAddress: true };
+
+      const unit = extractUnitDesignator(subject.address);
+      let scoped = rows;
+      if (unit) {
+        const withUnit = rows.filter((r) => addressHasUnit(r.service_address, unit));
+        // Only narrow when at least one candidate actually carries a unit designator that could
+        // match — some stored addresses never carry one at all, in which case a caller-named
+        // unit is not (yet) real disambiguating information, same as scope.js's own
+        // `unitNarrowed` flag.
+        const anyCarriesDesignator = rows.some((r) => /\b(?:apt|apartment|suite|ste|unit|#)\b/i.test(r.service_address ?? ''));
+        if (anyCarriesDesignator) {
+          if (!withUnit.length) return { kind: 'no-unit', viaAddress: true, unit };
+          scoped = withUnit;
+        }
       }
-      if (rows.length > 0) return { kind: 'ambiguous' };
+
+      const equipmentRows = scoped.filter((r) => r.entity_type === 'equipment');
+      const uniqueEquip = pickUnique(equipmentRows);
+      if (uniqueEquip) return { kind: 'equipment', equipment: uniqueEquip, viaAddress: true };
+      if (equipmentRows.length === 0) {
+        const uniqueCust = pickUnique(scoped.filter((r) => r.entity_type === 'customer'));
+        if (uniqueCust) return { kind: 'customer', customer: uniqueCust, viaAddress: true };
+      }
+      if (scoped.length > 0) return { kind: 'ambiguous', viaAddress: true };
     }
   }
 
@@ -263,8 +297,54 @@ async function fetchLastServiceDate(db, resolution, today) {
   return pickMostRecent(rows.filter((r) => { const d = isoDate(r.value); return !d || d <= t; }));
 }
 
+/** Effective (correction-applied) total for whichever of `documentIds` already has a
+ *  document_financials row — one row per document, `total` with any `corrections->>'total'`
+ *  override already substituted in, exactly like agent/financeViews.js's own `financials` view
+ *  does for the model path. A document with NO document_financials row is not returned here at
+ *  all (see fetchInvoiceTotal's own doc comment for why that's the right split). */
+async function fetchEffectiveFinancialTotals(db, documentIds) {
+  if (!documentIds.length) return [];
+  const { rows } = await db.raw(
+    `SELECT f.document_id, d.document_type, d.stage, d.created_at,
+            (CASE WHEN f.corrections ? 'total' THEN NULLIF(f.corrections->>'total', '') ELSE f.total::text END) AS value,
+            f.confidence,
+            COALESCE(
+              (CASE WHEN f.corrections ? 'invoice_date' THEN NULLIF(f.corrections->>'invoice_date', '') ELSE f.invoice_date::text END),
+              d.created_at::date::text
+            ) AS date
+       FROM document_financials f
+       JOIN documents d ON d.id = f.document_id
+      WHERE f.document_id = ANY($1::uuid[]) AND f.${TENANT_SQL}
+      LIMIT 50`,
+    [documentIds]
+  );
+  return rows.map((r) => ({ document_id: r.document_id, field_key: 'total', value: r.value, confidence: r.confidence, stage: r.stage, document_type: r.document_type, date: r.date }));
+}
+
+/**
+ * R15 (Team C, follow-up round — fixes a real split-brain, see handoff): a human correction to an
+ * invoice total (financials/store.js's correctFinancialField) writes ONLY to
+ * document_financials.corrections — it was NEVER reflected back onto the extractions.cost row
+ * this function used to read exclusively, so a corrected invoice total was silently ignored by
+ * the fast path forever (not just for a cache window). document_financials is now the
+ * authoritative source for any document that HAS a row there (a document can only ever BE
+ * corrected once such a row exists — correctFinancialField itself 404s otherwise — so reading
+ * financials there can never disagree with a correction, and reading extractions there
+ * deliberately never happens again). The extractions.cost fallback survives ONLY for a document
+ * that has no document_financials row at all yet (financials migration not pasted, or this
+ * specific document hasn't been backfilled) — a document with no financials row can never have
+ * been corrected, so that fallback carries no staleness risk.
+ */
 async function fetchInvoiceTotal(db, resolution) {
-  const rows = await fetchFieldRowsForResolution(db, resolution, 'cost');
+  const documentIds = await documentIdsForResolution(db, resolution);
+  if (!documentIds.length) return null;
+
+  const finRows = (await financialsTableExists(db)) ? await fetchEffectiveFinancialTotals(db, documentIds) : [];
+  const finCoveredIds = new Set(finRows.map((r) => r.document_id));
+  const remainingIds = documentIds.filter((id) => !finCoveredIds.has(id));
+  const extractionRows = remainingIds.length ? await fetchFieldRowsByDocumentIds(db, remainingIds, 'cost') : [];
+
+  const rows = [...finRows.filter((r) => r.value != null && String(r.value).trim() !== ''), ...extractionRows];
   const invoiceRows = rows.filter((r) => r.document_type === 'invoice');
   return pickMostRecent(invoiceRows.length ? invoiceRows : rows);
 }
@@ -357,6 +437,19 @@ export async function runFastPath(db, fp, { today } = {}) {
   if (NO_FIELD_INTENTS.has(intent)) return null; // no extraction field exists — always defer (seer, filter_size)
 
   const resolution = await resolveFastPathSubject(db, subject);
+
+  // R15 (Team C): an address-sourced resolution asking about warranty/manufacturer/tonnage/
+  // refrigerant/install-date never fabricates a value, whatever it resolved to — see
+  // ADDRESS_ENTITY_FIELD_INTENTS' own doc comment (fastPath.js) for why a raw street address can
+  // never confirm which of a customer's units, or that any one field, truly belongs to it. This
+  // covers every outcome resolveFastPathSubject's address branch can produce (no match at all, an
+  // unmatched apartment/unit, more than one candidate, or exactly one) with one honest decline —
+  // checked before the "not customer/equipment" bail below, since 'no-address'/'no-unit'/
+  // 'ambiguous' are exactly the outcomes that bail turns into a (wasted) model call today.
+  if (resolution.viaAddress && ADDRESS_ENTITY_FIELD_INTENTS.has(intent)) {
+    return buildAddressFieldDecline({ intent, subject, resolution });
+  }
+
   if (resolution.kind !== 'customer' && resolution.kind !== 'equipment') return null;
 
   if (LIST_INTENTS.has(intent)) {

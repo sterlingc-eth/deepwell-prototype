@@ -27,11 +27,18 @@
  * scripts/verify-analytics.mjs's contact-lookup section. resolveContact/
  * runContactLookup are the only functions here that touch `db`.
  */
-import { normalizeQuestion } from "./nlNormalize.js";
+import { normalizeQuestion, correctTriggerWordTypos } from "./nlNormalize.js";
 // TEAM C (citations everywhere): each answer names the record(s) it was read from.
 import { attachCitations, customerRecord, unitRecord, documentRecord } from "./citations/records.js";
 import { ENTITY_SYNONYMS, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
-import { documentTypeLabel } from "./documentTypes.js";
+import { documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
+// R15 (Team C): a typo'd doctype word ("invoides for delgado") must not be swallowed whole as a
+// person name by this file's own greedy bare-name shape before docLookup.js ever gets a turn — see
+// isRealNamePhrase's AGGREGATE_WORD_RE below, which only rejects an EXACT "invoices"/"permits"/etc
+// match. Correcting the typo first (the same trigger-word vocabulary docLookup.js itself corrects
+// against, defined once in documentTypes.js so importing it here never creates a circular
+// dependency with docLookup.js, which already imports FROM this file) lets that existing rejection
+// fire, exactly as it already does for the untypo'd "List invoices for Delgado".
 import { significantAddressTokens, formatDateHuman } from "./fastPath.js";
 import { alertTier, BRAND_RULES } from "./warrantyRules.js";
 import { listOpenReminders } from "./reminders.js";
@@ -461,7 +468,9 @@ export function parseContactLookupQuestion(question, opts = {}) {
   const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
   if (!raw) return null;
-  const q = stripTrailingChatter(fixFieldWordTypos(normalizeQuestion(raw, { overlay }).normalized));
+  const q = stripTrailingChatter(
+    fixFieldWordTypos(normalizeQuestion(correctTriggerWordTypos(raw, DOCTYPE_TRIGGER_WORDS), { overlay }).normalized)
+  );
   if (!q) return null;
 
   // Shape 1: "<field> ... for/of <name>" (the original, more specific shape

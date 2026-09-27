@@ -23,6 +23,74 @@
 import { describeWarranty, alertTier } from './warrantyRules.js';
 // TEAM C (citations everywhere): equipment / document lists cite the exact rows they list.
 import { attachCitations, unitRecord, documentRecord } from './citations/records.js';
+// R15 (Team C): typo tolerance for this file's own short trigger-word vocabulary — see
+// matchTrigger and correctFastPathTriggerTypos below. Deliberately reimplemented locally (a small,
+// self-contained copy of nlNormalize.js's withinEditDistance1 + correctTriggerWordTypos) rather
+// than imported from nlNormalize.js: nlNormalize.js imports ENTITY_SYNONYMS from analytics.js at
+// its own module top level (to build its VOCAB), and analytics.js imports scope.js, which imports
+// THIS file (fastPath.js) — so an import here of nlNormalize.js closes analytics.js -> scope.js ->
+// fastPath.js -> nlNormalize.js -> analytics.js into a real circular import. That cycle crashes
+// with "Cannot access 'ENTITY_SYNONYMS' before initialization" in exactly one situation: whenever
+// analytics.js happens to be the FIRST module loaded (verify-analytics.mjs, verify-financials.mjs
+// and verify-r7-guardrails.mjs all import analytics.js directly, before ever reaching api/ask.js) —
+// confirmed by reproducing and fixing this exact crash while adding this file's typo tolerance.
+// A local copy avoids the cycle entirely; keep it in sync with nlNormalize.js's own algorithm if
+// that one ever changes, but do not re-import it from here.
+function fastPathWithinEditDistance1(a, b) {
+  if (a === b) return true;
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  if (la === lb) {
+    let diffCount = 0;
+    let i1 = -1;
+    let i2 = -1;
+    for (let i = 0; i < la; i++) {
+      if (a[i] !== b[i]) {
+        diffCount++;
+        if (diffCount === 1) i1 = i;
+        else if (diffCount === 2) i2 = i;
+        else return false;
+      }
+    }
+    if (diffCount <= 1) return true;
+    return i2 === i1 + 1 && a[i1] === b[i2] && a[i2] === b[i1];
+  }
+  const [s, l] = la < lb ? [a, b] : [b, a];
+  let i = 0;
+  let j = 0;
+  let usedSkip = false;
+  while (i < s.length && j < l.length) {
+    if (s[i] === l[j]) { i++; j++; continue; }
+    if (usedSkip) return false;
+    usedSkip = true;
+    j++;
+  }
+  return true;
+}
+
+function correctFastPathTriggerTypos(text, triggerWords) {
+  const trig = (triggerWords ?? []).map((w) => String(w ?? '').toLowerCase()).filter(Boolean);
+  if (!trig.length) return String(text ?? '');
+  const byLen = new Map();
+  for (const w of trig) {
+    if (!byLen.has(w.length)) byLen.set(w.length, []);
+    byLen.get(w.length).push(w);
+  }
+  return String(text ?? '').replace(/[A-Za-z]+/g, (word) => {
+    const lower = word.toLowerCase();
+    if (lower.length < 3 || trig.includes(lower)) return word;
+    let match = null;
+    for (const len of [lower.length - 1, lower.length, lower.length + 1]) {
+      for (const cand of byLen.get(len) ?? []) {
+        if (!fastPathWithinEditDistance1(lower, cand)) continue;
+        if (match && match !== cand) return word; // ambiguous between two trigger words — leave it alone
+        match = cand;
+      }
+    }
+    return match ?? word;
+  });
+}
 
 /* ============================================================ intent catalogue */
 
@@ -108,10 +176,37 @@ const TRIGGERS = [
   ['invoice_total', /\b(invoice|bill)\b[\s\S]*\b(total|cost|amount|come to|how much)\b/i],
   ['invoice_total', /\bhow much\b[\s\S]*\b(invoice|bill|job|install(?:ation)?)\b/i],
   ['invoice_total', /\btotal (?:cost|amount|due)\b/i],
-  ['invoice_total', /\b(?:last|latest|most recent)\s+(?:invoice|bill)\b/i],
+  // R15 (Team C, follow-up round): "when was the last invoice for X" asks for a DATE, never an
+  // amount — this trigger used to fire for it anyway (the shared "last/latest invoice" phrasing),
+  // but fetchInvoiceTotal's own answer template only ever states a dollar figure, never a date,
+  // so it silently answered the wrong dimension of the question (caught only once
+  // fetchInvoiceTotal started actually returning a value — see this file's own header note on the
+  // document_financials fix — because until then this intent never resolved to anything at all in
+  // this corpus, and the question fell through to the money gate's own last_invoice answer, which
+  // states both the date AND the amount). Excluding a when/date-asking phrasing here sends it back
+  // to that same money-gate path instead of this file's plainer, date-less template.
+  ['invoice_total', /^(?!.*\b(?:when|what date|which date|what day)\b)[\s\S]*\b(?:last|latest|most recent)\s+(?:invoice|bill)\b/i],
   ['document_list_for_subject', /\bwhat documents?\b[\s\S]*\b(?:on|for)\b|\bwhat do we have\b[\s\S]*\b(?:on|for)\b|\bshow (?:me )?everything (?:on|for)\b|\ball documents? for\b/i],
   ['equipment_list', /\bwhat equipment\b|\bwhat units?\b[\s\S]*\bhave\b|\bwhat'?s installed at\b|\blist (?:the )?equipment\b/i],
 ];
+
+// R15 (Team C): a handful of TRIGGERS words are exactly the kind of short, closed, domain-specific
+// vocabulary correctTriggerWordTypos (nlNormalize.js) exists for — see that function's own doc
+// comment and docLookup.js's identical use for DOCTYPE_TRIGGER_WORDS. Needed because
+// normalizeQuestionForAnalytics's own general fuzzy corrector (api/ask.js) never reaches a fastPath
+// question at all (fastPath classifies the RAW question, before that normalization runs), and a
+// short word like "under"/"tonnage" is exactly the length nlNormalize's own dictionary-based
+// correction floor (5+ letters, whole-word) misses or never attempts on some single-record shapes.
+// Without this, "still uner warranty" / "the onnage of the unit at ..." never matched
+// TRIGGERS at all and silently fell through to needs-model, on questions whose ADDRESS was parsed
+// perfectly fine.
+// R15 (Team C): deliberately excludes "installed"/"installation" — "installer" (a real word, its
+// own distinct trigger just below) sits at edit-distance-1 from "installed" and isn't in this
+// file's domain VOCAB, so including it wrongly "corrected" every genuine "Who was the installer…"
+// phrasing into "installed" and broke that trigger (see verify-fastpath.mjs's corpus regression
+// caught while adding this list — re-add an install-family word here only alongside a VOCAB entry
+// for "installer" itself, so the two can never be confused).
+const TRIGGER_TYPO_WORDS = ['under', 'tonnage', 'warranty', 'refrigerant', 'manufacturer', 'permit'];
 
 /** Raw trigger match only — NOT the public classifier. "serial killer
  *  documentary recommendations", "what was the model of behavior therapy
@@ -121,8 +216,9 @@ const TRIGGERS = [
  *  question. classifyIntent (below) is the actual public entry point and
  *  never skips the domain-anchor gate. */
 function matchTrigger(question) {
-  const q = String(question ?? '');
-  if (!q.trim()) return null;
+  const raw = String(question ?? '');
+  if (!raw.trim()) return null;
+  const q = correctFastPathTriggerTypos(raw, TRIGGER_TYPO_WORDS);
   for (const [intent, re] of TRIGGERS) {
     if (re.test(q)) return intent;
   }
@@ -215,16 +311,29 @@ const STREET_SUFFIX_RE =
 // R11 fix (lookups-0010/0084, hvac-tech-0007/0036 — golden tenant): this used to stop capturing
 // right after the street-suffix word, so "137 W Southern Ave, Mesa, AZ 85201" and "137 W
 // Southern Ave, Phoenix, AZ 85001" (two DIFFERENT real addresses in this corpus that share a
-// house number and street name) became the identical subject.address "137 W Southern Ave" —
-// fastPathQuery.js's own ILIKE-ALL match then had no city/zip tokens to require and silently
-// answered the Phoenix customer's real record for a Mesa address that was never on file. The
+// house number and street name) became the identical subject.address "137 W Southern Ave". The
 // trailing city/state/zip is optional (a bare "3247 Elm St" with no city still matches exactly
-// as before) but, when present, is now part of the captured address so its tokens flow through
-// significantAddressTokens/ILIKE ALL and a same-street-different-city collision can no longer
-// resolve to the wrong customer. State is [A-Za-z]{2,12} (not just 2 letters) because
-// normalizeQuestion.js may have already expanded "AZ" to "Arizona" upstream of this regex.
+// as before) but, when present, is now part of the captured address, same as before.
+// R15 fix (Team C, 2026-09-26): the R11 comment above assumed the caller's stated city/zip is
+// trustworthy enough to REQUIRE for a match — it isn't (a dispatcher who says "Casa Grande" about
+// a unit actually on file as "Mesa" is common real-world noise, not a different address), and
+// requiring it made fastPathQuery.js's resolution fail closed (0 rows, not a wrong row) for every
+// one of warranty-0001/0002/0006/0008/0012/0017/0029, hvac-tech-0039/0073, lookups-0019/0024/0092
+// and both notes questions (hvac-tech-0036/0085) — a regression this round's offline exam caught
+// as `needs-model`, not `wrong`, but still real lost coverage. fastPathQuery.js now matches on the
+// house number + street name ALONE first (see houseStreetTokens below) exactly like
+// scope.js's resolveAddressScope already does for the deterministic-history router, and only
+// falls back to requiring more (an apartment/unit number via extractUnitDesignator, then this
+// same city/zip capture as a last-resort tie-break) when the street match alone is ambiguous —
+// see fastPathQuery.js's resolveFastPathSubject. Capturing city/state/zip AND an apartment/unit
+// segment here (before the R15 fix neither survived a comma-separated "Apt 103" in between) keeps
+// both available for that later disambiguation without ever requiring either up front. State is
+// [A-Za-z]{2,12} (not just 2 letters) because normalizeQuestion.js may have already expanded "AZ"
+// to "Arizona" upstream of this regex.
+const ADDRESS_UNIT_SEG_RE_SRC =
+  "(?:,?\\s+(?:apt|apartment|suite|ste|unit|no|number)\\.?\\s*#?\\s*[A-Za-z0-9]+|,?\\s+#\\s*[A-Za-z0-9]+)?";
 const ADDRESS_RE = new RegExp(
-  `\\b(\\d{1,6}\\s+[A-Za-z0-9.']+(?:\\s+[A-Za-z0-9.']+){0,3}\\s+${STREET_SUFFIX_RE}(?:,?\\s+[A-Za-z][A-Za-z\\s]{1,24}?,?\\s+[A-Za-z]{2,12}\\s+\\d{5})?)\\b\\.?`,
+  `\\b(\\d{1,6}\\s+[A-Za-z0-9.']+(?:\\s+[A-Za-z0-9.']+){0,3}\\s+${STREET_SUFFIX_RE}${ADDRESS_UNIT_SEG_RE_SRC}(?:,?\\s+[A-Za-z][A-Za-z\\s]{1,24}?,?\\s+[A-Za-z]{2,12}\\s+\\d{5})?)\\b\\.?`,
   'i'
 );
 // A word that must never be swallowed into a loose address or mistaken for a
@@ -411,6 +520,47 @@ export function significantAddressTokens(address) {
   return words.filter((w, i) => !unitNumberIdx.has(i) && (/^\d+$/.test(w) || w.length >= 3) && !ADDRESS_STOPWORDS.has(w) && !STATE_NAME_WORDS.has(w));
 }
 
+const HOUSE_STREET_DIRECTIONALS = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw', 'north', 'south', 'east', 'west']);
+const HOUSE_STREET_HEAD_RE = new RegExp(
+  `(\\d{1,6})\\s+((?:[A-Za-z0-9.']+\\s+){0,4}?[A-Za-z0-9.']+?)\\s+${STREET_SUFFIX_RE}\\b`,
+  'i'
+);
+
+/**
+ * Pure (R15, Team C): an address fragment -> ONLY the house number + street-name tokens, e.g.
+ * "3300 S Alma School Rd, Apt 103, Mesa, AZ 85201" -> ['3300', 'alma', 'school']. Deliberately
+ * excludes the city, state, zip AND any apartment/unit number/designator — see this file's own
+ * ADDRESS_RE comment for why: a caller's stated city is the least reliable part of a spoken
+ * address, and requiring it turns a real, on-file record into a false "nothing on file". This is
+ * the PRIMARY match key fastPathQuery.js's resolveFastPathSubject tries first; a caller-named
+ * apartment/unit number (extractUnitDesignator, scope.js) and, only if a street match is still
+ * ambiguous, this same address's own city/zip words are applied as narrower disambiguation
+ * afterward — never required up front. Mirrors scope.js's own parseStreetAddress (same
+ * house+street shape, same "no suffix word" fallback to significantAddressTokens), kept as its own
+ * small function here rather than imported to avoid a circular import (scope.js already imports
+ * from this file). Empty input, or no street-shaped text at all -> empty list (caller must treat
+ * that as "can't resolve", never as "match everything").
+ */
+export function houseStreetTokens(address) {
+  const text = String(address ?? '');
+  const m = HOUSE_STREET_HEAD_RE.exec(text);
+  if (m) {
+    const words = m[2]
+      .toLowerCase()
+      .split(/\s+/)
+      .map((w) => w.replace(/[.']/g, ''))
+      .filter((w) => w && !HOUSE_STREET_DIRECTIONALS.has(w));
+    return words.length ? [m[1], ...words.slice(0, 2)] : [m[1]];
+  }
+  // No suffix word ("3247 Elm"): fall back to the same generic significant-token extraction
+  // significantAddressTokens uses, but still capped to the house number + first street word so a
+  // trailing city never sneaks in here either.
+  const tokens = significantAddressTokens(text);
+  const house = tokens.find((t) => /^\d+$/.test(t));
+  const rest = tokens.filter((t) => !/^\d+$/.test(t));
+  return house && rest.length ? [house, ...rest.slice(0, 2)] : [];
+}
+
 /** Pure: does this list of candidate rows resolve to exactly one? Dedupes by
  *  `id` first (the same row can legitimately come back from more than one
  *  query path). Returns the single row, or null for zero OR more-than-one —
@@ -550,6 +700,57 @@ const FACT_LABEL = {
   refrigerant: 'Refrigerant', tonnage: 'Tonnage', permit_number: 'Permit number',
   invoice_total: 'Invoice total', agreement_term: 'Agreement term',
 };
+
+/**
+ * Intents whose value lives on the EQUIPMENT entity's own record (warranty, manufacturer, tonnage,
+ * refrigerant, install date) rather than on a document a customer's address can reach. A raw street
+ * address (fastPath.js's own `subject.address`, as opposed to a customer-number/serial/name subject)
+ * only ever resolves to a CUSTOMER's file here — equipment is never itself tagged with an address,
+ * only a `customer_id` — so for these specific intents an address can identify WHOSE file it is, but
+ * never confirm WHICH of that file's units (if the caller didn't otherwise say) the fact belongs to,
+ * nor that the fact is really "at that address" rather than another property on the same account.
+ * See buildAddressFieldDecline below and fastPathQuery.js's resolveFastPathSubject (the `viaAddress`
+ * flag) for how this is used: never a fabricated value for one of these, only an honest, cited-to-
+ * nothing decline, when the subject came from an address rather than a name/customer number/serial.
+ */
+export const ADDRESS_ENTITY_FIELD_INTENTS = new Set(['warranty_status', 'warranty_expires', 'manufacturer', 'tonnage', 'refrigerant', 'install_date']);
+
+const ADDRESS_FIELD_LABEL = {
+  warranty_status: 'warranty status', warranty_expires: 'warranty', manufacturer: 'manufacturer',
+  tonnage: 'tonnage', refrigerant: 'refrigerant', install_date: 'install date',
+};
+
+/**
+ * The honest-decline answer for one of ADDRESS_ENTITY_FIELD_INTENTS, resolved by a raw street
+ * address (see fastPathQuery.js's resolveFastPathSubject — `resolution.viaAddress`). Never invents a
+ * value; `facts` stays empty so this reads as a genuine "not on file" rather than a fabricated one
+ * (api/_lib/scorecard/compare.js's compareHonestZero treats `kind: 'no-answer'` with no facts as a
+ * pass, never a fail, for exactly this shape of question).
+ *   resolution.kind === 'no-address'  -> nothing on file anywhere at that street at all
+ *   resolution.kind === 'no-unit'     -> the street is on file, but not the apartment/unit named
+ *   resolution.kind === 'ambiguous'   -> more than one unit at that street and no unit/apt named
+ *   resolution.kind === 'customer'/'equipment' -> the street resolves to exactly one file, but
+ *     nothing on file ties this specific field directly to the address itself (see ADDRESS_ENTITY_FIELD_INTENTS)
+ */
+export function buildAddressFieldDecline({ intent, subject, resolution }) {
+  const addressLabel = String(subject?.address ?? '').replace(/\s+/g, ' ').trim() || 'that address';
+  const fieldLabel = ADDRESS_FIELD_LABEL[intent] ?? 'that';
+  let text;
+  if (resolution?.kind === 'no-unit') {
+    const unitLabel = resolution.unit ? `unit ${resolution.unit}` : 'that unit';
+    text = `I don't see ${unitLabel} on file at ${addressLabel} — not on file for that address.`;
+  } else if (resolution?.kind === 'ambiguous') {
+    text = `There's more than one unit on file at ${addressLabel} and nothing here says which one, so I can't give a single ${fieldLabel} — not on file for that address without a specific unit.`;
+  } else if (resolution?.kind === 'customer' || resolution?.kind === 'equipment') {
+    text = `I have a file for ${addressLabel}, but nothing on file ties a ${fieldLabel} directly to that street address by itself — not on file for that address.`;
+  } else {
+    text = `${addressLabel} isn't on file — not on file for that address.`;
+  }
+  return {
+    kind: 'no-answer', text, facts: [], sources: [], confidence: 0,
+    verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent,
+  };
+}
 
 /**
  * Build the final answer object for a single field-lookup intent from the

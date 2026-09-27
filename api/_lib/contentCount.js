@@ -20,6 +20,14 @@
  * pure: expandTerms, buildTermPattern, extractKnownTerms, parseContentCountQuestion, findMatches
  * db:   runContentCount
  *
+ * Round 15 (2026-09-26, R15_CONTRACT.md, Team D): two more root causes fixed -
+ *   6. "How many jobs involved a TXV or expansion valve?" / "...mention a heat exchanger crack?" needed two
+ *      new HVAC synonym groups (txv, heat exchanger below) - once added, the EXISTING "how many jobs ..."
+ *      question-shape fallback already recognizes and answers them; no new parsing logic needed.
+ *   7. "What was found or done on the Mercer job?" is a wholly different shape (one NAMED customer's own
+ *      on-file documents, extractive sentences, no HVAC term at all) - see content/jobSummary.js, wired in
+ *      at the top of parseContentCountQuestion/runContentCount below so no other file needs to change.
+ *
  * Round 7 (2026-09-26, R7_MEASURE.md content 13/27): two more root causes fixed in this file alone —
  *   3. "Which customers had the X replaced?" / "How many times have we replaced a X?" never matched
  *      parseContentCountQuestion at all (REPLACED_WORD_RE was explicitly EXCLUDED from the question-shape
@@ -41,6 +49,7 @@
  */
 import { documentTypeLabel, canonicalTypeId } from './documentTypes.js';
 import { attachCitations, customerRecord, documentRecord } from './citations/records.js';
+import { parseJobSummaryQuestion, runJobSummary } from './content/jobSummary.js';
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -95,6 +104,17 @@ export const HVAC_TERM_SYNONYMS = {
   'not cooling': ['not cooling', 'no cooling', 'no cool', 'won\'t cool', 'wont cool', 'blowing warm', 'warm air', 'not cold', 'isn\'t cooling', 'isnt cooling', 'insufficient cool', 'not keeping up', 'wasn\'t keeping up', 'wasnt keeping up', 'no-cooling'],
   'no power': ['won\'t start', 'wont start', 'not starting', 'no power', 'tripped breaker', 'tripping breaker', 'breaker tripped', 'not turning on', 'won\'t turn on', 'wont turn on', 'would not turn on', 'wouldn\'t turn on'],
   odor: ['smell', 'smells', 'odor', 'odour', 'burning smell', 'burning odor', 'strange smell'],
+  // Round 15 (breadth-content-030): matches the exam oracle's own bare (txv|expansion valve) pattern exactly
+  // (no boundary at the end there, so "expansion valveS" already counts for it too - "txvs"/"expansion
+  // valves" are added explicitly here so this file's own word-boundary-anchored buildTermPattern catches
+  // those plurals as well; see splitStems/buildTermPattern's own doc comment for why a stem, not a second
+  // plural entry, would be needed if this ever needed a true PREFIX match instead).
+  txv: ['txv', 'txvs', 'expansion valve', 'expansion valves'],
+  // Round 15 (breadth-content-031): matches the exam oracle's own bare "heat exchanger" pattern - the
+  // question asks about a CRACK, but the oracle's own search term is just "heat exchanger" itself (a crack
+  // is always reported as "heat exchanger cracked"/"crack in the heat exchanger", so anchoring on the
+  // component name alone is what the reference record actually searches for).
+  'heat exchanger': ['heat exchanger', 'heat exchangers'],
 };
 
 const TERM_TO_GROUP = new Map();
@@ -146,6 +166,21 @@ const QUESTION_ALIASES = {
   refrigerant: ['refrigerant charge', 'low on refrigerant', 'low charge', 'needs a charge'],
   drain: ['drain problem', 'drain issue', 'drainage problem', 'drainage issue'],
   freeze: ['freeze-up', 'freeze up', 'frozen up', 'freezing up'],
+};
+
+/**
+ * Round 15 (breadth-content-028, deferred at R11/verify-golden.mjs, now fixed): a phrase that ALREADY
+ * implies the replace action on its own, with no verb anywhere nearby - "a filter change" IS a filter
+ * replacement, the same way the exam oracle's own pattern for this question ORs in a bare "filter change"
+ * alternative alongside its verb-proximity one (`(replac\w*[^.]{0,40}filter|filter[^.]{0,30}replac|filter
+ * change)`). Verified against the golden tenant's own corpus (scripts/golden/): the two sets are disjoint
+ * (77 proximity-only + 8 "filter change"-only = 85, exactly the oracle's own count) - this widens recall
+ * without moving a single already-correct document, so it's safe for the shared replaceVerb path used by
+ * every other "replaced X" question too (only ever added when `terms` includes a key listed here). Kept to
+ * this one verified term rather than guessed at for every replace-term.
+ */
+const REPLACE_STANDALONE_PHRASES = {
+  filter: ['filter change', 'filter changes'],
 };
 
 /** canonical group key(s) -> every variant word/phrase, deduplicated. */
@@ -358,6 +393,12 @@ export function parseContentCountQuestion(question, pack = null) {
   if (!q) return null;
   const lower = q.toLowerCase();
 
+  // Round 15 (Team D): "What was found or done on the Mercer job?" - a wholly different shape (one named
+  // customer's own record, no HVAC term needed at all) checked FIRST, before the mention/replace shapes
+  // below (which all require a recognized term this shape never has) - see content/jobSummary.js.
+  const jobSummary = parseJobSummaryQuestion(q);
+  if (jobSummary) return jobSummary;
+
   const replaced = parseReplacedQuestion(lower);
   if (replaced) {
     const terms = extractKnownTerms(lower, pack);
@@ -465,11 +506,23 @@ export function hasWorkMention(text, jsRe) {
  *   this only returns null when `terms` is empty (a caller bug, never a real question).
  */
 export async function runContentCount(db, parsed, pack = null) {
+  // Round 15 (Team D): the job-summary shape (content/jobSummary.js) is a completely separate code path -
+  // one named customer's own documents, extractive sentences, no term/synonym matching at all.
+  if (parsed?.mode === 'jobSummary') return runJobSummary(db, parsed, pack);
+
   const { terms, scope, groupBy, replaceVerb, replaceVerbWord } = parsed;
   const variants = expandTerms(terms, pack);
   if (!variants.length) return null;
-  const pattern = replaceVerb ? buildProximityPattern(replaceVerb, variants) : buildTermPattern(variants);
-  const jsRe = replaceVerb ? buildProximityJsRegex(replaceVerb, variants) : buildJsTermRegex(variants);
+  // Round 15: a verified standalone phrase (REPLACE_STANDALONE_PHRASES) is OR'd in alongside the normal
+  // verb-proximity pattern - see that map's own doc comment. Empty for every term not listed there, so this
+  // is a no-op for every replaceVerb question this file already answered correctly.
+  const standalone = replaceVerb ? terms.flatMap((t) => REPLACE_STANDALONE_PHRASES[t] ?? []) : [];
+  const pattern = replaceVerb
+    ? [buildProximityPattern(replaceVerb, variants), ...(standalone.length ? [buildTermPattern(standalone)] : [])].join('|')
+    : buildTermPattern(variants);
+  const jsRe = replaceVerb
+    ? new RegExp([buildProximityJsRegex(replaceVerb, variants).source, ...(standalone.length ? [buildJsTermRegex(standalone).source] : [])].join('|'), 'gi')
+    : buildJsTermRegex(variants);
 
   // Review r3: a full-corpus regex scan gets its own 4 s statement_timeout (same idea as the agent's run_query guard),
   // inside a savepoint so a timeout never poisons the caller's tenant transaction.

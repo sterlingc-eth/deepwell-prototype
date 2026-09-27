@@ -26,9 +26,9 @@
  *   - breadth-content-019: the exam oracle's own "ice " (trailing space) pattern coincidentally
  *     substring-matches "invoice " in nearly every invoice; replicating that in production HVAC
  *     term synonyms would hurt real freeze-up detection, so deliberately not chased.
- *   - breadth-content-028: needs a standalone "filter change" phrase alternative with no verb-
- *     proximity requirement, structurally different from buildProximityPattern; deferred as too
- *     risky to bolt onto a shared, already-tuned function this late.
+ *   - breadth-content-028: FIXED in Round 15 (contentCount.js's REPLACE_STANDALONE_PHRASES) - a
+ *     verified, term-scoped "filter change" alternative OR'd in alongside the shared
+ *     buildProximityPattern, never changing what any other replaceVerb question matches.
  *   - breadth-semantic-001/002/003: the corpus generator's current output contains zero
  *     noise-complaint vocabulary anywhere (confirmed via direct pdftotext scan of every PDF) while
  *     exam.json's frozen ground truth expects 8 specific customers to have it — a generator/exam
@@ -153,11 +153,9 @@ const examExport = exportA ?? committed;
 // fails this check; the exam shrinking below this set (a gap gets fixed later) also passes, since
 // the check is "actual wrong ids subset of this list", not "equal to".
 const KNOWN_WRONG_IDS = new Set([
-  "lookups-0010-canonical", "lookups-0010-typo", "lookups-0010-abbreviated",
-  "hvac-tech-0007-canonical", "lookups-0084-canonical",
-  "breadth-content-019", "breadth-content-028",
+  // R15: lookups-0010-*, hvac-tech-0007, lookups-0084 (install_date) and breadth-content-028 fixed; shrink-only list.
+  "breadth-content-019", // deliberately not chased - see file header
   "breadth-semantic-001", "breadth-semantic-002", "breadth-semantic-003",
-  "breadth-connect-119",
 ]);
 
 if (examExport) {
@@ -226,8 +224,11 @@ if (examExport) {
     // moved counts-geo/brand/age/warranty/docs, coverage, data-hygiene, existence, lists, technician
     // and most of time/data-quality off the model entirely (measured 532/474 at the time of this
     // change). Combined with K4 relations/decompose work at integration: measured 582/521 → floor 565/505.
-    check(`no-model coverage floor: answeredWithoutModel ≥ 565 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 565, JSON.stringify(overall));
-    check(`no-model coverage floor: correct ≥ 505 (got ${overall.correct})`, overall.correct >= 505, JSON.stringify(overall));
+    // Round 15 (Team D, content family): new HVAC vocabulary (txv/heat exchanger) and the deterministic
+    // job-summary shape (content/jobSummary.js) moved 8 more content questions off needs-model (2 newly
+    // correct, 6 to needs-grader) — measured 590/523 → floor raised to 585/520.
+    check(`no-model coverage floor: answeredWithoutModel ≥ 670 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 670, JSON.stringify(overall));
+    check(`no-model coverage floor: correct ≥ 595 (got ${overall.correct})`, overall.correct >= 595, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 
     realLog(`NOTE  golden offline exam: ${JSON.stringify(overall)}`);
