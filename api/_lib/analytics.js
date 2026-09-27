@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { deriveCity } from './routes/customers.js';
-import { alertTier, normalizeBrand } from './warrantyRules.js';
+import { alertTier, normalizeBrand, isPlausibleToday, isValidYmd, daysBetween } from './warrantyRules.js';
 import { DOCUMENT_TYPE_IDS, docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from './documentTypes.js';
 // Team A (2026-09-24): "added/uploaded" -> created_at vs "serviced/visited" -> service_date, decided from the wording.
 import { dateBasisPhrase } from './scope.js';
@@ -92,6 +92,11 @@ export const FILTER_FIELDS = [
   'hasAnyDocument', 'hasServiceAddress', 'hasZip', 'hasCustomerLink',
   'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage',
   'installDateInFuture', 'hasServiceDate',
+  // R16 D2 audit item 9: "which units are missing a refrigerant on file" —
+  // same shape as hasTonnage right above (a nameplate/startup-sheet/
+  // warranty-registration-only field, ~53% coverage in this corpus by
+  // design), just the one boolean field that pattern didn't cover yet.
+  'hasRefrigerant',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -134,6 +139,7 @@ export const DATA_QUALITY_FIELD_ENTITY = {
   hasInstallDate: 'equipment',
   hasModel: 'equipment',
   hasTonnage: 'equipment',
+  hasRefrigerant: 'equipment',
   // Round 15 (A): deliberately no hasWarrantyInfo — deriveWarranty
   // (warrantyRules.js) always writes a non-empty "stable" object onto every
   // unit's data.warranty, even one with no real warranty data at all, so
@@ -154,6 +160,16 @@ export const DEFAULT_LIMIT = 500;
  *  'customers' + op 'list'; see queryTopCustomers, routes/analytics.js. */
 export const SORT_FIELDS = ['equipmentCount', 'documentCount'];
 export const TOP_CUSTOMERS_LIMIT = 10;
+/** Field-phrasing g133/g138 ("whats the oldest unit we have on file" /
+ *  "whats our newest install") — equipment RANKED by installation_date, not
+ *  filtered/counted, the equipment-entity sibling of SORT_FIELDS above. Only
+ *  meaningful for entity 'equipment' + op 'list' — see
+ *  queryInstallDateExtreme/formatInstallDateExtremeAnswer, routes/analytics.js. */
+export const INSTALL_DATE_SORT_FIELDS = ['installDateAsc', 'installDateDesc'];
+/** Ties (several units sharing the exact same printed install date) are
+ *  never silently dropped, but a cap keeps one pathological tie from
+ *  producing an unbounded answer/citation list. */
+export const INSTALL_DATE_EXTREME_LIMIT = 50;
 
 /* ================================================================ classifier
  *
@@ -2410,9 +2426,20 @@ export function validatePlan(raw) {
   // `limit` the model also set — "top 10" is what was asked, not "top 500".
   let sortBy;
   if (p.sortBy != null) {
-    if (!SORT_FIELDS.includes(p.sortBy) || p.entity !== 'customers' || p.op !== 'list') return null;
-    sortBy = p.sortBy;
-    limit = Math.min(limit, TOP_CUSTOMERS_LIMIT);
+    if (INSTALL_DATE_SORT_FIELDS.includes(p.sortBy)) {
+      // g133/g138: equipment ranked by installation_date — same "only
+      // meaningful for one entity+op combo" gate as the customers case
+      // below, just for 'equipment'/'list' instead of 'customers'/'list'.
+      if (p.entity !== 'equipment' || p.op !== 'list') return null;
+      sortBy = p.sortBy;
+      limit = Math.min(limit, INSTALL_DATE_EXTREME_LIMIT);
+    } else if (SORT_FIELDS.includes(p.sortBy)) {
+      if (p.entity !== 'customers' || p.op !== 'list') return null;
+      sortBy = p.sortBy;
+      limit = Math.min(limit, TOP_CUSTOMERS_LIMIT);
+    } else {
+      return null;
+    }
   }
 
   // Team A: which date a documents time window is about — set by code from the question wording (never the model).
@@ -3121,13 +3148,59 @@ export function installYearOf(installationDate) {
   return m ? Number(m[1]) : null;
 }
 
-/** warrantyStatus bucket ('active'|'expiring'|'expired'|'unknown') from an
- *  equipment row's alertTier — folds the three "expiring-*" tiers together, a
- *  dispatcher asking "expiring" doesn't care whether it's in 20 or 80 days. */
+/**
+ * warrantyStatus bucket ('active'|'expiring'|'expired'|'unknown') — a PURE
+ * function of the unit's coverage EXPIRY date only, matching the exam
+ * oracle's own definition byte-for-byte (test-docs/scorecard/exam.json's
+ * warranty-status CASE expression): unknown when there's no parseable
+ * expiry, expired when it's in the past, expiring when it's 0-365 days out,
+ * active otherwise.
+ *
+ * R16 D2 audit item 1 BUG FIX (2026-09-26): this used to go through
+ * warrantyRules.alertTier(), which folds in a SEPARATE, registration-
+ * paperwork-deadline signal ('unregistered-window-closing', fired whenever
+ * the registration deadline — not the coverage expiry — is <=30 days out)
+ * ahead of the expiry bucket, by design, for the reminders/alerts UI
+ * (warranty-attention.js/notify.js/outreach.js still call alertTier()
+ * directly and are UNCHANGED by this fix — that surface still needs and
+ * gets the registration-window signal). Routing THIS "what's the coverage
+ * status" question through that same tier silently recoded "active,
+ * registration paperwork due soon" as "expiring" — a unit installed in
+ * 2021 with a 10-year term (expires 2031, ~5 years out) but an unregistered
+ * 60-day window closing in 3 weeks came back 'expiring', wrong by
+ * ~1800 days, on every warranty count/list/rollup/ranking/customer-file/
+ * graph-node consumer that reuses this one function (see this file's own
+ * module header and rollups/refresh.js, rankings.js, compose.js,
+ * agent/tools.js, customerFile.js, graph/query.js — none of those
+ * reimplement the bucket, so fixing it here fixes every one of them).
+ *
+ * The registration deadline remains available, unchanged, as its own signal
+ * — never folded into this bucket again — via alertTier() directly (still
+ * 'unregistered-window-closing') or registrationActionNeededOf() below, a
+ * plain boolean wrapper for a caller that just wants "is registration
+ * paperwork due soon" without the full tier enum.
+ */
 export function warrantyStatusOf(warranty, today) {
-  const tier = alertTier(warranty, today);
-  if (tier === 'expired') return 'expired';
-  if (tier === 'ok') return 'active';
-  if (tier === 'unknown') return 'unknown';
-  return 'expiring'; // expiring-30 / expiring-90 / expiring-365 / unregistered-window-closing
+  if (!isPlausibleToday(today)) return 'unknown';
+  const expires = warranty?.expires;
+  if (!isValidYmd(expires)) return 'unknown';
+  const days = daysBetween(today, expires);
+  if (days === null) return 'unknown';
+  if (days < 0) return 'expired';
+  if (days <= 365) return 'expiring';
+  return 'active';
+}
+
+/**
+ * A distinct, separate-from-coverage flag: is this unit's REGISTRATION
+ * paperwork deadline (not its coverage expiry) closing within 30 days with
+ * nothing on file yet? This is exactly warrantyRules.alertTier()'s own
+ * 'unregistered-window-closing' tier, named here for a caller that wants a
+ * plain boolean without reasoning about the full tier enum — it composes
+ * ALONGSIDE warrantyStatusOf's coverage bucket (a unit can be
+ * registrationActionNeeded AND warrantyStatusOf === 'active' at the same
+ * time, which is exactly the case this fix corrects for).
+ */
+export function registrationActionNeededOf(warranty, today) {
+  return alertTier(warranty, today) === 'unregistered-window-closing';
 }

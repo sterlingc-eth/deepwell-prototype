@@ -371,6 +371,52 @@ export function buildProximityPattern(verb, variants, window = 100) {
   return `(\\y${v}\\w*[^.]{0,${window}}\\y(?:${termAlts})\\y|\\y(?:${termAlts})\\y[^.]{0,${window}}\\y${v}\\w*)(?!\\s*:)`;
 }
 
+/**
+ * Round 16 (D2 audit #8): a safe OVER-APPROXIMATING tsquery for `variants` — a candidate PREFILTER
+ * against the existing tenant-scoped GIN(tenant_id, tsv) index (document_pages_tenant_tsv_idx,
+ * 17-ask-cache-and-search-index.sql), so a full-corpus content-count question narrows to matching
+ * pages via that index before ever running the regex below, instead of a sequential `text ~* pattern`
+ * scan of every page's raw text on every call. Never a false negative: every exact (non-'~') variant
+ * goes through plainto_tsquery('english', ...) — the SAME text-search config document_pages.tsv is
+ * itself GENERATED with (03-retrieval.sql/11-fix-tsv.sql), so its stemming/stopword/tokenizing
+ * decisions are guaranteed consistent with the column already, never a second hand-rolled stemmer
+ * that could quietly disagree with it. A multi-word variant becomes an AND of its own words
+ * (plainto_tsquery's default, no adjacency required) — weaker than the regex's own exact-phrase
+ * match, so still a safe superset (a literal phrase match in the text implies each of its words is
+ * present somewhere on that page). A '~'-suffixed STEM variant (already a literal prefix — e.g.
+ * 'recharg~' for recharge/recharging/recharged) uses a raw `word:*` prefix tsquery term instead of
+ * running it through the dictionary a second time (a stem is not itself a real word, so stemming it
+ * again risks the dictionary treating the fragment oddly; a prefix match is exactly what a stem
+ * means). Every variant's term is OR'd together with `||`. Verified empirically against every
+ * variant in HVAC_TERM_SYNONYMS (see scripts/verify-content.mjs's own "tsv prefilter never drops a
+ * true match" section) that this can never exclude a page the exact regex below would otherwise
+ * keep — the regex still runs, unchanged, as the authoritative filter; this only narrows what
+ * reaches it. Returns null for an empty/all-blank variant list (never happens from a real caller —
+ * runContentCount already requires `variants.length` — kept only as a defensive no-op).
+ */
+export function buildTsPrefilterQuery(variants) {
+  const clauses = [];
+  const params = [];
+  const seen = new Set();
+  for (const raw of variants ?? []) {
+    const v = String(raw ?? '');
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    if (v.endsWith('~')) {
+      const stem = v.slice(0, -1).replace(/[^a-z0-9]/gi, '').toLowerCase();
+      if (!stem) continue;
+      params.push(`${stem}:*`);
+      clauses.push(`to_tsquery('english', $${params.length}::text)`);
+    } else {
+      if (!v.trim()) continue;
+      params.push(v);
+      clauses.push(`plainto_tsquery('english', $${params.length}::text)`);
+    }
+  }
+  if (!clauses.length) return null;
+  return { sql: clauses.join(' || '), params };
+}
+
 /** The same pattern, as a JS RegExp (global, case-insensitive) — used client-side to build excerpts. */
 export function buildProximityJsRegex(verb, variants, window = 100) {
   const { exact, stems } = splitStems(variants);
@@ -524,21 +570,52 @@ export async function runContentCount(db, parsed, pack = null) {
     ? new RegExp([buildProximityJsRegex(replaceVerb, variants).source, ...(standalone.length ? [buildJsTermRegex(standalone).source] : [])].join('|'), 'gi')
     : buildJsTermRegex(variants);
 
+  // Round 16 (D2 audit #8): narrow via the existing tenant-scoped tsv GIN index BEFORE the regex,
+  // instead of a sequential `text ~* pattern` scan of every page — see buildTsPrefilterQuery's own
+  // doc comment for why this can never drop a page the regex would otherwise have kept. Tried first,
+  // in its own nested savepoint; ANY failure (a fixture/tenant somehow missing the generated `tsv`
+  // column migration 03/11-fix-tsv.sql already backfills everywhere else, a to_tsquery edge case, …)
+  // rolls back to that savepoint and falls back to the exact pre-existing plain-regex query — same
+  // "detect and fall back" contract as every other optional-schema check in this codebase, and never
+  // a behavior change, only a performance one.
+  const prefilterTerms = [...new Set([...variants, ...standalone])];
+  const prefilter = buildTsPrefilterQuery(prefilterTerms);
+
   // Review r3: a full-corpus regex scan gets its own 4 s statement_timeout (same idea as the agent's run_query guard),
   // inside a savepoint so a timeout never poisons the caller's tenant transaction.
   await db.raw("SAVEPOINT content_count", []);
   let pages;
   try {
     await db.raw("SET LOCAL statement_timeout = '4000'", []);
-    ({ rows: pages } = await db.raw(
-    `SELECT p.document_id, p.page_no, p.text, d.document_type, d.original_filename, d.created_at
-       FROM document_pages p
-       JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
-      WHERE p.${TENANT_SQL} AND p.text ~* $1
-      ORDER BY d.created_at DESC
-      LIMIT ${MAX_PAGES}`,
-    [pattern]
-  ));
+    if (prefilter) {
+      await db.raw("SAVEPOINT content_count_tsv", []);
+      try {
+        ({ rows: pages } = await db.raw(
+          `SELECT p.document_id, p.page_no, p.text, d.document_type, d.original_filename, d.created_at
+             FROM document_pages p
+             JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
+            WHERE p.${TENANT_SQL} AND p.tsv @@ (${prefilter.sql}) AND p.text ~* $${prefilter.params.length + 1}
+            ORDER BY d.created_at DESC
+            LIMIT ${MAX_PAGES}`,
+          [...prefilter.params, pattern]
+        ));
+        await db.raw("RELEASE SAVEPOINT content_count_tsv", []);
+      } catch {
+        await db.raw("ROLLBACK TO SAVEPOINT content_count_tsv", []).catch(() => {});
+        pages = undefined;
+      }
+    }
+    if (pages === undefined) {
+      ({ rows: pages } = await db.raw(
+      `SELECT p.document_id, p.page_no, p.text, d.document_type, d.original_filename, d.created_at
+         FROM document_pages p
+         JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
+        WHERE p.${TENANT_SQL} AND p.text ~* $1
+        ORDER BY d.created_at DESC
+        LIMIT ${MAX_PAGES}`,
+      [pattern]
+    ));
+    }
     await db.raw("RELEASE SAVEPOINT content_count", []);
   } catch (err) {
     await db.raw("ROLLBACK TO SAVEPOINT content_count", []).catch(() => {});

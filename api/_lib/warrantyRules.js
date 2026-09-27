@@ -724,6 +724,15 @@ function describePendingOptions(pending) {
  * @param {object} facts   canonical field_key -> value, as `extractions` holds them
  * @param {string} [today] YYYY-MM-DD; injected rather than read from the clock so
  *                         this is testable and so a batch run is self-consistent
+ * @param {object} [pack]  an industry pack's own brand-rules table, or null for hvac
+ * @param {object} [fieldSources] R16 D2 audit item 4 (citations): OPTIONAL
+ *   `field_key -> {documentId: string, page?: number}` map — the same field
+ *   keys `facts` carries (installation_date, warranty_registered_date,
+ *   warranty_expires), each naming the document that field's VALUE actually
+ *   came from. Nothing populates this yet (see the `sources` return field's
+ *   own doc comment for the upstream hook this needs); omitted entirely, the
+ *   return shape is unchanged and every `sources.*` entry is simply null —
+ *   this is a purely additive, backward-compatible parameter.
  * @returns {{
  *   brand: string|null, brandLabel: string|null, brandVerified: boolean,
  *   installDate: string|null, installDatePrecision: 'day'|'month'|null,
@@ -733,10 +742,11 @@ function describePendingOptions(pending) {
  *   expires: string|null, expiresBasis: 'printed'|'computed'|null,
  *   expiresPrecision: 'day'|'month'|null,
  *   termYears: number|null, termConditional: boolean,
- *   daysToExpiry: number|null, action: string|null, notes: string[]
+ *   daysToExpiry: number|null, action: string|null, notes: string[],
+ *   sources: {installDate: object|null, registrationOnFile: object|null, expires: object|null}
  * }}
  */
-export function deriveWarranty(facts = {}, today = null, pack = null) {
+export function deriveWarranty(facts = {}, today = null, pack = null, fieldSources = null) {
   const notes = [];
   const brand = normalizeBrand(facts.manufacturer, pack);
   const entry = brand ? brandRulesForPack(pack)[brand] : null;
@@ -755,6 +765,21 @@ export function deriveWarranty(facts = {}, today = null, pack = null) {
 
   const printedExpiryParsed = normalizeDate(facts.warranty_expires);
   const printedExpiry = printedExpiryParsed?.ymd ?? null;
+
+  // R16 D2 audit item 4: normalize one fieldSources entry into the
+  // {documentId, location:{field, page?}} shape citations/records.js's
+  // makeRecord/deriveRecords already reads off a fact's `sources[]` — so a
+  // caller that spreads sources.installDate/registrationOnFile/expires
+  // straight into a fact's `sources` array gets a real, working citation
+  // with no shape translation of its own.
+  const srcFor = (key) => {
+    const s = fieldSources?.[key];
+    if (!s || !s.documentId) return null;
+    const src = { documentId: String(s.documentId), location: { field: key } };
+    const page = Number(s.page);
+    if (Number.isFinite(page) && page > 0) src.location.page = Math.trunc(page);
+    return src;
+  };
 
   const out = {
     brand,
@@ -779,6 +804,17 @@ export function deriveWarranty(facts = {}, today = null, pack = null) {
     daysToExpiry: null,
     action: null,
     notes,
+    // R16 D2 audit item 4 (citations): which document each stored date came
+    // from, so a warranty answer can cite something more specific than "the
+    // unit's record" — `expires` is filled in below once its basis
+    // (printed/computed) is known, since a COMPUTED expiry's real source is
+    // whatever document gave the install date it was computed FROM, not a
+    // document that never printed an expiry at all.
+    sources: {
+      installDate: srcFor('installation_date'),
+      registrationOnFile: srcFor('warranty_registered_date'),
+      expires: null,
+    },
   };
 
   if (!brand) notes.push(`Manufacturer not recognised${facts.manufacturer ? ` ("${facts.manufacturer}")` : ''}.`);
@@ -808,6 +844,9 @@ export function deriveWarranty(facts = {}, today = null, pack = null) {
     out.expires = printedExpiry;
     out.expiresBasis = 'printed';
     out.expiresPrecision = printedExpiryParsed.precision;
+    // The expiry itself is what was printed — its citation is whatever
+    // document that printed value came from, never the install document.
+    out.sources.expires = srcFor('warranty_expires');
     if (printedExpiryParsed.precision === 'month') notes.push('Printed expiry is month precision — exact day unknown; the 1st is used for arithmetic only.');
   } else if (rule && installDate) {
     // Registered within the window earns the long term. Absence of a
@@ -840,6 +879,12 @@ export function deriveWarranty(facts = {}, today = null, pack = null) {
     // anchored to — addYears preserves day-of-month, so month precision
     // carries straight through.
     out.expiresPrecision = installDatePrecision;
+    // A COMPUTED expiry has no document of its own printing it — it's
+    // arithmetic on the install date, so its real citation is whatever
+    // document that install date came from (never a registration document:
+    // registeredInTime only changes which TERM applies, not which document
+    // the computation is anchored to).
+    out.sources.expires = out.sources.installDate;
 
     if (!registrationOnFile) {
       if (rule.registeredPartsYears != null) {

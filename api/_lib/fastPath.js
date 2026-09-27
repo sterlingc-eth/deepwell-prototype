@@ -127,11 +127,17 @@ export const WARRANTY_INTENTS = new Set(['warranty_expires', 'warranty_status'])
 /** Multi-row list answers, not a single fact. */
 export const LIST_INTENTS = new Set(['equipment_list', 'document_list_for_subject']);
 
+/** R16 (F1): a single question asking for TWO fields about the SAME unit together (field-phrasing
+ *  "compound" shape) — resolved and answered as one pair, never as just whichever intent's TRIGGERS
+ *  regex happened to match first (see fastPathQuery.js's runModelAndSerial). */
+export const COMPOUND_INTENTS = new Set(['model_and_serial']);
+
 export const ALL_INTENTS = [
   ...Object.keys(FIELD_BY_INTENT),
   ...NO_FIELD_INTENTS,
   ...WARRANTY_INTENTS,
   ...LIST_INTENTS,
+  ...COMPOUND_INTENTS,
 ];
 
 /* ================================================================ classification
@@ -155,6 +161,12 @@ const TRIGGERS = [
   ['warranty_expires', /\b(when'?s?|whens)\b[\s\S]*\bwarr[ae]nty\b/i],
   ['agreement_term', /\b(maintenance )?agreement\b[\s\S]*\b(expire|expir\w*|term|end|renew)\b/i],
   ['agreement_term', /\bservice contract\b[\s\S]*\b(expire|term|end)\b/i],
+  // R16 (F1, field-phrasing "compound" shape): "whats the model and serial on the unit at ..." asks
+  // for BOTH fields about the SAME unit and must be answered together — checked before the
+  // standalone 'serial'/'model' triggers below (first match wins) so a bare "serial" substring
+  // match never silently drops the model half (or vice versa), which the exam's own "set"
+  // comparison (both values expected) grades as a confident-but-incomplete WRONG, not needs-model.
+  ['model_and_serial', /\bmodel\b[^?.!]{0,20}\band\b[^?.!]{0,20}\bserial\b|\bserial\b[^?.!]{0,20}\band\b[^?.!]{0,20}\bmodel\b/i],
   ['serial', /\bserial\b|\bs\/n\b|\bseriel\b|\bserail\b/i],
   ['model', /\bmodel\b|\bmodle\b/i],
   ['manufacturer', /\bwhat (?:brand|make)\b|\bmanufacturer\b|\bmanufaturer\b|\bwho makes\b/i],
@@ -380,6 +392,18 @@ const THE_NAME_NOUN_RE =
 // "does Henderson have/need/take" — a name with no leading preposition at all.
 const DOES_NAME_HAVE_RE = new RegExp(`\\bdoes\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2})\\s+(?:have|need|take)\\b`);
 
+// R16 (F1, field-phrasing "ambiguous_multiunit"/"two_value" — a commercial customer's own BUSINESS
+// NAME used as the location, typed exactly as a dispatcher would ("at holy trinity church", "at
+// sunrise valley elementary", never capitalized): every commercial customer in this corpus is named
+// "<name> Dental/Restaurant/Church/Elementary School" (see synth-business.mjs's own
+// COMMERCIAL_LABEL), so a closed, recognizable business-type suffix word is exactly as safe an
+// anchor here as STREET_SUFFIX_RE is for a street address — it can only ever match a REAL business
+// name's own trailing word, never an arbitrary noun phrase. Deliberately case-INSENSITIVE (unlike
+// NAME_HINT_RE/POSSESSIVE_NAME_RE above): resolveFastPathSubject's own name match is already
+// case-insensitive ILIKE, so nothing downstream needs the caller to have capitalized anything.
+const BUSINESS_SUFFIX_RE = '(?:dental|restaurant|church|elementary(?:\\s+school)?|clinic)';
+const BUSINESS_NAME_RE = new RegExp(`\\bat\\s+(?:the\\s+)?([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z'.-]+){0,4}\\s+${BUSINESS_SUFFIX_RE})\\b`, 'i');
+
 /** A name candidate that's really a customer-number fragment ("C-", "C")
  *  or too short to be a real name — discarded rather than returned, since
  *  extractSubject already captures the real customer number separately and
@@ -393,19 +417,40 @@ function isJunkName(s) {
 const ORDINAL_RE = /\b(last|latest|most recent)\b/i;
 const UNIT_TYPE_RE = /\b(condenser|air handler|furnace|heat pump|package unit|rtu|mini[- ]?split)\b/i;
 
+// R16 (F1, field-phrasing "slang_fragment"): "wats the tonnage 4 396 w baseline rd" — a texting
+// numeronym ("4" standing in for "for") sitting directly in front of a house number used to be
+// swallowed AS the house number by ADDRESS_RE/LOOSE_ADDRESS_RE (captured address: "4 396 w
+// baseline rd", house token "4" instead of "396" — a real on-file record then matched nothing).
+// Only rewritten when "4"/"2" is immediately followed by ANOTHER bare, ALL-digit token (the
+// `\d+\b` lookahead requires the digits to end at a non-word character, not just start with one)
+// — so this fires for a genuine two-number slang fragment ("4 396 ...") but never for a real
+// one-digit house number sitting on a NUMBERED street ("4 21st St", "2 42nd Ave": "21st"/"42nd"
+// have a word character right after their digits, so `\d+\b` never matches there), nor for "4 W
+// Main"/"2 E Baseline" (the token right after is a letter, not a digit, so the lookahead fails
+// immediately). "@" -> "at" similarly covers "... unit @ 322 n greenfield" without teaching every
+// trigger/preposition regex about the bare symbol too. Address-matching only (see below) — never
+// applied to the raw text callers keep for anything else.
+function deslangForAddressMatch(text) {
+  return String(text ?? '')
+    .replace(/@/g, ' at ')
+    .replace(/\b4\b(?=\s+\d+\b)/g, 'for')
+    .replace(/\b2\b(?=\s+\d+\b)/g, 'to');
+}
+
 /** Pure: free text -> best-effort subject hints. Never throws, never null —
  *  callers check `.hasAny` / individual fields. */
 export function extractSubject(question) {
   const q = String(question ?? '');
+  const addrQ = deslangForAddressMatch(q);
 
   const numMatch = q.match(CUSTOMER_NUMBER_RE);
   const customerNumber = numMatch ? `C-${numMatch[1]}` : null;
 
   let address = null;
-  const strongAddr = q.match(ADDRESS_RE);
+  const strongAddr = addrQ.match(ADDRESS_RE);
   if (strongAddr) address = strongAddr[1].trim();
   else {
-    const looseAddr = q.match(LOOSE_ADDRESS_RE);
+    const looseAddr = addrQ.match(LOOSE_ADDRESS_RE);
     if (looseAddr) address = looseAddr[1].trim();
   }
 
@@ -428,6 +473,10 @@ export function extractSubject(question) {
   if (!name) {
     const doesHave = q.match(DOES_NAME_HAVE_RE);
     if (doesHave && !isJunkName(doesHave[1])) name = doesHave[1].trim();
+  }
+  if (!name) {
+    const biz = q.match(BUSINESS_NAME_RE);
+    if (biz && !isJunkName(biz[1])) name = biz[1].trim();
   }
 
   const ordinal = ORDINAL_RE.test(q) ? 'last' : null;
@@ -655,7 +704,7 @@ export function subjectLabel(resolution) {
     const d = resolution.equipment?.data ?? {};
     const descriptor = [d.manufacturer, d.equipment_type].filter(Boolean).join(' ');
     const at = d.service_address ? ` at ${d.service_address}` : '';
-    return descriptor ? `The ${descriptor}${at}` : `The unit${at || ''}` || 'The unit';
+    return descriptor ? `The ${descriptor}${at}` : `The unit${at}`;
   }
   if (resolution?.kind === 'customer') {
     const d = resolution.customer?.data ?? {};
@@ -715,22 +764,25 @@ const FACT_LABEL = {
  */
 export const ADDRESS_ENTITY_FIELD_INTENTS = new Set(['warranty_status', 'warranty_expires', 'manufacturer', 'tonnage', 'refrigerant', 'install_date']);
 
-const ADDRESS_FIELD_LABEL = {
+export const ADDRESS_FIELD_LABEL = {
   warranty_status: 'warranty status', warranty_expires: 'warranty', manufacturer: 'manufacturer',
   tonnage: 'tonnage', refrigerant: 'refrigerant', install_date: 'install date',
 };
 
 /**
  * The honest-decline answer for one of ADDRESS_ENTITY_FIELD_INTENTS, resolved by a raw street
- * address (see fastPathQuery.js's resolveFastPathSubject — `resolution.viaAddress`). Never invents a
- * value; `facts` stays empty so this reads as a genuine "not on file" rather than a fabricated one
+ * address (see fastPathQuery.js's resolveAddressEntityFieldGroup). Never invents a value; `facts`
+ * stays empty so this reads as a genuine "not on file" rather than a fabricated one
  * (api/_lib/scorecard/compare.js's compareHonestZero treats `kind: 'no-answer'` with no facts as a
  * pass, never a fail, for exactly this shape of question).
- *   resolution.kind === 'no-address'  -> nothing on file anywhere at that street at all
- *   resolution.kind === 'no-unit'     -> the street is on file, but not the apartment/unit named
- *   resolution.kind === 'ambiguous'   -> more than one unit at that street and no unit/apt named
- *   resolution.kind === 'customer'/'equipment' -> the street resolves to exactly one file, but
- *     nothing on file ties this specific field directly to the address itself (see ADDRESS_ENTITY_FIELD_INTENTS)
+ *   resolution.kind === 'no-address'     -> nothing on file anywhere at that street at all
+ *   resolution.kind === 'no-unit'        -> the street is on file, but not the apartment/unit named
+ *   resolution.kind === 'multi-customer' -> OWNER DECISION 2026-09-26: more than one CUSTOMER at
+ *     this address (an apartment complex, no unit # given) — never pick one; list who's there and
+ *     ask which. `resolution.names` is a best-effort list (customer names / unit descriptors).
+ *   resolution.kind === 'customer'/'equipment' (zero units on file for that one resolved file) ->
+ *     the street resolves to exactly one file, but it has no equipment on file at all to answer
+ *     an equipment-scoped question about.
  */
 export function buildAddressFieldDecline({ intent, subject, resolution }) {
   const addressLabel = String(subject?.address ?? '').replace(/\s+/g, ' ').trim() || 'that address';
@@ -739,10 +791,16 @@ export function buildAddressFieldDecline({ intent, subject, resolution }) {
   if (resolution?.kind === 'no-unit') {
     const unitLabel = resolution.unit ? `unit ${resolution.unit}` : 'that unit';
     text = `I don't see ${unitLabel} on file at ${addressLabel} — not on file for that address.`;
+  } else if (resolution?.kind === 'multi-customer') {
+    const names = (resolution.names ?? []).filter(Boolean);
+    const who = names.length
+      ? `: ${names.slice(0, 8).join(', ')}${names.length > 8 ? `, and ${names.length - 8} more` : ''}`
+      : '';
+    text = `There's more than one customer on file at ${addressLabel}${who} — let me know which one you mean and I can look up the ${fieldLabel}.`;
   } else if (resolution?.kind === 'ambiguous') {
     text = `There's more than one unit on file at ${addressLabel} and nothing here says which one, so I can't give a single ${fieldLabel} — not on file for that address without a specific unit.`;
   } else if (resolution?.kind === 'customer' || resolution?.kind === 'equipment') {
-    text = `I have a file for ${addressLabel}, but nothing on file ties a ${fieldLabel} directly to that street address by itself — not on file for that address.`;
+    text = `I have a file for ${addressLabel}, but there's no equipment on file to give a ${fieldLabel} for — not on file for that address.`;
   } else {
     text = `${addressLabel} isn't on file — not on file for that address.`;
   }
@@ -760,9 +818,9 @@ export function buildAddressFieldDecline({ intent, subject, resolution }) {
  * missing (caller should already have checked this; kept here too since this
  * function is the contract boundary).
  */
-export function buildFieldAnswer({ intent, resolution, row }) {
+export function buildFieldAnswer({ intent, resolution, row, labelOverride }) {
   if (!row || row.value == null || String(row.value).trim() === '') return null;
-  const label = subjectLabel(resolution);
+  const label = labelOverride ?? subjectLabel(resolution);
   const value = String(row.value);
   const intro = FIELD_INTRO[intent];
   const text = intro ? intro(label, value) : `${label}: ${value}.`;
@@ -803,13 +861,13 @@ export function buildFieldAnswer({ intent, resolution, row }) {
  * on file to say anything (no brand rule, no expiry, or no citation row) —
  * this is exactly where the fast path must defer rather than guess.
  */
-export function buildWarrantyAnswer({ intent, resolution, stable, today, citationRow }) {
+export function buildWarrantyAnswer({ intent, resolution, stable, today, citationRow, labelOverride }) {
   if (!stable || !stable.expires || !citationRow) return null;
   const tier = alertTier(stable, today);
   if (tier === 'unknown') return null;
   const described = describeWarranty(stable, today);
 
-  const label = subjectLabel(resolution);
+  const label = labelOverride ?? subjectLabel(resolution);
   const dateHuman = formatDateHuman(stable.expires);
   const basis = stable.expiresBasis === 'computed' ? 'computed' : 'printed';
   const computedNote = basis === 'computed' ? ' (computed)' : '';

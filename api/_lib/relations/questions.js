@@ -319,11 +319,13 @@ const HANDLERS = {
     }
     const n = hits.length;
     const label = brand ? `${brand} ` : '';
+    // R16 (D2 #5): a brand-filtered zero answer cites the units actually checked (every unit of that
+    // brand with an install date on file) instead of an empty records array.
     return finish(
       `${n} ${label}unit${n === 1 ? '' : 's'} had a repeat visit within ${days} days of installation.`,
       [{ label: 'Units', value: String(n) }],
       {
-        records: [...unitRecordsFor(hits), ...(await documentRecordsFor(db, [...docIds]))], total: n,
+        records: [...unitRecordsFor(n ? hits : units), ...(await documentRecordsFor(db, [...docIds]))], total: n, kind: n ? 'basis' : 'searched',
         basis: `Checked ${units.length} unit${units.length === 1 ? '' : 's'}${brand ? ` (${brand})` : ''} with an installation date on file for a service visit after install and within ${days} days; ${n} qualify.`,
       }
     );
@@ -413,8 +415,15 @@ const HANDLERS = {
     // PER NAME (not a single count) also lets the citation-precision check match each named
     // customer against the answer's own citations, instead of a lone "Customers: 6" fact that
     // names nobody.
+    // R16 (D2 #5): a city-filtered zero answer cites the customers actually checked (every customer
+    // with a service visit on file, city-narrowed) instead of an empty records array.
+    let scanned = named;
+    if (!n) {
+      scanned = [...byCust.keys()].map((id) => byId.get(id)).filter((c) => c?.name);
+      if (city) scanned = scanned.filter((c) => cityMatches(c?.address, city));
+    }
     return finish(text, named.map((c) => ({ label: 'Customer', value: c.name, entityId: c.id })), {
-      records: [...named.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, [...docIds]))],
+      records: [...scanned.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, [...docIds]))],
       total: n, kind: n ? 'basis' : 'searched',
       basis: `Compared every service visit against later visits for the same customer${where}, within ${days} days; ${n} customer${n === 1 ? '' : 's'} qualify.`,
     });
@@ -519,7 +528,7 @@ const HANDLERS = {
   /* ---------------------------------------------------------------- connect: quoted a replacement */
 
   async quotedReplacementSet(db, { city }) {
-    const { qualifying, docIdsByCust } = await qualifyingReplacementNoInstall(db);
+    const { qualifying, docIdsByCust, checkedIds } = await qualifyingReplacementNoInstall(db);
     const customers = await fetchCustomers(db);
     const byId = new Map(customers.map((c) => [c.id, c]));
     let named = qualifying.map((id) => byId.get(id)).filter((c) => c?.name);
@@ -530,14 +539,22 @@ const HANDLERS = {
     const text = n
       ? `${n} customer${n === 1 ? '' : 's'} were quoted a replacement but have not had a new unit installed since: ${namesList(named.map((c) => c.name))}.`
       : 'No customers were quoted a replacement with no new unit installed since.';
+    // R16 (D2 #5): a zero/city-filtered answer still cites the scanned scope (every customer who was
+    // ever quoted a replacement at all, city-narrowed same as the named list would be) rather than an
+    // empty records array — matches this file's own repeatVisitYesNo "No" precedent.
+    let scanned = named;
+    if (!n) {
+      scanned = checkedIds.map((id) => byId.get(id)).filter((c) => c?.name);
+      if (city) scanned = scanned.filter((c) => cityMatches(c.address, city));
+    }
     return finish(text, named.map((c) => ({ label: 'Customer', value: c.name, entityId: c.id })), {
-      records: [...named.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, docIds))], total: n, kind: n ? 'basis' : 'searched',
+      records: [...scanned.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, docIds))], total: n, kind: n ? 'basis' : 'searched',
       basis: 'Checked every customer quoted a unit replacement for a later equipment installation; none found is a real "not yet".',
     });
   },
 
   async quotedReplacementCount(db, { city }) {
-    const { qualifying, docIdsByCust } = await qualifyingReplacementNoInstall(db);
+    const { qualifying, docIdsByCust, checkedIds } = await qualifyingReplacementNoInstall(db);
     const customers = await fetchCustomers(db);
     const byId = new Map(customers.map((c) => [c.id, c]));
     let named = qualifying.map((id) => byId.get(id)).filter((c) => c?.name);
@@ -545,8 +562,14 @@ const HANDLERS = {
     const n = named.length;
     const docIds = named.flatMap((c) => [...(docIdsByCust.get(c.id) ?? [])]);
     const where = city ? `${city} ` : '';
+    // R16 (D2 #5): same "cite the scanned scope on zero" fix as quotedReplacementSet above.
+    let scanned = named;
+    if (!n) {
+      scanned = checkedIds.map((id) => byId.get(id)).filter((c) => c?.name);
+      if (city) scanned = scanned.filter((c) => cityMatches(c.address, city));
+    }
     return finish(`${n} ${where}customer${n === 1 ? '' : 's'} were quoted a replacement but never got one.`, [{ label: 'Customers', value: String(n) }], {
-      records: await documentRecordsFor(db, docIds), total: n, claimedCount: n,
+      records: [...(n ? [] : scanned.map((c) => customerRecord(c))), ...(await documentRecordsFor(db, docIds))], total: n, claimedCount: n, kind: n ? 'basis' : 'searched',
       basis: `Checked every ${where}customer quoted a unit replacement for a later equipment installation; ${n} never got one.`,
     });
   },
@@ -628,7 +651,7 @@ const HANDLERS = {
   /* ---------------------------------------------------------------- connect: quoted long ago, never invoiced */
 
   async quotedNoInvoiceSet(db, { months }, today) {
-    const { qualifying, docIds } = await qualifyingQuotedNoInvoice(db, months, today);
+    const { qualifying, docIds, checkedIds, checkedDocIds } = await qualifyingQuotedNoInvoice(db, months, today);
     if (qualifying === null) return null;
     const customers = await fetchCustomers(db);
     const byId = new Map(customers.map((c) => [c.id, c]));
@@ -637,19 +660,28 @@ const HANDLERS = {
     const text = n
       ? `${n} customer${n === 1 ? '' : 's'} were quoted more than ${months} months ago and have not been invoiced since: ${namesList(named.map((c) => c.name))}.`
       : `No customers were quoted more than ${months} months ago with no invoice since.`;
+    // R16 (D2 #5): a zero answer cites the scanned scope (every customer quoted that long ago, whether
+    // or not they were invoiced) instead of an empty records array.
+    const scannedCust = n ? named : (checkedIds ?? []).map((id) => byId.get(id)).filter((c) => c?.name);
+    const scannedDocIds = n ? [...docIds] : [...(checkedDocIds ?? [])];
     return finish(text, named.map((c) => ({ label: 'Customer', value: c.name, entityId: c.id })), {
-      records: [...named.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, [...docIds]))], total: n, kind: n ? 'basis' : 'searched',
+      records: [...scannedCust.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, scannedDocIds))], total: n, kind: n ? 'basis' : 'searched',
       basis: `Checked every customer quoted more than ${months} months ago for any invoice on file since; ${n} have none.`,
     });
   },
 
   async quotedNoInvoiceCount(db, { months }, today) {
-    const { qualifying, docIds } = await qualifyingQuotedNoInvoice(db, months, today);
+    const { qualifying, docIds, checkedIds, checkedDocIds } = await qualifyingQuotedNoInvoice(db, months, today);
     if (qualifying === null) return null;
     const n = qualifying.length;
+    const customers = await fetchCustomers(db);
+    const byId = new Map(customers.map((c) => [c.id, c]));
+    // R16 (D2 #5): same "cite the scanned scope on zero" fix as quotedNoInvoiceSet above.
+    const scannedCust = n ? [] : (checkedIds ?? []).map((id) => byId.get(id)).filter((c) => c?.name);
+    const scannedDocIds = n ? [...docIds] : [...(checkedDocIds ?? [])];
     return finish(`${n} customer${n === 1 ? '' : 's'} were quoted more than ${months} months ago with no invoice since.`,
       [{ label: 'Customers', value: String(n) }],
-      { records: await documentRecordsFor(db, [...docIds]), total: n,
+      { records: [...scannedCust.map((c) => customerRecord(c)), ...(await documentRecordsFor(db, scannedDocIds))], total: n, kind: n ? 'basis' : 'searched',
         basis: `Checked every customer quoted more than ${months} months ago for any invoice on file since; ${n} have none.` });
   },
 
@@ -665,10 +697,14 @@ const HANDLERS = {
     const label = cands.length === 1 ? (cands[0].name || name) : name;
     const neverInvoiced = !fins.some((f) => f.kind === 'invoice');
     const yes = oldQuotes.length > 0 && neverInvoiced;
+    // R16 (D2 #5): a "No" answer cites everything checked for this customer (every quote and invoice
+    // on file for them), not only the old-quotes subset — which is empty in the common "No" case where
+    // the customer simply has no quote old enough to qualify, losing citations on a real, honest "no".
+    const citedDocIds = yes ? oldQuotes.map((f) => f.docId) : fins.map((f) => f.docId);
     return finish(
       yes ? `Yes — ${label} was quoted a job more than ${months} months ago that was never invoiced.` : `No — ${label} was not quoted a job that was never invoiced.`,
       [{ label: 'Quoted, never invoiced', value: yes ? 'Yes' : 'No' }],
-      { records: await documentRecordsFor(db, oldQuotes.map((f) => f.docId)), total: oldQuotes.length,
+      { records: await documentRecordsFor(db, citedDocIds), total: citedDocIds.length, kind: yes ? 'basis' : 'searched',
         basis: `Checked every quote on file for ${label} older than ${months} months against every invoice on file for them.` }
     );
   },
@@ -1268,7 +1304,10 @@ async function qualifyingReplacementNoInstall(db) {
     const laterInstall = (installsByCust.get(custId) ?? []).some((d) => e.minDate && d > e.minDate);
     if (!laterInstall) { qualifying.push(custId); docIdsByCust.set(custId, e.docIds); }
   }
-  return { qualifying, docIdsByCust };
+  // R16 (D2 #5): every customer with a replacement quote at all is the SCANNED scope this question
+  // checks (whether or not they went on to get a new unit) — a zero-qualifying answer still has
+  // something honest to cite (see this file's own quotedReplacementSet/Count using it).
+  return { qualifying, docIdsByCust, checkedIds: [...byCust.keys()], checkedDocIdsByCust: byCust };
 }
 
 /**
@@ -1315,12 +1354,18 @@ async function qualifyingQuotedNoInvoice(db, months, today) {
   for (const f of fins) { const a = byCust.get(f.custId) ?? []; a.push(f); byCust.set(f.custId, a); }
   const qualifying = [];
   const docIds = new Set();
+  const checkedIds = [];
+  const checkedDocIds = new Set();
   for (const [custId, list] of byCust) {
     const oldQuotes = list.filter((f) => f.kind === 'estimate' && f.invoiceDate && f.invoiceDate <= cutoff);
     const everInvoiced = list.some((f) => f.kind === 'invoice');
+    if (oldQuotes.length) { checkedIds.push(custId); for (const f of oldQuotes) checkedDocIds.add(f.docId); }
     if (oldQuotes.length && !everInvoiced) { qualifying.push(custId); for (const f of oldQuotes) docIds.add(f.docId); }
   }
-  return { qualifying, docIds };
+  // R16 (D2 #5): every customer quoted more than `months` months ago is the SCANNED scope this
+  // question checks (whether or not they were later invoiced) — a zero-qualifying answer still has
+  // something honest to cite.
+  return { qualifying, docIds, checkedIds, checkedDocIds };
 }
 
 /** Every customer with MORE THAN ONE "open" invoice (document_financials: doc_kind='invoice',

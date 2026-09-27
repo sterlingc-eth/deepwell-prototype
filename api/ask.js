@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
@@ -27,8 +26,14 @@ import { runFastPath } from "./_lib/fastPathQuery.js";
 // Team A (2026-09-24): deterministic history/comparison/maintenance router (no model call, cited answers).
 import { classifyDeterministic, runDeterministic } from "./_lib/deterministicRouter.js";
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion, moneyFallbackAnswer, detectedConditions } from "./_lib/analytics.js";
+// R16 (F2 hook): oldest/newest-unit questions now have a deterministic, cited planner — keep them off the agent-first gates.
+import { isInstallDateExtremeQuestion } from "./_lib/analytics/detPlan.js";
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): answers money questions from SQL over document_financials.
-import { answerMoneyQuestion, moneyNoMatchAnswer } from "./_lib/financials/moneyGate.js";
+// Round 16 D1 #7 (cold start): moneyGate.js -> financials/answers.js -> agent/tools.js
+// -> agent/viewPage.js/search/dossier.js/search/mapReduce.js all transitively pull in
+// @anthropic-ai/sdk (the agent tool-use loop these share) — loaded lazily below
+// (loadMoneyGateModule), gated on the exact same `moneyQuestion` condition that used
+// to just call these functions directly, so a non-money question never touches it.
 import { isFinancialQuestion } from "./_lib/financials/classify.js";
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
@@ -36,7 +41,10 @@ import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
 import { attachSentenceCitationsSync } from "./_lib/citations/sentences.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
 import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZeroCitations, searchedLibraryBasis } from "./_lib/citations/enrich.js";
-import { runAnalyticsQuestion, isAnalyticsEnabled, applyExistenceShape } from "./_lib/routes/analytics.js";
+// Round 16 D1 #7 (cold start): routes/analytics.js imports @anthropic-ai/sdk
+// at module scope (its one-Haiku-tool-use-call planner) — loaded lazily
+// below (loadAnalyticsRouteModule) instead of statically, so a request a
+// deterministic pre-router answers never pays for it.
 import { parseContactLookupQuestion, runContactLookup } from "./_lib/contactLookup.js";
 import { parseDocLookupQuestion, runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
 // TEAM E (2026-09-24): full-corpus content-count questions ("how many jobs mention a capacitor", "which customers had
@@ -77,17 +85,24 @@ import { normalizeQuestion as normalizeQuestionForAnalytics } from "./_lib/nlNor
 import { getActiveOverlayForTenant } from "./_lib/learning/overlay.js";
 // Donovan agent fallback (api/_lib/agent/): a bounded read-only tool-use loop tried when every
 // pre-router / the analytics planner / retrieval+model could not answer. DONOVAN_AGENT=0 disables it.
-import { runDonovanAgent, isAgentEnabled, agentQuestionHash, AGENT_PROMPT_VERSION, agentDebugTrace } from "./_lib/agent/loop.js";
+// Round 16 D1 #7 (cold start): agent/loop.js imports @anthropic-ai/sdk at
+// module scope — loaded lazily below (loadAgentModule) instead of statically.
 import { isAgentFirstQuestion, isEnumerationQuestion, isUnitRankingQuestion, isReasoningQuestion } from "./_lib/agent/intents.js";
-import { runRecipeFastPath } from "./_lib/agent/fastReplay.js";
+// Round 16 D1 #7 (cold start): fastReplay.js -> agent/tools.js -> viewPage.js/search/
+// dossier.js/search/mapReduce.js transitively pull @anthropic-ai/sdk — loaded lazily
+// below (loadFastReplayModule), only reached from inside tryAgent (see loadAgentModule).
 // TEAM T1 (research agent v2, 2026-09-25): Sonnet-first, more-tools, longer-budget successor to the
 // Haiku loop above, with its own verify step. Swapped in at every existing tryAgent() call site below —
 // none of the pre-router chain above it changes. See loopV2.js's own doc comment.
-import { runResearchAgent, isResearchAgentEnabled, RESEARCH_PROMPT_VERSION, researchQuestionHash } from "./_lib/agent/loopV2.js";
+// Round 16 D1 #7 (cold start): loopV2.js imports @anthropic-ai/sdk (and
+// routes/analytics.js's ANALYTICS_MODEL) at module scope — loaded lazily
+// below (loadResearchAgentModule) instead of statically.
 import { logRouteDecision } from "./_lib/agent/router.js";
 // Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
 import { findExactRecipe, matchParametricExamples } from "./_lib/learning/recipes.js";
-import { submitRecipe } from "./_lib/learning/replay.js";
+// Round 16 D1 #7 (cold start): learning/replay.js itself statically imports
+// agent/loop.js (-> @anthropic-ai/sdk) just for its own isAgentEnabled() —
+// loaded lazily below (loadReplayModule) instead of statically.
 import { isPlatformOperator } from "./_lib/missDigest.js";
 // Donovan Scorecard (api/_lib/scorecard/): in-process calls carry {auth, escalate} under a Symbol no HTTP request can set.
 import { takeScorecardCall } from "./_lib/scorecard/hook.js";
@@ -211,10 +226,77 @@ export function hashQuestion(question) {
 // still finishes in well under a second and is completely unaffected by a larger ceiling.
 export const config = { api: { bodyParser: { sizeLimit: "512kb" } }, maxDuration: 300 };
 
+// ---------------------------------------------------------------------------
+// Round 16 D1 #7 (cold start): every model-only module below (the Anthropic
+// SDK itself, the two agent loops, the analytics planner, and the recipe-
+// teaching module that pulls the v1 loop in just for its own isAgentEnabled)
+// used to be a static top-of-file import, so simply `import()`-ing this file
+// (before a single request is even handled) cost ~250-290ms — ~130ms of it
+// @anthropic-ai/sdk alone — paid on every cold Vercel invocation even for a
+// request the deterministic pre-router chain (meta/relations/deterministic/
+// decompose/fast-path/contact/doc-lookup/content-count/money) answers
+// without ever touching the model. Each loader is a plain dynamic import(),
+// cached in a module-level variable (`??=`) the first time it's actually
+// awaited: the SECOND and later calls in the same warm process resolve
+// instantly (Node's own module cache backs this up regardless), and a
+// request that never reaches one of these call sites never imports the SDK
+// at all. See scripts/verify-cold-start.mjs for the regression check (plain
+// `import('./api/ask.js')` must not pull @anthropic-ai/sdk into the graph).
+let _anthropicSdk = null;
+function loadAnthropicSdk() {
+  return (_anthropicSdk ??= import("@anthropic-ai/sdk"));
+}
+let _agentModule = null;
+function loadAgentModule() {
+  return (_agentModule ??= import("./_lib/agent/loop.js"));
+}
+let _researchAgentModule = null;
+function loadResearchAgentModule() {
+  return (_researchAgentModule ??= import("./_lib/agent/loopV2.js"));
+}
+let _analyticsRouteModule = null;
+function loadAnalyticsRouteModule() {
+  return (_analyticsRouteModule ??= import("./_lib/routes/analytics.js"));
+}
+let _moneyGateModule = null;
+function loadMoneyGateModule() {
+  return (_moneyGateModule ??= import("./_lib/financials/moneyGate.js"));
+}
+let _fastReplayModule = null;
+function loadFastReplayModule() {
+  return (_fastReplayModule ??= import("./_lib/agent/fastReplay.js"));
+}
+let _replayModule = null;
+function loadReplayModule() {
+  return (_replayModule ??= import("./_lib/learning/replay.js"));
+}
+
 // Research agent v2 (owner decision, 2026-09-25): "Sonnet as the default research agent for anything
-// non-trivial." Resolved once per process, not per request — DONOVAN_RESEARCH_AGENT=0 reverts every
-// tryAgent() call site below to the v1 Haiku loop (loop.js) with no other change.
-const RESEARCH_V2_ENABLED = isResearchAgentEnabled();
+// non-trivial." Resolved once per process, not per request (memoized below, same as the old module-level
+// constant) — DONOVAN_RESEARCH_AGENT=0 reverts every tryAgent() call site below to the v1 Haiku loop
+// (loop.js) with no other change. Computed lazily (only once something actually needs to know) rather
+// than at module load, per the cold-start note above — isResearchAgentEnabled() itself lives inside
+// loopV2.js, so checking it does still load that module (and the SDK) the first time any request reaches
+// a call site that needs it; a request a deterministic pre-router answers never reaches one.
+let _researchV2Enabled = null;
+async function getResearchV2Enabled() {
+  if (_researchV2Enabled === null) {
+    const mod = await loadResearchAgentModule();
+    _researchV2Enabled = mod.isResearchAgentEnabled();
+  }
+  return _researchV2Enabled;
+}
+
+// DONOVAN_AGENT (default on) — same "resolved once, memoized" shape as
+// getResearchV2Enabled above, for the exact same cold-start reason.
+let _agentOnCache = null;
+async function getAgentOn() {
+  if (_agentOnCache === null) {
+    const mod = await loadAgentModule();
+    _agentOnCache = mod.isAgentEnabled();
+  }
+  return _agentOnCache;
+}
 
 const MAX_QUESTION = 2000;
 const MAX_PASSAGES = 12;
@@ -864,16 +946,30 @@ export default async function handler(req, res) {
     // normalization, keeps that exclusion working for input that arrives
     // capitalized, on top of whatever preClassifyAnalytics(normalized) itself
     // already re-checks (redundant on lowercased text, never wrong).
-    const analyticsCandidate =
-      !meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !contentCountIntent && !moneyQuestion && isAnalyticsEnabled() &&
-      !looksLikeSingleRecordReference(question) &&
-      // "newest/oldest unit": ranking the whole fleet needs an ORDER BY, which the closed-vocabulary planner
-      // does not have (it would list every unit) - the agent answers these (agent-first, below).
-      !(isAgentEnabled() && isUnitRankingQuestion(question)) &&
-      // Team A: comparison / why / trend questions the deterministic router could not parse go to the agent (Sonnet-
-      // escalated by the hard-question classifier) instead of a planner that flattens them into one count.
-      !(isAgentEnabled() && isReasoningQuestion(question)) &&
-      preClassifyAnalytics(normalizedForAnalytics, { overlay });
+    // Round 16 D1 #7 (cold start): restructured from one `&&`-chained boolean
+    // expression into this if-gated form so isAnalyticsEnabled()/isAgentEnabled()
+    // — both of which now live behind a lazy dynamic import (loadAnalyticsRouteModule/
+    // loadAgentModule) — are only ever loaded when the SAME condition that used to
+    // just call them directly actually holds; the boolean RESULT is identical to the
+    // original expression (De Morgan on `!(agentEnabled && unitRanking) && !(agentEnabled
+    // && reasoning)` collapses to the single `agentEnabled` read below), so a meta/
+    // fast-path/contact/doc/content-count/money-classified question still never touches
+    // the analytics or agent modules at all.
+    let analyticsCandidate = false;
+    if (!meta && !fastPathIntent && !contactLookupIntent && !docLookupIntent && !contentCountIntent && !moneyQuestion) {
+      const analyticsRouteModule = await loadAnalyticsRouteModule();
+      if (analyticsRouteModule.isAnalyticsEnabled() && !looksLikeSingleRecordReference(question)) {
+        const agentModuleForGate = await loadAgentModule();
+        const agentEnabledForGate = agentModuleForGate.isAgentEnabled();
+        // "newest/oldest unit": ranking the whole fleet needs an ORDER BY, which the closed-vocabulary planner
+        // does not have (it would list every unit) - the agent answers these (agent-first, below).
+        // Team A: comparison / why / trend questions the deterministic router could not parse go to the agent (Sonnet-
+        // escalated by the hard-question classifier) instead of a planner that flattens them into one count.
+        if (!(agentEnabledForGate && isUnitRankingQuestion(question) && !isInstallDateExtremeQuestion(question)) && !(agentEnabledForGate && isReasoningQuestion(question))) {
+          analyticsCandidate = preClassifyAnalytics(normalizedForAnalytics, { overlay });
+        }
+      }
+    }
     const customerNumber = extractCustomerNumber(question);
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
@@ -893,29 +989,43 @@ export default async function handler(req, res) {
     // (usage.js "agent"). Any agent error / timeout / no-answer returns false and the caller
     // continues with exactly today's behaviour. The operator-only `data.debug` trace needs both an
     // operator caller AND body.debug === true. Returns true iff it already sent the response.
-    const agentOn = isAgentEnabled();
-    const agentDebug = agentOn && (Boolean(scorecardCall) || (req.body?.debug === true && isPlatformOperator(auth)));
     const requestStartedAt = Date.now();
     let agentTried = false;
-    // The research agent budgets up to ~240s of tool-use (loopV2.js); the v1 Haiku loop stays at its
-    // original, much shorter default. Every explicit budgetMs below scales the same way.
-    const DEFAULT_AGENT_BUDGET_MS = RESEARCH_V2_ENABLED ? Math.max(20_000, (Number(process.env.DONOVAN_AGENT_DEADLINE_MS) || 240_000) - 20_000) : 50_000; // must track vercel.json maxDuration (300 s on Pro)
-    const tryAgent = async ({ extraUsage = null, budgetMs = DEFAULT_AGENT_BUDGET_MS, recordMiss = true } = {}) => {
-      if (!agentOn || agentTried) return false;
+    // Round 16 D1 #7 (cold start): agentOn/agentDebug/the v1-vs-v2 budget default used
+    // to be computed unconditionally right here, forcing agent/loop.js (and loopV2.js's
+    // isResearchAgentEnabled check, and hence @anthropic-ai/sdk) to load for EVERY
+    // request, even ones a deterministic pre-router branch (meta/relations/deterministic/
+    // decompose/fast-path/contact/doc-lookup/content-count/money) fully answers without
+    // ever calling tryAgent(). Moved inside tryAgent's own body below (still resolved at
+    // most once per request, via getAgentOn/getResearchV2Enabled's own module-level
+    // memoization) so a request that never calls tryAgent() never loads either module.
+    const tryAgent = async ({ extraUsage = null, budgetMs, recordMiss = true } = {}) => {
+      if (agentTried) return false;
+      const agentOn = await getAgentOn();
+      if (!agentOn) return false;
       agentTried = true;
+      const agentDebug = Boolean(scorecardCall) || (req.body?.debug === true && isPlatformOperator(auth));
+      const researchV2Enabled = await getResearchV2Enabled();
+      // The research agent budgets up to ~240s of tool-use (loopV2.js); the v1 Haiku loop stays at its
+      // original, much shorter default. Every explicit budgetMs below scales the same way.
+      if (budgetMs === undefined) {
+        budgetMs = researchV2Enabled ? Math.max(20_000, (Number(process.env.DONOVAN_AGENT_DEADLINE_MS) || 240_000) - 20_000) : 50_000; // must track vercel.json maxDuration (300 s on Pro)
+      }
+      const agentModule = await loadAgentModule();
+      const researchAgentModule = researchV2Enabled ? await loadResearchAgentModule() : null;
       // Route-decision log (build spec item 1): counts only (route id + reason codes), never question
       // text — see router.js's own doc comment. Every call here already fell through the whole
       // deterministic fast layer (meta/detIntent/fastPath/contact/doc-lookup/content-count/money), so
       // this only records WHY, not whether, the research agent gets involved.
-      logRouteDecision(question, { agent_version: RESEARCH_V2_ENABLED ? "v2" : "v1" });
+      logRouteDecision(question, { agent_version: researchV2Enabled ? "v2" : "v1" });
       // Streaming (build spec item 4): only for the research agent, and only once, from whichever of
       // this function's several call sites actually gets here first for this request.
-      if (wantStream && RESEARCH_V2_ENABLED) startStreaming();
+      if (wantStream && researchV2Enabled) startStreaming();
       const onEvent = streaming
         ? (evt) => { try { res.write(`${JSON.stringify({ type: "step", ...evt })}\n`); } catch { /* client may be gone */ } }
         : undefined;
-      const qHash = RESEARCH_V2_ENABLED ? researchQuestionHash(question) : agentQuestionHash(question);
-      const promptVersion = RESEARCH_V2_ENABLED ? RESEARCH_PROMPT_VERSION : AGENT_PROMPT_VERSION;
+      const qHash = researchV2Enabled ? researchAgentModule.researchQuestionHash(question) : agentModule.agentQuestionHash(question);
+      const promptVersion = researchV2Enabled ? researchAgentModule.RESEARCH_PROMPT_VERSION : agentModule.AGENT_PROMPT_VERSION;
       let corpusStamp = null;
       let result = null;
       try {
@@ -952,14 +1062,15 @@ export default async function handler(req, res) {
         // Same-shaped question with a different city/brand/doc type (parametric recipe, workstream A).
         const recipe = findExactRecipe(overlay?.recipes, question) ?? matchParametricExamples(question, overlay?.recipes);
         if (recipe) {
+          const { runRecipeFastPath } = await loadFastReplayModule();
           const fast = await timer.time("recipe", () => runRecipeFastPath({ withTenant, ctxArg, recipe, question, today: todayResolved }));
           if (fast.handled) result = fast;
         }
         if (!result) {
           const deadlineAt = Math.min(requestStartedAt + budgetMs, scorecardCall?.deadlineAt ?? Infinity);
-          result = RESEARCH_V2_ENABLED
-            ? await timer.time("agent", () => runResearchAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, onEvent }))
-            : await timer.time("agent", () => runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: scorecardCall?.escalate === true }));
+          result = researchV2Enabled
+            ? await timer.time("agent", () => researchAgentModule.runResearchAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, onEvent }))
+            : await timer.time("agent", () => agentModule.runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: scorecardCall?.escalate === true }));
         }
       } catch (err) {
         // Includes ModelBudgetExceededError: the standard fallback below decides what a
@@ -973,7 +1084,7 @@ export default async function handler(req, res) {
         return false;
       }
       const data = result.data;
-      send(200, { success: true, data: agentDebug ? { ...data, debug: agentDebugTrace(result) } : data });
+      send(200, { success: true, data: agentDebug ? { ...data, debug: agentModule.agentDebugTrace(result) } : data });
       await timer.time("bookkeeping", async () => {
         try {
           await withTenant(ctxArg, async (db) => {
@@ -1004,7 +1115,12 @@ export default async function handler(req, res) {
         if (extraUsage) await recordModelCall(ctxArg, extraUsage).catch(() => {});
         // A fresh grounded agent answer teaches a recipe proposal (goes live only once confirmed:
         // same result twice, or an operator/thumbs-up approves it - learning/policy.js). Never throws.
-        if (!result.fastReplay) await submitRecipe({ ctxArg, question, run: result });
+        // A real model call already ran above, so loading replay.js's own transitive
+        // agent/loop.js import here costs nothing extra (already cached, see loadAgentModule above).
+        if (!result.fastReplay) {
+          const replayModule = await loadReplayModule();
+          await replayModule.submitRecipe({ ctxArg, question, run: result });
+        }
       });
       return true;
     };
@@ -1050,28 +1166,40 @@ export default async function handler(req, res) {
     // ---- 0. meta-question pre-router (no model, no retrieval) --------------
     if (meta) {
       try {
-        const data = await timer.time("retrieve", () => withTenant(ctxArg, (db) => runMetaQuestion(db, meta)));
-        await timer.time("bookkeeping", async () => {
+        // Round 16 D1 #8: compute + bookkeeping used to be two separate
+        // withTenant() round trips (BEGIN/SET LOCAL/COMMIT each) on the same
+        // tenant; one transaction now does both — the audit row (and the
+        // no-answer miss row) is written from the SAME connection right after
+        // the answer is known, before it commits. A logAction/insertAskMiss
+        // failure is still caught here exactly as before and never affects
+        // the answer already computed in `data` (that document is returned
+        // from JS memory, not re-read from the DB after this point) — see the
+        // identical try/catch-inside-withTenant shape already used below for
+        // the agent cache-hit and analytics bookkeeping blocks.
+        const data = await timer.time("retrieve", () => withTenant(ctxArg, async (db) => {
+          const result = await runMetaQuestion(db, meta);
+          const bkStart = Date.now();
           try {
-            await withTenant(ctxArg, async (db) => {
-              await db.logAction({
-                action: "document.queried",
-                resource_type: "question",
-                clerk_user_id: auth.userId,
-                changes: {
-                  question_hash: hashQuestion(question),
-                  documents: [...new Set(data.sources.map((s) => s.documentId))],
-                  passages: 0,
-                },
-              });
-              if (data.kind === "no-answer") {
-                await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER });
-              }
+            await db.logAction({
+              action: "document.queried",
+              resource_type: "question",
+              clerk_user_id: auth.userId,
+              changes: {
+                question_hash: hashQuestion(question),
+                documents: [...new Set(result.sources.map((s) => s.documentId))],
+                passages: 0,
+              },
             });
+            if (result.kind === "no-answer") {
+              await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER });
+            }
           } catch (err) {
             console.error("Failed to write document.queried audit row (meta):", err?.message);
+          } finally {
+            timer.add("bookkeeping", Date.now() - bkStart);
           }
-        });
+          return result;
+        }));
         return send(200, { success: true, data });
       } catch (err) {
         // A broken meta-query must not 500 a cheap question — fall through to
@@ -1096,24 +1224,33 @@ export default async function handler(req, res) {
     if (detIntent) {
       let detData = null;
       try {
+        // Round 16 D1 #8: compute + the audit-log write share one withTenant
+        // transaction (was two round trips) — see the meta-router above for
+        // why a logAction failure here is still harmless and non-fatal.
         detData = await timer.time("deterministic", () =>
-          withTenant(ctxArg, (db) => withCitations(db, runDeterministic(db, detIntent, { today: todayResolved }))) // TEAM C
+          withTenant(ctxArg, async (db) => {
+            const result = await withCitations(db, runDeterministic(db, detIntent, { today: todayResolved })); // TEAM C
+            if (result) {
+              const bkStart = Date.now();
+              try {
+                await db.logAction({
+                  action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+                  changes: { question_hash: hashQuestion(question), documents: [...new Set((result.sources ?? []).map((x) => x.documentId))], passages: 0, deterministic: detIntent.route },
+                });
+              } catch (err) {
+                console.error("Failed to write document.queried audit row (deterministic):", err?.message);
+              } finally {
+                timer.add("bookkeeping", Date.now() - bkStart);
+              }
+            }
+            return result;
+          })
         );
       } catch (err) {
         console.error("Deterministic router failed, falling through:", err?.message);
       }
       console.log(JSON.stringify({ route: "ask", det_route: detIntent.route, det_kind: detIntent.kind ?? null, det_hit: Boolean(detData) }));
       if (detData) {
-        await timer.time("bookkeeping", async () => {
-          try {
-            await withTenant(ctxArg, (db) => db.logAction({
-              action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
-              changes: { question_hash: hashQuestion(question), documents: [...new Set((detData.sources ?? []).map((x) => x.documentId))], passages: 0, deterministic: detIntent.route },
-            }));
-          } catch (err) {
-            console.error("Failed to write document.queried audit row (deterministic):", err?.message);
-          }
-        });
         return send(200, { success: true, data: detData });
       }
     }
@@ -1127,22 +1264,31 @@ export default async function handler(req, res) {
     if (decomposeIntent) {
       let decData = null;
       try {
-        decData = await timer.time("decompose", () => withTenant(ctxArg, (db) => runDecompose(db, decomposeIntent, { today: todayResolved })));
+        // Round 16 D1 #8: one withTenant transaction for compute + audit log
+        // (was two round trips) — see the meta-router above for why a
+        // logAction failure here is harmless and non-fatal.
+        decData = await timer.time("decompose", () => withTenant(ctxArg, async (db) => {
+          const result = await runDecompose(db, decomposeIntent, { today: todayResolved });
+          if (result) {
+            const bkStart = Date.now();
+            try {
+              await db.logAction({
+                action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+                changes: { question_hash: hashQuestion(question), documents: [...new Set((result.sources ?? []).map((x) => x.documentId))], passages: 0, decompose: decomposeIntent.mode },
+              });
+            } catch (err) {
+              console.error("Failed to write document.queried audit row (decompose):", err?.message);
+            } finally {
+              timer.add("bookkeeping", Date.now() - bkStart);
+            }
+          }
+          return result;
+        }));
       } catch (err) {
         console.error("Query decomposition failed, falling through:", err?.message);
       }
       console.log(JSON.stringify({ route: "ask", decompose_mode: decomposeIntent.mode, decompose_hit: Boolean(decData) }));
       if (decData) {
-        await timer.time("bookkeeping", async () => {
-          try {
-            await withTenant(ctxArg, (db) => db.logAction({
-              action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
-              changes: { question_hash: hashQuestion(question), documents: [...new Set((decData.sources ?? []).map((x) => x.documentId))], passages: 0, decompose: decomposeIntent.mode },
-            }));
-          } catch (err) {
-            console.error("Failed to write document.queried audit row (decompose):", err?.message);
-          }
-        });
         return send(200, { success: true, data: decData });
       }
     }
@@ -1162,8 +1308,34 @@ export default async function handler(req, res) {
     if (fastPathIntent) {
       let fastData = null;
       try {
+        // Round 16 D1 #8: one withTenant transaction for compute + audit log
+        // (was two round trips) — see the meta-router above for why a
+        // logAction failure here is harmless and non-fatal.
         fastData = await timer.time("fast", () =>
-          withTenant(ctxArg, (db) => withCitations(db, runFastPath(db, fastPathIntent, { today: todayResolved }))) // TEAM C
+          withTenant(ctxArg, async (db) => {
+            const result = await withCitations(db, runFastPath(db, fastPathIntent, { today: todayResolved })); // TEAM C
+            if (result) {
+              const bkStart = Date.now();
+              try {
+                await db.logAction({
+                  action: "document.queried",
+                  resource_type: "question",
+                  clerk_user_id: auth.userId,
+                  changes: {
+                    question_hash: hashQuestion(question),
+                    documents: [...new Set((result.sources ?? []).map((s) => s.documentId))],
+                    passages: 0,
+                    fast: true,
+                  },
+                });
+              } catch (err) {
+                console.error("Failed to write document.queried audit row (fast path):", err?.message);
+              } finally {
+                timer.add("bookkeeping", Date.now() - bkStart);
+              }
+            }
+            return result;
+          }) // TEAM C
         );
       } catch (err) {
         console.error("Fast path failed, falling through to retrieval+model:", err?.message);
@@ -1174,23 +1346,6 @@ export default async function handler(req, res) {
         fast_hit: Boolean(fastData),
       }));
       if (fastData) {
-        await timer.time("bookkeeping", async () => {
-          try {
-            await withTenant(ctxArg, (db) => db.logAction({
-              action: "document.queried",
-              resource_type: "question",
-              clerk_user_id: auth.userId,
-              changes: {
-                question_hash: hashQuestion(question),
-                documents: [...new Set((fastData.sources ?? []).map((s) => s.documentId))],
-                passages: 0,
-                fast: true,
-              },
-            }));
-          } catch (err) {
-            console.error("Failed to write document.queried audit row (fast path):", err?.message);
-          }
-        });
         return send(200, { success: true, data: fastData, fast: true });
       }
       // fastData is null: DB found nothing certain enough. Retrieval was never
@@ -1208,8 +1363,43 @@ export default async function handler(req, res) {
     if (contactLookupIntent) {
       let contactData = null;
       try {
+        // Round 16 D1 #8: one withTenant transaction for compute + audit log
+        // (was two round trips) — see the meta-router above for why a
+        // logAction/insertAskMiss failure here is harmless and non-fatal.
         contactData = await timer.time("contact", () =>
-          withTenant(ctxArg, (db) => withCitations(db, runContactLookup(db, question, { overlay, today: todayResolved }))) // TEAM C
+          withTenant(ctxArg, async (db) => {
+            const result = await withCitations(db, runContactLookup(db, question, { overlay, today: todayResolved })); // TEAM C
+            if (result) {
+              const bkStart = Date.now();
+              try {
+                await db.logAction({
+                  action: "document.queried",
+                  resource_type: "question",
+                  clerk_user_id: auth.userId,
+                  changes: {
+                    question_hash: hashQuestion(question),
+                    documents: [],
+                    passages: 0,
+                    contactLookup: true,
+                  },
+                });
+                // Miss loop: more than one customer matched the name — the
+                // dispatcher got a "which one did you mean" instead of a value
+                // (candidateCount, contactLookup.js's buildAmbiguousContactAnswer).
+                if ((result.candidateCount ?? 1) > 1) {
+                  await insertAskMiss(db, {
+                    question, questionNormalized: normalizedForAnalytics,
+                    outcome: MISS_OUTCOMES.CONTACT_AMBIGUOUS,
+                  });
+                }
+              } catch (err) {
+                console.error("Failed to write document.queried audit row (contact lookup):", err?.message);
+              } finally {
+                timer.add("bookkeeping", Date.now() - bkStart);
+              }
+            }
+            return result;
+          }) // TEAM C
         );
       } catch (err) {
         console.error("Contact lookup failed, falling through to retrieval+model:", err?.message);
@@ -1220,34 +1410,6 @@ export default async function handler(req, res) {
         contact_lookup_hit: Boolean(contactData),
       }));
       if (contactData) {
-        await timer.time("bookkeeping", async () => {
-          try {
-            await withTenant(ctxArg, async (db) => {
-              await db.logAction({
-                action: "document.queried",
-                resource_type: "question",
-                clerk_user_id: auth.userId,
-                changes: {
-                  question_hash: hashQuestion(question),
-                  documents: [],
-                  passages: 0,
-                  contactLookup: true,
-                },
-              });
-              // Miss loop: more than one customer matched the name — the
-              // dispatcher got a "which one did you mean" instead of a value
-              // (candidateCount, contactLookup.js's buildAmbiguousContactAnswer).
-              if ((contactData.candidateCount ?? 1) > 1) {
-                await insertAskMiss(db, {
-                  question, questionNormalized: normalizedForAnalytics,
-                  outcome: MISS_OUTCOMES.CONTACT_AMBIGUOUS,
-                });
-              }
-            });
-          } catch (err) {
-            console.error("Failed to write document.queried audit row (contact lookup):", err?.message);
-          }
-        });
         return send(200, { success: true, data: contactData });
       }
       // contactData is null: no customer matched the name. Miss loop: zero
@@ -1271,8 +1433,40 @@ export default async function handler(req, res) {
     if (docLookupIntent) {
       let docData = null;
       try {
+        // Round 16 D1 #8: one withTenant transaction for compute + audit log
+        // (was two round trips) — see the meta-router above for why a
+        // logAction/insertAskMiss failure here is harmless and non-fatal.
         docData = await timer.time("doclookup", () =>
-          withTenant(ctxArg, (db) => withCitations(db, runDocLookup(db, question, { overlay }))) // TEAM C
+          withTenant(ctxArg, async (db) => {
+            const result = await withCitations(db, runDocLookup(db, question, { overlay })); // TEAM C
+            if (result) {
+              const bkStart = Date.now();
+              try {
+                await db.logAction({
+                  action: "document.queried",
+                  resource_type: "question",
+                  clerk_user_id: auth.userId,
+                  changes: {
+                    question_hash: hashQuestion(question),
+                    documents: [...new Set((result.sources ?? []).map((s) => s.documentId))],
+                    passages: 0,
+                    docLookup: true,
+                  },
+                });
+                if ((result.candidateCount ?? 1) > 1) {
+                  await insertAskMiss(db, {
+                    question, questionNormalized: normalizedForAnalytics,
+                    outcome: MISS_OUTCOMES.CONTACT_AMBIGUOUS,
+                  });
+                }
+              } catch (err) {
+                console.error("Failed to write document.queried audit row (doc lookup):", err?.message);
+              } finally {
+                timer.add("bookkeeping", Date.now() - bkStart);
+              }
+            }
+            return result;
+          }) // TEAM C
         );
       } catch (err) {
         console.error("Doc lookup failed, falling through to retrieval+model:", err?.message);
@@ -1283,31 +1477,6 @@ export default async function handler(req, res) {
         doc_lookup_hit: Boolean(docData),
       }));
       if (docData) {
-        await timer.time("bookkeeping", async () => {
-          try {
-            await withTenant(ctxArg, async (db) => {
-              await db.logAction({
-                action: "document.queried",
-                resource_type: "question",
-                clerk_user_id: auth.userId,
-                changes: {
-                  question_hash: hashQuestion(question),
-                  documents: [...new Set((docData.sources ?? []).map((s) => s.documentId))],
-                  passages: 0,
-                  docLookup: true,
-                },
-              });
-              if ((docData.candidateCount ?? 1) > 1) {
-                await insertAskMiss(db, {
-                  question, questionNormalized: normalizedForAnalytics,
-                  outcome: MISS_OUTCOMES.CONTACT_AMBIGUOUS,
-                });
-              }
-            });
-          } catch (err) {
-            console.error("Failed to write document.queried audit row (doc lookup):", err?.message);
-          }
-        });
         return send(200, { success: true, data: docData });
       }
       // docData is null: no customer/address matched, or matched but had no
@@ -1328,7 +1497,26 @@ export default async function handler(req, res) {
     if (contentCountIntent) {
       let contentData = null;
       try {
-        contentData = await timer.time("contentcount", () => withTenant(ctxArg, (db) => runContentCount(db, contentCountIntent, pack)));
+        // Round 16 D1 #8: one withTenant transaction for compute + audit log
+        // (was two round trips) — see the meta-router above for why a
+        // logAction failure here is harmless and non-fatal.
+        contentData = await timer.time("contentcount", () => withTenant(ctxArg, async (db) => {
+          const result = await runContentCount(db, contentCountIntent, pack);
+          if (result) {
+            const bkStart = Date.now();
+            try {
+              await db.logAction({
+                action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+                changes: { question_hash: hashQuestion(question), documents: (result.records ?? []).map((r) => r.documentId).filter(Boolean), passages: 0, contentCount: true },
+              });
+            } catch (err) {
+              console.error("Failed to write document.queried audit row (content count):", err?.message);
+            } finally {
+              timer.add("bookkeeping", Date.now() - bkStart);
+            }
+          }
+          return result;
+        }));
       } catch (err) {
         console.error("Content-count router failed, falling through to retrieval+model:", err?.message);
       }
@@ -1337,16 +1525,6 @@ export default async function handler(req, res) {
         content_count_hit: Boolean(contentData),
       }));
       if (contentData) {
-        await timer.time("bookkeeping", async () => {
-          try {
-            await withTenant(ctxArg, (db) => db.logAction({
-              action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
-              changes: { question_hash: hashQuestion(question), documents: (contentData.records ?? []).map((r) => r.documentId).filter(Boolean), passages: 0, contentCount: true },
-            }));
-          } catch (err) {
-            console.error("Failed to write document.queried audit row (content count):", err?.message);
-          }
-        });
         return send(200, { success: true, data: contentData });
       }
       // contentData is null only on an unexpected error above; retrieval (run inline just below) still gets a shot.
@@ -1360,10 +1538,11 @@ export default async function handler(req, res) {
     // here should ever be served back stale once financials ships) and not
     // counted against the monthly model allowance (no model call was made).
     if (moneyQuestion) {
+      const moneyGateModule = await loadMoneyGateModule();
       // FINANCIALS hook: when M3-config/22 exists AND this tenant has financial rows, answer from real data
       // (deterministic SQL first, then the Donovan agent over the `financials` view); otherwise `fin.hasData`
       // is false and everything below is exactly the old honest refusal.
-      const fin = await timer.time("financials", () => answerMoneyQuestion({ withTenant, ctxArg, question, today: todayResolved }));
+      const fin = await timer.time("financials", () => moneyGateModule.answerMoneyQuestion({ withTenant, ctxArg, question, today: todayResolved }));
       if (fin.handled) {
         send(200, { success: true, data: fin.data });
         await timer.time("bookkeeping", () =>
@@ -1375,7 +1554,7 @@ export default async function handler(req, res) {
         return;
       }
       if (fin.hasData && (await tryAgent())) return;
-      const data = fin.hasData ? moneyNoMatchAnswer() : moneyFallbackAnswer();
+      const data = fin.hasData ? moneyGateModule.moneyNoMatchAnswer() : moneyFallbackAnswer();
       send(200, { success: true, data });
       await timer.time("bookkeeping", () =>
         withTenant(ctxArg, async (db) => {
@@ -1411,13 +1590,17 @@ export default async function handler(req, res) {
         // in flight (fired concurrently with the gate check above), just
         // consulted here instead of after retrieval.
         await budgetPromise;
+        // analyticsCandidate can only be true once the analytics module was
+        // already loaded above (loadAnalyticsRouteModule is memoized, so this
+        // resolves instantly from cache — never a second import).
+        const analyticsRouteModule = await loadAnalyticsRouteModule();
         // No `questionHash` passed through: runAnalyticsQuestion computes its
         // own namespaced hashes (api/_lib/analytics.js's analyticsQuestionHash/
         // analyticsPlanHash) so an analytics cache row can never collide with
         // — or be shadowed by — a retrieval-cached row for the same question
         // text (2026-09-21 reviewer fix, handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md).
         analyticsResult = await timer.time("analytics_plan", () =>
-          runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay, tenantVocab, noCache: Boolean(scorecardCall) })
+          analyticsRouteModule.runAnalyticsQuestion({ withTenant, ctxArg, question, today: todayResolved, overlay, tenantVocab, noCache: Boolean(scorecardCall) })
         );
       } catch (err) {
         // A tenant already over its daily model budget must not spend a
@@ -1445,7 +1628,9 @@ export default async function handler(req, res) {
         // "how many Ruud units" question can share a Tier-2 plan-hash row with "do we have any Ruud units";
         // only the second one wants the Yes/No lead-in, so the wrap must never be persisted into the shared
         // cache row itself. applyExistenceShape is a pure, idempotent string transform (see its own doc
-        // comment), so computing it fresh on every response costs nothing.
+        // comment), so computing it fresh on every response costs nothing. (Module already loaded above
+        // to reach this branch at all; loadAnalyticsRouteModule's cache makes this a no-op re-fetch.)
+        const { applyExistenceShape } = await loadAnalyticsRouteModule();
         send(200, { success: true, data: applyExistenceShape(data, question) });
         await timer.time("bookkeeping", async () => {
           try {
@@ -1528,7 +1713,7 @@ export default async function handler(req, res) {
       // "Analytics plan rejected" (live miss cluster): the agent gets a shot before retrieval.
       // v1: retrieval + model (35s) still follows on a miss, so this stays a small share of the old 60s
       // budget. v2 (streaming, up to maxDuration 300) can afford to give the research agent a full try here.
-      if (await tryAgent({ budgetMs: RESEARCH_V2_ENABLED ? 90_000 : 18_000 })) return;
+      if (await tryAgent({ budgetMs: (await getResearchV2Enabled()) ? 90_000 : 18_000 })) return;
       recordAskMiss(ctxArg, {
         question, questionNormalized: normalizedForAnalytics,
         outcome: MISS_OUTCOMES.ANALYTICS_FALLTHROUGH,
@@ -1653,7 +1838,7 @@ export default async function handler(req, res) {
     // compressor replaced?") go to the agent BEFORE the retrieval model: retrieval answers from the top few
     // pages and caps a reply at 5 facts, which silently truncated a 13-customer list. Falls through to
     // retrieval when the agent cannot answer (its budget leaves room for the retrieval call inside maxDuration).
-    if (isAgentFirstQuestion(question) && (await tryAgent({ budgetMs: RESEARCH_V2_ENABLED ? 90_000 : 20_000, recordMiss: false }))) return;
+    if (isAgentFirstQuestion(question) && !isInstallDateExtremeQuestion(question) && (await tryAgent({ budgetMs: (await getResearchV2Enabled()) ? 90_000 : 20_000, recordMiss: false }))) return;
 
     // ---- 2. ask ------------------------------------------------------------
     // Three separate blocks, not one flat prompt string, so an Anthropic
@@ -1695,6 +1880,7 @@ export default async function handler(req, res) {
       ASK_MODEL
     );
 
+    const { default: Anthropic } = await loadAnthropicSdk();
     const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
     const startedAt = Date.now();
     // Retries only 429/529/overloaded, with jitter, and never past the model

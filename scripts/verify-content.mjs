@@ -33,6 +33,7 @@ console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('{"rou
 const content = await import('../api/_lib/contentCount.js');
 const {
   HVAC_TERM_SYNONYMS, expandTerms, buildTermPattern, extractKnownTerms, canonicalizeTerm, parseContentCountQuestion,
+  buildTsPrefilterQuery,
 } = content;
 const jobSummaryMod = await import('../api/_lib/content/jobSummary.js');
 const { parseJobSummaryQuestion, extractFindingSentences } = jobSummaryMod;
@@ -56,6 +57,20 @@ const { parseJobSummaryQuestion, extractFindingSentences } = jobSummaryMod;
   check('vocab: heat exchanger group includes singular + plural', ['heat exchanger', 'heat exchangers'].every((w) => HVAC_TERM_SYNONYMS['heat exchanger'].includes(w)));
   eq('extractKnownTerms: "involved a TXV or expansion valve" finds txv', extractKnownTerms('how many jobs involved a txv or expansion valve'), ['txv']);
   eq('extractKnownTerms: "heat exchanger crack" finds heat exchanger', extractKnownTerms('how many jobs mention a heat exchanger crack'), ['heat exchanger']);
+}
+
+/* ================================================================== 1b. pure: tsv prefilter query (Round 16, F4, D2 #8) */
+{
+  const plain = buildTsPrefilterQuery(['loud noise']);
+  check('buildTsPrefilterQuery: a plain phrase uses plainto_tsquery', plain?.sql === "plainto_tsquery('english', $1::text)" && plain.params[0] === 'loud noise', JSON.stringify(plain));
+  const prefix = buildTsPrefilterQuery(['replac~']);
+  check('buildTsPrefilterQuery: a "~"-suffixed stem uses to_tsquery with a prefix match', prefix?.sql === "to_tsquery('english', $1::text)" && prefix.params[0] === 'replac:*', JSON.stringify(prefix));
+  const both = buildTsPrefilterQuery(['loud noise', 'replac~']);
+  check('buildTsPrefilterQuery: several variants OR together, one placeholder each, in order', both?.sql === "plainto_tsquery('english', $1::text) || to_tsquery('english', $2::text)" && both.params.length === 2, JSON.stringify(both));
+  const deduped = buildTsPrefilterQuery(['cap', 'cap', '', null, undefined]);
+  check('buildTsPrefilterQuery: blank/duplicate variants are dropped, never produce an empty clause', deduped?.params.length === 1 && deduped.params[0] === 'cap', JSON.stringify(deduped));
+  eq('buildTsPrefilterQuery: no usable variant at all -> null (caller must fall back to the plain query)', buildTsPrefilterQuery([]), null);
+  eq('buildTsPrefilterQuery: a stem that is ONLY punctuation -> null, never an empty to_tsquery(\'\')', buildTsPrefilterQuery(['---~']), null);
 }
 
 /* ================================================================== 2. pure: question shape (never-hijack) */
@@ -218,10 +233,20 @@ async function seedTenant(t, tenantId, world) {
   for (const c of world.customers) await ent(uid(t, 'c', c.n), 'customer', { customer_name: c.name, service_address: c.address }, { number: `C-0000${c.n}` });
   for (const e of world.equipment ?? []) await ent(uid(t, 'e', e.n), 'equipment', { manufacturer: e.mfr ?? 'Trane', equipment_type: 'condenser' }, { customerId: uid(t, 'c', e.customer) });
   for (const d of world.docs) {
-    await lite.query('INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,$4,$5,$6)',
-      [uid(t, 'd', d.n), tenantId, d.file, d.type, `${t}-hash-${d.n}`, 'verified']);
+    if (d.date) {
+      await lite.query('INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [uid(t, 'd', d.n), tenantId, d.file, d.type, `${t}-hash-${d.n}`, 'verified', d.date]);
+    } else {
+      await lite.query('INSERT INTO documents (id, tenant_id, original_filename, document_type, sha256_hash, stage) VALUES ($1,$2,$3,$4,$5,$6)',
+        [uid(t, 'd', d.n), tenantId, d.file, d.type, `${t}-hash-${d.n}`, 'verified']);
+    }
     for (const link of d.links ?? []) await lite.query('INSERT INTO document_entity_links (tenant_id, document_id, entity_id) VALUES ($1,$2,$3)', [tenantId, uid(t, 'd', d.n), link]);
     for (const [i, text] of (d.pages ?? []).entries()) await lite.query('INSERT INTO document_pages (document_id, tenant_id, page_no, text) VALUES ($1,$2,$3,$4)', [uid(t, 'd', d.n), tenantId, i + 1, text]);
+    // Round 16 (F4): address-resolved job-summary fixtures read structured extractions
+    // (work_performed/notes), not document_pages text - see runJobSummaryByAddress.
+    for (const [key, value] of d.fields ?? []) {
+      await lite.query('INSERT INTO extractions (tenant_id, document_id, field_key, value, confidence) VALUES ($1,$2,$3,$4,0.9)', [tenantId, uid(t, 'd', d.n), key, value]);
+    }
   }
 }
 
@@ -238,6 +263,12 @@ const worldA = {
     { n: 8, name: 'Rios Boulevard Apartments', address: '400 Rios Blvd, Mesa, AZ 85205' },
     { n: 9, name: 'Janet Holloway', address: '22 Holloway Dr, Mesa, AZ 85205' }, // on file, no finding text
     { n: 10, name: 'Greg Palmer', address: '5 Palmer Ct, Mesa, AZ 85201' }, // "filter change", no "replac" word at all
+    // Round 16 (F4): address-resolved job-summary fixtures (field-phrasing g099-g101 shape).
+    { n: 11, name: 'Nora Install', address: '55 Alpha Rd, Mesa, AZ 85201' }, // install (invoice) has no notes; a LATER service-ticket does
+    { n: 12, name: 'Otto Fallback', address: '66 Beta Rd, Mesa, AZ 85202' }, // no literal work-order doc at all - falls back to the service-ticket
+    { n: 13, name: 'Wendy Dispatch', address: '77 Gamma Rd, Mesa, AZ 85203' }, // has both a real work-order AND a later service-ticket
+    { n: 14, name: 'Ambiguous Alpha', address: '88 Delta Rd, Mesa, AZ 85204' }, // shares house+street with #15 - address alone is ambiguous
+    { n: 15, name: 'Ambiguous Beta', address: '88 Delta Rd, Gilbert, AZ 85234' },
   ],
   equipment: [{ n: 4, customer: 4, mfr: 'Carrier' }],
   docs: [
@@ -251,6 +282,17 @@ const worldA = {
     { n: 7, file: 'rios-workorder.pdf', type: 'work-order', links: [uid('a', 'c', 7)], pages: ['Found a loose duct connection near the attic access. Resealed it and recommend a follow-up next season.'] },
     { n: 9, file: 'holloway-invoice.pdf', type: 'invoice', links: [uid('a', 'c', 9)], pages: ['Invoice total $220. Payment received in full.'] },
     { n: 10, file: 'palmer-service.pdf', type: 'service-ticket', links: [uid('a', 'c', 10)], pages: ['Performed a filter change during the visit. No other issues noted.'] },
+    // Round 16 (F4): address-resolved job-summary fixtures.
+    { n: 11, file: 'nora-invoice.pdf', type: 'invoice', links: [uid('a', 'c', 11)], date: '2026-01-01',
+      fields: [['work_performed', 'Install 3 ton Goodman system, R-410A charge']] },
+    { n: 12, file: 'nora-service.pdf', type: 'service-ticket', links: [uid('a', 'c', 11)], date: '2026-06-01',
+      fields: [['work_performed', 'Annual PM: checked charge'], ['notes', 'System operating normally after visit']] },
+    { n: 13, file: 'otto-service.pdf', type: 'service-ticket', links: [uid('a', 'c', 12)], date: '2026-02-01',
+      fields: [['work_performed', 'No cooling - replaced run capacitor']] },
+    { n: 14, file: 'wendy-workorder.pdf', type: 'work-order', links: [uid('a', 'c', 13)], date: '2026-01-15',
+      fields: [['work_performed', 'No heat, dispatched for diagnosis']] },
+    { n: 15, file: 'wendy-service.pdf', type: 'service-ticket', links: [uid('a', 'c', 13)], date: '2026-05-01',
+      fields: [['work_performed', 'Replaced igniter']] },
   ],
 };
 const worldB = {
@@ -381,6 +423,52 @@ const run = (parsed) => withTenant(ctxA, (db) => runContentCount(db, parsed));
   // Tenant isolation: tenant B's own "Zed Competitor" is invisible to tenant A's job-summary lookup.
   const rCrossTenant = await withTenant(ctxA, (db) => content.runContentCount(db, { mode: 'jobSummary', customerName: 'Zed Competitor' }));
   check('job-summary: tenant isolation - another tenant\'s customer is invisible', rCrossTenant.recordsTotal === 0);
+}
+
+/* ================================================================== 10. address-resolved job summary
+ * (Round 16, F4, D2 #5 / field-phrasing g099-g101): "what was found on the job at <address>",
+ * "any notes on the install at <address>", "whats the work order say for <address>" - resolved via
+ * the SAME fast-path address resolution the rest of the app uses, then answered extractively from that
+ * one customer's own structured work_performed/notes extractions - never a page-text guess, never a
+ * later document's note borrowed to answer about an earlier one. */
+{
+  const runQ = (q) => withTenant(ctxA, (db) => content.runContentCount(db, parseContentCountQuestion(q)));
+
+  // "the job" (generic): every document with a work_performed/notes value, each attributed to its own
+  // document - the install invoice AND the later service-ticket both show up, never merged into one quote.
+  const rJob = await runQ('what was found on the job at 55 alpha rd');
+  check('address job-summary: parses as an address-anchored jobSummary', parseContentCountQuestion('what was found on the job at 55 alpha rd')?.addressKind === 'job');
+  check('address job-summary (generic): includes the install invoice\'s own work_performed', rJob.text.includes('Install 3 ton Goodman system'), rJob.text);
+  check('address job-summary (generic): also includes the later service-ticket\'s own notes', rJob.text.includes('System operating normally after visit'), rJob.text);
+  check('address job-summary (generic): cites both documents', rJob.records.filter((x) => x.documentId).length === 2, JSON.stringify(rJob.records));
+
+  // "the install" specifically: the invoice has work_performed but NO notes field on IT - the answer must
+  // say so plainly and must NEVER borrow the later service-ticket's "System operating normally" note.
+  const rInstall = await runQ('any notes on the install at 55 alpha rd');
+  check('address job-summary (install): states the install document has no notes field', /no notes field/i.test(rInstall.text), rInstall.text);
+  check('address job-summary (install): never borrows the LATER service-ticket\'s note', !rInstall.text.includes('System operating normally'), rInstall.text);
+  check('address job-summary (install): still gives the install\'s own work_performed extractively', rInstall.text.includes('Install 3 ton Goodman system'), rInstall.text);
+  check('address job-summary (install): cites only the install document, not the later one', rInstall.records.filter((x) => x.documentId).length === 1, JSON.stringify(rInstall.records));
+
+  // "the work order", no literal work-order document on file at all: falls back to whichever document
+  // covers the address (the one service-ticket), rather than an honest-but-useless decline.
+  const rWoFallback = await runQ('whats the work order say for 66 beta rd');
+  check('address job-summary (work order, no literal work-order doc): falls back to the service-ticket on file', rWoFallback.text.includes('replaced run capacitor'), rWoFallback.text);
+
+  // "the work order", a real work-order document DOES exist (plus a later, unrelated service-ticket):
+  // the real work-order is used, not the later visit.
+  const rWoReal = await runQ('whats the work order say for 77 gamma rd');
+  check('address job-summary (work order, real work-order on file): quotes the work order itself', rWoReal.text.includes('dispatched for diagnosis'), rWoReal.text);
+  check('address job-summary (work order, real work-order on file): never the later, unrelated service-ticket', !rWoReal.text.includes('Replaced igniter'), rWoReal.text);
+
+  // Address ambiguity: two customers share the same house number + street name (different city) - asks
+  // which, never guesses one.
+  const rAmbig = await runQ('what was found on the job at 88 delta rd');
+  check('address job-summary: an address matching 2+ customers asks which, never guesses', /which one/i.test(rAmbig.text), rAmbig.text);
+
+  // No address on file at all.
+  const rNoAddr = await runQ('what was found on the job at 999 nowhere ln');
+  check('address job-summary: no address on file -> honest decline, not a guess', rNoAddr.recordsTotal === 0 && /no job or customer/i.test(rNoAddr.text), rNoAddr.text);
 }
 
 console.log('');

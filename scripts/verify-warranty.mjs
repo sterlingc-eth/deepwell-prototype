@@ -732,5 +732,43 @@ eq('Mitsubishi Electric alias still resolves', normalizeBrand('Mitsubishi Electr
   check('upsell: printed expiry within a year is eligible even for a conditional brand', u.eligible === true);
 }
 
+/* ------------------------------------------------------------ item 4: sources */
+// R16 D2 audit item 4: deriveWarranty's OPTIONAL 4th arg (fieldSources) — a
+// backward-compatible, purely additive plumbing point for a caller that
+// knows which document each fact came from, so a warranty answer can cite
+// something more specific than "the unit's record". Nothing calls this yet
+// with real data (see this file's own doc comment on the upstream hook
+// extractDocument.js/findOrCreateEquipment would need); these checks pin the
+// SHAPE so a future wire-up has something real to build against, and that
+// omitting the argument entirely is still exactly as before.
+{
+  const w = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2024-01-01' }, '2026-09-16');
+  eq('sources: omitted fieldSources -> every source is null (fully backward compatible)', w.sources, { installDate: null, registrationOnFile: null, expires: null });
+}
+{
+  const sources = {
+    installation_date: { documentId: 'doc-install-1', page: 2 },
+    warranty_registered_date: { documentId: 'doc-reg-1' },
+  };
+  const w = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2024-01-01', warranty_registered_date: '2024-01-10' }, '2026-09-16', null, sources);
+  eq('sources: installDate carries the install document + page', w.sources.installDate, { documentId: 'doc-install-1', location: { field: 'installation_date', page: 2 } });
+  eq('sources: registrationOnFile carries the registration document (no page given)', w.sources.registrationOnFile, { documentId: 'doc-reg-1', location: { field: 'warranty_registered_date' } });
+  eq('sources: a COMPUTED expiry inherits the INSTALL document\'s source (it is arithmetic on that date, not its own document)', w.sources.expires, w.sources.installDate);
+}
+{
+  const sources = {
+    installation_date: { documentId: 'doc-install-2' },
+    warranty_expires: { documentId: 'doc-warranty-card' },
+  };
+  const w = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2024-01-01', warranty_expires: '2034-01-01' }, '2026-09-16', null, sources);
+  eq('sources: a PRINTED expiry cites its OWN document, never the install document', w.sources.expires, { documentId: 'doc-warranty-card', location: { field: 'warranty_expires' } });
+  check('sources: printed-expiry case does not conflate with the install document', w.sources.expires.documentId !== w.sources.installDate.documentId);
+}
+{
+  // A malformed source entry (no documentId) is simply null, never a half-built record.
+  const w = deriveWarranty({ manufacturer: 'Goodman', installation_date: '2024-01-01' }, '2026-09-16', null, { installation_date: { page: 3 } });
+  eq('sources: an entry with no documentId is null, not a partial object', w.sources.installDate, null);
+}
+
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nAll warranty checks passed.');
 process.exit(failures ? 1 : 0);

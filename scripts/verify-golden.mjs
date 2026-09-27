@@ -156,12 +156,32 @@ const KNOWN_WRONG_IDS = new Set([
   // R15: lookups-0010-*, hvac-tech-0007, lookups-0084 (install_date) and breadth-content-028 fixed; shrink-only list.
   "breadth-content-019", // deliberately not chased - see file header
   "breadth-semantic-001", "breadth-semantic-002", "breadth-semantic-003",
+
+  // R16 part 2 (F1): the 23 g-ids below (the owner-decision address policy not yet answering
+  // manufacturer/tonnage/refrigerant/warranty by address; 3 install-date-by-address reading the
+  // registration date instead; 1 "4"="for" leetspeak address-parsing bug) are FIXED this round —
+  // see build-golden-export.mjs (manufacturer/model/serial_number/installation_date now parsed off
+  // each document's own printed text wherever it states them + the unit's own service_address
+  // stamped per E2's intake/backfill rule) and fastPath.js/fastPathQuery.js (the "4"/"@" numeronym
+  // fix, and the owner address policy generalized to a business-name-resolved customer too) —
+  // removed from this shrink-only list, not just left here stale.
+  //   - 1 id: the deterministic "how many Trane units are still under warranty" analytics count is off by
+  //     one against the equipment entities' own warranty.expires dates (5 actual vs. 4 reported) - a
+  //     real, small discrepancy between the analytics path and the golden per-unit warranty data. A
+  //     (api/_lib/analytics.js owner) - NOT F1's file, left as documented.
+  "g135",
+  // R16 part 2 (F2): counts-warranty-0008-canonical/-typo/-abbreviated, counts-warranty-0004-canonical,
+  // breadth-multi-hop-010 and breadth-persona-017 (the "environmental drift" ids formerly listed here)
+  // were the warrantyStatusOf bug (r16_d2_data.json #1: a unit whose REGISTRATION deadline was <=30d out
+  // got bucketed "expiring" even though its coverage expired years later) - not date drift. Fixed by
+  // separating coverage status (warrantyStatusOf, by expiry date only) from registration-action-needed
+  // (registrationActionNeededOf, new) in api/_lib/warrantyRules.js/analytics.js; removed from this list
+  // now that they measure correct. g135 above is left in deliberately - see its own comment.
 ]);
 
 if (examExport) {
   const offline = await import("./offline-exam.mjs");
-  const { installPgHarness, installModelBlock, createPGlite, setActiveDatabase, loadExportIntoNewTenant, runOfflineExam } = offline;
-  const { loadExam } = await import("../api/_lib/scorecard/exam.js");
+  const { installPgHarness, installModelBlock, createPGlite, setActiveDatabase, loadExportIntoNewTenant, runOfflineExam, loadFullExam } = offline;
 
   const realLog = console.log;
   console.log = (...a) => { if (typeof a[0] === "string" && (a[0].startsWith('{"route"') || a[0].startsWith('{"event"'))) return; realLog(...a); };
@@ -177,7 +197,7 @@ if (examExport) {
   const lite = await createPGlite();
   await setActiveDatabase(lite);
 
-  const exam = loadExam();
+  const exam = await loadFullExam();
   check("test-docs/scorecard/exam.json is present and non-empty", exam.questions.length > 0, String(exam.questions.length));
 
   if (exam.questions.length) {
@@ -227,8 +247,27 @@ if (examExport) {
     // Round 15 (Team D, content family): new HVAC vocabulary (txv/heat exchanger) and the deterministic
     // job-summary shape (content/jobSummary.js) moved 8 more content questions off needs-model (2 newly
     // correct, 6 to needs-grader) — measured 590/523 → floor raised to 585/520.
-    check(`no-model coverage floor: answeredWithoutModel ≥ 670 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 670, JSON.stringify(overall));
-    check(`no-model coverage floor: correct ≥ 595 (got ${overall.correct})`, overall.correct >= 595, JSON.stringify(overall));
+    // Round 16 (E1, owner product decision 2026-09-26, see test-docs/scorecard/ADJUDICATION.md): a rare
+    // DOWNWARD adjustment, and a deliberate one — not a code regression. 24 exam ids (warranty/
+    // manufacturer/tonnage/refrigerant "is the unit at <address> ..." questions) were previously scored
+    // "correct" only because their oracle wrongly encoded "always not on file" for an address-resolved
+    // unit; the owner's new policy says these SHOULD resolve (single customer+unit -> answer). Measured
+    // 664/586 (was 687/609) → floor LOWERED to 660/580 at the time — this corpus's extraction pipeline had
+    // no citable manufacturer/tonnage/refrigerant/installation_date row for ANY unit at all yet.
+    //
+    // Round 16 part 2 (F1): that citation gap is what this round closes. build-golden-export.mjs now parses
+    // manufacturer/model/serial_number/installation_date off each document's own printed text wherever it
+    // states them (warranty-registration/equipment-record/nameplate-photo's clean labeled lines, invoice/
+    // startup-sheet/service-ticket's combined "Equipment: <brand> <model>" line, and an invoice whose own
+    // work description literally starts "Install ..." for its own printed date) and stamps each equipment
+    // entity's own service_address the same way E2's intake/backfill rule would (customer-single-address) —
+    // so a genuine citation now exists for most of those 24 ids (verified: wrong id set unchanged, still
+    // only the F2/F4-owned ids documented above, none newly wrong). Measured 778/693 (today=2026-09-25,
+    // this file's own fixed date) → floor RAISED to 770/685 (a little below measured, same margin
+    // convention as every floor above).
+    // R16 integration (F1+F2+F3+F4 + ask.js install-date-extreme hook): measured 817/727, wrong 5 → floor 800/710.
+    check(`no-model coverage floor: answeredWithoutModel ≥ 800 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 800, JSON.stringify(overall));
+    check(`no-model coverage floor: correct ≥ 710 (got ${overall.correct})`, overall.correct >= 710, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 
     realLog(`NOTE  golden offline exam: ${JSON.stringify(overall)}`);

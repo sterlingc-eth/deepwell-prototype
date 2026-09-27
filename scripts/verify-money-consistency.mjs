@@ -231,7 +231,22 @@ async function invoiceTotalFor(customerNumber, today = '2026-09-26') {
   // Positive control: a unit whose installation_date IS backed by a genuine extraction must still
   // be answered (this fix must not turn every install-date question into a decline).
   const unitId = await withTenant(ctx, async (db) => {
-    const { rows } = await db.raw(`SELECT id, customer_id FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL LIMIT 1`, []);
+    // R16 integration: deterministic pick — a single-unit customer whose SURNAME is unique (the question below
+    // asks by surname, and this corpus duplicates surnames), with any pre-existing installation_date
+    // extraction removed so the only backed date is the one inserted below.
+    const { rows } = await db.raw(
+      `SELECT e.id, e.customer_id FROM entities e JOIN entities c ON c.id = e.customer_id
+        WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
+          AND (SELECT count(*) FROM entities c2 WHERE c2.entity_type = 'customer' AND c2.merged_into IS NULL
+                 AND lower(split_part(c2.data->>'customer_name', ' ', -1)) = lower(split_part(c.data->>'customer_name', ' ', -1))) = 1
+          AND (SELECT count(*) FROM entities u2 WHERE u2.entity_type = 'equipment' AND u2.merged_into IS NULL AND u2.customer_id = e.customer_id) = 1
+        ORDER BY e.id LIMIT 1`, []);
+    if (rows[0]) {
+      await db.raw(`DELETE FROM extractions WHERE entity_id = $1 AND field_key = 'installation_date'`, [rows[0].id]);
+      // The router only states a date that a genuine extraction agrees with (a conflicting extraction declines),
+      // so make the unit's own recorded date match the extraction inserted below.
+      await db.raw(`UPDATE entities SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{installation_date}', '"2019-04-02"') WHERE id = $1`, [rows[0].id]);
+    }
     return rows[0];
   });
   check('setup :: found a unit to attach a genuine installation_date extraction to', Boolean(unitId));
@@ -257,22 +272,35 @@ async function invoiceTotalFor(customerNumber, today = '2026-09-26') {
     }
   }
 
-  // Negative: a unit whose data.installation_date is populated with NOTHING backing it (this
-  // corpus's own default shape — zero installation_date extractions ship with it at all) must
-  // decline honestly, never state that raw value as a fact.
-  const { unitData, customerName2 } = await withTenant(ctx, async (db) => {
+  // Negative: a unit whose data.installation_date is populated with NOTHING backing it must
+  // decline honestly, never state that raw value as a fact. R16 (F1): the golden corpus now
+  // carries genuine installation_date extractions for most units (from each customer's first
+  // "Install ..." invoice), so an un-backed unit at an otherwise-clean, uniquely-named,
+  // single-unit customer is no longer reliably present in the corpus to go hunting for — so this
+  // manufactures the exact shape directly (the same way the positive control above manufactures
+  // its own genuine-extraction case), rather than relying on a fixture accident: pick any single-unit
+  // customer with a unique name, strip any real installation_date extraction it happens to carry, and
+  // stamp its raw data.installation_date with a value nothing backs.
+  const target = await withTenant(ctx, async (db) => {
     const { rows } = await db.raw(
-      `SELECT e.id, e.data, c.data->>'customer_name' AS customer_name FROM entities e JOIN entities c ON c.id = e.customer_id
-        WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'installation_date' IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM extractions x WHERE x.entity_id = e.id AND x.field_key = 'installation_date')
+      `SELECT e.id, e.customer_id, c.data->>'customer_name' AS customer_name FROM entities e JOIN entities c ON c.id = e.customer_id
+        WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
+          AND (SELECT count(*) FROM entities c2 WHERE c2.entity_type = 'customer' AND c2.merged_into IS NULL
+                 AND c2.data->>'customer_name' = c.data->>'customer_name') = 1
+          AND (SELECT count(*) FROM entities u2 WHERE u2.entity_type = 'equipment' AND u2.merged_into IS NULL
+                 AND u2.customer_id = e.customer_id) = 1
         LIMIT 1`,
       []
     );
-    return { unitData: rows[0], customerName2: rows[0]?.customer_name };
+    return rows[0];
   });
-  check('setup :: found a unit with an un-backed installation_date (this corpus\'s normal shape)', Boolean(unitData));
-  if (customerName2) {
-    const answer = await askDeterministic(`When was the ${customerName2.split(' ').pop()} unit installed?`);
+  check('setup :: found a single-unit, uniquely-named customer to use for the un-backed case', Boolean(target));
+  if (target) {
+    await withTenant(ctx, async (db) => {
+      await db.raw(`DELETE FROM extractions WHERE entity_id = $1 AND field_key = 'installation_date'`, [target.id]);
+      await db.raw(`UPDATE entities SET data = jsonb_set(data, '{installation_date}', '"2015-06-01"') WHERE id = $1`, [target.id]);
+    });
+    const answer = await askDeterministic(`When was the ${target.customer_name} unit installed?`);
     check('hook fix :: an un-backed installation_date is never stated as a fact', !answer?.facts?.length, JSON.stringify(answer));
     check('hook fix :: declines with the honest "No install date is recorded" text', /no install date is recorded/i.test(answer?.text ?? ''), answer?.text);
   }

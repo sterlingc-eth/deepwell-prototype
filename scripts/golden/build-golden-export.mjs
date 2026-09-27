@@ -55,6 +55,14 @@ import { fileURLToPath } from 'node:url';
 import { normalizeDate } from '../../api/_lib/extractFields.js';
 import { deriveWarranty } from '../../api/_lib/warrantyRules.js';
 import { normalizeFinancials } from '../../api/_lib/financials/normalize.js';
+// R16 (F1): the SAME pure rule engine E2's intake hook / one-time backfill use (see that module's
+// own header) -- applied here so the golden export's equipment entities carry a stamped
+// service_address exactly the way a real tenant would end up after intake/backfill runs, instead of
+// the golden export staying frozen at the pre-E2 "132/132 equipment entities have none" shape. Pure,
+// no DB: every customer in this corpus has exactly one on-file address (this synthetic generator
+// never prints two different service addresses for the same customer), so this always resolves to
+// the 'customer-single-address' rule, deterministically.
+import { decideUnitAddress } from '../../api/_lib/intake/unitAddress.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, '..', '..');
@@ -110,10 +118,35 @@ function pagesForFile(absPath) {
 /* ============================================================== per-document field parser
  * Generic "Label: value" line reader + a few block readers, matched against
  * scripts/synth-business.mjs's own fixed templates (read directly from that file; never modified).
- * Only fields NOT already known from ANSWER_KEY ground truth are parsed here (customer identity and
- * equipment serial/model/manufacturer/installDate/expires all come from the key, not from text).
+ * Customer/equipment IDENTITY (canonical name/address, serial/model/manufacturer/installDate) still
+ * comes from ANSWER_KEY ground truth, never re-derived from text -- but see EQUIPMENT_IDENTITY_KEYS
+ * below: R16 F1 also parses these same four fields OFF EACH DOCUMENT'S OWN PRINTED TEXT, purely so a
+ * genuine `extractions` row (a real citation) exists wherever the paperwork actually states them,
+ * matching the already-correct entity.data value it never overrides.
  */
 const LABEL_RE = /^([A-Za-z][A-Za-z0-9 /#]*?):\s*(.*)$/;
+
+// R16 (F1): mirrors scripts/synth-business.mjs's own BRANDS list (read directly from that file,
+// never modified) -- the ONLY use is to split a document's own printed "Equipment: <brand> <model>"
+// line (invoice/startup-sheet/service-ticket templates) into its two real fields; the split is only
+// ever accepted when the line's leading word is an EXACT match for one of these known manufacturer
+// names, so nothing is ever invented, only read off text that is already there.
+const KNOWN_BRANDS = ['Trane', 'Carrier', 'Goodman', 'Lennox', 'Rheem', 'York', 'Daikin', 'Mitsubishi'];
+
+/** "Trane 4TTR4004L1000AA" -> {manufacturer, model}; "Trane 4TTR4004L1000AA  Serial: F123456" (the
+ *  service-ticket template's one-line combined form) -> also {serial}. Returns {} when the leading
+ *  word isn't one of KNOWN_BRANDS (never a wrong guess at a split point). */
+function splitEquipmentText(raw) {
+  if (!raw) return {};
+  let text = String(raw).trim();
+  let serial = null;
+  const embeddedSerial = text.match(/^(.*?)\s{2,}Serial:\s*(\S+)\s*$/);
+  if (embeddedSerial) { text = embeddedSerial[1].trim(); serial = embeddedSerial[2].trim(); }
+  const brand = KNOWN_BRANDS.find((b) => text === b || text.startsWith(`${b} `));
+  if (!brand) return { serial };
+  const model = text.slice(brand.length).trim();
+  return { manufacturer: brand, ...(model ? { model } : {}), serial };
+}
 
 function parseLabelLines(text) {
   const map = new Map();
@@ -165,12 +198,26 @@ function parseDocument(type, text) {
       setDate('service_date', map.get('Date'));
       const desc = lines[lines.findIndex((l) => l.trim() === 'Description of work:') + 1];
       setText('work_performed', desc?.trim());
+      // R16 (F1): an invoice whose own printed description of work literally STARTS WITH "Install"
+      // ("Install 2 ton Carrier system, R-410A charge" -- both buildResidential's and
+      // buildApartmentComplex's own first invoice template) is the shop's own install record, not a
+      // later service call -- its own printed "Date:" IS the installation date, read off the text,
+      // never invented. A later invoice for the same unit (repair/PM work, a different description)
+      // never matches this and is correctly left alone.
+      if (/^install\b/i.test(String(desc ?? '').trim())) setDate('installation_date', map.get('Date'));
       const labor = map.get('Labor');
       if (labor) { const h = labor.match(/([\d.]+)/); if (h) out.labor_hours = h[1]; }
       const total = money(map.get('TOTAL DUE'));
       if (total) out._total = { value: total, label: 'TOTAL DUE' };
       setText('technician', map.get('Technician'));
       setText('status', map.get('Status'));
+      // R16 (F1): "Equipment: <brand> <model>" + a separate "Serial: <serial>" line -- every
+      // invoice prints these, so this is the widest-coverage source of a real, citable
+      // manufacturer/model/serial_number extraction (see EQUIPMENT_IDENTITY_KEYS note above).
+      const eq = splitEquipmentText(map.get('Equipment'));
+      setText('manufacturer', eq.manufacturer);
+      setText('model', eq.model);
+      setText('serial_number', map.get('Serial'));
       break;
     }
     case 'warranty-registration': {
@@ -179,6 +226,12 @@ function parseDocument(type, text) {
       setText('tonnage', map.get('Tonnage'));
       setText('refrigerant', map.get('Refrigerant'));
       setDate('warranty_expires', map.get('Valid through'));
+      // R16 (F1): this template prints Manufacturer/Model/Serial/Installation Date as their own
+      // clean labeled lines -- no splitting needed, straight setText/setDate.
+      setText('manufacturer', map.get('Manufacturer'));
+      setText('model', map.get('Model'));
+      setText('serial_number', map.get('Serial'));
+      setDate('installation_date', map.get('Installation Date'));
       break;
     }
     case 'startup-sheet': {
@@ -186,6 +239,12 @@ function parseDocument(type, text) {
       setText('refrigerant', map.get('Refrigerant charge'));
       setText('technician', map.get('Technician'));
       setDate('service_date', map.get('Service Date'));
+      // R16 (F1): "Equipment: <brand> <model>" + separate "Serial:"/"Installation Date:" lines.
+      const eq = splitEquipmentText(map.get('Equipment'));
+      setText('manufacturer', eq.manufacturer);
+      setText('model', eq.model);
+      setText('serial_number', map.get('Serial'));
+      setDate('installation_date', map.get('Installation Date'));
       break;
     }
     case 'service-ticket': {
@@ -196,6 +255,12 @@ function parseDocument(type, text) {
       setText('notes', map.get('Notes'));
       setText('technician', map.get('Technician'));
       setText('status', map.get('Status'));
+      // R16 (F1): this template's own "Equipment: <brand> <model>  Serial: <serial>" is a single
+      // combined line -- splitEquipmentText's embeddedSerial branch pulls both halves apart.
+      const eq = splitEquipmentText(map.get('Equipment'));
+      setText('manufacturer', eq.manufacturer);
+      setText('model', eq.model);
+      setText('serial_number', eq.serial);
       break;
     }
     case 'work-order': {
@@ -242,6 +307,10 @@ function parseDocument(type, text) {
     }
     case 'equipment-record': {
       setText('equipment_type', map.get('Equipment Type'));
+      // R16 (F1): clean separate Manufacturer/Model/Serial lines, same as warranty-registration.
+      setText('manufacturer', map.get('Manufacturer'));
+      setText('model', map.get('Model'));
+      setText('serial_number', map.get('Serial'));
       break;
     }
     case 'correspondence': {
@@ -252,6 +321,10 @@ function parseDocument(type, text) {
     case 'nameplate-photo': {
       setText('refrigerant', map.get('REFRIG'));
       setText('tonnage', map.get('CAPACITY'));
+      // R16 (F1): same data plate, upper-case labels ("MANUFACTURER"/"MODEL NO"/"SERIAL NO").
+      setText('manufacturer', map.get('MANUFACTURER'));
+      setText('model', map.get('MODEL NO'));
+      setText('serial_number', map.get('SERIAL NO'));
       break;
     }
     case 'dispatch-note': {
@@ -381,6 +454,15 @@ function main() {
         manufacturer: unit.brand, installation_date: unit.installDate,
         ...(facts.warranty_registered_date ? { warranty_registered_date: facts.warranty_registered_date } : {}),
       }, null);
+      // R16 (F1): stamp the unit's own service_address the same way E2's intake/backfill would --
+      // never overwrite (existingAddress is always null here, this export never carries one yet),
+      // and always via 'customer-single-address' (see the import comment above for why that's the
+      // only rule this deterministic corpus can ever produce). stampedAt is a FIXED constant, not
+      // `new Date()` -- this whole builder must stay byte-for-byte deterministic (verify:golden).
+      const addressDecision = decideUnitAddress({ existingAddress: null, customerAddress: cust.address, customerHasSingleAddress: true });
+      const addressStamp = addressDecision.outcome === 'stamp'
+        ? { service_address: addressDecision.address, service_address_source: { rule: addressDecision.rule, sourceDocumentId: null, customerId: custId, stampedAt: '2026-01-01T00:00:00Z' } }
+        : {};
       entities.push({
         id: eqId, entity_type: 'equipment', merged_into: null, customer_id: custId,
         data: {
@@ -389,6 +471,7 @@ function main() {
           ...(facts.refrigerant ? { refrigerant: facts.refrigerant } : {}),
           ...(facts.warranty_registered_date ? { warranty_registered_date: facts.warranty_registered_date } : {}),
           warranty,
+          ...addressStamp,
         },
         created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
       });

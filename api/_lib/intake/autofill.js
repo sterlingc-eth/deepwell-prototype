@@ -44,6 +44,10 @@ import { refreshGraphForDocument } from "../graph/build.js";
 import { refreshAllRollups } from "../rollups/refresh.js";
 import { TENANT_SQL } from "../scope.js";
 import { assignDisplayName } from "../naming/assign.js";
+import {
+  decideUnitAddress, loadCustomerAddressInfo, applyUnitAddressStamp,
+  raiseUnitAddressConflict, resolveDocumentEquipmentIds,
+} from "./unitAddress.js";
 
 /** A fill is accepted over a conflicting alternative only when it leads by at least this much
  *  confidence — the same "don't guess, be sure" margin documentTypes.js's AI_VERIFY_MIN_CONFIDENCE
@@ -540,8 +544,11 @@ async function runIntakeAutofillTx(db, documentId, info) {
   const haveInferences = await inferencesTableExists(db);
   const haveNeedsInfo = await needsInfoTableExists(db);
   const result = { ok: true, filled: [], questions: [], verified: false };
-  if (!haveInferences && !haveNeedsInfo) return result;
 
+  // loadDocumentContext is a plain read (extractions/documents/document_entity_links — none of it
+  // migration-43 territory), so it runs BEFORE the migration-43 gate below: step 0 (the
+  // unit<->address stamp) must still work on a database that hasn't pasted 43 yet, since it reads
+  // and writes none of that migration's tables (only a genuine CONFLICT needs intake_needs_info).
   const loaded = await loadDocumentContext(db, documentId);
   if (!loaded) return result;
 
@@ -551,6 +558,44 @@ async function runIntakeAutofillTx(db, documentId, info) {
   const customerId = info.customerId ?? loaded.customerId;
   const facts = info.facts ?? Object.fromEntries(loaded.fields.map((f) => [f.field_key, f.value]));
   const extractedFields = loaded.fields;
+
+  // ---- 0. fix the unit<->address gap AT THE SOURCE (Round 16 owner decision, 2026-09-26) ----
+  // Equipment entities have never carried their own service_address (0/132 in the golden export),
+  // so an address-based unit question could never be answered strictly from the unit's own record.
+  // Every document that links THIS document to a specific equipment entity is a chance to fix that,
+  // going forward — see api/_lib/intake/unitAddress.js for the shared rule engine (also used by the
+  // one-time api/_lib/backfill/unitAddress.js for existing data). Independent of intake_field_inferences
+  // / intake_needs_info existing: the stamp itself only ever touches entities.data; only a genuine
+  // conflict needs intake_needs_info (haveNeedsInfo, already probed above), same tolerance as everywhere
+  // else in this file. Best-effort — never allowed to fail intake.
+  try {
+    const units = await resolveDocumentEquipmentIds(db, documentId);
+    for (const unit of units) {
+      if (unit.existing_address) continue; // never overwrite
+      const customerInfo = await loadCustomerAddressInfo(db, unit.customer_id);
+      const decision = decideUnitAddress({
+        existingAddress: unit.existing_address,
+        customerAddress: customerInfo.address,
+        customerHasSingleAddress: customerInfo.hasSingleAddress,
+        documentAddress: facts.service_address ?? null,
+      });
+      if (decision.outcome === "stamp") {
+        await applyUnitAddressStamp(db, {
+          unitId: unit.id, address: decision.address, rule: decision.rule,
+          sourceDocumentId: documentId, customerId: unit.customer_id ?? null,
+        });
+      } else if (decision.outcome === "conflict" && haveNeedsInfo) {
+        await raiseUnitAddressConflict(db, {
+          unitId: unit.id, documentId,
+          documentAddress: decision.documentAddress, customerAddress: decision.customerAddress,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("intake-autofill: unit-address stamp failed (best-effort)", err?.message);
+  }
+
+  if (!haveInferences && !haveNeedsInfo) return result;
 
   const completeness = completenessFor(resolvedType, extractedFields, pack);
 

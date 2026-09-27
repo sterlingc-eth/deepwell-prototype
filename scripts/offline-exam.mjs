@@ -384,6 +384,51 @@ export function renderMarkdownReport({ tenantKey, examVersion, generatedAt, dura
   return lines.filter((l) => l !== "").join("\n") + "\n";
 }
 
+/* ============================================================== extra category files (Round 16, E3) */
+
+// api/_lib/scorecard/exam.js (engine code) loads only test-docs/scorecard/exam.json and has no multi-file
+// merge support, and it must not be touched (R11_RULES.md: "Never edit exam.json, the oracle or grader
+// semantics"; api/** is off-limits this round). Extra, hand-verified exam categories instead ship as
+// their own files under test-docs/scorecard/generalization/*.json (each `{version, category, questions}`,
+// same question shape exam.json uses) and are merged in here, in this SCRIPT (not engine code, and
+// unowned this round) - the one place both this CLI and scripts/verify-golden.mjs load the full exam from.
+const GENERALIZATION_DIR = path.join(ROOT, "test-docs", "scorecard", "generalization");
+
+/** Every *.json file directly under test-docs/scorecard/generalization/, each contributing a `questions`
+ *  array validated with exam.js's own validQuestions (so a malformed file degrades to "contributes
+ *  nothing" exactly like a missing exam.json does, never a crash). Returns [] if the directory doesn't
+ *  exist. Id collisions with questions already in `existingIds` are dropped (logged once) rather than
+ *  silently shadowing/duplicating a scorecard question. */
+export async function loadExtraCategoryQuestions(existingIds = new Set()) {
+  const { validQuestions } = await import("../api/_lib/scorecard/exam.js");
+  let files = [];
+  try { files = fs.readdirSync(GENERALIZATION_DIR).filter((f) => f.endsWith(".json")).sort(); }
+  catch { return []; }
+  const seen = new Set();
+  const out = [];
+  for (const f of files) {
+    let parsed;
+    try { parsed = JSON.parse(fs.readFileSync(path.join(GENERALIZATION_DIR, f), "utf8")); }
+    catch (err) { console.warn(`offline-exam: ${f} is not valid JSON, skipping:`, err?.message); continue; }
+    for (const q of validQuestions(parsed?.questions)) {
+      if (existingIds.has(q.id) || seen.has(q.id)) { console.warn(`offline-exam: ${f}: duplicate question id ${q.id}, dropped`); continue; }
+      seen.add(q.id);
+      out.push(q);
+    }
+  }
+  return out;
+}
+
+/** The full exam this run should grade: exam.json's own questions plus every extra category file's, with
+ *  id collisions resolved in exam.json's favor. Both the CLI below and scripts/verify-golden.mjs call
+ *  this rather than `loadExam()` directly, so the two never drift apart on which categories get graded. */
+export async function loadFullExam() {
+  const { loadExam } = await import("../api/_lib/scorecard/exam.js");
+  const exam = loadExam();
+  const extra = await loadExtraCategoryQuestions(new Set(exam.questions.map((q) => q.id)));
+  return { version: exam.version, questions: [...exam.questions, ...extra] };
+}
+
 /* ============================================================== CLI */
 
 async function main() {
@@ -402,8 +447,7 @@ async function main() {
   const lite = await createPGlite();
   await setActiveDatabase(lite);
 
-  const { loadExam } = await import("../api/_lib/scorecard/exam.js");
-  const exam = loadExam();
+  const exam = await loadFullExam();
   if (!exam.questions.length) {
     console.error("offline-exam: test-docs/scorecard/exam.json not found or empty — run `node scripts/gen-scorecard.mjs` first.");
     process.exit(1);

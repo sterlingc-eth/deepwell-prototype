@@ -3246,7 +3246,7 @@
    "text": "Who makes the unit at 729 W Camelback Rd, Tucson, AZ 85701?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'manufacturer', '') <> ''",
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'manufacturer', '') <> ''",
     "params": [
      "729 W Camelback Rd%"
     ],
@@ -3624,7 +3624,7 @@
    "text": "Who makes the unit at 211 E University Dr, Mesa, AZ 85201?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'manufacturer', '') <> ''",
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'manufacturer', '') <> ''",
     "params": [
      "211 E University Dr%"
     ],
@@ -3763,7 +3763,7 @@
    "text": "Who makes the unit at 248 W Guadalupe Rd, Mesa, AZ 85201?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'manufacturer', '') <> ''",
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'manufacturer', '') <> ''",
     "params": [
      "248 W Guadalupe Rd%"
     ],
@@ -3783,7 +3783,7 @@
    "text": "who makes the unit at 248 w guadlaupe rd, mesa, az 85201",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'manufacturer', '') <> ''",
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'manufacturer', '') <> ''",
     "params": [
      "248 W Guadalupe Rd%"
     ],
@@ -3803,7 +3803,7 @@
    "text": "who makes the unit at 248 w guadalupe rd, mesa, az 85201",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'manufacturer', '') <> ''",
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'manufacturer', '') <> ''",
     "params": [
      "248 W Guadalupe Rd%"
     ],
@@ -4257,7 +4257,7 @@
    "text": "What's the tonnage of the unit at 3300 S Alma School Rd, Apt 103, Mesa, AZ 85201?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'tonnage' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'tonnage', '') <> ''",
+    "sql": "SELECT e.data->>'tonnage' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'tonnage', '') <> ''",
     "params": [
      "3300 S Alma School Rd%Apt 103%"
     ],
@@ -4278,7 +4278,7 @@
    "text": "what's the onnage of the unit at 3300 s alma school rd, apt 103, mesa, az 85201",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'tonnage' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'tonnage', '') <> ''",
+    "sql": "SELECT e.data->>'tonnage' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'tonnage', '') <> ''",
     "params": [
      "3300 S Alma School Rd%Apt 103%"
     ],
@@ -4299,7 +4299,7 @@
    "text": "what's the tonnage of the unit at 3300 s alma school rd, apt 103, mesa, az 85201",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'tonnage' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'tonnage', '') <> ''",
+    "sql": "SELECT e.data->>'tonnage' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'tonnage', '') <> ''",
     "params": [
      "3300 S Alma School Rd%Apt 103%"
     ],
@@ -4412,7 +4412,7 @@
    "text": "What refrigerant does the Lennox at 507 N Dobson Rd, Casa Grande, AZ 85122 use?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT e.data->>'refrigerant' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1) AND coalesce(e.data->>'refrigerant', '') <> ''",
+    "sql": "SELECT e.data->>'refrigerant' AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))) AND coalesce(e.data->>'refrigerant', '') <> ''",
     "params": [
      "507 N Dobson Rd%"
     ],
@@ -5164,7 +5164,7 @@
    "text": "Is the unit at 3300 S Alma School Rd, Apt 103, Mesa, AZ 85201 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "3300 S Alma School Rd%Apt 103%",
      "@today"
@@ -5185,7 +5185,7 @@
    "text": "is the unit at 3300 s alma school rd, apt 103, mesa, az 85201 still uner warranty",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "3300 S Alma School Rd%Apt 103%",
      "@today"
@@ -5206,7 +5206,7 @@
    "text": "is the unit at 3300 s alma school rd, apt 103, mesa, az 85201 still under warranty",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "3300 S Alma School Rd%Apt 103%",
      "@today"
@@ -5227,7 +5227,7 @@
    "text": "Is the Rheem at 544 E Ray Rd, Casa Grande, AZ 85122 under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "544 E Ray Rd%",
      "@today"
@@ -5249,7 +5249,7 @@
    "text": "Is the unit at 137 W Southern Ave, Mesa, AZ 85201 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "137 W Southern Ave%",
      "@today"
@@ -5270,7 +5270,7 @@
    "text": "Is the unit at 100 E Main St, Mesa, AZ 85201 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "100 E Main St%",
      "@today"
@@ -5291,7 +5291,7 @@
    "text": "is the unit at 100 e main st, mesa, az 85201 sstill under warranty",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "100 E Main St%",
      "@today"
@@ -5312,7 +5312,7 @@
    "text": "is the unit at 100 e main st, mesa, az 85201 still under warranty",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "100 E Main St%",
      "@today"
@@ -5355,7 +5355,7 @@
    "text": "Is the Trane at 988 W Southern Ave, Tucson, AZ 85701 under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "988 W Southern Ave%",
      "@today"
@@ -5377,7 +5377,7 @@
    "text": "Is the unit at 507 N Dobson Rd, Casa Grande, AZ 85122 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "507 N Dobson Rd%",
      "@today"
@@ -5398,7 +5398,7 @@
    "text": "is the unit at 507 n doobson rd, casa grande, az 85122 still under warranty",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "507 N Dobson Rd%",
      "@today"
@@ -5419,7 +5419,7 @@
    "text": "is the unit at 507 n dobson rd, casa grande, az 85122 still under warranty",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "507 N Dobson Rd%",
      "@today"
@@ -5440,7 +5440,7 @@
    "text": "Is the unit at 285 E Elliot Rd, Mesa, AZ 85201 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "285 E Elliot Rd%",
      "@today"
@@ -5461,7 +5461,7 @@
    "text": "Is the unit at 692 S Higley Rd, Casa Grande, AZ 85122 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "692 S Higley Rd%",
      "@today"
@@ -5503,7 +5503,7 @@
    "text": "Is the unit at 359 E Broadway Rd, Mesa, AZ 85201 still under warranty?",
    "cmp": "value",
    "oracle": {
-    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1)",
+    "sql": "SELECT (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e WHERE e.id IN (SELECT e.id FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1 OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1)))",
     "params": [
      "359 E Broadway Rd%",
      "@today"

@@ -563,7 +563,10 @@ const text = (r) => r.data?.text ?? '';
 /* ================================================================== 6. gate with/without the table */
 {
   const ask = fs.readFileSync(path.join(ROOT, 'api', 'ask.js'), 'utf8');
-  check('ask.js wiring: the money gate asks the financials layer first, hands unmatched questions to the agent, and otherwise keeps moneyFallbackAnswer', /answerMoneyQuestion\(\{ withTenant, ctxArg, question, today: todayResolved \}\)/.test(ask) && /fin\.hasData && \(await tryAgent\(\)\)/.test(ask) && /fin\.hasData \? moneyNoMatchAnswer\(\) : moneyFallbackAnswer\(\)/.test(ask));
+  // R16 D1 #7 (cold start, F4): financials/moneyGate.js now loads lazily (loadMoneyGateModule), so
+  // answerMoneyQuestion/moneyNoMatchAnswer are read off the namespaced `moneyGateModule` rather than
+  // bare top-of-file imports; moneyFallbackAnswer/tryAgent stay local to ask.js, unqualified as before.
+  check('ask.js wiring: the money gate asks the financials layer first, hands unmatched questions to the agent, and otherwise keeps moneyFallbackAnswer', /moneyGateModule\.answerMoneyQuestion\(\{ withTenant, ctxArg, question, today: todayResolved \}\)/.test(ask) && /fin\.hasData && \(await tryAgent\(\)\)/.test(ask) && /fin\.hasData \? moneyGateModule\.moneyNoMatchAnswer\(\) : moneyFallbackAnswer\(\)/.test(ask));
   eq('the honest refusal text is unchanged when there is no data', moneyFallbackAnswer().text, MONEY_FALLBACK_TEXT);
   check('no-match text never claims "can\'t total yet" (it would be false once data exists)', !/can't total/.test(G.MONEY_NO_MATCH_TEXT) && G.moneyNoMatchAnswer().facts.length === 0);
   const q = (await gate('what did we bill Bracken for his last job')).handled;

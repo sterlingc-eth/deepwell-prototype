@@ -31,6 +31,13 @@ import { resolveContactCandidates, resolveAddressCandidates, nameTokens } from "
 // Team A (2026-09-24): address/name scopes that include EVERY customer and unit at an address (apartments), the same
 // document union the customer profile uses, and legacy-tolerant document-type matching.
 import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitDesignator, docTypeAliases, typeSql } from "./scope.js";
+// R16 F3 (compound questions): "whats the model and serial on the unit at
+// <address>" / "is Abernathy still under warranty and whos the tech that did
+// it" — two sub-asks in one question, neither a document-type lookup at all.
+// See parseDocLookupQuestion/runDocLookup's own dispatch below, and
+// lookups/compound.js's own header comment for why this is wired in HERE
+// rather than through a new api/ask.js call site.
+import { parseCompoundQuestion, runCompound } from "./lookups/compound.js";
 
 /* ============================================================ shape detection */
 
@@ -101,6 +108,48 @@ const SHAPES = [
   // half-sentence: "startup sheet for the Prentiss install", "permit for 123 Main St"
   new RegExp(
     `^${DOCTYPE_RE_SRC}s?\\s*(?:for|of)\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})${TRAILING_JOB_RE_SRC}\\s*\\??$`,
+    "i"
+  ),
+  // R16 F3 (misc-field generalization): "whats the po number for the job at
+  // 1395 e ray rd" — same doctype+address shape as above, just "for the job
+  // at <address>" instead of "for the <address> job", with an optional "#"/
+  // "number" right after the doctype word (a PO/permit is routinely asked for
+  // by its NUMBER, not the document itself).
+  new RegExp(
+    `^(?:what'?s|what\\s+is)\\s+the\\s+${DOCTYPE_RE_SRC}s?\\s*(?:#|number)?\\s+for\\s+the\\s+job\\s+at\\s+(${NAME_OR_ADDRESS_SRC})\\s*\\??$`,
+    "i"
+  ),
+  // R16 F3: "permit # for 1728 W Ocotillo Rd" — the same half-sentence shape
+  // right above, but with a "#"/"number" infix BETWEEN the doctype word and
+  // "for" (the existing half-sentence shape has no room for one). The infix
+  // is REQUIRED here (never optional) so this never doubly matches what the
+  // existing half-sentence shape already covers with no infix at all.
+  new RegExp(
+    `^${DOCTYPE_RE_SRC}s?\\s*(?:#|number)\\s+for\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})${TRAILING_JOB_RE_SRC}\\s*\\??$`,
+    "i"
+  ),
+  // R16 F3: "when does the maintenance agreement expire for Calloway" — an
+  // expiration-date question about a document TYPE (maintenance agreement),
+  // same "do we have this on file" answer underneath (runDocLookup never
+  // actually extracts/states a date — see its own doc comment — an honest
+  // "N on file: ..." or "no X on file" either answers or admits it can't say
+  // the date, never fabricates one).
+  new RegExp(
+    `^when\\s+does\\s+(?:the\\s+)?${DOCTYPE_RE_SRC}\\s+expire\\s+for\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})\\s*\\??$`,
+    "i"
+  ),
+  // R16 F3: "hows the service contract looking on 2394 S Higley Rd" — casual
+  // dispatcher shorthand for "is there a maintenance agreement/contract on
+  // file", same underlying question as the "do we have X on file" shapes
+  // above.
+  new RegExp(
+    // "service " is optional and separate from DOCTYPE_RE_SRC itself: the
+    // alternation only has "service ticket(s)" starting with that word, so
+    // "service contract" (a real maintenance-agreement synonym, "contract",
+    // preceded by the adjective "service") would otherwise never match
+    // AT this fixed position — DOCTYPE_RE_SRC has to match starting
+    // immediately after "the ", not somewhere later in the phrase.
+    `^how'?s\\s+the\\s+(?:service\\s+)?${DOCTYPE_RE_SRC}\\s+looking\\s+(?:on|for|at)\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})\\s*\\??$`,
     "i"
   ),
 ];
@@ -211,6 +260,15 @@ export function parseDocLookupQuestion(question, opts = {}) {
   const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
   if (!raw) return null;
+
+  // R16 F3: a compound question ("model and serial", "name and phone", "under
+  // warranty and whos the tech") never names a document TYPE at all, so it
+  // has to be tried before the cheap DOCTYPE_WORD_RE reject just below would
+  // throw it away. `compound: true` tells runDocLookup to dispatch to
+  // lookups/compound.js instead of the document-type resolution beneath it.
+  const compound = parseCompoundQuestion(raw);
+  if (compound) return { compound: true, ...compound };
+
   const q = normalizeQuestion(correctTriggerWordTypos(raw, DOCTYPE_TRIGGER_WORDS), { overlay }).normalized;
   if (!q || !DOCTYPE_WORD_RE.test(q)) return null; // cheap reject before trying every shape
 
@@ -310,6 +368,10 @@ const YES_NO_SHAPE_RE = /^\s*(?:do|does|did|is there|are there|have we|has anyon
 export async function runDocLookup(db, question, opts = {}) {
   const parsed = parseDocLookupQuestion(question, opts);
   if (!parsed) return null;
+  // R16 F3: a compound question was already split out in parseDocLookupQuestion
+  // above — dispatch to its own splitter/resolver rather than the document-
+  // type machinery below, which has no `doctype` to work with here at all.
+  if (parsed.compound) return runCompound(db, question, opts);
   const { doctype, namePhrase, isAddress } = parsed;
   const yesNo = YES_NO_SHAPE_RE.test(String(question ?? ""));
   const docLabel = documentTypeLabel(doctype);

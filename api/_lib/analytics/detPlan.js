@@ -290,6 +290,43 @@ function detectTechnicianGroupBy(q) {
  *  breakdown list). */
 const DIFFERENT_DIM_RE = new RegExp(`\\bhow many different\\s+(${DIM_ALT})\\b`, 'i');
 
+/**
+ * Field-phrasing g133/g138 ("whats the oldest unit we have on file" /
+ * "whats our newest install") — equipment RANKED by installation_date, never
+ * a filtered/counted question. Scoped to a genuine equipment/install noun
+ * (EQUIPMENT_NOUN_RE, the same table entityFromNouns above reads) so an
+ * unrelated superlative this file has no ranking query for ("our newest
+ * customer", "the latest invoice") is left alone rather than guessed at —
+ * this shape, unlike sortBy for customers (validatePlan, analytics.js),
+ * plugs into queryInstallDateExtreme/formatInstallDateExtremeAnswer
+ * (routes/analytics.js), never buildAnalyticsSQL's plain filtered path.
+ */
+function detectInstallDateExtreme(q) {
+  if (!EQUIPMENT_NOUN_RE.test(q)) return null;
+  if (/\b(oldest|earliest)\b/i.test(q)) return { entity: 'equipment', op: 'list', sortBy: 'installDateAsc' };
+  if (/\b(newest|latest)\b/i.test(q)) return { entity: 'equipment', op: 'list', sortBy: 'installDateDesc' };
+  return null;
+}
+
+/**
+ * Round 16 part 2, D2 item 3: exported so api/ask.js (F4) can stop routing this exact shape to the
+ * agent-first path. agent/intents.js's isUnitRankingQuestion (and ask.js's own analyticsCandidate
+ * gate, ~L872, plus the isAgentFirstQuestion check at ~L1656) both predate this file's new
+ * detectInstallDateExtreme/queryInstallDateExtreme/formatInstallDateExtremeAnswer support and were
+ * written when "the closed-vocabulary analytics planner has no sort for equipment" was still true —
+ * it no longer is, for this one shape (oldest/newest/earliest/latest unit|system|equipment|install).
+ * ask.js does not import analytics/detPlan.js today (only analytics.js, which cannot re-export
+ * this — detPlan.js already imports from analytics.js, so the reverse import is circular and
+ * throws a TDZ error on ENTITY_SYNONYMS at load) and is outside F2's ownership this round, so this
+ * export is a hook, not a wire-up — see the round report for the exact ask.js patch needed (a new
+ * import straight from './_lib/analytics/detPlan.js' plus two call-site edits) to stop
+ * double-routing g133/g138-shaped questions to the model-backed agent when this deterministic path
+ * can already answer them for free.
+ */
+export function isInstallDateExtremeQuestion(question) {
+  return detectInstallDateExtreme(String(question ?? '')) !== null;
+}
+
 function detectDistinctDimensionCount(q) {
   const m = DIFFERENT_DIM_RE.exec(q);
   if (!m) return null;
@@ -696,6 +733,7 @@ export function detectAnalyticsPlan(question, tenantVocab) {
       detectCustomersHasDocType(q) ??
       detectTechnicianAction(q) ??
       detectTechnicianGroupBy(q) ??
+      detectInstallDateExtreme(q) ??
       detectDistinctDimensionCount(q) ??
       detectBrandComparison(q) ??
       detectGroupByPhrase(q);

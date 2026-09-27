@@ -54,3 +54,68 @@ Sonnet (more model will not add a source).
 The exact customer behind the geography count and the specific documents behind the 988 W Southern and 137 W Southern answers
 cannot be identified from the failure summary. The rules above are the ones a business owner means and are pinned on seeded data;
 after the next production run any remaining disagreement on those rows is Donovan's, and the failing list shows expected vs got.
+
+## Round 16 (2026-09-26): address-answer policy — owner product decision 2026-09-26
+
+**Decision** (R16_CONTRACT.md): a question about the unit's warranty, manufacturer, tonnage, refrigerant, or install date,
+resolved by a raw street ADDRESS (`ADDRESS_ENTITY_FIELD_INTENTS` in `api/_lib/fastPath.js`), is no longer a blanket
+"not on file". Resolve address → customer(s) → their unit(s) and:
+- exactly one customer + one unit (or a named brand/model narrows several down to one) → answer, with an explicit
+  match-basis sentence ("the only \[Trane\] unit on file for \<addr\> (\<customer\>)") and the field's own citation.
+- one customer, several units, nothing disambiguating → list every unit, each with its own answer + source.
+- several customers at the address (apartment complex, no unit # given) → ask which one, list who's there. Never pick.
+- nothing on file at the address → unchanged ("not on file for that address").
+
+Implemented in `api/_lib/fastPathQuery.js` (`resolveAddressEntityFieldGroup` + `runAddressEntityFieldPolicy`, called from
+`runFastPath` in place of the old blanket `buildAddressFieldDecline` for these six intents) and `api/_lib/fastPath.js`
+(`buildFieldAnswer`/`buildWarrantyAnswer` gained an optional `labelOverride` for the match-basis sentence;
+`buildAddressFieldDecline` gained a `multi-customer` case that lists names instead of a generic "ambiguous"). Tests:
+`scripts/verify-address-lookups.mjs` section 4 (single unit via a customer match, single unit via the unit's own address,
+brand-narrows-to-one, no-disambiguation multi-unit list, two-brand-words-match-two-units, several-customers ask-which,
+apartment-with-unit# answers only that unit, nothing-on-file, field-genuinely-missing defers to the model) plus the
+required look-alike/negative traps (same house # different street, same street different city — two real accounts, never
+conflated, typo'd street fails safe).
+
+**Oracle fix** (`test-docs/scorecard/exam.json`, SQL only — never hard-coded values, never touching any other question):
+these 4 field-templates' oracle SQL matched ONLY an equipment row whose OWN `service_address` matched (this corpus's
+equipment entities never carry one — see R15's own note above); broadened to also resolve via a matching CUSTOMER's
+address, joined by `customer_id` — the same address → customer → unit path the fast path now takes:
+```
+-- was:  e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'service_address' ILIKE $1
+-- now:  e.entity_type = 'equipment' AND e.merged_into IS NULL AND (e.data->>'service_address' ILIKE $1
+--         OR e.customer_id IN (SELECT c.id FROM entities c WHERE c.entity_type = 'customer'
+--                                AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $1))
+```
+Verified against the real golden corpus (`scripts/golden/golden-export.json`) that every adjudicated address resolves to
+exactly one customer with exactly one unit, so this broadening introduces no new ambiguity for any of these 24 ids.
+
+**Changed ids** (24 — every one a `value`-cmp "is the unit at \<address\> ..." question; verdict **ORACLE**, reason "owner
+product decision 2026-09-26"):
+- warranty (15): `warranty-0001-canonical/-typo/-abbreviated`, `warranty-0002-canonical`, `warranty-0006-canonical`,
+  `warranty-0008-canonical`, `warranty-0012-canonical/-typo/-abbreviated`, `warranty-0017-canonical`,
+  `warranty-0029-canonical/-typo/-abbreviated`, `hvac-tech-0039-canonical`, `hvac-tech-0073-canonical`
+- manufacturer (5): `lookups-0092-canonical`, `lookups-0019-canonical`, `lookups-0024-canonical/-typo/-abbreviated`
+- tonnage (3): `hvac-tech-0085-canonical/-typo/-abbreviated`
+- refrigerant (1): `hvac-tech-0036-canonical`
+
+**Measured effect** (offline exam, golden tenant, `today=2026-09-25`, models disabled): wrong is **unchanged at 4** (same
+4 ids as before — `breadth-content-019`, `breadth-semantic-001/002/003` — verified id-for-id, no new wrong). Of the 24,
+only `hvac-tech-0036` (refrigerant) is answerable without a model in THIS corpus (refrigerant is the one field of the six
+with a real per-entity `extractions` row — confirmed: manufacturer/model/serial_number/installation_date/warranty_expires
+have ZERO extraction rows anywhere in the golden export, only `entities.data`, so warranty/manufacturer/install-date
+answers correctly decline to fabricate a citation and instead defer to the model = `needs-model`, never `wrong`); the
+other 23 move `correct → needs-model` (honest: the shop DOES have this on file, Donovan just can't cite it without a
+model yet — that gap is a citation-pipeline one, outside `fastPath*.js`, not this policy). Net: `answeredWithoutModel`
+687→664, `correct` 609→586 (a deliberate, adjudicated drop — see `scripts/verify-golden.mjs`'s own updated floor comment;
+its `wrong` floor is untouched). `hvac-tech-0036` example: was `no-answer: not on file`; now `answer: The only unit on
+file for 507 N Dobson Rd, Casa Grande, AZ 85122 (Donald Sorenson) takes R-410A.` (cited, `citationPrecision: 1`).
+
+**Explicitly NOT touched** (left declining "not on file", per "never loosen anything else"): `lookups-0010-canonical/
+-typo/-abbreviated`, `lookups-0084-canonical`, `hvac-tech-0007-canonical` (install-date questions already resolve their
+address/unit correctly via a separate mechanism that states "No install date is recorded for the \<manufacturer\>
+\<model\> at ..." — a genuine, already-correct, model-free decline that does not reach the address-entity-field policy
+at all; updating their oracle to expect a real date would turn a correct decline into a hard wrong, since that mechanism
+never attempts a model call to fall back on). `live-misses-2026-09-21-0018-*` (766 N Val Ivsta Dr — a typo severe enough
+that no real address matches at all; still correctly "not on file" either way) and `live-misses-2026-09-21-0019-canonical`
+(serial number — not one of the six `ADDRESS_ENTITY_FIELD_INTENTS`, unaffected by this policy) were identified by the same
+oracle-SQL-shape search and deliberately left alone.

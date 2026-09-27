@@ -272,6 +272,13 @@ const oracleQ = (sql, params) => lite.query(sql, params.map((p) => (p === '@toda
 
   const missing = await answerRelationsQuestion({ withTenant, ctxArg, question: 'Did Zzyzx Nobody have a repeat visit within 90 days of installing a unit?', today: TODAY });
   check('repeat-visit yes/no :: an unknown customer name returns null (never guesses)', missing === null);
+
+  // R16 (F4, D2 #5): a brand-filtered ZERO answer must still cite the scanned scope (every unit of that
+  // brand that was actually checked) rather than an empty records array - Karl Kilo's Lennox unit (#11,
+  // "old unit, never serviced") is on file but never qualifies, so this exercises exactly that path.
+  const a011 = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many Lennox units had a repeat visit within 90 days of installation?', today: TODAY });
+  eq('repeat-visit brand-filtered ZERO :: matches oracle (no Lennox unit ever had a repeat visit)', Number(a011.facts[0].value), 0);
+  check('repeat-visit brand-filtered ZERO :: still cites the scanned Lennox unit, not an empty records array', a011.recordsTotal > 0 && a011.records.some((r) => r.type === 'unit'), JSON.stringify(a011.records));
 }
 
 /* ================================================================== connect: callback within N days */
@@ -630,6 +637,18 @@ const oracleQ = (sql, params) => lite.query(sql, params.map((p) => (p === '@toda
     const { rows: o } = await oracleQ(oracle.sql, oracle.params);
     const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many maintenance agreements are there for Trane customers with zero service visits?', today: TODAY });
     eq('maintenance zero-visits brand count :: app matches oracle for Trane', Number(a.facts[0].value), Number(o[0].n));
+  }
+  {
+    // R16 (F4, D2 #5): a brand WITH equipment and a maintenance agreement on file, but where every
+    // such customer also has a service visit, is a real, honest 0 for that brand — this ZERO answer
+    // must still cite the York customer(s) actually checked, not an empty records array.
+    await insertCustomer({ n: 90, name: 'Yolanda Yorkshire', address: '90 Test Ave, Mesa, AZ 85201' });
+    await insertEquipment({ n: 90, customer: 90, mfr: 'York', installed: '2021-01-01' });
+    await doc(90, { type: 'maintenance-agreement', customer: 90 });
+    await doc(91, { type: 'service-ticket', customer: 90, serviceDate: '2026-08-01' });
+    const a = await answerRelationsQuestion({ withTenant, ctxArg, question: 'How many maintenance agreements are there for York customers with zero service visits?', today: TODAY });
+    eq('maintenance zero-visits brand count :: York is a real 0 (Yolanda\'s agreement has a visit)', Number(a.facts[0].value), 0);
+    check('maintenance zero-visits brand count ZERO :: still cites the scanned York customer(s), not an empty records array', a.recordsTotal > 0 && a.records.some((r) => r.type === 'customer'), JSON.stringify(a.records));
   }
   {
     // Review fix (R15 blocking defect): this used to return null, which fell through

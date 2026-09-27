@@ -161,11 +161,30 @@ export const HANDLERS = {
     const n = rows.length;
     const docIds = [...new Set(rows.flatMap((r) => r.doc_ids ?? []))];
     const label = part.trim().toLowerCase();
+    // R16 (D2 #5): on zero units qualifying, cite the SCANNED scope — every unit with at least one
+    // document mentioning the part being replaced (just not more than one) — instead of an empty
+    // records array, the same "checked but none qualify" convention this file's own
+    // anyPartReplacedYesNo "No" branch already uses.
+    let scannedRows = rows;
+    let scannedDocIds = docIds;
+    if (!n) {
+      const { rows: scanned } = await db.raw(
+        `SELECT le.id, le.customer_id, le.data->>'manufacturer' AS manufacturer, array_agg(DISTINCT p.document_id) AS doc_ids
+           FROM document_pages p
+           JOIN document_entity_links l ON l.document_id = p.document_id AND l.${TENANT_SQL}
+           JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
+          WHERE p.${TENANT_SQL} AND p.text ~* $1
+          GROUP BY le.id, le.customer_id, le.data->>'manufacturer'`,
+        [pattern]
+      );
+      scannedRows = scanned;
+      scannedDocIds = [...new Set(scanned.flatMap((r) => r.doc_ids ?? []))];
+    }
     return finish(
       `${n} unit${n === 1 ? '' : 's'} have had the ${label} replaced more than once.`,
       [{ label: 'Units', value: String(n) }],
       {
-        records: [...unitRecordsFor(rows), ...(await documentRecordsFor(db, docIds))], total: n, claimedCount: n,
+        records: [...unitRecordsFor(scannedRows), ...(await documentRecordsFor(db, scannedDocIds))], total: n, claimedCount: n, kind: n ? 'basis' : 'searched',
         basis: `Checked every unit's own linked documents for a page mentioning the ${label} being replaced; ${n} have more than one such document.`,
       }
     );
@@ -334,9 +353,19 @@ export const HANDLERS = {
     const custIds = rows.map((r) => r.id);
     const docIds = custIds.length ? await maintAgreementDocIdsFor(db, custIds) : [];
     const where = brand ? `for ${brand} customers ` : '';
+    // R16 (D2 #5): on zero (common for a brand-narrowed count), cite the SCANNED scope — every
+    // customer with a maintenance agreement on file (brand-filtered) that was checked for a service
+    // visit — instead of an empty records array.
+    let citeRows = rows;
+    let citeDocIds = docIds;
+    if (!n) {
+      citeRows = await maintenanceAgreementCustomers(db, brand);
+      const scannedIds = citeRows.map((r) => r.id);
+      citeDocIds = scannedIds.length ? await maintAgreementDocIdsFor(db, scannedIds) : [];
+    }
     return finish(`${n} maintenance agreement${n === 1 ? '' : 's'} ${where}have zero service visits behind ${n === 1 ? 'it' : 'them'}.`,
       [{ label: 'Maintenance agreements with zero visits', value: String(n) }],
-      { records: [...rows.map((r) => customerRecord({ id: r.id, customer_name: r.name })), ...(await documentRecordsFor(db, docIds))], total: n, claimedCount: n,
+      { records: [...citeRows.map((r) => customerRecord({ id: r.id, customer_name: r.name })), ...(await documentRecordsFor(db, citeDocIds))], total: n, claimedCount: n, kind: n ? 'basis' : 'searched',
         basis: `Checked every ${brand ? `${brand} ` : ''}customer with a maintenance agreement on file for any service visit; ${n} have none.` });
   },
 
@@ -498,6 +527,24 @@ async function maintenanceZeroVisitCustomers(db, brand) {
                         WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                           AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[]))`,
     brand ? [MAINT_ALIASES, VISIT_DOC_TYPES, brand] : [MAINT_ALIASES, VISIT_DOC_TYPES]
+  );
+  return rows;
+}
+
+/** Every customer with a maintenance agreement on file (brand-narrowed if given) — the SCANNED scope
+ *  maintZeroVisitsCount checks for a service visit, regardless of whether they turn out to have one.
+ *  Same shape as maintenanceZeroVisitCustomers just above, minus its own NOT EXISTS(visit) clause. */
+async function maintenanceAgreementCustomers(db, brand) {
+  const { rows } = await db.raw(
+    `SELECT c.id, c.data->>'customer_name' AS name FROM entities c
+      WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+        ${brand ? `AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+                                 AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($2))` : ''}
+        AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+                      LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
+                    WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
+                      AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))`,
+    brand ? [MAINT_ALIASES, brand] : [MAINT_ALIASES]
   );
   return rows;
 }

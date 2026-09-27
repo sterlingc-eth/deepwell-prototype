@@ -488,7 +488,7 @@ const activeRecipes = async () => (await store.listActiveLearned()).filter((r) =
   check('review.js: learningReplay is an OPERATOR action and rate-limited', /OPERATOR_ACTIONS = new Set\([^)]*'learningReplay'/.test(review) && /INTEGRITY_RATE_LIMIT_ACTIONS = new Set\([^)]*'learningReplay'/.test(review));
   check('review.js: askFeedback is a normal-user action (not operator-gated), rate-limited, billing-gated for thumbs-down', /'askFeedback'/.test(review) && !/OPERATOR_ACTIONS = new Set\([^)]*'askFeedback'/.test(review) && /INTEGRITY_RATE_LIMIT_ACTIONS = new Set\([^)]*'askFeedback'/.test(review) && /askFeedback[\s\S]{0,200}rating === 'down'|rating === 'down'[\s\S]{0,300}assertActiveBilling/.test(review));
   check('ask.js: a recipe replay skips the allowance increment', /!result\.fastReplay && isCountableAskSource\("agent"\)/.test(ask));
-  check('ask.js: enumeration / repair-history questions go to the agent before the retrieval model', /isAgentFirstQuestion\(question\) && \(await tryAgent\(/.test(ask));
+  check('ask.js: enumeration / repair-history questions go to the agent before the retrieval model', /isAgentFirstQuestion\(question\) && (?:!isInstallDateExtremeQuestion\(question\) && )?\(await tryAgent\(/.test(ask));
   const apiFiles = fs.readdirSync(path.join(ROOT, 'api'), { withFileTypes: true }).filter((e) => e.isFile()).length;
   eq('exactly 12 files directly under api/', apiFiles, 12);
   const ui = fs.readFileSync(path.join(ROOT, 'src', 'components', 'DonovanMissesCard.tsx'), 'utf8');

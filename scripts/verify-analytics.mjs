@@ -54,6 +54,7 @@ import {
   brandMatches,
   installYearOf,
   warrantyStatusOf,
+  registrationActionNeededOf,
   MAX_FACT_ROWS,
   UNKNOWN_BUCKET,
   ANALYTICS_PROMPT_VERSION,
@@ -503,6 +504,39 @@ eq('warrantyStatusOf: expired tier -> expired', warrantyStatusOf({ expires: '202
 eq('warrantyStatusOf: ok tier -> active', warrantyStatusOf({ expires: '2030-01-01' }, '2026-09-21'), 'active');
 eq('warrantyStatusOf: expiring-30 tier folds into "expiring"', warrantyStatusOf({ expires: '2026-10-01' }, '2026-09-21'), 'expiring');
 eq('warrantyStatusOf: no data -> unknown', warrantyStatusOf(null, '2026-09-21'), 'unknown');
+
+/* R16 D2 audit item 1 BUG FIX: warrantyStatusOf must be a PURE function of
+ * the coverage expiry date only, never the registration deadline — a unit
+ * whose expiry is years out but whose REGISTRATION deadline is closing soon
+ * (the Robert Thornton golden-export case: expires 2031-08-28, registration
+ * deadline ~2026-10-27) must read 'active', not 'expiring'. Pinned `today`,
+ * boundary cases on both sides of the fix (registration due in 29/31 days
+ * with expiry far out; expiry itself in 29/31 days). */
+{
+  const TODAY = '2026-09-27';
+  // Registration due in 29 days (inside alertTier's own 30-day window), expiry ~5 years out.
+  const regDue29 = { expires: '2031-08-28', registrationOnFile: null, registrationDeadline: '2026-10-26' };
+  eq('R16 fix: registration due in 29 days, expiry years out -> STILL active (was expiring)', warrantyStatusOf(regDue29, TODAY), 'active');
+  check('R16 fix: the same unit DOES still flag registrationActionNeededOf (the distinct, separate flag)', registrationActionNeededOf(regDue29, TODAY) === true);
+  // Registration due in 31 days (just OUTSIDE alertTier's 30-day window) — never flagged either way; expiry still controls.
+  const regDue31 = { expires: '2031-08-28', registrationOnFile: null, registrationDeadline: '2026-10-28' };
+  eq('R16 fix: registration due in 31 days (just outside the 30-day window), expiry years out -> active', warrantyStatusOf(regDue31, TODAY), 'active');
+  check('R16 fix: registrationActionNeededOf is false one day past the 30-day boundary', registrationActionNeededOf(regDue31, TODAY) === false);
+  // Now the boundary on the EXPIRY side itself (no registration deadline involved at all): 365 vs 366 days out.
+  const expires365 = { expires: '2027-09-27', registrationOnFile: '2026-09-01', registrationDeadline: '2026-09-01' };
+  eq('R16 fix: expiry exactly 365 days out -> expiring (inclusive boundary, matches the exam oracle\'s own <=365 CASE)', warrantyStatusOf(expires365, TODAY), 'expiring');
+  const expires366 = { expires: '2027-09-28', registrationOnFile: '2026-09-01', registrationDeadline: '2026-09-01' };
+  eq('R16 fix: expiry 366 days out -> active', warrantyStatusOf(expires366, TODAY), 'active');
+  // Expiry itself due in 29/31 days (unregistered-window-closing is irrelevant here since registrationOnFile is set).
+  const expires29 = { expires: '2026-10-26', registrationOnFile: '2020-01-01', registrationDeadline: '2020-03-01' };
+  eq('R16 fix: expiry in 29 days -> expiring', warrantyStatusOf(expires29, TODAY), 'expiring');
+  const expires31 = { expires: '2026-10-28', registrationOnFile: '2020-01-01', registrationDeadline: '2020-03-01' };
+  eq('R16 fix: expiry in 31 days -> expiring (still inside the 365-day window; only the registration signal ever used a 30-day cutoff)', warrantyStatusOf(expires31, TODAY), 'expiring');
+  // Expired coverage with a registration window that ALSO happens to be closing soon — expired wins, not folded into "expiring".
+  const expiredAndRegDue = { expires: '2026-09-01', registrationOnFile: null, registrationDeadline: '2026-10-01' };
+  eq('R16 fix: expired coverage stays "expired" even when a registration deadline is also closing soon', warrantyStatusOf(expiredAndRegDue, TODAY), 'expired');
+  check('R16 fix: registrationActionNeededOf still separately true for that same expired unit', registrationActionNeededOf(expiredAndRegDue, TODAY) === true);
+}
 
 /* ======================================================================
  * 9. Env flag.

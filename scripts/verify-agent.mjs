@@ -800,12 +800,16 @@ void missBefore;
   check('ask.js: the agent is tried from five places (incl. money gate) + agent-first (analytics fallback / unhandled, no retrieval, model no-answer, enumeration/history before retrieval)', (ask.match(/await tryAgent\(/g) ?? []).length === 6, String((ask.match(/await tryAgent\(/g) ?? []).length));
   check('ask.js: the money gate is left alone (money-fallback never goes to the agent)', /missOutcome !== MISS_OUTCOMES\.MONEY_FALLBACK/.test(ask));
   check('ask.js: data.debug needs an operator AND body.debug === true', /req\.body\?\.debug === true && isPlatformOperator\(auth\)/.test(ask));
-  // T1 (research agent v2, 2026-09-25): the cache key is now RESEARCH_V2_ENABLED ? the v2 hash/prompt
+  // T1 (research agent v2, 2026-09-25): the cache key is now researchV2Enabled ? the v2 hash/prompt
   // version : these same v1 ones (see loopV2.js's own, differently-namespaced researchQuestionHash/
   // RESEARCH_PROMPT_VERSION) — still resolved once per request into `qHash`/`promptVersion`, still never
   // shared with a retrieval or analytics cache row either way. Checks the conditional form directly
   // rather than the old unconditional one line 803 used to assert.
-  check('ask.js: agent answers are cached under their own hash + prompt version', /agentQuestionHash\(question\)/.test(ask) && /AGENT_PROMPT_VERSION/.test(ask) && /RESEARCH_V2_ENABLED \? researchQuestionHash\(question\) : agentQuestionHash\(question\)/.test(ask));
+  // R16 D1 #7 (cold start, F4): agent/loopV2 modules now load lazily (loadAgentModule/
+  // loadResearchAgentModule), so the hash/version symbols are read off their namespaced module objects
+  // (agentModule.agentQuestionHash, researchAgentModule.researchQuestionHash, etc.) instead of bare
+  // top-of-file imports; the boolean gate itself is unchanged (still `researchV2Enabled ? v2 : v1`).
+  check('ask.js: agent answers are cached under their own hash + prompt version', /agentModule\.agentQuestionHash\(question\)/.test(ask) && /agentModule\.AGENT_PROMPT_VERSION/.test(ask) && /researchV2Enabled \? researchAgentModule\.researchQuestionHash\(question\) : agentModule\.agentQuestionHash\(question\)/.test(ask));
   check('ask.js: the agent path never logs question text', !/console\.(log|error)\([^)]*question[^)]*\)/.test(ask.slice(ask.indexOf('const tryAgent'), ask.indexOf('// ---- overlap, not a chain'))));
   check('agent loop logs counts only (no question / answer text)', !/JSON\.stringify\(\{[^}]*(question|text)/.test(loop.slice(loop.indexOf('console.log('))));
 }
@@ -827,7 +831,12 @@ console.log('');
   check('teamA escalation :: a full-file request is a hard question (Sonnet)', classifyQuestionDifficulty('what do we have on file for Bracken').hard);
   check('teamA intents :: comparison / why / trend go agent-first when unparsed', isReasoningQuestion('more invoices or more tickets') && isReasoningQuestion('why did jobs drop') && isAgentFirstQuestion('are jobs trending up'));
   check('teamA intents :: plain counts stay on the analytics path', !isReasoningQuestion('how many customers are in mesa'));
-  check('teamA ask.js :: the analytics planner does not take reasoning questions', /!\(isAgentEnabled\(\) && isReasoningQuestion\(question\)\)/.test(askSrc));
+  // R16 D1 #7 (cold start, F4): isAgentEnabled() is read once into `agentEnabledForGate` right after
+  // agent/loop.js's own module is lazily loaded (loadAgentModule), then reused for BOTH the ranking and
+  // reasoning checks below — De Morgan-equivalent to the old inline `!(isAgentEnabled() && ...)` form,
+  // just no longer calling isAgentEnabled() a second time (which would have forced the eager top-level
+  // import this round removes it for).
+  check('teamA ask.js :: the analytics planner does not take reasoning questions', /!\(agentEnabledForGate && isReasoningQuestion\(question\)\)/.test(askSrc));
   check('teamA ask.js :: the deterministic history router runs before the fast path', askSrc.indexOf('classifyDeterministic') > 0 && askSrc.indexOf('runDeterministic') > 0);
 }
 

@@ -51,12 +51,18 @@ import {
   warrantyStatusOf,
   UNKNOWN_BUCKET,
   TOP_CUSTOMERS_LIMIT,
+  INSTALL_DATE_EXTREME_LIMIT,
 } from '../analytics.js';
 import { normalizeQuestion } from '../nlNormalize.js';
 // Round 11 (literature #6/#7): per-tenant vocabulary schema-linking for the planner prompt (above).
 import { schemaLinkedVocabLines } from '../vocab/tenantVocab.js';
 // TEAM C (citations everywhere): records/basis come from the SAME rows the number was computed from.
 import { withAnalyticsCitations } from '../citations/analytics.js';
+// g133/g138 (oldest/newest install): its own citation build, not withAnalyticsCitations'
+// (that helper's sortBy wording is customers-ranking-specific — see citations/analytics.js's
+// own analyticsBasis) — attachCitations/unitRecord are the same generic, pure primitives
+// compose.js already reuses the same way, just called directly here instead.
+import { attachCitations, unitRecord } from '../citations/records.js';
 // Team A (2026-09-24): time semantics (uploaded vs service date) and future-dated service records.
 import { dateBasisOf, todayIso, splitFuture } from '../scope.js';
 // Tier 2 learning loop, Part A (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
@@ -237,6 +243,12 @@ function shapeEquipmentRow(r, today) {
     hasInstallDate: present(r.installation_date),
     hasModel: present(r.model),
     hasTonnage: present(r.tonnage),
+    // R16 D2 audit item 9: same presence-check pattern as hasTonnage right
+    // above — refrigerant is only ever printed on a nameplate/startup-sheet/
+    // warranty-registration document, same as tonnage, so this corpus's ~53%
+    // coverage is real and by design, not a bug; this just makes the gap
+    // countable/filterable instead of invisible.
+    hasRefrigerant: present(r.refrigerant),
     hasCustomerLink: present(r.customer_id),
     installDateInFuture,
   };
@@ -293,7 +305,7 @@ const ENTITY_SUPPORTED_FIELDS = {
   ]),
   equipment: new Set([
     'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
-    'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage', 'hasCustomerLink', 'installDateInFuture',
+    'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage', 'hasRefrigerant', 'hasCustomerLink', 'installDateInFuture',
   ]),
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus']),
   documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink']),
@@ -480,6 +492,95 @@ async function queryTopCustomers(db, sortBy, limit) {
 }
 
 /**
+ * Field-phrasing g133/g138 ("whats the oldest unit we have on file" /
+ * "whats our newest install"): the equipment entity/entities whose
+ * installation_date is the min/max of every one actually on file. Two
+ * queries rather than one ORDER BY ... LIMIT N — the first finds the exact
+ * extreme VALUE, the second fetches every unit that shares it (a tie), so a
+ * fleet where several units share one install date never silently reports
+ * just whichever one row Postgres happened to return first. String
+ * comparison/equality is safe here for the same reason shapeEquipmentRow's
+ * own installDateInFuture check already relies on it: every install-date
+ * shape this corpus stores (YYYY-MM-DD, YYYY-MM, YYYY) is left-zero-padded,
+ * so lexicographic min/max agrees with calendar min/max at whatever
+ * precision is actually on file, and an EXACT string match is the correct
+ * definition of "the same printed date" regardless of precision.
+ */
+async function queryInstallDateExtreme(db, sortBy) {
+  const dir = sortBy === 'installDateAsc' ? 'ASC' : 'DESC';
+  const { rows: extremeRows } = await db.raw(
+    `SELECT data->>'installation_date' AS d FROM entities
+      WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND data->>'installation_date' IS NOT NULL AND data->>'installation_date' <> ''
+      ORDER BY data->>'installation_date' ${dir}
+      LIMIT 1`,
+    []
+  );
+  const extreme = extremeRows[0]?.d ?? null;
+  if (!extreme) return { rows: [], extreme: null };
+
+  const { rows: raw } = await db.raw(
+    `SELECT e.id, e.customer_id, e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer,
+            e.data->>'equipment_type' AS equipment_type, e.data->>'tonnage' AS tonnage,
+            e.data->>'refrigerant' AS refrigerant, e.data->>'installation_date' AS installation_date,
+            e.data->>'serial_number' AS serial_number,
+            c.data->>'service_address' AS service_address, c.data->>'customer_name' AS customer_name,
+            e.data->'warranty' AS warranty, e.updated_at
+       FROM entities e
+       LEFT JOIN entities c ON c.id = e.customer_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+      WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+        AND e.data->>'installation_date' = $1
+      ORDER BY e.updated_at DESC
+      LIMIT ${INSTALL_DATE_EXTREME_LIMIT}`,
+    [extreme]
+  );
+  const rows = raw.map((r) => ({
+    ...shapeEquipmentRow(r, null),
+    customerId: r.customer_id || null,
+    customerName: r.customer_name || null,
+  }));
+  return { rows, extreme };
+}
+
+/** Answer + citations for queryInstallDateExtreme's result. Built directly
+ *  (attachCitations/unitRecord, citations/records.js) rather than through
+ *  withAnalyticsCitations/analyticsCitations (citations/analytics.js): that
+ *  helper's own sortBy wording ("Ranked customers by...") is written for the
+ *  customers-ranking shape only — see that file's own analyticsBasis. */
+function formatInstallDateExtremeAnswer(plan, rows, extreme) {
+  if (!rows.length || !extreme) {
+    const data = {
+      kind: 'no-answer', text: 'No installation dates on file yet.',
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+    return attachCitations(data, { records: [], total: 0, kind: 'searched', basis: 'Searched every unit on file for an installation date; none was found.' });
+  }
+  const label = plan.sortBy === 'installDateAsc' ? 'oldest' : 'newest';
+  const describe = (r) => {
+    const detail = [r.brand, r.model].filter(Boolean).join(' ') || 'Equipment';
+    const where = r.customerName ? `${r.customerName}${r.city ? `, ${r.city}` : ''}` : r.city || null;
+    return where ? `${detail} (${where})` : detail;
+  };
+  const tieText = rows.length > 1
+    ? ` ${rows.length} units share that date: ${rows.map(describe).join('; ')}.`
+    : ` (${describe(rows[0])}).`;
+  const text = `The ${label} unit on file was installed ${extreme} —${tieText}`.replace(/—\s+\(/, '— (');
+  const data = {
+    kind: 'answer', text,
+    facts: rows.map((r) => ({ label: describe(r), value: extreme, entityId: r.id, sources: [] })),
+    sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+  const records = rows.map((r) => unitRecord(
+    { id: r.id, manufacturer: r.brand, equipment_type: r.equipmentType, model: r.model, customer_id: r.customerId },
+    { sublabel: [r.model, extreme, r.city].filter(Boolean).join(' · '), customerId: r.customerId ?? undefined }
+  ));
+  return attachCitations(data, {
+    records, total: rows.length, kind: 'basis',
+    basis: `Ranked every unit on file by installation date; the ${label} is dated ${extreme}.`,
+  });
+}
+
+/**
  * Item 7 (100-question persona sample, 2026-09-22): "customers with a
  * proposal but no invoice" — hasDocType/lacksDocType filters, resolved by
  * finding every customer directly/manually linked (document_entity_links) to
@@ -539,6 +640,14 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   // every other op: ranked, not filtered/counted. validatePlan already
   // guarantees sortBy only ever appears with entity 'customers' + op 'list'.
   if (plan.sortBy) {
+    // g133/g138: equipment ranked by installation_date is its own query/answer
+    // shape (queryInstallDateExtreme/formatInstallDateExtremeAnswer above) —
+    // distinct from the customers-by-equipmentCount/documentCount ranking
+    // below, which queryTopCustomers/withAnalyticsCitations already own.
+    if (plan.entity === 'equipment') {
+      const { rows, extreme } = await queryInstallDateExtreme(db, plan.sortBy);
+      return formatInstallDateExtremeAnswer(plan, rows, extreme);
+    }
     const rows = await queryTopCustomers(db, plan.sortBy, plan.limit ?? TOP_CUSTOMERS_LIMIT);
     // TEAM C: citations from the same ranked rows.
     return withAnalyticsCitations(formatAnalyticsAnswer(plan, { total: rows.length, rows }), plan, { rows, total: rows.length });

@@ -587,6 +587,36 @@ check(
   preClassifyAnalytics('is there a customer named ortega') === false
 );
 
+/* -- (f) R16 D2 audit / field-phrasing g133+g138: "oldest unit on file" / "newest install" ranks
+ * equipment by installation_date rather than filtering/counting; the ranking sortBy shape must
+ * stay scoped to a genuine equipment/install noun and never fire on an unrelated superlative this
+ * file has no ranking query for. -- */
+
+eq(
+  'field-phrasing g133: "whats the oldest unit we have on file" ranks equipment ascending by installation_date',
+  detectAnalyticsPlan('whats the oldest unit we have on file'),
+  { entity: 'equipment', op: 'list', sortBy: 'installDateAsc' }
+);
+eq(
+  'field-phrasing g138: "whats our newest install" ranks equipment descending by installation_date',
+  detectAnalyticsPlan('whats our newest install'),
+  { entity: 'equipment', op: 'list', sortBy: 'installDateDesc' }
+);
+eq(
+  'install-date-extreme: "earliest system we installed" (earliest/system synonyms) also resolves',
+  detectAnalyticsPlan('whats the earliest system we installed'),
+  { entity: 'equipment', op: 'list', sortBy: 'installDateAsc' }
+);
+eq(
+  'install-date-extreme: "latest rooftop unit" (latest/rooftop-unit synonyms) also resolves',
+  detectAnalyticsPlan('whats the latest rooftop unit on file'),
+  { entity: 'equipment', op: 'list', sortBy: 'installDateDesc' }
+);
+check(
+  'install-date-extreme: never fires with no equipment/install noun at all ("whats our newest customer") - no ranking query exists for that entity',
+  detectAnalyticsPlan('whats our newest customer') === null
+);
+
 console.log('');
 console.log(failures ? `${failures} check(s) FAILED.` : `${passes} checks passed.`);
 process.exit(failures ? 1 : 0);
