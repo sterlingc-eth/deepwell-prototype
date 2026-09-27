@@ -80,10 +80,10 @@ export function IntakeQueueCard({
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 !px-2 text-caption" title="Ask again later" aria-label="Snooze this question" onClick={(e) => { e.stopPropagation(); onSnooze(); }} disabled={busy}>
+          <button type="button" className="dw-btn-tertiary !min-h-11 !min-w-11 !py-1 !px-2 text-caption" title="Ask again later" aria-label="Snooze this question" onClick={(e) => { e.stopPropagation(); onSnooze(); }} disabled={busy}>
             <Clock className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
-          <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 !px-2 text-caption" title="Doesn't apply" aria-label="Dismiss this question" onClick={(e) => { e.stopPropagation(); onDismiss(); }} disabled={busy}>
+          <button type="button" className="dw-btn-tertiary !min-h-11 !min-w-11 !py-1 !px-2 text-caption" title="Doesn't apply" aria-label="Dismiss this question" onClick={(e) => { e.stopPropagation(); onDismiss(); }} disabled={busy}>
             <X className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
@@ -116,7 +116,7 @@ export function IntakeQueueCard({
 
       <div className="flex flex-wrap items-center gap-3">
         {!typing ? (
-          <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" onClick={(e) => { e.stopPropagation(); setTyping(true); }}>
+          <button type="button" className="dw-btn-tertiary !min-h-11 !py-1" onClick={(e) => { e.stopPropagation(); setTyping(true); }}>
             Type it instead
           </button>
         ) : (
@@ -125,20 +125,20 @@ export function IntakeQueueCard({
             <input
               id={`typed-${item.needsInfoId}`}
               autoFocus
-              className="dw-input !min-h-[40px] flex-1"
+              className="dw-input !min-h-11 flex-1"
               placeholder={item.fieldLabel}
               value={typedValue}
               onChange={(e) => setTypedValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitTyped(); if (e.key === 'Escape') setTyping(false); }}
             />
-            <button type="button" className="dw-btn-primary !min-h-[40px]" disabled={!typedValue.trim() || busy} onClick={submitTyped}>
+            <button type="button" className="dw-btn-primary !min-h-11" disabled={!typedValue.trim() || busy} onClick={submitTyped}>
               {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : 'Confirm'}
             </button>
-            <button type="button" className="dw-btn-tertiary !min-h-[40px]" onClick={() => setTyping(false)}>Cancel</button>
+            <button type="button" className="dw-btn-tertiary !min-h-11" onClick={() => setTyping(false)}>Cancel</button>
           </div>
         )}
         {hasEvidence && (
-          <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1 text-caption" onClick={(e) => { e.stopPropagation(); setShowEvidence((v) => !v); }}>
+          <button type="button" className="dw-btn-tertiary !min-h-11 !py-1 text-caption" onClick={(e) => { e.stopPropagation(); setShowEvidence((v) => !v); }}>
             {showEvidence ? 'Hide evidence' : 'Why are we asking?'}
           </button>
         )}

@@ -177,7 +177,10 @@ export function CustomerProfileScreen() {
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('documents');
+  // R17 UX audit fix #6: an office manager's #1 reason to open a customer is
+  // checking equipment/warranty status, not verifying documents — default
+  // here instead of costing that lookup an extra click every single time.
+  const [tab, setTab] = useState<Tab>('equipment');
 
   // Owner defect report (2026-09-22): a document click here used to navigate
   // straight to the Inbox's unscoped "All" filter, losing which customer it

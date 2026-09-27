@@ -5,6 +5,7 @@ import {
 import {
   reviewClient, replayAllMisses,
   type LearningLearnedItem, type LearningProposal, type LearningSummary, type AutopilotStatus, type GapReport,
+  type ExamCandidateMiss,
 } from '../services/reviewClient';
 
 /**
@@ -82,6 +83,13 @@ export function DonovanLearningCard() {
   const [gapsOpen, setGapsOpen] = useState(false);
   const [rejectingGroupKey, setRejectingGroupKey] = useState<string | null>(null);
 
+  // Round 17 (G3, R16 D3 research item 3): misses -> permanent exam. answeredNowMisses/promotedCount
+  // come from the same learningList call `load()` already makes (see api/review.js) — no extra round
+  // trip. `promotingKey` is the miss's own `normalized` key while a "Keep as test" request is in flight.
+  const [answeredNowMisses, setAnsweredNowMisses] = useState<ExamCandidateMiss[] | null>(null);
+  const [promotedCount, setPromotedCount] = useState(0);
+  const [promotingKey, setPromotingKey] = useState<string | null>(null);
+
   // TEAM H (2026-09-24): the autonomous per-tenant loop's own summary + the weekly gap report —
   // loaded lazily on first open (not on mount, unlike the proposal queue above) since both are
   // cross-tenant reads a shop admin's mount of this component must never trigger before it's even
@@ -112,6 +120,8 @@ export function DonovanLearningCard() {
         setProposals(r.items);
         setActiveLearned(r.activeLearned);
         setSummary(r.summary ?? null);
+        setAnsweredNowMisses(r.answeredNowMisses ?? []);
+        setPromotedCount(r.promotedCount ?? 0);
       })
       .catch((e) => {
         const message = e instanceof Error ? e.message : 'Could not load Donovan learning.';
@@ -231,6 +241,25 @@ export function DonovanLearningCard() {
     }
   };
 
+  // Round 17 (G3): "Keep as test" — turns one answered-now miss into a permanent regression-test
+  // question for this shop. The server derives a re-checkable oracle from the miss's own recorded
+  // answer (a structural one when it can, never a hard-coded string unless an operator supplies it —
+  // this minimal UI only ever offers the structural path; a miss that can't reduce to one simply
+  // reports why, same as any other 422).
+  const keepAsTest = async (m: ExamCandidateMiss) => {
+    setPromotingKey(m.normalized);
+    setError(null);
+    try {
+      await reviewClient.examPromote({ question: m.question, normalized: m.normalized });
+      setAnsweredNowMisses((prev) => (prev ? prev.map((x) => (x.normalized === m.normalized ? { ...x, alreadyPromoted: true } : x)) : prev));
+      setPromotedCount((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not keep this as a test.');
+    } finally {
+      setPromotingKey(null);
+    }
+  };
+
   const rejectAllGaps = async (ids?: string[]) => {
     const key = ids ? ids.join(',') : 'all';
     setRejectingGroupKey(key);
@@ -263,6 +292,7 @@ export function DonovanLearningCard() {
           <GraduationCap className="w-4 h-4" aria-hidden="true" />
           Donovan learning
           {proposals && <span className="dw-pill-muted">{nonGapProposals.length} pending</span>}
+          {answeredNowMisses && <span className="dw-pill-muted">Promoted tests ({promotedCount})</span>}
         </span>
         {open ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
       </button>
@@ -308,6 +338,35 @@ export function DonovanLearningCard() {
             <p className="text-body text-ink-3 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading…
             </p>
+          )}
+
+          {answeredNowMisses && answeredNowMisses.length > 0 && (
+            <div>
+              <h3 className="text-caption font-medium text-ink-3 uppercase tracking-wide mb-2">
+                Answered now — keep as a test?
+              </h3>
+              <p className="text-caption text-ink-3 mb-2">
+                A fixed miss stays fixed only if something checks it again. &quot;Keep as test&quot; adds it to this
+                shop&apos;s permanent exam, re-checked against the records every time — so if this ever regresses,
+                it&apos;s caught here, not by a customer.
+              </p>
+              <ul className="divide-y divide-line">
+                {answeredNowMisses.map((m) => (
+                  <li key={m.normalized} className="py-1.5 flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-caption text-ink truncate" title={m.question}>&quot;{m.question}&quot;</span>
+                    <button
+                      type="button"
+                      onClick={() => void keepAsTest(m)}
+                      disabled={promotingKey === m.normalized || m.alreadyPromoted}
+                      className="dw-btn-tertiary !min-h-[28px] !py-0 shrink-0"
+                    >
+                      {promotingKey === m.normalized ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GraduationCap className="w-3.5 h-3.5" aria-hidden="true" />}
+                      {m.alreadyPromoted ? 'Kept ✓' : 'Keep as test'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div>

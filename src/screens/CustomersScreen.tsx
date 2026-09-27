@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Download, GitMerge, Loader2, Plus, Search, Users2, X } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
 import { formatYmd } from '../core/answer';
+import { isAdminRole } from '../services/teamClient';
+import { DuplicateCustomersCard } from '../components/DuplicateCustomersCard';
 import { customerClient, CustomerAddressConflictError, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSummary } from '../services/customerClient';
 import {
   ACTIVITY_OPTIONS,
@@ -66,6 +69,8 @@ export function CustomersScreen() {
   const openCustomer = useAppStore((s) => s.openCustomer);
   const filters = useAppStore((s) => s.customerFilters);
   const setFilters = useAppStore((s) => s.setCustomerFilters);
+  const { orgRole } = useAuth();
+  const isAdmin = isAdminRole(orgRole ?? null);
 
   // Search, the four filter dropdowns, and sort are three independent pieces
   // of state on purpose (owner requirement: "changing a filter must never
@@ -405,6 +410,14 @@ export function CustomersScreen() {
           </ul>
         </div>
       )}
+
+      {/* Whole-shop duplicate scan (round 17, U2 top fix #11) — used to be a
+          second, near-identical "Possible duplicate customers" card on Team,
+          duplicating the tighter pair-matching banner just above (which only
+          catches two records at a time, off THIS loaded page). Same feature,
+          one home: the Customers tab, where a person already is when they
+          care about this. Admin-only, same gate Team used. */}
+      {isAdmin && <DuplicateCustomersCard />}
 
       <div className="dw-card p-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">

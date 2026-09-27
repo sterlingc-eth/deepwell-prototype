@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- Dev-only harness for scripts/verify-mobile-ux.mjs (round 17, UX-M). Mounts
+     the REAL src/mobile/** tab + sheet components (AskTab, ScanTab, DocsTab,
+     DocSheet, CustomerSheet — unmodified, exactly as the round's audit
+     required) plus a trimmed re-creation of MobileApp.tsx's own shell (header
+     toggle, tab bar, sheet routing) — the real MobileApp.tsx cannot be
+     mounted standalone because it hard-requires a live ClerkProvider, same
+     reason scripts/offline-queue-harness/ and scripts/records-harness/ mount
+     their tab components bare instead of the Clerk-wrapped page. No network
+     mock needed for AskTab's ask() (the repo's own deterministic mock
+     provider, same note the round's mobile audit made); DocSheet/CustomerSheet/
+     ScanTab's own calls are mocked below. -->
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Mobile UX harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./harness-main.tsx"></script>
+  </body>
+</html>

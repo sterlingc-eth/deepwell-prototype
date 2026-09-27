@@ -216,8 +216,13 @@ export function DocsTab({
           <label className="text-body font-semibold text-ink" htmlFor="dw-m-f-site">Site / address</label>
           <input id="dw-m-f-site" className="dw-input" placeholder="Street address" value={draft.site ?? ''} onChange={(e) => setDraft((d) => ({ ...d, site: e.target.value || undefined }))} />
 
-          <label className="flex items-center gap-2 text-body text-ink">
-            <input type="checkbox" checked={!!draft.uploadedByMe} onChange={(e) => setDraft((d) => ({ ...d, uploadedByMe: e.target.checked || undefined }))} />
+          <label className="min-h-11 flex items-center gap-2 text-body text-ink">
+            <input
+              type="checkbox"
+              checked={!!draft.uploadedByMe}
+              onChange={(e) => setDraft((d) => ({ ...d, uploadedByMe: e.target.checked || undefined }))}
+              className="w-6 h-6 accent-[var(--dw-accent)]"
+            />
             My uploads only
           </label>
 
@@ -233,7 +238,7 @@ export function DocsTab({
 
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <button type="button" onClick={onClear} className="shrink-0 inline-flex items-center gap-1 min-h-8 px-3 rounded-full bg-surface-2 text-caption text-ink-2">
+    <button type="button" onClick={onClear} className="shrink-0 inline-flex items-center gap-1 min-h-11 px-3 rounded-full bg-surface-2 text-caption text-ink-2">
       {label} <X className="w-3 h-3" aria-hidden="true" />
     </button>
   )

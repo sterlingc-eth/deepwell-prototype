@@ -20,6 +20,7 @@ import { useWorkFilter } from '../hooks/useWorkFilter';
 import { WorkFilterControl } from '../components/WorkFilterControl';
 import { FinancialStrip } from '../components/FinancialStrip';
 import { financialsClient } from '../services/financialsClient';
+import { FILTERS, FILTER_IDS, type Filter } from './reviewFilters';
 
 const CURRENT_USER = 'You';
 
@@ -56,25 +57,13 @@ function safeSetHideShopRecords(v: boolean) {
 // reasoning).
 const REVIEW_IS_DEMO_ONLY = import.meta.env?.VITE_DEMO_MODE === 'true';
 
-type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'shop-records' | 'money' | 'all';
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'attention', label: 'Needs a person' },
-  { id: 'gaps', label: 'Missing info' },
-  { id: 'unlinked', label: 'Needs linking' },
-  { id: 'conflicts', label: 'Conflicts' },
-  { id: 'duplicates', label: 'Duplicates' },
-  { id: 'ready', label: 'Ready to verify' },
-  // Round 4 (2026-09-21): shop-internal documents (parts counts, dispatch
-  // notes, memos to all techs — api/_lib/documentTypes.js's 'internal' type)
-  // are AI-verified on extraction (isShopInternalDocument) and so never show
-  // under "Needs a person" (isAttention requires stage !== 'verified'). This
-  // chip is the only place left to find them, rather than nowhere at all.
-  { id: 'shop-records', label: 'Shop records' },
-  // Financials layer: invoices/quotes whose printed numbers don't add up (or were read with low confidence).
-  { id: 'money', label: 'Money to check' },
-  { id: 'all', label: 'All' },
-];
-const FILTER_IDS = FILTERS.map((f) => f.id);
+// Filter/FILTERS live in reviewFilters.ts (round 17, InboxScreen.tsx merge —
+// pure data, split out so neither this file nor InboxScreen.tsx mixes a
+// component export with a plain data export — a value re-export from here
+// would reintroduce exactly that, so only the type (erased at build time,
+// exempt from that rule) is re-exported; InboxScreen.tsx imports the FILTERS
+// array straight from reviewFilters.ts).
+export type { Filter };
 
 /** Shared with BrowseScreen.tsx's Documents-tab Stage filter, so "Needs a
  *  person" always means the exact same set of documents everywhere it's
@@ -354,16 +343,35 @@ function LinkedCustomerSection({ doc, current, isDemo, suggestedName, reminderCu
   );
 }
 
+export interface ReviewBodyProps {
+  /** Controlled from InboxScreen's own single chip row (round 17 merge —
+   *  see its file comment) rather than owned here, so "Decisions" and these
+   *  9 filters render as one row, not two stacked tab systems. */
+  filter: Filter;
+  onFilterChange: (f: Filter) => void;
+  /** Fires whenever this body's per-filter counts change, so the chip row
+   *  that now lives in InboxScreen can show real numbers without
+   *  re-deriving all of this component's own work-scope/customer-scope/
+   *  money state a second time. */
+  onCounts?: (counts: Record<Filter, number>) => void;
+}
+
 /**
- * The Inbox's "Needs a person" tab. A person resolves what the pipeline
- * can't: required fields that are missing, documents that won't link, two
- * documents that disagree, and duplicates. Every approval writes to the
- * entity graph, so the next answer on the Ask screen reflects it.
+ * The Inbox's "Needs you" flow's filtered-queue half (the other half is
+ * IntakeQueuePanel's "Decisions" — see InboxScreen.tsx). A person resolves
+ * what the pipeline can't: required fields that are missing, documents that
+ * won't link, two documents that disagree, and duplicates. Every approval
+ * writes to the entity graph, so the next answer on the Ask screen reflects
+ * it.
  *
- * Rendered inside InboxScreen (which owns the AppShell + tab header) rather
- * than as its own top-level screen — see the IA note in InboxScreen.tsx.
+ * Rendered inside InboxScreen (which owns the AppShell + tab/chip header)
+ * rather than as its own top-level screen — see the IA note in
+ * InboxScreen.tsx. `filter`/`onFilterChange` are controlled by that parent
+ * (round 17: used to be this component's own internal state, with its own
+ * chip row rendered right here — now hoisted up so InboxScreen can put
+ * "Decisions" in the same row instead of a separate tab).
  */
-export function ReviewBody() {
+export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps) {
   const graph = useGraph();
   const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate, clearLastError, aiVerifyDoc, removeDoc } = useGraph();
   const lastError = useGraph((s) => s.lastError);
@@ -376,7 +384,7 @@ export function ReviewBody() {
   const setInboxCustomerScope = useAppStore((s) => s.setInboxCustomerScope);
   const openCustomer = useAppStore((s) => s.openCustomer);
 
-  const [filter, setFilter] = useState<Filter>('attention');
+  const setFilter = onFilterChange;
   const [preview, setPreview] = useState<SourceRef | null>(null);
 
   // "Hide shop records" + technician filter (owner defect report 2026-09-22,
@@ -511,6 +519,8 @@ export function ReviewBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph.docs, sets, work.choice, work.isMine, customerDupCount, inboxCustomerScope, hideShopRecords]);
 
+  useEffect(() => { onCounts?.(counts); }, [counts, onCounts]);
+
   // Distinct technicians named across this tenant's shop records (owner
   // defect report 2026-09-22, item 4) — the chip row above the Shop records
   // list, and what `shopTechFilter` filters by.
@@ -598,19 +608,9 @@ export function ReviewBody() {
           Hide shop records
         </label>
 
-        <div role="tablist" aria-label="Queue filters" className="flex flex-wrap gap-1.5">
-          {FILTERS.filter((f) => f.id !== 'money' || moneyIds.size > 0 || filter === 'money').map((f) => (
-            <button
-              key={f.id}
-              role="tab"
-              aria-selected={filter === f.id}
-              onClick={() => setFilter(f.id)}
-              className={['dw-btn !min-h-[40px] !py-1.5 !px-3 text-body-lg', filter === f.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
-            >
-              {f.label} <span className="font-mono text-caption opacity-80">{counts[f.id]}</span>
-            </button>
-          ))}
-        </div>
+        {/* Filter chips: rendered by InboxScreen now, in the same row as its
+            "Decisions" chip (round 17 merge) — see this file's own header
+            comment and InboxScreen.tsx. */}
 
         {inboxCustomerScope && (
           <div className="flex flex-wrap items-center gap-2">

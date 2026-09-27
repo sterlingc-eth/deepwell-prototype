@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- Dev-only harness for scripts/verify-offline-queue-ui.mjs: mounts ScanTab
+     alone (no ClerkProvider, no MobileApp shell — ScanTab takes tenantKey as
+     a plain prop, not a Clerk hook, exactly so it can be tested like this)
+     against mocked /api/upload-url, /api/read-document and
+     /api/v1/intake-status calls. See scripts/records-harness/ for the same
+     pattern. -->
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScanTab harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./harness-main.tsx"></script>
+  </body>
+</html>

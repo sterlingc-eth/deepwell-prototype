@@ -255,10 +255,19 @@ export const MobileAnswer = memo(function MobileAnswer({
             {recordsHeading(answer)}
           </button>
         )}
-        {citedIds.length > 0 && (
-          <button type="button" aria-expanded={panel === 'sources'} className={pill(panel === 'sources')} onClick={() => toggle('sources')}>
-            {noAnswer ? 'Closest' : 'Sources'} · {citedIds.length}
+        {citedIds.length === 1 ? (
+          // Round 17 audit fix #7: one citation is one document — opening
+          // the Sources panel just to tap its only row cost a second tap for
+          // nothing. Skip straight to it.
+          <button type="button" className={pill(false)} onClick={() => onOpenDoc(citedIds[0]!)}>
+            {noAnswer ? 'Closest' : 'Source'}
           </button>
+        ) : (
+          citedIds.length > 0 && (
+            <button type="button" aria-expanded={panel === 'sources'} className={pill(panel === 'sources')} onClick={() => toggle('sources')}>
+              {noAnswer ? 'Closest' : 'Sources'} · {citedIds.length}
+            </button>
+          )
         )}
         <span className="ml-auto shrink-0 inline-flex items-center gap-1">
           <ShareButton text={shareText(question, answer, resolveDocName)} />

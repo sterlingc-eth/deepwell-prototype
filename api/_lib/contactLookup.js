@@ -30,7 +30,9 @@
 import { normalizeQuestion, correctTriggerWordTypos } from "./nlNormalize.js";
 // TEAM C (citations everywhere): each answer names the record(s) it was read from.
 import { attachCitations, customerRecord, unitRecord, documentRecord } from "./citations/records.js";
-import { ENTITY_SYNONYMS, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES, STREET_ADDRESS_RE } from "./analytics.js";
+import { ENTITY_SYNONYMS, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES, STREET_ADDRESS_RE, escapeRegExp } from "./analytics.js";
+// R17 (G4, consolidation): canonical street-suffix list — see geo/streetSuffix.js.
+import { STREET_SUFFIX_ALTERNATION } from "./geo/streetSuffix.js";
 import { documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
 // R15 (Team C): a typo'd doctype word ("invoides for delgado") must not be swallowed whole as a
 // person name by this file's own greedy bare-name shape before docLookup.js ever gets a turn — see
@@ -203,7 +205,7 @@ const AGGREGATE_WORD_RE = new RegExp(
     ...ENTITY_SYNONYMS.warranties,
   ])]
     .sort((a, b) => b.length - a.length)
-    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .map((w) => escapeRegExp(w))
     .join("|")})\\b`,
   "i"
 );
@@ -313,7 +315,11 @@ const BARE_NAME_ONLY_RE = /^([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2
 // the optional suffix (group 2) so the DB query (below) can search on just
 // the street name — "Rd" vs "Road" in the address column must never block a
 // match the way an exact-suffix requirement would.
-const STREET_SUFFIX_ALT = "road|rd|street|st|ave|avenue|blvd|dr|drive|ln|lane|ct|way";
+// R17 (G4, consolidation): was this file's own hand-maintained suffix list (missing place, circle,
+// pkwy/parkway, hwy, and "court" long form); now the shared canonical superset (imported above) —
+// see geo/streetSuffix.js's own header comment. Still a single capture group (group 2 below), same
+// as before.
+const STREET_SUFFIX_ALT = STREET_SUFFIX_ALTERNATION;
 const STREET_ONLY_RE = new RegExp(
   `^(?:the\\s+(?:guy|lady|customer|account|people|folks)\\s+(?:on|at|over on)|customers?\\s+(?:on|at))\\s+` +
     `([a-zA-Z][a-zA-Z']*(?:\\s+[a-zA-Z][a-zA-Z']*){0,2}?)` +

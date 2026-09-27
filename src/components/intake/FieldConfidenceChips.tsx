@@ -80,10 +80,13 @@ export function FieldConfidenceChips({
               <Loader2 className="w-3 h-3 animate-spin text-ink-3" aria-hidden="true" />
             ) : (
               <>
-                <button type="button" className="text-ok-ink dark:text-ok-bg hover:opacity-70" aria-label={`Looks right: ${f.label}`} onClick={() => onConfirm(f.fieldKey, f.value)}>
+                {/* p-2.5 keeps the visible glyph small (dense chip row) while
+                    growing the actual hit area — a step toward the round's
+                    44px rule without ballooning this row on desktop too. */}
+                <button type="button" className="p-2.5 -m-1 text-ok-ink dark:text-ok-bg hover:opacity-70" aria-label={`Looks right: ${f.label}`} onClick={() => onConfirm(f.fieldKey, f.value)}>
                   <Check className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
-                <button type="button" className="text-ink-3 hover:opacity-70" aria-label={`Fix: ${f.label}`} onClick={() => startFix(f)}>
+                <button type="button" className="p-2.5 -m-1 text-ink-3 hover:opacity-70" aria-label={`Fix: ${f.label}`} onClick={() => startFix(f)}>
                   <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </>

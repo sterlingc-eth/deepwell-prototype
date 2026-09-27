@@ -47,6 +47,11 @@ import { dirname, join } from 'node:path';
 import { logOnce } from '../rateLimit.js';
 import { embedConfig, embedQuery, toVectorLiteral } from '../search/embed.js';
 import { BRAND_RULES } from '../warrantyRules.js';
+// R17 (G4, consolidation): canonical street-suffix list — see ../geo/streetSuffix.js.
+import { STREET_SUFFIX_ALTERNATION } from '../geo/streetSuffix.js';
+// R17 (G4, consolidation): shared regex-metachar escape (analytics.js does not import this file,
+// so no cycle) — see analytics.js's own escapeRegExp doc comment.
+import { escapeRegExp } from '../analytics.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -146,7 +151,7 @@ function findTerms(qLower, terms) {
   const sorted = [...terms].sort((a, b) => b.length - a.length);
   for (const term of sorted) {
     if (!term) continue;
-    const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    const re = new RegExp(`\\b${escapeRegExp(term)}\\b`, 'i');
     if (re.test(qLower)) found.add(term.toLowerCase());
   }
   return [...found].sort();
@@ -155,8 +160,14 @@ function findTerms(qLower, terms) {
 /** "581 W Thomas Rd" / "1420 N 7th St" — a street-number address fragment.
  *  Conservative on purpose: only a real digit-led address-shaped run counts
  *  as an address slot (a bare "60 days" or "2 units" is caught by the number
- *  slot instead, not here). */
-const ADDRESS_RE = /\b\d{2,6}\s+(?:[nsew]\.?\s+)?[a-z][a-z']*(?:\s+[a-z][a-z']*){0,3}\s+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|pl|place|cir|circle|pkwy|parkway)\b/gi;
+ *  slot instead, not here).
+ *  R17 (G4, consolidation): the suffix alternation was this file's own
+ *  hand-maintained list (missing hwy, ter); now the shared canonical
+ *  superset — see ../geo/streetSuffix.js's own header comment. */
+const ADDRESS_RE = new RegExp(
+  `\\b\\d{2,6}\\s+(?:[nsew]\\.?\\s+)?[a-z][a-z']*(?:\\s+[a-z][a-z']*){0,3}\\s+(?:${STREET_SUFFIX_ALTERNATION})\\b`,
+  'gi'
+);
 
 /** ISO / US-style dates and bare month names, so "in June" and "since 2024"
  *  are captured even without a day. */

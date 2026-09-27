@@ -22,7 +22,7 @@
  * aggregate/analytics question has no address to correct in the first place,
  * so this never costs anything on that path.
  */
-import { VOCAB } from "./nlNormalize.js";
+import { VOCAB, withinEditDistance1 } from "./nlNormalize.js";
 import { STREET_ADDRESS_RE, AT_ADDRESS_RE } from "./analytics.js";
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -83,48 +83,15 @@ export function clearStreetVocabCache() {
 
 /* ============================================================ pure correction */
 
-/** True when `a`/`b` are the same word, one substitution/transposition apart
- *  (equal length), or one insertion/deletion apart (length differs by 1) —
- *  Damerau-Levenshtein distance <= 1. Duplicated from nlNormalize.js's own
- *  (unexported) withinEditDistance1 rather than adding a cross-file
- *  dependency for six lines of pure string math — same idiom that file's own
- *  header comment already establishes for this codebase. */
-function withinEditDistance1(a, b) {
-  if (a === b) return true;
-  const la = a.length;
-  const lb = b.length;
-  if (Math.abs(la - lb) > 1) return false;
-  if (la === lb) {
-    let diffCount = 0;
-    let i1 = -1;
-    let i2 = -1;
-    for (let i = 0; i < la; i++) {
-      if (a[i] !== b[i]) {
-        diffCount++;
-        if (diffCount === 1) i1 = i;
-        else if (diffCount === 2) i2 = i;
-        else return false;
-      }
-    }
-    if (diffCount <= 1) return true;
-    return i2 === i1 + 1 && a[i1] === b[i2] && a[i2] === b[i1];
-  }
-  const [s, l] = la < lb ? [a, b] : [b, a];
-  let i = 0;
-  let j = 0;
-  let usedSkip = false;
-  while (i < s.length && j < l.length) {
-    if (s[i] === l[j]) {
-      i++;
-      j++;
-      continue;
-    }
-    if (usedSkip) return false;
-    usedSkip = true;
-    j++;
-  }
-  return true;
-}
+// R17 (G4, consolidation, ../r16_d1_pipeline.json #6): this used to be its own byte-identical copy
+// of nlNormalize.js's withinEditDistance1, on the theory that importing it would add a cross-file
+// dependency — but nlNormalize.js's version is already exported and tenantVocab.js
+// (vocab/tenantVocab.js) already imports it directly with no issue, so that justification was
+// stale. This file already imports VOCAB from nlNormalize.js above; nlNormalize.js does not import
+// this file (only mentions it in comments), so there is no cycle here — unlike fastPath.js's own
+// fastPathWithinEditDistance1 copy (analytics.js -> scope.js -> fastPath.js -> nlNormalize.js would
+// cycle back to analytics.js) or analytics.js's own isCloseTo copy (nlNormalize.js imports FROM
+// analytics.js), both of which stay local for that reason and are NOT consolidated here.
 
 /**
  * Pure: correct every token in `question` that is (a) alphabetic, (b) >= 5

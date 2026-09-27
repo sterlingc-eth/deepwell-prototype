@@ -54,6 +54,10 @@ import { scorecardRunAction, scorecardStatusAction, scorecardBaselineAction } fr
 import { listEligibleTenants, isoWeekStart, listRecentAutopilotSummaries } from './_lib/learning/autopilot.js';
 import { rotationForDate } from './_lib/learning/rotation.js';
 import { buildGapReport, latestGapReport } from './_lib/learning/gapReport.js';
+// Round 17 (G3): misses -> permanent exam questions (api/_lib/learning/examPromote.js) — same
+// requireOperator gate as the rest of the Donovan learning card, tenant-scoped (a promoted test's
+// oracle SQL names this tenant's own document/entity ids, so it can never be shared cross-tenant).
+import { promoteMissToExamCandidate, insertPromotedTest, listPromotedTests, rowsToQuestions, buildPromotedExport } from './_lib/learning/examPromote.js';
 // Search by meaning: status + resumable backfill of embeddings for existing pages (api/_lib/search/store.js).
 import { semanticStatus, runBackfill } from './_lib/search/store.js';
 // TEAM T2 (2026-09-25): dossiers — status + resumable, budget-aware backfill (api/_lib/search/dossier.js).
@@ -79,7 +83,7 @@ import { dossierStatus, runDossierBackfillPage } from './_lib/search/dossier.js'
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
 const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -173,6 +177,9 @@ const ACTIONS = new Set([
   'dossierBackfill',
   'learningAutopilotStatus',
   'learningGapReport',
+  'examPromote',
+  'examList',
+  'examExport',
 ]);
 
 export default async (req, res) => {
@@ -367,9 +374,19 @@ export default async (req, res) => {
         const dedupedGaps = [...gapGroups.values()].map(({ rep, ids }) => (
           ids.length > 1 ? { ...rep, groupCount: ids.length, groupIds: ids } : rep
         ));
+        // Round 17 (G3, misses -> permanent exam): every answered-now miss the card can offer a
+        // "Keep as test" button for, plus this tenant's own already-promoted count — reuses `open`
+        // (already fetched above) rather than a second listOpenMisses round trip.
+        const promotedRows = await listPromotedTests(ctx, { limit: 2000 });
+        const promotedKeys = new Set(promotedRows.map((r) => r.question_normalized));
+        const answeredNowMisses = open
+          .filter((m) => m.replay?.outcome === 'answered_now')
+          .map((m) => ({ question: m.question, normalized: m.normalized, answer: m.replay.answer, alreadyPromoted: promotedKeys.has(m.normalized) }));
         result = {
           items: [...nonGap, ...dedupedGaps],
           activeLearned,
+          answeredNowMisses,
+          promotedCount: promotedRows.length,
           summary: {
             recipesActive: activeLearned.filter((r) => r.kind === RECIPE_KIND).length,
             answeredNow: open.filter((m) => m.replay?.outcome === 'answered_now').length,
@@ -555,6 +572,54 @@ export default async (req, res) => {
               })),
           };
         }
+        break;
+      // Round 17 (G3, R16 D3 research item 3): turn one resolved miss into a permanent exam
+      // question. Tenant-scoped (ctx is already this request's own tenant) — see
+      // api/_lib/learning/examPromote.js's module doc for why a promoted test can never be shared
+      // cross-tenant. `normalized` should be the exact key a prior `learningList` response gave for
+      // this miss (its `answeredNowMisses[].normalized`); a caller with only `question` falls back to
+      // using it as its own key (still correct, just not overlay-normalized).
+      case 'examPromote': {
+        requireOperator(auth);
+        const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 300) : '';
+        const normalized = typeof payload.normalized === 'string' && payload.normalized ? payload.normalized.slice(0, 300) : question;
+        if (!question) throw new reviewStore.ReviewError('examPromote requires a question.', 400);
+        const operatorLiteral = typeof payload.operatorLiteral === 'string' ? payload.operatorLiteral : undefined;
+        const operatorCmp = typeof payload.operatorCmp === 'string' ? payload.operatorCmp : undefined;
+        let answer = null;
+        if (!operatorLiteral) {
+          const replays = await listReplays(ctx, [normalized]);
+          const replay = replays.get(normalized);
+          if (!replay || replay.outcome !== 'answered_now') {
+            throw new reviewStore.ReviewError('This miss has not been replayed to an answer yet — replay it first, or supply the expected answer yourself.', 400);
+          }
+          answer = replay.answer;
+        }
+        const candidate = promoteMissToExamCandidate({
+          question, questionNormalized: normalized, outcome: 'answered_now', answer, tenantKey: ctx.tenantKey, operatorLiteral, operatorCmp,
+        });
+        if (!candidate.ok) throw new reviewStore.ReviewError(candidate.reason, 422);
+        const row = await insertPromotedTest(ctx, {
+          examId: candidate.question.id, questionNormalized: normalized, question: candidate.question.text,
+          category: candidate.question.category, shape: candidate.question.shape, cmp: candidate.question.cmp,
+          oracle: candidate.question.oracle, citationRequired: candidate.question.citationRequired === true,
+          oracleKind: candidate.oracleKind, sourceOutcome: 'answered_now', createdBy: auth.userId,
+        });
+        if (!row) throw new reviewStore.ReviewError('Could not save this promoted test (migration 56 may not be applied yet).', 503);
+        result = { ok: true, id: candidate.question.id, question: candidate.question, oracleKind: candidate.oracleKind };
+        break;
+      }
+      case 'examList':
+        requireOperator(auth);
+        result = { items: rowsToQuestions(await listPromotedTests(ctx, { limit: payload.limit ?? 500 })) };
+        break;
+      // Returns this tenant's promoted set in the exact JSON shape
+      // test-docs/scorecard/generalization/*.json files use (plus `tenantKey`) — an operator saves it
+      // as test-docs/scorecard/promoted/<tenant-slug>.json (see that directory's README) the same
+      // weekly-repo-sync way learningExport's output gets folded into nlNormalize.js.
+      case 'examExport':
+        requireOperator(auth);
+        result = buildPromotedExport(ctx.tenantKey, rowsToQuestions(await listPromotedTests(ctx, { limit: 2000 })));
         break;
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });

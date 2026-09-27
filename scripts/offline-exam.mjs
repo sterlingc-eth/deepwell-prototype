@@ -419,14 +419,60 @@ export async function loadExtraCategoryQuestions(existingIds = new Set()) {
   return out;
 }
 
-/** The full exam this run should grade: exam.json's own questions plus every extra category file's, with
- *  id collisions resolved in exam.json's favor. Both the CLI below and scripts/verify-golden.mjs call
- *  this rather than `loadExam()` directly, so the two never drift apart on which categories get graded. */
-export async function loadFullExam() {
+// Round 17 (G3, R16 D3 research item 3, "golden-set growth from production miss-digest"): a resolved
+// PRODUCTION miss can be promoted (api/_lib/learning/examPromote.js, api/review.js's examPromote
+// action) into a permanent exam question, exported as its own test-docs/scorecard/promoted/<tenant-
+// slug>.json file — same {version, category, questions} shape loadExtraCategoryQuestions already
+// merges above, PLUS a top-level `tenantKey`. Unlike a generalization file (hand-written, tenant-
+// agnostic, always graded), a promoted file's oracle SQL is real production data scoped to ONE
+// tenant's own document/entity ids — grading it against any OTHER tenant's export would either error
+// (rows that don't exist there) or, worse, silently pass/fail on data it was never about. So a
+// promoted file is only ever merged when `tenantKey` is given AND matches the file's own — every
+// other case (no tenantKey passed, e.g. verify-golden.mjs's/verify-field-phrasing.mjs's synthetic
+// exports, or a mismatched one) skips it silently, same as a missing directory.
+const PROMOTED_DIR = path.join(ROOT, "test-docs", "scorecard", "promoted");
+
+/** Every *.json file directly under test-docs/scorecard/promoted/ whose own `tenantKey` matches the
+ *  given one, contributing its `questions` (validated exactly like loadExtraCategoryQuestions).
+ *  `dir` is overridable so scripts/verify-exam-promote.mjs can point this at a throwaway fixture
+ *  directory instead of the real one. Returns [] when `tenantKey` is falsy (nothing to match) or the
+ *  directory doesn't exist. */
+export async function loadPromotedCategoryQuestions(existingIds = new Set(), tenantKey = null, dir = PROMOTED_DIR) {
+  if (!tenantKey) return [];
+  const { validQuestions } = await import("../api/_lib/scorecard/exam.js");
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort(); }
+  catch { return []; }
+  const seen = new Set();
+  const out = [];
+  for (const f of files) {
+    let parsed;
+    try { parsed = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); }
+    catch (err) { console.warn(`offline-exam: promoted/${f} is not valid JSON, skipping:`, err?.message); continue; }
+    if (!parsed?.tenantKey || parsed.tenantKey !== tenantKey) continue; // a different (or unscoped) shop's set
+    for (const q of validQuestions(parsed?.questions)) {
+      if (existingIds.has(q.id) || seen.has(q.id)) { console.warn(`offline-exam: promoted/${f}: duplicate question id ${q.id}, dropped`); continue; }
+      seen.add(q.id);
+      out.push(q);
+    }
+  }
+  return out;
+}
+
+/** The full exam this run should grade: exam.json's own questions, every extra category file's, and
+ *  (only when `tenantKey` is given and matches) that tenant's own promoted set — id collisions
+ *  resolved in exam.json's favor, then the extra-category files'. Both the CLI below and
+ *  scripts/verify-golden.mjs call this rather than `loadExam()` directly, so the two never drift
+ *  apart on which categories get graded. `tenantKey` defaults to null (no promoted set merged),
+ *  matching every existing caller that doesn't pass one. */
+export async function loadFullExam(tenantKey = null) {
   const { loadExam } = await import("../api/_lib/scorecard/exam.js");
   const exam = loadExam();
-  const extra = await loadExtraCategoryQuestions(new Set(exam.questions.map((q) => q.id)));
-  return { version: exam.version, questions: [...exam.questions, ...extra] };
+  const existingIds = new Set(exam.questions.map((q) => q.id));
+  const extra = await loadExtraCategoryQuestions(existingIds);
+  for (const q of extra) existingIds.add(q.id);
+  const promoted = await loadPromotedCategoryQuestions(existingIds, tenantKey);
+  return { version: exam.version, questions: [...exam.questions, ...extra, ...promoted] };
 }
 
 /* ============================================================== CLI */
@@ -447,7 +493,10 @@ async function main() {
   const lite = await createPGlite();
   await setActiveDatabase(lite);
 
-  const exam = await loadFullExam();
+  // Round 17: the export's own tenantKey (its ORIGINAL production value, not the "offline:"-prefixed
+  // one loadExportIntoNewTenant gives the in-process PGlite tenant below) is what a promoted set's own
+  // `tenantKey` field is compared against — see loadPromotedCategoryQuestions's own doc comment.
+  const exam = await loadFullExam(exportData.tenantKey ?? null);
   if (!exam.questions.length) {
     console.error("offline-exam: test-docs/scorecard/exam.json not found or empty — run `node scripts/gen-scorecard.mjs` first.");
     process.exit(1);

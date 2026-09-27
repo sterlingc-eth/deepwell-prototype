@@ -9,6 +9,7 @@ import { useGraph } from '../core/entityGraph'
 import { DonovanMark } from '../components/DonovanMark'
 import type { Answer } from '../core/types'
 import { MobileAnswer } from './MobileAnswer'
+import { InsightsCard } from '../components/insights/InsightsCard'
 import { canPromptInstall, isIos, isStandalone, onInstallAvailabilityChange, promptInstall } from './pwa'
 
 interface Turn {
@@ -324,6 +325,7 @@ export function AskTab({
               <DonovanMark size={64} className="short:hidden" />
               <h2 className="text-h3 font-semibold mt-3 short:mt-0 mb-1">Ask Donovan</h2>
               <p className="text-body text-ink-2 m-0 max-w-xs short:hidden">A customer, an address, a serial number, or any question about your records.</p>
+              <div className="mt-4 short:mt-2 w-full short:hidden"><InsightsCard onAsk={send} /></div>
               <div className="mt-5 short:mt-2 w-full grid grid-cols-1 gap-2">
                 {suggestions.map((s, i) => (
                   <button

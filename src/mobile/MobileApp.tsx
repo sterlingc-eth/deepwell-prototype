@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SignIn, UserButton, useAuth, useOrganization } from '@clerk/clerk-react'
-import { FileText, Loader2, MessageCircle, ScanLine } from 'lucide-react'
+import { FileText, Loader2, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { setAuthTokenProvider } from '../services/authToken'
 import { billingClient, type BillingStatus } from '../services/billingClient'
 import { usePostgresSync } from '../hooks/usePostgresSync'
+import { useAppStore } from '../store/appStore'
 import { Wordmark } from '../components/Wordmark'
 import { AskTab } from './AskTab'
 import { ScanTab } from './ScanTab'
@@ -20,9 +21,25 @@ const TABS: { id: MobileTab; label: string; Icon: typeof MessageCircle }[] = [
   { id: 'docs', label: 'Docs', Icon: FileText },
 ]
 
-function tabFromUrl(): MobileTab {
-  const t = new URLSearchParams(window.location.search).get('tab')
-  return t === 'scan' || t === 'docs' ? t : 'ask'
+const LAST_TAB_KEY = 'deepwell.mobile.lastTab'
+
+function isMobileTab(v: string | null): v is MobileTab {
+  return v === 'ask' || v === 'scan' || v === 'docs'
+}
+
+/** URL wins (a shared/deep link), then the last tab this phone was on
+ *  (round 17, audit fix #5 — a Scan-first tech no longer pays a tap on
+ *  every open just to leave Ask), then Ask. */
+function initialTab(): MobileTab {
+  const fromUrl = new URLSearchParams(window.location.search).get('tab')
+  if (isMobileTab(fromUrl)) return fromUrl
+  try {
+    const last = window.localStorage.getItem(LAST_TAB_KEY)
+    if (isMobileTab(last)) return last
+  } catch {
+    /* storage unavailable — Ask is still a fine default */
+  }
+  return 'ask'
 }
 
 function FullScreenMessage({ title, body, action }: { title: string; body: string; action?: { href: string; label: string } }) {
@@ -49,12 +66,20 @@ export function MobileApp() {
     return () => setAuthTokenProvider(null)
   }, [getToken])
 
-  const [tab, setTabState] = useState<MobileTab>(tabFromUrl)
+  const fieldMode = useAppStore((s) => s.fieldMode)
+  const setFieldMode = useAppStore((s) => s.setFieldMode)
+
+  const [tab, setTabState] = useState<MobileTab>(initialTab)
   const setTab = (t: MobileTab) => {
     setTabState(t)
     const url = new URL(window.location.href)
     url.searchParams.set('tab', t)
     window.history.replaceState(null, '', url)
+    try {
+      window.localStorage.setItem(LAST_TAB_KEY, t)
+    } catch {
+      /* best-effort only */
+    }
   }
   const [sheet, setSheet] = useState<{ kind: 'doc'; id: string } | { kind: 'customer'; ref: string } | null>(null)
   const openDoc = useCallback((id: string) => setSheet({ kind: 'doc', id }), [])
@@ -165,10 +190,24 @@ export function MobileApp() {
       <header className="dw-safe-top shrink-0 bg-surface border-b border-line/60">
         <div className="max-w-2xl mx-auto min-h-14 short:min-h-11 px-4 flex items-center justify-between gap-3">
           <Wordmark size="sm" />
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             {organization?.name && (
               <span className="hidden min-[360px]:inline short:hidden text-caption text-ink-3 truncate max-w-[30vw] md:max-w-xs">{organization.name}</span>
             )}
+            {/* Round 17 audit fix #1: reachable, 1-tap, persisted (same
+                setFieldMode/localStorage the desktop toggle uses) — the only
+                thing missing before was a button that calls it from here. */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={fieldMode}
+              aria-label={fieldMode ? 'Field view on. Switch to Office view' : 'Office view on. Switch to Field view'}
+              title={fieldMode ? 'Field view: light, larger type for outdoors. Tap for Office view.' : 'Office view: dark. Tap for Field view (light, larger type).'}
+              onClick={() => setFieldMode(!fieldMode)}
+              className="w-11 h-11 -mr-1 shrink-0 flex items-center justify-center rounded-full text-ink-3"
+            >
+              {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
+            </button>
             <UserButton afterSignOutUrl="/m/" />
           </div>
         </div>
@@ -192,7 +231,12 @@ export function MobileApp() {
           <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} billing={billing} />
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
-          <ScanTab onUploaded={() => void sync.refresh()} onOpenDocs={() => setTab('docs')} />
+          <ScanTab
+            tenantKey={orgId ?? userId ?? null}
+            onUploaded={() => void sync.refresh()}
+            onOpenDocs={() => setTab('docs')}
+            onOpenDoc={openDoc}
+          />
         </div>
         <div className={tab === 'docs' ? 'h-full' : 'hidden'}>
           <DocsTab syncStatus={sync.status} onOpenDoc={openDoc} onRefresh={() => sync.refresh()} />
@@ -220,7 +264,9 @@ export function MobileApp() {
         </div>
       </nav>
 
-      {sheet?.kind === 'doc' && <DocSheet key={sheet.id} documentId={sheet.id} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onClose={closeSheet} />}
+      {sheet?.kind === 'doc' && (
+        <DocSheet key={sheet.id} documentId={sheet.id} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onOpenCustomer={openCustomer} onClose={closeSheet} />
+      )}
       {sheet?.kind === 'customer' && <CustomerSheet key={sheet.ref} customerRef={sheet.ref} onOpenDoc={openDoc} onClose={closeSheet} />}
     </div>
   )

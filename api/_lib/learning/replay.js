@@ -135,11 +135,27 @@ export async function retireRecipeForQuestion(question) {
 }
 
 const OUTCOME_ANSWER_KEYS = ["kind", "text", "confidence", "interpretation"];
+// A fact's `sources[].documentId`/`location.field` (and `entityId`) name exactly the extraction row
+// that backed it — never PII beyond an opaque document id and a schema field-key name (never a
+// value). Kept (Round 17, examPromote.js) so a stored "answered_now" replay can later be turned into
+// a permanent, structurally re-checkable exam question without re-running the agent (no model call)
+// — see api/_lib/learning/examPromote.js's buildStructuralOracle, the only reader of these two fields.
+function factSources(sources) {
+  if (!Array.isArray(sources) || !sources.length) return undefined;
+  const s = sources[0];
+  if (!s || typeof s.documentId !== "string" || !s.documentId) return undefined;
+  const field = s.location?.field;
+  return [{ documentId: s.documentId, ...(typeof field === "string" && field ? { location: { field } } : {}) }];
+}
 function answerSummary(data) {
   if (!data || typeof data !== "object") return null;
   const out = {};
   for (const k of OUTCOME_ANSWER_KEYS) if (data[k] != null) out[k] = data[k];
-  out.facts = (data.facts ?? []).slice(0, 40).map((f) => ({ label: f.label, value: f.value, ...(f.status ? { status: f.status } : {}) }));
+  out.facts = (data.facts ?? []).slice(0, 40).map((f) => ({
+    label: f.label, value: f.value, ...(f.status ? { status: f.status } : {}),
+    ...(typeof f.entityId === "string" && f.entityId ? { entityId: f.entityId } : {}),
+    ...(factSources(f.sources) ? { sources: factSources(f.sources) } : {}),
+  }));
   return out;
 }
 

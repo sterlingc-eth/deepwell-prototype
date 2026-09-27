@@ -23,6 +23,10 @@
 import { describeWarranty, alertTier } from './warrantyRules.js';
 // TEAM C (citations everywhere): equipment / document lists cite the exact rows they list.
 import { attachCitations, unitRecord, documentRecord } from './citations/records.js';
+// R17 (G4, consolidation): canonical street-suffix list — see geo/streetSuffix.js. Pure data, no
+// runtime dependency chain (geo/streetSuffix.js imports nothing), so this never risks the
+// analytics.js -> scope.js -> fastPath.js -> nlNormalize.js cycle documented below.
+import { STREET_SUFFIX_GROUP_SRC } from './geo/streetSuffix.js';
 // R15 (Team C): typo tolerance for this file's own short trigger-word vocabulary — see
 // matchTrigger and correctFastPathTriggerTypos below. Deliberately reimplemented locally (a small,
 // self-contained copy of nlNormalize.js's withinEditDistance1 + correctTriggerWordTypos) rather
@@ -318,8 +322,11 @@ export function classifyIntent(question) {
 
 const CUSTOMER_NUMBER_RE = /\bC-(\d{5})\b/i;
 
-const STREET_SUFFIX_RE =
-  '(?:st(?:reet)?|ave(?:nue)?|rd|road|dr(?:ive)?|ln|lane|blvd|boulevard|way|ct|court|pl(?:ace)?|cir(?:cle)?|pkwy|parkway)';
+// R17 (G4, consolidation): was this file's own hand-maintained suffix list (missing hwy/highway,
+// ter/terrace); now the shared canonical superset — see geo/streetSuffix.js's own header comment.
+// Same shape as before (a string holding a non-capturing group source, interpolated into the
+// larger address regexes below), so nothing downstream changes except widened suffix coverage.
+const STREET_SUFFIX_RE = STREET_SUFFIX_GROUP_SRC;
 // R11 fix (lookups-0010/0084, hvac-tech-0007/0036 — golden tenant): this used to stop capturing
 // right after the street-suffix word, so "137 W Southern Ave, Mesa, AZ 85201" and "137 W
 // Southern Ave, Phoenix, AZ 85001" (two DIFFERENT real addresses in this corpus that share a

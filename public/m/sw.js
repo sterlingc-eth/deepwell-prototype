@@ -75,3 +75,20 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+/* Offline upload queue (src/mobile/offline/uploadQueue.ts): the browser fires
+ * this once connectivity returns, even if DeepWell Mobile isn't open — but
+ * the actual upload needs the Clerk session, which only lives in an open
+ * page, not here. So the worker's whole job is to wake every open tab and
+ * let IT drain the queue with its own live auth; the online event and
+ * visibilitychange listener in wireAutoDrain() cover the rest (including
+ * iOS Safari, which has no Background Sync at all — this handler simply
+ * never fires there, harmlessly). */
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'dw-offline-queue') return;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      clients.forEach((c) => c.postMessage({ type: 'dw-offline-queue-sync' }));
+    })
+  );
+});

@@ -11,15 +11,20 @@ import {
 /**
  * Admin-only "Possible duplicate customers" card (Round 11, entity-resolution
  * clustering — M3-config/39-entity-resolution.sql, api/_lib/entities/{similarity,
- * resolve}.js) — Team screen, mirrors DonovanMissesCard/FollowupsCard's
- * collapsed-by-default dw-card styling exactly.
+ * resolve}.js) — lives on the Customers tab (BrowseScreen.tsx -> CustomersScreen.tsx),
+ * mirrors DonovanMissesCard/FollowupsCard's collapsed-by-default dw-card
+ * styling exactly.
  *
- * Distinct from CustomersScreen's own per-customer duplicate banner: this
- * scans the WHOLE tenant, clusters (not just pairs — 3+ records than name the
- * same person/company all group together), and shows every reason a cluster
- * was flagged plus the evidence documents behind it, so an admin can decide
- * without opening each customer individually. NEVER auto-merges: every
- * cluster here is a suggestion until Accept is clicked.
+ * Round 17 (U2 top fix #11): used to be a second copy of this same idea on
+ * Team, right next to CustomersScreen's own per-customer duplicate banner —
+ * two "are these customers the same" UIs, in two different places, neither
+ * near the other. Moved here, next to that banner, so there's exactly one.
+ * Distinct from that banner: this scans the WHOLE tenant, clusters (not just
+ * pairs — 3+ records that name the same person/company all group together),
+ * and shows every reason a cluster was flagged plus the evidence documents
+ * behind it, so an admin can decide without opening each customer
+ * individually. NEVER auto-merges: every cluster here is a suggestion until
+ * Accept is clicked.
  */
 function reasonLine(reasons: string[]): string {
   const first = reasons[0];

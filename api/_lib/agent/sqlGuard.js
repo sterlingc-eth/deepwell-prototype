@@ -53,6 +53,8 @@ export const REAL_TABLES = Object.freeze([
   "ask_semantic_cache", "tenant_rollups", // M3-config/40-rollups-and-semantic-cache.sql (R11: semantic cache + rollups)
   "intake_field_inferences", "intake_needs_info", // M3-config/43-intake-autofill.sql (R12: straight-through intake)
   "donovan_provider_status", // M3-config/48-donovan-provider-status.sql (R14: provider-outage detection)
+  "donovan_promoted_tests", // M3-config/56-donovan-promoted-tests.sql (R17: misses -> permanent exam)
+  "tenant_insights_cache", // M3-config/55-insights-cache.sql (R17: proactive insights cache)
 ]);
 
 const DENY_TOKENS = new Set([

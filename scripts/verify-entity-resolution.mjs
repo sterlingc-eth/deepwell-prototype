@@ -391,8 +391,9 @@ let list1;
   const accountSrc = fs.readFileSync(path.join(ROOT, 'api/account.js'), 'utf8');
   check('api/account.js registers entity-merge as an account action (admin)', /ACTIONS\s*=\s*\{[^}]*"entity-merge"/.test(accountSrc));
 
-  const teamSrc = fs.readFileSync(path.join(ROOT, 'src/screens/TeamScreen.tsx'), 'utf8');
-  check('TeamScreen.tsx renders DuplicateCustomersCard admin-only', /admin\s*&&\s*<DuplicateCustomersCard/.test(teamSrc));
+  // R17 (UX-D2): duplicate-customer review moved from Team to the Customers screen (one home, still admin-only).
+  const customersSrc = fs.readFileSync(path.join(ROOT, 'src/screens/CustomersScreen.tsx'), 'utf8');
+  check('CustomersScreen.tsx renders DuplicateCustomersCard admin-only', /[aA]dmin\s*&&\s*<DuplicateCustomersCard/.test(customersSrc));
 
   const srcs = ['similarity', 'resolve'].map((f) => fs.readFileSync(path.join(ROOT, `api/_lib/entities/${f}.js`), 'utf8')).join('\n')
     + fs.readFileSync(path.join(ROOT, 'api/_lib/routes/entity-merge.js'), 'utf8');

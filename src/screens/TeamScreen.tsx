@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CreateOrganization, OrganizationProfile, useAuth, useOrganization } from '@clerk/clerk-react';
-import { Bell, Download, Loader2, Users } from 'lucide-react';
+import { Bell, ChevronDown, ChevronUp, Download, Loader2, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus } from '../services/teamClient';
@@ -8,11 +8,7 @@ import { fetchNotifications, setEmailDigestPreference } from '../services/notify
 import { downloadTenantExportJson } from '../services/exportClient';
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
-import { DonovanMissesCard } from '../components/DonovanMissesCard';
-import { DonovanLearningCard } from '../components/DonovanLearningCard';
-import { SemanticSearchCard } from '../components/SemanticSearchCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
-import { DuplicateCustomersCard } from '../components/DuplicateCustomersCard';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -48,14 +44,28 @@ const clerkAppearance = {
 } as const;
 
 /**
- * Admin-only "Email me warranty digests" toggle (handoffs/NOTIFICATIONS.md).
- * Reads the current value off GET /api/account?action=notifications (the
- * same call the bell icon makes) rather than a dedicated endpoint — one
- * fewer round trip to keep, and the value already lives on that response.
+ * Admin-only "Settings" — the warranty-digest email toggle
+ * (handoffs/NOTIFICATIONS.md) and the whole-shop data export
+ * (api/_lib/routes/tenant-export.js), combined into one collapsed-by-default
+ * card instead of two always-open ones (round 17, U2 top fix #3).
+ *
+ * These are account-lifecycle settings, not a "team" feature and not an
+ * "answer quality" one (see DonovanScreen.tsx) — Billing/Settings is their
+ * real long-term home (the owner brief's own wording), but BillingScreen.tsx
+ * isn't a file this round's UX-D2 pass owns (see R17_CONTRACT.md's file
+ * split), so it stays here for now, under its own clearly-separated
+ * "Settings" heading rather than mixed into Team's people/seats content.
+ * HOOK FOR THE LEAD (small, optional): this component is self-contained —
+ * moving it is `import { AccountSettingsCard } from '../screens/TeamScreen'`
+ * (export it) into BillingScreen.tsx and dropping this section + that export
+ * from here.
  */
-function NotificationsCard() {
+function AccountSettingsCard() {
+  const [open, setOpen] = useState(false);
   const [emailDigest, setEmailDigestState] = useState<boolean | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [savingDigest, setSavingDigest] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchNotifications()
@@ -63,86 +73,82 @@ function NotificationsCard() {
       .catch(() => setEmailDigestState(true)); // fail open to the default rather than showing a stuck loading state
   }, []);
 
-  const toggle = () => {
-    if (emailDigest === null || saving) return;
+  const toggleDigest = () => {
+    if (emailDigest === null || savingDigest) return;
     const next = !emailDigest;
     setEmailDigestState(next);
-    setSaving(true);
+    setSavingDigest(true);
     setEmailDigestPreference(next)
       .catch(() => setEmailDigestState(!next)) // revert on failure
-      .finally(() => setSaving(false));
+      .finally(() => setSavingDigest(false));
   };
-
-  return (
-    <div className="dw-card p-4 space-y-2">
-      <h2 className="text-body font-medium text-ink flex items-center gap-2">
-        <Bell className="w-4 h-4" aria-hidden="true" />
-        Notifications
-      </h2>
-      <label className="flex items-center justify-between gap-3 py-1">
-        <span className="text-body text-ink-2">Email me warranty digests</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={emailDigest ?? false}
-          disabled={emailDigest === null || saving}
-          onClick={toggle}
-          className={[
-            'relative inline-flex items-center h-6 w-11 rounded-full transition-colors duration-quick shrink-0',
-            emailDigest ? 'bg-forest-700' : 'bg-line',
-            emailDigest === null ? 'opacity-50' : '',
-          ].join(' ')}
-        >
-          <span
-            className={[
-              'inline-block h-4 w-4 transform rounded-full bg-stone-0 transition-transform duration-quick',
-              emailDigest ? 'translate-x-6' : 'translate-x-1',
-            ].join(' ')}
-          />
-        </button>
-      </label>
-      <p className="text-caption text-ink-3">
-        One email a day, only when a warranty needs attention — expired, expiring soon, or a registration window
-        closing.
-      </p>
-    </div>
-  );
-}
-
-/**
- * Admin-only "export your data" — the promise the marketing page already makes and, until this build, the
- * app never delivered (api/_lib/routes/tenant-export.js): everything the shop's own documents, pages,
- * extractions, entities, links and audit log hold, as one JSON file. Same download-a-blob pattern as
- * CustomersScreen's CSV export (src/services/exportClient.ts), just a POST instead of a plain link since the
- * route needs the Clerk token.
- */
-function DataExportCard() {
-  const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const runExport = async () => {
     setExporting(true);
-    setError(null);
+    setExportError(null);
     try {
       await downloadTenantExportJson();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not download the data export.');
+      setExportError(e instanceof Error ? e.message : 'Could not download the data export.');
     } finally {
       setExporting(false);
     }
   };
 
   return (
-    <div className="dw-card p-4 space-y-2">
-      <h2 className="text-body font-medium text-ink">Your data</h2>
-      <p className="text-caption text-ink-3">
-        Download every document, extraction, customer/unit record and audit-log entry this shop has on file,
-        as one JSON file.
-      </p>
-      <button type="button" className="dw-btn-secondary shrink-0" disabled={exporting} onClick={() => void runExport()}>
-        {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Download data export (JSON)
+    <div className="dw-card p-4 space-y-3">
+      <button type="button" className="w-full flex items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
+        <span className="text-body font-medium text-ink">Settings</span>
+        {open ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
       </button>
-      {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
+
+      {open && (
+        <div className="space-y-4 pt-1">
+          <div className="space-y-2">
+            <h3 className="text-body font-medium text-ink flex items-center gap-2">
+              <Bell className="w-4 h-4" aria-hidden="true" /> Notifications
+            </h3>
+            <label className="flex items-center justify-between gap-3 py-1">
+              <span className="text-body text-ink-2">Email me warranty digests</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={emailDigest ?? false}
+                disabled={emailDigest === null || savingDigest}
+                onClick={toggleDigest}
+                className={[
+                  'relative inline-flex items-center h-6 w-11 rounded-full transition-colors duration-quick shrink-0',
+                  emailDigest ? 'bg-forest-700' : 'bg-line',
+                  emailDigest === null ? 'opacity-50' : '',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'inline-block h-4 w-4 transform rounded-full bg-stone-0 transition-transform duration-quick',
+                    emailDigest ? 'translate-x-6' : 'translate-x-1',
+                  ].join(' ')}
+                />
+              </button>
+            </label>
+            <p className="text-caption text-ink-3">
+              One email a day, only when a warranty needs attention — expired, expiring soon, or a registration
+              window closing.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-line">
+            <h3 className="text-body font-medium text-ink">Your data</h3>
+            <p className="text-caption text-ink-3">
+              Download every document, extraction, customer/unit record and audit-log entry this shop has on file,
+              as one JSON file.
+            </p>
+            <button type="button" className="dw-btn-secondary shrink-0" disabled={exporting} onClick={() => void runExport()}>
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Download data export (JSON)
+            </button>
+            {exportError && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportError}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -191,13 +197,21 @@ export function TeamScreen() {
 
         <PhoneAppCard />
 
-        {admin && <NotificationsCard />}
         {admin && <FollowupsCard />}
-        {admin && <DonovanMissesCard />}
-        {admin && <DonovanLearningCard />}
-        {admin && <SemanticSearchCard />}
-        {admin && <DuplicateCustomersCard />}
-        {admin && <DataExportCard />}
+
+        {/* Round 17 (U2 top fix #3): Team used to carry 7 stacked cards —
+            Donovan misses/learning and Search by meaning moved to their own
+            "Donovan" destination (account row, admin-only — see
+            AppShell.tsx/DonovanScreen.tsx: answer quality isn't a people/seats
+            concern), and Possible duplicate customers folded into the
+            Customers tab (CustomersScreen.tsx: it already had a related,
+            tighter duplicate check right there). Team now keeps only what is
+            actually about the team: the phone-app install card, follow-ups,
+            and — below — invites/seats/roles. Settings (notifications +
+            data export) stays here too, in its own separated, collapsed
+            section, until it has a Billing/Settings home this pass doesn't
+            own (see AccountSettingsCard's file comment). */}
+        {admin && <AccountSettingsCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

@@ -367,7 +367,18 @@ export interface MissReportGroup {
 export interface MissReplay {
   outcome: 'answered_now' | 'still_failing';
   reason: string | null;
-  answer: { text?: string; facts?: { label: string; value: string }[] } | null;
+  answer: {
+    text?: string;
+    facts?: {
+      label: string;
+      value: string;
+      /** Round 17 (G3): when this fact came from one cited extraction row (a fastPath-style field
+       *  lookup), the id of the record it's about and the extraction it was read from — present only
+       *  for that shape, used by "Keep as test" to build a re-checkable oracle, never shown as-is. */
+      entityId?: string;
+      sources?: { documentId: string; location?: { field?: string } }[];
+    }[];
+  } | null;
   note: string | null;
   replayedAt: string;
 }
@@ -530,6 +541,29 @@ export interface LearningExportItem {
   decidedAt: string | null;
   decidedBy: string | null;
   createdAt: string;
+}
+
+/* -------------------------------------------------------- misses -> permanent exam (Round 17, G3)
+ * api/_lib/learning/examPromote.js's exam-candidate shape — the same {id, text, category, shape,
+ * cmp, oracle} test-docs/scorecard/exam.json / generalization/*.json questions carry. */
+
+export interface ExamCandidateQuestion {
+  id: string;
+  text: string;
+  category: string;
+  shape: string;
+  cmp: 'value' | 'number' | 'yesno';
+  oracle: { sql: string; params: unknown[]; requires?: { sql: string; params: unknown[] } };
+  citationRequired?: boolean;
+}
+
+/** One answered-now miss the Donovan learning card can offer "Keep as test" for (learningList's own
+ *  `answeredNowMisses`). `normalized` is the exact key to pass back to `examPromote`. */
+export interface ExamCandidateMiss {
+  question: string;
+  normalized: string;
+  answer: MissReplay['answer'];
+  alreadyPromoted: boolean;
 }
 
 /* -------------------------------------------------------- autonomous per-tenant learning loop
@@ -753,7 +787,13 @@ export const reviewClient = {
    *  currently-active learned items, in one round trip. `status` omitted
    *  returns every proposal status; the server caps `limit` at 1000. */
   learningList(opts?: { status?: LearningProposalStatus; limit?: number }) {
-    return postJson<{ items: LearningProposal[]; activeLearned: LearningLearnedItem[]; summary?: LearningSummary }>({
+    return postJson<{
+      items: LearningProposal[]; activeLearned: LearningLearnedItem[]; summary?: LearningSummary;
+      /** Round 17 (G3): answered-now misses eligible for "Keep as test", and this tenant's own
+       *  already-promoted count — the whole "misses -> permanent exam" UI needs from this one call. */
+      answeredNowMisses?: ExamCandidateMiss[];
+      promotedCount?: number;
+    }>({
       action: 'learningList',
       status: opts?.status,
       limit: opts?.limit,
@@ -839,6 +879,30 @@ export const reviewClient = {
    *  DONOVAN_SELF_LEARNING_2026-09-22.md's "weekly repo-sync step"). */
   learningExport() {
     return postJson<{ items: LearningExportItem[] }>({ action: 'learningExport' });
+  },
+
+  /** "Keep as test": turns one answered-now miss into a permanent exam question for this tenant.
+   *  Pass back the exact `question`/`normalized` a `learningList` `answeredNowMisses` row gave —
+   *  the server looks up that miss's own recorded answer and builds a re-checkable oracle from its
+   *  citation. `operatorLiteral` (+ optional `operatorCmp`, default 'value') is the documented
+   *  exception for an answer that isn't a single cited field lookup: a human-typed expected value,
+   *  never Donovan's own guess. */
+  examPromote(opts: { question: string; normalized: string; operatorLiteral?: string; operatorCmp?: 'value' | 'number' | 'yesno' }) {
+    return postJson<{ ok: boolean; id: string; question: ExamCandidateQuestion; oracleKind: 'structural-extraction' | 'operator-literal' }>({
+      action: 'examPromote', ...opts,
+    });
+  },
+
+  /** Operator: this tenant's own promoted tests (already-kept exam questions), newest first. */
+  examList(opts?: { limit?: number }) {
+    return postJson<{ items: ExamCandidateQuestion[] }>({ action: 'examList', limit: opts?.limit });
+  },
+
+  /** Operator: this tenant's promoted set as a ready-to-save JSON file — same shape
+   *  test-docs/scorecard/generalization/*.json files use, plus `tenantKey` (see
+   *  test-docs/scorecard/promoted/README.md for the weekly repo-sync step). */
+  examExport() {
+    return postJson<{ version: string; tenantKey: string; category: string; questions: ExamCandidateQuestion[] }>({ action: 'examExport' });
   },
 };
 

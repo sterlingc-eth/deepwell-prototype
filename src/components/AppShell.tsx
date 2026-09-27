@@ -1,5 +1,5 @@
-import { useState, type ComponentType, type ReactNode } from 'react';
-import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sun, Moon, LogOut, Globe, Users, Smartphone, X } from 'lucide-react';
+import { lazy, Suspense, useState, type ComponentType, type ReactNode } from 'react';
+import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sparkles, Sun, Moon, LogOut, Globe, Users, Smartphone, X } from 'lucide-react';
 import { AskMark } from './AskMark';
 import { OrganizationSwitcher, useAuth, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
@@ -7,6 +7,16 @@ import { useAppStore, selectIngestProgress, type Screen } from '../store/appStor
 import { billingBannerFor } from '../services/billingClient';
 import { isAdminRole } from '../services/teamClient';
 import { NotificationsPanel } from './NotificationsPanel';
+import { useGraph } from '../core/entityGraph';
+import { needsPersonCount } from '../screens/ReviewScreen';
+import { CommandPalette } from './command/CommandPalette';
+
+// Lazy — same reasoning as App.tsx's WarrantyExportScreen/OutreachScreen:
+// this is an admin-only destination most sessions never open, and it pulls
+// in DonovanLearningCard (the heaviest of the three cards it hosts), so it
+// must not sit in AppShell's own bundle — AppShell wraps every screen,
+// including AskScreen, the one screen that stays eager for startup speed.
+const DonovanScreen = lazy(() => import('../screens/DonovanScreen').then((m) => ({ default: m.DonovanScreen })));
 
 interface NavItem {
   screen: Screen;
@@ -17,7 +27,9 @@ interface NavItem {
 }
 
 // Exactly four primary destinations — Ask, Dashboard, Inbox, Records. Browse
-// merged into Records (as its Documents/Search tabs); the old standalone
+// merged into Records (as its Documents/Customers/Grid/Graph tabs — round 17
+// folded the old standalone Search tab into ⌘K and the Documents/Customers
+// tabs' own search boxes instead, see BrowseScreen.tsx); the old standalone
 // Records screen's health metrics moved into Dashboard's "Data health"
 // strip; 'review' and 'records' are retired ids kept as aliases (see
 // store/appStore.ts) so they still light up the right item here.
@@ -45,6 +57,15 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const { signOut } = useClerk();
   const { orgRole } = useAuth();
   const isAdmin = isAdminRole(orgRole ?? null);
+  const [donovanOpen, setDonovanOpen] = useState(false);
+
+  // Inbox nav badge (round 17, U2 top fix #8): one number, always visible,
+  // for "is there open intake work" — no click required to find out. Same
+  // `isAttention` rule ReviewScreen's own "Needs a person" chip and
+  // DataHealthStrip's tile already use (needsPersonCount), so this can never
+  // disagree with what Inbox itself shows once you're in it.
+  const docs = useGraph((s) => s.docs);
+  const inboxBadge = needsPersonCount(docs);
 
   // HARD GATE (owner decision, 2026-09-21): a tenant App.tsx has routed into
   // the paywall (billingStatus 'none' or 'canceled') gets a stripped-down
@@ -113,6 +134,18 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
                     <Icon className="w-[18px] h-[18px]" active={active} />
                     <span className="hidden sm:inline">{label}</span>
                     <span className="sr-only sm:hidden">{label}</span>
+                    {screen === 'ingest' && inboxBadge > 0 && (
+                      <span
+                        className={[
+                          'inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-caption font-mono leading-none',
+                          active ? 'bg-brass-300 text-forest-950' : 'bg-forest-800 text-forest-100',
+                        ].join(' ')}
+                        aria-hidden="true"
+                      >
+                        {inboxBadge > 99 ? '99+' : inboxBadge}
+                      </span>
+                    )}
+                    {screen === 'ingest' && inboxBadge > 0 && <span className="sr-only">, {inboxBadge} need your attention</span>}
                   </button>
                 );
               })}
@@ -159,6 +192,23 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             >
               <Users className="w-5 h-5" aria-hidden="true" />
               <span className="hidden md:inline text-body">Team</span>
+            </button>
+          )}
+
+          {/* Donovan (answer quality: misses, learning, search-by-meaning) —
+              admin/operator-only, same gate as Team. Round 17 split: used to
+              be 3 of Team's 7 stacked cards; this is their new, obvious home,
+              one click from the same account row Team and Billing live in
+              (not buried inside Team's own scroll). Opens as an overlay —
+              see DonovanScreen.tsx's file comment for why. */}
+          {isAdmin && !billingGateActive && (
+            <button
+              type="button"
+              onClick={() => setDonovanOpen(true)}
+              className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
+            >
+              <Sparkles className="w-5 h-5" aria-hidden="true" />
+              <span className="hidden md:inline text-body">Donovan</span>
             </button>
           )}
 
@@ -260,6 +310,14 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           </span>
         </div>
       </footer>
+
+      {!billingGateActive && <CommandPalette isAdmin={isAdmin} onOpenDonovan={() => setDonovanOpen(true)} />}
+
+      {donovanOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-40 bg-bg" aria-busy="true" />}>
+          <DonovanScreen onClose={() => setDonovanOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

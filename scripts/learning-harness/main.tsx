@@ -53,11 +53,26 @@ const NON_GAP_PROPOSALS: LearningProposal[] = [
   },
 ];
 
+// Round 17 (G3): "misses -> permanent exam" — the answered-now misses the "Keep as test" section
+// lists, and how many this fixture shop has already promoted (harness for
+// scripts/verify-exam-promote-ui.mjs, same technique as the rest of this file).
+const ANSWERED_NOW_MISSES = [
+  { question: 'whats the model on the unit at 100 e main st', normalized: 'model at 100 e main st', answer: { text: "It's a RAP12345.", facts: [{ label: 'Model', value: 'RAP12345' }] }, alreadyPromoted: false },
+  { question: 'how many customers have an email on file', normalized: 'how many customers have an email on file', answer: { text: 'You have 7 customers with an email on file.', facts: [{ label: 'Customers with email', value: '7' }] }, alreadyPromoted: true },
+];
+
 reviewClient.scorecardStatus = () => Promise.resolve(SCORECARD_PAUSED);
 reviewClient.learningList = () => Promise.resolve({
   items: [...NON_GAP_PROPOSALS, ...GAP_PROPOSALS],
   activeLearned: [{ id: 'l-1', kind: 'abbreviation', key: 'PM', value: { from: 'PM', to: 'preventive maintenance' }, created_at: new Date().toISOString() }],
   summary: { recipesActive: 1, answeredNow: 2, stillFailing: 1, notReplayed: 0 },
+  answeredNowMisses: ANSWERED_NOW_MISSES,
+  promotedCount: 3,
+});
+reviewClient.examPromote = () => Promise.resolve({
+  ok: true, id: 'promoted-fixture-shop-abc123',
+  question: { id: 'promoted-fixture-shop-abc123', text: 'whats the model on the unit at 100 e main st', category: 'field-lookup', shape: 'address-lookup', cmp: 'value', oracle: { sql: 'SELECT value AS v FROM extractions WHERE document_id = $1::uuid AND field_key = $2 LIMIT 1', params: ['doc-1', 'model'] } },
+  oracleKind: 'structural-extraction',
 });
 reviewClient.learningAutopilotStatus = () => Promise.resolve<AutopilotStatus>({
   tenantsEligible: 12, perTenant: [], platformSpentUsd: 0.41, nextTenant: null, gapReportWeekStart: null,

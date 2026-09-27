@@ -171,6 +171,37 @@ export async function fetchDocumentIntakeSummaries(documentIds: string[]): Promi
   return documents;
 }
 
+/**
+ * Round 17 (UX-M, mobile audit fix #2): the queue endpoint has no
+ * documentId filter (api/_lib/routes/intake-status.js only takes
+ * `queue=1`/`limit`/`cursor` or `documentIds=`, and api/** isn't ours to
+ * extend this round) — each document ever surfaces at most ONE open
+ * question at a time in this listing (see IntakeQueueItem#moreQuestions),
+ * so this pages through it looking for this one document's card. Bounded to
+ * a few pages: a phone opening a single DocSheet has no reason to walk the
+ * whole shop's exception queue, and the common case (the document a tech
+ * just scanned) sits at or near the front (newest-first).
+ *
+ * Hook for whoever next touches api/_lib/routes/intake-status.js +
+ * api/_lib/intake/queue.js#listIntakeQueue: add an optional `documentId`
+ * filter (one more WHERE clause alongside the existing tenant scoping) so a
+ * single document's open question is a one-row round trip instead of this
+ * client-side page-and-filter, and this function can drop the paging loop.
+ */
+export async function fetchIntakeQueueItemsForDocument(documentId: string, opts: { maxPages?: number; pageSize?: number } = {}): Promise<IntakeQueueItem[]> {
+  const maxPages = opts.maxPages ?? 5;
+  const pageSize = opts.pageSize ?? 50;
+  let cursor: string | null = null;
+  for (let i = 0; i < maxPages; i++) {
+    const { queue } = await fetchIntakeQueue({ limit: pageSize, cursor });
+    const found = queue.items.filter((it) => it.documentId === documentId);
+    if (found.length) return found;
+    cursor = queue.nextCursor;
+    if (!cursor) break;
+  }
+  return [];
+}
+
 export interface ResolveIntakeArgs {
   documentId: string;
   fieldKey: string;

@@ -3,14 +3,166 @@ import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react'
 import { useGraph } from '../core/entityGraph'
 import { getOriginalUrl, type OriginalUrl } from '../services/documentClient'
 import { fieldLabel, requirementLabel } from '../domains/hvac/documentTypes'
+import {
+  dismissIntakeQuestion,
+  fetchIntakeQueueItemsForDocument,
+  resolveIntakeQuestion,
+  snoozeIntakeQuestion,
+  type IntakeCandidate,
+  type IntakeQueueItem,
+} from '../services/intakeClient'
+import { IntakeQueueCard } from '../components/intake/IntakeQueueCard'
 import { customerAddress, customerName, customerOf, fieldValue, formatDate, typeLabel } from './docUtils'
 import { Sheet } from './Sheet'
 import { documentName, hasFriendlyName, originalFilename } from '../core/documentName'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const CURRENT_USER = 'You' // matches IntakeQueuePanel.tsx's own CURRENT_USER constant
+
+function candidateArgs(c: IntakeCandidate): { value?: string; entityId?: string } {
+  return c.kind === 'entity'
+    ? { entityId: c.entityId ?? undefined, value: c.value ?? undefined }
+    : { value: c.value ?? undefined }
+}
+
+/**
+ * Round 17 audit fix #2: the exception queue card, reused in place so a tech
+ * never has to leave the phone (or find a desktop) to answer the one
+ * question autofill couldn't resolve on its own. Same client (intakeClient.ts)
+ * and the same card (IntakeQueueCard) InboxScreen.tsx uses — this component
+ * only owns the single-document fetch + optimistic remove-on-resolve loop
+ * IntakeQueuePanel.tsx already does for its whole list.
+ */
+function DocIntakeCard({ documentId }: { documentId: string }) {
+  const [item, setItem] = useState<IntakeQueueItem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [fieldBusyKey, setFieldBusyKey] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [justResolved, setJustResolved] = useState(false)
+
+  const load = async () => {
+    setErr(null)
+    try {
+      const [found] = await fetchIntakeQueueItemsForDocument(documentId)
+      setItem(found ?? null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not load this question.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentId])
+
+  const runResolve = async (args: { value?: string; entityId?: string }) => {
+    if (!item || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await resolveIntakeQuestion({ documentId: item.documentId, fieldKey: item.fieldKey, by: CURRENT_USER, ...args })
+      setJustResolved(true)
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "That answer didn't save.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runDismiss = async () => {
+    if (!item || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await dismissIntakeQuestion({ documentId: item.documentId, fieldKey: item.fieldKey, by: CURRENT_USER })
+      setJustResolved(true)
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not dismiss that question.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runSnooze = async () => {
+    if (!item || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await snoozeIntakeQuestion({ documentId: item.documentId, fieldKey: item.fieldKey, by: CURRENT_USER })
+      setJustResolved(true)
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not snooze that question.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runField = async (fieldKey: string, value: string) => {
+    if (!item) return
+    setFieldBusyKey(fieldKey)
+    setErr(null)
+    try {
+      await resolveIntakeQuestion({ documentId: item.documentId, fieldKey, value, by: CURRENT_USER })
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "That correction didn't save.")
+    } finally {
+      setFieldBusyKey(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <p className="m-0 flex items-center gap-2 text-body text-ink-3">
+        <Loader2 className="w-4 h-4 animate-spin" /> Checking for open questions…
+      </p>
+    )
+  }
+  if (!item) return justResolved ? <p className="m-0 text-body text-ok-ink">All set — nothing else needs an answer on this document.</p> : null
+
+  return (
+    <div>
+      <h3 className="m-0 mb-1 text-caption text-ink-3 font-semibold uppercase tracking-wide">Needs your input</h3>
+      {err && <p className="m-0 mb-2 text-caption text-bad">{err}</p>}
+      <ul className="list-none p-0 m-0">
+        <IntakeQueueCard
+          item={item}
+          active
+          shortcutIndex={99}
+          busy={busy}
+          fieldBusyKey={fieldBusyKey}
+          onActivate={() => {}}
+          onPickCandidate={(c) => void runResolve(candidateArgs(c))}
+          onTypeValue={(value) => void runResolve({ value })}
+          onDismiss={() => void runDismiss()}
+          onSnooze={() => void runSnooze()}
+          onConfirmField={(fieldKey, value) => void runField(fieldKey, value)}
+          onFixField={(fieldKey, value) => void runField(fieldKey, value)}
+          onPreview={() => {}}
+        />
+      </ul>
+    </div>
+  )
+}
 
 /** A document's key facts plus its original, one tap away. (Keyed by id in MobileApp, so state starts fresh.) */
-export function DocSheet({ documentId, graphLoading, onClose }: { documentId: string; graphLoading: boolean; onClose: () => void }) {
+export function DocSheet({
+  documentId,
+  graphLoading,
+  onOpenCustomer,
+  onClose,
+}: {
+  documentId: string
+  graphLoading: boolean
+  onOpenCustomer: (ref: string) => void
+  onClose: () => void
+}) {
   const doc = useGraph((s) => s.docs[documentId])
   const entities = useGraph((s) => s.entities)
   const [original, setOriginal] = useState<OriginalUrl | null>(null)
@@ -40,11 +192,23 @@ export function DocSheet({ documentId, graphLoading, onClose }: { documentId: st
       {doc && hasFriendlyName(doc) && (
         <p className="m-0 -mt-2 text-caption text-ink-3 truncate">{originalFilename(doc)}</p>
       )}
+      {UUID_RE.test(documentId) && <DocIntakeCard documentId={documentId} />}
       {(cust || missing.length > 0) && (
         <div className="rounded-xl bg-surface-2 p-3 grid gap-1">
           {cust && (
             <>
-              <p className="m-0 text-body-lg font-semibold text-ink">{customerName(cust) || 'Unnamed customer'}</p>
+              {/* Round 17 audit fix #3: was a plain <p> — a customer's contact
+                  card (with the Call button) was reachable only from an
+                  Ask-answer's entity chip, and most phrasings never produced
+                  one. Now: find a customer, call them, in <=3 taps from here. */}
+              <button
+                type="button"
+                data-testid="doc-customer-name"
+                onClick={() => onOpenCustomer(cust.id)}
+                className="min-h-11 -my-2 text-left text-body-lg font-semibold text-ink underline decoration-line-2 underline-offset-2 w-fit"
+              >
+                {customerName(cust) || 'Unnamed customer'}
+              </button>
               {customerAddress(cust) && <p className="m-0 text-body text-ink-2">{customerAddress(cust)}</p>}
             </>
           )}

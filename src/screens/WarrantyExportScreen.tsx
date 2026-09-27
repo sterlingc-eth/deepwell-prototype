@@ -28,6 +28,13 @@ export function WarrantyExportScreen() {
 
   const allUnits = entitiesOfType(graph, 'equipment');
   const units = selectedIds.map((id) => graph.entities[id]).filter((e): e is Entity => !!e && e.type === 'equipment');
+  const unselectedUnits = allUnits.filter((u) => !selectedIds.includes(u.id));
+  // R17 UX audit fix #2: the only way to add units used to be one
+  // dropdown-select + one Add click PER unit (12 units = 24 actions). This
+  // adds every remaining unit in one action; `toggle` is the store's
+  // existing selectedForExport toggle, so this stays a one-shot batch of
+  // synchronous store updates rather than a new store method.
+  const selectAll = () => { for (const u of unselectedUnits) toggle(u.id); };
   const property = (e: Entity) => graph.entities[str(e, 'propertyId')];
   const now = new Date();
 
@@ -105,6 +112,11 @@ export function WarrantyExportScreen() {
               <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" disabled={!picker} onClick={() => { toggle(picker); setPicker(''); }}>
                 <Plus className="w-4 h-4" aria-hidden="true" /> Add
               </button>
+              {unselectedUnits.length > 0 && (
+                <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={selectAll}>
+                  <Plus className="w-4 h-4" aria-hidden="true" /> Select all {unselectedUnits.length}
+                </button>
+              )}
               {units.length > 0 && <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5" onClick={clear}>Clear</button>}
             </div>
           </div>

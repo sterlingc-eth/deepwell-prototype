@@ -28,6 +28,10 @@ import { alertTier, normalizeBrand, isPlausibleToday, isValidYmd, daysBetween } 
 import { DOCUMENT_TYPE_IDS, docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel } from './documentTypes.js';
 // Team A (2026-09-24): "added/uploaded" -> created_at vs "serviced/visited" -> service_date, decided from the wording.
 import { dateBasisPhrase } from './scope.js';
+// R17 (G4, consolidation): canonical street-suffix list — see geo/streetSuffix.js. Pure data (no
+// imports of its own), so this never risks the analytics.js -> scope.js -> fastPath.js ->
+// nlNormalize.js -> analytics.js cycle documented at fastPath.js's own fastPathWithinEditDistance1.
+import { STREET_SUFFIX_ALTERNATION } from './geo/streetSuffix.js';
 
 // Plain readFileSync + JSON.parse rather than an import attribute (`with {
 // type: 'json' }`) — same idiom claude.js already uses for .env.local, and it
@@ -36,6 +40,18 @@ import { dateBasisPhrase } from './scope.js';
 // only ever needs to be read once, synchronously, at module load.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const zipCounty = JSON.parse(readFileSync(join(__dirname, 'geo', 'zip-county.json'), 'utf8'));
+
+// R17 (G4, consolidation): this file had FIVE separate inline copies of the same regex-metachar
+// escape (a word going into a `new RegExp(...)` template must have its own regex metacharacters
+// escaped first, or a synonym/city/brand name containing one — "5,000 BTU" style content is rare
+// here but a literal "." in a name is not — would silently change what the built pattern matches).
+// contactLookup.js and cache/semanticCache.js each also had their own copy of the exact same one-
+// liner; both already import from/are safe to import from this file (no cycle — see this file's
+// own STREET_SUFFIX_ALTERNATION import comment above for the cycle this codebase does have to
+// watch for, which doesn't apply here since this helper touches no other module).
+export function escapeRegExp(s) {
+  return String(s ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /** Brand/county name tables, moved above the classifier (they used to live
  *  down in the "honest fallback" section, below preClassifyAnalytics) so the
@@ -250,7 +266,7 @@ export const ENTITY_SYNONYMS = {
 function synonymAlternation(words) {
   return [...new Set(words)]
     .sort((a, b) => b.length - a.length)
-    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .map((w) => escapeRegExp(w))
     .join('|');
 }
 
@@ -515,8 +531,14 @@ const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+(?!we\b|you\b|they\b|the company\b|
  * an address or identifier is a stronger, unambiguous signal than any
  * quantifier/aggregate-noun match could ever override.
  */
-export const STREET_ADDRESS_RE =
-  /\b\d{2,6}\s+[NSEW]?\.?\s*[A-Za-z0-9.' ]+\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|way|ct|court|cir|circle|hwy|pkwy|pl|ter)\b/i;
+// R17 (G4, consolidation): the suffix alternation (capture group below) was this file's own
+// hand-maintained list (missing the "boulevard"/"parkway"/"place" long forms); now the shared
+// canonical superset — see geo/streetSuffix.js's own header comment. Still one capture group
+// (unused — every call site only reads the whole match), same as before.
+export const STREET_ADDRESS_RE = new RegExp(
+  `\\b\\d{2,6}\\s+[NSEW]?\\.?\\s*[A-Za-z0-9.' ]+\\b(${STREET_SUFFIX_ALTERNATION})\\b`,
+  'i'
+);
 /**
  * Reviewer NO-GO (2026-09-21, round 3, item 3): round 2's WHO_HAS_RE bypass
  * ("who has Trane units") let "who has the unit at 1234 Main" through too —
@@ -1208,7 +1230,7 @@ export function detectedConditions(question) {
   // city/state/zip (item 4, 2026-09-22): the same "a known geo word is
   // present" signal GEO_WORD_RE/ZIP_VALUE_RE already use for classification,
   // reused here so missingConditions can flag a plan that dropped one.
-  if ([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].some((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q))) {
+  if ([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].some((c) => new RegExp(`\\b${escapeRegExp(c)}\\b`).test(q))) {
     found.add('city');
   }
   if (/\barizona\b|\bnevada\b|\baz\b|\bnv\b/.test(q)) found.add('state');
@@ -1378,7 +1400,7 @@ const NEGATION_IMMEDIATELY_BEFORE_RE =
   /\b(?:not|except(?:\s+for)?|excluding|other\s+than|besides|outside(?:\s+of)?|without|no|isn'?t|aren'?t|wasn'?t|weren'?t)\s+(?:(?:an?|the|in|from|on)\s+){0,2}$/i;
 
 function isNegatedWord(q, word) {
-  const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const esc = escapeRegExp(word);
   const idx = new RegExp(`\\b${esc}\\b`, 'i').exec(q)?.index;
   if (idx == null) return false;
   if (NEGATION_IMMEDIATELY_BEFORE_RE.test(q.slice(0, idx))) return true;
@@ -1438,7 +1460,7 @@ export function buildConditionOverrideFilter(condition, question, entity) {
   }
   if (condition === 'county') {
     const sorted = [...KNOWN_COUNTY_NAMES].sort((a, b) => b.length - a.length);
-    const matches = [...new Set(sorted.filter((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q)))];
+    const matches = [...new Set(sorted.filter((c) => new RegExp(`\\b${escapeRegExp(c)}\\b`).test(q)))];
     if (matches.length === 0) return null;
     if (matches.length > 1) return null; // two distinct counties named — never guess which (see brand's own doc comment)
     const word = matches[0];
@@ -1448,7 +1470,7 @@ export function buildConditionOverrideFilter(condition, question, entity) {
     const names = [...new Set([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES])].sort((a, b) => b.length - a.length);
     const matches = [];
     for (const c of names) {
-      if (!new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(q)) continue;
+      if (!new RegExp(`\\b${escapeRegExp(c)}\\b`).test(q)) continue;
       // A shorter matched name that is itself a SUBSTRING of a longer name already matched (e.g. "Casa"
       // inside "Casa Grande") is the same one mention, not a second city — only a genuinely distinct
       // name counts toward the ambiguity check below.

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Check, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowRight, Check, ChevronDown, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { FinancialsCard } from '../components/FinancialsCard';
+import { InsightsCard } from '../components/insights/InsightsCard';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
 import { docCountsByStage, entitiesOfType, useGraph } from '../core/entityGraph';
 import { dateOf, formatYmd, normalize, str } from '../core/answer';
@@ -50,9 +51,15 @@ interface AttentionResponse {
  *  it's `item.upsell.eligible` across every item, so a unit can show up here
  *  and in another card too). Always rendered, 0 included, so the owner can
  *  tell the feature is working even on a quiet day. */
-type AlertCardKey = 'expired' | 'expiring-30' | 'expiring-90' | 'expiring-365' | 'unregistered-window-closing' | 'upsell';
+type AlertCardKey = 'expired' | 'this-quarter' | 'expiring-30' | 'expiring-90' | 'expiring-365' | 'unregistered-window-closing' | 'upsell';
 const ALERT_CARDS: { key: AlertCardKey; title: string }[] = [
   { key: 'expired', title: 'Expired' },
+  // Composite: the office manager's "find everything expiring this quarter"
+  // task used to take 2 card clicks (30d + 90d, mentally unioned) since the
+  // real tiers are mutually exclusive buckets, not cumulative (R17 UX audit
+  // fix #4). This unions them in one click; the two underlying tiers stay
+  // below for anyone who wants just one window.
+  { key: 'this-quarter', title: 'This quarter (30+90d)' },
   { key: 'expiring-30', title: 'Expiring in 30 days' },
   { key: 'expiring-90', title: 'Expiring in 90 days' },
   { key: 'expiring-365', title: 'Expiring in 12 months' },
@@ -63,6 +70,7 @@ const ALERT_CARDS: { key: AlertCardKey; title: string }[] = [
 /** Names the bucket instead of a generic "Nothing in this bucket right now." */
 const ALERT_EMPTY_LABEL: Record<AlertCardKey, string> = {
   expired: 'No units expired right now.',
+  'this-quarter': 'No units expiring this quarter right now.',
   'expiring-30': 'No units expiring in 30 days right now.',
   'expiring-90': 'No units expiring in 90 days right now.',
   'expiring-365': 'No units expiring in 12 months right now.',
@@ -71,7 +79,62 @@ const ALERT_EMPTY_LABEL: Record<AlertCardKey, string> = {
 };
 
 function itemsForCard(items: AttentionItem[], key: AlertCardKey): AttentionItem[] {
-  return key === 'upsell' ? items.filter((i) => i.upsell.eligible) : items.filter((i) => i.tier === key);
+  if (key === 'upsell') return items.filter((i) => i.upsell.eligible);
+  if (key === 'this-quarter') return items.filter((i) => i.tier === 'expiring-30' || i.tier === 'expiring-90');
+  return items.filter((i) => i.tier === key);
+}
+
+const COLLAPSE_KEY_PREFIX = 'deepwell.dashboard.collapsed.';
+function safeGetCollapsed(id: string): string | null {
+  try {
+    return window.localStorage.getItem(COLLAPSE_KEY_PREFIX + id);
+  } catch {
+    return null;
+  }
+}
+function safeSetCollapsed(id: string, value: boolean) {
+  try {
+    window.localStorage.setItem(COLLAPSE_KEY_PREFIX + id, value ? '1' : '0');
+  } catch {
+    /* private window / blocked storage — the toggle still works, it just won't be remembered */
+  }
+}
+
+/**
+ * One consistent expand/collapse idiom for every optional Dashboard section
+ * (Financials, Customer outreach, Warranty expiry, Equipment at risk,
+ * Covered, No-warranty-on-file — R17 UX audit fix #10, which found 3
+ * different idioms across these). Remembered per browser via localStorage
+ * (audit fix #12) so a returning viewer's choice sticks instead of the page
+ * resetting to its ~3-viewport default on every load.
+ */
+function useCollapsed(id: string, defaultCollapsed: boolean) {
+  const [collapsed, setCollapsed] = useState(() => {
+    const stored = safeGetCollapsed(id);
+    return stored === '1' ? true : stored === '0' ? false : defaultCollapsed;
+  });
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      safeSetCollapsed(id, next);
+      return next;
+    });
+  return [collapsed, toggle] as const;
+}
+
+/** The shared header: a chevron + title button that toggles the section,
+ *  plus room for section-specific controls (filters, actions) that stay
+ *  visible even when the body is collapsed. */
+function SectionHeader({ id, title, collapsed, onToggle, right }: { id: string; title: string; collapsed: boolean; onToggle: () => void; right?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <button type="button" onClick={onToggle} aria-expanded={!collapsed} aria-controls={`${id}-body`} className="flex items-center gap-1.5 dw-label hover:text-ink">
+        {collapsed ? <ChevronRight className="w-4 h-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />}
+        <span id={`${id}-heading`}>{title}</span>
+      </button>
+      {right && <div className="flex flex-wrap gap-2 items-center">{right}</div>}
+    </div>
+  );
 }
 
 /**
@@ -87,8 +150,20 @@ export function DashboardScreen() {
   const openOutreach = useAppStore((s) => s.openOutreach);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const setInboxTab = useAppStore((s) => s.setInboxTab);
+  const selectedForExport = useAppStore((s) => s.selectedForExport);
   const toggleSelectForExport = useAppStore((s) => s.toggleSelectForExport);
   const clearExportSelection = useAppStore((s) => s.clearExportSelection);
+
+  // One shared expand/collapse idiom (see useCollapsed above): primary,
+  // daily-use sections default open, secondary ones collapse away so a
+  // returning visit isn't a ~3-viewport scroll (R17 UX audit fix #12).
+  const [financialsCollapsed, toggleFinancials] = useCollapsed('financials', true);
+  const [alertsCollapsed, toggleAlerts] = useCollapsed('alerts', false);
+  const [outreachCollapsed, toggleOutreach] = useCollapsed('outreach', true);
+  const [expiryCollapsed, toggleExpiry] = useCollapsed('expiry', false);
+  const [atRiskCollapsed, toggleAtRisk] = useCollapsed('at-risk', true);
+  const [coveredCollapsed, toggleCovered] = useCollapsed('covered', true);
+  const [noWarrantyCollapsed, toggleNoWarranty] = useCollapsed('no-warranty', false);
 
   const now = new Date();
   const counts = docCountsByStage(graph);
@@ -287,6 +362,53 @@ export function DashboardScreen() {
     setCurrentScreen('warranty-export');
   };
 
+  // Checked/unchecked in one shot without re-reading the store mid-loop —
+  // `ids` is a snapshot decided before the loop starts, so toggling each one
+  // against the (stale-by-design) `selectedForExport` closure is correct.
+  const setSelected = (ids: string[], selected: boolean) => {
+    for (const id of ids) {
+      const isSelected = selectedForExport.includes(id);
+      if (selected && !isSelected) toggleSelectForExport(id);
+      if (!selected && isSelected) toggleSelectForExport(id);
+    }
+  };
+
+  // "This quarter": the 30-day and 90-day tiers are mutually exclusive
+  // buckets (see warrantyRules.js), so their union is just "expires within
+  // the next 90 days" — computed client-side here so the Warranty expiry
+  // table's own quick filter works even when /api/warranty-attention hasn't
+  // loaded (or in demo mode, which never calls it at all).
+  const quarterEnd = new Date(now.getTime() + 90 * DAY);
+  const [tableFilter, setTableFilter] = useState<'all' | 'quarter'>('all');
+  // Units with no known expiry can't be sorted "next to expire first" at
+  // all — they already get their own actionable callout below ("No
+  // warranty on file — needs install date"), so keep them out of this table
+  // instead of listing them twice.
+  const expiryRows = byExpiry.filter((e) => !!dateOf(e, 'warrantyExpiry'));
+  const quarterRows = expiryRows.filter((e) => {
+    const d = dateOf(e, 'warrantyExpiry');
+    return !!d && d >= now && d <= quarterEnd;
+  });
+  const visibleRows = tableFilter === 'quarter' ? quarterRows : expiryRows;
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((e) => selectedForExport.includes(e.id));
+
+  // Fix #1 (R17 UX audit): "Prepare claim packet" used to hardcode the top-3
+  // soonest-to-expire units. Now it respects whatever the office manager
+  // actually has in front of them, in priority order: an explicit checkbox
+  // selection (table or an open alert card) beats a filter, and a filter
+  // beats the plain default of "everything shown".
+  const prepareClaimPacket = () => {
+    if (selectedForExport.length > 0) {
+      setCurrentScreen('warranty-export');
+      return;
+    }
+    if (openCard) {
+      exportSelected(itemsForCard(attention?.items ?? [], openCard).map((i) => i.entityId));
+      return;
+    }
+    exportSelected(visibleRows.map((e) => e.id));
+  };
+
   return (
     <AppShell>
       <div className="space-y-10">
@@ -301,7 +423,19 @@ export function DashboardScreen() {
         </header>
 
         <DataHealthStrip />
-        {!DEMO_MODE && <FinancialsCard />}
+        {/* Kept near the top, always expanded — the one section the owner
+            asked to never bury (R17 UX audit fix #12). */}
+        {!DEMO_MODE && <InsightsCard onAsk={askQuestion} onOpenInbox={() => { setCurrentScreen('ingest'); setInboxTab('needs-person'); }} />}
+        {!DEMO_MODE && (
+          <section aria-labelledby="financials-heading" className="space-y-3">
+            <SectionHeader id="financials" title="Financials" collapsed={financialsCollapsed} onToggle={toggleFinancials} />
+            {!financialsCollapsed && (
+              <div id="financials-body">
+                <FinancialsCard />
+              </div>
+            )}
+          </section>
+        )}
 
         {!DEMO_MODE && total === 0 ? (
           <section aria-labelledby="alerts-heading" className="space-y-3">
@@ -315,8 +449,10 @@ export function DashboardScreen() {
           </section>
         ) : !DEMO_MODE && (
           <section aria-labelledby="alerts-heading" className="space-y-3">
-            <h2 id="alerts-heading" className="dw-label">Alerts</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <SectionHeader id="alerts" title="Alerts" collapsed={alertsCollapsed} onToggle={toggleAlerts} />
+            {!alertsCollapsed && (
+            <div id="alerts-body" className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
               {ALERT_CARDS.map(({ key, title }) => {
                 const count = itemsForCard(attention?.items ?? [], key).length;
                 const isOpen = openCard === key;
@@ -350,9 +486,33 @@ export function DashboardScreen() {
             )}
             {openCard && (
               <ul className="space-y-2">
+                {itemsForCard(attention?.items ?? [], openCard).length > 0 && (
+                  <li className="flex items-center justify-between gap-2 px-1">
+                    <span className="text-caption text-ink-3">
+                      {selectedForExport.length > 0 ? `${selectedForExport.length} selected for export` : `${itemsForCard(attention?.items ?? [], openCard).length} unit(s)`}
+                    </span>
+                    <button
+                      type="button"
+                      className="dw-btn-tertiary !min-h-[32px] !py-1"
+                      onClick={() => setSelected(itemsForCard(attention?.items ?? [], openCard).map((i) => i.entityId), true)}
+                    >
+                      Select all shown
+                    </button>
+                  </li>
+                )}
                 {itemsForCard(attention?.items ?? [], openCard).map((item) => (
                   <li key={item.entityId} className="dw-card p-3 flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex items-start gap-2">
+                      <label className="inline-flex items-center justify-center w-8 h-8 -m-1 mt-0.5 cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedForExport.includes(item.entityId)}
+                          onChange={() => toggleSelectForExport(item.entityId)}
+                          aria-label={`Select ${item.serialNumber ?? 'unit'} for export`}
+                          className="w-4 h-4 accent-forest-700"
+                        />
+                      </label>
+                      <div className="min-w-0">
                       <p className="font-mono text-data text-ink">{item.serialNumber ?? '—'}</p>
                       <p className="text-ink">
                         {[item.manufacturer, item.model].filter(Boolean).join(' ') || 'Unknown unit'}
@@ -370,6 +530,7 @@ export function DashboardScreen() {
                               ? `Expires ${item.expires}`
                               : 'No expiry on file'}
                         </span>
+                      </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
@@ -411,52 +572,76 @@ export function DashboardScreen() {
               </ul>
             )}
 
-            {/* Always visible (not gated on there being anything to act on) so
+            {/* Always here (not gated on there being anything to act on) so
                 the owner can see the feature is actually looking at their
                 units, not just silent. Derived client-side — see the
-                comment on coveredUnits/noWarrantyUnits above. */}
-            <details className="dw-card p-3">
-              <summary className="cursor-pointer text-body text-ink-2">
-                Covered · {coveredUnits.length} unit{coveredUnits.length === 1 ? '' : 's'}
-              </summary>
-              <ul className="mt-2 space-y-1.5">
-                {coveredUnits.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-3 text-body text-ink-3">
-                    <button type="button" onClick={() => openEntity(e.id)} className="font-mono text-data underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 truncate">
-                      {str(e, 'serial')}
-                    </button>
-                    <span>{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ')} · expires {formatYmd(dateOf(e, 'warrantyExpiry'))}</span>
-                  </li>
-                ))}
-                {coveredUnits.length === 0 && <li className="text-body text-ink-3">None yet.</li>}
-              </ul>
-            </details>
+                comment on coveredUnits/noWarrantyUnits above. Same
+                expand/collapse idiom as every other section on this screen
+                (R17 UX audit fix #10 — this used to be a native <details>
+                while "No warranty on file" was a third, always-open idiom). */}
+            <div className="dw-card p-3">
+              <SectionHeader
+                id="covered"
+                title={`Covered · ${coveredUnits.length} unit${coveredUnits.length === 1 ? '' : 's'}`}
+                collapsed={coveredCollapsed}
+                onToggle={toggleCovered}
+              />
+              {!coveredCollapsed && (
+                <ul id="covered-body" className="mt-2 space-y-1.5">
+                  {coveredUnits.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-3 text-body text-ink-3">
+                      <button type="button" onClick={() => openEntity(e.id)} className="font-mono text-data underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 truncate">
+                        {str(e, 'serial')}
+                      </button>
+                      <span>{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ')} · expires {formatYmd(dateOf(e, 'warrantyExpiry'))}</span>
+                    </li>
+                  ))}
+                  {coveredUnits.length === 0 && <li className="text-body text-ink-3">None yet.</li>}
+                </ul>
+              )}
+            </div>
 
             {noWarrantyUnits.length > 0 && (
               <div className="dw-card p-3 space-y-2">
-                <p className="text-body text-ink-2 font-medium">No warranty on file — needs install date · {noWarrantyUnits.length}</p>
-                <ul className="space-y-1.5">
-                  {noWarrantyUnits.map((e) => (
-                    <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-body text-ink-3">
-                      <span className="font-mono text-data">{str(e, 'serial')}</span>
-                      <span className="min-w-0 flex-1">{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ') || 'Unknown unit'}</span>
-                      <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-0.5" onClick={() => openEntity(e.id)}>Add install date</button>
-                    </li>
-                  ))}
-                </ul>
+                <SectionHeader
+                  id="no-warranty"
+                  title={`No warranty on file — needs install date · ${noWarrantyUnits.length}`}
+                  collapsed={noWarrantyCollapsed}
+                  onToggle={toggleNoWarranty}
+                />
+                {!noWarrantyCollapsed && (
+                  <ul id="no-warranty-body" className="space-y-1.5">
+                    {noWarrantyUnits.map((e) => (
+                      <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-body text-ink-3">
+                        <span className="font-mono text-data">{str(e, 'serial')}</span>
+                        <span className="min-w-0 flex-1">{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ') || 'Unknown unit'}</span>
+                        <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-0.5" onClick={() => openEntity(e.id)}>Add install date</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+            )}
+            </div>
             )}
           </section>
         )}
 
         {!DEMO_MODE && (
           <section aria-labelledby="outreach-heading" className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 id="outreach-heading" className="dw-label">Customer outreach</h2>
-              <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" onClick={() => openOutreach()}>
-                Open Outreach <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-            </div>
+            <SectionHeader
+              id="outreach"
+              title="Customer outreach"
+              collapsed={outreachCollapsed}
+              onToggle={toggleOutreach}
+              right={
+                <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" onClick={() => openOutreach()}>
+                  Open Outreach <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              }
+            />
+            {!outreachCollapsed && (
+            <div id="outreach-body">
             {outreachSettings?.migrationPending ? (
               <div className="dw-card p-4 text-body text-ink-2">Needs a database update before this is available.</div>
             ) : !outreachSettings?.enabled ? (
@@ -484,6 +669,8 @@ export function DashboardScreen() {
                 </div>
               </div>
             )}
+            </div>
+            )}
           </section>
         )}
 
@@ -504,17 +691,61 @@ export function DashboardScreen() {
         </section>
 
         <section aria-labelledby="expiry-heading" className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="expiry-heading" className="dw-label">Warranty expiry · next to expire first</h2>
-            <div className="flex gap-2">
-              <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" onClick={() => askQuestion('Which warranties expire in the next 12 months?')}>Ask: next 12 months</button>
-              <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" onClick={() => exportSelected(upcoming.slice(0, 3).map((e) => e.id))}>Prepare claim packet</button>
+          <SectionHeader
+            id="expiry"
+            title="Warranty expiry · next to expire first"
+            collapsed={expiryCollapsed}
+            onToggle={toggleExpiry}
+            right={
+              <>
+                <div className="inline-flex rounded-md border border-line-2 overflow-hidden" role="group" aria-label="Filter units shown">
+                  <button
+                    type="button"
+                    aria-pressed={tableFilter === 'all'}
+                    onClick={() => setTableFilter('all')}
+                    className={`!min-h-[36px] px-3 text-body ${tableFilter === 'all' ? 'bg-forest-700 text-stone-0' : 'bg-surface text-ink-2 hover:bg-surface-2'}`}
+                  >
+                    All · {expiryRows.length}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={tableFilter === 'quarter'}
+                    onClick={() => setTableFilter('quarter')}
+                    className={`!min-h-[36px] px-3 text-body border-l border-line-2 ${tableFilter === 'quarter' ? 'bg-forest-700 text-stone-0' : 'bg-surface text-ink-2 hover:bg-surface-2'}`}
+                  >
+                    This quarter · {quarterRows.length}
+                  </button>
+                </div>
+                <button type="button" className="dw-btn-tertiary !min-h-[36px] !py-1" onClick={() => askQuestion('Which warranties expire in the next 12 months?')}>Ask: next 12 months</button>
+                <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" onClick={prepareClaimPacket}>
+                  Prepare claim packet{selectedForExport.length > 0 ? ` (${selectedForExport.length})` : ''}
+                </button>
+              </>
+            }
+          />
+          {!expiryCollapsed && (
+          <div id="expiry-body" className="space-y-2">
+          {selectedForExport.length > 0 && (
+            <div className="dw-card p-2 flex items-center justify-between gap-3 text-body text-ink-2">
+              <span>{selectedForExport.length} selected for export</span>
+              <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" onClick={clearExportSelection}>Clear selection</button>
             </div>
-          </div>
+          )}
           <div className="relative overflow-x-auto border border-line rounded-lg bg-surface">
             <table className="w-full text-body-lg">
               <thead className="text-left text-label text-ink-3 uppercase bg-surface-2">
                 <tr>
+                  <th scope="col" className="px-4 py-2 w-10">
+                    <label className="inline-flex items-center justify-center w-8 h-8 -m-2 cursor-pointer" title="Select all shown">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={() => setSelected(visibleRows.map((e) => e.id), !allVisibleSelected)}
+                        aria-label="Select all shown units for export"
+                        className="w-4 h-4 accent-forest-700"
+                      />
+                    </label>
+                  </th>
                   <th scope="col" className="px-4 py-2 font-medium">Unit</th>
                   <th scope="col" className="px-4 py-2 font-medium">Location</th>
                   <th scope="col" className="px-4 py-2 font-medium">Expires</th>
@@ -523,11 +754,22 @@ export function DashboardScreen() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {byExpiry.map((e) => {
+                {visibleRows.map((e) => {
                   const p = property(e);
                   const q = `Is ${str(e, 'serial')} under warranty?`;
                   return (
                     <tr key={e.id} className="hover:bg-surface-2 cursor-pointer" onClick={() => askQuestion(q)}>
+                      <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
+                        <label className="inline-flex items-center justify-center w-8 h-8 -m-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedForExport.includes(e.id)}
+                            onChange={() => toggleSelectForExport(e.id)}
+                            aria-label={`Select ${str(e, 'serial')} for export`}
+                            className="w-4 h-4 accent-forest-700"
+                          />
+                        </label>
+                      </td>
                       <td className="px-4 py-3">
                         <button type="button" onClick={(ev) => { ev.stopPropagation(); openEntity(e.id); }} className="font-mono text-data text-ink underline decoration-line-2 underline-offset-4">{str(e, 'serial')}</button>
                         <span className="block text-body text-ink-3">{str(e, 'manufacturer')} {str(e, 'equipmentType')} · {str(e, 'model')}</span>
@@ -547,14 +789,20 @@ export function DashboardScreen() {
                     </tr>
                   );
                 })}
+                {visibleRows.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-3">No units expiring this quarter.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
+          </div>
+          )}
         </section>
 
         <section aria-labelledby="risk-heading" className="space-y-3">
-          <h2 id="risk-heading" className="dw-label">Equipment at risk · {atRisk.length}</h2>
-          <ul className="grid md:grid-cols-2 gap-3">
+          <SectionHeader id="at-risk" title={`Equipment at risk · ${atRisk.length}`} collapsed={atRiskCollapsed} onToggle={toggleAtRisk} />
+          {!atRiskCollapsed && (
+          <ul id="at-risk-body" className="grid md:grid-cols-2 gap-3">
             {atRisk.map(({ e, reasons, last }) => {
               const p = property(e);
               const q = p ? `${str(p, 'address')}` : str(e, 'serial');
@@ -587,6 +835,7 @@ export function DashboardScreen() {
               );
             })}
           </ul>
+          )}
         </section>
       </div>
     </AppShell>
