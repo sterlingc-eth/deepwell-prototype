@@ -212,6 +212,24 @@ const PAID_STATUS_RE = /\binvoices?\b[^?]*\b(paid|partial(?:ly\s+paid)?)\b|\b(pa
 const THRESHOLD_RE = /\b(over|above|more than|greater than|under|below|less than)\s*\$?\s?([\d,]+(?:\.\d+)?)\b(?!\s*days?\b)/i;
 const SUPERLATIVE_WORD_RE = /\b(biggest|largest|smallest|highest|lowest)\b/i;
 const OVERDUE_DAYS_RE = /\b(?:more than|over)\s+(\d{1,4})\s+days?\b/i;
+// R20 (J3, i013): "are we bringing in more revenue this year so far than we did all of last
+// year" - a whole-shop, two-CALENDAR-YEAR revenue comparison. The oracle (field-phrasing-3
+// i013) compares the full current-year sum against the full prior-year sum regardless of the
+// "so far"/"all of" wording (it never applies a same-day-of-year cutoff to the prior year), so
+// this detector and its executor do the same - no partial-year cutoff logic to invent or guess.
+// Scoped to a real yes/no comparison (THAN_RE + a revenue word + a more/less word) so a
+// declarative sentence is never mistaken for this question; both "this year" and "last year"
+// must be named or this bails to null (never guesses which two years are being compared).
+const REVENUE_WORD_RE = /\brevenue\b|\bbring(?:ing)?\s+in\b|\bbrought\s+in\b|\bincome\b|\binvoic\w*\b|\bbilled\b/i;
+const MORE_LESS_WORD_RE = /\bmore\b|\bless\b|\bhigher\b|\blower\b|\bgreater\b/i;
+const THAN_WORD_RE = /\bthan\b/i;
+const THIS_YEAR_ANY_RE = /\b(?:so\s+far\s+)?this\s+year\b/i;
+const LAST_YEAR_ANY_RE = /\b(?:all\s+of\s+)?last\s+year\b/i;
+function detectRevenueYearComparison(q) {
+  if (!REVENUE_WORD_RE.test(q) || !MORE_LESS_WORD_RE.test(q) || !THAN_WORD_RE.test(q)) return null;
+  if (!THIS_YEAR_ANY_RE.test(q) || !LAST_YEAR_ANY_RE.test(q)) return null;
+  return true;
+}
 /*
  * TEAM K (financial remainders, 2026-09-25, R5_FAILS.md): a handful of plain "how many
  * <documents> do we have" / "total value of our quotes" / "average fee on our agreements" /
@@ -325,6 +343,7 @@ export function parseMoneyIntent(question, { today }) {
   if (RE.aging.test(q)) return mk('ar_aging', { subject: null });
   if (RE.overdue.test(q)) return mk('overdue', { subject, dayThreshold: (q.match(OVERDUE_DAYS_RE) || [])[1] ? Number(q.match(OVERDUE_DAYS_RE)[1]) : null });
   if (RE.open.test(q) && !RE.last.test(q) && !RE.topCustomers.test(q)) return mk('open_invoices', { subject });
+  if (detectRevenueYearComparison(q)) return mk('revenue_year_comparison', { subject: null });
   if (RE.byMonth.test(q) && /\b(?:revenue|invoic|bill|sales|income|money)\w*/.test(q)) return mk('revenue_by_month', { subject: null });
   if (RE.topCustomers.test(q)) {
     // "top 3 customers by invoiced revenue" - an explicit count narrows the ranking to exactly
@@ -704,6 +723,29 @@ async function revenueByMonth(db, intent, ctx) {
   return baseAnswer(text, facts, {
     interpretation: 'invoiced revenue by month',
     cite: { records: monthRecords, total: monthTotal, claimedCount: monthTotal, basis: `Summed printed invoice totals month by month (${p?.label ?? 'the last 12 months'}), by invoice date; each month lists its invoices.` },
+  });
+}
+
+async function revenueYearComparison(db, intent, ctx) {
+  const today = ctx.today;
+  const Y = Number(today.slice(0, 4));
+  const rows = await q(db,
+    `SELECT extract(year from f.doc_date)::int AS yr, COALESCE(sum(f.total), 0) AS amount, count(*)::int AS n
+       FROM financials f WHERE ${REVENUE_WHERE} AND f.total IS NOT NULL AND extract(year from f.doc_date) IN ($2, $3)
+      GROUP BY 1`, [Y, Y - 1], ctx.hu);
+  const cur = rows.find((r) => r.yr === Y) ?? { amount: '0', n: 0 };
+  const prior = rows.find((r) => r.yr === Y - 1) ?? { amount: '0', n: 0 };
+  const curAmt = Number(cur.amount);
+  const priorAmt = Number(prior.amount);
+  const more = curAmt > priorAmt;
+  const text = `${more ? 'Yes' : 'No'} — ${Y} has ${fmt(String(curAmt))} across ${plural(cur.n, 'invoice')} so far, versus ${fmt(String(priorAmt))} across ${plural(prior.n, 'invoice')} in all of ${Y - 1}.`;
+  const facts = [
+    { label: `Revenue (${Y})`, value: fmt(String(curAmt)), status: 'ok', sources: [] },
+    { label: `Revenue (${Y - 1})`, value: fmt(String(priorAmt)), status: 'ok', sources: [] },
+  ];
+  return baseAnswer(text, facts, {
+    interpretation: `revenue comparison, ${Y} vs ${Y - 1}`,
+    cite: { records: [], total: cur.n + prior.n, claimedCount: cur.n + prior.n, basis: `Summed printed invoice totals dated in ${Y} and separately in ${Y - 1} (customer invoices and credit memos, USD).` },
   });
 }
 
@@ -1384,6 +1426,7 @@ export async function runMoneyIntent(db, intent, { today }) {
     case 'open_invoices': case 'overdue': case 'ar_aging': return receivables(db, intent, ctx, 'receivable');
     case 'payables_open': return receivables(db, intent, ctx, 'payable');
     case 'revenue_by_month': return revenueByMonth(db, intent, ctx);
+    case 'revenue_year_comparison': return revenueYearComparison(db, intent, ctx);
     case 'agreement_fees': return agreementFees(db, intent, ctx);
     case 'quote_vs_invoice': return quoteVsInvoice(db, intent, ctx);
     case 'top_customers': return topCustomers(db, intent, ctx);

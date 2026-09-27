@@ -85,6 +85,48 @@ function turn(question, extra = {}) { return { question, ...extra }; }
     check('refinement: "just the X ones" keeps the customer + brand', /Donna Thornton/.test(r.query) && /Goodman/i.test(r.query), r.query);
   }
 
+  // ---- R20 (J4, dialogue d036): brand-vs-brand "those" — "how many goodman units are on our
+  // books" / "do we have more of those than lennox" — a bare-portfolio anchor (no customer/address,
+  // same as d005's Carrier count above), where the CURRENT question ALSO names a real brand
+  // (Lennox, the comparison target) but "those" itself still means the EARLIER turn's brand
+  // (Goodman). A naive "does this question already mention a brand" check reads Lennox as "the
+  // question already has its own brand" and drops Goodman entirely — the exact bug this hook fixes.
+  {
+    const c = ctx([turn('how many goodman units are on our books')]);
+    const r = resolveFollowup(c, 'do we have more of those than lennox');
+    check('brand-comparison: "those" resolves to the PRIOR brand, not dropped', /goodman/i.test(r.query), r.query);
+    check('brand-comparison: the comparison target brand is still present', /lennox/i.test(r.query), r.query);
+    check('brand-comparison: the pronoun itself is gone (not left dangling)', !/\b(those|these|them)\b/i.test(r.query), r.query);
+  }
+  // Every paraphrase below keeps the REFINEMENT_RE shape ("of those/these/them") that routes it to
+  // resolveRefinement in the first place — a bare "is that/it more than lennox" (no "of those") is a
+  // different classifyFollowupKind bucket ('pronoun') entirely, out of this hook's scope.
+  const brandComparisonParaphrases = [
+    'do we have more of them than lennox',
+    'are there more of those than lennox units',
+    'do we carry more of those than lennox',
+    'do we have fewer of these than lennox',
+    'is the count of those higher than lennox',
+  ];
+  for (const q of brandComparisonParaphrases) {
+    const c = ctx([turn('how many goodman units are on our books')]);
+    const r = resolveFollowup(c, q);
+    check(`brand-comparison paraphrase keeps Goodman: "${q}"`, /goodman/i.test(r.query), r.query);
+  }
+  // Negatives: the question already names its OWN brand for the pronoun (no "than"-comparison split
+  // at all, or the pronoun's own side already has a brand) — inheriting would be WRONG here, so the
+  // ordinary (pre-existing) behavior must be unchanged.
+  {
+    const c = ctx([turn('how many goodman units are on our books')]);
+    const r = resolveFollowup(c, 'how many of those trane units are still under warranty');
+    check('brand-comparison negative: a pronoun that already names ITS OWN brand is not overridden', /trane/i.test(r.query) && !/goodman/i.test(r.query), r.query);
+  }
+  {
+    const c = ctx([turn('how many customers do we have in Mesa')]);
+    const r = resolveFollowup(c, 'do we have more of those than in Tucson');
+    check('brand-comparison negative: a city (not brand) comparison is left alone (no brand injected)', !/\b(goodman|lennox|trane|carrier)\b/i.test(r.query), r.query);
+  }
+
   // ---- entity swap ("same question for X" / "what about X") --------------------------------------
   {
     const c = ctx([turn('who is the customer at 214 Mercer St')]);

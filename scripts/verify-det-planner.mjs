@@ -16,11 +16,13 @@
  *   node scripts/verify-det-planner.mjs
  */
 import { detectAnalyticsPlan, questionNamesKnownCustomer } from '../api/_lib/analytics/detPlan.js';
+import { detectCountComparison } from '../api/_lib/analytics/comparison.js';
 import {
   resolveAgeFilter, warrantyStatusFromQuestion, buildConditionOverrideFilter,
   preClassifyAnalytics, resolveServiceVisitsOverride, looksLikeSingleRecordReference,
 } from '../api/_lib/analytics.js';
 import { isFinancialQuestion } from '../api/_lib/financials/classify.js';
+import { normalizeQuestion as normalizeQuestionNL } from '../api/_lib/nlNormalize.js';
 
 let failures = 0;
 let passes = 0;
@@ -720,6 +722,177 @@ eq(
   detectAnalyticsPlan('how many customer addresses are missing a zip code'),
   { entity: 'customers', op: 'count', filters: [{ field: 'hasZip', op: 'eq', value: false }] }
 );
+
+/* ============================================================ R19 (I2): rankings (h112-h115) */
+
+// "biggest/fewest <dimension>" — detectGroupBySuperlative — 5+ paraphrases across every dimension
+// this round's target ids need, plus negatives (no dimension named, plain groupBy stays plain).
+eq('superlative (top): "single biggest city" -> customers grouped by city, top', detectAnalyticsPlan('how many customers are in our single biggest city'), { entity: 'customers', op: 'groupBy', groupBy: 'city', superlative: 'top' });
+eq('superlative (top): "our largest state" (largest, not biggest)', detectAnalyticsPlan("what's our largest state by customer count"), { entity: 'customers', op: 'groupBy', groupBy: 'state', superlative: 'top' });
+eq('superlative (bottom): "which manufacturer do we have the fewest units of" -> equipment grouped by brand, bottom', detectAnalyticsPlan('which manufacturer do we have the fewest units of'), { entity: 'equipment', op: 'groupBy', groupBy: 'brand', superlative: 'bottom' });
+eq('superlative (bottom): "which tech has done the fewest visits" -> serviceVisits grouped by technician, bottom', detectAnalyticsPlan('which tech has done the fewest visits'), { entity: 'serviceVisits', op: 'groupBy', groupBy: 'technician', superlative: 'bottom' });
+eq('superlative (bottom): "brand" wording also resolves (not just "manufacturer")', detectAnalyticsPlan('which brand do we have the fewest units of'), { entity: 'equipment', op: 'groupBy', groupBy: 'brand', superlative: 'bottom' });
+eq('superlative (bottom): "least" is the same shape as "fewest"', detectAnalyticsPlan('which county has the least customers'), { entity: 'customers', op: 'groupBy', groupBy: 'county', superlative: 'bottom' });
+check('superlative negative: a plain groupBy ("customers by county") is NOT a superlative plan', !detectAnalyticsPlan('customers by county')?.superlative);
+check('superlative negative: no recognized dimension word -> null (never guessed)', detectAnalyticsPlan('which customer spent the most money') === null || !detectAnalyticsPlan('which customer spent the most money')?.superlative);
+
+// "whats our newest <brand> install" (h114) — detectInstallDateExtreme now carries a brand filter.
+eq('install-date-extreme + brand filter: "newest mitsubishi install"', detectAnalyticsPlan('whats our newest mitsubishi install'), { entity: 'equipment', op: 'list', sortBy: 'installDateDesc', filters: [{ field: 'brand', op: 'eq', value: 'Mitsubishi' }] });
+eq('install-date-extreme + brand filter: "oldest trane unit we have on file"', detectAnalyticsPlan('whats the oldest trane unit we have on file'), { entity: 'equipment', op: 'list', sortBy: 'installDateAsc', filters: [{ field: 'brand', op: 'eq', value: 'Trane' }] });
+eq('install-date-extreme, no brand named: still a bare sortBy plan (no filters key at all)', detectAnalyticsPlan('whats the newest unit we have installed'), { entity: 'equipment', op: 'list', sortBy: 'installDateDesc' });
+
+/* ============================================================ R19 (I2): yes/no comparisons */
+
+eq('count comparison: brand vs brand ("do we have more X than Y")', detectCountComparison('do we have more mitsubishi units installed than trane'), {
+  entity: 'equipment',
+  leftFilter: { field: 'brand', op: 'eq', value: 'Mitsubishi' }, rightFilter: { field: 'brand', op: 'eq', value: 'Trane' },
+  leftLabel: 'Mitsubishi units', rightLabel: 'Trane units',
+});
+eq('count comparison: "is X more common than Y" (brand)', detectCountComparison('is daikin more common than goodman in our records'), {
+  entity: 'equipment',
+  leftFilter: { field: 'brand', op: 'eq', value: 'Daikin' }, rightFilter: { field: 'brand', op: 'eq', value: 'Goodman' },
+  leftLabel: 'Daikin units', rightLabel: 'Goodman units',
+});
+eq('count comparison: city vs city ("do we have more customers in X than in Y")', detectCountComparison('do we have more customers in mesa than in tucson'), {
+  entity: 'customers',
+  leftFilter: { field: 'city', op: 'eq', value: 'Mesa' }, rightFilter: { field: 'city', op: 'eq', value: 'Tucson' },
+  leftLabel: 'customers in Mesa', rightLabel: 'customers in Tucson',
+});
+eq('count comparison: registered vs unregistered warranties (h122)', detectCountComparison('do we have more registered warranties than unregistered ones'), {
+  entity: 'equipment',
+  leftFilter: { field: 'warrantyRegistered', op: 'eq', value: true }, rightFilter: { field: 'warrantyRegistered', op: 'eq', value: false },
+  leftLabel: 'registered warranties', rightLabel: 'unregistered warranties',
+});
+eq('count comparison: unregistered vs registered (reversed order)', detectCountComparison('do we have more unregistered warranties than registered ones'), {
+  entity: 'equipment',
+  leftFilter: { field: 'warrantyRegistered', op: 'eq', value: false }, rightFilter: { field: 'warrantyRegistered', op: 'eq', value: true },
+  leftLabel: 'unregistered warranties', rightLabel: 'registered warranties',
+});
+
+// Negatives: never guess a comparison whose side needs fuzzy customer-name/address/financials
+// resolution, and never misfire on an unrelated "than" sentence with no yes/no lead-in.
+check('count comparison negative: named-customer comparison bails (no customerName vocabulary here)', detectCountComparison('has Rebecca Montoya had more documents on file than Charles Montoya') === null);
+check('count comparison negative: address/job-total comparison bails (financials join, not this file)', detectCountComparison('was the job at 803 e pecos rd bigger than the job at 877 w ocotillo rd') === null);
+check('count comparison negative: "more than N" (a plain threshold, not a two-sided comparison) bails', detectCountComparison('do we have more than 5 trane units') === null);
+check('count comparison negative: no yes/no lead-in verb -> bails', detectCountComparison('customers with more trane units than carrier units') === null);
+check('count comparison negative: same brand both sides -> bails (never a trivially-true/false guess)', detectCountComparison('do we have more trane units than trane units') === null);
+
+/* ============================================================ R20 (J3, round 20): new shapes */
+
+// --- detectInstallYearRelative (i003/F1 "installs this year vs last") ---
+eq('install-year-relative: "how many units did we install this year"', detectAnalyticsPlan('how many units did we install this year', {}, '2026-09-27'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'installYear', op: 'eq', value: 2026 }] });
+eq('install-year-relative: "how many units have we installed so far this year"', detectAnalyticsPlan('how many units have we installed so far this year', {}, '2026-09-27'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'installYear', op: 'eq', value: 2026 }] });
+eq('install-year-relative: "how many installs did we do last year"', detectAnalyticsPlan('how many installs did we do last year', {}, '2026-09-27'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'installYear', op: 'eq', value: 2025 }] });
+eq('install-year-relative: "which units were installed this year"', detectAnalyticsPlan('which units were installed this year', {}, '2026-09-27'),
+  { entity: 'equipment', op: 'list', filters: [{ field: 'installYear', op: 'eq', value: 2026 }] });
+check('install-year-relative negative: a literal year ("installed in 2024") is not this detector\'s job — bails to filters:[]',
+  JSON.stringify(detectAnalyticsPlan('how many units were installed in 2024', {}, '2026-09-27').filters) === '[]');
+check('install-year-relative negative: no install word at all -> untouched by this detector', detectAnalyticsPlan('how many customers do we have', {}, '2026-09-27').filters.length === 0);
+
+// --- detectMultiUnitCustomers ---
+eq('multi-unit customers: "which customers have more than one unit installed at their property"',
+  detectAnalyticsPlan('which customers have more than one unit installed at their property'),
+  { entity: 'customers', op: 'list', filters: [{ field: 'hasMultipleUnits', op: 'eq', value: true }] });
+eq('multi-unit customers: "how many properties have more than one unit installed"',
+  detectAnalyticsPlan('how many properties have more than one unit installed'),
+  { entity: 'customers', op: 'count', filters: [{ field: 'hasMultipleUnits', op: 'eq', value: true }] });
+eq('multi-unit customers: "which customers have multiple units installed at their home"',
+  detectAnalyticsPlan('which customers have multiple units installed at their home'),
+  { entity: 'customers', op: 'list', filters: [{ field: 'hasMultipleUnits', op: 'eq', value: true }] });
+eq('multi-unit customers: "which customers have at least two units installed at their address"',
+  detectAnalyticsPlan('which customers have at least two units installed at their address'),
+  { entity: 'customers', op: 'list', filters: [{ field: 'hasMultipleUnits', op: 'eq', value: true }] });
+check('multi-unit customers negative: "how many customers have multiple units" (no "installed at") never guesses', detectAnalyticsPlan('how many customers have multiple units').filters.length === 0);
+
+// --- detectVendorPurchaseOrderCount (i020/i021) ---
+eq('vendor PO count: "how many purchase orders have we cut to Baker Distributing"',
+  detectAnalyticsPlan('how many purchase orders have we cut to Baker Distributing'),
+  { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'purchase-order' }, { field: 'vendor', op: 'contains', value: 'Baker Distributing' }] });
+eq('vendor PO count: "how many purchase orders were issued to ABC Supply"',
+  detectAnalyticsPlan('how many purchase orders were issued to ABC Supply'),
+  { entity: 'documents', op: 'count', filters: [{ field: 'documentType', op: 'eq', value: 'purchase-order' }, { field: 'vendor', op: 'contains', value: 'Abc Supply' }] });
+check('vendor PO count: "purchase orders sent to Carrier Wholesale" resolves a vendor filter',
+  (detectAnalyticsPlan('how many purchase orders were sent to Carrier Wholesale').filters ?? []).some((f) => f.field === 'vendor' && f.value === 'Carrier Wholesale'));
+check('vendor PO count negative: "how many invoices have we sent to Baker Distributing" (not a PO) never adds a vendor filter',
+  !(detectAnalyticsPlan('how many invoices have we sent to Baker Distributing').filters ?? []).some((f) => f.field === 'vendor'));
+check('vendor PO count negative: bare "how many purchase orders do we have" (no vendor named) never adds a vendor filter',
+  !(detectAnalyticsPlan('how many purchase orders do we have').filters ?? []).some((f) => f.field === 'vendor'));
+
+// --- detectWarrantyRegistrationDays ---
+eq('warranty-reg-days: "took longer than 30 days after the install"',
+  detectAnalyticsPlan('how many warranty registrations took longer than 30 days after the install'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'gt', value: 30 }] });
+eq('warranty-reg-days: "took more than 45 days after install"',
+  detectAnalyticsPlan('how many warranty registrations took more than 45 days after install'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'gt', value: 45 }] });
+eq('warranty-reg-days: "over 60 days after the install"',
+  detectAnalyticsPlan('how many warranty registrations were over 60 days after the install'),
+  { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'gt', value: 60 }] });
+check('warranty-reg-days negative: "warranty registrations were on time" (no day threshold) bails', detectAnalyticsPlan('how many warranty registrations were on time').filters.length === 0);
+check('warranty-reg-days negative: a day count with no "warranty registration" phrase never fires this detector',
+  !(detectAnalyticsPlan('how many units are more than 60 days overdue for service').filters ?? []).some((f) => f.field === 'warrantyRegistrationDays'));
+
+// --- detectWarrantyRegDateExtreme (i115/i116) ---
+eq('warranty-reg-date extreme: "earliest warranty registration date"', detectAnalyticsPlan("what's the earliest warranty registration date we have on file"),
+  { entity: 'equipment', op: 'list', sortBy: 'warrantyRegDateAsc' });
+eq('warranty-reg-date extreme: "oldest warranty registration on file"', detectAnalyticsPlan('whats the oldest warranty registration we have on file'),
+  { entity: 'equipment', op: 'list', sortBy: 'warrantyRegDateAsc' });
+eq('warranty-reg-date extreme: "most recent warranty registration date"', detectAnalyticsPlan('whats the most recent warranty registration date on file'),
+  { entity: 'equipment', op: 'list', sortBy: 'warrantyRegDateDesc' });
+eq('warranty-reg-date extreme: "latest warranty registration on file"', detectAnalyticsPlan('whats the latest warranty registration we have on file'),
+  { entity: 'equipment', op: 'list', sortBy: 'warrantyRegDateDesc' });
+check('warranty-reg-date extreme negative: "oldest unit on file" (install-date ranking, no "warranty registration" phrase) never gets warrantyRegDate sortBy',
+  detectAnalyticsPlan('whats the oldest unit we have on file').sortBy === 'installDateAsc');
+
+// --- COMPARISON_YESNO_LEAD_RE / preClassifyAnalytics ask.js gate-miss ("is A more common than B") ---
+check('preClassify: "is daikin more common than goodman in our records" is admitted (was the ask.js gate-miss target)', preClassifyAnalytics('is daikin more common than goodman in our records') === true);
+check('preClassify: "have we sold more Lennox units than Rheem" is admitted', preClassifyAnalytics('have we sold more Lennox units than Rheem') === true);
+check('preClassify: "were there more service calls this year than last year" is admitted', preClassifyAnalytics('were there more service calls this year than last year') === true);
+check('preClassify: "did we install more units last year than this year" is admitted', preClassifyAnalytics('did we install more units last year than this year') === true);
+check('preClassify: "is Mesa more common than Tucson for our customers" is admitted', preClassifyAnalytics('is Mesa more common than Tucson for our customers') === true);
+check('preClassify negative: a name-vs-name comparison with no more/fewer/greater/higher/busier word stays excluded',
+  preClassifyAnalytics('was the invoice for Smith bigger than the one for Jones') === false);
+
+eq('count comparison (via the newly-admitted gate): "is daikin more common than goodman"', detectCountComparison('is daikin more common than goodman in our records', '2026-09-27'), {
+  entity: 'equipment',
+  leftFilter: { field: 'brand', op: 'eq', value: 'Daikin' }, rightFilter: { field: 'brand', op: 'eq', value: 'Goodman' },
+  leftLabel: 'Daikin units', rightLabel: 'Goodman units',
+});
+
+// --- detectInstallYearComparison (i003, comparison.js) ---
+eq('count comparison: install years, "did we install more units last year than this year"',
+  detectCountComparison('did we install more units last year than we have this year', '2026-09-27'),
+  {
+    entity: 'equipment',
+    leftFilter: { field: 'installYear', op: 'eq', value: 2025 }, rightFilter: { field: 'installYear', op: 'eq', value: 2026 },
+    leftLabel: 'installs in 2025', rightLabel: 'installs so far in 2026',
+  });
+eq('count comparison: install years, reversed ("more installs this year than last year")',
+  detectCountComparison('did we do more installs this year than last year', '2026-09-27'),
+  {
+    entity: 'equipment',
+    leftFilter: { field: 'installYear', op: 'eq', value: 2026 }, rightFilter: { field: 'installYear', op: 'eq', value: 2025 },
+    leftLabel: 'installs so far in 2026', rightLabel: 'installs in 2025',
+  });
+check('count comparison negative: install-year comparison naming the SAME year both sides bails',
+  detectCountComparison('did we install more units this year than this year', '2026-09-27') === null);
+check('count comparison negative: no install-word at all -> the year comparison branch itself never fires (falls to brand/city, which also bail here)',
+  detectCountComparison('did we have more revenue this year than last year', '2026-09-27') === null);
+
+// --- nlNormalize "fewest" -> "newest" vocab collision (EXTRA_DOMAIN_WORDS) ---
+check('nlNormalize: "fewest" is a real word, never fuzzy-corrected to "newest"',
+  normalizeQuestionNL('which technician closed the fewest jobs this month').normalized.includes('fewest'));
+check('nlNormalize: "fewest" survives in a bare superlative question',
+  normalizeQuestionNL('which manufacturer do we have the fewest units of').normalized.includes('fewest'));
+check('nlNormalize: "fewest" survives alongside "visits"',
+  normalizeQuestionNL('which tech has done the fewest visits').normalized.includes('fewest'));
+check('nlNormalize negative: a genuine "newest" question is unaffected (still says "newest", not "fewest")',
+  normalizeQuestionNL('whats the newest install we have on file').normalized.includes('newest'));
+check('nlNormalize negative: an actual typo\'d "newest" ("neweat") still recovers to "newest", not "fewest"',
+  normalizeQuestionNL('whats the neweat unit we have').normalized.includes('newest'));
 
 console.log('');
 console.log(failures ? `${failures} check(s) FAILED.` : `${passes} checks passed.`);

@@ -525,6 +525,11 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     JSON.stringify({
       route: "ask", research_agent: true, model: RESEARCH_MODEL, reason, handled,
       model_calls: totals.modelCalls, input_tokens: totals.inputTokens, output_tokens: totals.outputTokens,
+      // ROUND 20 (J4), task 2 ("report estimated $/question by route"): cost_usd was already computed
+      // (recordSonnetSpend just above already spends it) but never made it into this log line — added
+      // here, alongside the cache breakdown totals already tracked, so a $/question read never needs a
+      // second source. No new tracking, just surfacing what already existed.
+      cost_usd: costUsd, cache_read_input_tokens: totals.cacheReadInputTokens, cache_creation_input_tokens: totals.cacheCreationInputTokens,
       tool_calls: toolCallsUsed, tool_steps: steps.length, model_ms: modelCallsMs,
       dropped_facts: (shaped?.dropped?.facts ?? 0) + verifyDropped, verify_dropped: verifyDropped,
       // Perf pass diagnostics (build spec items 2-4) — counts only, never question/answer content.

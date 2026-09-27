@@ -164,6 +164,14 @@ function extractionRow({ entityId, documentId, fieldKey, value, confidence = 0.9
 function mockAddressEntityDb({ entities = [], extractions = [] }) {
   return {
     raw: async (sql, params) => {
+      // R19 (I1, owner ask (a)/audience adoption): documentsHaveAudience's own information_schema
+      // probe (fastPathQuery.js's audienceWhereClause) is legitimately tenant-agnostic — it's asking
+      // "does this COLUMN exist" (schema metadata), not reading tenant data — so it's exempt from the
+      // tenant-scope assertion below, same as every other migration-tolerance probe in this codebase
+      // (audience/probe.js's own doc comment). Answering "no" here (column absent) routes every
+      // caller to the pre-migration extractions-fallback SQL, which DOES carry a real tenant
+      // predicate and so is checked normally.
+      if (/information_schema\.columns/.test(sql)) return { rows: [] };
       check('mockAddressEntityDb :: query is tenant-scoped', /TENANT_SQL|tenant_id/.test(sql) || /current_setting/.test(sql));
       if (/entity_type IN \('customer', 'equipment'\)/.test(sql) && /ILIKE ALL/.test(sql)) {
         const patterns = (params?.[0] ?? []).map((p) => new RegExp(String(p).replace(/^%|%$/g, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));

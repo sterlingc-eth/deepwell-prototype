@@ -16,7 +16,10 @@
  * 2024") — see this file's own CLAUSE matchers below for exactly what it adds.
  */
 
-import { KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from '../analytics.js';
+import {
+  KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES, warrantyStatusFromQuestion,
+  buildConditionOverrideFilter, looksLikeSingleRecordReference,
+} from '../analytics.js';
 
 const reEscape = (s) => String(s ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const NUM_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
@@ -72,14 +75,39 @@ function docTypePhrases(pack) {
     .filter((t) => t.phrase);
 }
 
+/** Round 20 (J3, F1 regression — "purchase order on file for <name>" wrongly claimed by a phantom
+ *  'work order' condition): the bare-last-word shortcut below ("agreement" standing in for
+ *  "maintenance agreement") is only safe when that bare word is NOT also the last word of some
+ *  OTHER tracked document-type phrase — "purchase order" and "work order" both end in "order", so
+ *  "order on file" (a plain substring of "a PURCHASE order on file for Amy Isaacson") wrongly
+ *  satisfied "work order"'s own bare-word alternative too, manufacturing a SECOND hasDocType
+ *  condition (work-order) that was never actually named, which then fed a wrong AND-of-two-doc-
+ *  types plan ignoring the customer name entirely (F1's "ignoring the name entirely" bug). Computed
+ *  once per pack (never per phrase) so this stays a general, pack-driven ambiguity check — any two
+ *  document-type labels sharing a last word are protected the same way, not just this one pair. */
+function ambiguousBareWords(pack) {
+  const counts = new Map();
+  for (const { phrase } of docTypePhrases(pack)) {
+    const words = phrase.split(/\s+/);
+    const bare = words[words.length - 1];
+    counts.set(bare, (counts.get(bare) ?? 0) + 1);
+  }
+  return counts;
+}
+
 /** Bare-noun doc-type mention ("no agreement", "an agreement on file") — broader than compose.js's own
  *  docTypeMention, which requires the FULL phrase ("no maintenance agreement"). Matches the LAST word of
  *  the phrase too, so "no agreement"/"no maintenance agreement" both resolve to the same canonical id -
- *  the shape the R11 brief's own "with no agreement" example needs and compose.js's parser doesn't cover. */
-function docTypeMention(q, phrase) {
+ *  the shape the R11 brief's own "with no agreement" example needs and compose.js's parser doesn't cover.
+ *  `bareWordCounts` (ambiguousBareWords, above) disables that bare-word shortcut whenever this phrase's
+ *  own last word is shared with another tracked phrase (see that function's own doc comment) — the full
+ *  phrase is still matched either way, so a genuinely ambiguous phrase just loses its short-form alias,
+ *  never its real one. */
+function docTypeMention(q, phrase, bareWordCounts) {
   const words = phrase.split(/\s+/);
   const bare = words[words.length - 1]; // "agreement" out of "maintenance agreement"
-  const alt = bare === phrase ? reEscape(phrase) : `(?:${reEscape(phrase)}|${reEscape(bare)})`;
+  const bareIsAmbiguous = (bareWordCounts?.get(bare) ?? 1) > 1;
+  const alt = bare === phrase || bareIsAmbiguous ? reEscape(phrase) : `(?:${reEscape(phrase)}|${reEscape(bare)})`;
   const NEG = [
     new RegExp(`\\bno\\s+${alt}s?\\b`, 'i'),
     new RegExp(`\\bwithout\\s+(?:a |an )?${alt}\\b`, 'i'),
@@ -150,7 +178,35 @@ const AGE_OLDER_DAYS_RE = /\binstalled\s+more\s+than\s+(\d{1,4})\s*days?\s+ago\b
 // just two more everyday phrasings for it, never a new status.
 const WARRANTY_EXPIRED_RE = /\bexpired\s+warrant(?:y|ies)\b|\bwarrant(?:y|ies)\s+(?:already\s+)?lapsed\b|\bout\s+of\s+warranty\b/i;
 const WARRANTY_EXPIRING_RE = /\bwarrant(?:y|ies)\s+expiring\b|\bexpiring\s+warrant(?:y|ies)\b/i;
-const WARRANTY_ACTIVE_RE = /\bactive\s+warrant(?:y|ies)\b/i;
+// R19 (I2, h050/h091-h097/h092/g135): this used to be its own narrow
+// `/\bactive\s+warrant(?:y|ies)\b/i` — matched only the literal phrase "active warranty/warranties"
+// and missed every other everyday phrasing of the SAME idea ("still under warranty", "still
+// covered", "under warranty", "in warranty", "covered", "current", "valid") — so a multi-hop
+// question naming it this way ("how many trane units in mesa are still under warranty", h091) had
+// only TWO recognized clauses (brand + geoCity) and silently answered a customer count with the
+// warranty condition dropped entirely, the exact "second condition vanishes" bug this engine exists
+// to prevent.
+//
+// Reused HERE is only the WORD RECOGNITION half of analytics.js's warrantyStatusFromQuestion (does
+// the question name the "still under warranty" idea at all?) — never that function's own bucket
+// CHOICE. This engine's own oracle definition for the SAME phrase is a documented, deliberate split
+// (test-docs/scorecard/generalization/field-phrasing-2.json's h050/h091-h097/h092 and the base
+// exam's g135, every one of them a MULTI-condition question: brand alone, or brand+geoCity) is the
+// LOOSE "hasn't expired yet" reading (expires date in the future at all — active OR expiring), while
+// analytics.js's own bucket choice (kept exactly as it was — see that function's own R18 P4 doc
+// comment) stays the STRICT >365-day 'active' bucket for the portfolio-wide, ZERO-other-condition
+// phrasing the frozen counts-warranty-0004-canonical oracle tests ("how many units have still under
+// warranty?", no brand/city/anything else — a question this engine's own >=2-clause floor never
+// even lets reach here). The two shapes never collide (a single bare condition can never satisfy
+// parseFilterClauses' >=2 threshold), so both oracle-verified definitions can be honored at once —
+// see conditionMatches (entitySets.js) for where 'not_expired' is actually evaluated. Only ever
+// narrowed to 'expired'/'expiring'/'not_expired' here — never 'unknown' — so an unqualified "unknown
+// warranty status" mention (not one of this file's own tested shapes) still falls through exactly
+// as before this change, rather than newly claiming a shape nobody has verified this engine answers
+// correctly.
+function looseWarrantyNotExpired(q) {
+  return warrantyStatusFromQuestion(q) === 'active';
+}
 const NO_EMAIL_RE = /\b(?:no|missing|without)\s+(?:an?\s+)?email\b|\bemail\b.*\bmissing\b/i;
 // R14 (K4): the positive counterpart — "have email on file" / "with an email on file" — needed for a
 // follow-up narrowing ("...and how many of those have email on file?"), never confused with NO_EMAIL_RE
@@ -167,8 +223,22 @@ const TECHNICIAN_RE = /\bserviced by\s+([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+
 function collectConditions(q, pack) {
   const conditions = [];
 
-  const brands = (pack?.brands ?? []).filter((b) => new RegExp(`\\b${reEscape(b)}\\b`, 'i').test(q));
-  if (brands.length) conditions.push({ type: 'brand', values: brands });
+  const brands = new Set((pack?.brands ?? []).filter((b) => new RegExp(`\\b${reEscape(b)}\\b`, 'i').test(q)));
+  // R19 (I2, h098): pack.brands is the industry pack's own LABEL per manufacturer (e.g. "Mitsubishi
+  // Electric" — see warrantyRules.js's BRAND_RULES) which sometimes differs from the bare word a
+  // dispatcher actually types ("mitsubishi units") and, worse, from what this corpus's own
+  // manufacturer field stores (see h114's oracle: `manufacturer ILIKE 'mitsubishi'`, no "Electric" at
+  // all) — a pack-only match silently dropped the WHOLE brand condition for exactly this brand,
+  // the same "second condition vanishes" bug this file exists to prevent, just from a vocabulary gap
+  // instead of a missing detector. analytics.js's buildConditionOverrideFilter('brand', ...) is the
+  // one shared, already-tested brand vocabulary every other engine (fastPath, the analytics planner)
+  // trusts for this — used here as a fallback, never a replacement, so a pack-only brand alias with
+  // no analytics.js counterpart still works exactly as before.
+  const bareBrand = buildConditionOverrideFilter('brand', q, 'equipment');
+  if (bareBrand?.op === 'eq' && ![...brands].some((b) => b.toLowerCase() === String(bareBrand.value).toLowerCase())) {
+    brands.add(bareBrand.value);
+  }
+  if (brands.size) conditions.push({ type: 'brand', values: [...brands] });
 
   const age = AGE_OLDER_RE.exec(q);
   if (age) conditions.push({ type: 'ageOlder', years: Number(age[1]) });
@@ -178,10 +248,11 @@ function collectConditions(q, pack) {
 
   if (WARRANTY_EXPIRED_RE.test(q)) conditions.push({ type: 'warrantyStatus', status: 'expired' });
   else if (WARRANTY_EXPIRING_RE.test(q)) conditions.push({ type: 'warrantyStatus', status: 'expiring' });
-  else if (WARRANTY_ACTIVE_RE.test(q)) conditions.push({ type: 'warrantyStatus', status: 'active' });
+  else if (looseWarrantyNotExpired(q)) conditions.push({ type: 'warrantyStatus', status: 'not_expired' });
 
+  const bareWordCounts = ambiguousBareWords(pack);
   for (const { id, phrase } of docTypePhrases(pack)) {
-    const mention = docTypeMention(q, phrase);
+    const mention = docTypeMention(q, phrase, bareWordCounts);
     if (mention === 'has') conditions.push({ type: 'hasDocType', id, phrase });
     else if (mention === 'lacks') conditions.push({ type: 'lacksDocType', id, phrase });
   }
@@ -228,6 +299,16 @@ function collectConditions(q, pack) {
 export function parseFilterClauses(question, pack) {
   const q = String(question ?? '').trim();
   if (!q) return null;
+  // R19 (I2): "Is the Rheem at 544 E Ray Rd, Casa Grande, AZ 85122 under warranty?" names TWO
+  // clauses by this file's own closed vocabulary (brand + warrantyStatus) but is a SINGLE-RECORD
+  // lookup, not a portfolio-wide conjunctive filter — this engine's whole job (see this file's own
+  // module header) is "checked every customer on file against..."; answering a one-record question
+  // that way silently ignores the one address named and reports how many OTHER customers happen to
+  // share both traits instead. looksLikeSingleRecordReference (analytics.js) is the same street-
+  // address/serial/possessive-name guard the analytics planner already trusts for the identical
+  // "this is about ONE record, not a count" signal (detectAnalyticsPlan's questionNamesKnownCustomer
+  // is the tenant-vocab sibling of this same idea) — never guess a portfolio answer for it here.
+  if (looksLikeSingleRecordReference(q)) return null;
   const conditions = collectConditions(q, pack);
   if (conditions.length < 2) return null;
   const op = /^\s*how many\b/i.test(q) ? 'count' : 'list';

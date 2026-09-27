@@ -38,6 +38,12 @@ import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitD
 // lookups/compound.js's own header comment for why this is wired in HERE
 // rather than through a new api/ask.js call site.
 import { parseCompoundQuestion, runCompound } from "./lookups/compound.js";
+// R19 (I1, owner ask (a)/audience adoption): internal/team-only documents must never feed a
+// customer-scoped document-list answer here unless the question itself is about team/internal
+// material — see fastPath.js's isTeamScopedQuestion and audience/sql.js's own header.
+import { documentsHaveAudience } from "./audience/probe.js";
+import { audienceFilterSql } from "./audience/sql.js";
+import { isTeamScopedQuestion } from "./fastPath.js";
 
 /* ============================================================ shape detection */
 
@@ -215,6 +221,27 @@ const AGGREGATE_WORD_RE = new RegExp(
 // marker is never the geo-scope reading, whatever it also happens to spell.
 const TRAILING_JOB_WORD_RE = /\b(?:job|install)\s*\??\s*$/i;
 
+// R20 (J2, lookup fixes — R19 blind-3 F1/i048-i053): "do we have a purchase order on file for
+// the Amy Isaacson ACCOUNT" is a colloquial way of naming a customer ("the <name> account"),
+// never a literal question about accounts-in-general — but AGGREGATE_WORD_RE above (shared with
+// the "how many accounts do we have" analytics guard) matches the word "account" for exactly that
+// reason, so a captured name phrase carrying this filler word as its LAST token was rejected
+// whole by isRealNameOrAddressPhrase, parseDocLookupQuestion returned null, and the question fell
+// through to an unrelated analytics template that answered the same wrong portfolio-wide count for
+// six different customer names in a row. The SHAPES regexes already externalize a trailing
+// "job"/"install" this same way (TRAILING_JOB_RE_SRC); this generalizes it to "account"/"customer"/
+// "client" and works regardless of which SHAPE matched, by stripping the filler word from the
+// capture itself rather than growing every regex.
+const TRAILING_FILLER_WORD_RE = /\s+(?:account|accounts|customer|client|clients)\s*$/i;
+
+function stripTrailingFillerWord(phrase) {
+  const p = String(phrase ?? "").trim();
+  const stripped = p.replace(TRAILING_FILLER_WORD_RE, "").trim();
+  // Never strip down to nothing — a bare "the account"/"the customer" with no name at all still
+  // isn't a name/address phrase; isRealNameOrAddressPhrase's own stopword/aggregate checks reject it.
+  return stripped || p;
+}
+
 function isRealNameOrAddressPhrase(phrase, { trailingJob = false } = {}) {
   const p = String(phrase ?? "").trim();
   if (!p) return false;
@@ -275,7 +302,7 @@ export function parseDocLookupQuestion(question, opts = {}) {
   for (const re of SHAPES) {
     const m = q.match(re);
     if (!m) continue;
-    const namePhrase = m[1].trim();
+    const namePhrase = stripTrailingFillerWord(m[1].trim());
     const trailingJob = TRAILING_JOB_WORD_RE.test(m[0]);
     if (!isRealNameOrAddressPhrase(namePhrase, { trailingJob })) continue;
     const doctypeWordMatch = m[0].match(DOCTYPE_WORD_RE);
@@ -435,6 +462,20 @@ export async function runDocLookup(db, question, opts = {}) {
         if (name && address) for (const r of await db.listNameMatchedDocuments(name, address)) idSet.add(r.document_id);
       } catch { /* enrichment only */ }
     }
+  }
+  // R19 (I1, owner ask (a)/audience adoption): drop internal/team-only documents from the scope's
+  // own id set BEFORE either the "none" honest-zero basis or the type query below ever sees them —
+  // unless the question is itself about team/internal material (isTeamScopedQuestion).
+  const teamScoped = isTeamScopedQuestion(question);
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
+  const audienceClause = audienceFilterSql({ docAlias: "d", hasAudienceColumn, teamScoped });
+  if (idSet.size && !teamScoped) {
+    const { rows: audRows } = await db.raw(
+      `SELECT d.id FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} AND (${audienceClause})`,
+      [[...idSet]]
+    );
+    idSet.clear();
+    for (const r of audRows) idSet.add(r.id);
   }
   const ids = [...idSet];
   // TEAM C: an honest "none" cites what WAS searched - every document reachable from the scope (or, with no

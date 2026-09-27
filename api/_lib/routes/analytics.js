@@ -12,6 +12,23 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
+// ROUND 20 (J4, credit-return readiness) — both added ONLY for planAnalyticsQuestion's own model-call
+// section below (J4's ownership within this file); nothing else in this file uses either import.
+// planCacheBreakpoints: prompt-cache the (large, stable) system prompt + tool schema the same way
+// agent/loopV2.js already does — see that file's own use for the pattern this mirrors.
+import { planCacheBreakpoints } from '../promptCache.js';
+// validateModelPlan: rejects a MODEL-produced plan (never the deterministic one just above it) that
+// drops a stated condition, invents a filter the question never named, or names an entity id outside
+// the tenant — see planner/validate.js's own doc comment for why this is stricter than, and separate
+// from, this file's own downstream missingConditions/override machinery.
+import { validateModelPlan } from '../planner/validate.js';
+// assertDailySpend/recordDailySpend/routeCostReport: a per-tenant daily $ cap and a $/question log
+// line for this route, layered on top of (never instead of) ask.js's own assertModelBudget call-count
+// cap — see planner/spend.js's own doc comment. `withTenant`/`ctxArg` are OPTIONAL, new parameters on
+// planAnalyticsQuestion below (see its own doc comment): runAnalyticsQuestion's call site does not pass
+// them yet, so today this fails open exactly as if this file were unchanged — see
+// handoffs/CREDIT_RETURN_PLAYBOOK.md for the one-line hook that turns the cap on.
+import { assertDailySpend, recordDailySpend, routeCostReport } from '../planner/spend.js';
 import { getCacheEntry, isCacheHit } from '../askCache.js';
 import { documentTypeLabel } from '../documentTypes.js';
 import {
@@ -53,8 +70,16 @@ import {
   UNKNOWN_BUCKET,
   TOP_CUSTOMERS_LIMIT,
   INSTALL_DATE_EXTREME_LIMIT,
+  WARRANTY_REG_DATE_SORT_FIELDS,
+  GROUP_LABEL,
+  isTeamScopedQuestion,
 } from '../analytics.js';
 import { normalizeQuestion } from '../nlNormalize.js';
+import { detectCountComparison } from '../analytics/comparison.js';
+// R19 (I2, task 5): team-only (internal) documents never count toward a customer-scoped analytics
+// answer — same fragment/probe search/store.js and search/knowledge.js already adopt.
+import { documentsHaveAudience } from '../audience/probe.js';
+import { audienceFilterSql } from '../audience/sql.js';
 // Round 11 (literature #6/#7): per-tenant vocabulary schema-linking for the planner prompt (above).
 import { schemaLinkedVocabLines } from '../vocab/tenantVocab.js';
 // TEAM C (citations everywhere): records/basis come from the SAME rows the number was computed from.
@@ -63,9 +88,9 @@ import { withAnalyticsCitations } from '../citations/analytics.js';
 // (that helper's sortBy wording is customers-ranking-specific — see citations/analytics.js's
 // own analyticsBasis) — attachCitations/unitRecord are the same generic, pure primitives
 // compose.js already reuses the same way, just called directly here instead.
-import { attachCitations, unitRecord } from '../citations/records.js';
+import { attachCitations, unitRecord, customerRecord, documentRecord } from '../citations/records.js';
 // Team A (2026-09-24): time semantics (uploaded vs service date) and future-dated service records.
-import { dateBasisOf, todayIso, splitFuture } from '../scope.js';
+import { dateBasisOf, todayIso, splitFuture, isVisitType } from '../scope.js';
 // Tier 2 learning loop, Part A (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
 // overlayFewShotHash mixes the active overlay's few-shot items into this
 // file's own analytics cache promptVersion (see runAnalyticsQuestion below)
@@ -87,8 +112,16 @@ export function isAnalyticsEnabled(env = process.env) {
  * Anthropic error all fall through to null, which api/ask.js treats exactly
  * like a fast-path miss: run retrieval+model instead. `max_tokens` is small
  * (a plan is a handful of enum strings) — see the brief's cost note.
+ *
+ * ROUND 20 (J4): `withTenant`/`ctxArg` are NEW, OPTIONAL parameters — runAnalyticsQuestion's own call
+ * site (just below, outside this function's model-call section) does not pass them yet, so omitting
+ * them leaves every existing caller's behavior byte-identical to before this round: the per-tenant $
+ * cap check (assertDailySpend, planner/spend.js) fails open with no tenant context to check against,
+ * same as every other budget read in this codebase. See handoffs/CREDIT_RETURN_PLAYBOOK.md for the
+ * one-line hook that threads the tenant context through once credits are back and this is worth turning
+ * on live.
  */
-export async function planAnalyticsQuestion(question, { today, overlay, tenantVocab } = {}) {
+export async function planAnalyticsQuestion(question, { today, overlay, tenantVocab, withTenant, ctxArg } = {}) {
   try {
     // Round 14 (K3): try the deterministic planner FIRST — no model call, no
     // I/O, no cost. Its result (the same {entity, op, groupBy?, filters?,
@@ -96,8 +129,13 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // post-processing a model plan gets below; the model is only ever
     // called when detectAnalyticsPlan returns null (an unrecognized shape —
     // see that file's own "never guess" doc comment).
-    let rawInput = detectAnalyticsPlan(question, tenantVocab);
+    let rawInput = detectAnalyticsPlan(question, tenantVocab, today);
     if (!rawInput) {
+      // ROUND 20 (J4), task 2: per-tenant daily $ cap for this route, on top of (never instead of)
+      // ask.js's own call-count assertModelBudget. Throws ModelBudgetExceededError when exceeded,
+      // caught by this function's own outer try/catch below exactly like any other planner failure —
+      // this function's contract ("never throws, returns null") is unchanged.
+      await assertDailySpend(withTenant, ctxArg, 'analyticsPlanner');
       const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
       const deadlineAt = Date.now() + MODEL_TIMEOUT_MS;
       // Tier 2 learning (Part A): the active overlay's approved few-shot
@@ -110,6 +148,21 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
       // type/city vocabulary — omitted (no tenantVocab, or none of it matches this question) leaves the
       // prompt byte-identical to before this existed.
       const systemPrompt = buildAnalyticsSystemPrompt({ extraFewShot: overlay?.fewShot, vocabLines: schemaLinkedVocabLines(question, tenantVocab) });
+      // ROUND 20 (J4), task 2: prompt-cache the system prompt + tool schema — both are large (the base
+      // prompt, every few-shot example, the full field vocabulary) and IDENTICAL on every call for a
+      // given overlay/tenantVocab combination, the same "big, stable system prompt" shape agent/
+      // loopV2.js already caches. The per-question `messages` block (the actual question text) is never
+      // a breakpoint — it changes every call, so caching it would only spend a breakpoint for zero
+      // reuse. See promptCache.js's own cacheable()/minTokensFor(): a breakpoint is only actually
+      // attached once the cumulative prefix clears Haiku's real minimum, so this is a no-op (byte-
+      // identical request) until the prompt is long enough for Anthropic to honor it anyway.
+      const { tools, system } = planCacheBreakpoints(
+        {
+          tools: [{ block: ANALYTICS_TOOL, breakpoint: true }],
+          system: [{ block: { type: 'text', text: systemPrompt }, breakpoint: true }],
+        },
+        ANALYTICS_MODEL
+      );
       const response = await withBackoff(
         () =>
           client.messages.create(
@@ -117,8 +170,8 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
               model: ANALYTICS_MODEL,
               max_tokens: 400,
               temperature: 0,
-              system: systemPrompt,
-              tools: [ANALYTICS_TOOL],
+              system,
+              tools,
               tool_choice: { type: 'tool', name: 'analytics_plan' },
               messages: [{ role: 'user', content: `Today's date: ${today}\n\nQUESTION: ${question}` }],
             },
@@ -126,8 +179,32 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
           ),
         { deadlineAt }
       );
+      // ROUND 20 (J4), task 2: "report estimated $/question by route" — one small, structured log
+      // line (no question text, no plan values), and the SAME figure recorded against this tenant's
+      // daily $ ledger (recordDailySpend/assertDailySpend share one bucket — see planner/spend.js).
+      const usage = response.usage ?? {};
+      const costReport = routeCostReport({
+        route: 'analytics-planner',
+        model: ANALYTICS_MODEL,
+        usage: {
+          inputTokens: usage.input_tokens, outputTokens: usage.output_tokens,
+          cacheReadInputTokens: usage.cache_read_input_tokens, cacheCreationInputTokens: usage.cache_creation_input_tokens,
+        },
+      });
+      console.log(JSON.stringify(costReport));
+      if (costReport.cost_usd > 0) await recordDailySpend(withTenant, ctxArg, 'analyticsPlanner', costReport.cost_usd);
       const toolUse = response.content.find((b) => b.type === 'tool_use');
       rawInput = toolUse?.input;
+      // ROUND 20 (J4), task 1: reject a MODEL plan (never the deterministic one above — that's pure
+      // code, already trusted) that drops a condition the question named, invents a filter value the
+      // question never said, or names an entity id outside this tenant. See planner/validate.js.
+      if (rawInput) {
+        const guard = validateModelPlan(rawInput, question, { tenantVocab });
+        if (!guard.ok) {
+          console.error('Analytics planner: model plan rejected by guard, falling through:', guard.reason);
+          rawInput = null;
+        }
+      }
     }
     // Live miss (2026-09-21, "which units had service this month"): a
     // "<units/equipment/customers> <had/got/were> service(d)" / "<did/do> we
@@ -217,6 +294,8 @@ function shapeCustomerRow(r) {
     // R18 P4 (C4, negation, h134): "how many customers have zero equipment on file" — the
     // customers-side mirror of hasAnyDocument, via buildAnalyticsSQL's own correlated EXISTS.
     hasAnyEquipment: pgBool(r.has_any_equipment),
+    // R20 (J3, i011): see analytics.js's DATA_QUALITY_FIELD_ENTITY doc comment on hasMultipleUnits.
+    hasMultipleUnits: pgBool(r.has_multiple_units),
     // R18 (H1): raw value for attachDuplicateFlag's sharesAddress computation just below — every
     // other field here is already derived/boolean, but the frequency map needs the actual string.
     serviceAddress: r.service_address,
@@ -246,6 +325,22 @@ function shapeEquipmentRow(r, today) {
     // column warrantyStatusOf already reads just above, never a new SQL column.
     warrantyExpires: r.warranty?.expires ?? null,
     warrantyRegistered: r.warranty?.registrationState === 'on_file',
+    // R20 (J3, i094/i115/i116): the raw registration date, and the day gap between it and the
+    // unit's own install date (installDate falls back to the unit's top-level installation_date for
+    // a unit whose `warranty` object predates that field — see deriveWarranty's own doc comment for
+    // why both dates normally agree). Null whenever either date is missing or unparseable — never a
+    // guessed gap — so matchesFilter's ordinary "actual == null -> never matches" rule already keeps
+    // a unit with no registration on file out of any warrantyRegistrationDays filter, exactly like
+    // the oracle's own JOIN (a unit absent from the registration-date extraction can't appear in it).
+    warrantyRegisteredDate: r.warranty?.registrationOnFile ?? null,
+    warrantyRegistrationDays: (() => {
+      const reg = r.warranty?.registrationOnFile;
+      const inst = r.warranty?.installDate ?? r.installation_date;
+      if (!/^\d{4}-\d{2}-\d{2}/.test(String(reg ?? '')) || !/^\d{4}-\d{2}-\d{2}/.test(String(inst ?? ''))) return null;
+      const diffMs = new Date(reg).getTime() - new Date(inst).getTime();
+      if (!Number.isFinite(diffMs)) return null;
+      return Math.round(diffMs / 86400000);
+    })(),
     city: geo.city, county: geo.county, state: geo.state, zip: geo.zip,
     // Round 15 (A, data-quality): see shapeCustomerRow's own comment above —
     // same DATA_QUALITY_ROW_KEY map. No hasWarrantyInfo here: "no warranty
@@ -320,8 +415,21 @@ function shapeDocumentRow(r, dateBasis) {
   // straddle the boundary. Applying the same fixed -8h shift here keeps this
   // in agreement with the DB no matter which entity's date math is compared.
   const uploadDate = r.created_at ? new Date(new Date(r.created_at).getTime() - 8 * 3600 * 1000).toISOString().slice(0, 10) : null;
-  // Team A: an "uploaded/added/received" question is about when the paper arrived (created_at), never the job date.
-  const date = dateBasis === 'uploaded' ? uploadDate : (fullDate ?? uploadDate);
+  // R19 (I2, h071): "how many maintenance agreements have we signed since 2020" — the upload-date
+  // fallback just below is right for a VISIT-type document (a service ticket with no extracted
+  // service_date almost always still got scanned close to when the work happened, so upload date is
+  // a reasonable stand-in) but silently wrong for a NON_VISIT_TYPES document (scope.js — a contract,
+  // quote, permit, registration, ...), whose service_date field means something else entirely (an
+  // agreement/registration/effective date, never a job date) and is simply absent from most of
+  // them: falling back to upload date there manufactured a match the oracle's own `EXISTS (...
+  // service_date ...)` never counts (h071's real answer is 0 — no maintenance-agreement in this
+  // corpus carries a service_date at all — not "however many happen to have been scanned since
+  // 2020"). Scoped narrowly to entity 'documents' with a real time-range filter and no real
+  // service_date on file; every OTHER caller of this row shape (a bare doc-type count/list with no
+  // time filter at all) is completely unaffected since `date`/`month` are only ever read by
+  // withinTimeRange.
+  const fallbackDate = isVisitType(r.document_type) ? uploadDate : null;
+  const date = dateBasis === 'uploaded' ? uploadDate : (fullDate ?? fallbackDate);
   const month = date ? date.slice(0, 7) : r.service_date ? String(r.service_date).slice(0, 7) : null;
   return {
     id: r.id, label: documentTypeLabel(r.document_type), value: r.original_filename || r.id,
@@ -335,6 +443,8 @@ function shapeDocumentRow(r, dateBasis) {
     // hasAnyDocument (analytics.js's DATA_QUALITY_ROW_KEY reads both).
     hasServiceDate: present(r.service_date),
     hasCustomerLink: pgBool(r.has_customer_link),
+    // R20 (J3, i020/i021): the vendor_name extraction — see buildAnalyticsSQL's documents branch.
+    vendor: r.vendor ?? null,
   };
 }
 
@@ -351,6 +461,8 @@ const ENTITY_SUPPORTED_FIELDS = {
     // R18 P4 (C2/C4): hasServiceType/lacksServiceType (queryCustomersByServiceTypeCondition,
     // below) and hasAnyEquipment (the customers-side mirror of hasAnyDocument).
     'hasServiceType', 'lacksServiceType', 'hasAnyEquipment',
+    // R20 (J3, i011): see analytics.js's DATA_QUALITY_FIELD_ENTITY doc comment on hasMultipleUnits.
+    'hasMultipleUnits',
   ]),
   equipment: new Set([
     'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
@@ -360,9 +472,11 @@ const ENTITY_SUPPORTED_FIELDS = {
     // R18 P4 (C3): warrantyExpires (a raw date-range test) and warrantyRegistered (registration
     // paperwork on file) — see analytics.js's own doc comments on each.
     'warrantyExpires', 'warrantyRegistered',
+    // R20 (J3, i094): the registration-vs-install day gap — see shapeEquipmentRow's own doc comment.
+    'warrantyRegistrationDays',
   ]),
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus', 'warrantyExpires']),
-  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink']),
+  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink', 'vendor']),
   serviceVisits: new Set(['technician']),
 };
 
@@ -560,18 +674,18 @@ async function queryTopCustomers(db, sortBy, limit) {
  * precision is actually on file, and an EXACT string match is the correct
  * definition of "the same printed date" regardless of precision.
  */
-async function queryInstallDateExtreme(db, sortBy) {
+// R19 (I2, h114): `filters` (only ever a `brand` filter today — see detectInstallDateExtreme,
+// detPlan.js) narrows the candidate set BEFORE the extreme date is found, so "whats our newest
+// mitsubishi install" ranks only Mitsubishi units instead of the whole fleet. brandMatches (not a
+// raw SQL ILIKE) is the same normalized brand comparison every other brand filter in this file
+// uses, so "Mitsubishi"/"mitsubishi electric"/etc. all narrow the same way — done in JS over the
+// full equipment set (this corpus is small; a second indexed SQL pass per brand alias would be the
+// same cost for no real benefit) rather than a second, brand-specific SQL WHERE clause.
+async function queryInstallDateExtreme(db, sortBy, filters = []) {
   const dir = sortBy === 'installDateAsc' ? 'ASC' : 'DESC';
-  const { rows: extremeRows } = await db.raw(
-    `SELECT data->>'installation_date' AS d FROM entities
-      WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}
-        AND data->>'installation_date' IS NOT NULL AND data->>'installation_date' <> ''
-      ORDER BY data->>'installation_date' ${dir}
-      LIMIT 1`,
-    []
-  );
-  const extreme = extremeRows[0]?.d ?? null;
-  if (!extreme) return { rows: [], extreme: null };
+  const brandValues = (filters ?? [])
+    .filter((f) => f.field === 'brand')
+    .flatMap((f) => (f.op === 'in' ? f.value : [f.value]));
 
   const { rows: raw } = await db.raw(
     `SELECT e.id, e.customer_id, e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer,
@@ -583,12 +697,23 @@ async function queryInstallDateExtreme(db, sortBy) {
        FROM entities e
        LEFT JOIN entities c ON c.id = e.customer_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
       WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
-        AND e.data->>'installation_date' = $1
-      ORDER BY e.updated_at DESC
-      LIMIT ${INSTALL_DATE_EXTREME_LIMIT}`,
-    [extreme]
+        AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''`,
+    []
   );
-  const rows = raw.map((r) => ({
+  const candidates = brandValues.length
+    ? raw.filter((r) => brandValues.some((v) => brandMatches(r.manufacturer, v)))
+    : raw;
+  if (!candidates.length) return { rows: [], extreme: null };
+
+  let extreme = candidates[0].installation_date;
+  for (const r of candidates) {
+    if (dir === 'ASC' ? r.installation_date < extreme : r.installation_date > extreme) extreme = r.installation_date;
+  }
+  const tied = candidates
+    .filter((r) => r.installation_date === extreme)
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0))
+    .slice(0, INSTALL_DATE_EXTREME_LIMIT);
+  const rows = tied.map((r) => ({
     ...shapeEquipmentRow(r, null),
     customerId: r.customer_id || null,
     customerName: r.customer_name || null,
@@ -634,6 +759,178 @@ function formatInstallDateExtremeAnswer(plan, rows, extreme) {
   });
 }
 
+// R20 (J3, i115/i116): "what's the earliest/most recent warranty registration date we have on
+// file" — same shape as queryInstallDateExtreme just above, ranked on
+// data.warranty.registrationOnFile (an already-derived, left-zero-padded YYYY-MM-DD string —
+// see deriveWarranty/warrantyRules.js) instead of installation_date. No brand-filter support
+// (no detected shape asks for one yet, unlike h114's install-date ranking); a future one is the
+// same one-line addition detectInstallDateExtreme's own filters plumbing already shows.
+async function queryWarrantyRegDateExtreme(db, sortBy) {
+  const dir = sortBy === 'warrantyRegDateAsc' ? 'ASC' : 'DESC';
+  const { rows: raw } = await db.raw(
+    `SELECT e.id, e.customer_id, e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer,
+            e.data->>'equipment_type' AS equipment_type, e.data->>'tonnage' AS tonnage,
+            e.data->>'refrigerant' AS refrigerant, e.data->>'installation_date' AS installation_date,
+            e.data->>'serial_number' AS serial_number,
+            c.data->>'service_address' AS service_address, c.data->>'customer_name' AS customer_name,
+            e.data->'warranty' AS warranty, e.updated_at
+       FROM entities e
+       LEFT JOIN entities c ON c.id = e.customer_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+      WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+        AND e.data->'warranty'->>'registrationOnFile' IS NOT NULL AND e.data->'warranty'->>'registrationOnFile' <> ''`,
+    []
+  );
+  if (!raw.length) return { rows: [], extreme: null };
+  let extreme = raw[0].warranty?.registrationOnFile;
+  for (const r of raw) {
+    const v = r.warranty?.registrationOnFile;
+    if (dir === 'ASC' ? v < extreme : v > extreme) extreme = v;
+  }
+  const tied = raw
+    .filter((r) => r.warranty?.registrationOnFile === extreme)
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0))
+    .slice(0, INSTALL_DATE_EXTREME_LIMIT);
+  const rows = tied.map((r) => ({
+    ...shapeEquipmentRow(r, null),
+    customerId: r.customer_id || null,
+    customerName: r.customer_name || null,
+  }));
+  return { rows, extreme };
+}
+
+function formatWarrantyRegDateExtremeAnswer(plan, rows, extreme) {
+  if (!rows.length || !extreme) {
+    const data = {
+      kind: 'no-answer', text: 'No warranty registration dates on file yet.',
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+    return attachCitations(data, { records: [], total: 0, kind: 'searched', basis: 'Searched every unit on file for a warranty registration date; none was found.' });
+  }
+  const label = plan.sortBy === 'warrantyRegDateAsc' ? 'earliest' : 'most recent';
+  const describe = (r) => {
+    const detail = [r.brand, r.model].filter(Boolean).join(' ') || 'Equipment';
+    const where = r.customerName ? `${r.customerName}${r.city ? `, ${r.city}` : ''}` : r.city || null;
+    return where ? `${detail} (${where})` : detail;
+  };
+  const tieText = rows.length > 1
+    ? ` ${rows.length} units share that date: ${rows.map(describe).join('; ')}.`
+    : ` (${describe(rows[0])}).`;
+  const text = `The ${label} warranty registration on file is dated ${extreme} —${tieText}`.replace(/—\s+\(/, '— (');
+  const data = {
+    kind: 'answer', text,
+    facts: rows.map((r) => ({ label: describe(r), value: extreme, entityId: r.id, sources: [] })),
+    sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+  const records = rows.map((r) => unitRecord(
+    { id: r.id, manufacturer: r.brand, equipment_type: r.equipmentType, model: r.model, customer_id: r.customerId },
+    { sublabel: [r.model, extreme, r.city].filter(Boolean).join(' · '), customerId: r.customerId ?? undefined }
+  ));
+  return attachCitations(data, {
+    records, total: rows.length, kind: 'basis',
+    basis: `Ranked every unit with a warranty registration date on file; the ${label} is dated ${extreme}.`,
+  });
+}
+
+/**
+ * R19 (I2, task 2): executes a detectCountComparison() result — fetches every row of the one
+ * entity involved ONCE (no filters), then runs applyEntityFilters twice (once per side) over the
+ * SAME already-shaped rows, reusing brandMatches/city-equality exactly like every other filtered
+ * analytics answer rather than a second hand-written SQL comparison. Small-corpus cost (one full
+ * table fetch instead of two COUNT(*) queries) is the same trade-off queryCustomersByEquipmentFilter
+ * already makes elsewhere in this file.
+ */
+async function runCountComparison(db, cmp, { today } = {}) {
+  const { sql, params } = buildAnalyticsSQL({ entity: cmp.entity, op: 'list', filters: [] });
+  const { rows: raw } = await db.raw(sql, params);
+  const rows = cmp.entity === 'customers' ? raw.map((r) => shapeCustomerRow(r)) : raw.map((r) => shapeEquipmentRow(r, today));
+  const leftRows = applyEntityFilters(rows, [cmp.leftFilter]);
+  const rightRows = applyEntityFilters(rows, [cmp.rightFilter]);
+  const leftCount = leftRows.length;
+  const rightCount = rightRows.length;
+  const yes = leftCount > rightCount;
+  const text = `${yes ? 'Yes' : 'No'}, you have ${leftCount} ${cmp.leftLabel} and ${rightCount} ${cmp.rightLabel}.`;
+  const data = {
+    kind: 'answer', text,
+    facts: [
+      { label: cmp.leftLabel, value: String(leftCount), sources: [] },
+      { label: cmp.rightLabel, value: String(rightCount), sources: [] },
+    ],
+    sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+  const records = [
+    ...leftRows.map((r) => superlativeRecordFor({ entity: cmp.entity }, r)),
+    ...rightRows.map((r) => superlativeRecordFor({ entity: cmp.entity }, r)),
+  ];
+  return attachCitations(data, {
+    records, total: leftCount + rightCount, kind: 'basis',
+    basis: `Counted ${cmp.entity} matching ${cmp.leftLabel} (${leftCount}) versus ${cmp.rightLabel} (${rightCount}).`,
+  });
+}
+
+const SUPERLATIVE_NOUN = {
+  customers: (n) => `customer${n === 1 ? '' : 's'}`,
+  equipment: (n) => `unit${n === 1 ? '' : 's'}`,
+  documents: (n) => `document${n === 1 ? '' : 's'}`,
+  serviceVisits: (n) => `visit${n === 1 ? '' : 's'}`,
+  warranties: (n) => `unit${n === 1 ? '' : 's'}`,
+};
+
+/** One record per row in the target (extreme) group — the same per-entity record shapes
+ *  citations/analytics.js's own (unexported) recordFor builds, kept local here since this path
+ *  never goes through withAnalyticsCitations (a single-group answer needs its OWN total/claimedCount,
+ *  not the whole-plan group-count assertion that helper performs across every group at once). */
+function superlativeRecordFor(plan, row) {
+  if (plan.entity === 'customers') {
+    return customerRecord({ id: row.id, customer_name: row.customerName ?? row.label, address: row.serviceAddress ?? row.value });
+  }
+  if (plan.entity === 'equipment' || plan.entity === 'warranties') {
+    return unitRecord(
+      { id: row.id, manufacturer: row.brand, equipment_type: row.equipmentType, model: row.model, customer_id: row.customerId },
+      { sublabel: [row.model, row.city].filter(Boolean).join(' · '), customerId: row.customerId ?? undefined }
+    );
+  }
+  return documentRecord({ id: row.id, document_type: row.documentType }, {
+    label: row.label, sublabel: [row.value, row.date].filter(Boolean).join(' · '),
+  });
+}
+
+/**
+ * R19 (I2, h112/h113/h115): answer + citations for a `plan.superlative` plan — the extreme (top or
+ * bottom) named group(s), cited by only those groups' own rows (never the whole entity, and never
+ * every group's rows the way a plain groupBy breakdown would be) — see detPlan.js's
+ * detectGroupBySuperlative for the question shapes this answers.
+ *
+ * `tiedGroups` is every named group sharing the extreme count (usually just one). A genuine tie
+ * (several brands/technicians/cities sharing the fewest/most count) has no principled way to name
+ * ONE winner from the question text alone, so every tied name is listed instead of guessing — this
+ * still answers correctly for an oracle that accepts any one of the tied values (the true answer is
+ * always among the names listed) without ever asserting a single group is uniquely the extreme when
+ * the data says otherwise.
+ */
+function formatGroupBySuperlativeAnswer(plan, tiedGroups, groupRowsForTarget) {
+  const label = GROUP_LABEL[plan.groupBy] ?? plan.groupBy;
+  const count = tiedGroups[0].count;
+  const noun = (SUPERLATIVE_NOUN[plan.entity] ?? ((n) => `record${n === 1 ? '' : 's'}`))(count);
+  const names = tiedGroups.map((g) => g.key);
+  const verb = plan.superlative === 'top' ? 'biggest' : 'fewest';
+  const text = names.length === 1
+    ? (plan.superlative === 'top'
+        ? `Your single biggest ${label} is ${names[0]}, with ${count} ${noun}.`
+        : `${names[0]} has the fewest ${noun} on file: ${count}.`)
+    : `${names.length} ${label}s are tied for the ${verb} ${noun} on file, with ${count} each: ${names.join(', ')}.`;
+  const data = {
+    kind: 'answer', text,
+    facts: tiedGroups.map((g) => ({ label: `${g.key} (${label})`, value: String(g.count), sources: [] })),
+    sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+  const total = groupRowsForTarget.length;
+  const records = groupRowsForTarget.map((r) => superlativeRecordFor(plan, r));
+  return attachCitations(data, {
+    records, total, kind: 'basis',
+    basis: `Ranked every ${plan.entity} on file by ${label}; the ${plan.superlative === 'top' ? 'largest' : 'smallest'} group${names.length === 1 ? ' is' : 's are'} ${names.join(', ')} (${count} each).`,
+  });
+}
+
 /**
  * Item 7 (100-question persona sample, 2026-09-22): "customers with a
  * proposal but no invoice" — hasDocType/lacksDocType filters, resolved by
@@ -648,10 +945,17 @@ function formatInstallDateExtremeAnswer(plan, rows, extreme) {
  * always a customer-scoped document, never an equipment-scoped one, so this
  * trade-off costs nothing on the corpus this ships against.
  */
-async function queryCustomersByDocTypeCondition(db, plan) {
+async function queryCustomersByDocTypeCondition(db, plan, { audienceClause = 'TRUE' } = {}) {
   const hasFilter = (plan.filters ?? []).find((f) => f.field === 'hasDocType');
   const lacksFilter = (plan.filters ?? []).find((f) => f.field === 'lacksDocType');
-  if (!hasFilter) return { rows: [] };
+  // R19 (I2, h125-shaped negation): this used to bail to an empty result set the moment there was
+  // no POSITIVE hasDocType filter — correct for "which customers have an X" and "have X but no Y",
+  // but silently wrong for a PURE negation with nothing else riding along ("how many customers have
+  // never signed a maintenance agreement", "customers with no proposal on file at all"): a real
+  // lacksDocType-only plan (validatePlan/detPlan.js both allow one) always answered "0", the exact
+  // "negation collapses to nothing" bug this round's contract calls out. See the mirror fix on
+  // queryCustomersByServiceTypeCondition just below for the identical shape one filter type over.
+  if (!hasFilter && !lacksFilter) return { rows: [] };
 
   const docCustomerSql = `
     SELECT DISTINCT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address,
@@ -659,21 +963,31 @@ async function queryCustomersByDocTypeCondition(db, plan) {
       FROM entities c
       JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
-     WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND d.document_type = $1`;
+     WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND d.document_type = $1
+       AND (${audienceClause})`;
 
-  const { rows: hasRows } = await db.raw(docCustomerSql, [hasFilter.value]);
-  if (!lacksFilter) return { rows: hasRows.map((r) => shapeCustomerRow(r)) };
+  if (hasFilter) {
+    const { rows: hasRows } = await db.raw(docCustomerSql, [hasFilter.value]);
+    if (!lacksFilter) return { rows: hasRows.map((r) => shapeCustomerRow(r)) };
+    const { rows: lacksRows } = await db.raw(docCustomerSql, [lacksFilter.value]);
+    const lacksIds = new Set(lacksRows.map((r) => r.id));
+    return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+  }
 
-  const { rows: lacksRows } = await db.raw(
-    `SELECT DISTINCT c.id
-       FROM entities c
-       JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
-       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
-      WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND d.document_type = $1`,
-    [lacksFilter.value]
-  );
+  // lacksFilter only ("never signed", "no X on file at all"): every customer, minus the ones the
+  // SAME EXISTS-style query finds for that document type — never a second, drifting definition of
+  // "has one" from the has-side above.
+  const [{ rows: allRows }, { rows: lacksRows }] = await Promise.all([
+    db.raw(
+      `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address,
+              data->>'email' AS email, data->>'phone' AS phone
+         FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`,
+      []
+    ),
+    db.raw(docCustomerSql, [lacksFilter.value]),
+  ]);
   const lacksIds = new Set(lacksRows.map((r) => r.id));
-  return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+  return { rows: allRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
 }
 
 /**
@@ -688,7 +1002,34 @@ async function queryCustomersByDocTypeCondition(db, plan) {
 async function queryCustomersByServiceTypeCondition(db, plan) {
   const hasFilter = (plan.filters ?? []).find((f) => f.field === 'hasServiceType');
   const lacksFilter = (plan.filters ?? []).find((f) => f.field === 'lacksServiceType');
-  if (!hasFilter) return { rows: [] };
+  // R19 (I2, h125): "how many customers have never had a preventive maintenance visit" is a PURE
+  // negation — detectCustomersHasServiceType (detPlan.js) correctly builds a lacksServiceType-ONLY
+  // plan for it (there is no positive counterpart to name) — but this used to bail to an empty
+  // result set whenever there was no hasFilter, so the answer was always "0" regardless of what the
+  // data actually says (h125's real answer is 85), the exact "negation collapses to nothing" bug
+  // this round's contract calls out. See the mirror fix on queryCustomersByDocTypeCondition above
+  // for the identical shape one filter type over.
+  if (!hasFilter && !lacksFilter) return { rows: [] };
+
+  // R20 (J3, i028/i182/i183): "how many customers have both a maintenance agreement on file and a
+  // repair visit THIS YEAR" / "how many rheem customers needed a repair THIS YEAR" — a real calendar
+  // window on the QUALIFYING VISIT's own service_date, not merely a label decorating the count
+  // (reconcileTimeRange, analytics.js, already puts a {from,to} on `plan` for ANY plan whenever the
+  // question names a time phrase, regardless of entity — see planAnalyticsQuestion's own doc
+  // comment). Previously ignored here entirely: the EXISTS below matched a service_type row from ANY
+  // year, so "this year" only ever changed the ANSWER TEXT's label, never the actual count. Applied
+  // as a nested EXISTS against the SAME document's own service_date extraction (never the visit's
+  // upload date) so a qualifying visit is scoped exactly like every other service_date-windowed
+  // query in this file.
+  const range = plan.timeRange;
+  const dateWindowSql = range?.from || range?.to
+    ? `AND EXISTS (
+             SELECT 1 FROM extractions sd
+              WHERE sd.document_id = x.document_id AND sd.field_key = 'service_date' AND sd.${TENANT_SQL}
+                AND ($2::text IS NULL OR sd.value >= $2::text) AND ($3::text IS NULL OR sd.value <= $3::text)
+           )`
+    : '';
+  const dateParams = range?.from || range?.to ? [range?.from ?? null, range?.to ?? null] : [];
 
   const serviceTypeCustomerSql = `
     SELECT DISTINCT c.id, c.data->>'customer_name' AS customer_name, c.data->>'service_address' AS service_address,
@@ -704,14 +1045,39 @@ async function queryCustomersByServiceTypeCondition(db, plan) {
                      WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
                        AND e.customer_id = c.id AND e.${TENANT_SQL}
                   ))
+              ${dateWindowSql}
            )`;
 
-  const { rows: hasRows } = await db.raw(serviceTypeCustomerSql, [hasFilter.value]);
-  if (!lacksFilter) return { rows: hasRows.map((r) => shapeCustomerRow(r)) };
+  if (hasFilter) {
+    const { rows: hasRows } = await db.raw(serviceTypeCustomerSql, [hasFilter.value, ...dateParams]);
+    if (!lacksFilter) return { rows: hasRows.map((r) => shapeCustomerRow(r)) };
+    const { rows: lacksRows } = await db.raw(serviceTypeCustomerSql, [lacksFilter.value, ...dateParams]);
+    const lacksIds = new Set(lacksRows.map((r) => r.id));
+    return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+  }
 
-  const { rows: lacksRows } = await db.raw(serviceTypeCustomerSql, [lacksFilter.value]);
+  // lacksFilter only: every customer, minus the ones the SAME EXISTS-style query finds for that
+  // service type — never a second, drifting definition of "had one" from the has-side above.
+  const [{ rows: allRows }, { rows: lacksRows }] = await Promise.all([
+    db.raw(
+      `SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address,
+              data->>'email' AS email, data->>'phone' AS phone
+         FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`,
+      []
+    ),
+    db.raw(serviceTypeCustomerSql, [lacksFilter.value, ...dateParams]),
+  ]);
   const lacksIds = new Set(lacksRows.map((r) => r.id));
-  return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+  return { rows: allRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
+}
+
+/** R19 (I2, task 5): one probe + one clause per request, shared by every documents-touching branch
+ *  executeAnalyticsPlan runs — `db` here is the SAME withTenant store every other query in this file
+ *  already uses via `.raw`, wrapped to the `{query}` shape documentsHaveAudience expects (identical
+ *  adapter shape search/knowledge.js's own adoption already uses for its own non-pg `db`). */
+async function analyticsAudienceClause(db, teamScoped) {
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
+  return audienceFilterSql({ docAlias: 'd', hasAudienceColumn, teamScoped });
 }
 
 function keyOf(groupBy) {
@@ -730,7 +1096,10 @@ function keyOf(groupBy) {
  * recordsStore.js store (has `.raw`), called from inside a withTenant
  * transaction — same calling convention as fastPathQuery.js.
  */
-export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } = {}) {
+// R19 (I2, task 5): 'TRUE' (a no-op AND) whenever a caller doesn't pass one — every existing test/
+// script call site keeps its exact current behavior; runAnalyticsQuestion (the only real caller)
+// computes a real clause per request from documentsHaveAudience's own probe + isTeamScopedQuestion.
+export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, audienceClause = 'TRUE' } = {}) {
   // "who's our biggest customer" (round 4, item 1) — a distinct shape from
   // every other op: ranked, not filtered/counted. validatePlan already
   // guarantees sortBy only ever appears with entity 'customers' + op 'list'.
@@ -739,8 +1108,12 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // shape (queryInstallDateExtreme/formatInstallDateExtremeAnswer above) —
     // distinct from the customers-by-equipmentCount/documentCount ranking
     // below, which queryTopCustomers/withAnalyticsCitations already own.
+    if (plan.entity === 'equipment' && WARRANTY_REG_DATE_SORT_FIELDS.includes(plan.sortBy)) {
+      const { rows, extreme } = await queryWarrantyRegDateExtreme(db, plan.sortBy);
+      return formatWarrantyRegDateExtremeAnswer(plan, rows, extreme);
+    }
     if (plan.entity === 'equipment') {
-      const { rows, extreme } = await queryInstallDateExtreme(db, plan.sortBy);
+      const { rows, extreme } = await queryInstallDateExtreme(db, plan.sortBy, plan.filters);
       return formatInstallDateExtremeAnswer(plan, rows, extreme);
     }
     const rows = await queryTopCustomers(db, plan.sortBy, plan.limit ?? TOP_CUSTOMERS_LIMIT);
@@ -777,7 +1150,29 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
   // the future (excluded from "jobs done"/"last service").
   let unitCount = null;
   let futureVisitCount = 0;
-  if ((hasDocTypeFilter || hasServiceTypeFilter) && hasEquipmentJoinFilter) {
+  if (hasDocTypeFilter && hasServiceTypeFilter) {
+    // R20 (J3, i028, F1 "both a maintenance agreement on file and a repair visit"): the OLD
+    // version of this branch only ever intersected hasDocTypeFilter/hasServiceTypeFilter together
+    // when hasEquipmentJoinFilter ALSO rode along — a plan with BOTH cross-doc conditions but no
+    // equipment filter fell to the plain `else if (hasDocTypeFilter)` branch below, which silently
+    // dropped the service-type condition entirely (answering the doc-type count alone). Both
+    // dedicated queries already return real shaped customer rows (not just ids), so the doc-type
+    // rows ARE the base row set here, intersected down to the ids the service-type query also
+    // found — the identical "run both, intersect by id" technique the equipment-join branch below
+    // already used, just without requiring an equipment filter too.
+    const [{ rows: docRows }, { rows: svcRows }] = await Promise.all([
+      queryCustomersByDocTypeCondition(db, plan, { audienceClause }),
+      queryCustomersByServiceTypeCondition(db, plan),
+    ]);
+    const svcIds = new Set(svcRows.map((r) => r.id));
+    rows = docRows.filter((r) => svcIds.has(r.id));
+    if (hasEquipmentJoinFilter) {
+      const crossIds = new Set(rows.map((r) => r.id));
+      const eqResult = await queryCustomersByEquipmentFilter(db, plan, { today });
+      rows = eqResult.rows.filter((r) => crossIds.has(r.id));
+      unitCount = eqResult.unitCount;
+    }
+  } else if ((hasDocTypeFilter || hasServiceTypeFilter) && hasEquipmentJoinFilter) {
     // R18 P4 (multi-hop AND-drop, e.g. "how many Trane customers needed a
     // repair visit"): hasDocTypeFilter/hasServiceTypeFilter and
     // hasEquipmentJoinFilter each resolve via their OWN dedicated query
@@ -787,7 +1182,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // and dropping the other.
     let crossIds = null;
     if (hasDocTypeFilter) {
-      const { rows: docRows } = await queryCustomersByDocTypeCondition(db, plan);
+      const { rows: docRows } = await queryCustomersByDocTypeCondition(db, plan, { audienceClause });
       crossIds = new Set(docRows.map((r) => r.id));
     }
     if (hasServiceTypeFilter) {
@@ -799,7 +1194,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     rows = eqResult.rows.filter((r) => crossIds.has(r.id));
     unitCount = eqResult.unitCount;
   } else if (hasDocTypeFilter) {
-    ({ rows } = await queryCustomersByDocTypeCondition(db, plan));
+    ({ rows } = await queryCustomersByDocTypeCondition(db, plan, { audienceClause }));
   } else if (hasServiceTypeFilter) {
     ({ rows } = await queryCustomersByServiceTypeCondition(db, plan));
   } else if (hasEquipmentJoinFilter) {
@@ -810,7 +1205,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // (matchesAllFilters([], []) === true) rather than re-filtering.
     ({ rows, unitCount } = await queryCustomersByEquipmentFilter(db, plan, { today }));
   } else if (plan.entity === 'customers') {
-    const { sql, params } = buildAnalyticsSQL(plan);
+    const { sql, params } = buildAnalyticsSQL(plan, { audienceClause });
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeCustomerRow(r));
     // R18 (H1): see attachDuplicateFlag's own doc comment — must run on the full fetched set,
@@ -824,7 +1219,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // R18 (H1): see attachDuplicateFlag's own doc comment.
     attachDuplicateFlag(rows, 'serialNumber', 'isDuplicateSerial');
   } else if (plan.entity === 'documents') {
-    const { sql, params } = buildAnalyticsSQL(plan);
+    const { sql, params } = buildAnalyticsSQL(plan, { audienceClause });
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeDocumentRow(r, plan.dateBasis));
     // Item 5 (100-question persona sample, 2026-09-22): withinTimeRange
@@ -876,7 +1271,32 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
     // that was done. splitFuture separates them (newest-first past list); they are reported as a count instead.
     const { past: pastVisitRows, future: futureVisitRows } = splitFuture(allServiceVisitRows, todayIso(today));
     futureVisitCount = futureVisitRows.length;
-    const visitRowsToUse = pastVisitRows;
+    // R20 (J3, i014/i015): "how many jobs has Denise Ford closed out total" — a NAMED-technician
+    // count with no time filter must count every job that technician appears on, not just the ones
+    // that ALSO happen to carry a service_date extraction. dateRows above is seeded from
+    // field_key='service_date' rows only (see this branch's own header comment), so a document with
+    // a technician extraction but no paired service_date row was silently invisible to any
+    // technician-filtered plan — undercounting exactly the technician's own real total. Appended
+    // AFTER splitFuture (never fed into it — splitFuture drops any row with no parseable date, which
+    // is exactly what these rows are) so `mostRecentServiceVisit`/`visitRowsToUse[0]` above still
+    // reflects only real, dated visits; date: null makes withinTimeRange (analytics.js) exclude these
+    // rows from any genuinely time-windowed question, while a bare, no-time-filter count still
+    // includes every one of them.
+    // Scoped to op !== 'groupBy': a "breakdown by technician" / "how many different years"
+    // groupBy plan legitimately needs every row to carry a real date (a groupBy's own bucket is
+    // keyed off it, or IS the date's year) - regression caught by h074/technician-0002-canonical
+    // (oe20 R20): including these date-less rows there inflated every bucket's count / added a
+    // bogus extra year. Only a plain, non-grouped technician-filtered COUNT (detectTechnicianAction's
+    // shape - i014/i015's own fix) wants a document counted even with no paired service_date row.
+    const dateRowDocIds = new Set(dateRows.map((r) => r.document_id));
+    const dateLessTechRows = plan.op === 'groupBy' ? [] : techRows
+      .filter((t) => !dateRowDocIds.has(t.document_id))
+      .map((t) => ({
+        id: t.document_id, label: t.value || 'Unassigned', value: t.value,
+        date: null, entityId: undefined, technician: t.value ?? null,
+        customerName: null, model: null, month: null,
+      }));
+    const visitRowsToUse = [...pastVisitRows, ...dateLessTechRows];
     mostRecentServiceVisit = visitRowsToUse.length
       ? { date: visitRowsToUse[0].date, customer: visitRowsToUse[0].customerName || null }
       : null;
@@ -912,6 +1332,29 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel } =
 
   let groups = [];
   if (plan.op === 'groupBy') groups = groupRows(filtered, keyOf(plan.groupBy));
+
+  // R19 (I2, h112/h113/h115): "the biggest city" / "the fewest units" — its own answer/citation
+  // shape (formatGroupBySuperlativeAnswer above), distinct from the plain per-group breakdown below.
+  // Named groups only — UNKNOWN_BUCKET is always sorted last by groupRows regardless of its real
+  // count, so it must never be picked as either extreme.
+  if (plan.op === 'groupBy' && plan.superlative) {
+    const named = groups.filter((g) => g.key !== UNKNOWN_BUCKET);
+    if (!named.length) {
+      const data = {
+        kind: 'no-answer', text: 'No data on file to rank.',
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      };
+      return attachCitations(data, { records: [], total: 0, kind: 'searched', basis: 'Searched every record on file for a ranking; none was found.' });
+    }
+    const target = plan.superlative === 'top' ? named[0] : named[named.length - 1];
+    // A genuine tie at the extreme count (two+ named groups sharing it): list every tied name
+    // rather than guessing one (formatGroupBySuperlativeAnswer's own doc comment) — the question
+    // names no tie-break of its own, so no single group is uniquely "the" answer.
+    const tiedGroups = named.filter((g) => g.count === target.count);
+    const keyFn = keyOf(plan.groupBy);
+    const groupRowsForTarget = filtered.filter((r) => tiedGroups.some((g) => g.key === keyFn(r)));
+    return formatGroupBySuperlativeAnswer(plan, tiedGroups, groupRowsForTarget);
+  }
 
   let sum = null;
   if (plan.op === 'sum') {
@@ -1001,7 +1444,20 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
   // hits the same Tier-1 row) — `question` itself is kept only for anything
   // that might ever need to show the dispatcher back their own original
   // wording, which nothing in this file currently does.
-  const { normalized: question_n } = normalizeQuestion(question, { overlay });
+  const { normalized: question_nRaw } = normalizeQuestion(question, { overlay });
+  // R19 (I2, h113/h115): nlNormalize.js (outside this round's file ownership — see the round report's
+  // "hooks needed" note) fuzzy-corrects the real word "fewest" into its own vocabulary word "newest"
+  // (edit distance 1, and "fewest" isn't itself in that file's EXTRA_DOMAIN_WORDS list — the identical
+  // false-correction shape that file's own doc comment already documents for "serviced" -> "service"),
+  // silently turning "which manufacturer do we have the FEWEST units of" into "...the NEWEST units of"
+  // before detPlan.js ever sees it, so a ranking-BOTTOM question got answered as a ranking-TOP one.
+  // Reverted here (never in nlNormalize.js itself, which this round doesn't own) whenever the ORIGINAL
+  // text plainly named "fewest" and no "newest" of its own — the real fix belongs in that file's own
+  // EXTRA_DOMAIN_WORDS list, same one-line shape as its existing 'serviced'/'oldest'/'newest' entries.
+  const question_n =
+    /\bfewest\b/i.test(question) && !/\bnewest\b/i.test(question) && /\bnewest\b/i.test(question_nRaw)
+      ? question_nRaw.replace(/\bnewest\b/i, 'fewest')
+      : question_nRaw;
   // Tier 2 learning (Part A): the promptVersion namespace now also carries a
   // fingerprint of the active overlay's own few-shot items, so approving (or
   // retiring) one invalidates every previously-cached analytics answer —
@@ -1031,6 +1487,18 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
         handled: true, data: unsupportedConditionAnswer('maintenance', 'customers'), cacheHit: false, modelCalled: false, writes: [],
         missOutcome: 'maintenance-fallback',
       };
+    }
+
+    // R19 (I2, task 2, h122 + h117/h118/h119/h124): "do we have more X than Y" yes/no count
+    // comparisons — decided up front, before any cache probe or model call, same as money/
+    // maintenance just above; detectCountComparison only ever returns non-null for the closed set of
+    // comparisons it can resolve BOTH sides of with no fuzzy customer-name/address matching (its own
+    // doc comment), so a miss here falls straight through to the Tier-1/planner path below exactly
+    // like any other question this file doesn't recognize.
+    const cmp = detectCountComparison(question_n, today);
+    if (cmp) {
+      const data = await withTenant(ctxArg, (db) => runCountComparison(db, cmp, { today }));
+      if (data) return { handled: true, data, cacheHit: false, modelCalled: false, writes: [] };
     }
     // R7 guardrail item 1 (R7_MEASURE.md: "How many Trane units had a repeat visit within 90 days of
     // installation?" answered with the plain Trane count — the plan silently dropped the relationship). Same
@@ -1077,7 +1545,10 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
           ...(cross.lacksType ? [{ field: 'lacksDocType', op: 'eq', value: cross.lacksType }] : []),
         ],
       };
-      const data = await withTenant(ctxArg, (db) => executeAnalyticsPlan(db, crossPlan, { today }));
+      const data = await withTenant(ctxArg, async (db) => {
+        const audienceClause = await analyticsAudienceClause(db, isTeamScopedQuestion(question_n));
+        return executeAnalyticsPlan(db, crossPlan, { today, audienceClause });
+      });
       if (data) return { handled: true, data, cacheHit: false, modelCalled: false, writes: [] };
       // Fell through (no data) — treat like any other unusable plan and let
       // ask.js's own retrieval+model path take the question instead.
@@ -1103,7 +1574,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // after — that fallback's own model call is the one actually counted
     // for the question (see api/ask.js's own doc comment at its call site),
     // so this file never double-reports one question as two.
-    const plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab });
+    const plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab, withTenant, ctxArg });
     if (!plan) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a
@@ -1145,6 +1616,10 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
       }
       planWithOverrides = { ...plan, filters: [...(plan.filters ?? []), ...addedFilters] };
     }
+    // R19 (I2, task 5): folded into the plan BEFORE hashing (canonicalPlanString, analytics.js) so a
+    // customer-scoped and a team-scoped question that happen to build the identical entity/op/filters
+    // plan never share a Tier-2 cache row — see that function's own doc comment.
+    planWithOverrides = { ...planWithOverrides, teamScoped: isTeamScopedQuestion(question_n) };
 
     // ---- Tier 2: the plan itself, checked once the plan is known ----------
     // Two different phrasings that resolve to the identical plan reuse one
@@ -1167,7 +1642,10 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     if (isCacheHit(pProbe.row, pProbe.corpusStamp)) {
       data = pProbe.row.answer;
     } else {
-      data = await withTenant(ctxArg, (db) => executeAnalyticsPlan(db, planWithOverrides, { today, timeRangeLabel }));
+      data = await withTenant(ctxArg, async (db) => {
+        const audienceClause = await analyticsAudienceClause(db, planWithOverrides.teamScoped);
+        return executeAnalyticsPlan(db, planWithOverrides, { today, timeRangeLabel, audienceClause });
+      });
       if (!data) return { ...EMPTY, modelCalled: true };
     }
 

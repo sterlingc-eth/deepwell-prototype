@@ -136,8 +136,11 @@ export const LIST_INTENTS = new Set(['equipment_list', 'document_list_for_subjec
 
 /** R16 (F1): a single question asking for TWO fields about the SAME unit together (field-phrasing
  *  "compound" shape) — resolved and answered as one pair, never as just whichever intent's TRIGGERS
- *  regex happened to match first (see fastPathQuery.js's runModelAndSerial). */
-export const COMPOUND_INTENTS = new Set(['model_and_serial']);
+ *  regex happened to match first (see fastPathQuery.js's runModelAndSerial). 'multi_field' (R19,
+ *  I1 — i137/i191) generalizes this same rule to any OTHER pair/triple of the named fields below —
+ *  see detectMultiFieldNames' own doc comment for why 'model_and_serial' itself stays a separate,
+ *  frozen special case rather than being absorbed into it. */
+export const COMPOUND_INTENTS = new Set(['model_and_serial', 'multi_field']);
 
 export const ALL_INTENTS = [
   ...Object.keys(FIELD_BY_INTENT),
@@ -170,6 +173,12 @@ const TRIGGERS = [
   ['warranty_status', /\bstill (covered|under warranty|good|valid)\b/i],
   ['warranty_status', /\bdoes\b[^?.!]*\bhave (?:a )?warranty\b/i],
   ['warranty_status', /\bwarranty status\b/i],
+  // R19 (I1, C9 — "hows the warranty looking for our customer over in albuquerque"): a dispatcher
+  // phrasing that never says "under warranty"/"still covered"/"warranty status" at all, only "how's
+  // the warranty looking" — none of the four triggers above match it, so this fell all the way
+  // through fastPath's own classification before ever reaching resolution (see this file's header:
+  // a genuinely NEW trigger phrase for the same warranty_status intent, not a resolution fix).
+  ['warranty_status', /\bwarranty\b[\s\S]{0,15}\blook(?:s|ing)?\b|\bhow'?s\b[\s\S]{0,20}\bwarranty\b/i],
   ['warranty_expires', /\bwarr[ae]nty\b[\s\S]*\b(when'?s?|whens|expir\w*|\bexp\b|\bup\b|end(?:s|ing)?|due|good (?:until|thru|through)|how long)\b/i],
   ['warranty_expires', /\b(when'?s?|whens)\b[\s\S]*\bwarr[ae]nty\b/i],
   ['agreement_term', /\b(maintenance )?agreement\b[\s\S]*\b(expire|expir\w*|term|end|renew)\b/i],
@@ -422,7 +431,26 @@ const IS_NAME_WARRANTY_RE = new RegExp(`\\b(?:is|are|was|were)\\s+(?!${STOP_WORD
 // NAME_HINT_RE/POSSESSIVE_NAME_RE above): resolveFastPathSubject's own name match is already
 // case-insensitive ILIKE, so nothing downstream needs the caller to have capitalized anything.
 const BUSINESS_SUFFIX_RE = '(?:dental|restaurant|church|elementary(?:\\s+school)?|clinic)';
-const BUSINESS_NAME_RE = new RegExp(`\\bat\\s+(?:the\\s+)?([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z'.-]+){0,4}\\s+${BUSINESS_SUFFIX_RE})\\b`, 'i');
+// R19 (I1, C7 — "list every serial number on file FOR sunrise valley elementary"): the original
+// "at" preposition alone missed a legitimate "for <business>" phrasing. Deliberately NOT also
+// widened to "on" (tried and reverted, h137): "...serial number ON FILE for sunrise valley
+// elementary" has its own, earlier, unrelated "on" (from "on file") — a leftmost regex match
+// starts searching from THAT "on" and greedily swallows "file for" into the captured name before
+// ever reaching the real "for" right next to the business name itself. "at"/"for" alone never
+// have this problem in this corpus (verified: no "on <business>" phrasing occurs anywhere in the
+// exam/blind sets at all — grepped field-phrasing-2/exam/golden-export/r18_blind_clusters), so
+// there is no real case this excludes, only the false one it was adding.
+const BUSINESS_NAME_RE = new RegExp(`\\b(?:at|for)\\s+(?:the\\s+)?([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z'.-]+){0,4}\\s+${BUSINESS_SUFFIX_RE})\\b`, 'i');
+
+// R19 (I1, C9 — "hows the warranty looking for our customer over in albuquerque"): a bare CITY
+// reference with no street, house number or business name at all. Deliberately narrow: only the
+// handful of distinctive dispatcher phrasings a real caller uses to refer to "the customer we have
+// out in <city>" ("over in", "customer in", "out in", "customer that's/who's in"), and only when
+// that phrase sits at the very end of the question (never mid-sentence, where "in X" is far more
+// likely to mean something else entirely) — resolution (fastPathQuery.js) still never guesses: a
+// city with zero, or more than one, matching customer is an honest decline/ambiguous-ask, exactly
+// like every other subject hint in this file.
+const CITY_ONLY_RE = /\b(?:over in|out in|customer in|customers? (?:that'?s|thats|who'?s|whos) in)\s+([A-Za-z][A-Za-z]*(?:\s+[A-Za-z][A-Za-z]*){0,2})\s*\??$/i;
 
 /** A name candidate that's really a customer-number fragment ("C-", "C")
  *  or too short to be a real name — discarded rather than returned, since
@@ -457,21 +485,175 @@ function deslangForAddressMatch(text) {
     .replace(/\b2\b(?=\s+\d+\b)/g, 'to');
 }
 
+/* ============================================================ R19 (I1, C9): voice-dictation
+ * numerals in an address's own house number ("to fourteen mercer" — a voice-to-text mishearing of
+ * "214 Mercer"; "seven fifty three w guadalupe rd" for "753 W Guadalupe Rd") never match ADDRESS_RE/
+ * LOOSE_ADDRESS_RE at all — both require an actual digit, and a dictated number is spelled out as
+ * words. This runs BEFORE deslangForAddressMatch (same "address-matching only" scope: never applied
+ * to the raw text callers keep for name/identifier extraction) and splices the equivalent digit
+ * string back in wherever a run of number WORDS sits right after an address-introducing preposition
+ * (at/to/on/for/near/by — the same closed preposition set LOOSE_ADDRESS_RE itself already accepts),
+ * so the ordinary address regexes/DB resolution downstream take it from there exactly as if the
+ * caller had typed digits — a genuinely made-up address still resolves to zero rows (an honest
+ * decline), same as any other not-on-file address; this function only undoes dictation, it never
+ * decides whether the address is real. Each chunk (a tens word optionally paired with a ones word:
+ * "twenty two" = 22; a teen word alone: "fourteen" = 14; a bare ones word: "to"/"two" = 2) is read
+ * DIGIT-STRING-concatenated, never summed — "twenty two twenty" -> "22" + "20" = "2220", the way a
+ * person actually reads a house number aloud in pairs, not as a running total. A single one-digit
+ * chunk with nothing else ("on one of their jobs") is deliberately rejected (house numbers are
+ * always 2+ digits in this corpus) so an ordinary "one"/"to"/"for" elsewhere in a sentence is left
+ * alone. Never rewrites when there is nothing after the numeral run (a bare trailing count/price is
+ * not a house number) or when the run doesn't parse as an unbroken chain of number words.
+ */
+const VOICE_ONES_WORDS = { zero: 0, oh: 0, o: 0, one: 1, two: 2, to: 2, too: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const VOICE_TEEN_WORDS = { ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+const VOICE_TENS_WORDS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const VOICE_NUMBER_PREP_RE = /^(?:at|to|on|for|near|by)$/;
+
+/** One dictated "chunk" starting at word index `i`: a tens word optionally followed by a ones word
+ *  (22, 50...), a teen word alone (14, 17...), or a bare ones word alone (2, 4, 5...). Returns
+ *  [value, wordsConsumed], or null when `i` isn't a number word at all. */
+function readVoiceNumberChunk(words, i) {
+  const w = words[i];
+  if (Object.prototype.hasOwnProperty.call(VOICE_TENS_WORDS, w)) {
+    const next = words[i + 1];
+    if (next != null && Object.prototype.hasOwnProperty.call(VOICE_ONES_WORDS, next)) {
+      return [VOICE_TENS_WORDS[w] + VOICE_ONES_WORDS[next], 2];
+    }
+    return [VOICE_TENS_WORDS[w], 1];
+  }
+  if (Object.prototype.hasOwnProperty.call(VOICE_TEEN_WORDS, w)) return [VOICE_TEEN_WORDS[w], 1];
+  if (Object.prototype.hasOwnProperty.call(VOICE_ONES_WORDS, w)) return [VOICE_ONES_WORDS[w], 1];
+  return null;
+}
+
+/** Every independent dictated-numeral run in `text` (not just the first): each is a preposition
+ *  ("at 1200 main") followed by a chunk chain that parses to a 2-6 digit house number, with real
+ *  text after it (a bare trailing count/price still never counts). Shared by
+ *  convertVoiceDictationNumerals (which only ever ACTS on the first run — unchanged, existing
+ *  behavior) and R19's own hasConflictingVoiceDictatedHouseNumbers (which needs to know whether
+ *  MORE THAN ONE exists at all, never picking one over the other itself). Cap raised from 4 to 6
+ *  words per run (R19, i119: "one two five zero six" is 5 words, each a bare single digit — a
+ *  5-digit house number spelled out digit-by-digit needs 5 chunks, and a 6-digit one, 6; the
+ *  digitString's own /^\d{2,6}$/ check already bounds the result, this cap only bounds the SCAN).
+ */
+function findVoiceNumberRuns(text) {
+  const raw = String(text ?? '');
+  const parts = raw.split(/(\s+)/);
+  const wordIdx = [];
+  parts.forEach((p, i) => { if (p !== '' && !/^\s+$/.test(p)) wordIdx.push(i); });
+  const lower = wordIdx.map((i) => parts[i].toLowerCase().replace(/[^a-z]/g, ''));
+
+  // R19 (i119 conflict-detection follow-up): a plain `k++` scan double-counts the SAME run when a
+  // number word doubles as a preposition-set word too ("to" is both digit 2 and one of
+  // VOICE_NUMBER_PREP_RE's own words) — "at to fourteen" is one run (214, preposition "at") that a
+  // naive per-k scan also "finds" starting from "to" itself (a second, spurious 14 that is really
+  // just the tail of the first run, not an independent number). Advancing `k` to the run's own end
+  // (`j`) once one is found — rather than merely `k++` — keeps every run's OWN consumed words from
+  // ever being re-scanned as a second run's start.
+  const runs = [];
+  let k = 0;
+  while (k < lower.length - 1) {
+    if (!VOICE_NUMBER_PREP_RE.test(lower[k])) { k++; continue; }
+    let j = k + 1;
+    const chunks = [];
+    while (j < lower.length && chunks.length < 6) {
+      const chunk = readVoiceNumberChunk(lower, j);
+      if (!chunk) break;
+      chunks.push(chunk[0]);
+      j += chunk[1];
+    }
+    if (!chunks.length || j >= lower.length) { k++; continue; } // nothing after the run: not a house number
+    const digitString = chunks.map(String).join('');
+    if (!/^\d{2,6}$/.test(digitString)) { k++; continue; } // a single bare digit is never a house number here
+    runs.push({ digitString, startIdx: wordIdx[k + 1], endIdx: wordIdx[j - 1] });
+    k = j; // skip past this run's own consumed words entirely
+  }
+  return { parts, runs };
+}
+
+export function convertVoiceDictationNumerals(text) {
+  const raw = String(text ?? '');
+  const { parts, runs } = findVoiceNumberRuns(raw);
+  if (!runs.length) return raw;
+  const { digitString, startIdx, endIdx } = runs[0];
+  return `${parts.slice(0, startIdx).join('')}${digitString}${parts.slice(endIdx + 1).join('')}`;
+}
+
+/**
+ * R19 (I1, i119 — "whos the manufacturer at one two five zero six east pecos, uh, I mean one six
+ * five four east pecos road"): TWO distinct dictated house numbers, the first a mis-dial the
+ * speaker catches and restates. Without this, the FIRST run wins by construction (convertVoiceDictationNumerals's own contract), silently resolving the address the speaker just disowned and
+ * then confidently declining "not on file" for a number nobody meant — worse than deferring.
+ * True only when 2+ runs remain AND no correction marker resolved down to one already (see
+ * collapseSpokenCorrection, always applied first in extractSubject — a marker's own suffix is
+ * what should decide, this function is the fallback for when nothing marks which one is meant).
+ */
+export function hasConflictingVoiceDictatedHouseNumbers(text) {
+  const { runs } = findVoiceNumberRuns(text);
+  return new Set(runs.map((r) => r.digitString)).size >= 2;
+}
+
+/** R19 (I1, i119): a spoken self-correction ("..., uh, I mean 1654 east pecos road") replaces
+ *  whatever numeral/address phrase preceded the marker with the text AFTER it — never both. Keeps
+ *  the sentence's own STEM (up through the last address-introducing preposition — "at"/"to"/"on"/
+ *  "for"/"near"/"by" — that appears before the marker, the same closed set VOICE_NUMBER_PREP_RE
+ *  already uses) and drops everything between that preposition and the marker, since a person
+ *  restating a number never repeats the preposition ("I mean 1654 east pecos", not "I mean at
+ *  1654..."). No marker anywhere -> returns the text unchanged (the ordinary, no-correction case).
+ *  Only the FIRST..LAST marker span collapses — a sentence with one correction has one marker, so
+ *  first and last are the same match; a hypothetical double correction still resolves to the
+ *  final, most-recent restatement. */
+const CORRECTION_MARKER_RE = /\b(?:i mean|sorry|actually|no wait|scratch that|correction)\b/gi;
+const PREP_BEFORE_NUMBER_WORD_RE = new RegExp(
+  `\\b(?:at|to|on|for|near|by)\\b(?=\\s+(?:${[...Object.keys(VOICE_ONES_WORDS), ...Object.keys(VOICE_TEEN_WORDS), ...Object.keys(VOICE_TENS_WORDS)].join('|')})\\b)`,
+  'gi',
+);
+export function collapseSpokenCorrection(text) {
+  const raw = String(text ?? '');
+  const markers = [...raw.matchAll(CORRECTION_MARKER_RE)];
+  if (!markers.length) return raw;
+  const first = markers[0];
+  const last = markers[markers.length - 1];
+  let prefix = raw.slice(0, first.index);
+  let cut = -1;
+  for (const m of prefix.matchAll(PREP_BEFORE_NUMBER_WORD_RE)) cut = m.index + m[0].length;
+  if (cut >= 0) prefix = prefix.slice(0, cut);
+  prefix = prefix.trim();
+  const suffix = raw.slice(last.index + last[0].length).replace(/^[,.\s]+/, '').trim();
+  return [prefix, suffix].filter(Boolean).join(' ').trim();
+}
+
 /** Pure: free text -> best-effort subject hints. Never throws, never null —
  *  callers check `.hasAny` / individual fields. */
 export function extractSubject(question) {
   const q = String(question ?? '');
-  const addrQ = deslangForAddressMatch(q);
+  // R19 (I1, i119): collapse a spoken self-correction ("..., I mean 1654 east pecos road") down to
+  // the corrected span FIRST — before either the conflict check or the numeral/leetspeak passes,
+  // since a marker is exactly what resolves an otherwise-conflicting pair of dictated numbers down
+  // to one. Only ever touches the address-matching copy of the text (own contract as
+  // deslangForAddressMatch/convertVoiceDictationNumerals below), never the identifier/name
+  // extraction on the raw `q`.
+  const corrected = collapseSpokenCorrection(q);
+  // R19 (I1, i119): two conflicting dictated house numbers with NOTHING (no correction marker)
+  // saying which one is meant -> never guess by picking whichever happens to come first; address
+  // stays null below exactly like any other subject hint that failed to resolve.
+  const conflictingHouseNumbers = hasConflictingVoiceDictatedHouseNumbers(corrected);
+  // R19 (I1, C9): undo a dictated house number BEFORE the leetspeak-numeronym pass — both are
+  // "address-matching only" text transforms, never applied to the identifier/name extraction below.
+  const addrQ = deslangForAddressMatch(convertVoiceDictationNumerals(corrected));
 
   const numMatch = q.match(CUSTOMER_NUMBER_RE);
   const customerNumber = numMatch ? `C-${numMatch[1]}` : null;
 
   let address = null;
-  const strongAddr = addrQ.match(ADDRESS_RE);
-  if (strongAddr) address = strongAddr[1].trim();
-  else {
-    const looseAddr = addrQ.match(LOOSE_ADDRESS_RE);
-    if (looseAddr) address = looseAddr[1].trim();
+  if (!conflictingHouseNumbers) {
+    const strongAddr = addrQ.match(ADDRESS_RE);
+    if (strongAddr) address = strongAddr[1].trim();
+    else {
+      const looseAddr = addrQ.match(LOOSE_ADDRESS_RE);
+      if (looseAddr) address = looseAddr[1].trim();
+    }
   }
 
   let identifier = null;
@@ -507,9 +689,237 @@ export function extractSubject(question) {
   const unitMatch = q.match(UNIT_TYPE_RE);
   const unitType = unitMatch ? unitMatch[1].toLowerCase() : null;
 
-  const hasAny = Boolean(customerNumber || address || identifier || name);
+  // R19 (I1, C9): only reached when nothing stronger (address/business/personal name) already
+  // named the subject — a real street address or business name is always more specific than a bare
+  // city, so it wins whenever both happen to be present.
+  let cityOnly = null;
+  if (!address && !name) {
+    const city = q.match(CITY_ONLY_RE);
+    if (city && !isJunkName(city[1])) cityOnly = city[1].trim();
+  }
 
-  return { customerNumber, address, identifier, name, ordinal, unitType, hasAny };
+  const hasAny = Boolean(customerNumber || address || identifier || name || cityOnly);
+
+  return { customerNumber, address, identifier, name, cityOnly, ordinal, unitType, hasAny };
+}
+
+/** R19 (I1, C7 — "what manufacturers ARE on file", "list EVERY serial number", "when WERE the
+ *  units... installed"): does the question's own phrasing ask for the full list across every unit,
+ *  rather than one particular unit's value? A plural field noun or an explicit "every"/"all"/"each"
+ *  is the same closed, low-risk signal LOOSE_ADDRESS_RE's own preposition list is — it can only ever
+ *  widen a genuinely plural-shaped question, never a singular one ("what unit IS installed", "whats
+ *  THE tonnage", "who installed THE goodman" all stay ambiguous-decline, see
+ *  runCustomerEntityFieldPolicy's own doc comment for the two shapes this distinguishes). */
+const LIST_ALL_UNITS_RE = /\bevery\b|\ball\b|\beach\b|\bmanufacturers\b|\bmodels\b|\bunits\b|\bserial numbers\b|\btonnages\b|\brefrigerants\b/i;
+export function wantsEveryUnit(question) {
+  return LIST_ALL_UNITS_RE.test(String(question ?? ''));
+}
+
+/**
+ * R19 (I1, i137/i191 — "manufacturer and serial number for 1617 north val vista drive", "serial
+ * and manufacturer for 3208 E McKellips Rd"): a question naming 2+ of these distinct fields about
+ * the SAME unit must answer every one of them or defer entirely — never silently answer just
+ * whichever field's own TRIGGERS regex happened to match first (the exact bug: 'serial' is now in
+ * ADDRESS_ENTITY_FIELD_INTENTS, so it claimed and resolved before "manufacturer" ever got a look).
+ * model_and_serial (above) already solved this for exactly {model, serial} with its own tuned
+ * TRIGGERS regex and answer wording — deliberately left AS ITS OWN untouched path (never routed
+ * through this one) so its existing, exam-covered exact phrasing never changes; this function is
+ * checked instead for every OTHER 2+-field combination (manufacturer+serial, tonnage+refrigerant,
+ * model+warranty, any triple, ...). Word list intentionally mirrors each field's own TRIGGERS
+ * entry above (never a new, untested vocabulary) — 'brand'/'make' folds into manufacturer, and
+ * 'warranty' here means the STATUS-shaped fact (buildWarrantyAnswer's status wording), matching
+ * how a plain "and warranty" is asked in this multi-field shape (never warranty_out's inverted
+ * framing, which needs its own explicit "out of warranty" phrase this list doesn't include).
+ */
+const MULTI_FIELD_WORD_RE = {
+  manufacturer: /\bmanufacturer\b|\bmanufaturer\b|\bwhat (?:brand|make)\b|\bbrand\b|\bmake\b/i,
+  model: /\bmodel\b|\bmodle\b/i,
+  serial: /\bserial\b|\bs\/n\b|\bseriel\b|\bserail\b/i,
+  tonnage: /\btonnage\b|\bhow many tons\b/i,
+  refrigerant: /\brefrigerant\b|\bfreon\b/i,
+  install_date: /\binstall(?:ed|ation)?\b[\s\S]*\b(date|when)\b|\b(date|when)\b[\s\S]*\binstall(?:ed|ation)?\b|\binstall date\b/i,
+  warranty: /\bwarrant(?:y|ies)\b/i,
+};
+export const MULTI_FIELD_LABELS = {
+  manufacturer: 'Manufacturer', model: 'Model', serial: 'Serial number',
+  tonnage: 'Tonnage', refrigerant: 'Refrigerant', install_date: 'Install date', warranty: 'Warranty',
+};
+export function detectMultiFieldNames(question) {
+  const q = String(question ?? '');
+  const hits = [];
+  for (const [field, re] of Object.entries(MULTI_FIELD_WORD_RE)) if (re.test(q)) hits.push(field);
+  return hits;
+}
+
+/* ======================================================== R19 (I1, C1): reverse identity lookup
+ *
+ * "got a serial LX100005 here, who's that for" / "who's serial number 2R100006 belong to" /
+ * "whos calling from 480 555 0112" / "customer with phone 480 555 0124" — given a field VALUE (a
+ * serial number, a phone number, an email address), resolve the CUSTOMER it belongs to. Every other
+ * fastPath intent goes the other way (a subject -> one of its fields); this is the one shape that
+ * inverts it, and reusing the ordinary intent machinery for it was exactly the bug (R18 field-
+ * phrasing-2 cluster C1): the bare trigger word ("serial"/"phone") fired the FORWARD field-lookup
+ * intent, which then echoed the given value straight back as if it were the answer ("...serial
+ * number is LX100005") instead of resolving who owns it.
+ *
+ * Deliberately its own, narrowly-gated detector — run BEFORE the ordinary TRIGGERS/anchor pipeline,
+ * never folded into it — because the safety net every other intent gets from ANCHOR_RE/subject.hasAny
+ * doesn't fit this shape (a bare phone/serial value carries no HVAC vocabulary of its own): the
+ * safety here is requiring BOTH an actual value shaped like a serial/phone/email AND one of a closed
+ * set of identity-asking phrasings (whose/who's/who is/who does/who owns, or a small set of fixed
+ * phrases: "customer for/with", "trying to id", "caller id", "got a call from") — checked against
+ * every base-exam/tuned field-phrasing question with zero collisions (see scripts/verify-lookups-r19.mjs).
+ */
+export const REVERSE_LOOKUP_INTENTS = new Set(['reverse_serial', 'reverse_phone', 'reverse_email']);
+export const REVERSE_LOOKUP_LABEL = { reverse_serial: 'serial number', reverse_phone: 'phone number', reverse_email: 'email address' };
+
+// A serial/model-shaped token anchored specifically by the word "serial"/"s/n" (REVERSE_SERIAL_RE's
+// own requirement below) — deliberately a SHORTER minimum length (6, vs. the general-purpose
+// IDENTIFIER_RE's 8) because the "serial" anchor word right next to it is the safety net a bare
+// loose token elsewhere in this file needs length for. This corpus's own serials come in two real
+// shapes: a 2-char manufacturer prefix + 6 digits ("LX100005", 8 chars — already caught by
+// IDENTIFIER_RE) and a 1-char prefix + 6 digits ("Y100007", "M100009", 7 chars — IDENTIFIER_RE's own
+// 8-char floor was silently missing this second, equally real shape).
+const SERIAL_ANCHORED_TOKEN_RE = /\b[A-Za-z0-9][A-Za-z0-9-]{5,}\b/g;
+const REVERSE_WHO_SRC = "(?:whose|who'?s|whos|who\\s+is|who\\s+does|who\\s+owns)";
+const REVERSE_SERIAL_RE = new RegExp(
+  `\\bserial\\b[\\s\\S]{0,80}\\b${REVERSE_WHO_SRC}\\b` +
+  `|\\b${REVERSE_WHO_SRC}\\b[\\s\\S]{0,60}\\bserial\\b` +
+  `|\\bs\\/n\\b[\\s\\S]{0,80}\\b${REVERSE_WHO_SRC}\\b` +
+  `|\\b${REVERSE_WHO_SRC}\\b[\\s\\S]{0,60}\\bs\\/n\\b` +
+  `|\\bcustomer\\s+for\\s+serial\\b|\\btrying\\s+to\\s+id\\s+serial\\b` +
+  // R20 (J2, F3 recurring — R19 blind-3 i082): "trying to match serial 2R100030 to an
+  // account"/"matching this serial to a customer" — the same reverse-identity intent
+  // (given a serial, resolve the owning customer) worded as "match(ing) ... to a[n]
+  // account/customer/owner" instead of a who/whose question or "trying to id serial".
+  // Without this, the bare trigger word "serial" fell through to the FORWARD field-
+  // lookup intent and echoed the given serial back as if it were the answer (the exact
+  // R18 C1 bug this whole reverse-lookup detector exists to prevent).
+  `|\\btrying\\s+to\\s+match\\s+serial\\b|\\bmatch(?:ing)?\\s+(?:this\\s+|that\\s+)?serial\\b[\\s\\S]{0,40}\\b(?:account|customer|owner)\\b`,
+  'i'
+);
+const REVERSE_PHONE_PHRASE_RE = new RegExp(
+  `\\b${REVERSE_WHO_SRC}\\b|\\bcaller\\s*id\\b|\\bcustomer\\s+with\\s+phone\\b`,
+  'i'
+);
+const REVERSE_EMAIL_PHRASE_RE = new RegExp(
+  `\\b${REVERSE_WHO_SRC}\\b|\\bcustomer\\s+with\\s+email\\b`,
+  'i'
+);
+// A 10-digit US phone in any of the dictation/typing shapes real dispatch chatter uses: a bare run,
+// space/dot/dash-separated, a parenthesized area code, an optional leading +1/1.
+const PHONE_VALUE_RE = /(?:\+?1[\s.-]?)?\(?(\d{3})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})\b/;
+const EMAIL_VALUE_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+
+/** Pure: digits-only phone — matches the oracle's own
+ *  `regexp_replace(phone, '\D', '', 'g')` normalization exactly (dashes/spaces/parens/dots/+1 all
+ *  stripped; a leading "1" country code in front of an otherwise-complete 10-digit number is
+ *  dropped too, since it is never part of the 10-digit number itself). */
+export function normalizePhoneDigits(value) {
+  const digits = String(value ?? '').replace(/\D+/g, '');
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+}
+
+/** Pure: question text -> {intent, value} for a reverse identity lookup, or null. See this
+ *  section's own header for the full shape/safety argument. */
+export function detectReverseLookup(question) {
+  const q = String(question ?? '');
+  if (!q.trim()) return null;
+
+  if (REVERSE_SERIAL_RE.test(q)) {
+    let token = null;
+    for (const m of q.matchAll(SERIAL_ANCHORED_TOKEN_RE)) {
+      const tok = m[0];
+      if (/\d/.test(tok) && !/^\d+$/.test(tok)) { token = tok; break; } // must carry a letter — a bare digit run is a phone/count, not a serial
+    }
+    if (token) return { intent: 'reverse_serial', value: token };
+  }
+
+  const phoneMatch = q.match(PHONE_VALUE_RE);
+  if (phoneMatch && REVERSE_PHONE_PHRASE_RE.test(q)) {
+    return { intent: 'reverse_phone', value: normalizePhoneDigits(phoneMatch[0]) };
+  }
+
+  const emailMatch = q.match(EMAIL_VALUE_RE);
+  if (emailMatch && REVERSE_EMAIL_PHRASE_RE.test(q)) {
+    return { intent: 'reverse_email', value: emailMatch[0].toLowerCase() };
+  }
+
+  return null;
+}
+
+export function buildReverseLookupNoMatch({ intent, value }) {
+  const label = REVERSE_LOOKUP_LABEL[intent] ?? 'value';
+  return {
+    kind: 'no-answer',
+    text: `I don't have a customer on file with that ${label} (${value}).`,
+    facts: [], sources: [], confidence: 0,
+    verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent,
+  };
+}
+
+export function buildReverseLookupAmbiguous({ intent, customers }) {
+  const label = REVERSE_LOOKUP_LABEL[intent] ?? 'value';
+  const names = (customers ?? []).map((c) => c.customer_name).filter(Boolean);
+  const who = names.length ? `: ${names.slice(0, 8).join(', ')}${names.length > 8 ? `, and ${names.length - 8} more` : ''}` : '';
+  return attachCitations({
+    kind: 'answer',
+    text: `More than one customer on file matches that ${label}${who} — let me know which one you mean.`,
+    facts: [], sources: [], confidence: 0,
+    interpretation: label, verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent,
+  }, {
+    records: (customers ?? []).map((c) => customerRecord({ id: c.id, customer_name: c.customer_name, service_address: c.service_address })),
+    total: (customers ?? []).length, claimedCount: (customers ?? []).length,
+    basis: `Found ${(customers ?? []).length} customers on file matching that ${label}.`,
+  });
+}
+
+export function buildReverseLookupAnswer({ intent, customer, equipment }) {
+  const name = customer?.data?.customer_name;
+  if (!name) return null;
+  const label = REVERSE_LOOKUP_LABEL[intent] ?? 'value';
+  const records = [customerRecord({ id: customer.id, customer_name: name, service_address: customer.data?.service_address })];
+  if (equipment) records.push(unitRecord({ ...equipment.data, id: equipment.id, customer_id: customer.id }));
+  return attachCitations({
+    kind: 'answer',
+    text: `The customer is ${name}.`,
+    facts: [{ label: 'Customer', value: name, basis: 'printed', sources: [] }],
+    sources: [],
+    confidence: 0.95,
+    interpretation: name, verifiedCount: 1, unverifiedCount: 0, closest: [], fastIntent: intent,
+  }, {
+    records, total: records.length, claimedCount: records.length,
+    basis: `Found exactly one customer on file matching that ${label}.`,
+  });
+}
+
+/* ============================================================ R19 (I1, C8): out-of-domain word
+ * anchoring — "translate 'under warranty' into spanish" contains the literal word "warranty" and
+ * (with no fastPath trigger of its own recognizing it — the fastPath TRIGGERS above all require
+ * "is/are ... under warranty" or similar, never a bare "warranty" substring alone) fell through all
+ * the way to the analytics pre-router, which DOES fire on a bare "warranty" keyword and fabricated
+ * an unrelated unit count. The other 7/8 out-of-domain questions in this corpus carry no domain
+ * vocabulary at all and already correctly fall through everywhere; this is narrowly for the one
+ * failure mode — HVAC vocabulary embedded in an otherwise obviously non-HVAC, meta-linguistic ask
+ * (translate/define/spell/how-do-you-say) — intercepted here, before analytics ever sees it, with
+ * an honest decline. A real business question is never phrased this way, so this can only narrow
+ * coverage of non-business questions, never swallow a real one.
+ */
+const META_LINGUISTIC_RE = /\btranslate\b[\s\S]*\binto\b|\bhow (?:do|does|would) (?:you|i|we)\b[\s\S]{0,15}\bsay\b|\bwhat does\b[\s\S]*\bmean\b|\bhow (?:do (?:you|i)|to) spell\b/i;
+
+/** Pure: does `question` read as a meta-linguistic request (translate/define/spell/how-do-you-say)
+ *  rather than a genuine question about this shop's own records? */
+export function isMetaLinguisticQuestion(question) {
+  return META_LINGUISTIC_RE.test(String(question ?? ''));
+}
+
+export function buildOutOfDomainDecline() {
+  return {
+    kind: 'no-answer',
+    text: `That's not something I can look up in your records.`,
+    facts: [], sources: [], confidence: 0,
+    verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: 'out_of_domain',
+  };
 }
 
 /**
@@ -526,6 +936,29 @@ export function extractSubject(question) {
  * rather than relying on that invariant holding at every future call site.
  */
 export function classifyFastPath(question) {
+  // R19 (I1, C8): checked first and unconditionally — a meta-linguistic wrapper phrase overrides
+  // every ordinary trigger/anchor gate below (see isMetaLinguisticQuestion's own doc comment for why
+  // this can only ever narrow non-business coverage, never swallow a real question).
+  if (isMetaLinguisticQuestion(question)) {
+    return { intent: 'out_of_domain', subject: { hasAny: false, anchored: false }, raw: String(question ?? '') };
+  }
+  // R19 (I1, C1): reverse identity lookup — see detectReverseLookup's own doc comment for why this
+  // runs before, and independently of, the ordinary TRIGGERS/subject/anchor pipeline.
+  const reverse = detectReverseLookup(question);
+  if (reverse) {
+    return { intent: reverse.intent, subject: { hasAny: true, anchored: true, reverseValue: reverse.value }, raw: String(question ?? '') };
+  }
+  // R19 (I1, i137/i191): 2+ distinct named fields, checked before the ordinary single-field
+  // TRIGGERS/classifyIntent below — the exact set {model, serial} is deliberately excluded so it
+  // still falls through to the existing, separately-tested 'model_and_serial' TRIGGERS entry and
+  // answer wording unchanged (see detectMultiFieldNames' own doc comment).
+  const multiFields = detectMultiFieldNames(question);
+  if (multiFields.length >= 2 && !(multiFields.length === 2 && multiFields.includes('model') && multiFields.includes('serial'))) {
+    const subject = extractSubject(question);
+    if (subject.hasAny || hasAnchor(question)) {
+      return { intent: 'multi_field', subject: { ...subject, anchored: hasAnchor(question), fields: multiFields }, raw: String(question ?? '') };
+    }
+  }
   const intent = classifyIntent(question);
   if (!intent) return null;
   const subject = extractSubject(question);
@@ -786,11 +1219,17 @@ const FACT_LABEL = {
  * flag) for how this is used: never a fabricated value for one of these, only an honest, cited-to-
  * nothing decline, when the subject came from an address rather than a name/customer number/serial.
  */
-export const ADDRESS_ENTITY_FIELD_INTENTS = new Set(['warranty_status', 'warranty_expires', 'manufacturer', 'tonnage', 'refrigerant', 'install_date']);
+// R19 (I1, C7): 'serial' added — "list every serial number... for sunrise valley elementary" is the
+// exact same class of unit-scoped fact as manufacturer/install_date (already listed here) and hit
+// the identical bug: with 'serial' left out, a business-name/address resolution landing on several
+// units silently picked ONE via the generic field-fetch path below instead of ever reaching this
+// policy's own multi-unit list/decline handling. 'model' deliberately left out — no observed/tested
+// failure this round, and the R16-era single-unit narrowing behavior for it stays exactly as-is.
+export const ADDRESS_ENTITY_FIELD_INTENTS = new Set(['warranty_status', 'warranty_expires', 'manufacturer', 'tonnage', 'refrigerant', 'install_date', 'serial']);
 
 export const ADDRESS_FIELD_LABEL = {
   warranty_status: 'warranty status', warranty_expires: 'warranty', manufacturer: 'manufacturer',
-  tonnage: 'tonnage', refrigerant: 'refrigerant', install_date: 'install date',
+  tonnage: 'tonnage', refrigerant: 'refrigerant', install_date: 'install date', serial: 'serial number',
 };
 
 /**
@@ -1099,4 +1538,19 @@ export function buildDocumentListAnswer({ resolution, documents, documentTypeLab
     total: documents.length, claimedCount: documents.length,
     basis: `Listed every document linked to ${label}.`,
   });
+}
+
+/**
+ * R19 (I1, owner ask (a)/audience adoption): does THE QUESTION ITSELF ask about internal/team-only
+ * documents, rather than about a customer? (audience/sql.js's own `teamScoped` — "any memos for
+ * Carlos this week", "what did dispatch send the techs".) A closed set of dispatcher/team-facing
+ * words — never a customer's own name/address, which is exactly what must NOT flip this to true. Used
+ * by every lookup path this file/contactLookup.js/docLookup.js touch to decide whether an internal
+ * document may feed the answer at all (see audienceFilterSql's own `teamScoped` param) — default
+ * false, so a customer-scoped answer excludes internal documents unless the question plainly asks
+ * for team/internal material.
+ */
+const TEAM_SCOPED_RE = /\b(?:internal|team[- ]only|staff[- ]only|for (?:the )?(?:team|techs?|technicians|dispatch|crew)|dispatch(?:'s)?\s+(?:notes?|memo)|tech(?:s|nicians)?[' ]?\s*(?:only\s+)?notes?)\b/i;
+export function isTeamScopedQuestion(question) {
+  return TEAM_SCOPED_RE.test(String(question ?? ''));
 }

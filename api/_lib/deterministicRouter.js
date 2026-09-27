@@ -250,42 +250,56 @@ async function installDate(db, intent, ctx) {
   const units = narrowByBrand(ctx.scope.equipment, intent.brand);
   if (!units.length) return null;
   const rows = await installFacts(db, units.map((u) => u.id), ['installation_date', 'warranty_registered_date']);
-  const found = [];
+  // R19 (I1, h140 hook — Canyon View Dental's two units, "when were the units at <address>
+  // installed"): `results` now covers EVERY unit, not just the ones a citable date was found for —
+  // see the loop below for why a unit can legitimately have none, and the "found" filter right
+  // after for how that's stated rather than silently dropped.
+  const results = [];
   for (const u of units) {
     let date = isoDate(u.data?.installation_date) ?? (/^\d{4}(-\d{2})?$/.test(String(u.data?.installation_date ?? '')) ? String(u.data.installation_date) : null);
     let src = rows.find((r) => r.entity_id === u.id && r.field_key === 'installation_date' && String(r.value).slice(0, 10) === String(date ?? '').slice(0, 10));
-    if (!date) {
+    // R19 (I1): gating this fallback on `!src` (rather than the original `!date`) also covers a
+    // unit whose entity data DOES carry an installation_date, just in a different format than its
+    // own extraction row states it (a full timestamp vs. a plain date, say) — the exact-string
+    // match above would fail for that case even though a real, citable extraction exists.
+    if (!src) {
       // Only an install-shaped document may state it: a warranty registration's date is a registration date.
       const alt = rows.find((r) => r.entity_id === u.id && r.field_key === 'installation_date' && normalizeTypeId(r.document_type) !== 'warranty-registration');
       if (alt) { date = String(alt.value).slice(0, 10); src = alt; }
     }
     // R15 (Team C, follow-up round): `date` alone is not enough to state as an answer — the
     // equipment entity's own data.installation_date is only as trustworthy as the genuine
-    // per-document extraction that backs it (`src`). Before this fix, a unit whose data blob
-    // carried an installation_date with NOTHING behind it (no installation_date extraction
-    // anywhere for that unit — confirmed against the golden corpus: zero installation_date
-    // extractions exist for ANY unit) still got stated here as a confident, cited-looking answer,
-    // which is exactly the fabrication the offline exam's oracle flags as wrong for a single-unit
-    // install-date lookup (its ground truth for "when was THIS unit installed" requires either the
-    // unit's own on-file address to match — equipment entities never carry one — or a genuine
-    // extraction; a bare entity field backs neither). Requiring src turns that into the honest
-    // "No install date is recorded..." decline below instead of a wrong, unsupported date.
-    if (date && src) found.push({ unit: u, date, src });
+    // per-document extraction that backs it (`src`). A unit whose data blob carries an
+    // installation_date with NOTHING behind it (no installation_date extraction anywhere for that
+    // unit — a genuine, verified gap in this corpus's own extraction data, not a matching bug: this
+    // round's investigation confirmed Canyon View Dental's Mitsubishi unit has zero
+    // installation_date extraction rows at all, only its own entity-data copy) never gets stated as
+    // a confident, cited-looking date — exactly the fabrication the offline exam's own oracle
+    // flags as wrong for a single-unit install-date lookup. R19 (I1): for a MULTI-unit customer,
+    // this used to mean the whole unit silently vanished from the answer with no mention at all —
+    // now it's named honestly instead (`found: false`, see below), same "state what's missing,
+    // never omit it" rule buildAddressFieldDecline/buildMultiUnitAddressAnswer already follow in
+    // fastPathQuery.js for this exact shape.
+    results.push({ unit: u, date, src, found: Boolean(date && src) });
   }
+  const found = results.filter((r) => r.found);
   if (found.length) {
-    const facts = found.map((f, i) => ({
-      label: found.length === 1 ? 'Installed' : `Unit ${i + 1} (${brandModel(f.unit)})`,
-      value: /^\d{4}-\d{2}-\d{2}$/.test(f.date) ? humanDate(f.date) : f.date,
-      sources: f.src ? [{ documentId: f.src.document_id, location: { field: 'installation_date' } }] : [],
+    const allFound = found.length === results.length;
+    const facts = results.map((r, i) => ({
+      label: results.length === 1 ? 'Installed' : `Unit ${i + 1} (${brandModel(r.unit)})`,
+      value: r.found ? (/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? humanDate(r.date) : r.date) : 'no install date on file',
+      sources: r.src ? [{ documentId: r.src.document_id, location: { field: 'installation_date' } }] : [],
     }));
-    const text = found.length === 1
+    const text = results.length === 1
       ? `The ${brandModel(found[0].unit)} at ${ctx.label} was installed ${facts[0].value}.`
-      : `${found.length} units at ${ctx.label}: ${facts.map((f) => `${f.label} installed ${f.value}`).join('; ')}.`;
+      : `${results.length} units at ${ctx.label}: ${facts.map((f) => `${f.label} installed ${f.value}`).join('; ')}.`;
     const srcIds = [...new Set(found.map((f) => f.src?.document_id).filter(Boolean))];
     return attachCitations(answerEnvelope({ text, facts }), {
-      records: [...scopeUnitRecords(found.map((f) => f.unit)), ...(srcIds.length ? await documentRecordsFor(db, srcIds) : [])],
-      total: found.length + srcIds.length,
-      basis: `Read the installation date recorded for ${found.length} unit${found.length === 1 ? '' : 's'} at ${ctx.label} and the document it came from; registration dates are not install dates.`,
+      records: [...scopeUnitRecords(results.map((r) => r.unit)), ...(srcIds.length ? await documentRecordsFor(db, srcIds) : [])],
+      total: results.length + srcIds.length,
+      basis: allFound
+        ? `Read the installation date recorded for ${found.length} unit${found.length === 1 ? '' : 's'} at ${ctx.label} and the document it came from; registration dates are not install dates.`
+        : `Read the installation date recorded for ${found.length} of ${results.length} units at ${ctx.label} and the document it came from (the rest have no installation-date extraction on file); registration dates are not install dates.`,
     });
   }
   // Honest zero: say what IS on file instead of inventing an install date.

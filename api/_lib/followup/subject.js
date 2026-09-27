@@ -91,6 +91,40 @@ export function brandMentionIn(text) {
   return null;
 }
 
+// ---------------------------------------------------------------------- brand-vs-brand "those"
+// R20 (J4, dialogue d036 — "how many goodman units are on our books" / "do we have more of those than
+// lennox"): a bare `brandMentionIn(question)` check can't tell a question that already names ITS OWN
+// brand ("how many of those Trane units...") apart from a two-brand COMPARISON where the pronoun and
+// the named brand are two DIFFERENT halves of the same sentence — "those" (Goodman, from the prior
+// turn) versus "lennox" (this turn's own comparison target). Treating the latter as "already has a
+// brand" (the naive check) drops the Goodman reference entirely and answers a completely different,
+// unfiltered comparison. resolve.js's inheritedBrandFrom uses this instead of a bare brandMentionIn
+// call for exactly the 'refinement' kind.
+const THAN_RE = /\bthan\b/i;
+const COMPARISON_PRONOUN_RE = /\b(?:those|these|them)\b/i;
+
+/**
+ * True when `question` is a "than" comparison where ONE side is a bare pronoun ("those"/"these"/
+ * "them") naming no brand of its own and the OTHER side names a real, different brand — the shape
+ * that needs the pronoun's brand pulled from an EARLIER turn rather than read off this question's own
+ * text (inheritedBrandFrom, resolve.js). A question with no "than" split at all falls back to the
+ * plain "does this question mention any brand anywhere" check (unchanged from before this existed);
+ * a "than" comparison naming no brand on EITHER side (a city/customer comparison, say) is left alone —
+ * nothing to disambiguate.
+ */
+export function pronounNeedsBrandFromEarlierTurn(question) {
+  const q = String(question ?? '');
+  const idx = q.search(THAN_RE);
+  if (idx < 0) return COMPARISON_PRONOUN_RE.test(q) && !brandMentionIn(q);
+  const left = q.slice(0, idx);
+  const right = q.slice(idx + 4);
+  const leftBrand = brandMentionIn(left);
+  const rightBrand = brandMentionIn(right);
+  if (COMPARISON_PRONOUN_RE.test(left) && !leftBrand && rightBrand) return true;
+  if (COMPARISON_PRONOUN_RE.test(right) && !rightBrand && leftBrand) return true;
+  return false;
+}
+
 /**
  * Text this subject can stand in for inside a rewritten question — null when there is nothing usable.
  * `possessive` is deliberately a FIXED, address-free phrase ("the customer's") rather than "the

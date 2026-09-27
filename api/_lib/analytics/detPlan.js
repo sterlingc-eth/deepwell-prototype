@@ -217,6 +217,96 @@ const NO_CONTACT_INFO_RE = /\b(?:no|not have|don'?t have|without|missing|lacking
 /** "installs ... since 2020" — see its one use-site's own doc comment. */
 const SINCE_YEAR_RE = /\bsince\s+(\d{4})\b/i;
 
+/**
+ * R20 (J3, F1 "installs this year vs last"): "how many units have we installed so far this year" /
+ * "how many units did we install last year" — a real calendar-YEAR cutoff on the unit's own
+ * installation_date, named with "this year"/"last year" rather than a literal 4-digit year
+ * (SINCE_YEAR_RE's own territory just above). Scoped to a genuine install-event mention (the
+ * INSTALL_WORD_RE verb, not just any equipment noun) so an unrelated "units under warranty this
+ * year" question is left to the ordinary warranty/time-window paths instead of being reinterpreted
+ * as an install-year filter it never named. installYear is a plain numeric FILTER_FIELD (op 'eq'
+ * already works via matchesFilter's generic numeric compare — see that function's own doc comment),
+ * so no new plan vocabulary is needed, just the year arithmetic itself (done here from `today`, the
+ * same "code computes the year, never the model" rule resolveAgeFilter/detectWarrantyExpiryWindow
+ * already follow).
+ */
+const INSTALL_WORD_RE = /\binstall(?:ed|s|ation)?\b/i;
+const THIS_YEAR_INSTALL_RE = /\b(?:so\s+far\s+)?this\s+year\b/i;
+const LAST_YEAR_INSTALL_RE = /\blast\s+year\b/i;
+
+function detectInstallYearRelative(q, today) {
+  if (!INSTALL_WORD_RE.test(q) || !EQUIPMENT_NOUN_RE.test(q)) return null;
+  const now = today ? new Date(today) : new Date();
+  if (Number.isNaN(now.getTime())) return null;
+  const currentYear = now.getUTCFullYear();
+  let year = null;
+  if (LAST_YEAR_INSTALL_RE.test(q)) year = currentYear - 1;
+  else if (THIS_YEAR_INSTALL_RE.test(q)) year = currentYear;
+  if (year === null) return null;
+  return { entity: 'equipment', op: opFromShape(q), filters: [{ field: 'installYear', op: 'eq', value: year }] };
+}
+
+/**
+ * R20 (J3, i011): "how many properties do we have more than one unit installed at" — a per-customer
+ * equipment count > 1 (a GROUP BY ... HAVING shape no flat filter value alone could express), the
+ * customers-side mirror of hasAnyEquipment (which only ever answers the zero/nonzero question, not
+ * "more than one"). hasMultipleUnits (analytics.js's DATA_QUALITY_FIELD_ENTITY) is computed the same
+ * correlated-subquery way as hasAnyEquipment — see buildAnalyticsSQL's own customers branch.
+ */
+const MULTI_UNIT_CUSTOMER_RE =
+  /\b(?:more\s+than\s+one|multiple|two\s+or\s+more|at\s+least\s+two)\s+units?\b[\s\S]{0,20}\binstalled\s+at\b|\bproperties\b[\s\S]{0,30}\bmore\s+than\s+one\s+unit\b/i;
+
+function detectMultiUnitCustomers(q) {
+  if (!MULTI_UNIT_CUSTOMER_RE.test(q)) return null;
+  return { entity: 'customers', op: opFromShape(q), filters: [{ field: 'hasMultipleUnits', op: 'eq', value: true }] };
+}
+
+/**
+ * R20 (J3, F1 "per-name purchase-order checks" sibling / i020-i021): "how many purchase orders have
+ * we cut/issued/sent to Baker Distributing" — a documents count filtered to BOTH the purchase-order
+ * document type and the vendor named right after cut/issued/sent/placed/written ... to. `vendor` is a
+ * plain string FILTER_FIELD matched via matchesFilter's generic 'contains' path (analytics.js) against
+ * the vendor_name extraction buildAnalyticsSQL's documents branch now also selects — no closed vendor
+ * vocabulary needed (unlike a customer name, a vendor name here is read straight off the question, the
+ * same way a city/brand value already is). Requires an explicit purchase-order mention AND an action
+ * verb + "to" so this never fires on an unrelated "documents linked to <name>" sentence.
+ */
+const VENDOR_PO_RE =
+  /\bpurchase\s+orders?\b[\s\S]{0,30}?\b(?:cut|issued|sent|placed|written|made\s+out)\s+to\s+([a-z][a-z0-9 &.,'-]*?)\s*[?.!]*$/i;
+
+function detectVendorPurchaseOrderCount(q) {
+  const m = VENDOR_PO_RE.exec(q);
+  if (!m) return null;
+  const vendor = titleCaseWords(m[1].trim());
+  if (!vendor) return null;
+  return {
+    entity: 'documents',
+    op: 'count',
+    filters: [
+      { field: 'documentType', op: 'eq', value: 'purchase-order' },
+      { field: 'vendor', op: 'contains', value: vendor },
+    ],
+  };
+}
+
+/**
+ * R20 (J3, i094): "how many warranty registrations took longer than 30 days after install" — the
+ * per-unit gap (in days) between warranty.registrationOnFile and the unit's own install date,
+ * compared against whatever threshold the question actually names (never hard-coded to 30 — a
+ * paraphrase asking about 60 or 14 days must compare against ITS OWN number). warrantyRegistrationDays
+ * is a plain numeric FILTER_FIELD (shapeEquipmentRow, routes/analytics.js) — null on a unit missing
+ * either date, which matchesFilter's own "actual == null -> never matches" rule already excludes from
+ * every op, exactly like the oracle's own join (a unit with no registration row can't appear in it).
+ */
+const WARRANTY_REG_DAYS_RE =
+  /\bwarranty\s+registrations?\b[\s\S]{0,25}\b(?:took\s+longer\s+than|longer\s+than|more\s+than|over)\s+(\d{1,3})\s*days?\s+after\s+(?:the\s+)?install/i;
+
+function detectWarrantyRegistrationDays(q) {
+  const m = WARRANTY_REG_DAYS_RE.exec(q);
+  if (!m) return null;
+  return { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'gt', value: Number(m[1]) }] };
+}
+
 /* ============================================================ dimension words
  * (groupBy/coverage shapes — "by <dim>", "per <dim>", "how many different
  * <dim>", "each <dim>") — canonical GROUP_BY_FIELDS names, matched via their
@@ -228,7 +318,14 @@ const DIM_WORD_TO_FIELD = {
   city: 'city', cities: 'city',
   state: 'state', states: 'state',
   brand: 'brand', brands: 'brand',
+  // R19 (I2, h113): "manufacturer" is the same closed BRAND_WORDS-backed dimension as "brand" —
+  // just the word an owner uses when asking "which MANUFACTURER do we have the fewest units of"
+  // rather than "which brand". Same GROUP_BY_FIELDS value ('brand'), never a second column.
+  manufacturer: 'brand', manufacturers: 'brand',
   technician: 'technician', technicians: 'technician',
+  // R19 (I2, h115): "tech" is the everyday-speech short form of "technician" ("which tech has done
+  // the fewest visits") — same dimension, same forced 'serviceVisits' entity below.
+  tech: 'technician', techs: 'technician',
   month: 'month', months: 'month',
   'document type': 'documentType', 'document types': 'documentType',
   'warranty status': 'warrantyStatus',
@@ -248,6 +345,12 @@ const DIM_ALT = altOf(Object.keys(DIM_WORD_TO_FIELD));
  *  subject) — this is the same shape for a specific PERSON instead. */
 const TECHNICIAN_ACTION_RE =
   /\b(?:did|do|does)\s+([a-z][a-z.'-]*(?:\s+[a-z][a-z.'-]*){0,2})\s+(?:do|run|close(?:\s+out)?|complete|handle)\b/i;
+// R20 (J3, i014/i015): "how many jobs HAS Denise Ford CLOSED OUT total" / "...HAVE they COMPLETED
+// total" — the same named-technician-as-subject shape as TECHNICIAN_ACTION_RE just above, only with
+// a has/have auxiliary (present-perfect) instead of did/do/does, so the verb that follows the name is
+// the PAST-PARTICIPLE form (closed/completed/handled/done/run) rather than the bare one.
+const TECHNICIAN_ACTION_PERFECT_RE =
+  /\b(?:has|have)\s+([a-z][a-z.'-]*(?:\s+[a-z][a-z.'-]*){0,2})\s+(?:done|run|closed(?:\s+out)?|completed|handled)\b/i;
 const NON_NAME_STOPWORDS = new Set([
   'we', 'you', 'they', 'it', 'he', 'she', 'the', 'our', 'any', 'each', 'this', 'that',
   'customers', 'clients', 'units', 'equipment', 'jobs', 'work', 'service',
@@ -265,7 +368,7 @@ function dedupeLeadingLetter(word) {
 }
 
 function detectTechnicianAction(q) {
-  const m = TECHNICIAN_ACTION_RE.exec(q);
+  const m = TECHNICIAN_ACTION_RE.exec(q) ?? TECHNICIAN_ACTION_PERFECT_RE.exec(q);
   if (!m) return null;
   const name = m[1].trim().split(/\s+/).map(dedupeLeadingLetter).join(' ');
   const firstWord = name.split(/\s+/)[0].toLowerCase();
@@ -293,11 +396,13 @@ function detectTechnicianGroupBy(q) {
 }
 
 /** "how many different zip codes/counties/cities/states/brands/technicians
- *  do we cover/serve/have" — the DIMENSION's own distinct-value count, never
- *  a per-group breakdown (see analytics.js's formatAnalyticsAnswer, which
+ *  do we cover/serve/have" / "how many distinct document types do we
+ *  actually track" — the DIMENSION's own distinct-value count, never a
+ *  per-group breakdown (see analytics.js's formatAnalyticsAnswer, which
  *  reads plan.countDistinct to answer with a single number instead of a
- *  breakdown list). */
-const DIFFERENT_DIM_RE = new RegExp(`\\bhow many different\\s+(${DIM_ALT})\\b`, 'i');
+ *  breakdown list). "distinct" is the same request as "different" — a plain
+ *  everyday synonym, not a second shape. */
+const DIFFERENT_DIM_RE = new RegExp(`\\bhow many (?:different|distinct)\\s+(${DIM_ALT})\\b`, 'i');
 
 /**
  * Field-phrasing g133/g138 ("whats the oldest unit we have on file" /
@@ -310,11 +415,19 @@ const DIFFERENT_DIM_RE = new RegExp(`\\bhow many different\\s+(${DIM_ALT})\\b`, 
  * plugs into queryInstallDateExtreme/formatInstallDateExtremeAnswer
  * (routes/analytics.js), never buildAnalyticsSQL's plain filtered path.
  */
+// R19 (I2, h114): "whats our newest mitsubishi install" — the oldest/newest RANKING must still
+// respect a brand named in the same sentence (queryInstallDateExtreme, routes/analytics.js, now
+// takes plan.filters and narrows the candidate set to it before finding the extreme date) — reuses
+// buildConditionOverrideFilter('brand', ...) exactly like every other brand mention in this file
+// rather than a second brand-word table. A question naming no brand gets no filter, same as before.
 function detectInstallDateExtreme(q) {
   if (!EQUIPMENT_NOUN_RE.test(q)) return null;
-  if (/\b(oldest|earliest)\b/i.test(q)) return { entity: 'equipment', op: 'list', sortBy: 'installDateAsc' };
-  if (/\b(newest|latest)\b/i.test(q)) return { entity: 'equipment', op: 'list', sortBy: 'installDateDesc' };
-  return null;
+  const sortBy = /\b(oldest|earliest)\b/i.test(q) ? 'installDateAsc' : /\b(newest|latest)\b/i.test(q) ? 'installDateDesc' : null;
+  if (!sortBy) return null;
+  const plan = { entity: 'equipment', op: 'list', sortBy };
+  const brand = buildConditionOverrideFilter('brand', q, 'equipment');
+  if (brand) plan.filters = [brand];
+  return plan;
 }
 
 /**
@@ -336,12 +449,29 @@ export function isInstallDateExtremeQuestion(question) {
   return detectInstallDateExtreme(String(question ?? '')) !== null;
 }
 
+// R20 (J3, i115/i116): "what's the earliest/most recent warranty registration date we have on
+// file" — a RANKING over data.warranty.registrationOnFile, never a plain filtered count.
+// Requires the explicit phrase "warranty registration(s)" so an unrelated "oldest unit"
+// (detectInstallDateExtreme above) or "most recent invoice" is never mistaken for this shape.
+const WARRANTY_REG_DATE_RE = /\bwarranty\s+registrations?\b/i;
+function detectWarrantyRegDateExtreme(q) {
+  if (!WARRANTY_REG_DATE_RE.test(q)) return null;
+  const sortBy = /\b(oldest|earliest)\b/i.test(q) ? 'warrantyRegDateAsc' : /\b(newest|latest|most\s+recent)\b/i.test(q) ? 'warrantyRegDateDesc' : null;
+  if (!sortBy) return null;
+  return { entity: 'equipment', op: 'list', sortBy };
+}
+
 function detectDistinctDimensionCount(q) {
   const m = DIFFERENT_DIM_RE.exec(q);
   if (!m) return null;
   const field = DIM_WORD_TO_FIELD[m[1].toLowerCase()];
   if (!field) return null;
-  const entity = field === 'brand' ? 'equipment' : field === 'technician' ? 'serviceVisits' : 'customers';
+  // R20 (J3, i030): "how many distinct document types do we actually track" used to fall through
+  // to the 'customers' default below — documents have no per-customer documentType column at all,
+  // so that silently answered a bare customer count instead. documentType is its own entity, same
+  // as brand/technician just below.
+  const entity =
+    field === 'brand' ? 'equipment' : field === 'technician' ? 'serviceVisits' : field === 'documentType' ? 'documents' : 'customers';
   return { entity, op: 'groupBy', groupBy: field, countDistinct: true };
 }
 
@@ -366,6 +496,35 @@ function detectGroupByPhrase(q) {
   if (field === 'technician') return { entity: 'serviceVisits', op: 'groupBy', groupBy: 'technician' };
   const entity = field === 'brand' ? 'equipment' : entityFromNouns(q);
   return { entity, op: 'groupBy', groupBy: field };
+}
+
+/**
+ * R19 (I2, h112/h113/h115): "how many customers are in our single biggest city" / "which manufacturer
+ * do we have the fewest units of" / "which tech has done the fewest visits" — a groupBy breakdown is
+ * the right DATA (groupRows, analytics.js, already sorts every group largest-first), but the question
+ * wants only the ONE extreme group's own name/count, never the full per-group list detectGroupByPhrase
+ * builds. `superlative: 'top'|'bottom'` marks a plan for exactly that — see routes/analytics.js's
+ * formatGroupBySuperlativeAnswer for how it picks the extreme named group (skipping the "Unknown"
+ * bucket, which groupRows always sorts last regardless of its real count) and cites only that group's
+ * own rows. Scoped to a genuine dimension word (DIM_ALT) so a question with no groupable dimension is
+ * left alone, same discipline as every other detector here.
+ */
+const SUPERLATIVE_TOP_RE = new RegExp(`\\b(?:single\\s+)?(?:biggest|largest)\\s+(${DIM_ALT})\\b`, 'i');
+const SUPERLATIVE_BOTTOM_RE = new RegExp(
+  `\\b(?:fewest|least|smallest)\\b[\\s\\S]*?\\b(${DIM_ALT})\\b|\\b(${DIM_ALT})\\b[\\s\\S]*?\\b(?:fewest|least|smallest)\\b`,
+  'i'
+);
+
+function detectGroupBySuperlative(q) {
+  const topM = SUPERLATIVE_TOP_RE.exec(q);
+  const botM = !topM ? SUPERLATIVE_BOTTOM_RE.exec(q) : null;
+  const m = topM ?? botM;
+  if (!m) return null;
+  const word = (m[1] ?? m[2] ?? '').toLowerCase();
+  const field = DIM_WORD_TO_FIELD[word];
+  if (!field || !GROUP_BY_FIELDS.includes(field)) return null;
+  const entity = field === 'brand' ? 'equipment' : field === 'technician' ? 'serviceVisits' : entityFromNouns(q);
+  return { entity, op: 'groupBy', groupBy: field, superlative: topM ? 'top' : 'bottom' };
 }
 
 /** "Trane vs Carrier units" / "Trane versus Carrier" — a brand comparison:
@@ -685,6 +844,21 @@ const FOLLOW_UP_FRAGMENT_RE = /\s(?:--|—|-)\s.*\b(?:just|only|now)\b/i;
 const READABLE_TEXT_DENY_RE = /\breadable text\b/i;
 
 /**
+ * R20 (J3, F6 "NEW this round" cluster): "how many open warranty claims do we have right now" /
+ * "have we sent a renewal reminder on any of the maintenance agreements" — a warranty CLAIM and a
+ * maintenance-agreement renewal REMINDER are business concepts this corpus never tracks at all (no
+ * claim_number/claim_status/renewal_notice_sent field is ever extracted — see
+ * extractFields.js/documentTypes.js's own field lists). Left unrecognized, the generic path below
+ * would otherwise happily match "warranty"/"claims" to the bare warranties entity, or "maintenance
+ * agreements" to a plain document-type count, and answer with total confidence (a portfolio-wide
+ * unit/document count that has nothing to do with what was actually asked) — exactly the "answers a
+ * business concept that was never recorded" failure mode this file's own header comment exists to
+ * prevent. Denied at the TOP level, same as READABLE_TEXT_DENY_RE just above, so a miss here can
+ * never fall through to a confident bare-count guess.
+ */
+const UNTRACKED_CONCEPT_DENY_RE = /\bwarranty\s+claims?\b|\brenewal\s+reminders?\b/i;
+
+/**
  * Round 15 (A): "data-quality" / missing-field shapes — "documents aren't
  * linked to any customer", "customers have no documents on file", "no
  * service address on file", "missing a serial number", "no install date on
@@ -712,8 +886,11 @@ const MISSING_FIELD_RULES = [
     re: /\bdocuments?\b[\s\S]{0,30}\b(?:aren'?t|are\s+not|is\s+not|isn'?t|not)\s+linked(?:\s+to)?\s+(?:any\s+)?customers?\b|\bdocuments?\b[\s\S]{0,20}\bmissing\s+a\s+customer\b/i,
   },
   {
+    // R20 (J3, i029): "zero documents of any kind on file" — the same condition as "no documents on
+    // file", just with "zero"/"not a single" for "no" and an optional "of any kind" qualifier an
+    // owner adds for emphasis, never a different field.
     entity: 'customers', field: 'hasAnyDocument', value: false,
-    re: /\bcustomers?\b[\s\S]{0,25}\bno\s+documents?\s+on\s+file\b|\bcustomers?\b[\s\S]{0,25}\b(?:don'?t|do\s+not)\s+have\s+(?:any\s+)?documents?\s+on\s+file\b/i,
+    re: /\bcustomers?\b[\s\S]{0,25}\b(?:no|zero|not\s+a\s+single)\s+documents?\s+(?:of\s+any\s+kind\s+)?on\s+file\b|\bcustomers?\b[\s\S]{0,25}\b(?:don'?t|do\s+not)\s+have\s+(?:any\s+)?documents?\s+(?:of\s+any\s+kind\s+)?on\s+file\b/i,
   },
   {
     entity: 'customers', field: 'hasServiceAddress', value: false,
@@ -749,6 +926,15 @@ const MISSING_FIELD_RULES = [
     // unregistered AND still active — the two are independent facts).
     entity: 'equipment', field: 'warrantyRegistered', value: true,
     re: /\b(?:actually\s+)?registered\s+for\s+warranty\b|\bwarranty\s+registration\s+(?:is\s+)?on\s+file\b/i,
+  },
+  {
+    // R20 (J3, i009): "how many warranty registrations are we still missing" — the exact negation of
+    // the rule just above (registrationState !== 'on_file'). Checked as its own rule (not a bare
+    // negation of the positive phrase) so the ordinary "still missing"/"outstanding"/"haven't done"
+    // wording is recognized directly, the same way every other MISSING_FIELD_RULES entry names its
+    // own negative phrasing rather than inverting a positive one.
+    entity: 'equipment', field: 'warrantyRegistered', value: false,
+    re: /\bwarranty\s+registrations?\b[\s\S]{0,25}\b(?:missing|outstanding|(?:haven'?t|have\s+not)\s+(?:done|completed|filed|submitted))\b|\bmissing\b[\s\S]{0,20}\bwarranty\s+registrations?\b/i,
   },
   {
     // R18 P4 (C4, negation, h134): "how many customers have zero equipment on file" — the
@@ -892,7 +1078,7 @@ export function questionNamesKnownCustomer(q, tenantVocab) {
   return false;
 }
 
-export function detectAnalyticsPlan(question, tenantVocab) {
+export function detectAnalyticsPlan(question, tenantVocab, today) {
   try {
     const q = String(question ?? '').trim();
     if (!q) return null;
@@ -913,6 +1099,8 @@ export function detectAnalyticsPlan(question, tenantVocab) {
     // "how many documents" instead — a confident wrong answer, the one
     // outcome this whole file exists to avoid.
     if (READABLE_TEXT_DENY_RE.test(q)) return null;
+    // F6 (warranty "claim" / renewal "reminder") — see UNTRACKED_CONCEPT_DENY_RE's own doc comment.
+    if (UNTRACKED_CONCEPT_DENY_RE.test(q)) return null;
 
     // ---- dedicated shapes, most specific first --------------------------
     const missingField = detectMissingFieldCondition(q);
@@ -936,11 +1124,17 @@ export function detectAnalyticsPlan(question, tenantVocab) {
 
     const dedicated =
       detectWarrantyExpiryWindow(q) ??
+      detectWarrantyRegistrationDays(q) ??
       detectDistinctYearsCount(q) ??
       detectTechnicianAction(q) ??
       detectTechnicianGroupBy(q) ??
+      detectWarrantyRegDateExtreme(q) ??
       detectInstallDateExtreme(q) ??
+      detectInstallYearRelative(q, today) ??
+      detectMultiUnitCustomers(q) ??
+      detectVendorPurchaseOrderCount(q) ??
       detectDistinctDimensionCount(q) ??
+      detectGroupBySuperlative(q) ??
       detectBrandComparison(q) ??
       detectGroupByPhrase(q);
     if (dedicated) return dedicated;

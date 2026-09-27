@@ -150,6 +150,27 @@ const TODAY = '2026-09-23';
     'how many invoices still need someone to verify the numbers', 'have customers paid us',
   ].every((q) => C.isFinancialQuestion(q)), JSON.stringify(['how many invoices are still unpaid', 'do we have any overdue invoices', 'invoices are over $5,000'].map((q) => [q, C.isFinancialQuestion(q)])));
   check('classify: an ordinary non-financial question is not claimed', !C.isFinancialQuestion('how many customers are in gilbert') && !C.isFinancialQuestion('what unit is installed at the Bracken house') && !C.isFinancialQuestion(''));
+
+  // R20 (J3, i013, F1 "installs this year vs last" sibling — same shape, revenue instead of installs):
+  // "are we bringing in more revenue this year so far than we did all of last year" — a whole-shop,
+  // two-CALENDAR-YEAR revenue comparison. Oracle compares the full current-year sum against the
+  // full prior-year sum regardless of "so far"/"all of" wording, so this intent does the same.
+  eq('intent: revenue year comparison, 5 paraphrases all resolve to revenue_year_comparison', [
+    I('are we bringing in more revenue this year so far than we did all of last year')?.intent,
+    I('did we bring in more revenue this year than last year')?.intent,
+    I('are we billed more revenue this year so far than all of last year')?.intent,
+    I('is our income higher this year so far than all of last year')?.intent,
+    I('did we invoice more this year so far than last year')?.intent,
+  ], Array(5).fill('revenue_year_comparison'));
+  check('intent negative: revenue mentioned but only ONE year phrase ("revenue this year") stays revenue_by_month/total_invoiced, never the comparison intent',
+    I('how much revenue have we brought in this year')?.intent !== 'revenue_year_comparison');
+  check('intent negative: a year-over-year comparison with no revenue/income/invoiced word at all is not claimed here (analytics.js\'s own install-count comparison territory)',
+    I('did we install more units this year than last year')?.intent !== 'revenue_year_comparison');
+  check('classify gate: every revenue-year-comparison paraphrase above also clears isFinancialQuestion (the money gate checked before this intent, and before deterministic/analytics get a look)', [
+    'are we bringing in more revenue this year so far than we did all of last year',
+    'did we bring in more revenue this year than last year',
+    'is our income higher this year so far than all of last year',
+  ].every((q) => C.isFinancialQuestion(q)));
   eq('period: ytd / last quarter / in march / last 30 days', [parsePeriod('ytd', TODAY)?.from, parsePeriod('last quarter', TODAY)?.label, parsePeriod('in march', TODAY)?.to, parsePeriod('last 30 days', TODAY)?.from], ['2026-01-01', 'Q2 2026', '2026-03-31', '2026-08-24']);
   eq('subject phrase: "last invoice for Bracken" / "bill karen abernathy this year" / none', [extractSubjectPhrase('last invoice for Bracken'), extractSubjectPhrase('how much did we bill karen abernathy this year'), extractSubjectPhrase('how much did we invoice last month')], ['bracken', 'karen abernathy', null]);
   // R18 (H1, breadth-financials-006/010/018): whole-portfolio aggregate questions with NO real

@@ -42,6 +42,12 @@ function describeClause(cond) {
     case 'warrantyStatus':
       return cond.status === 'expired' ? 'have an expired warranty'
         : cond.status === 'expiring' ? 'have a warranty expiring within the next year'
+        // R19 (I2): 'not_expired' — this engine's own oracle-verified "still under warranty"
+        // reading (active OR expiring; see clauses.js's looseWarrantyNotExpired doc comment) —
+        // reads the same as the plain 'active' wording below, deliberately: both describe a
+        // warranty that HASN'T run out yet, and the sentence never needs to distinguish which
+        // of the two non-expired buckets a matched unit landed in.
+        : cond.status === 'not_expired' ? 'still have a warranty on file that hasn\'t expired'
         : 'have an active warranty';
     case 'hasDocType': return `have a ${cond.phrase} on file`;
     case 'lacksDocType': return `have no ${cond.phrase} on file`;

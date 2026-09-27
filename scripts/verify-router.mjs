@@ -56,6 +56,8 @@ function loadExamQuestions() {
   const genDir = path.join(ROOT, "test-docs/scorecard/generalization");
   for (const f of fs.readdirSync(genDir).filter((f) => f.endsWith(".json"))) {
     const gen = JSON.parse(fs.readFileSync(path.join(genDir, f), "utf8"));
+    // R19: dialogues-1.json (multi-turn, {dialogues:[...]}) is replayed by scripts/run-dialogues.mjs, not a single-question set.
+    if (!Array.isArray(gen.questions)) continue;
     for (const q of gen.questions) out.push({ id: q.id, text: q.text, category: q.category ?? gen.category, source: f });
   }
   return out;

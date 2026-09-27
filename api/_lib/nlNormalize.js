@@ -102,6 +102,15 @@ const EXTRA_DOMAIN_WORDS = [
   // "receivables"/"outstanding". "quarter" backs item 5's "this quarter"/
   // "last quarter" time windows the same way "week"/"month" above already do.
   'times', 'collected', 'fees', 'receivables', 'outstanding', 'quarter', 'quarters',
+  // R20 (J3): "fewest" is a real, correctly-spelled word (superlative of "few" —
+  // "which technician closed the fewest jobs") one edit away from "newest"
+  // (already in this vocabulary, SUPERLATIVE_RE's own "oldest"/"newest"/...
+  // group above) — fuzzyCorrect was silently rewriting every "fewest" to
+  // "newest" before it ever reached SUPERLATIVE_RE, exactly the same
+  // real-word-collides-with-vocab-word bug 'serviced' already documents above,
+  // just in the opposite direction (the typo table lacked the correct word
+  // itself, not the misspelling).
+  'fewest',
 ];
 
 function buildVocab() {

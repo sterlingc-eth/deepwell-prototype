@@ -73,6 +73,7 @@ import {
   isServiceVisitsQuestion,
   resolveServiceVisitsOverride,
   detectedConditions,
+  isTeamScopedQuestion,
   missingConditions,
   unsupportedConditionAnswer,
   buildConditionOverrideFilter,
@@ -88,6 +89,7 @@ import {
   isExistenceQuestion,
   existenceWrap,
   warrantyStatusFromQuestion,
+  hasAmbiguousWarrantyStatusNegation,
 } from '../api/_lib/analytics.js';
 import { DOCUMENT_TYPE_IDS } from '../api/_lib/documentTypes.js';
 import { isAnalyticsEnabled, executeAnalyticsPlan, runAnalyticsQuestion } from '../api/_lib/routes/analytics.js';
@@ -2125,6 +2127,184 @@ for (const q of [
   eq('warrantyStatusFromQuestion: "under warranty" (no "still") is also the strict active bucket', warrantyStatusFromQuestion('is this unit under warranty'), 'active');
   eq('warrantyStatusFromQuestion: "covered" is also the strict active bucket', warrantyStatusFromQuestion('is the warranty covered on this unit'), 'active');
   eq('warrantyStatusFromQuestion: literal "active" is unchanged', warrantyStatusFromQuestion('how many warranties are active'), 'active');
+}
+
+{
+  // R19 (I2, task 5): audienceFilterSql adoption — team-only (internal) documents never count
+  // toward a customer-scoped analytics answer, unless the question is explicitly team-scoped.
+  check('isTeamScopedQuestion: a plain customer-facing question is NOT team-scoped', !isTeamScopedQuestion('how many service tickets do we have for Acme HVAC'));
+  check('isTeamScopedQuestion: "internal" names the team side', isTeamScopedQuestion('how many internal notes are on file'));
+  check('isTeamScopedQuestion: "for the team"/"for techs" names the team side', isTeamScopedQuestion('any memos for the techs this week'));
+  check('isTeamScopedQuestion: "dispatch notes" names the team side', isTeamScopedQuestion('what dispatch notes went out this week'));
+  check('isTeamScopedQuestion: an unrelated mention of "team" (not the phrase this closed set matches) stays customer-scoped', !isTeamScopedQuestion('how many customers does the sales team have'));
+
+  // buildAnalyticsSQL: audienceClause defaults to a no-op ('TRUE') so every pre-existing caller
+  // (this whole file's own section-6 SQL-builder fixture included) keeps its exact current SQL.
+  const noClause = buildAnalyticsSQL({ entity: 'documents', op: 'count', filters: [] });
+  check('buildAnalyticsSQL: no audienceClause passed -> the default no-op TRUE, never a bare unclosed AND', noClause.sql.includes('AND (TRUE)'));
+  const withClause = buildAnalyticsSQL({ entity: 'documents', op: 'count', filters: [] }, { audienceClause: "COALESCE(d.audience, 'customer') <> 'internal'" });
+  check('buildAnalyticsSQL: a real audienceClause is AND-ed into the documents WHERE clause', withClause.sql.includes("AND (COALESCE(d.audience, 'customer') <> 'internal')"));
+
+  // End to end against a mock db: the SAME plan answers differently depending on which
+  // audienceClause executeAnalyticsPlan was given — proves the wiring actually reaches the query,
+  // not just that the SQL string contains the right substring.
+  const customerDoc = { id: 'd1', document_type: 'invoice', original_filename: 'inv1.pdf', created_at: '2026-08-01', service_date: '2026-08-01', has_customer_link: true };
+  const internalDoc = { id: 'd2', document_type: 'invoice', original_filename: 'memo.pdf', created_at: '2026-08-02', service_date: '2026-08-02', has_customer_link: true };
+  const mockDbAudience = {
+    raw: async (sql) => {
+      if (!sql.includes('FROM documents')) return { rows: [] };
+      // Simulates a real WHERE clause: only returns the internal doc when the query's own
+      // audienceClause does NOT exclude it (mirrors what a real Postgres WHERE would do).
+      const excludesInternal = sql.includes("<> 'internal'") && !sql.includes('AND (TRUE)');
+      return { rows: excludesInternal ? [customerDoc] : [customerDoc, internalDoc] };
+    },
+  };
+  const docsPlan = validatePlan({ entity: 'documents', op: 'count' });
+  const withoutFilter = await executeAnalyticsPlan(mockDbAudience, docsPlan, { today: '2026-09-26' });
+  eq('audienceFilterSql not adopted (default TRUE): both documents count', withoutFilter.facts[0].value, '2');
+  const withFilter = await executeAnalyticsPlan(mockDbAudience, docsPlan, {
+    today: '2026-09-26', audienceClause: "COALESCE(d.audience, 'customer') <> 'internal'",
+  });
+  eq('audienceFilterSql adopted: the internal document is excluded from a customer-scoped count', withFilter.facts[0].value, '1');
+  const withTeamScoped = await executeAnalyticsPlan(mockDbAudience, docsPlan, { today: '2026-09-26', audienceClause: 'TRUE' });
+  eq('team-scoped question (audienceClause TRUE) still sees the internal document', withTeamScoped.facts[0].value, '2');
+}
+
+{
+  // R20 (J3, i028, F1 "both a maintenance agreement on file and a repair visit this year"): the OLD
+  // code only ever intersected hasDocTypeFilter/hasServiceTypeFilter together when an EQUIPMENT/brand
+  // filter also rode along (the R18 P4 multi-hop AND-drop fix above) — a plan naming BOTH cross-doc
+  // conditions with NO equipment filter fell to the plain hasDocType-only branch, silently dropping
+  // the service-type condition. c1: has both, repair dated THIS year. c2: has the agreement only. c3:
+  // has a repair visit only (no agreement). c4: has both, but the repair visit is dated LAST year
+  // (outside the plan's own timeRange) — must not count either.
+  const customerRows4 = [
+    { id: 'c1', customer_name: 'Alpha Co', service_address: '1 A St', email: null, phone: null },
+    { id: 'c2', customer_name: 'Beta Co', service_address: '2 B St', email: null, phone: null },
+    { id: 'c3', customer_name: 'Gamma Co', service_address: '3 C St', email: null, phone: null },
+    { id: 'c4', customer_name: 'Delta Co', service_address: '4 D St', email: null, phone: null },
+  ];
+  const mockDbBoth = {
+    raw: async (sql, params) => {
+      if (sql.includes('document_type = $1')) {
+        return { rows: params[0] === 'maintenance-agreement' ? [customerRows4[0], customerRows4[1], customerRows4[3]] : [] };
+      }
+      if (sql.includes("field_key = 'service_type'")) {
+        if (params[0] !== 'Repair') return { rows: [] };
+        // params[1]/params[2] are the plan's timeRange from/to — c4's repair visit is dated
+        // last year, so it is excluded whenever a date window is actually applied.
+        const dated = params.length > 1 && (params[1] || params[2]);
+        return { rows: dated ? [customerRows4[0], customerRows4[2]] : [customerRows4[0], customerRows4[2], customerRows4[3]] };
+      }
+      return { rows: [] };
+    },
+  };
+  const bothPlan = validatePlan({
+    entity: 'customers', op: 'count',
+    filters: [{ field: 'hasDocType', op: 'eq', value: 'maintenance-agreement' }, { field: 'hasServiceType', op: 'eq', value: 'Repair' }],
+    timeRange: { from: '2026-01-01', to: '2026-12-31' },
+  });
+  const bothAnswer = await executeAnalyticsPlan(mockDbBoth, bothPlan, { today: '2026-09-26' });
+  eq('hasDocType+hasServiceType AND-drop fix (i028, no equipment filter): only c1 (both conditions, repair dated this year) counted — was silently answering the doc-type count alone (3)', bothAnswer.facts[0].value, '1');
+
+  // Same two conditions, no timeRange at all: c4's repair visit (undated window) still counts.
+  const noRangePlan = validatePlan({
+    entity: 'customers', op: 'count',
+    filters: [{ field: 'hasDocType', op: 'eq', value: 'maintenance-agreement' }, { field: 'hasServiceType', op: 'eq', value: 'Repair' }],
+  });
+  const noRangeAnswer = await executeAnalyticsPlan(mockDbBoth, noRangePlan, { today: '2026-09-26' });
+  eq('hasDocType+hasServiceType AND-drop fix, no time window: c1 AND c4 both count (2)', noRangeAnswer.facts[0].value, '2');
+}
+
+{
+  // R20 (J3, i115/i116): "what's the earliest/most recent warranty registration date we have on
+  // file" — ranked on data.warranty.registrationOnFile, distinct from installDateAsc/Desc's own
+  // install-date ranking (queryInstallDateExtreme).
+  const warrantyEquipRows = [
+    { id: 'e1', customer_id: 'c1', model: 'X1', manufacturer: 'Trane', equipment_type: 'RTU', tonnage: null, refrigerant: null, installation_date: '2020-01-01', serial_number: 'S1', service_address: null, customer_name: 'Alpha Co', warranty: { registrationOnFile: '2020-02-01' }, updated_at: '2026-01-01' },
+    { id: 'e2', customer_id: 'c2', model: 'X2', manufacturer: 'Daikin', equipment_type: 'RTU', tonnage: null, refrigerant: null, installation_date: '2009-01-01', serial_number: 'S2', service_address: null, customer_name: 'Beta Co', warranty: { registrationOnFile: '2009-01-16' }, updated_at: '2026-01-01' },
+    { id: 'e3', customer_id: 'c3', model: 'X3', manufacturer: 'Carrier', equipment_type: 'RTU', tonnage: null, refrigerant: null, installation_date: '2024-06-01', serial_number: 'S3', service_address: null, customer_name: 'Gamma Co', warranty: { registrationOnFile: null }, updated_at: '2026-01-01' },
+  ];
+  const mockDbWarrantyReg = { raw: async () => ({ rows: warrantyEquipRows }) };
+  const earliestPlan = validatePlan({ entity: 'equipment', op: 'list', sortBy: 'warrantyRegDateAsc' });
+  const earliestAnswer = await executeAnalyticsPlan(mockDbWarrantyReg, earliestPlan, { today: '2026-09-26' });
+  check('warrantyRegDateAsc: e2 (2009-01-16, the earliest registrationOnFile) is picked, ignoring the null row', earliestAnswer.text.includes('2009-01-16'));
+  const latestPlan = validatePlan({ entity: 'equipment', op: 'list', sortBy: 'warrantyRegDateDesc' });
+  const latestAnswer = await executeAnalyticsPlan(mockDbWarrantyReg, latestPlan, { today: '2026-09-26' });
+  check('warrantyRegDateDesc: e1 (2020-02-01, the most recent registrationOnFile) is picked', latestAnswer.text.includes('2020-02-01'));
+  const emptyAnswer = await executeAnalyticsPlan({ raw: async () => ({ rows: [] }) }, earliestPlan, { today: '2026-09-26' });
+  check('warrantyRegDateAsc, no data on file: an honest no-answer, never a guessed date', emptyAnswer.kind === 'no-answer');
+}
+
+{
+  // R20 (coordinator follow-up (a), 2026-09-27, d005): "and how many of those are past their
+  // warranty?" — warrantyStatusFromQuestion didn't recognize "past (its/their/the)? warranty" at
+  // all (only "expired"/"out of warranty"/"no longer"/"lapsed" mapped to the 'expired' bucket), so
+  // the answer silently ignored the status condition and returned the bare unit count. Generalized
+  // (a regex over the shape, not the exam's exact words) — 6 of the round's own paraphrases plus the
+  // two negatives the coordinator named verbatim ("past warranty claims" talks about old CLAIMS, not
+  // an expired unit; "past the warranty registration deadline" names a DEADLINE, not a status — both
+  // must NOT map to 'expired').
+  const pastWarrantyPositives = [
+    'and how many of those are past their warranty?',
+    'how many units are past their warranty',
+    'how many units are past its warranty',
+    'how many units are past the warranty',
+    'how many units are past warranty',
+    'how many of the Carrier units are past their warranties',
+  ];
+  for (const q of pastWarrantyPositives) {
+    eq(`warrantyStatusFromQuestion("${q}") -> 'expired'`, warrantyStatusFromQuestion(q), 'expired');
+  }
+  const pastWarrantyNegatives = [
+    ['how many units have past warranty claims', null],
+    ['how many units are past the warranty registration deadline', null],
+    ['how many units are past their warranty paperwork', null],
+    ['how many units are not past their warranty', null], // negated — genuinely ambiguous, never guess
+  ];
+  for (const [q, want] of pastWarrantyNegatives) {
+    eq(`warrantyStatusFromQuestion("${q}") -> ${JSON.stringify(want)} (not 'expired')`, warrantyStatusFromQuestion(q), want);
+  }
+  // The negated case must also be flagged ambiguous (never silently answered unfiltered), same
+  // contract as every other status bucket's own negation handling (hasAmbiguousWarrantyStatusNegation's
+  // own doc comment).
+  check(
+    '"not past their warranty" is flagged as an ambiguous negation (never a silent unfiltered plan)',
+    hasAmbiguousWarrantyStatusNegation('how many units are not past their warranty')
+  );
+}
+
+{
+  // R20 (coordinator follow-up (b), 2026-09-27, i003 shape): preClassifyAnalytics's own yes/no
+  // COMPARISON_THAN_RE branch only ever recognized the "than" connector ("more X than Y") — the same
+  // "more/fewer/... A vs. B" comparison worded with "compared to"/"compare(d) with"/"vs"/"versus"
+  // instead of "than" is the identical shape (i003: "did we install more units last year than we've
+  // done so far this year" is this same install-year comparison, just with "than"). Widened
+  // COMPARISON_THAN_RE's connector (not by adding a parallel regex) so every existing caller of it —
+  // this branch and looksLikeSingleRecordReference's own exclusion — picks up the wider connector
+  // for free. 5 of the round's own paraphrases plus negatives: a bare "vs"/"compared to" with no
+  // magnitude comparator word is NOT this shape (too ambiguous — could be any two-sided mention, not
+  // a yes/no count question), and an unrelated declarative sentence must not be mistaken for one
+  // either.
+  const compareConnectorPositives = [
+    'did we install more units this year compared to last year',
+    'did we have more service calls this year vs last year',
+    'do we have higher revenue this quarter compared with last quarter',
+    'did we install more units this year versus last year',
+    'is Daikin more common than Goodman in our records', // unchanged "than" shape still holds
+  ];
+  for (const q of compareConnectorPositives) {
+    check(`preClassifyAnalytics("${q}") -> true (compared-to/vs connector)`, preClassifyAnalytics(q) === true);
+  }
+  const compareConnectorNegatives = [
+    'compare the invoice to the estimate for job 42', // no magnitude comparator word at all
+    'what is the model number on the Trane condenser',
+    'does Chandler have a warranty on file',
+    'this year was busier than last year for the whole industry', // declarative, not a yes/no question
+  ];
+  for (const q of compareConnectorNegatives) {
+    check(`preClassifyAnalytics("${q}") -> false`, preClassifyAnalytics(q) === false);
+  }
 }
 
 console.log(`\n${count - failures}/${count} checks passed.`);

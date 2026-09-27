@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-27T06:50:31.373Z",
-  "count": 465,
+  "generatedAt": "2026-09-27T19:31:11.196Z",
+  "count": 520,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -2467,6 +2467,17 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
+      "id": "breadth-trends-004",
+      "category": "trends",
+      "text": "Were service visits higher last month than two months ago?",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "breadth-trends-005",
       "category": "trends",
       "text": "Did we invoice more last month than the month before?",
@@ -2484,7 +2495,8 @@
       "text": "Is invoiced revenue higher last quarter than the quarter before?",
       "claimants": [
         "deterministic",
-        "money"
+        "money",
+        "analytics"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -2591,6 +2603,17 @@
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
     },
     {
+      "id": "breadth-rankings-008",
+      "category": "rankings",
+      "text": "Which brand do we have the fewest units of?",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "breadth-rankings-009",
       "category": "rankings",
       "text": "Which brand has the most out-of-warranty units?",
@@ -2660,6 +2683,17 @@
       ],
       "winner": "relations",
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-rankings-015",
+      "category": "rankings",
+      "text": "Which document type do we have the fewest of?",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "breadth-rankings-016",
@@ -4443,6 +4477,17 @@
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
     },
     {
+      "id": "h014",
+      "category": "field-phrasing-2",
+      "text": "customer with phone 480 555 0124",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
       "id": "h029",
       "category": "field-phrasing-2",
       "text": "whos the manufacturer on the unit at 581 West Thomas Road",
@@ -4463,6 +4508,17 @@
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "h050",
+      "category": "field-phrasing-2",
+      "text": "how many carrier units are still under warranty",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
       "id": "h056",
@@ -4631,6 +4687,7 @@
       "text": "how many mitsubishi customers have a maintenance agreement on file",
       "claimants": [
         "deterministic",
+        "decompose",
         "analytics"
       ],
       "winner": "deterministic",
@@ -4714,6 +4771,28 @@
       "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
+      "id": "h098",
+      "category": "field-phrasing-2",
+      "text": "how many mitsubishi units in maricopa are still under warranty",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "h137",
+      "category": "field-phrasing-2",
+      "text": "list every serial number on file for sunrise valley elementary",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
       "id": "h140",
       "category": "field-phrasing-2",
       "text": "when were the units at canyon view dental installed",
@@ -4723,6 +4802,17 @@
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h158",
+      "category": "field-phrasing-2",
+      "text": "translate 'under warranty' into spanish",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "h161",
@@ -4743,6 +4833,514 @@
         "deterministic",
         "fastPath",
         "docLookup"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h182",
+      "category": "field-phrasing-2",
+      "text": "is the unit at to fourteen mercer under warranty",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "h196",
+      "category": "field-phrasing-2",
+      "text": "hows the warranty looking for our customer over in albuquerque",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i004",
+      "category": "field-phrasing-3",
+      "text": "was our invoiced revenue higher in 2021 than in 2025",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "i013",
+      "category": "field-phrasing-3",
+      "text": "are we bringing in more revenue this year so far than we did all of last year",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "i024",
+      "category": "field-phrasing-3",
+      "text": "how many inspection reports do we have on file",
+      "claimants": [
+        "relations",
+        "analytics"
+      ],
+      "winner": "relations",
+      "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
+    },
+    {
+      "id": "i028",
+      "category": "field-phrasing-3",
+      "text": "how many customers have both a maintenance agreement on file and a repair visit this year",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i034",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Cactus Rose Restaurant job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i035",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Canyon View Dental job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i036",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Copper Sky Dental job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i037",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Grace Community Church job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i038",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Holy Trinity Church job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i039",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Amanda Quinley job",
+      "claimants": [
+        "decompose",
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "i040",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Amanda Redwine job",
+      "claimants": [
+        "decompose",
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "i041",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Amy Jarvis job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i042",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Ashley Vance job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i043",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Anthony Alvarez job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i044",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Linda Fitzgerald job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i045",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Kenneth Fenwick job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i046",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Michael Redwine job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i047",
+      "category": "field-phrasing-3",
+      "text": "is there a permit on file for the Nancy Zamora job",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i048",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Amy Isaacson account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i049",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Karen Abernathy account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i050",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Daniel Keller account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i051",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Brian Chavez account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i052",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Rebecca Montoya account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i053",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Patricia Esparza account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i054",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Linda Fitzgerald account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i055",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Ashley Vance account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i056",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Nancy Zamora account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i057",
+      "category": "field-phrasing-3",
+      "text": "do we have a purchase order on file for the Kenneth Fenwick account",
+      "claimants": [
+        "docLookup",
+        "analytics"
+      ],
+      "winner": "docLookup",
+      "reason": "ask.js: `!meta && !contactLookupIntent ? parseDocLookupQuestion(...) : null`."
+    },
+    {
+      "id": "i063",
+      "category": "field-phrasing-3",
+      "text": "who was last out to 100 E Main St and what did they do there",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i065",
+      "category": "field-phrasing-3",
+      "text": "who was last at 1071 N Recker Rd, and what did they do",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i066",
+      "category": "field-phrasing-3",
+      "text": "last tech out to 1124 N College Ave - what was the visit for",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i067",
+      "category": "field-phrasing-3",
+      "text": "who was out at 1018 E Pecos Rd last, and what was done",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i069",
+      "category": "field-phrasing-3",
+      "text": "last tech at 3319 N Val Vista Dr - what did they work on",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i070",
+      "category": "field-phrasing-3",
+      "text": "who was out to 3504 E Main St last and what was the job",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i072",
+      "category": "field-phrasing-3",
+      "text": "who was last out at 3652 W Guadalupe Rd, what did they do",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i088",
+      "category": "field-phrasing-3",
+      "text": "who's the last one we sent to 1284 S Alma School Rd",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i089",
+      "category": "field-phrasing-3",
+      "text": "who went out to 1321 E Chandler Blvd last",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i090",
+      "category": "field-phrasing-3",
+      "text": "whos the last tech that hit 1395 E Ray Rd",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i091",
+      "category": "field-phrasing-3",
+      "text": "who was the last one dispatched to 137 W Southern Ave",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i092",
+      "category": "field-phrasing-3",
+      "text": "who's the last tech we sent out to 1543 S Higley Rd",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i120",
+      "category": "field-phrasing-3",
+      "text": "install date on the unit at one seven four north college avenue",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i134",
+      "category": "field-phrasing-3",
+      "text": "ok so quick question the manufacturer and, uh, tonnage on the unit at one three two one east chandler blvd",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i193",
+      "category": "field-phrasing-3",
+      "text": "list every serial number on file for Holy Trinity Church",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i195",
+      "category": "field-phrasing-3",
+      "text": "when were the units at Sonoran Grill Restaurant installed",
+      "claimants": [
+        "deterministic",
+        "fastPath"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -5098,6 +5696,17 @@
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g135",
+      "category": "field-phrasing",
+      "text": "how many trane units are still under warranty",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
       "id": "g141",

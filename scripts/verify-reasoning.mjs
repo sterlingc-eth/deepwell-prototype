@@ -90,6 +90,38 @@ for (const [q, kind, metric, grain] of trendCases) {
 check('trends: which month had the most', parseTrends('Which month had the most service calls this year?')?.kind === 'monthMax');
 check('trends: monthly series', parseTrends('How have our monthly service calls changed this year?')?.kind === 'monthSeries');
 
+// ROUND 20 (J4, hook 3, i003/i013): a grain='year' comparison naming BOTH "this year"/"so far this
+// year" and "last year" is the one shape periodBounds gets wrong (it only ever compares two full
+// PRIOR calendar years, never a partial current one) — parseTrends must yield (null) here, generally,
+// for any metric/phrasing, not just the two exam questions' exact text, so the correct engines already
+// built for this shape (analytics/comparison.js's detectInstallYearComparison, financials/answers.js's
+// revenueYearComparison) get a turn instead of a silently-wrong period compare.
+const yieldsToOtherEngine = [
+  'are we bringing in more revenue this year so far than we did all of last year', // i013 (exact)
+  'did we install more units last year than we\'ve done so far this year', // i003 (exact)
+  'is invoiced revenue higher this year than it was last year',
+  'did we do more service calls this year than last year',
+  'are we running more jobs so far this year compared to last year',
+  'was revenue up this year versus last year',
+  'did we install fewer units this year than last year',
+];
+for (const q of yieldsToOtherEngine) {
+  check(`trends yields (this-year-vs-last-year): ${q}`, parseTrends(q) === null, JSON.stringify(parseTrends(q)));
+}
+// Negatives: a genuine two-FULL-period comparison (no partial "this year" side) is unaffected —
+// periodBounds is the right tool for these, so parseTrends must keep claiming them. (Literal-year and
+// "N years ago" phrasing, e.g. "2021 vs 2025", is a pre-existing, separate gap in detectGrain/
+// detectMetric — out of this hook's scope — so it is not exercised here.)
+const stillClaimsCompare = [
+  'Did we install more units last year than the year before?',
+  'did we do more service calls last quarter than the quarter before',
+  'Did we invoice more last month than the month before?',
+  'is invoiced revenue higher last quarter than the quarter before',
+];
+for (const q of stillClaimsCompare) {
+  check(`trends still claims (full-period compare, no "this year"): ${q}`, parseTrends(q)?.kind === 'compare', JSON.stringify(parseTrends(q)));
+}
+
 // period arithmetic (pure)
 check('truncPeriod month', truncPeriod('2026-09-25', 'month') === '2026-09-01');
 check('truncPeriod quarter', truncPeriod('2026-09-25', 'quarter') === '2026-07-01');

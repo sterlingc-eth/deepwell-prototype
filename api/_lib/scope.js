@@ -19,6 +19,12 @@
 import { significantAddressTokens, formatDateHuman } from './fastPath.js';
 import { documentTypeLabel, DOCUMENT_TYPE_ALIASES } from './documentTypes.js';
 import { escapeRegex, escapeLikePattern as escapeLike } from './util/escape.js';
+// R19 (I1, owner ask (a)/audience adoption): fetchVisits below is shared by every "last visit"/
+// "visit history" caller in the codebase (contactLookup.js, deterministicRouter.js, explain.js,
+// customerFile.js) — filtering it here, defaulted OFF (customer-safe), covers all of them without
+// touching those other files. See fastPath.js's isTeamScopedQuestion for the one thing that opts out.
+import { documentsHaveAudience } from './audience/probe.js';
+import { audienceFilterSql } from './audience/sql.js';
 
 export const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -287,9 +293,11 @@ export async function scopeDocumentIds(db, scope) {
  * `corrected_value` (a human's fix) wins over the extracted value, like the agent views do.
  * @returns {Promise<Array<{documentId, date, documentType, filename, technician, serviceType, customerName, createdAt}>>}
  */
-export async function fetchVisits(db, documentIds) {
+export async function fetchVisits(db, documentIds, teamScoped = false) {
   const ids = [...new Set(documentIds ?? [])];
   if (!ids.length) return [];
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
+  const audienceClause = audienceFilterSql({ docAlias: 'd', hasAudienceColumn, teamScoped });
   const { rows } = await db.raw(
     `SELECT x.document_id, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS service_date,
             d.document_type, d.original_filename, d.created_at,
@@ -307,7 +315,7 @@ export async function fetchVisits(db, documentIds) {
               WHERE l.document_id = x.document_id AND l.${TENANT_SQL}
               ORDER BY l.created_at DESC LIMIT 1) AS customer_name
        FROM extractions x JOIN documents d ON d.id = x.document_id
-      WHERE x.field_key = 'service_date' AND x.document_id = ANY($1::uuid[]) AND x.${TENANT_SQL}
+      WHERE x.field_key = 'service_date' AND x.document_id = ANY($1::uuid[]) AND x.${TENANT_SQL} AND (${audienceClause})
       LIMIT 2000`,
     [ids]
   );

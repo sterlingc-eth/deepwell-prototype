@@ -21,6 +21,10 @@ import { alertTier } from './warrantyRules.js';
 // financials/moneyGate.js and financials/store.js already use (to_regclass, never a failing
 // SELECT) so this file behaves identically before migration 22 is pasted.
 import { financialsTableExists } from './financials/store.js';
+// R19 (I1, owner ask (a) — audience adoption): internal/team-only documents must never feed a
+// customer-scoped answer unless the question itself is about team/internal material (isTeamScopedQuestion).
+import { documentsHaveAudience } from './audience/probe.js';
+import { audienceFilterSql } from './audience/sql.js';
 import {
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
@@ -29,6 +33,7 @@ import {
   ADDRESS_ENTITY_FIELD_INTENTS,
   ADDRESS_FIELD_LABEL,
   COMPOUND_INTENTS,
+  REVERSE_LOOKUP_INTENTS,
   pickUnique,
   pickBestExtraction,
   pickMostRecent,
@@ -44,6 +49,13 @@ import {
   isNamedUnitPhrasing,
   buildEquipmentListAnswer,
   buildDocumentListAnswer,
+  buildReverseLookupNoMatch,
+  buildReverseLookupAmbiguous,
+  buildReverseLookupAnswer,
+  buildOutOfDomainDecline,
+  wantsEveryUnit,
+  isTeamScopedQuestion,
+  MULTI_FIELD_LABELS,
 } from './fastPath.js';
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -149,6 +161,36 @@ export async function resolveFastPathSubject(db, subject) {
     }
   }
 
+  // R19 (I1, C9): a bare CITY reference ("our customer over in albuquerque") with no street/house
+  // number/business name at all — see fastPath.js's CITY_ONLY_RE for the narrow phrase gate.
+  // Deliberately NOT `viaAddress: true` (unlike the street-address branch above): there is no house
+  // number here for runAddressEntityFieldPolicy's own resolveAddressEntityFieldGroup to re-resolve
+  // against, so this is treated exactly like a business/personal NAME resolution instead — one
+  // customer, multiple units, ask-which/list-all still applies the same way via
+  // runCustomerEntityFieldPolicy below.
+  if (subject.cityOnly) {
+    const { rows } = await db.raw(
+      `SELECT id, entity_type, customer_id, data->>'service_address' AS service_address, data FROM entities
+        WHERE merged_into IS NULL AND ${TENANT_SQL}
+          AND entity_type IN ('customer', 'equipment')
+          AND data->>'service_address' ILIKE $1
+        LIMIT 20`,
+      [`%${subject.cityOnly}%`]
+    );
+    if (rows.length) {
+      const equipmentRows = rows.filter((r) => r.entity_type === 'equipment');
+      const uniqueEquip = pickUnique(equipmentRows);
+      if (uniqueEquip) return { kind: 'equipment', equipment: uniqueEquip };
+      if (equipmentRows.length === 0) {
+        const uniqueCust = pickUnique(rows.filter((r) => r.entity_type === 'customer'));
+        if (uniqueCust) return { kind: 'customer', customer: uniqueCust };
+      }
+      return { kind: 'ambiguous' };
+    }
+    // zero rows: no customer at all in that city — fall through to the whole-tenant fallback below
+    // exactly like every other hint that matched nothing (never decided "none" on one failed guess).
+  }
+
   if (subject.name) {
     const { rows } = await db.raw(
       `SELECT id, data, customer_number FROM entities
@@ -244,20 +286,30 @@ function mapExtractionRow(r) {
   };
 }
 
+/** R19 (I1, owner ask (a)/audience adoption): the same WHERE-safe fragment every other retrieval
+ *  path (search/store.js, search/knowledge.js) already ANDs into its own documents join —
+ *  `teamScoped` (fastPath.js's isTeamScopedQuestion) is the one thing that lets an internal/tech-
+ *  only document feed the answer, when the question is plainly ABOUT team/internal material. */
+async function audienceWhereClause(db, teamScoped) {
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
+  return audienceFilterSql({ docAlias: 'd', hasAudienceColumn, teamScoped });
+}
+
 /** Every extraction for `fieldKey` on documents in `documentIds` — no stage
  *  filter (see fastPath.js's isStageEligible doc comment: the model path's
  *  own searchExtractions applies none either, so a fast answer must not be
  *  MORE restrictive than a model answer would be, only as-or-more careful
  *  about which one it picks). */
-async function fetchFieldRowsByDocumentIds(db, documentIds, fieldKey) {
+async function fetchFieldRowsByDocumentIds(db, documentIds, fieldKey, teamScoped = false) {
   if (!documentIds.length) return [];
+  const audienceClause = await audienceWhereClause(db, teamScoped);
   const { rows } = await db.raw(
     `SELECT x.document_id, x.field_key, x.value, x.confidence, d.stage, d.document_type, d.created_at,
             (SELECT sx.value FROM extractions sx
               WHERE sx.document_id = x.document_id AND sx.field_key = 'service_date' AND sx.tenant_id = x.tenant_id
               ORDER BY sx.confidence DESC NULLS LAST LIMIT 1) AS service_date
        FROM extractions x JOIN documents d ON d.id = x.document_id
-      WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = $2 AND x.${TENANT_SQL}
+      WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = $2 AND x.${TENANT_SQL} AND (${audienceClause})
       LIMIT 50`,
     [documentIds, fieldKey]
   );
@@ -266,47 +318,48 @@ async function fetchFieldRowsByDocumentIds(db, documentIds, fieldKey) {
 
 /** Same shape, keyed directly by entity_id — the fast path for a unit-scoped
  *  field once the subject already resolved to one specific equipment row. */
-async function fetchFieldRowsByEntity(db, entityId, fieldKey) {
+async function fetchFieldRowsByEntity(db, entityId, fieldKey, teamScoped = false) {
+  const audienceClause = await audienceWhereClause(db, teamScoped);
   const { rows } = await db.raw(
     `SELECT x.document_id, x.field_key, x.value, x.confidence, d.stage, d.document_type, d.created_at,
             (SELECT sx.value FROM extractions sx
               WHERE sx.document_id = x.document_id AND sx.field_key = 'service_date' AND sx.tenant_id = x.tenant_id
               ORDER BY sx.confidence DESC NULLS LAST LIMIT 1) AS service_date
        FROM extractions x JOIN documents d ON d.id = x.document_id
-      WHERE x.entity_id = $1 AND x.field_key = $2 AND x.${TENANT_SQL}
+      WHERE x.entity_id = $1 AND x.field_key = $2 AND x.${TENANT_SQL} AND (${audienceClause})
       LIMIT 50`,
     [entityId, fieldKey]
   );
   return rows.map(mapExtractionRow);
 }
 
-async function fetchFieldRowsForResolution(db, resolution, fieldKey) {
+async function fetchFieldRowsForResolution(db, resolution, fieldKey, teamScoped = false) {
   if (resolution.kind === 'equipment' && UNIT_SCOPED_FIELD_KEYS.has(fieldKey)) {
-    return fetchFieldRowsByEntity(db, resolution.equipment.id, fieldKey);
+    return fetchFieldRowsByEntity(db, resolution.equipment.id, fieldKey, teamScoped);
   }
   const documentIds = await documentIdsForResolution(db, resolution);
   if (!documentIds.length) return [];
-  return fetchFieldRowsByDocumentIds(db, documentIds, fieldKey);
+  return fetchFieldRowsByDocumentIds(db, documentIds, fieldKey, teamScoped);
 }
 
 /* ============================================================ intent handlers */
 
-async function fetchInstaller(db, resolution) {
-  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician');
+async function fetchInstaller(db, resolution, teamScoped = false) {
+  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician', teamScoped);
   // Team A (2026-09-24): "who installed it" is answered ONLY from a document that records an install (a startup sheet or a
   // work order). The old fallback to ANY technician on ANY document told owners a tech installed a unit he only serviced.
   const preferred = rows.filter((r) => r.document_type === 'work-order' || r.document_type === 'startup-sheet');
   return pickBestExtraction(preferred);
 }
 
-async function fetchLastServiceTech(db, resolution) {
-  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician');
+async function fetchLastServiceTech(db, resolution, teamScoped = false) {
+  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician', teamScoped);
   const preferred = rows.filter((r) => r.document_type === 'service-ticket' || r.document_type === 'work-order');
   return pickMostRecent(preferred.length ? preferred : rows);
 }
 
-async function fetchLastServiceDate(db, resolution, today) {
-  const rows = await fetchFieldRowsForResolution(db, resolution, 'service_date');
+async function fetchLastServiceDate(db, resolution, today, teamScoped = false) {
+  const rows = await fetchFieldRowsForResolution(db, resolution, 'service_date', teamScoped);
   // Team A: a service_date after today is scheduled/a typo, not a visit that happened - never "the last service".
   const t = isoDate(today) ?? new Date().toISOString().slice(0, 10);
   return pickMostRecent(rows.filter((r) => { const d = isoDate(r.value); return !d || d <= t; }));
@@ -350,21 +403,21 @@ async function fetchEffectiveFinancialTotals(db, documentIds) {
  * specific document hasn't been backfilled) — a document with no financials row can never have
  * been corrected, so that fallback carries no staleness risk.
  */
-async function fetchInvoiceTotal(db, resolution) {
+async function fetchInvoiceTotal(db, resolution, teamScoped = false) {
   const documentIds = await documentIdsForResolution(db, resolution);
   if (!documentIds.length) return null;
 
   const finRows = (await financialsTableExists(db)) ? await fetchEffectiveFinancialTotals(db, documentIds) : [];
   const finCoveredIds = new Set(finRows.map((r) => r.document_id));
   const remainingIds = documentIds.filter((id) => !finCoveredIds.has(id));
-  const extractionRows = remainingIds.length ? await fetchFieldRowsByDocumentIds(db, remainingIds, 'cost') : [];
+  const extractionRows = remainingIds.length ? await fetchFieldRowsByDocumentIds(db, remainingIds, 'cost', teamScoped) : [];
 
   const rows = [...finRows.filter((r) => r.value != null && String(r.value).trim() !== ''), ...extractionRows];
   const invoiceRows = rows.filter((r) => r.document_type === 'invoice');
   return pickMostRecent(invoiceRows.length ? invoiceRows : rows);
 }
 
-async function runWarranty(db, resolution, intent, today, labelOverride) {
+async function runWarranty(db, resolution, intent, today, labelOverride, teamScoped = false) {
   let equipment = null;
 
   if (resolution.kind === 'equipment') {
@@ -399,7 +452,7 @@ async function runWarranty(db, resolution, intent, today, labelOverride) {
 
   const equipmentResolution = { kind: 'equipment', equipment };
   const citationField = stable.expiresBasis === 'computed' ? 'installation_date' : 'warranty_expires';
-  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, citationField);
+  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, citationField, teamScoped);
   const citationRow = pickBestExtraction(rows);
   if (!citationRow) return null;
 
@@ -556,11 +609,25 @@ function narrowUnitsByBrandOrModel(units, rawQuestion) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+/** R20 (J2, F4 recurring — R19 blind-3 i192/i193): intents whose value is already a known,
+ *  structured field on the unit object itself — fetchCustomerUnits/equipmentRowToUnit load it
+ *  straight from the equipment entity's own `data`, the SAME value unitDescriptor's own label
+ *  below is built from. Without this fallback, a unit whose manufacturer/model/serial/install-date
+ *  was simply never independently re-extracted into `extractions` (a real, common gap — the field
+ *  lives on the equipment record itself, not necessarily on any one document) answered "Not on
+ *  file" for that ONE field while its own descriptor label — built from this same stored value —
+ *  named it right there in the same line: a self-contradictory "Daikin (...) = Not on file" that
+ *  silently dropped a real, known unit from a "list every X" multi-unit answer. Cited via
+ *  `entityId` (the same equipment-record citation convention buildContactAnswer's own Serial fact
+ *  uses), never a document — this IS the record, not a document's restatement of it.
+ */
+const UNIT_OWN_FIELD_BY_INTENT = { manufacturer: 'manufacturer', model: 'model', serial: 'serial_number', install_date: 'installation_date' };
+
 /** One unit's own answer to `intent`, as a citable {label, value, sources} fact — never fabricated
  *  (a unit with nothing on file for this field states "Not on file", with zero sources, rather than
  *  being skipped or guessed). Used both for a single narrowed-to-one-unit answer and for every row
  *  of a multi-unit list. */
-async function unitFieldFact(db, unit, customerId, intent, today) {
+async function unitFieldFact(db, unit, customerId, intent, today, teamScoped = false) {
   const idBits = [unit.model, unit.serial_number ? `serial ${unit.serial_number}` : null].filter(Boolean).join(', ');
   const label = idBits ? `${unitDescriptor(unit)} (${idBits})` : unitDescriptor(unit);
   const equipmentResolution = { kind: 'equipment', equipment: { id: unit.id, customer_id: customerId, data: unit } };
@@ -569,7 +636,7 @@ async function unitFieldFact(db, unit, customerId, intent, today) {
     const stable = unit.warranty;
     if (!stable || !stable.expires) return { label, value: 'No warranty on file', sources: [] };
     const citationField = stable.expiresBasis === 'computed' ? 'installation_date' : 'warranty_expires';
-    const rows = await fetchFieldRowsForResolution(db, equipmentResolution, citationField);
+    const rows = await fetchFieldRowsForResolution(db, equipmentResolution, citationField, teamScoped);
     const citationRow = pickBestExtraction(rows);
     const tier = citationRow ? alertTier(stable, today) : 'unknown';
     if (!citationRow || tier === 'unknown') return { label, value: 'No warranty on file', sources: [] };
@@ -582,11 +649,19 @@ async function unitFieldFact(db, unit, customerId, intent, today) {
   }
 
   const fieldKey = FIELD_BY_INTENT[intent];
-  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey);
+  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey, teamScoped);
   const row = pickBestExtraction(rows);
-  if (!row) return { label, value: 'Not on file', sources: [] };
-  const value = intent === 'install_date' ? formatDateHuman(row.value) : row.value;
-  return { label, value, sources: [{ documentId: row.document_id, location: { field: row.field_key } }] };
+  if (row) {
+    const value = intent === 'install_date' ? formatDateHuman(row.value) : row.value;
+    return { label, value, sources: [{ documentId: row.document_id, location: { field: row.field_key } }] };
+  }
+  const ownKey = UNIT_OWN_FIELD_BY_INTENT[intent];
+  const ownValue = ownKey ? unit[ownKey] : null;
+  if (ownValue) {
+    const value = intent === 'install_date' ? formatDateHuman(ownValue) : ownValue;
+    return { label, value, sources: [], entityId: unit.id };
+  }
+  return { label, value: 'Not on file', sources: [] };
 }
 
 /** exactly one customer + exactly one unit (or a brand/model narrowed a multi-unit customer down
@@ -594,7 +669,7 @@ async function unitFieldFact(db, unit, customerId, intent, today) {
  *  sentence standing in for the usual subjectLabel. Returns null when the unit resolved fine but
  *  this SPECIFIC field just isn't on file for it (defer to the model — same as every other
  *  fast-path field miss, never a fabricated value). */
-async function buildSingleUnitAddressAnswer(db, { intent, unit, customer, addressLabel, today, narrowedByBrand }) {
+async function buildSingleUnitAddressAnswer(db, { intent, unit, customer, addressLabel, today, narrowedByBrand, teamScoped = false }) {
   const customerId = customer?.id ?? unit.customer_id ?? null;
   const equipmentResolution = { kind: 'equipment', equipment: { id: unit.id, customer_id: customerId, data: unit } };
   const who = customer?.data?.customer_name ? ` (${customer.data.customer_name})` : '';
@@ -602,10 +677,10 @@ async function buildSingleUnitAddressAnswer(db, { intent, unit, customer, addres
   const labelOverride = `The only ${brandWord}unit on file for ${addressLabel}${who}`.replace(/\s+/g, ' ').trim();
 
   if (WARRANTY_INTENTS.has(intent)) {
-    return runWarranty(db, equipmentResolution, intent, today, labelOverride);
+    return runWarranty(db, equipmentResolution, intent, today, labelOverride, teamScoped);
   }
   const fieldKey = FIELD_BY_INTENT[intent];
-  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey);
+  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey, teamScoped);
   const row = pickBestExtraction(rows);
   if (!row) return null;
   return buildFieldAnswer({ intent, resolution: equipmentResolution, row, labelOverride });
@@ -613,10 +688,10 @@ async function buildSingleUnitAddressAnswer(db, { intent, unit, customer, addres
 
 /** one customer, several units, nothing (or nothing NEW) disambiguating them — list every unit
  *  with its own answer + source, never merge or guess across units. */
-async function buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel, today }) {
+async function buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel, today, teamScoped = false }) {
   const customerId = customer?.id ?? null;
   const facts = [];
-  for (const u of units) facts.push(await unitFieldFact(db, u, customerId, intent, today));
+  for (const u of units) facts.push(await unitFieldFact(db, u, customerId, intent, today, teamScoped));
   const who = customer?.data?.customer_name ? ` (${customer.data.customer_name})` : '';
   const fieldLabel = ADDRESS_FIELD_LABEL[intent] ?? 'that';
   const text = `There's more than one unit on file for ${addressLabel}${who} — here's the ${fieldLabel} for each:`;
@@ -632,6 +707,9 @@ async function buildMultiUnitAddressAnswer(db, { intent, units, customer, addres
 async function runAddressEntityFieldPolicy(db, { intent, subject, raw, today }) {
   const addressLabel = String(subject?.address ?? '').replace(/\s+/g, ' ').trim() || 'that address';
   const group = await resolveAddressEntityFieldGroup(db, subject.address);
+  // R19 (I1, owner ask (a)/audience adoption): computed once from the question's own text — see
+  // isTeamScopedQuestion's own doc comment.
+  const teamScoped = isTeamScopedQuestion(raw);
 
   if (group.kind === 'no-address') return buildAddressFieldDecline({ intent, subject, resolution: { kind: 'no-address' } });
   if (group.kind === 'no-unit') return buildAddressFieldDecline({ intent, subject, resolution: { kind: 'no-unit', unit: group.unit } });
@@ -645,11 +723,11 @@ async function runAddressEntityFieldPolicy(db, { intent, subject, raw, today }) 
   const narrowed = units.length === 1 ? units[0] : narrowUnitsByBrandOrModel(units, raw);
   if (narrowed) {
     const answer = await buildSingleUnitAddressAnswer(db, {
-      intent, unit: narrowed, customer, addressLabel, today, narrowedByBrand: units.length > 1,
+      intent, unit: narrowed, customer, addressLabel, today, narrowedByBrand: units.length > 1, teamScoped,
     });
     return answer; // null defers to the model — the unit is known, just not this field
   }
-  return buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel, today });
+  return buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel, today, teamScoped });
 }
 
 /**
@@ -673,11 +751,21 @@ async function runCustomerEntityFieldPolicy(db, { intent, resolution, raw, today
   const customer = resolution.customer;
   const label = String(customer?.data?.customer_name ?? '').trim() || 'that customer';
   const units = await fetchCustomerUnits(db, customer.id);
+  const teamScoped = isTeamScopedQuestion(raw); // R19 (I1, owner ask (a)/audience adoption)
   if (!units.length) return buildAddressFieldDecline({ intent, subject: { address: label }, resolution: { kind: 'customer' } });
 
   const narrowed = units.length === 1 ? units[0] : narrowUnitsByBrandOrModel(units, raw);
   if (narrowed) {
-    return buildSingleUnitAddressAnswer(db, { intent, unit: narrowed, customer: null, addressLabel: label, today, narrowedByBrand: units.length > 1 });
+    return buildSingleUnitAddressAnswer(db, { intent, unit: narrowed, customer: null, addressLabel: label, today, narrowedByBrand: units.length > 1, teamScoped });
+  }
+  // R19 (I1, C7): several units, nothing narrows them to one — the R16 owner decision's honest
+  // "ambiguous, ask which" decline is still right for a SINGULAR-framed question ("whats the tonnage
+  // at sunrise valley elementary"), but a question that explicitly asks for the full list across
+  // every unit ("what manufacturers are on file...", "list every serial number...") is legitimately
+  // answerable and must not be declined as if it were the same single-value ambiguity — see
+  // wantsEveryUnit's own doc comment.
+  if (wantsEveryUnit(raw)) {
+    return buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel: label, today, teamScoped });
   }
   return buildAddressFieldDecline({ intent, subject: { address: label }, resolution: { kind: 'ambiguous' } });
 }
@@ -713,7 +801,7 @@ async function runEquipmentList(db, resolution, today) {
  *  cross-unit merge this file's other policies refuse) and BOTH fields present on file; missing
  *  either, or a customer-level (multi-unit-possible) resolution, defers to the model rather than
  *  guess or answer half a compound question. */
-async function runModelAndSerial(db, resolution) {
+async function runModelAndSerial(db, resolution, teamScoped = false) {
   let equipmentResolution = resolution;
   if (resolution.kind === 'customer') {
     // A customer resolution (reached by address before the unit itself carries one, or by name)
@@ -724,8 +812,8 @@ async function runModelAndSerial(db, resolution) {
     equipmentResolution = { kind: 'equipment', equipment: { id: units[0].id, customer_id: resolution.customer.id, data: units[0] } };
   }
   const [modelRows, serialRows] = await Promise.all([
-    fetchFieldRowsForResolution(db, equipmentResolution, 'model'),
-    fetchFieldRowsForResolution(db, equipmentResolution, 'serial_number'),
+    fetchFieldRowsForResolution(db, equipmentResolution, 'model', teamScoped),
+    fetchFieldRowsForResolution(db, equipmentResolution, 'serial_number', teamScoped),
   ]);
   const modelRow = pickBestExtraction(modelRows);
   const serialRow = pickBestExtraction(serialRows);
@@ -750,13 +838,185 @@ async function runModelAndSerial(db, resolution) {
   };
 }
 
-async function runDocumentList(db, resolution) {
+/** One named field's value for `runMultiField` below — the same per-field logic
+ *  unitFieldFact/buildSingleUnitAddressAnswer already use for warranty vs. every other plain
+ *  extraction field, just returning null (never a partial fact) instead of a display string when
+ *  the field isn't on file. 'warranty' answers the STATUS-shaped fact (see MULTI_FIELD_LABELS' own
+ *  doc comment in fastPath.js for why — never warranty_out's inverted framing). */
+async function fetchOneMultiField(db, equipmentResolution, field, today, teamScoped) {
+  if (field === 'warranty') {
+    const stable = equipmentResolution.equipment?.data?.warranty;
+    if (!stable || !stable.expires) return null;
+    const citationField = stable.expiresBasis === 'computed' ? 'installation_date' : 'warranty_expires';
+    const rows = await fetchFieldRowsForResolution(db, equipmentResolution, citationField, teamScoped);
+    const citationRow = pickBestExtraction(rows);
+    const tier = citationRow ? alertTier(stable, today) : 'unknown';
+    if (!citationRow || tier === 'unknown') return null;
+    const dateHuman = formatDateHuman(stable.expires);
+    const note = stable.expiresBasis === 'computed' ? ' (computed)' : '';
+    const value = tier === 'expired' ? `expired ${dateHuman}${note}` : `valid through ${dateHuman}${note}`;
+    return { value, documentId: citationRow.document_id, fieldKey: citationRow.field_key };
+  }
+  const fieldKey = FIELD_BY_INTENT[field];
+  if (!fieldKey) return null;
+  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey, teamScoped);
+  const row = pickBestExtraction(rows);
+  if (!row) return null;
+  const value = field === 'install_date' ? formatDateHuman(row.value) : row.value;
+  return { value, documentId: row.document_id, fieldKey: row.field_key };
+}
+
+/**
+ * R19 (I1, i137/i191): generalizes runModelAndSerial's own "answer every named field or defer,
+ * never a subset" rule to any OTHER 2+-field combination named in one question (fastPath.js's
+ * detectMultiFieldNames/MULTI_FIELD_LABELS). Same single-unit-only resolution rule as
+ * runModelAndSerial (several units with nothing to narrow them -> defer entirely, never merge
+ * facts across different units), and the same "any field missing -> null" rule extended from two
+ * fields to however many were named — a confident partial answer is exactly the bug this exists to
+ * fix (the exam's own "set" comparator grades a dropped field as WRONG, not needs-model).
+ */
+async function runMultiField(db, resolution, fields, today, teamScoped = false) {
+  let equipmentResolution = resolution;
+  if (resolution.kind === 'customer') {
+    const units = await fetchCustomerUnits(db, resolution.customer.id);
+    if (units.length !== 1) return null;
+    equipmentResolution = { kind: 'equipment', equipment: { id: units[0].id, customer_id: resolution.customer.id, data: units[0] } };
+  }
+  const uniqueFields = [...new Set(fields ?? [])];
+  if (uniqueFields.length < 2) return null;
+
+  const results = [];
+  for (const field of uniqueFields) {
+    const r = await fetchOneMultiField(db, equipmentResolution, field, today, teamScoped);
+    if (!r) return null; // ANY named field missing on file -> defer entirely, never answer a subset
+    results.push({ field, ...r });
+  }
+
+  const label = subjectLabel(equipmentResolution);
+  const facts = results.map((r) => ({
+    label: MULTI_FIELD_LABELS[r.field] ?? r.field, value: r.value, basis: 'printed',
+    sources: [{ documentId: r.documentId, location: { field: r.fieldKey } }],
+  }));
+  const sources = [...new Map(facts.flatMap((f) => f.sources).map((s) => [s.documentId, s])).values()];
+  const parts = results.map((r) => `${(MULTI_FIELD_LABELS[r.field] ?? r.field).toLowerCase()} ${r.value}`);
+  return {
+    kind: 'answer',
+    text: `${label} is ${parts.join(', ')}.`,
+    facts, sources,
+    confidence: 0.85,
+    interpretation: label,
+    verifiedCount: facts.length,
+    unverifiedCount: 0,
+    closest: [],
+    fastIntent: 'multi_field',
+  };
+}
+
+/* =================================================== R19 (I1, C1): reverse identity lookup
+ * (serial->customer / phone->customer / email->customer) — see fastPath.js's detectReverseLookup
+ * for the pure classification/value-extraction half. Zero matches -> honest "no customer on file
+ * with that X" (never a fabricated name, never an unrelated portfolio count); more than one -> ask
+ * which, list every match; exactly one -> answer, cited to the customer record (+ the equipment
+ * record too, for a serial) — never a document lookup, since the identity IS the fact, not
+ * something printed on a page this row also happens to name.
+ */
+async function resolveReverseSerial(db, value) {
+  const { rows } = await db.raw(
+    `SELECT id, customer_id, data FROM entities
+      WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND data->>'serial_number' ILIKE $1
+      LIMIT 5`,
+    [value]
+  );
+  return rows;
+}
+
+async function resolveReversePhone(db, digits) {
+  const { rows } = await db.raw(
+    `SELECT id, data FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND regexp_replace(coalesce(data->>'phone', ''), '\\D', '', 'g') = $1
+      LIMIT 5`,
+    [digits]
+  );
+  return rows;
+}
+
+async function resolveReverseEmail(db, email) {
+  const { rows } = await db.raw(
+    `SELECT id, data FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+        AND lower(coalesce(data->>'email', '')) = lower($1)
+      LIMIT 5`,
+    [email]
+  );
+  return rows;
+}
+
+async function runReverseLookup(db, intent, value) {
+  if (!value) return null;
+
+  if (intent === 'reverse_serial') {
+    const equipRows = await resolveReverseSerial(db, value);
+    if (!equipRows.length) return buildReverseLookupNoMatch({ intent, value });
+    if (equipRows.length > 1) {
+      // Several units share this exact serial (a data-quality edge case, not the common path) —
+      // resolve each to its own owning customer rather than guessing across them.
+      const owners = [];
+      for (const eq of equipRows) {
+        if (!eq.customer_id) continue;
+        const c = await db.getCustomerByIdOrNumber({ id: eq.customer_id });
+        if (c) owners.push({ id: c.id, customer_name: c.data?.customer_name, service_address: c.data?.service_address });
+      }
+      const uniqueOwners = [...new Map(owners.map((o) => [o.id, o])).values()];
+      if (uniqueOwners.length === 1) {
+        const customer = await db.getCustomerByIdOrNumber({ id: uniqueOwners[0].id });
+        return buildReverseLookupAnswer({ intent, customer, equipment: equipRows[0] });
+      }
+      return buildReverseLookupAmbiguous({ intent, customers: uniqueOwners });
+    }
+    const eq = equipRows[0];
+    if (!eq.customer_id) return buildReverseLookupNoMatch({ intent, value });
+    const customer = await db.getCustomerByIdOrNumber({ id: eq.customer_id });
+    if (!customer) return buildReverseLookupNoMatch({ intent, value });
+    return buildReverseLookupAnswer({ intent, customer, equipment: eq });
+  }
+
+  const rows = intent === 'reverse_phone' ? await resolveReversePhone(db, value) : await resolveReverseEmail(db, value);
+  if (!rows.length) return buildReverseLookupNoMatch({ intent, value });
+  if (rows.length > 1) {
+    return buildReverseLookupAmbiguous({
+      intent,
+      customers: rows.map((r) => ({ id: r.id, customer_name: r.data?.customer_name, service_address: r.data?.service_address })),
+    });
+  }
+  return buildReverseLookupAnswer({ intent, customer: rows[0] });
+}
+
+/** R19 (I1, owner ask (a)/audience adoption): `customerDocumentIds`/`equipmentDocumentIds` above
+ *  gather every document a customer/unit is reachable through with NO audience filter of their
+ *  own (they feed the field-fetch path too, where fetchFieldRowsByDocumentIds's own JOIN applies
+ *  it) — but runDocumentList hands the raw id list straight to db.listDocumentDetails (recordsStore
+ *  .js, not owned here, and its SELECT carries no audience column to filter on after the fact), so
+ *  the exclusion has to happen HERE, on the id list itself, before that call. Mirrors
+ *  audienceWhereClause's own gate exactly: `teamScoped` skips it entirely. */
+async function filterDocumentIdsByAudience(db, documentIds, teamScoped) {
+  if (!documentIds.length || teamScoped) return documentIds;
+  const audienceClause = await audienceWhereClause(db, false);
+  const { rows } = await db.raw(
+    `SELECT d.id FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} AND (${audienceClause})`,
+    [documentIds]
+  );
+  return rows.map((r) => r.id);
+}
+
+async function runDocumentList(db, resolution, teamScoped = false) {
   let customerResolution = resolution.kind === 'customer' ? resolution : null;
 
   if (!customerResolution) {
     const eq = resolution.equipment;
     if (!eq.customer_id) {
-      const documentIds = await equipmentDocumentIds(db, eq.id);
+      const documentIds = await filterDocumentIdsByAudience(db, await equipmentDocumentIds(db, eq.id), teamScoped);
       if (!documentIds.length) return null;
       const documents = (await db.listDocumentDetails(documentIds)).slice(0, FAST_LIST_LIMIT);
       return buildDocumentListAnswer({ resolution, documents, documentTypeLabel });
@@ -766,7 +1026,7 @@ async function runDocumentList(db, resolution) {
     customerResolution = { kind: 'customer', customer };
   }
 
-  const documentIds = await customerDocumentIds(db, customerResolution.customer);
+  const documentIds = await filterDocumentIdsByAudience(db, await customerDocumentIds(db, customerResolution.customer), teamScoped);
   if (!documentIds.length) return null;
   const documents = (await db.listDocumentDetails(documentIds)).slice(0, FAST_LIST_LIMIT);
   return buildDocumentListAnswer({ resolution: customerResolution, documents, documentTypeLabel });
@@ -784,6 +1044,8 @@ async function runDocumentList(db, resolution) {
  */
 export async function runFastPath(db, fp, { today } = {}) {
   const { intent, subject, raw } = fp;
+  if (intent === 'out_of_domain') return buildOutOfDomainDecline(); // R19 (I1, C8)
+  if (REVERSE_LOOKUP_INTENTS.has(intent)) return runReverseLookup(db, intent, subject.reverseValue); // R19 (I1, C1)
   if (NO_FIELD_INTENTS.has(intent)) return null; // no extraction field exists — always defer (seer, filter_size)
 
   const resolution = await resolveFastPathSubject(db, subject);
@@ -823,27 +1085,33 @@ export async function runFastPath(db, fp, { today } = {}) {
 
   if (resolution.kind !== 'customer' && resolution.kind !== 'equipment') return null;
 
+  // R19 (I1, owner ask (a)/audience adoption): computed once, from the question's own raw text —
+  // see isTeamScopedQuestion's own doc comment. Every downstream fetch below is gated on it.
+  const teamScoped = isTeamScopedQuestion(raw);
+
   if (LIST_INTENTS.has(intent)) {
     return intent === 'equipment_list'
       ? runEquipmentList(db, resolution, today)
-      : runDocumentList(db, resolution);
+      : runDocumentList(db, resolution, teamScoped);
   }
 
   if (COMPOUND_INTENTS.has(intent)) {
-    return intent === 'model_and_serial' ? runModelAndSerial(db, resolution) : null;
+    if (intent === 'model_and_serial') return runModelAndSerial(db, resolution, teamScoped);
+    if (intent === 'multi_field') return runMultiField(db, resolution, subject.fields, today, teamScoped);
+    return null;
   }
 
-  if (WARRANTY_INTENTS.has(intent)) return runWarranty(db, resolution, intent, today);
+  if (WARRANTY_INTENTS.has(intent)) return runWarranty(db, resolution, intent, today, undefined, teamScoped);
 
   const fieldKey = FIELD_BY_INTENT[intent];
   if (!fieldKey) return null;
 
   let row;
-  if (intent === 'installer') row = await fetchInstaller(db, resolution);
-  else if (intent === 'last_service_tech') row = await fetchLastServiceTech(db, resolution);
-  else if (intent === 'last_service_date') row = await fetchLastServiceDate(db, resolution, today);
-  else if (intent === 'invoice_total') row = await fetchInvoiceTotal(db, resolution);
-  else row = pickBestExtraction(await fetchFieldRowsForResolution(db, resolution, fieldKey));
+  if (intent === 'installer') row = await fetchInstaller(db, resolution, teamScoped);
+  else if (intent === 'last_service_tech') row = await fetchLastServiceTech(db, resolution, teamScoped);
+  else if (intent === 'last_service_date') row = await fetchLastServiceDate(db, resolution, today, teamScoped);
+  else if (intent === 'invoice_total') row = await fetchInvoiceTotal(db, resolution, teamScoped);
+  else row = pickBestExtraction(await fetchFieldRowsForResolution(db, resolution, fieldKey, teamScoped));
 
   if (!row) return null;
   return buildFieldAnswer({ intent, resolution, row });

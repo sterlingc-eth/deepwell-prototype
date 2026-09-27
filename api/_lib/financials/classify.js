@@ -30,7 +30,9 @@ const FIN_NOUN_RE = /\b(?:invoic\w*|quote[sd]?|quoting|estimat\w*|proposal\w*|pu
 const FIN_STATUS_RE = /\b(?:overdue|past[\s-]?due|unpaid|outstanding|delinquent|paid|partial(?:ly)?|open|owe[sd]?|owing|owed|uncollected|collected|verify|verified|unverified)\b/i;
 
 // A bare money-domain word that is unambiguous on its own (no noun required).
-const FIN_MONEY_WORD_RE = /\b(?:revenue|balances?|receivables?|payables?|invoiced|billed|sales\s*tax|taxe?s?)\b/i;
+// R20 (J3, i013): "income" added — the same unambiguous-on-its-own money word "revenue" already
+// is, just a second everyday synonym for it ("is our income higher this year than last year").
+const FIN_MONEY_WORD_RE = /\b(?:revenue|income|balances?|receivables?|payables?|invoiced|billed|sales\s*tax|taxe?s?)\b/i;
 
 // JOB COSTING (M3-config/36-job-costing.sql, 2026-09-26): "margin"/"profit(able)" are
 // unambiguous money words even with no invoice/quote/PO noun in sight ("gross margin by
@@ -53,6 +55,13 @@ const FIN_THRESHOLD_RE = /\b(?:over|above|more than|greater than|under|below|les
 
 // A superlative ("biggest/smallest/highest/lowest invoice").
 const FIN_SUPERLATIVE_RE = /\b(?:biggest|largest|smallest|highest|lowest)\b/i;
+
+// R20 (J3, i020/i021): "how many purchase orders have we cut to Baker Distributing" — a per-vendor
+// DOCUMENT count (analytics.js's detPlan.js now has a real, deterministic 'vendor' filter for this
+// exact shape), never a dollar/status question — the same "bare count, not money" carve-out
+// FIN_COUNT_OR_AVG_RE's own onlyAgreement branch already makes for "how many maintenance agreements
+// are there", just triggered by a vendor RECIPIENT clause instead of the noun being "agreement".
+const VENDOR_RECIPIENT_RE = /\b(?:cut|issued|sent|placed|written|made\s+out)\s+to\s+[a-z]/i;
 
 // TEAM K (2026-09-25, R5_FAILS.md): "how many invoices do we have on file", "average quote
 // amount", "total value of our quotes", "average annual fee on our agreements" - a plain count
@@ -92,7 +101,11 @@ export function isFinancialQuestion(question) {
     // unaffected: onlyAgreement is false for those, so they still return true exactly as before.
     const onlyAgreement = !/\b(?:invoic\w*|quote[sd]?|quoting|estimat\w*|proposal\w*|purchase\s*orders?|\bpos\b|receipts?|bill(?:s|ed|ing)?)\b/i.test(q);
     const bareHowMany = /\bhow many\b/i.test(q) && !/\$|\b(?:fees?|amounts?|dollars?|totals?|balances?|owe[sd]?|owing|money|cost)\b/i.test(q);
-    if (onlyAgreement && bareHowMany) {
+    // R20 (J3, i020/i021): a purchase-order (or other money-noun) count scoped to a named vendor
+    // RECIPIENT ("...cut/issued/sent to X") is the same "plain count, not a dollar question" shape
+    // as onlyAgreement just above — see VENDOR_RECIPIENT_RE's own doc comment.
+    const vendorScopedCount = VENDOR_RECIPIENT_RE.test(q);
+    if ((onlyAgreement || vendorScopedCount) && bareHowMany) {
       // fall through to the other branches (FIN_STATUS_RE etc.) rather than returning early -
       // "how many agreements are overdue" (a real status word alongside "how many") must still
       // be checked below, same as it always was.

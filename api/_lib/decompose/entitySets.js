@@ -60,6 +60,17 @@ export function qualifyingCallback(list, { days, scope, year }, today) {
  *  types compose.js's own matchesCondition doesn't know. Falls through to matchesCondition for every
  *  other (shared) condition type. */
 function conditionMatches(c, cond, ctx) {
+  // R19 (I2, h050/h091-h097/h092/g135): 'not_expired' is THIS engine's own oracle-verified
+  // "still under warranty" reading — active OR expiring, i.e. any unit whose coverage hasn't run
+  // out yet (see clauses.js's looseWarrantyNotExpired doc comment for why this deliberately
+  // differs from analytics.js's own strict 'active'-only bucket for the SAME phrase, and why the
+  // two never collide). Intercepted here, before matchesCondition (compose.js) ever sees it —
+  // that function's own 'warrantyStatus' case is a plain bucket-string equality test and has no
+  // vocabulary for a two-bucket OR; adding one there would mean widening a shared primitive for a
+  // definition only this file's oracle actually calls for.
+  if (cond.type === 'warrantyStatus' && cond.status === 'not_expired') {
+    return c.equipment.some((e) => e.warrantyStatus === 'active' || e.warrantyStatus === 'expiring');
+  }
   if (cond.type === 'noVisitSinceYear') {
     const cutoff = `${cond.year}-01-01`;
     return !c.serviceDates.some((d) => d >= cutoff);

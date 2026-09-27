@@ -20,7 +20,7 @@ import { resolveAnyTimeRange } from '../analytics.js';
 import { extractDocTypeMentions } from '../search/knowledge.js';
 import { KNOWN_AZ_CITY_NAMES } from '../analytics.js';
 import { looksLikeContinuation, classifyFollowupKind, detectSwapTarget, looksLikeDisambiguationReply } from './classify.js';
-import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent } from './subject.js';
+import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
 
 /** Runs a pronoun substitution and guarantees the anchor's own raw text (address/name/customer
  *  number) ends up somewhere in the result — appending `repl.place` when the substitution didn't
@@ -185,20 +185,56 @@ function resolveSwap(question, priorTurn) {
 // bail), so "those" becomes a generic noun phrase ("the units") rather than being left as a dangling
 // pronoun the planner has no vocabulary for.
 const GENERIC_PRONOUN_RE = /\b(those|these|them|that one)\b/i;
-function genericSubstitution(question, noun) {
+function genericSubstitution(question, noun, brandLabel = null) {
   if (!GENERIC_PRONOUN_RE.test(question)) return question;
-  return question.replace(GENERIC_PRONOUN_RE, `the ${noun}`);
+  const phrase = brandLabel ? `${brandLabel} ${noun}` : noun;
+  return question.replace(GENERIC_PRONOUN_RE, `the ${phrase}`);
 }
 
-function resolveRefinement(question, anchor) {
-  const brand = brandMentionIn(question);
+/**
+ * R20 (J2, dialogue d005 — "how many carrier units do we have on the books" / "and how many of
+ * those are past their warranty?"): a bare tenant-wide aggregate turn names no customer/address
+ * (findAnchor returns null for it — nothing pronounReplacement could stand in for), so the brand
+ * it DID name ("carrier") was only ever recovered from the CURRENT question's own text
+ * (brandMentionIn(question)) — never carried forward from the turn "those" is actually referring
+ * back to. Every downstream caller (api/ask.js's own composeFollowup call site) reads only this
+ * function's rewritten `query` text, never its `filters` object (see api/ask.js:794-795 — the
+ * deterministic analytics planner parses free text, not a filters map), so an inherited brand has
+ * to land IN THE REWRITTEN QUESTION TEXT itself, not just in `filters.manufacturer`, to actually
+ * narrow the next turn's count the way "those" implies.
+ *
+ * R20 (J4, dialogue d036 — "how many goodman units are on our books" / "do we have more of those
+ * than lennox"): a bare `brandMentionIn(question)` reports "some brand is mentioned somewhere in this
+ * text", which used to false-positive on a two-brand COMPARISON — "lennox" here is the comparison
+ * TARGET this question names itself, never what "those" (Goodman, from the turn above) refers to —
+ * and silently dropped the Goodman half entirely. pronounNeedsBrandFromEarlierTurn (subject.js) is the
+ * position-aware version: it still blocks inheritance for an ordinary "of those Trane units" (the
+ * question really does name its own brand for the pronoun), but recognizes a brand-vs-pronoun "than"
+ * split as still needing the earlier turn's brand for the pronoun's own half.
+ */
+function inheritedBrandFrom(question, priorTurn) {
+  if (!pronounNeedsBrandFromEarlierTurn(question)) return null;
+  return priorTurn ? brandMentionIn(priorTurn.question) : null;
+}
+
+function resolveRefinement(question, anchor, priorTurn) {
+  const inherited = inheritedBrandFrom(question, priorTurn);
+  const brand = brandMentionIn(question) || inherited;
   const docTypes = extractDocTypeMentions(question);
   // An anchor with only a bare candidate-unit LIST (no single resolved name/address — e.g. the prior
   // turn was itself a tenant-wide count, not about one customer) has nothing pronounReplacement can
   // stand in for; rewriteWithAnchor then leaves the pronoun untouched (`changed: false`), and the
   // generic noun substitution below is the right fallback rather than shipping a dangling "those".
   const rewritten = anchor ? rewriteWithAnchor(question, anchor.subject) : { query: question, changed: false };
-  const q = rewritten.changed ? rewritten.query : genericSubstitution(question, anchor?.subject?.noun || inferNoun(question));
+  const noun = anchor?.subject?.noun || inferNoun(question);
+  let q = rewritten.changed ? rewritten.query : genericSubstitution(question, noun, inherited?.label);
+  // The anchor DID rewrite the pronoun (a named customer/address carried forward) but an inherited
+  // brand still isn't anywhere in the resulting text ("those" replaced by the customer's own
+  // possessive, never a noun phrase genericSubstitution could have folded the brand into) — append it
+  // rather than silently drop it.
+  if (inherited && !new RegExp(`\\b${inherited.key}\\b`, 'i').test(q)) {
+    q = `${stripTrailingPunct(q)} (${inherited.label} only)`;
+  }
   const filters = {};
   if (brand) filters.manufacturer = brand.key;
   if (docTypes.length) filters.docTypes = docTypes;
@@ -264,6 +300,6 @@ export function resolveFollowup(context, question) {
     return { query: clip(q), filters: composeFollowupFilters(priorTurn.resolvedFilters, q), isFollowup: true, kind: 'own-subject', needsClarification: false };
   }
 
-  if (kind === 'refinement') return resolveRefinement(q, anchor);
+  if (kind === 'refinement') return resolveRefinement(q, anchor, priorTurn);
   return resolvePronoun(q, anchor, priorTurn);
 }

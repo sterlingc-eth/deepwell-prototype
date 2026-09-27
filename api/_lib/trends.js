@@ -46,6 +46,33 @@ function detectGrain(q) {
 const COMPARATIVE_RE = /\b(?:more|higher|up|greater|fewer|lower|down)\b/i;
 const THAN_RE = /\b(?:than|compared\s+(?:to|with))\b/i;
 
+// ROUND 20 (J4 <-> J1/J3 wiring, task 3): "are we bringing in more revenue this year so far than we
+// did all of last year" (i013) / "did we install more units last year than we've done so far this
+// year" (i003) — both share the SAME shape this file cannot answer right: "this year" ALWAYS names
+// the current, still-in-progress year, while periodBounds below (used by every OTHER grain='year'
+// comparison this file handles, e.g. "last year vs the year before" — two full, completed years) has
+// no notion of a partial period at all — it always compares the last two FULL calendar years before
+// today, silently dropping the whole current year from the comparison whenever one side is meant to be
+// "so far". Detected generally (either phrase order, "so far" optional) rather than by matching either
+// question's exact text, so this yields (returns null, never a wrong compare intent) for ANY grain=
+// 'year' comparison naming both "this year"/"so far this year" and "last year" — including a metric
+// (serviceCount) neither downstream engine below recognizes yet, which is the correct, honest "let it
+// fall through further" outcome rather than a silently-wrong period compare.
+//
+// Two purpose-built engines already compute the RIGHT comparison for this exact shape and sit at a
+// LOWER (later-checked) router precedence than this file's own deterministic-router slot (0.4) — see
+// R11_RULES.md's own precedence list:
+//   - installCount ("units"/"install..."): api/_lib/analytics/comparison.js's detectInstallYearComparison,
+//     reached via routes/analytics.js's runAnalyticsQuestion (detectCountComparison, run up front,
+//     before any cache/plan) — analytics pre-router, 0.7.
+//   - invoiceSum ("revenue"/"invoice..."): api/_lib/financials/answers.js's revenueYearComparison
+//     intent (detectRevenueYearComparison) — money gate, 0.65.
+// Yielding here (this file simply never claims the question) is exactly what "return null so the chain
+// falls through" (R11_RULES.md) means — no new vocabulary is added to THIS file, the correct answer
+// was already built by J1/J3, it just never got a turn.
+const THIS_YEAR_ANY_RE = /\b(?:so\s+far\s+)?this\s+year\b/i;
+const LAST_YEAR_ANY_RE = /\blast\s+year\b/i;
+
 /** Pure: question -> {kind:'compare', metric, grain} | {kind:'monthMax'|'monthSeries', metric} | null. */
 export function parseTrends(question) {
   const q = String(question ?? '').trim();
@@ -62,7 +89,10 @@ export function parseTrends(question) {
   if (COMPARATIVE_RE.test(q) && THAN_RE.test(q)) {
     const metric = detectMetric(q);
     const grain = detectGrain(q);
-    if (metric && grain) return { kind: 'compare', metric, grain };
+    if (metric && grain) {
+      if (grain === 'year' && THIS_YEAR_ANY_RE.test(q) && LAST_YEAR_ANY_RE.test(q)) return null;
+      return { kind: 'compare', metric, grain };
+    }
   }
   return null;
 }

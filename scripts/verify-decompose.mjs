@@ -30,7 +30,45 @@ const HVAC_PACK = getPack('hvac');
 
 /* ================================================================== 1. pure classify */
 const Clauses = await import('../api/_lib/decompose/clauses.js');
+const { parseFilterClauses } = Clauses;
 const { classifyDecompose } = await import('../api/_lib/decompose/index.js');
+
+{
+  // R20 (J3, F1 regression, i048-i053 "purchase order on file for <name>" cluster): docTypeMention's
+  // bare-last-word shortcut ("agreement" standing in for "maintenance agreement") used to let
+  // "purchase order" and "work order" - both ending in the SAME bare word "order" - each match the
+  // OTHER's literal text too, manufacturing a phantom second hasDocType condition nothing in the
+  // question actually named. ambiguousBareWords now detects any two doc-type labels sharing a last
+  // word and forces the FULL phrase (never the bare word alone) for either one.
+  const eqCond = (name, got, want) => check(name, JSON.stringify(got?.conditions) === JSON.stringify(want), `got ${JSON.stringify(got)}`);
+  eqCond(
+    'docTypeMention fix: "purchase order" + a city condition never also claims a phantom "work order"',
+    parseFilterClauses('which customers have a purchase order on file and live in Mesa', HVAC_PACK),
+    [{ type: 'hasDocType', id: 'purchase-order', phrase: 'purchase order' }, { type: 'geoCity', value: 'Mesa' }]
+  );
+  eqCond(
+    'docTypeMention fix: "purchase order" + missing-email condition, same single hasDocType',
+    parseFilterClauses('which customers have a purchase order on file and are missing an email', HVAC_PACK),
+    [{ type: 'hasDocType', id: 'purchase-order', phrase: 'purchase order' }, { type: 'noEmail' }]
+  );
+  eqCond(
+    'docTypeMention fix: brand + "purchase order", same single hasDocType (order reversed)',
+    parseFilterClauses('which trane customers have a purchase order on file', HVAC_PACK),
+    [{ type: 'brand', values: ['Trane'] }, { type: 'hasDocType', id: 'purchase-order', phrase: 'purchase order' }]
+  );
+  // A genuine two-doctype AND ("has X on file AND has Y on file") must still resolve BOTH real
+  // conditions - the fix narrows a false match, it never drops a real second doc-type mention.
+  eqCond(
+    'docTypeMention fix does not break a genuine two-doctype AND',
+    parseFilterClauses('which customers have a purchase order on file and a work order on file', HVAC_PACK),
+    [{ type: 'hasDocType', id: 'work-order', phrase: 'work order' }, { type: 'hasDocType', id: 'purchase-order', phrase: 'purchase order' }]
+  );
+  eqCond(
+    'docTypeMention fix does not break a genuine has-X-but-no-Y AND',
+    parseFilterClauses('which customers have a work order but no invoice', HVAC_PACK),
+    [{ type: 'hasDocType', id: 'work-order', phrase: 'work order' }, { type: 'lacksDocType', id: 'invoice', phrase: 'invoice' }]
+  );
+}
 
 {
   const yes = (q) => check(`classify recognizes: "${q}"`, Boolean(classifyDecompose(q, { pack: HVAC_PACK })), q);
@@ -72,6 +110,38 @@ const { classifyDecompose } = await import('../api/_lib/decompose/index.js');
   const flt = Clauses.parseFilterClauses('Which Trane customers with no agreement had a callback this year?', HVAC_PACK);
   const types = flt.conditions.map((c) => c.type).sort();
   eq('parseFilterClauses: recognizes brand + lacksDocType + callback(thisYear)', types, ['brand', 'callback', 'lacksDocType'].sort());
+}
+
+/* R19 (I2, h050/h091-h097/h092/g135): decompose's OWN 'not_expired' warranty bucket (active OR
+ * expiring — "hasn't run out yet"), distinct from analytics.js's strict 'active'-only bucket for
+ * the SAME bare phrasing — see clauses.js's looseWarrantyNotExpired doc comment. 5 paraphrases +
+ * negatives. */
+{
+  const notExpired = (q, label) => {
+    const flt = Clauses.parseFilterClauses(q, HVAC_PACK);
+    check(`parseFilterClauses "not_expired": ${label}`, flt?.conditions?.some((c) => c.type === 'warrantyStatus' && c.status === 'not_expired'), JSON.stringify(flt));
+  };
+  notExpired('How many carrier units in chandler are still under warranty?', '"still under warranty"');
+  notExpired('Which mitsubishi customers in Mesa are covered under warranty?', '"covered under warranty"');
+  notExpired('How many trane units in Tucson have active warranty coverage?', '"active warranty coverage"');
+  notExpired('Which york customers in gilbert have a warranty still in effect?', '"warranty still in effect"');
+  notExpired('How many goodman units in tempe are under active warranty?', '"under active warranty"');
+
+  // Negative: the frozen base-exam oracle (counts-warranty-0004-canonical) — a BARE phrasing with no
+  // second condition — must never be claimed by decompose at all (below the 2-clause floor), so it
+  // is untouched by this bucket and still reaches analytics.js's own strict 'active'-only reading.
+  check('classify correctly ignores the bare (single-condition) "still under warranty" phrasing', classifyDecompose('How many units are still under warranty?', { pack: HVAC_PACK }) === null);
+
+  // R19 (I2, h098): pack.brands' own LABEL ("Mitsubishi Electric") vs the bare word a question (and
+  // the stored `manufacturer` field) actually uses ("mitsubishi") — buildConditionOverrideFilter's
+  // BRAND_WORDS fallback must still find it.
+  const bareBrand = Clauses.parseFilterClauses('How many mitsubishi units in maricopa are still under warranty?', HVAC_PACK);
+  check('parseFilterClauses: bare "mitsubishi" resolves via the BRAND_WORDS fallback (pack label mismatch)', bareBrand?.conditions?.some((c) => c.type === 'brand' && c.values.some((v) => /mitsubishi/i.test(v))), JSON.stringify(bareBrand));
+
+  // R19 (I2): a single-record address reference must never be hijacked into a portfolio-wide count,
+  // even though it wears two "conditions" on its face (brand + a phrase this file's own guard
+  // recognizes as a specific-unit lookup) — looksLikeSingleRecordReference bails the whole parse.
+  check('classify correctly ignores a single-record address+brand lookup (never a portfolio count)', classifyDecompose('Is the Rheem at 544 E Ray Rd, Casa Grande, AZ 85122 under warranty?', { pack: HVAC_PACK }) === null);
 }
 
 /* ================================================================== harness: real Postgres via PGlite */

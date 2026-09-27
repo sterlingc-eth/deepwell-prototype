@@ -144,6 +144,20 @@ export const FILTER_FIELDS = [
   // mirror of hasAnyDocument, computed the same correlated-EXISTS way (buildAnalyticsSQL's
   // customers branch).
   'hasAnyEquipment',
+  // R20 (J3, i011): "how many properties do we have more than one unit installed at" — a
+  // per-customer equipment count > 1, same correlated-EXISTS idiom as hasAnyEquipment just above,
+  // just a ">1" test (see DATA_QUALITY_FIELD_ENTITY's own doc comment).
+  'hasMultipleUnits',
+  // R20 (J3, i020/i021): "how many purchase orders have we cut to Baker Distributing" — a plain
+  // string field on `documents` (the extractions.field_key='vendor_name' value, correlated the same
+  // way documents' own service_date already is — see buildAnalyticsSQL's documents branch), matched
+  // via matchesFilter's generic string eq/contains path like any other unindexed field.
+  'vendor',
+  // R20 (J3, i094): "how many warranty registrations took longer than N days after install" — a
+  // plain numeric field on `equipment` (shapeEquipmentRow, routes/analytics.js): the day gap between
+  // a unit's warranty.registrationOnFile and its own install date, null when either is missing
+  // (matchesFilter's ordinary "actual == null -> never matches" rule already excludes those).
+  'warrantyRegistrationDays',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -232,6 +246,10 @@ export const DATA_QUALITY_FIELD_ENTITY = {
   // R18 P4 (C4): "how many customers have zero equipment on file" — customers-side mirror of
   // hasAnyDocument (buildAnalyticsSQL's customers branch adds the matching correlated EXISTS).
   hasAnyEquipment: 'customers',
+  // R20 (J3, i011): "how many properties do we have more than one unit installed at" — a
+  // per-customer equipment count > 1 (a GROUP BY ... HAVING shape), computed the same
+  // correlated-subquery way as hasAnyEquipment just above, just a ">1" test instead of ">0".
+  hasMultipleUnits: 'customers',
   // R18 P4 (C3): "actually registered for warranty" — data.warranty.registrationState === 'on_file',
   // computed in shapeEquipmentRow (routes/analytics.js) directly from the same `warranty` JSON
   // column warrantyStatusOf already reads; deliberately its own field, never folded into
@@ -259,6 +277,11 @@ export const INSTALL_DATE_SORT_FIELDS = ['installDateAsc', 'installDateDesc'];
  *  never silently dropped, but a cap keeps one pathological tie from
  *  producing an unbounded answer/citation list. */
 export const INSTALL_DATE_EXTREME_LIMIT = 50;
+/** R20 (J3, i115/i116): "what's the earliest/most recent warranty registration date we have on
+ *  file" — equipment RANKED by data.warranty.registrationOnFile, the warranty-registration
+ *  sibling of INSTALL_DATE_SORT_FIELDS just above. Only meaningful for entity 'equipment' + op
+ *  'list' — see queryWarrantyRegDateExtreme/formatWarrantyRegDateExtremeAnswer, routes/analytics.js. */
+export const WARRANTY_REG_DATE_SORT_FIELDS = ['warrantyRegDateAsc', 'warrantyRegDateDesc'];
 
 /* ================================================================ classifier
  *
@@ -588,6 +611,33 @@ const COVERAGE_NOUN_RE = /\b(zip\s*codes?|counties|cities|states)\b/i;
  * ("Henderson", "the unit at 3247 Elm", "Plaza Dental") still matches.
  */
 const POSSESSIVE_SINGLE_RE = /\b(does|did)\s+(?!we\b|you\b|they\b|the company\b|the shop\b)[\s\S]+\b(have|has|need)\b/i;
+
+/**
+ * R20 (J3, i200/F1 sibling — the ask.js "analytics-candidate gate miss" for "does X have more Y
+ * than Z"/"is A more common than B"): "does Chandler have more customers on the books than Tempe"
+ * matches POSSESSIVE_SINGLE_RE just above ("does <name> ... have") exactly like a genuine
+ * single-record lookup ("does Henderson have a warranty") would, wrongly routing a two-entity
+ * COMPARISON to fastPath/retrieval instead of analytics/comparison.js's own detectCountComparison
+ * (which already resolves this exact shape once it's allowed through). A "more/fewer/less/higher/
+ * busier ... than" construction can never be about one record's own attribute — it always names TWO
+ * things being sized against each other — so it is excluded from the single-record read here, before
+ * POSSESSIVE_SINGLE_RE ever gets a chance to claim it.
+ */
+// R20 (coordinator follow-up, 2026-09-27): the exact same two-sided comparison ("more/fewer/...")
+// can also be worded with "compared to"/"compare(d) with"/"vs"/"versus" instead of "than" ("did we
+// install more units this year compared to last year", "... higher this year vs last year") — same
+// shape COMPARISON_THAN_RE already exists for (its own doc comment above), just a different
+// connector word. Widened here (not by adding a new regex) so every existing caller — this file's
+// own preClassifyAnalytics/looksLikeSingleRecordReference — picks up the wider connector for free.
+const COMPARISON_THAN_RE =
+  /\b(?:more|fewer|less|greater|higher|busier)\b[\s\S]*\b(?:than|vs\.?|versus|compared?\s+(?:to|with))\b/i;
+
+// R20 (J3): a bare yes/no comparison ("is Daikin more common than Goodman", "did we install more
+// units last year than this year") never puts "we"/"there"/"you"/"our shop" right after the lead
+// verb the way EXISTENCE_QUESTION_RE requires — the subject is whatever is being compared (a brand,
+// a year, a city). Scoped to the same yes/no verb family as comparison.js's own YESNO_LEAD_RE so an
+// unrelated declarative sentence containing "than" is never mistaken for a question.
+const COMPARISON_YESNO_LEAD_RE = /^\s*(?:do|does|did|is|are|was|were|has|have)\b/i;
 
 /**
  * Reviewer NO-GO (2026-09-21, A1): WHICH_CUSTOMERS_RE / WHO_SERVICED_RE /
@@ -1015,7 +1065,7 @@ export function looksLikeSingleRecordReference(question) {
     looksLikeIdentifierToken(q) ||
     SERIAL_VALUE_RE.test(q) ||
     AT_POSSESSIVE_RE.test(q) ||
-    POSSESSIVE_SINGLE_RE.test(q) ||
+    (POSSESSIVE_SINGLE_RE.test(q) && !COMPARISON_THAN_RE.test(q)) ||
     hasTrailingNameReference(q) ||
     hasNamedActionObject(q) ||
     hasNamedWarrantySubject(q) ||
@@ -1145,7 +1195,15 @@ export function preClassifyAnalytics(question, opts = {}) {
       // it — paired with a real aggregate noun so a genuinely single-record
       // "is there a warranty on the Whitmore unit" still falls to
       // looksLikeSingleRecordReference's own exclusion above, never here.
-      (isExistenceQuestion(q) && cr.aggregateNoun.test(q))
+      (isExistenceQuestion(q) && cr.aggregateNoun.test(q)) ||
+      // R20 (J3): "is Daikin more common than Goodman in our records" / "did we install more
+      // units last year than this year" — a genuine yes/no COMPARISON_THAN_RE shape (see its
+      // own doc comment) names no aggregate noun at all when the compared values ARE the nouns
+      // (two brand names, two years) — admitted directly rather than requiring cr.aggregateNoun,
+      // same as isExistenceQuestion's own bare "is there a maintenance agreement" branch above.
+      // detectCountComparison (routes/analytics.js) still bails to null (never guesses) if the
+      // two compared values don't resolve to a real brand/city/year pair.
+      (COMPARISON_YESNO_LEAD_RE.test(q) && COMPARISON_THAN_RE.test(q))
     ) {
       return true;
     }
@@ -1368,7 +1426,19 @@ export const CONDITION_RATIO = 'a ratio or percentage';
  *  warranties do we have"): the model dropped the status and the count came
  *  back as every unit, so this is decided in code like email/brand/geo. */
 const WARRANTY_STATUS_WORD_RE =
-  /\b(?:active|current|valid|still (?:under|covered|in) warranty|under warranty|in warranty|covered|expired|out of warranty|no longer (?:under|covered)|lapsed|expiring|expires? soon|about to expire|running out|unknown warranty|warranty (?:status )?unknown)\b/i;
+  /\b(?:active|current|valid|still (?:under|covered|in) warranty|under warranty|in warranty|covered|expired|out of warranty|no longer (?:under|covered)|lapsed|expiring|expires? soon|about to expire|running out|unknown warranty|warranty (?:status )?unknown|past (?:its|their|the) ?warranty|past warranty)\b/i;
+
+// R20 (coordinator follow-up, 2026-09-27): "past their warranty" / "past its warranty" / "past the
+// warranty" / bare "past warranty" is the same 'expired' bucket as "out of warranty"/"no longer
+// covered" (d005: "how many of those are past their warranty?"). The coarse WARRANTY_STATUS_WORD_RE
+// alt above is deliberately loose (it only gates "does this question mention a warranty-status
+// phrase at all", same as every other alt in that regex) — this dedicated regex is the precise one
+// that actually decides the 'expired' bucket, and it must NOT fire when "warranty" is the head of a
+// different noun phrase entirely ("past warranty claims" = old CLAIMS, not an expired unit; "past
+// the warranty registration deadline" = a DEADLINE, not a status). The negative lookahead rules out
+// that closed set of nouns; it never guesses on anything else "past ... warranty" doesn't fit.
+const PAST_WARRANTY_RE =
+  /\bpast\s+(?:its|their|the)?\s*warrant(?:y|ies)\b(?!\s+(?:claims?|registrations?|paperwork|applications?|deadlines?|periods?|docs?|documents?))/i;
 
 // Reviewer NO-GO (2026-09-26, round 14): "units that are NOT expired" / "not
 // active" / "which units aren't under warranty" / "not out of warranty" all
@@ -1400,6 +1470,7 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
     /\be[xp]{2}ir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/,
     /\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/,
     /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/,
+    PAST_WARRANTY_RE,
   ];
   return REGEXES.some((re) => {
     const m = re.exec(q);
@@ -1431,6 +1502,8 @@ export function warrantyStatusFromQuestion(question) {
   let m = /\be[xp]{2}ir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/.exec(q);
   if (m) return statusNegatedAt(q, m.index) ? null : 'expiring';
   m = /\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/.exec(q);
+  if (m) return statusNegatedAt(q, m.index) ? null : 'expired';
+  m = PAST_WARRANTY_RE.exec(q);
   if (m) return statusNegatedAt(q, m.index) ? null : 'expired';
   if (/\bunknown\b/.test(q)) return 'unknown';
   m = STRICT_ACTIVE_STATUS_RE.exec(q);
@@ -2106,6 +2179,16 @@ function canonicalPlanString(plan) {
     sortBy: plan?.sortBy ?? null,
     // Team A: an "uploaded" count and a "by service date" count run different logic.
     dateBasis: plan?.dateBasis ?? null,
+    // R19 (I2, h112/h113/h115): "biggest city" (top) and "fewest units" (bottom) share the same
+    // entity/op/groupBy/filters — omitting this would let the two share one cache row and serve
+    // each other's answer.
+    superlative: plan?.superlative ?? null,
+    // R19 (I2, task 5): a customer-scoped and a team-scoped question can produce the identical
+    // entity/op/filters plan (no FILTER_FIELDS entry names "internal" vs "customer" audience at
+    // all) — omitting this would let the two share a cache row and serve each other's (differently
+    // audience-filtered) answer. Never set by the model — see routes/analytics.js's own
+    // isTeamScopedQuestion call site, the same code-side-only convention as superlative/countDistinct.
+    teamScoped: plan?.teamScoped ?? null,
   });
 }
 
@@ -2718,6 +2801,10 @@ export function validatePlan(raw) {
       if (p.entity !== 'equipment' || p.op !== 'list') return null;
       sortBy = p.sortBy;
       limit = Math.min(limit, INSTALL_DATE_EXTREME_LIMIT);
+    } else if (WARRANTY_REG_DATE_SORT_FIELDS.includes(p.sortBy)) {
+      if (p.entity !== 'equipment' || p.op !== 'list') return null;
+      sortBy = p.sortBy;
+      limit = Math.min(limit, INSTALL_DATE_EXTREME_LIMIT);
     } else if (SORT_FIELDS.includes(p.sortBy)) {
       if (p.entity !== 'customers' || p.op !== 'list') return null;
       sortBy = p.sortBy;
@@ -2739,9 +2826,15 @@ export function validatePlan(raw) {
   // dateBasis above is code-side-only.
   const countDistinct = p.countDistinct === true && p.op === 'groupBy' ? true : undefined;
 
+  // R19 (I2, h112/h113/h115): "the biggest city" / "the fewest units" — same code-side-only
+  // convention as countDistinct just above (ANALYTICS_TOOL's schema has no such property, so a
+  // model plan can never carry this; only detPlan.js's detectGroupBySuperlative sets it).
+  const superlative = (p.superlative === 'top' || p.superlative === 'bottom') && p.op === 'groupBy' ? p.superlative : undefined;
+
   return {
     entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy,
     ...(dateBasis ? { dateBasis } : {}), ...(countDistinct ? { countDistinct } : {}),
+    ...(superlative ? { superlative } : {}),
   };
 }
 
@@ -2992,8 +3085,30 @@ function pushColumnFilter(where, params, column, filter) {
   where.push(`${column} ${sqlOp} $${params.length}`);
 }
 
-/** @returns {{sql: string, params: any[]}} */
-export function buildAnalyticsSQL(plan) {
+/**
+ * R19 (I2, task 5): "how many service tickets for X" / "how many documents on file for X" is a
+ * question about the CUSTOMER's own record, never one about internal/team-only paperwork — that is
+ * the default audienceFilterSql (api/_lib/audience/sql.js) already assumes for every OTHER adopter
+ * (search/store.js, search/knowledge.js). A question explicitly ABOUT the internal side of the
+ * business ("internal memos", "notes for the team/techs/dispatch", "team-only documents") is the
+ * one carve-out — narrow and closed-vocabulary on purpose, same discipline as every other detector
+ * in this file: a miss here just means "assume customer-scoped" (the safe default), never a guess
+ * that widens what a customer answer can see.
+ */
+const TEAM_SCOPED_RE =
+  /\b(?:internal|team-only|tech-only)\b|\bfor\s+(?:the\s+)?(?:team|techs?|technicians?|dispatch)\b|\b(?:team|dispatch)\s+(?:notes?|memos?)\b/i;
+export function isTeamScopedQuestion(question) {
+  return TEAM_SCOPED_RE.test(String(question ?? ''));
+}
+
+/** @returns {{sql: string, params: any[]}}
+ *  @param opts.audienceClause  a WHERE-safe SQL fragment (audienceFilterSql, api/_lib/audience/sql.js)
+ *    AND-ed into the `documents`-touching branches below — 'TRUE' (its default) is a no-op, so every
+ *    existing caller that doesn't pass it keeps its exact current behavior. R19 (I2, task 5): the
+ *    caller (routes/analytics.js) builds this once per request from documentsHaveAudience's own
+ *    migration-tolerance probe and isTeamScopedQuestion above — this file stays pure/no-I/O and never
+ *    probes the schema itself. */
+export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
   const where = [TENANT_SQL];
   const params = [];
   const columnsFor = SQL_COLUMN[plan.entity === 'warranties' ? 'equipment' : plan.entity] ?? {};
@@ -3019,12 +3134,19 @@ export function buildAnalyticsSQL(plan) {
                    data->>'service_address' AS service_address,
                    data->>'email' AS email, data->>'phone' AS phone, updated_at,
                    (EXISTS (SELECT 1 FROM document_entity_links l
-                             WHERE l.entity_id = entities.id AND l.${TENANT_SQL})) AS has_any_document,
+                             JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+                             WHERE l.entity_id = entities.id AND l.${TENANT_SQL} AND (${audienceClause}))) AS has_any_document,
                    -- R18 P4 (C4, negation, h134): "how many customers have zero equipment on
                    -- file" — the customers-side mirror of has_any_document just above.
                    (EXISTS (SELECT 1 FROM entities e
                              WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
-                               AND e.customer_id = entities.id AND e.${TENANT_SQL})) AS has_any_equipment
+                               AND e.customer_id = entities.id AND e.${TENANT_SQL})) AS has_any_equipment,
+                   -- R20 (J3, i011): "how many properties do we have more than one unit installed
+                   -- at" — the same correlated subquery as has_any_equipment just above, counted
+                   -- instead of merely checked for existence.
+                   ((SELECT count(*) FROM entities e
+                             WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
+                               AND e.customer_id = entities.id AND e.${TENANT_SQL}) > 1) AS has_multiple_units
               FROM entities
              WHERE entity_type = 'customer' AND merged_into IS NULL AND ${where.join(' AND ')}
              ORDER BY updated_at DESC
@@ -3078,9 +3200,15 @@ export function buildAnalyticsSQL(plan) {
                      ORDER BY x.created_at DESC LIMIT 1) AS service_date,
                    (EXISTS (SELECT 1 FROM document_entity_links l
                              JOIN entities ce ON ce.id = l.entity_id AND ce.entity_type = 'customer' AND ce.merged_into IS NULL AND ce.${TENANT_SQL}
-                            WHERE l.document_id = d.id AND l.${TENANT_SQL})) AS has_customer_link
+                            WHERE l.document_id = d.id AND l.${TENANT_SQL})) AS has_customer_link,
+                   -- R20 (J3, i020/i021): "how many purchase orders have we cut to Baker
+                   -- Distributing" — the vendor named on a purchase order (or vendor bill), pulled
+                   -- the same correlated-scalar way as service_date just above.
+                   (SELECT v.value FROM extractions v
+                     WHERE v.document_id = d.id AND v.field_key = 'vendor_name' AND v.${TENANT_SQL}
+                     ORDER BY v.created_at DESC LIMIT 1) AS vendor
               FROM documents d
-             WHERE ${where.join(' AND ')}
+             WHERE ${where.join(' AND ')} AND (${audienceClause})
              ORDER BY d.created_at DESC
              LIMIT ${MAX_LIMIT}`,
       params,
@@ -3194,7 +3322,10 @@ const ENTITY_NOUN = {
   warranties: (n) => `unit${n === 1 ? '' : 's'}`,
 };
 
-const GROUP_LABEL = {
+// R19 (I2, h112/h113/h115): exported so routes/analytics.js's formatGroupBySuperlativeAnswer can
+// name the extreme group's own dimension the same way every plain groupBy breakdown already does,
+// rather than a second hand-copied label table that could quietly drift from this one.
+export const GROUP_LABEL = {
   city: 'city', county: 'county', state: 'state', zip: 'ZIP', brand: 'brand',
   documentType: 'document type', month: 'month', technician: 'technician', warrantyStatus: 'warranty status',
 };

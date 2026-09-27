@@ -1,0 +1,1215 @@
+{
+  "version": "2026-09-27.dialogues-1-r19",
+  "category": "dialogues-1",
+  "source": "Round 19 (I3) blind multi-turn dialogue set - 40 dialogues (2-4 turns), replayed through the real /api/ask handler against the golden tenant with conversationContext threaded exactly as the client builds it. See scripts/run-dialogues.mjs.",
+  "dialogues": [
+    {
+      "id": "d001",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "who is the customer at 1210 E Broadway Rd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'customer_name', '') <> ''",
+              "params": [
+                "%Melissa Pruitt%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Melissa Pruitt%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "is it under warranty?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "@today",
+                "1210 E Broadway Rd%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d002",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "is the unit at 1580 W Camelback Rd under warranty",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "@today",
+                "1580 W Camelback Rd%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "and when's the warranty up?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+              "params": [
+                "1580 W Camelback Rd%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d003",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "who serviced 1284 S Alma School Rd last",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1), docs AS (SELECT x.document_id, x.value AS service_date FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m))) SELECT t.value AS v FROM extractions t WHERE t.field_key='technician' AND t.document_id = (SELECT document_id FROM docs ORDER BY service_date DESC LIMIT 1) AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "1284 S Alma School Rd%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "when were we last out there?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1) SELECT x.value AS v FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.document_id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id IN (SELECT id FROM m)) AND (SELECT count(*) FROM m)=1 ORDER BY x.value DESC LIMIT 1",
+              "params": [
+                "1284 S Alma School Rd%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d004",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "whats the manufacturer on file for Cynthia Kowalski",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+              "params": [
+                "%Cynthia Kowalski%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Cynthia Kowalski%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "and its warranty expiry?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1) SELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+              "params": [
+                "%Cynthia Kowalski%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d005",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "how many carrier units do we have on the books",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'carrier'",
+              "params": []
+            }
+          }
+        },
+        {
+          "text": "and how many of those are past their warranty?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'carrier' AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date",
+              "params": [
+                "@today"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d006",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "how many units are on file at 3300 S Alma School Rd, Apt 101, Mesa, AZ 85201",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)",
+              "params": [
+                "3300 S Alma School Rd, Apt 101%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "how many of those are Carrier?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND e.data->>'manufacturer' ILIKE 'carrier'",
+              "params": [
+                "3300 S Alma School Rd, Apt 101%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d007",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "how many total customers do we have on file",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL",
+              "params": []
+            }
+          }
+        },
+        {
+          "text": "how many of those are in Tempe?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE '%, Tempe,%'",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d008",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "list the equipment for Grace Community Church",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "set",
+            "oracle": {
+              "sql": "SELECT e.data->>'serial_number' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Grace Community Church%'",
+              "params": []
+            }
+          }
+        },
+        {
+          "text": "just the Daikin ones",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "set",
+            "oracle": {
+              "sql": "SELECT e.data->>'serial_number' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Grace Community Church%' AND e.data->>'manufacturer' ILIKE 'daikin'",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d009",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "what's Ashley Vance's phone number",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+              "params": [
+                "%Ashley Vance%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Ashley Vance%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "same question for Kenneth Fenwick",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+              "params": [
+                "%Kenneth Fenwick%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Kenneth Fenwick%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d010",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "who is the customer at 137 W Southern Ave",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'customer_name', '') <> ''",
+              "params": [
+                "%Thomas Mercer%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Thomas Mercer%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "what about 174 N College Ave?",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'customer_name', '') <> ''",
+              "params": [
+                "%Donna Sorensen%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Donna Sorensen%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d011",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "is Anthony Bennett still under warranty",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+              "params": [
+                "@today",
+                "%Anthony Bennett%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "same question for Susan Calloway",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+              "params": [
+                "@today",
+                "%Susan Calloway%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d012",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "what's Karen Abernathy's phone number",
+          "expect": {
+            "kind": "clarify"
+          }
+        },
+        {
+          "text": "the other Abernathy, Kevin",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+              "params": [
+                "%Kevin Abernathy%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Kevin Abernathy%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d013",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "warranty status on osborn",
+          "expect": {
+            "kind": "clarify"
+          }
+        },
+        {
+          "text": "I mean Thomas Osborn",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "SELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE c.data->>'customer_name' ILIKE $2 AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $2) = 1",
+              "params": [
+                "@today",
+                "%Thomas Osborn%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d014",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "phone number for the hutchins account",
+          "expect": {
+            "kind": "clarify"
+          }
+        },
+        {
+          "text": "the Linda Hutchins one",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+              "params": [
+                "%Linda Hutchins%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Linda Hutchins%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d015",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "who is the customer at 1506 E McKellips Rd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'customer_name', '') <> ''",
+              "params": [
+                "%Ashley Vance%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Ashley Vance%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "how many total customers do we have on file",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL",
+              "params": []
+            }
+          }
+        },
+        {
+          "text": "is it under warranty?",
+          "expect": {
+            "kind": "mustNotContain",
+            "terms": [
+              "1506 E McKellips",
+              "Ashley Vance"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "d016",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "who's the customer at 1617 N Val Vista Dr",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'customer_name', '') <> ''",
+              "params": [
+                "%Michael Redwine%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Michael Redwine%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "whats todays date",
+          "expect": {
+            "kind": "decline"
+          }
+        },
+        {
+          "text": "is it under warranty?",
+          "expect": {
+            "kind": "mustNotContain",
+            "terms": [
+              "1617 N Val Vista",
+              "Michael Redwine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "d017",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "who do we have going out today",
+          "expect": {
+            "kind": "decline"
+          }
+        },
+        {
+          "text": "is anybody free this afternoon",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d018",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "and what was the total for that job",
+          "expect": {
+            "kind": "decline"
+          }
+        },
+        {
+          "text": "put me through to whoever handled it",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d019",
+      "persona": "voice_tech",
+      "turns": [
+        {
+          "text": "uh whats the model at one zero zero east main street",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'model', '') <> ''",
+              "params": [
+                "100 E Main St%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "100 E Main St%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "and the serial too",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'serial_number', '') <> ''",
+              "params": [
+                "100 E Main St%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "100 E Main St%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d020",
+      "persona": "voice_tech",
+      "turns": [
+        {
+          "text": "is that a train unit out at 3060 n dobson rd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+              "params": [
+                "3060 N Dobson Rd%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "3060 N Dobson Rd%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "whats the tonnage on it",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'tonnage' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'tonnage', '') <> ''",
+              "params": [
+                "3060 N Dobson Rd%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "3060 N Dobson Rd%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d021",
+      "persona": "voice_tech",
+      "turns": [
+        {
+          "text": "so is it a carry her unit out at 2801 w guadalupe rd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+              "params": [
+                "2801 W Guadalupe Rd%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "2801 W Guadalupe Rd%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "when was it installed",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'installation_date', '') <> ''",
+              "params": [
+                "2801 W Guadalupe Rd%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "2801 W Guadalupe Rd%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d022",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "whats the manufacturer at 1321 E Chandler Blvd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'manufacturer', '') <> ''",
+              "params": [
+                "1321 E Chandler Blvd%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "1321 E Chandler Blvd%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "is it still under warranty",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "@today",
+                "1321 E Chandler Blvd%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "when does it expire",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+              "params": [
+                "1321 E Chandler Blvd%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d023",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "who's the customer at 1654 E Pecos Rd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'customer_name', '') <> ''",
+              "params": [
+                "%Nancy Zamora%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Nancy Zamora%"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "text": "is their unit still covered",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "@today",
+                "1654 E Pecos Rd%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "and the expiry date",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL",
+              "params": [
+                "1654 E Pecos Rd%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d024",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "whose unit is serial F100002",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1) SELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "F100002"
+              ]
+            }
+          }
+        },
+        {
+          "text": "whats their service address",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE '%Linda Fitzgerald%'",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d025",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "whos calling from 480 555 0158",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND regexp_replace(coalesce(data->>'phone',''), '\\D', '', 'g') = $1) SELECT data->>'customer_name' AS v FROM entities WHERE id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "4805550158"
+              ]
+            }
+          }
+        },
+        {
+          "text": "whats their service address",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE '%Amanda Quinley%'",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d026",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "how many maintenance agreements do we have on the books, all in",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM documents WHERE document_type='maintenance-agreement'",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d027",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "which tech is racking up the most repair calls",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "SELECT t.value AS v FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' GROUP BY t.value ORDER BY count(*) DESC LIMIT 1",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d028",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "is there a permit on file for the Canyon View Dental job",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "citationRequired": false,
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1) SELECT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='permit' AND l.entity_id IN (SELECT id FROM m)) AS v FROM (SELECT 1) z WHERE (SELECT count(*) FROM m)=1",
+              "params": [
+                "%Canyon View Dental%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d029",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "is there a permit on file for Amanda Quinley",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "citationRequired": false,
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1) SELECT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='permit' AND l.entity_id IN (SELECT id FROM m)) AS v FROM (SELECT 1) z WHERE (SELECT count(*) FROM m)=1",
+              "params": [
+                "%Amanda Quinley%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d030",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "how many open warranty claims do we have right now",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d031",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "is anyone dispatched to that address right now",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d032",
+      "persona": "voice_tech",
+      "turns": [
+        {
+          "text": "uh whats the seer rating on the unit at one seven two eight west ocotillo rd",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d033",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "any memos for Kevin Pratt this week",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d034",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "what's on file for the fenwick account",
+          "expect": {
+            "kind": "clarify"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d035",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "translate 'under warranty' into spanish",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d036",
+      "persona": "owner",
+      "turns": [
+        {
+          "text": "how many goodman units are on our books",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'goodman'",
+              "params": []
+            }
+          }
+        },
+        {
+          "text": "do we have more of those than lennox",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'goodman') > (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'lennox') AS v",
+              "params": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d037",
+      "persona": "office_manager",
+      "turns": [
+        {
+          "text": "what's on file for the osborn account",
+          "expect": {
+            "kind": "clarify"
+          }
+        },
+        {
+          "text": "the Richard Osborn one, what's his phone number",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+              "params": [
+                "%Richard Osborn%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Richard Osborn%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d038",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "whose unit is serial 2C100027",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT customer_id FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'serial_number' = $1) SELECT c.data->>'customer_name' AS v FROM entities c WHERE c.id IN (SELECT customer_id FROM m) AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "2C100027"
+              ]
+            }
+          }
+        },
+        {
+          "text": "is their unit still under warranty",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "yesno",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $2)\nSELECT (e.data#>>'{warranty,expires}')::date > $1::date AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND e.data#>>'{warranty,expires}' IS NOT NULL AND (SELECT count(*) FROM m) = 1",
+              "params": [
+                "@today",
+                "1025 N College Ave%"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d039",
+      "persona": "warranty_clerk",
+      "turns": [
+        {
+          "text": "how many warranty registrations went in within 30 days of the install date",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "number",
+            "tolerance": 0,
+            "citationRequired": false,
+            "oracle": {
+              "sql": "SELECT count(*) AS n FROM entities e JOIN document_entity_links l ON l.entity_id=e.id JOIN extractions x ON x.document_id=l.document_id AND x.field_key='warranty_registered_date' WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (x.value::date - (e.data->>'installation_date')::date) <= 30",
+              "params": []
+            }
+          }
+        },
+        {
+          "text": "any memos about that policy from the manufacturers",
+          "expect": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d040",
+      "persona": "dispatch",
+      "turns": [
+        {
+          "text": "who's the customer at 3208 E McKellips Rd",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "SELECT data->>'customer_name' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1 AND (SELECT count(*) FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1) = 1",
+              "params": [
+                "3208 E McKellips Rd%"
+              ]
+            }
+          }
+        },
+        {
+          "text": "whats the tonnage on their unit",
+          "expect": {
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'tonnage' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND coalesce(e.data->>'tonnage', '') <> ''",
+              "params": [
+                "3208 E McKellips Rd%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+                "params": [
+                  "3208 E McKellips Rd%"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

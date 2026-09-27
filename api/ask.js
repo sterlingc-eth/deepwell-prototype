@@ -100,6 +100,11 @@ import { logRouteDecision } from "./_lib/agent/router.js";
 // Round 18 (H3): the unified pre-router classification (relations through analytics) — see this
 // module's own header and its call site below ("unified pre-router classification").
 import { classifyAll } from "./_lib/router/classifyAll.js";
+// Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
+// F1/F6) — see guard/check.js's own header for what each function checks and why, and the untracked-concept
+// registry (api/_lib/concepts/registry.js) for the honest-decline half.
+import { guardDecomposeAnswer, guardAnalyticsAnswer } from "./_lib/router/guard/check.js";
+import { detectUntrackedConcept, untrackedConceptAnswer } from "./_lib/concepts/registry.js";
 // Recipes (api/_lib/learning/recipes.js): worked examples an approved/confirmed grounded answer taught the agent.
 import { findExactRecipe, matchParametricExamples } from "./_lib/learning/recipes.js";
 // Round 16 D1 #7 (cold start): learning/replay.js itself statically imports
@@ -1143,6 +1148,23 @@ export default async function handler(req, res) {
       }
     }
 
+    // ---- 0.2 untracked-concept honest decline (Round 20 J1, no model, no DB) ----
+    // "how many open warranty claims do we have right now" / "have we sent a renewal reminder on any of
+    // the maintenance agreements" — a business concept this corpus's own schema never tracks at all (see
+    // concepts/registry.js's own doc comment). Checked BEFORE every other deterministic router below —
+    // several of them (the analytics fallback among them) have no notion of "claim"/"renewal reminder" as
+    // their own vocabulary and, left unchecked, silently match the question to an unrelated count/yes-no
+    // template instead (r19_blind3_clusters.json cluster F6). A tenant with no matching field ever
+    // extracted (isTracked, concepts/registry.js) always gets this honest decline; a tenant whose pack DOES
+    // track the concept (a future FIELD_SPECS/pack addition) never reaches this branch at all.
+    if (!meta) {
+      const untracked = detectUntrackedConcept(question, { pack });
+      if (untracked) {
+        console.log(JSON.stringify({ route: "ask", untracked_concept: untracked.id }));
+        return send(200, { success: true, data: untrackedConceptAnswer(untracked) });
+      }
+    }
+
     // ---- 0.35 relations engine (Round 7, no model, DB only) -----------------
     // Returns null (falls through) whenever a named condition can't be applied exactly.
     if (relationsIntent) {
@@ -1223,6 +1245,18 @@ export default async function handler(req, res) {
         console.error("Query decomposition failed, falling through:", err?.message);
       }
       console.log(JSON.stringify({ route: "ask", decompose_mode: decomposeIntent.mode, decompose_hit: Boolean(decData) }));
+      // Round 20 (J1) precision guard: decompose's own clause vocabulary has no condition type that ever
+      // scopes to one named customer/business (see guard/check.js's own doc comment) — a question naming
+      // one that decompose still claims to have answered silently ignored it (r19_blind3_clusters.json F1,
+      // "purchase order on file for the Amy Isaacson account" answered from an unscoped portfolio-wide
+      // scan). Treated exactly like a null decompose result: falls through to the next stage below.
+      if (decData) {
+        const guard = guardDecomposeAnswer({ question, data: decData, intent: decomposeIntent, tenantVocab });
+        if (guard.blocked) {
+          console.log(JSON.stringify({ route: "ask", guard: "precision", stage: "decompose", blocked: true, reason: guard.reason, constraint: guard.constraintType }));
+          decData = null;
+        }
+      }
       if (decData) {
         return send(200, { success: true, data: decData });
       }
@@ -1553,6 +1587,26 @@ export default async function handler(req, res) {
           analytics_cache_hit: Boolean(analyticsResult?.cacheHit),
         })
       );
+      // Round 20 (J1) precision guard: routes/analytics.js's own plan (filters/timeRange/groupBy) is never
+      // returned in `data`, so this checks only what the ANSWER itself can prove — a genuine honest
+      // fallback (missOutcome set) is never touched, only a genuine "handled" count/value answer. Blocked
+      // means treated exactly like `handled: false` below — same tryAgent-then-retrieval fallthrough a real
+      // analytics miss already takes (r19_blind3_clusters.json F1: "so far this year"/"zero ... on file"/
+      // "distinct document types"/"longer than 30 days"/"earliest ... date" silently answered from an
+      // unfiltered portfolio total or a bare count where a date/distinct value was asked for).
+      if (analyticsResult?.handled && !analyticsResult.missOutcome) {
+        const guard = await guardAnalyticsAnswer({
+          question,
+          data: analyticsResult.data,
+          tenantVocab,
+          withTenant,
+          ctxArg,
+        });
+        if (guard.blocked) {
+          console.log(JSON.stringify({ route: "ask", guard: "precision", stage: "analytics", blocked: true, reason: guard.reason, constraint: guard.constraintType }));
+          analyticsResult = { ...analyticsResult, handled: false };
+        }
+      }
       if (analyticsResult?.handled) {
         // An honest analytics fallback (maintenance / unsupported condition / cross-doc) gets one
         // shot at the agent first. The money gate is deliberately left alone (financials phase).
