@@ -404,7 +404,20 @@
         {
           "text": "what's Karen Abernathy's phone number",
           "expect": {
-            "kind": "clarify"
+            "kind": "oracle",
+            "cmp": "value",
+            "oracle": {
+              "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT c.data->>'phone' AS v FROM entities c WHERE c.id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1 AND coalesce(c.data->>'phone', '') <> ''",
+              "params": [
+                "%Karen Abernathy%"
+              ],
+              "requires": {
+                "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+                "params": [
+                  "%Karen Abernathy%"
+                ]
+              }
+            }
           }
         },
         {
@@ -435,7 +448,14 @@
         {
           "text": "warranty status on osborn",
           "expect": {
-            "kind": "clarify"
+            "kind": "oracle",
+            "cmp": "set",
+            "oracle": {
+              "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+              "params": [
+                "%Osborn%"
+              ]
+            }
           }
         },
         {

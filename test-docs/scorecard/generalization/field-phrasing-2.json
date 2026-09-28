@@ -2035,6 +2035,29 @@
       "rubric": "2 units at Copper Sky Dental (Trane/Carrier) - only the Trane has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one, and must not invent a value for the Carrier.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": "Trane"
+          },
+          {
+            "type": "text",
+            "value": "R-410A"
+          },
+          {
+            "type": "text",
+            "value": "Carrier"
+          },
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no refrigerant"
+            ]
+          }
+        ]
       }
     },
     {
@@ -2046,6 +2069,29 @@
       "rubric": "2 units at Sonoran Grill Restaurant (Carrier/Goodman) - only the Carrier has a tonnage on file (3 ton); must not silently report just one unit as if it were the only one.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": "Carrier"
+          },
+          {
+            "type": "text",
+            "value": "Goodman"
+          },
+          {
+            "type": "text",
+            "value": "3 ton"
+          },
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no tonnage"
+            ]
+          }
+        ]
       }
     },
     {
@@ -2332,6 +2378,21 @@
       "rubric": "Installer (not on file - no document ever carries one) AND the install date for 803 E Pecos Rd (Joseph Norwood); both parts must be addressed, not just the date.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no installer"
+            ]
+          },
+          {
+            "type": "date",
+            "value": "2016-12-04"
+          }
+        ]
       }
     },
     {
@@ -2365,6 +2426,18 @@
       "rubric": "The unit at 692 S Higley Rd (Carol Rios, Trane) has a manufacturer on file (Trane) but no tonnage on file - both parts must be addressed, must not invent a tonnage.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": "Trane"
+          },
+          {
+            "type": "text",
+            "value": "3 ton"
+          }
+        ]
       }
     },
     {
@@ -2376,6 +2449,22 @@
       "rubric": "Warranty status (expired - registered 2022, expires 2022-11-19) AND the most recent service_date for 3282 W Camelback Rd (Angela Ibarra); both parts must be addressed.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "date",
+            "value": "2022-11-19"
+          },
+          {
+            "type": "text",
+            "value": "expired"
+          },
+          {
+            "type": "date",
+            "value": "2022-04-25"
+          }
+        ]
       }
     },
     {

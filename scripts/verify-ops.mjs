@@ -9,6 +9,7 @@
  *   node scripts/verify-ops.mjs
  */
 import { captureException, captureMessage, scrubContext } from '../api/_lib/telemetry.js';
+import { hashForLog } from '../api/_lib/privacy/redact.js';
 import { alreadyIngested } from '../api/_lib/readDocument.js';
 import { DELETE_ORDER } from '../api/_lib/opsStore.js';
 import { isValidCronAuth } from '../api/_lib/routes/cron-sweep.js';
@@ -66,7 +67,9 @@ const eq = (name, got, want) =>
     authorization: 'Bearer xyz',
   });
   check('scrubContext drops everything off the allowlist', !('token' in scrubbed) && !('body' in scrubbed) && !('connectionString' in scrubbed) && !('authorization' in scrubbed));
-  check('scrubContext keeps allowlisted keys', scrubbed.route === '/api/ask' && scrubbed.tenantId === 't_1');
+  // Round 22 (S2, privacy): tenantId now leaves this file as a hash, never the raw Clerk org id — see
+  // telemetry.js's own HASHED_CONTEXT_KEYS / scripts/verify-privacy.mjs's own Sentry-scrubbing section.
+  check('scrubContext keeps allowlisted keys (tenantId hashed, route in the clear)', scrubbed.route === '/api/ask' && scrubbed.tenantId === hashForLog('t_1') && scrubbed.tenantId !== 't_1');
 }
 
 /* ------------------------------------------------------ idempotency guard */

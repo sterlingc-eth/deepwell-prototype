@@ -69,7 +69,10 @@ const VENDOR_RECIPIENT_RE = /\b(?:cut|issued|sent|placed|written|made\s+out)\s+t
 // trigger any check above.
 // Also: "last/latest invoice for X" (a person's name gives it no other money word), "bring in"
 // (agreement revenue) and "spent" (MONEY_RE only has "spend(?:ing)?", never the past tense).
-const FIN_COUNT_OR_AVG_RE = /\b(?:how many|average|avg|total\s+(?:value|amount)|annual\s+fee|last|latest|most recent|bring(?:s|ing)?\s+in|spent)\b/i;
+// R21 M2 (breadth-financials-051): "how much" added alongside "how many" — always gated by
+// FIN_NOUN_RE (a real money-document noun) at the call site just below, same as every other
+// alternative here, so this can never fire on an unrelated "how much time"/"how much work" question.
+const FIN_COUNT_OR_AVG_RE = /\b(?:how many|how much|average|avg|total\s+(?:value|amount)|annual\s+fee|last|latest|most recent|bring(?:s|ing)?\s+in|spent)\b/i;
 
 /**
  * @param {string} question  the ALREADY fuzzy-corrected / lowercased question text

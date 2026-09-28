@@ -7,6 +7,9 @@
  * staging environment runs on until Sterling adds the key
  * (handoffs/NOTIFICATIONS.md).
  */
+// Round 22 (S2, privacy): the log-only fallback below used to print every recipient address and the
+// full subject line (which can carry a customer's name, e.g. a warranty digest subject) verbatim.
+import { hashForLog, describeForLog } from "./privacy/redact.js";
 
 export const EMAIL_FROM = "alerts@deepwelltechnology.com";
 export const EMAIL_FROM_NAME = "DeepWell Technology";
@@ -25,7 +28,7 @@ const SEND_TIMEOUT_MS = 10_000;
 export async function sendEmail({ to, subject, text, html }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || !to?.length) {
-    console.log(`[email:log-only] to=${(to ?? []).join(",")} subject=${JSON.stringify(subject)}`);
+    console.log(`[email:log-only] to=${(to ?? []).map((t) => hashForLog(t) ?? "?").join(",")} ${describeForLog("subject", subject)}`);
     return { sent: false, channel: "in-app" };
   }
 

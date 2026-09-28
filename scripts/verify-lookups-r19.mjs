@@ -487,12 +487,17 @@ await withTenant(ctx, async (db) => {
 });
 
 /* ---- R19 follow-up (h140 hook, deterministicRouter.js installDate): a multi-unit customer where
- * only SOME units have a citable installation_date extraction must state every unit, marking the
- * ones with none honestly — never silently drop them from the answer (Canyon View Dental: the
- * Daikin unit has a real installation_date extraction; the Mitsubishi unit has none anywhere in
- * this corpus — a genuine data gap, not a matching bug, confirmed by direct query). Run through the
- * full ask handler at the TOP level (never nested inside the withTenant above — askViaHandler opens
- * its own tenant context, and PGlite's single connection does not tolerate a nested one). ---- */
+ * only SOME units have a citable installation_date extraction must state every unit — never
+ * silently drop one from the answer (Canyon View Dental: the Daikin unit has a real
+ * installation_date extraction; the Mitsubishi unit's installation_date lives only on its own
+ * entity record, with no extraction anywhere in this corpus). R21 (M1, L4 rubric g105/h140): R19
+ * used to mark an extraction-less unit "no install date on file" (reasoned as too fabrication-risky
+ * to state without a citable document behind it) — h140's own oracle makes plain that a value
+ * genuinely on the entity's own record must be reported, not withheld, so installDate() now states
+ * it too (uncited to a document, never a fabricated citation — see deterministicRouter.js's own doc
+ * comment). Run through the full ask handler at the TOP level (never nested inside the withTenant
+ * above — askViaHandler opens its own tenant context, and PGlite's single connection does not
+ * tolerate a nested one). ---- */
 {
   const { askViaHandler } = await import(path.join(ROOT, "api/_lib/scorecard/askCall.js"));
   const { default: askHandler } = await import(path.join(ROOT, "api/ask.js"));
@@ -500,8 +505,8 @@ await withTenant(ctx, async (db) => {
   const asked = await askViaHandler({ handler: askHandler, auth, question: "when were the units at canyon view dental installed", today });
   const text = asked.data?.sentences?.map((s) => s.text).join(" ") ?? asked.data?.text ?? "";
   check(
-    "installDate hook :: Canyon View Dental names BOTH units (Daikin's real date, Mitsubishi honestly marked not on file), never silently drops one",
-    /daikin/i.test(text) && /november 3, 2023/i.test(text) && /mitsubishi/i.test(text) && /no install date on file/i.test(text),
+    "installDate hook :: Canyon View Dental names BOTH units, each with its own real install date, never silently drops one",
+    /daikin/i.test(text) && /november 3, 2023/i.test(text) && /mitsubishi/i.test(text) && /november 6, 2023/i.test(text),
     text,
   );
 }

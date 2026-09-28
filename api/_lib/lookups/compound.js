@@ -10,7 +10,7 @@
  * to the model.
  *
  * Deliberately narrow and additive: every shape here reuses the SAME
- * resolvers (resolveAddressCandidates/resolveContactCandidates,
+ * resolvers (resolveAddressCandidates/resolveNamedCustomers,
  * db.listCustomerEquipment, computeVisitHistory) contactLookup.js's own
  * single-question shapes already use, never a new SQL query of its own. Two
  * different honesty postures, matching the exam's own two comparison modes:
@@ -35,12 +35,56 @@
 import { normalizeQuestion } from "../nlNormalize.js";
 import { attachCitations, customerRecord, unitRecord } from "../citations/records.js";
 import { formatDateHuman } from "../fastPath.js";
+import { TENANT_SQL } from "../scope.js";
 import {
   resolveAddressCandidates,
-  resolveContactCandidates,
+  resolveNamedCustomers,
   computeVisitHistory,
   unitWarrantyPhrase,
 } from "../contactLookup.js";
+
+/**
+ * R21 (M1, L4 rubric g151/g155/g149/g153/h163 — "warranty status AND installer"/"who installed it
+ * and when"): the installer half of these compound questions must be the actual `installed_by`
+ * field (or, absent that, honestly "no installer on file") — NEVER the technician of some other,
+ * unrelated service visit, which is what this file used to substitute (computeVisitHistory's
+ * `mostRecent.technician`). That conflation is exactly the bug deterministicRouter.js's own
+ * `installer()` already avoids (see its doc comment: "never substitute the technician of some
+ * other visit") — this mirrors it, scoped to the unit ids these compound shapes already resolved.
+ */
+async function installedByFor(db, unitIds) {
+  if (!unitIds.length) return new Map();
+  const { rows } = await db.raw(
+    `SELECT x.entity_id, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS value
+       FROM extractions x
+      WHERE x.entity_id = ANY($1::uuid[]) AND x.field_key = 'installed_by' AND x.${TENANT_SQL}
+        AND coalesce(x.value, '') <> ''
+      ORDER BY x.confidence DESC NULLS LAST, x.created_at DESC`,
+    [unitIds]
+  );
+  const byUnit = new Map();
+  for (const r of rows) if (!byUnit.has(r.entity_id)) byUnit.set(r.entity_id, r.value);
+  return byUnit;
+}
+
+/** The `installed_by` name for a set of equipment rows: each unit's own `data.installed_by` first
+ *  (an equipment entity can carry the field directly, same as installFacts' caller in
+ *  deterministicRouter.js checks `u.data?.installed_by` before its own extraction fallback), then
+ *  the extraction table. Returns the FIRST name found across all units (these compound shapes report
+ *  one installer for the address/customer as a whole, same as the pre-existing wording did). */
+async function resolveInstaller(db, equipmentRows) {
+  for (const u of equipmentRows) {
+    const own = String(u?.installed_by ?? "").trim();
+    if (own) return own;
+  }
+  const ids = equipmentRows.map((u) => u.id).filter(Boolean);
+  const byUnit = await installedByFor(db, ids);
+  for (const u of equipmentRows) {
+    const v = byUnit.get(u.id);
+    if (v) return v;
+  }
+  return null;
+}
 
 function titleCase(s) {
   return String(s ?? "")
@@ -63,6 +107,10 @@ const NAME_PHONE_ADDR_RE = new RegExp(`customers?\\s+name\\s+and\\s+phone\\s+for
 // either.
 const WARRANTY_TECH_NAME_RE = new RegExp(`\\bis\\s+(${NAME_SRC})\\s+still\\s+under\\s+warranty\\s+and\\s+who'?s\\s+the\\s+tech(?:nician)?\\s+that\\s+did\\s+it\\s*\\??$`, "i");
 const INSTALLER_DATE_ADDR_RE = new RegExp(`who\\s+installed\\s+it\\s+and\\s+when\\s+for\\s+(${ADDR_SRC})\\s*\\??$`, "i");
+// h167-style: "warranty status and last visit date for <address>" — normalizeQuestion already
+// expands "quick one -"/"quick q," lead-ins away same as the other patterns above; anchored at the
+// END for the same reason (a chatty lead-in has nothing to do with the shape itself).
+const WARRANTY_LAST_VISIT_ADDR_RE = new RegExp(`warranty\\s+status\\s+and\\s+last\\s+visit\\s+date\\s+for\\s+(${ADDR_SRC})\\s*\\??$`, "i");
 
 const NAME_STOPWORD_RE = /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|it|which|who|what)$/i;
 
@@ -90,6 +138,9 @@ export function parseCompoundQuestion(question) {
 
   m = q.match(INSTALLER_DATE_ADDR_RE);
   if (m) return { kind: "installerDate", address: m[1].trim() };
+
+  m = q.match(WARRANTY_LAST_VISIT_ADDR_RE);
+  if (m) return { kind: "warrantyLastVisit", address: m[1].trim() };
 
   return null;
 }
@@ -164,8 +215,11 @@ async function runNamePhone(db, address) {
  *  the two "set"-graded shapes above. Ambiguous (2+ same-surname customers,
  *  the exact case both rubric examples in this corpus name) answers for
  *  EVERY match, never picks one. */
-async function runWarrantyTech(db, namePhrase, today) {
-  const candidates = await resolveContactCandidates(db, namePhrase);
+async function runWarrantyTech(db, question, namePhrase, today) {
+  // R21 (M1, P0 — fp-4 cluster 5): never report a DIFFERENT real customer's own warranty/
+  // technician facts just because their name is one edit away from what was typed.
+  const { candidates, declined } = await resolveNamedCustomers(db, question, namePhrase);
+  if (declined) return declined;
   if (!candidates.length) return null;
   const rows = [];
   for (const row of candidates) {
@@ -176,23 +230,22 @@ async function runWarrantyTech(db, namePhrase, today) {
       console.error("compound warrantyTech: listCustomerEquipment failed:", err?.message);
     }
     const warranty = equipmentRows.length ? equipmentRows.map((u) => unitWarrantyPhrase(u, today)).join("; ") : "no equipment on file";
-    let technician = null;
+    let installer = null;
     try {
-      const visits = await computeVisitHistory(db, row.id, today);
-      technician = visits.mostRecent?.technician ?? null;
+      installer = await resolveInstaller(db, equipmentRows);
     } catch (err) {
-      console.error("compound warrantyTech: computeVisitHistory failed:", err?.message);
+      console.error("compound warrantyTech: resolveInstaller failed:", err?.message);
     }
-    rows.push({ row, warranty, technician });
+    rows.push({ row, warranty, installer });
   }
   const lines = rows.map((r) => {
     const name = r.row.customer_name || r.row.customer_number || "Unnamed customer";
-    const techPart = r.technician ? `tech on file: ${r.technician}` : "no technician/installer on file";
+    const techPart = r.installer ? `installer on file: ${r.installer}` : "no installer on file";
     return `${name} — ${r.warranty}; ${techPart}`;
   });
   const facts = rows.map((r) => ({
     label: r.row.customer_name || r.row.customer_number || "Unnamed customer",
-    value: `${r.warranty}; ${r.technician ? `tech ${r.technician}` : "no technician/installer on file"}`,
+    value: `${r.warranty}; ${r.installer ? `installer ${r.installer}` : "no installer on file"}`,
     entityId: r.row.id, sources: [],
   }));
   const prefix = rows.length > 1 ? `${rows.length} customers match "${namePhrase}", so here is each one — ` : "";
@@ -207,7 +260,7 @@ async function runWarrantyTech(db, namePhrase, today) {
 
 /** Rubric-graded (g149/g153-style): same "always state both halves honestly"
  *  posture as runWarrantyTech. */
-async function runInstallerDate(db, address, today) {
+async function runInstallerDate(db, address) {
   const row = await resolveSingleAddress(db, address);
   if (!row) return null;
   let equipmentRows = [];
@@ -217,22 +270,21 @@ async function runInstallerDate(db, address, today) {
     console.error("compound installerDate: listCustomerEquipment failed:", err?.message);
   }
   const installDates = equipmentRows.map((u) => u.installation_date).filter(Boolean);
-  let technician = null;
+  let installer = null;
   try {
-    const visits = await computeVisitHistory(db, row.id, today);
-    technician = visits.mostRecent?.technician ?? null;
+    installer = await resolveInstaller(db, equipmentRows);
   } catch (err) {
-    console.error("compound installerDate: computeVisitHistory failed:", err?.message);
+    console.error("compound installerDate: resolveInstaller failed:", err?.message);
   }
   const addrLabel = row.service_address || titleCase(address);
   const who = row.customer_name || row.customer_number || "this customer";
   const dateText = installDates.length ? `installed ${installDates.map((d) => formatDateHuman(d)).join(", ")}` : "no install date on file";
-  const techText = technician ? `installer/tech on file: ${technician}` : "no installer/technician on file";
+  const techText = installer ? `installer on file: ${installer}` : "no installer on file";
   return attachCitations(
     {
       kind: "answer", text: `${who} at ${addrLabel} — ${techText}; ${dateText}.`,
       facts: [
-        { label: "Installer", value: technician || "not on file", sources: [] },
+        { label: "Installer", value: installer || "not on file", sources: [] },
         { label: "Install date", value: installDates.length ? installDates.map((d) => formatDateHuman(d)).join(", ") : "not on file", sources: [] },
       ],
       sources: [], confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
@@ -240,7 +292,45 @@ async function runInstallerDate(db, address, today) {
     {
       records: [customerRecord(row), ...equipmentRows.map((u) => unitRecord(u, { customerId: row.id }))],
       total: 1 + equipmentRows.length,
-      basis: `Checked the install date and service history on file for ${who} at ${addrLabel}.`,
+      basis: `Checked the install date and installer on file for ${who} at ${addrLabel} (never the technician of an unrelated service visit).`,
+    }
+  );
+}
+
+/** Rubric-graded (h167-style): "warranty status and last visit date for <address>" — same
+ *  always-state-both-halves posture as runWarrantyTech/runInstallerDate. */
+async function runWarrantyLastVisit(db, address, today) {
+  const row = await resolveSingleAddress(db, address);
+  if (!row) return null;
+  let equipmentRows = [];
+  try {
+    equipmentRows = await db.listCustomerEquipment(row.id);
+  } catch (err) {
+    console.error("compound warrantyLastVisit: listCustomerEquipment failed:", err?.message);
+  }
+  const warranty = equipmentRows.length ? equipmentRows.map((u) => unitWarrantyPhrase(u, today)).join("; ") : "no equipment on file";
+  let lastVisitText = "no service visit on file";
+  try {
+    const visits = await computeVisitHistory(db, row.id, today);
+    if (visits.mostRecent?.date) lastVisitText = `last serviced ${formatDateHuman(visits.mostRecent.date)}`;
+  } catch (err) {
+    console.error("compound warrantyLastVisit: computeVisitHistory failed:", err?.message);
+  }
+  const addrLabel = row.service_address || titleCase(address);
+  const who = row.customer_name || row.customer_number || "this customer";
+  return attachCitations(
+    {
+      kind: "answer", text: `${who} at ${addrLabel} — ${warranty}; ${lastVisitText}.`,
+      facts: [
+        { label: "Warranty", value: warranty, sources: [] },
+        { label: "Last visit", value: lastVisitText, sources: [] },
+      ],
+      sources: [], confidence: 1, verifiedCount: 2, unverifiedCount: 0, closest: [],
+    },
+    {
+      records: [customerRecord(row), ...equipmentRows.map((u) => unitRecord(u, { customerId: row.id }))],
+      total: 1 + equipmentRows.length,
+      basis: `Checked warranty status and the most recent service visit on file for ${who} at ${addrLabel}.`,
     }
   );
 }
@@ -256,7 +346,8 @@ export async function runCompound(db, question, opts = {}) {
   const today = opts?.today ?? null;
   if (parsed.kind === "modelSerial") return runModelSerial(db, parsed.address);
   if (parsed.kind === "namePhone") return runNamePhone(db, parsed.address);
-  if (parsed.kind === "warrantyTech") return runWarrantyTech(db, parsed.namePhrase, today);
-  if (parsed.kind === "installerDate") return runInstallerDate(db, parsed.address, today);
+  if (parsed.kind === "warrantyTech") return runWarrantyTech(db, question, parsed.namePhrase, today);
+  if (parsed.kind === "installerDate") return runInstallerDate(db, parsed.address);
+  if (parsed.kind === "warrantyLastVisit") return runWarrantyLastVisit(db, parsed.address, today);
   return null;
 }

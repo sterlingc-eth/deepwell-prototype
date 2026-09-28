@@ -101,6 +101,37 @@ export function futureNote(future, today) {
   return ` There's also a record dated ${humanDate(first.date)}${others}, which is after today (${humanDate(t)}) — it looks like a typo or a scheduled visit, so I left it out.`;
 }
 
+// R21 (M1, P0 — fp-4 cluster 6, r21_blind4_clusters.json C8 "adversarial_future_date_mishandled"):
+// a manifestly future YEAR named in the question ("do we have anything logged for 2030") must be
+// acknowledged, never silently reinterpreted as this year or dropped. Anchored to a preposition a
+// real date phrase actually uses ("in"/"for"/"since"/"by"/"dated"/"during"/"of" + a bare 4-digit
+// year) so a serial/model number that happens to contain four digits in a row is never mistaken for
+// one (this corpus's own serials/models always mix in letters right next to their digits — see
+// e.g. "4TTR4002L1000AA", "DZ16SA0361" — so a real, standalone year token never collides with one).
+// `g` is required: String.prototype.matchAll (below) throws on a non-global RegExp, unconditionally,
+// regardless of whether it would ever match — a missing `g` here silently took down EVERY caller of
+// explicitFutureYearInQuestion (lastService/lastNVisits/installDate/installer in deterministicRouter
+// .js, buildVisitAnswer in contactLookup.js), not just future-dated questions.
+const EXPLICIT_YEAR_RE = /\b(?:in|for|since|by|dated|during|of|through|until)\s+(20[2-9][0-9]|2[1-9][0-9]{2})\b/gi;
+
+/**
+ * Pure: the future calendar year explicitly named in `question` (strictly after `today`'s own
+ * year), or null. Used to add an honest acknowledgment to an otherwise-generic "nothing on file"
+ * answer — see futureNote's own new `question` parameter below — rather than silently answering as
+ * if the caller had asked about some other, on-file year instead.
+ */
+export function explicitFutureYearInQuestion(question, today) {
+  const t = todayIso(today);
+  const todayYear = Number(String(t).slice(0, 4));
+  if (!Number.isFinite(todayYear)) return null;
+  let best = null;
+  for (const m of String(question ?? '').matchAll(EXPLICIT_YEAR_RE)) {
+    const y = Number(m[1]);
+    if (y > todayYear && (best === null || y > best)) best = y;
+  }
+  return best;
+}
+
 /**
  * Which date a question is about, decided from its wording (never left to a model):
  *   'uploaded' -> documents.created_at ("added / uploaded / received / scanned / filed / imported ...")

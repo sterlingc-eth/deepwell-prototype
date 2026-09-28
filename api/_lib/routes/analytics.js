@@ -51,9 +51,12 @@ import {
   parseCrossDocCondition,
   crossDocUnsupportedAnswer,
   moneyFallbackAnswer,
+  mentionsFutureYear,
+  futureDateAnswer,
   isExistenceQuestion,
   existenceWrap,
   CONDITION_CROSS_VISIT_RELATION,
+  CONDITION_UNTRACKED_CALLBACK,
   CONDITION_RATIO,
   DOC_TYPE_FILTER_FIELDS,
   SERVICE_TYPE_FILTER_FIELDS,
@@ -232,7 +235,15 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // "serviced/visited/job/work done" -> service date. Both override whatever the model guessed.
     if (input) {
       const age = resolveAgeFilter(question, today);
-      if (age) input = { ...input, filters: [...(input.filters ?? []).filter((f) => f?.field !== 'installYear'), age] };
+      // R21 M2 (Cluster 3, j144 "between X and Y years old"): resolveAgeFilter now returns an ARRAY
+      // of two filters for the between-shape (a single age direction still returns one plain filter
+      // object, unchanged) — spread either shape the same way; installDate replaces installYear as
+      // the age filter's field (day-precise, see resolveAgeFilter's own doc comment), so any stray
+      // installYear the model guessed is stripped here too, never left to double up with the real one.
+      if (age) {
+        const ageFilters = Array.isArray(age) ? age : [age];
+        input = { ...input, filters: [...(input.filters ?? []).filter((f) => f?.field !== 'installYear' && f?.field !== 'installDate'), ...ageFilters] };
+      }
       const basis = dateBasisOf(question);
       if (input.entity === 'documents' && basis) input = { ...input, dateBasis: basis };
     }
@@ -359,6 +370,11 @@ function shapeEquipmentRow(r, today) {
     hasRefrigerant: present(r.refrigerant),
     hasCustomerLink: present(r.customer_id),
     installDateInFuture,
+    // R21 M2 (Cluster 2/3): the raw YYYY-MM-DD (or shorter) install date, day-precise — installYear
+    // above is a bare calendar-year number and can't tell "before June 1" from "any time that same
+    // year" apart; a relative-time plan.timeRange (detPlan.js's detectInstallDateRelativeRange) and
+    // an age-threshold filter (resolveAgeFilter) both need the real date, not just its year.
+    installDate: /^\d{4}(-\d{2}(-\d{2})?)?$/.test(installRaw) ? installRaw : null,
     // R18 (H1): raw value for attachDuplicateFlag's isDuplicateSerial computation just below —
     // see shapeCustomerRow's own serviceAddress comment above for why this needs the raw string.
     serialNumber: r.serial_number,
@@ -465,7 +481,7 @@ const ENTITY_SUPPORTED_FIELDS = {
     'hasMultipleUnits',
   ]),
   equipment: new Set([
-    'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
+    'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'installDate', 'warrantyStatus',
     'hasSerial', 'hasInstallDate', 'hasModel', 'hasTonnage', 'hasRefrigerant', 'hasCustomerLink', 'installDateInFuture',
     // R18 (H1, breadth-data-quality-023): see attachDuplicateFlag's own doc comment.
     'isDuplicateSerial',
@@ -474,10 +490,30 @@ const ENTITY_SUPPORTED_FIELDS = {
     'warrantyExpires', 'warrantyRegistered',
     // R20 (J3, i094): the registration-vs-install day gap — see shapeEquipmentRow's own doc comment.
     'warrantyRegistrationDays',
+    // R21 M2 (Cluster 1/C1): a unit existentially linked to a service VISIT of a given type — see
+    // queryEquipmentByServiceTypeCondition's own doc comment for the dedicated join query this
+    // needs (buildAnalyticsSQL's plain equipment branch has no notion of a document join).
+    'hasServiceType', 'lacksServiceType',
   ]),
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus', 'warrantyExpires']),
-  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink', 'vendor']),
-  serviceVisits: new Set(['technician']),
+  // R21 (M2, g103): 'linkedEquipmentBrand' — see queryDocumentsByEquipmentBrand's own doc comment
+  // for why this needs its own dedicated join query rather than a plain column filter.
+  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink', 'vendor', 'linkedEquipmentBrand']),
+  // R21 (L3): 'hasServiceType' — a visit's OWN service_type (see buildAnalyticsSQL's serviceVisits
+  // branch, analytics.js, and the row-merge just above where it is set) — was missing here, so
+  // "how many repair visits have we logged" always failed this whitelist and fell straight to
+  // `return null` in executeAnalyticsPlan below, even though detectAnalyticsPlan already built the
+  // exact right filter deterministically.
+  //
+  // NOTE: 'brand' was tried here too (for "how many trane jobs have we done total") and reverted.
+  // The oracle for that shape counts DISTINCT DOCUMENTS joined to an equipment ENTITY whose
+  // data->>'manufacturer' matches (any document type, not gated by a service_date extraction
+  // existing on that document) — see test-docs/scorecard/generalization/field-phrasing.json g103.
+  // This serviceVisits row set is anchored on field_key='service_date' extractions and a per-
+  // document manufacturer subquery, which undercounts against that oracle (34 vs 54 measured) and
+  // would need its own entity-linked plan/executor, not this filter whitelist. Left as needs-model;
+  // see final report for the hook a future round should build.
+  serviceVisits: new Set(['technician', 'hasServiceType']),
 };
 
 /**
@@ -492,7 +528,7 @@ const ENTITY_SUPPORTED_FIELDS = {
  * queryCustomersByEquipmentFilter below.
  */
 const EQUIPMENT_FIELDS_VIA_CUSTOMER_JOIN = new Set([
-  'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'warrantyStatus',
+  'brand', 'model', 'equipmentType', 'tonnage', 'refrigerant', 'installYear', 'installDate', 'warrantyStatus',
 ]);
 
 function filtersSupported(entity, filters) {
@@ -726,7 +762,23 @@ async function queryInstallDateExtreme(db, sortBy, filters = []) {
  *  withAnalyticsCitations/analyticsCitations (citations/analytics.js): that
  *  helper's own sortBy wording ("Ranked customers by...") is written for the
  *  customers-ranking shape only — see that file's own analyticsBasis. */
-function formatInstallDateExtremeAnswer(plan, rows, extreme) {
+// R21 M2 (Cluster 3, j148/j149): full ELAPSED calendar years between `dateStr` and `today` — the
+// same thing Postgres's `extract(year from age(today, dateStr))` gives (the generator's own oracle
+// SQL): the years component of the calendar interval, decremented by one whenever this year's
+// month/day anniversary of `dateStr` hasn't happened yet — never a bare `today.year - date.year`,
+// which overcounts by one for any date whose anniversary later in the year hasn't yet occurred.
+function calendarAgeYears(today, dateStr) {
+  const t = new Date(`${today}T00:00:00Z`);
+  const d = new Date(`${dateStr.length === 4 ? `${dateStr}-01-01` : dateStr.length === 7 ? `${dateStr}-01` : dateStr}T00:00:00Z`);
+  if (Number.isNaN(t.getTime()) || Number.isNaN(d.getTime())) return null;
+  let years = t.getUTCFullYear() - d.getUTCFullYear();
+  const anniversaryPassed =
+    t.getUTCMonth() > d.getUTCMonth() || (t.getUTCMonth() === d.getUTCMonth() && t.getUTCDate() >= d.getUTCDate());
+  if (!anniversaryPassed) years -= 1;
+  return Math.max(0, years);
+}
+
+function formatInstallDateExtremeAnswer(plan, rows, extreme, today) {
   if (!rows.length || !extreme) {
     const data = {
       kind: 'no-answer', text: 'No installation dates on file yet.',
@@ -735,6 +787,23 @@ function formatInstallDateExtremeAnswer(plan, rows, extreme) {
     return attachCitations(data, { records: [], total: 0, kind: 'searched', basis: 'Searched every unit on file for an installation date; none was found.' });
   }
   const label = plan.sortBy === 'installDateAsc' ? 'oldest' : 'newest';
+  if (plan.ageInYears) {
+    const years = calendarAgeYears(today, extreme);
+    const text = `The ${label} unit on file is ${years} year${years === 1 ? '' : 's'} old (installed ${extreme}).`;
+    const data = {
+      kind: 'answer', text,
+      facts: [{ label: `Age of ${label} unit (years)`, value: String(years) }],
+      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+    const records = rows.map((r) => unitRecord(
+      { id: r.id, manufacturer: r.brand, equipment_type: r.equipmentType, model: r.model, customer_id: r.customerId },
+      { sublabel: [r.model, extreme, r.city].filter(Boolean).join(' · '), customerId: r.customerId ?? undefined }
+    ));
+    return attachCitations(data, {
+      records, total: rows.length, kind: 'basis',
+      basis: `Ranked every unit on file by installation date; the ${label} is dated ${extreme}, ${years} year${years === 1 ? '' : 's'} old as of ${today}.`,
+    });
+  }
   const describe = (r) => {
     const detail = [r.brand, r.model].filter(Boolean).join(' ') || 'Equipment';
     const where = r.customerName ? `${r.customerName}${r.city ? `, ${r.city}` : ''}` : r.city || null;
@@ -991,6 +1060,36 @@ async function queryCustomersByDocTypeCondition(db, plan, { audienceClause = 'TR
 }
 
 /**
+ * R21 (M2, g103): "how many trane jobs have we done total" — the oracle counts DISTINCT DOCUMENTS
+ * joined (via document_entity_links) to an equipment ENTITY whose manufacturer matches, ANY document
+ * type, never gated by a service_date extraction existing on that same document. The serviceVisits
+ * entity (buildAnalyticsSQL, analytics.js) is anchored on field_key='service_date' rows and a
+ * per-document manufacturer subquery, which undercounts against this exact join definition (34 vs 54
+ * measured — see ENTITY_SUPPORTED_FIELDS' own doc comment on why 'brand' was reverted from that
+ * entity's whitelist instead of fixed there). This is the dedicated join query that definition
+ * actually needs, the same "buildAnalyticsSQL can't express a real join as a plain column filter"
+ * shape queryCustomersByDocTypeCondition above already exists for.
+ */
+async function queryDocumentsByEquipmentBrand(db, plan, { audienceClause = 'TRUE' } = {}) {
+  const brandFilter = (plan.filters ?? []).find((f) => f.field === 'linkedEquipmentBrand');
+  if (!brandFilter) return { rows: [] };
+  const { rows: raw } = await db.raw(
+    `SELECT DISTINCT d.id, d.document_type, d.original_filename, d.created_at,
+            (SELECT x.value FROM extractions x
+              WHERE x.document_id = d.id AND x.field_key = 'service_date' AND x.${TENANT_SQL}
+              ORDER BY x.created_at DESC LIMIT 1) AS service_date
+       FROM documents d
+       JOIN document_entity_links l ON l.document_id = d.id AND l.${TENANT_SQL}
+       JOIN entities e ON e.id = l.entity_id AND e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+      WHERE d.${TENANT_SQL} AND (${audienceClause}) AND e.data->>'manufacturer' ILIKE $1
+      ORDER BY d.created_at DESC
+      LIMIT 500`,
+    [brandFilter.value]
+  );
+  return { rows: raw.map((r) => shapeDocumentRow(r, plan.dateBasis)) };
+}
+
+/**
  * R18 P4 (blind generalization round 18 part 2, C2/C4): "how many trane customers needed a
  * repair visit" / "how many customers have never had a preventive maintenance visit" —
  * hasServiceType/lacksServiceType filters, the event-level sibling of
@@ -1071,6 +1170,74 @@ async function queryCustomersByServiceTypeCondition(db, plan) {
   return { rows: allRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeCustomerRow(r)) };
 }
 
+/**
+ * R21 M2 (deferred list, Cluster 1/C1): the equipment-entity sibling of
+ * queryCustomersByServiceTypeCondition just above — same EXISTS-a-linked-document-with-this-
+ * service_type shape, just anchored on the UNIT (e.id) rather than the customer, and joined either
+ * DIRECTLY (a ticket linked to the unit itself) or via the unit's OWN customer_id (a ticket linked
+ * to the customer record instead) — the oracle's own `l.entity_id = e.id OR l.entity_id =
+ * e.customer_id` (every C1 id shares this exact join). detectBrandCityServiceTypeSince (detPlan.js)
+ * is the only producer of this filter shape; brand/city (this plan's other filters) are applied
+ * afterward by executeAnalyticsPlan's own generic applyEntityFilters pass, exactly like the
+ * customers-side function leaves its own equipment-join filter for queryCustomersByEquipmentFilter
+ * to combine separately.
+ */
+async function queryEquipmentByServiceTypeCondition(db, plan) {
+  const hasFilter = (plan.filters ?? []).find((f) => f.field === 'hasServiceType');
+  const lacksFilter = (plan.filters ?? []).find((f) => f.field === 'lacksServiceType');
+  if (!hasFilter && !lacksFilter) return { rows: [] };
+
+  const range = plan.timeRange;
+  const dateWindowSql = range?.from || range?.to
+    ? `AND EXISTS (
+             SELECT 1 FROM extractions sd
+              WHERE sd.document_id = x.document_id AND sd.field_key = 'service_date' AND sd.${TENANT_SQL}
+                AND ($2::text IS NULL OR sd.value >= $2::text) AND ($3::text IS NULL OR sd.value <= $3::text)
+           )`
+    : '';
+  const dateParams = range?.from || range?.to ? [range?.from ?? null, range?.to ?? null] : [];
+
+  const equipmentCols = `e.id, e.customer_id, e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer,
+           e.data->>'equipment_type' AS equipment_type, e.data->>'tonnage' AS tonnage,
+           e.data->>'refrigerant' AS refrigerant, e.data->>'installation_date' AS installation_date,
+           e.data->>'serial_number' AS serial_number,
+           e.data->>'service_address' AS service_address, e.data->'warranty' AS warranty, e.updated_at`;
+
+  const serviceTypeEquipmentSql = `
+    SELECT ${equipmentCols}
+      FROM entities e
+     WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+       AND EXISTS (
+             SELECT 1 FROM document_entity_links l
+             JOIN extractions x ON x.document_id = l.document_id AND x.${TENANT_SQL}
+            WHERE l.${TENANT_SQL} AND x.field_key = 'service_type' AND x.value = $1
+              AND (l.entity_id = e.id OR l.entity_id = e.customer_id)
+              ${dateWindowSql}
+           )`;
+
+  if (hasFilter) {
+    const { rows: hasRows } = await db.raw(serviceTypeEquipmentSql, [hasFilter.value, ...dateParams]);
+    if (!lacksFilter) return { rows: hasRows.map((r) => shapeEquipmentRow(r)) };
+    const { rows: lacksRows } = await db.raw(serviceTypeEquipmentSql, [lacksFilter.value, ...dateParams]);
+    const lacksIds = new Set(lacksRows.map((r) => r.id));
+    return { rows: hasRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeEquipmentRow(r)) };
+  }
+
+  // lacksFilter only: every unit, minus the ones the SAME EXISTS-style query finds for that service
+  // type — never a second, drifting definition of "had one" from the has-side above. Mirrors
+  // queryCustomersByServiceTypeCondition's own lacks-only path; kept for parity even though none of
+  // C1's own ids need it (every one names a positive hasServiceType).
+  const [{ rows: allRows }, { rows: lacksRows }] = await Promise.all([
+    db.raw(
+      `SELECT ${equipmentCols} FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}`,
+      []
+    ),
+    db.raw(serviceTypeEquipmentSql, [lacksFilter.value, ...dateParams]),
+  ]);
+  const lacksIds = new Set(lacksRows.map((r) => r.id));
+  return { rows: allRows.filter((r) => !lacksIds.has(r.id)).map((r) => shapeEquipmentRow(r)) };
+}
+
 /** R19 (I2, task 5): one probe + one clause per request, shared by every documents-touching branch
  *  executeAnalyticsPlan runs — `db` here is the SAME withTenant store every other query in this file
  *  already uses via `.raw`, wrapped to the `{query}` shape documentsHaveAudience expects (identical
@@ -1114,7 +1281,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     }
     if (plan.entity === 'equipment') {
       const { rows, extreme } = await queryInstallDateExtreme(db, plan.sortBy, plan.filters);
-      return formatInstallDateExtremeAnswer(plan, rows, extreme);
+      return formatInstallDateExtremeAnswer(plan, rows, extreme, today);
     }
     const rows = await queryTopCustomers(db, plan.sortBy, plan.limit ?? TOP_CUSTOMERS_LIMIT);
     // TEAM C: citations from the same ranked rows.
@@ -1139,6 +1306,17 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
   // same shape as hasDocTypeFilter above — see queryCustomersByServiceTypeCondition.
   const hasServiceTypeFilter =
     plan.entity === 'customers' && (plan.filters ?? []).some((f) => SERVICE_TYPE_FILTER_FIELDS.includes(f.field));
+  // R21 M2 (Cluster 1/C1): the equipment-entity sibling of hasServiceTypeFilter just above —
+  // detectBrandCityServiceTypeSince (detPlan.js) is the only producer of an equipment-entity
+  // hasServiceType filter (see queryEquipmentByServiceTypeCondition's own doc comment for the
+  // dedicated join query this needs, same "buildAnalyticsSQL can't express a real join" shape as
+  // hasServiceTypeFilter's own customers-side query).
+  const hasEquipmentServiceTypeFilter =
+    plan.entity === 'equipment' && (plan.filters ?? []).some((f) => SERVICE_TYPE_FILTER_FIELDS.includes(f.field));
+  // R21 (M2, g103): see queryDocumentsByEquipmentBrand's own doc comment — a real join,
+  // buildAnalyticsSQL's documents branch has no notion of one.
+  const hasLinkedEquipmentBrandFilter =
+    plan.entity === 'documents' && (plan.filters ?? []).some((f) => f.field === 'linkedEquipmentBrand');
 
   let rows;
   // Set only in the serviceVisits branch below, from the SAME already-fetched
@@ -1212,12 +1390,43 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     // before applyEntityFilters (below) narrows it down.
     attachDuplicateFlag(rows, 'customerName', 'isDuplicateName');
     attachDuplicateFlag(rows, 'serviceAddress', 'sharesAddress');
+  } else if (hasEquipmentServiceTypeFilter) {
+    // R21 M2 (Cluster 1/C1): plan.timeRange here scopes the QUALIFYING VISIT's own service_date
+    // (already applied inside the dedicated query's own EXISTS join, exactly like
+    // queryCustomersByServiceTypeCondition's identical dateWindowSql) — never the unit's own
+    // install date, so this branch deliberately never runs the install-date withinTimeRange pass
+    // the plain equipment branch below does; brand/city (plan's other filters) are left for the
+    // generic applyEntityFilters pass further down, same as every other cross-doc branch above.
+    ({ rows } = await queryEquipmentByServiceTypeCondition(db, plan, { today }));
   } else if (plan.entity === 'equipment' || plan.entity === 'warranties') {
     const { sql, params } = buildAnalyticsSQL(plan);
     const { rows: raw } = await db.raw(sql, params);
     rows = raw.map((r) => shapeEquipmentRow(r, today));
     // R18 (H1): see attachDuplicateFlag's own doc comment.
     attachDuplicateFlag(rows, 'serialNumber', 'isDuplicateSerial');
+    // R21 M2 (Cluster 2, j040/j041/j046/j061 — "before the summer this year", "within the past 5
+    // years"): buildAnalyticsSQL's equipment branch has no notion of plan.timeRange at all (its own
+    // WHERE clause only ever applies plan.filters), so a relative-time install-date question used to
+    // fetch every unit, unfiltered, and answer with the whole-corpus count. Same day-grain
+    // withinTimeRange helper (analytics.js) the documents branch above already uses, keyed off the
+    // row's own installDate (shapeEquipmentRow, just added) rather than a document date/month —
+    // `.date`/`.month` is exactly the shape withinTimeRange itself expects.
+    // R21 M2 (h047/h051 regression fix): reconcileTimeRange (analytics.js) attaches SOME plan.timeRange
+    // to EVERY plan whenever the question names ANY relative-time phrase, regardless of which field
+    // that phrase is really about — "how many units had their warranty expire in the past year" names
+    // a time window on warrantyExpires (already fully expressed via THIS plan's own filters, above,
+    // built by detectWarrantyExpiryWindow), never on the unit's own install date. Applying the
+    // install-date withinTimeRange narrowing on top of an UNRELATED warrantyExpires-filtered plan
+    // wrongly intersected two different dates on the same unit and silently zeroed out real matches.
+    // Skipped whenever the plan already carries its own warrantyExpires filter — the time condition is
+    // then already fully answered by that filter, never a second, wrong-field one.
+    const hasOwnWarrantyExpiresFilter = (plan.filters ?? []).some((f) => f.field === 'warrantyExpires');
+    if (plan.timeRange && !hasOwnWarrantyExpiresFilter) {
+      const withRangeFields = rows.map((r) => ({ ...r, date: r.installDate, month: r.installDate ? r.installDate.slice(0, 7) : null }));
+      rows = withRangeFields.filter((r) => withinTimeRange(r, plan.timeRange));
+    }
+  } else if (hasLinkedEquipmentBrandFilter) {
+    ({ rows } = await queryDocumentsByEquipmentBrand(db, plan, { audienceClause }));
   } else if (plan.entity === 'documents') {
     const { sql, params } = buildAnalyticsSQL(plan, { audienceClause });
     const { rows: raw } = await db.raw(sql, params);
@@ -1261,6 +1470,16 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
       technician: techByDoc.get(r.document_id) ?? null,
       customerName: r.customer_name ?? null,
       model: r.model ?? null,
+      // R21 (L3): a visit's own brand (applyEntityFilters' generic brand-matching special case,
+      // above, already reads whatever entity's row carries a `.brand`) and its own service type —
+      // see buildAnalyticsSQL's serviceVisits branch (analytics.js) for where these come from.
+      // `hasServiceType` is named to match the SAME filter field detPlan.js's safety net already
+      // builds for a serviceVisits plan (SERVICE_TYPE_PHRASE_RE) — on a customers-entity plan that
+      // field means "linked to ANY visit of this type" (queryCustomersByServiceTypeCondition,
+      // above); on a serviceVisits row it is simply the row's OWN type, a plain matchesFilter string
+      // eq (analytics.js) — the two never collide since a plan's entity picks which path runs.
+      brand: r.manufacturer ?? null,
+      hasServiceType: r.service_type ?? null,
       month: /^\d{4}-\d{2}/.test(r.value ?? '') ? r.value.slice(0, 7) : null,
     }));
     // buildAnalyticsSQL's own query is `ORDER BY x.value DESC`, so the first
@@ -1288,8 +1507,17 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     // (oe20 R20): including these date-less rows there inflated every bucket's count / added a
     // bogus extra year. Only a plain, non-grouped technician-filtered COUNT (detectTechnicianAction's
     // shape - i014/i015's own fix) wants a document counted even with no paired service_date row.
+    //
+    // R21 (M2, j048/j049): the technician-filter check below is NEW — this used to run for ANY
+    // non-groupBy serviceVisits plan, not just a technician-filtered one, so even a bare "how many
+    // service visits have we logged in total" (no technician named at all) silently counted every
+    // document with a stray technician extraction and no service_date row too, inflating the true
+    // all-time total (317 real dated visits) to 340. i014/i015's own shape always carries a
+    // `{field:'technician'}` filter (detectTechnicianAction, detPlan.js) — scoping to that keeps
+    // their fix exactly as it was while no longer silently padding every OTHER bare/filtered count.
+    const hasTechnicianFilter = (plan.filters ?? []).some((f) => f.field === 'technician');
     const dateRowDocIds = new Set(dateRows.map((r) => r.document_id));
-    const dateLessTechRows = plan.op === 'groupBy' ? [] : techRows
+    const dateLessTechRows = plan.op === 'groupBy' || !hasTechnicianFilter ? [] : techRows
       .filter((t) => !dateRowDocIds.has(t.document_id))
       .map((t) => ({
         id: t.document_id, label: t.value || 'Unassigned', value: t.value,
@@ -1321,10 +1549,13 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
   // filter in the plan (a geo filter, or brand/model via the equipment-join
   // branch above, combined with the cross-doc condition) still needs this
   // pass, same as hasEquipmentJoinFilter's own rows above.
-  const crossDocFilterUsed = hasDocTypeFilter || hasServiceTypeFilter;
+  // R21 (M2, g103): linkedEquipmentBrand is likewise already fully resolved by its own dedicated
+  // join query (queryDocumentsByEquipmentBrand) — rows carry no such field, so leaving it in would
+  // zero out every row the same way an unstripped hasDocType/hasServiceType filter would.
+  const crossDocFilterUsed = hasDocTypeFilter || hasServiceTypeFilter || hasEquipmentServiceTypeFilter || hasLinkedEquipmentBrandFilter;
   const filtersToApply = crossDocFilterUsed
     ? (plan.filters ?? []).filter(
-        (f) => !DOC_TYPE_FILTER_FIELDS.includes(f.field) && !SERVICE_TYPE_FILTER_FIELDS.includes(f.field)
+        (f) => !DOC_TYPE_FILTER_FIELDS.includes(f.field) && !SERVICE_TYPE_FILTER_FIELDS.includes(f.field) && f.field !== 'linkedEquipmentBrand'
       )
     : plan.filters;
   const filtered = applyEntityFilters(rows, filtersToApply);
@@ -1475,6 +1706,13 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // would flag them as unsupported no matter what any plan says — that
     // makes them safe to decide HERE, before any cache lookup or model call,
     // so a stale/wrong cached answer can never be returned for them again.
+    // R21 M2 (Cluster 6, j192/j195): a future-dated year named in the question — checked FIRST,
+    // before even the money/maintenance conditions below, since a future-dated MONEY question
+    // ("do we have an invoice dated January 1st, 2030") is still a future-date question first and
+    // foremost, never a "financials not built yet" one. See mentionsFutureYear's own doc comment.
+    if (mentionsFutureYear(question_n, today)) {
+      return { handled: true, data: futureDateAnswer(), cacheHit: false, modelCalled: false, writes: [] };
+    }
     const conditionsUpFront = detectedConditions(question_n);
     if (conditionsUpFront.has('money')) {
       // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): missOutcome
@@ -1508,6 +1746,15 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // answer for the same reason the round-6 fix above was needed. missOutcome routes this through ask.js's
     // "give the agent one shot first" branch (api/ask.js, near tryAgent()) rather than a bare decline, since a
     // real multi-hop agent CAN answer these — this layer must only ever decline to guess, never answer wrong.
+    // R21 M2 (deferred list, h106/i006): a bare "callback(s)" mention naming no computable time
+    // window at all — unlike CONDITION_CROSS_VISIT_RELATION just below, there is no path to a real
+    // answer here, ever (see CONDITION_UNTRACKED_CALLBACK's own doc comment, analytics.js), so this
+    // declines immediately with NO missOutcome set — ask.js's "give the agent one shot first" branch
+    // only ever runs when missOutcome is present, so leaving it unset (unlike money/maintenance/
+    // cross-visit-relation, which all still want that one shot) is what skips it here.
+    if (conditionsUpFront.has(CONDITION_UNTRACKED_CALLBACK)) {
+      return { handled: true, data: unsupportedConditionAnswer(CONDITION_UNTRACKED_CALLBACK, 'customers'), cacheHit: false, modelCalled: false, writes: [] };
+    }
     if (conditionsUpFront.has(CONDITION_CROSS_VISIT_RELATION)) {
       return {
         handled: true, data: unsupportedConditionAnswer(CONDITION_CROSS_VISIT_RELATION, 'customers'), cacheHit: false, modelCalled: false, writes: [],

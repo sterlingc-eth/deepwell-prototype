@@ -36,6 +36,11 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://deepwelltechnology.com/security.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
     <loc>https://deepwelltechnology.com/terms.html</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

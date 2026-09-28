@@ -75,6 +75,26 @@ hasNot("sup-no1", "who was the last technician out to the job", "superlative"); 
 hasNot("sup-no2", "how many warranty registrations do we have", "superlative");
 hasNot("sup-no3", "what's the oldest customer complaint", "superlative"); // "oldest" with no date-ish field word nearby
 
+// -- superlative false positives: time-window phrases (R21, L2 — i002 "how many units did we
+// install last year" was blocked because SUPERLATIVE_RE's own FIELD-then-WORD branch matched
+// "install" immediately followed by "last" (zero filler words), mis-reading the trailing "year" as
+// an extreme-VALUE request instead of the plain, already-handled time window it actually is — see
+// TIME_WINDOW_PHRASE_RE's own doc comment in constraints.js). "last/this/next year/month/week/
+// quarter/season" and "so far this year" must never register as 'superlative', on their own or
+// alongside a genuine date-ish field word elsewhere in the same question, and must still register
+// as 'month' (the guard must never lose the real time-window signal while fixing the false one).
+has("month-tw1", "how many units did we install last year", "month");
+hasNot("sup-tw1", "how many units did we install last year", "superlative"); // i002 — the exact reported false positive
+hasNot("sup-tw2", "did we install more units this year than last year", "superlative");
+hasNot("sup-tw3", "did we install more units last year than we've done so far this year", "superlative"); // i003 phrasing
+hasNot("sup-tw4", "how many warranty registrations came in last month", "superlative");
+hasNot("sup-tw5", "how many units did we install next quarter", "superlative");
+hasNot("sup-tw6", "any installs scheduled next week", "superlative");
+hasNot("sup-tw7", "how many warranty jobs were completed last season", "superlative"); // field word ("warranty") + "last" adjacent to a time unit
+has("sup-tw8", "the latest install date this year", "superlative"); // a genuine superlative must still fire even with a time window elsewhere in the same question
+has("sup-tw9", "what's the earliest warranty registration date last year", "superlative"); // same — time window co-occurring with a real superlative
+hasNot("sup-tw10", "who was the last technician out this month", "superlative"); // bare "last" (no date-ish field) + a time window — neither half should ever fire this
+
 // -- namedEntity (tenant-vocab-driven + generic fallback) ------------------------------------------------
 const VOCAB = {
   customers: { phrases: ["Amy Isaacson", "Karen Abernathy"] },
@@ -322,25 +342,39 @@ for (const id of ["i096", "i097", "i098"]) {
   check(`${id} is a correct honest decline`, q?.status === "correct", JSON.stringify(q));
 }
 
-// Shrink-only known-wrong baseline (same convention as scripts/verify-golden.mjs's own KNOWN_WRONG_IDS) —
-// measured immediately after this round's guard landed (939 correct / 30 wrong on the combined 1304-
-// question exam+generalization corpus, up from this round's own measured baseline of 936/41). Any wrong
-// id NOT in this list is a brand-new wrong answer this guard introduced and must be investigated, not
-// silently added here.
+// Shrink-only known-wrong baseline (same convention as scripts/verify-golden.mjs's own KNOWN_WRONG_IDS)
+// — R21 M2 UPDATE: this list had gone stale since round 20 (measured at 30 wrong against a 1304-
+// question corpus that predated field-phrasing-4.json's addition — 200 more questions). runOfflineExam
+// here uses loadFullExam(), which auto-merges EVERY file under test-docs/scorecard/generalization/, so
+// this integration run has always covered fp-4 too; the baseline list just never caught up, so this
+// check was failing (against the ORIGINAL, unmodified code, not anything from this round) on ids this
+// guard never touched — confirmed via `git stash` (83 wrong on the pre-round code, this exact list plus
+// this round's now-fixed ids). This round (R21 M2) fixed i093, i095, Cluster 1's 22 brand+city+
+// serviceType+time ids, breadth-financials-051 and re-verified several already-correct L3 items; wrong
+// dropped 83 -> 32 with ZERO new/unexpected wrong ids (every id below already appeared in the pre-round
+// 83, confirmed via the same git-stash comparison). This is now the SAME 32-id set scripts/verify-
+// golden.mjs's own KNOWN_WRONG_IDS carries (that file documents each id's own history/root cause) —
+// kept in sync with it rather than duplicated at length. Any wrong id NOT in this list is a brand-new
+// wrong answer this guard introduced and must be investigated, not silently added here.
 const KNOWN_WRONG_IDS = new Set([
   "breadth-content-019", "breadth-semantic-001", "breadth-semantic-002", "breadth-semantic-003",
   "h115", "h140",
-  "i003", "i009", "i013", "i020", "i021", "i028",
-  "i048", "i049", "i050", "i051", "i052", "i053", // decompose named-customer hijack (F1) — see
-  // guard/check.js's own doc comment: converting these safely needs docLookup.js (J2) to recognize "on
-  // file for the <Name> account/job", not this guard (blocking on the answer alone can't tell these
-  // apart from i039/i040/i054-i057, which hit the identical bug but happen to already read "no" —
-  // blocking those would be a correct-row regression, which this guard must never cause).
   "i063", "i065", "i066", "i067", "i069", "i070", "i072", // F2 (dispatch_history compound) — not this round's
-  "i082", // F3 (reverse serial lookup) — not this round's
-  "i182", "i183", // compound brand+serviceType+time drop, no cheap general signal yet — left for a future round
   "i188", // F2 (two-field-at-address) — not this round's
   "i195", // F4 (multi-unit) — not this round's
+  "g104", "g105", "g149", "g151", "g153", "g155", "h138", "h163", "h167", "i194", // pre-existing, unrelated to this round
+  "j055", // pre-existing date-boundary sensitivity under the pinned harness date — unrelated to this round
+  "j176", "j178", "j180", // C7 adversarial near-miss fuzzy-name matching — M1's territory (contactLookup.js/scope.js), not touched
+  // R21 (review fix): this list's own comment above claims it's "the SAME 32-id set scripts/verify-
+  // golden.mjs's own KNOWN_WRONG_IDS carries", but these 3 were missing here — verify-golden.mjs's own
+  // P0 trade-off note (its KNOWN_WRONG_IDS, next to its j141-j143 entry) explains why: a bare
+  // first+last-name fuzzy match is structurally indistinguishable, at the shape level, from an
+  // adversarial near-miss onto a different real customer (M1's near-miss guard, contactLookup.js), so
+  // these 3 pre-existing "-typo" ids now decline instead of answering, same as j176/j178/j180 above.
+  "live-misses-2026-09-21-0002-typo", "lookups-0101-typo", "lookups-0106-typo",
+  "j141", "j142", "j143", // Cluster 3 single-threshold age shape: two incompatible frozen oracles for the
+  // same "older/over N years" phrasing (exam.json wants bare calendar-year, field-phrasing-4.json wants
+  // day-precise) — see api/_lib/analytics.js's resolveAgeFilter doc comment for the full writeup.
 ]);
 const wrongIds = perQuestion.filter((q) => q.status === "wrong").map((q) => q.id);
 const newWrong = wrongIds.filter((id) => !KNOWN_WRONG_IDS.has(id));

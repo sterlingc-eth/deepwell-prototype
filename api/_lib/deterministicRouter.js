@@ -26,7 +26,7 @@ import { parseCompose, runCompose } from './compose.js';
 import { parseTrends, runTrends } from './trends.js';
 import { parseRanking, runRanking } from './rankings.js';
 import { packForTenant } from './industry/index.js';
-import { resolveContactCandidates } from './contactLookup.js';
+import { resolveNamedCustomers } from './contactLookup.js';
 import { brandMatches } from './analytics.js';
 import { fetchNotes, buildNotesAnswer } from './customerFile.js';
 // TEAM C: every answer below cites the rows it was computed from (records / recordsTotal / recordsKind / basis).
@@ -35,9 +35,10 @@ import { documentRecordsFor } from './citations/enrich.js';
 import { citeVisits, citeSearched, citeNotes, scopeUnitRecords, distinctVisitDocs } from './citations/history.js';
 import {
   TENANT_SQL, todayIso, humanDate, splitFuture, futureNote, fetchVisits, scopeDocumentIds, scopeFromCustomers, resolveAddressScope,
-  extractUnitDesignator, describeVisit, visitFact, answerEnvelope, isoDate, normalizeTypeId,
+  extractUnitDesignator, describeVisit, visitFact, answerEnvelope, isoDate, normalizeTypeId, explicitFutureYearInQuestion,
 } from './scope.js';
 import { correctTriggerWordTypos, normalizeQuestion } from './nlNormalize.js';
+import { parseCompoundQuestion } from './lookups/compound.js';
 
 const HISTORY_INTENTS = new Set(['last_service_date', 'last_service_tech', 'install_date', 'installer']);
 const NUM_WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6, ten: 10 };
@@ -149,6 +150,14 @@ export function classifyDeterministic(question, opts = {}) {
   const fast = classifyFastPath(q);
   if (fast && HISTORY_INTENTS.has(fast.intent) && !fast.subject.customerNumber && !fast.subject.identifier
     && (fast.subject.address || fast.subject.name)) {
+    // R21 (M1, L4 rubric g149/g153/h163): "who installed it and when for <address>" is a compound
+    // both-halves question that lookups/compound.js's runInstallerDate answers far more honestly
+    // (states BOTH parts, never conflates the installer with a later service visit's technician)
+    // than this file's own single-field 'installer' HISTORY_INTENT route ever could — bail out here
+    // (fastPathQuery.js's runFastPath has the identical bail-out for the same reason) so the
+    // question falls all the way through to docLookup.js's own dispatch to that file, instead of
+    // this file answering (and, critically, omitting the date half of) only the installer half.
+    if (parseCompoundQuestion(question)?.kind === 'installerDate') return null;
     const kind = { last_service_date: 'last-service', last_service_tech: 'last-tech', install_date: 'install-date', installer: 'installer' }[fast.intent];
     // "who was last out there" style tech questions: only when the question is really about the last visit.
     return {
@@ -168,7 +177,12 @@ async function resolveScope(db, intent) {
     if (!scope.customers.length && !scope.equipment.length) return null;
     return { scope, label: String(scope.customers[0]?.service_address ?? scope.equipment[0]?.service_address ?? intent.address).split(',')[0].trim() };
   }
-  const cands = await resolveContactCandidates(db, intent.name);
+  // R21 (M1, P0 — fp-4 cluster 5): never surface a DIFFERENT real customer's own service/install
+  // history just because their name is one edit away from what was typed — see
+  // resolveNamedCustomers' own doc comment (contactLookup.js). `declined` is threaded back through
+  // runDeterministic (below) as-is.
+  const { candidates: cands, declined } = await resolveNamedCustomers(db, intent.question, intent.name);
+  if (declined) return { declined };
   if (!cands.length || cands.length > 8) return null;
   const scope = await scopeFromCustomers(db, cands);
   const label = cands.length === 1 ? cands[0].customer_name || intent.name : `${intent.name} (${cands.length} customers)`;
@@ -193,11 +207,23 @@ function narrowByBrand(equipment, brand) {
 
 /* ------------------------------------------------------------------ handlers */
 
+// R21 (M1, P0 — fp-4 cluster 6, r21_blind4_clusters.json C8): a caller naming a manifestly future
+// YEAR ("visits in 2030") gets nothing back from splitFuture (there is no record dated then at
+// all — futureNote's own future-RECORD note never fires), so the honest "No X on file" reply below
+// used to say nothing about the year the caller actually asked about, reading as if the question had
+// been ignored. Appended only to the already-existing honest-zero branches (never the found-a-
+// result branches, which already state the real, correct data and are not the "silently ignored the
+// question" shape this fixes).
+function explicitFutureYearNote(question, today) {
+  const y = explicitFutureYearInQuestion(question, today);
+  return y ? ` You asked about ${y} — that's in the future; nothing on file could be dated then yet.` : '';
+}
+
 async function lastService(db, intent, ctx, today) {
   const ids = await scopeDocumentIds(db, ctx.scope);
   const { past, future } = splitFuture(await fetchVisits(db, ids), today);
   if (!past.length) {
-    return citeSearched(db, answerEnvelope({ text: `No service visits on file for ${ctx.label}.${futureNote(future, today)}`, facts: [] }), ids, { future, basis: `Searched ${ids.length} document${ids.length === 1 ? '' : 's'} linked to ${ctx.label} for a service date on or before today (by service date); none found.` });
+    return citeSearched(db, answerEnvelope({ text: `No service visits on file for ${ctx.label}.${futureNote(future, today)}${explicitFutureYearNote(intent.question, today)}`, facts: [] }), ids, { future, basis: `Searched ${ids.length} document${ids.length === 1 ? '' : 's'} linked to ${ctx.label} for a service date on or before today (by service date); none found.` });
   }
   const top = past[0];
   const same = past.filter((v) => v.date === top.date);
@@ -225,7 +251,7 @@ async function lastService(db, intent, ctx, today) {
 async function lastNVisits(db, intent, ctx, today) {
   const ids = await scopeDocumentIds(db, ctx.scope);
   const { past, future } = splitFuture(await fetchVisits(db, ids), today);
-  if (!past.length) return citeSearched(db, answerEnvelope({ text: `No service visits on file for ${ctx.label}.${futureNote(future, today)}`, facts: [] }), ids, { future, basis: `Searched ${ids.length} document${ids.length === 1 ? '' : 's'} linked to ${ctx.label} for a service date on or before today (by service date); none found.` });
+  if (!past.length) return citeSearched(db, answerEnvelope({ text: `No service visits on file for ${ctx.label}.${futureNote(future, today)}${explicitFutureYearNote(intent.question, today)}`, facts: [] }), ids, { future, basis: `Searched ${ids.length} document${ids.length === 1 ? '' : 's'} linked to ${ctx.label} for a service date on or before today (by service date); none found.` });
   const shown = past.slice(0, intent.n);
   const facts = shown.map((v, i) => visitFact(v, `Visit ${i + 1}`));
   const list = shown.map((v) => `${humanDate(v.date)} (${describeVisit(v)})`).join('; ');
@@ -246,7 +272,7 @@ async function installFacts(db, unitIds, keys) {
   return rows;
 }
 
-async function installDate(db, intent, ctx) {
+async function installDate(db, intent, ctx, today) {
   const units = narrowByBrand(ctx.scope.equipment, intent.brand);
   if (!units.length) return null;
   const rows = await installFacts(db, units.map((u) => u.id), ['installation_date', 'warranty_registered_date']);
@@ -267,20 +293,21 @@ async function installDate(db, intent, ctx) {
       const alt = rows.find((r) => r.entity_id === u.id && r.field_key === 'installation_date' && normalizeTypeId(r.document_type) !== 'warranty-registration');
       if (alt) { date = String(alt.value).slice(0, 10); src = alt; }
     }
-    // R15 (Team C, follow-up round): `date` alone is not enough to state as an answer — the
-    // equipment entity's own data.installation_date is only as trustworthy as the genuine
-    // per-document extraction that backs it (`src`). A unit whose data blob carries an
-    // installation_date with NOTHING behind it (no installation_date extraction anywhere for that
-    // unit — a genuine, verified gap in this corpus's own extraction data, not a matching bug: this
-    // round's investigation confirmed Canyon View Dental's Mitsubishi unit has zero
-    // installation_date extraction rows at all, only its own entity-data copy) never gets stated as
-    // a confident, cited-looking date — exactly the fabrication the offline exam's own oracle
-    // flags as wrong for a single-unit install-date lookup. R19 (I1): for a MULTI-unit customer,
-    // this used to mean the whole unit silently vanished from the answer with no mention at all —
-    // now it's named honestly instead (`found: false`, see below), same "state what's missing,
-    // never omit it" rule buildAddressFieldDecline/buildMultiUnitAddressAnswer already follow in
-    // fastPathQuery.js for this exact shape.
-    results.push({ unit: u, date, src, found: Boolean(date && src) });
+    // R21 (M1, L4 rubric g105/h140 — "install dates on file but omitted"): R15/R19 used to require
+    // a genuine per-document extraction (`src`) before a unit's own data.installation_date could be
+    // stated at all — reasoned as guarding against "fabricating" a citation for a date backed by
+    // nothing. But h140/g105's own oracle (a `set`/`rubric` comparison over
+    // entities.data->>'installation_date' directly, verified against scripts/golden/golden-export
+    // .json — Grace Community Church's Daikin/Mitsubishi units and Canyon View Dental's Mitsubishi
+    // unit each have a real, well-formed installation_date on the entity record with ZERO
+    // installation_date extraction rows anywhere) makes plain that a value genuinely ON FILE (the
+    // entity's own record, not invented) must be reported, not withheld — the entity record itself
+    // is a real, citable source (scopeUnitRecords already includes every one of these units in
+    // `records` below), never a fabrication. Citing a document field an extraction never produced
+    // would still be wrong; simply stating what the record itself carries, uncited to a document
+    // (`src` stays null, `sources: []` below), is the same honest "own-value fallback" fastPathQuery
+    // .js's unitFieldFact already uses for this identical situation.
+    results.push({ unit: u, date, src, found: Boolean(date) });
   }
   const found = results.filter((r) => r.found);
   if (found.length) {
@@ -298,15 +325,15 @@ async function installDate(db, intent, ctx) {
       records: [...scopeUnitRecords(results.map((r) => r.unit)), ...(srcIds.length ? await documentRecordsFor(db, srcIds) : [])],
       total: results.length + srcIds.length,
       basis: allFound
-        ? `Read the installation date recorded for ${found.length} unit${found.length === 1 ? '' : 's'} at ${ctx.label} and the document it came from; registration dates are not install dates.`
-        : `Read the installation date recorded for ${found.length} of ${results.length} units at ${ctx.label} and the document it came from (the rest have no installation-date extraction on file); registration dates are not install dates.`,
+        ? `Read the installation date recorded for ${found.length} unit${found.length === 1 ? '' : 's'} at ${ctx.label} (from the extraction or, absent one, the unit's own record); registration dates are not install dates.`
+        : `Read the installation date recorded for ${found.length} of ${results.length} units at ${ctx.label} (from the extraction or, absent one, the unit's own record — the rest have no installation date on file at all); registration dates are not install dates.`,
     });
   }
   // Honest zero: say what IS on file instead of inventing an install date.
   const reg = rows.find((r) => r.field_key === 'warranty_registered_date');
   const regNote = reg ? ` The warranty was registered on ${humanDate(reg.value)}, but that is a registration date, not an install date.` : '';
   return attachCitations(answerEnvelope({
-    text: `No install date is recorded for the ${units.map(brandModel)[0]} at ${ctx.label}.${regNote}`,
+    text: `No install date is recorded for the ${units.map(brandModel)[0]} at ${ctx.label}.${regNote}${explicitFutureYearNote(intent.question, today)}`,
     facts: [], sources: reg ? [{ documentId: reg.document_id, location: { field: 'warranty_registered_date' } }] : [],
   }), {
     records: [...scopeUnitRecords(units), ...(reg ? await documentRecordsFor(db, [reg.document_id]) : [])],
@@ -315,7 +342,7 @@ async function installDate(db, intent, ctx) {
   });
 }
 
-async function installer(db, intent, ctx) {
+async function installer(db, intent, ctx, today) {
   const units = narrowByBrand(ctx.scope.equipment, intent.brand);
   if (!units.length) return null;
   const rows = await installFacts(db, units.map((u) => u.id), ['installed_by']);
@@ -351,7 +378,7 @@ async function installer(db, intent, ctx) {
   const visits = ids.length ? (await fetchVisits(db, ids)).filter((v) => v.technician) : [];
   const techs = [...new Set(visits.map((v) => v.technician))];
   const onFile = techs.length ? ` Service visits at this address were done by ${techs.slice(0, 4).join(', ')}, but no document says who installed the unit.` : '';
-  return attachCitations(answerEnvelope({ text: `No installer is on file for the ${units.map(brandModel)[0]} at ${ctx.label}.${onFile}`, facts: [] }), {
+  return attachCitations(answerEnvelope({ text: `No installer is on file for the ${units.map(brandModel)[0]} at ${ctx.label}.${onFile}${explicitFutureYearNote(intent.question, today)}`, facts: [] }), {
     records: scopeUnitRecords(units), total: units.length, kind: 'searched',
     basis: `Checked ${units.length} unit${units.length === 1 ? '' : 's'} at ${ctx.label} for an installer; none is recorded${visits.length ? ` (${distinctVisitDocs(visits)} service visit${distinctVisitDocs(visits) === 1 ? '' : 's'} name technicians, but none says who installed)` : ''}.`,
   });
@@ -382,6 +409,7 @@ export async function runDeterministic(db, intent, { today } = {}) {
   if (intent.route !== 'history') return null;
 
   const ctx = await resolveScope(db, intent);
+  if (ctx?.declined) return ctx.declined;
   if (!ctx) return null;
   switch (intent.kind) {
     case 'last-service':
@@ -390,9 +418,9 @@ export async function runDeterministic(db, intent, { today } = {}) {
     case 'last-n-visits':
       return lastNVisits(db, intent, ctx, t);
     case 'install-date':
-      return installDate(db, intent, ctx);
+      return installDate(db, intent, ctx, t);
     case 'installer':
-      return installer(db, intent, ctx);
+      return installer(db, intent, ctx, t);
     case 'unit-notes': {
       const customers = ctx.scope.customers;
       if (!customers.length) return null;

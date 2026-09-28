@@ -12,6 +12,7 @@ import {
 } from "./_lib/billing.js";
 import { PLAN_LIMITS, planStateFor } from "./_lib/plan.js";
 import { getUsage, estimateCostUsd, getAsksThisMonth, resetsOnIso } from "./_lib/usage.js";
+import { limit as rateLimit } from "./_lib/rateLimit.js";
 
 /**
  * POST /api/billing?action=checkout|portal|webhook, GET/POST ?action=status
@@ -56,6 +57,7 @@ async function handleCheckout(req, res, auth) {
     return res.status(400).json({ error: "Unknown plan" });
   }
   if (hasShop(auth)) requireRole(auth, "admin");
+  if (!(await rateLimit(req, res, auth, "billing"))) return; // 429 already written
 
   const stripe = getStripe();
   const result = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (store) => {
@@ -94,6 +96,7 @@ async function handleCheckout(req, res, auth) {
 
 async function handlePortal(req, res, auth) {
   if (hasShop(auth)) requireRole(auth, "admin");
+  if (!(await rateLimit(req, res, auth, "billing"))) return; // 429 already written
   const stripe = getStripe();
   const result = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (store) => {
     const tenantRow = await getTenantBillingRow(store);

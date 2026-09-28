@@ -36,6 +36,10 @@ import { isInstallDateExtremeQuestion } from "./_lib/analytics/detPlan.js";
 // (isFinancialQuestion itself is now only called from classifyAll.js — see the router import below.)
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
 import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
+// Round 22 (S2, privacy): a fuzzy-typo correction pair (below) is a fragment of whatever a
+// technician actually typed — a customer surname, a street name — so it is hashed before it ever
+// reaches a route log, never printed raw. See api/_lib/privacy/redact.js's own module doc.
+import { hashForLog } from "./_lib/privacy/redact.js";
 import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
 import { attachSentenceCitationsSync } from "./_lib/citations/sentences.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
@@ -842,7 +846,14 @@ export default async function handler(req, res) {
       try {
         const { corrected, corrections } = correctTenantNameTypos(question, tenantVocab);
         if (corrections.length) {
-          console.log(JSON.stringify({ route: "ask", tenant_name_corrections: corrections }));
+          // Round 22 (S2, privacy): `corrections` used to log the raw {from,to} word pairs — often a
+          // customer surname or a mistyped tenant-vocab entry — straight into the route log. Only the
+          // count and a hash pair (for grep-correlating a repeated bad correction) leave the process now.
+          console.log(JSON.stringify({
+            route: "ask",
+            tenant_name_corrections: corrections.length,
+            tenant_name_correction_hashes: corrections.map((c) => ({ from: hashForLog(c.from), to: hashForLog(c.to) })),
+          }));
           question = corrected;
         }
       } catch (err) {
@@ -874,7 +885,13 @@ export default async function handler(req, res) {
         );
         const { corrected, corrections } = correctStreetTypos(question, streetVocab);
         if (corrections.length) {
-          console.log(JSON.stringify({ route: "ask", street_typo_corrections: corrections }));
+          // Round 22 (S2, privacy): same reasoning as tenant_name_corrections above — a street-name
+          // fragment is still part of a real customer's address; hash it, don't print it.
+          console.log(JSON.stringify({
+            route: "ask",
+            street_typo_corrections: corrections.length,
+            street_typo_correction_hashes: corrections.map((c) => ({ from: hashForLog(c.from), to: hashForLog(c.to) })),
+          }));
           question = corrected;
         }
       } catch (err) {
@@ -1407,7 +1424,7 @@ export default async function handler(req, res) {
         // logAction/insertAskMiss failure here is harmless and non-fatal.
         docData = await timer.time("doclookup", () =>
           withTenant(ctxArg, async (db) => {
-            const result = await withCitations(db, runDocLookup(db, question, { overlay })); // TEAM C
+            const result = await withCitations(db, runDocLookup(db, question, { overlay, today: todayResolved })); // TEAM C
             if (result) {
               const bkStart = Date.now();
               try {

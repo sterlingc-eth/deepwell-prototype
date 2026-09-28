@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<!-- Template prepared for DeepWell — review with counsel before relying on it -->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How DeepWell Technology isolates, encrypts, and controls access to your company's documents and account data — in plain language.">
+<meta property="og:title" content="Security &amp; Privacy — DeepWell Technology">
+<meta property="og:description" content="How DeepWell Technology isolates, encrypts, and controls access to your company's documents and account data — in plain language.">
+<meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="DeepWell Technology">
+<meta property="og:url" content="https://deepwelltechnology.com/security.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Security &amp; Privacy — DeepWell Technology">
+<meta name="twitter:description" content="How DeepWell Technology isolates, encrypts, and controls access to your company's documents and account data — in plain language.">
+<meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
+<link rel="canonical" href="https://deepwelltechnology.com/security.html">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0B1613">
+<title>Security &amp; Privacy — DeepWell Technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --well:#163C2C; --navy:#123D6B; --brass:#B98A4E; --ink:#0B1613;
+  --ground:#EEF2EE; --surface:#FFFFFF; --text:#0F1F19; --muted:#4F6259;
+  --faint:#8FA39A; --line:rgba(22,60,44,.18); --line-strong:rgba(22,60,44,.38);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1613; --surface:#10201A; --text:#E6EEE9; --muted:#A9BBB2;
+    --faint:#6E8579; --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0B1613; --surface:#10201A; --text:#E6EEE9;
+  --muted:#A9BBB2; --faint:#6E8579; --line:rgba(230,238,233,.14); --line-strong:rgba(230,238,233,.32);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.15;letter-spacing:-.01em}
+h1{font-size:clamp(1.9rem,4vw,2.6rem);margin:0 0 8px}
+h2{font-size:1.35rem;margin:40px 0 12px}
+p,li{color:var(--muted)}
+a{color:var(--brass);text-decoration:underline}
+.wrap{max-width:760px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-family:"Newsreader",serif;font-weight:600;font-size:1.2rem}
+.brand svg{width:28px;height:28px}
+.brand:hover{text-decoration:none}
+main{padding-block:clamp(32px,6vw,64px)}
+.updated{font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--faint);margin-bottom:32px}
+ul{padding-left:20px}
+li{margin-bottom:8px}
+table{width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse;margin:16px 0;font-size:.92rem}
+th,td{text-align:left;padding:10px 12px;border:1px solid var(--line);vertical-align:top;overflow-wrap:break-word}
+th{color:var(--text);font-weight:600}
+@media (max-width:480px){
+  table{font-size:.82rem}
+  th,td{padding:8px}
+}
+.callout{border:1px solid var(--line-strong);border-left:4px solid var(--brass);background:var(--surface);padding:16px 20px;margin:20px 0}
+footer{border-top:1px solid var(--line);padding-block:28px;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
+footer a{color:var(--muted)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--brass)" stroke-width="7"><circle cx="50" cy="50" r="40"/><circle cx="50" cy="50" r="26"/><circle cx="50" cy="50" r="12"/></g></svg>
+      DeepWell Technology
+    </a>
+    <a href="/">← Home</a>
+  </div>
+</nav>
+<main class="wrap">
+  <h1>Security &amp; Privacy</h1>
+  <div class="updated">Last reviewed: September 28, 2026</div>
+
+  <p>This page is the plain-language answer to the question every new customer asks: <em>can you see our data or files?</em> It describes the real, current controls behind DeepWell — how your documents are isolated, encrypted, and accessed — so you don't have to take our word for it without knowing why. For the legal version, see the <a href="/privacy.html">Privacy Policy</a> and <a href="/terms.html">Terms &amp; Conditions</a>.</p>
+
+  <h2>Your data is isolated per account</h2>
+  <p>Every document, customer record, and answer lives under your company's own account. The database enforces this at the row level for every single query — not just in application code that could have a bug in it — so one customer's records are never returned by a request made under another customer's account, even by mistake.</p>
+
+  <h2>Encryption</h2>
+  <p>Data is encrypted in transit (HTTPS/TLS) everywhere, including between DeepWell and the providers listed below. Document files and database records are encrypted at rest by those providers (Cloudflare and Neon) as a standard part of their storage.</p>
+
+  <h2>File access is private and short-lived</h2>
+  <p>Uploaded files are not public. Every time a document is viewed or downloaded, DeepWell issues a signed link scoped to that one file, for a short window of time, rather than a permanent public URL — so a leaked link can't be replayed indefinitely and a file can't be found by guessing a URL.</p>
+
+  <h2>Support access is yours to grant</h2>
+  <p>Our support team does not have standing access to your documents. When you want our help — troubleshooting an issue, for example — you grant temporary support access from your account settings, and you can revoke it at any time. Every grant, and everything accessed under it, is recorded in your account's activity log so there's a record of who looked at what, and when.</p>
+
+  <h2>Audit logs</h2>
+  <p>Account-level actions — uploads, edits, exports, and the support access above — are written to an activity log scoped to your account, so you can see what happened on your account and when.</p>
+
+  <h2>Your data, your control</h2>
+  <p>You can export your account's data or delete your account entirely, at any time, from account settings — you don't need to email us and wait. Deleting a document removes it from both the file vault and the search index within our normal processing cycle.</p>
+
+  <h2>AI processing and training</h2>
+  <p>To read documents and answer questions, DeepWell sends document content and query text to our AI providers (Anthropic, and Voyage AI for search) for processing. Under those providers' API terms, this content is not used to train their models, and it is not shared with any other customer. Answers include a citation back to the source document — but AI-generated answers can be wrong, so always check the citation; see the Terms &amp; Conditions for the full disclaimer.</p>
+
+  <h2>Subprocessors</h2>
+  <p>We use a small number of vetted service providers ("subprocessors") to run DeepWell. Each is limited to the role below and is bound by its own data protection terms. See the <a href="/privacy.html#subprocessors">Privacy Policy</a> for the same list in context.</p>
+  <table>
+    <colgroup><col style="width:26%"><col style="width:44%"><col style="width:30%"></colgroup>
+    <thead><tr><th>Provider</th><th>Purpose</th><th>Sees document content?</th></tr></thead>
+    <tbody>
+      <tr><td>Cloudflare (R2)</td><td>Storage of uploaded document files</td><td>Yes — encrypted file storage</td></tr>
+      <tr><td>Neon</td><td>Postgres database — account data and extracted facts</td><td>Yes — encrypted database storage</td></tr>
+      <tr><td>Clerk</td><td>Authentication and session management</td><td>No — account/session data only</td></tr>
+      <tr><td>Anthropic</td><td>AI processing — document reading, extraction, and Q&amp;A</td><td>Yes — to generate answers</td></tr>
+      <tr><td>Voyage AI</td><td>Search — document/query embeddings and result ranking</td><td>Yes — to power search</td></tr>
+      <tr><td>Inngest</td><td>Background job processing for document ingestion</td><td>No — job identifiers only, not file contents</td></tr>
+      <tr><td>Vercel</td><td>Website and application hosting; cookieless web analytics</td><td>Yes — hosting infrastructure</td></tr>
+      <tr><td>Stripe</td><td>Payment processing</td><td>No — billing data only</td></tr>
+      <tr><td>Resend</td><td>Transactional email — warranty digests and outreach messages sent on your behalf</td><td>No — recipient address and message text only, never document content</td></tr>
+      <tr><td>Sentry</td><td>Error monitoring (scrubbed — see above)</td><td>No — error type, stack trace, route, and a hashed tenant id only</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Reporting a security concern</h2>
+  <p>If you believe you've found a security issue, please tell us before telling anyone else: <a href="mailto:deepwellincorporated@gmail.com?subject=Security%20report">deepwellincorporated@gmail.com</a>. We'll acknowledge real reports and work with you on a fix.</p>
+  <p style="margin-top:24px;font-size:.9rem">DeepWell Inc. (DeepWell Technology) · Mesa, Arizona, USA</p>
+</main>
+<footer>
+  <div class="wrap">
+    <div>© 2026 DeepWell Technology</div>
+    <div><a href="/privacy.html">Privacy</a><a href="/security.html">Security</a><a href="/terms.html">Terms</a></div>
+  </div>
+</footer>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

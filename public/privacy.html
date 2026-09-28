@@ -65,6 +65,7 @@ th{color:var(--text);font-weight:600}
 .callout{border:1px solid var(--line-strong);border-left:4px solid var(--brass);background:var(--surface);padding:16px 20px;margin:20px 0}
 footer{border-top:1px solid var(--line);padding-block:28px;font-size:.84rem;color:var(--faint)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
 footer a{color:var(--muted)}
 :focus-visible{outline:2px solid var(--brass);outline-offset:3px}
 </style>
@@ -96,9 +97,9 @@ footer a{color:var(--muted)}
   <p>The work orders, invoices, warranty sheets, photos, and other records you upload are stored under your company's own account and are never pooled with another customer's data. We process the content of these documents so the product can extract facts (serials, dates, addresses, amounts) and answer your team's questions about them. You retain ownership of everything you upload — see the Terms &amp; Conditions for details.</p>
 
   <h2>AI processing</h2>
-  <p>To read and extract information from your documents, and to generate answers to questions, DeepWell sends document content and query text to Anthropic's AI models for processing. This is done to provide the service you asked for — it is not used to train Anthropic's or anyone else's models, and your documents are not shared with any other customer. Answers are generated from your records and include a citation back to the source document, but AI-generated answers can be wrong; see the Terms &amp; Conditions for the AI output disclaimer.</p>
+  <p>To read and extract information from your documents, and to generate answers to questions, DeepWell sends document content and query text to our AI providers — Anthropic, and Voyage AI for search — for processing. This is done to provide the service you asked for — it is not used to train these providers' models, and your documents are not shared with any other customer. Answers are generated from your records and include a citation back to the source document, but AI-generated answers can be wrong; see the Terms &amp; Conditions for the AI output disclaimer.</p>
 
-  <h2>Subprocessors</h2>
+  <h2 id="subprocessors">Subprocessors</h2>
   <p>We use a small number of vetted service providers ("subprocessors") to run DeepWell. Each is limited to the role below and is bound by its own data protection terms.</p>
   <table>
     <thead><tr><th>Subprocessor</th><th>Purpose</th><th>Data location</th></tr></thead>
@@ -107,8 +108,12 @@ footer a{color:var(--muted)}
       <tr><td>Neon</td><td>Postgres database — account data and extracted facts</td><td>United States</td></tr>
       <tr><td>Clerk</td><td>Authentication and session management</td><td>United States</td></tr>
       <tr><td>Anthropic</td><td>AI processing — document reading, extraction, and Q&amp;A</td><td>United States</td></tr>
+      <tr><td>Voyage AI</td><td>Search — document/query embeddings and result ranking</td><td>United States</td></tr>
+      <tr><td>Inngest</td><td>Background job processing for document ingestion (document identifiers only, not file contents)</td><td>United States</td></tr>
       <tr><td>Vercel</td><td>Website and application hosting; cookieless web analytics</td><td>United States</td></tr>
       <tr><td>Stripe</td><td>Payment processing</td><td>United States</td></tr>
+      <tr><td>Resend</td><td>Transactional email — warranty digests and outreach messages sent on your behalf (recipient address and message text, not document content)</td><td>United States</td></tr>
+      <tr><td>Sentry</td><td>Error monitoring, scrubbed of customer content before it leaves our servers (see Security &amp; Privacy)</td><td>United States</td></tr>
     </tbody>
   </table>
 
@@ -116,7 +121,7 @@ footer a{color:var(--muted)}
   <p>You can delete any document from your account at any time; deletion removes it from both the vault (Cloudflare R2) and the index (Neon Postgres) within our normal processing cycle. You can request full account deletion at any time by contacting us below — we will remove your company's account data and stored documents, except where we're required to retain limited records for legal or accounting reasons.</p>
 
   <h2>Security</h2>
-  <p>Data is encrypted in transit (HTTPS/TLS) and at rest. Document storage is scoped per account so one customer's files are never visible to another. Access to production data is limited to the people who need it to operate the service.</p>
+  <p>Data is encrypted in transit (HTTPS/TLS) and at rest. Document storage is scoped per account so one customer's files are never visible to another. Access to production data is limited to the people who need it to operate the service. For the full plain-language breakdown — isolation, file access, support access, and audit logging — see <a href="/security.html">Security &amp; Privacy</a>.</p>
 
   <h2>Cookies</h2>
   <div class="callout">
@@ -136,7 +141,7 @@ footer a{color:var(--muted)}
 <footer>
   <div class="wrap">
     <div>© 2026 DeepWell Technology</div>
-    <div><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></div>
+    <div><a href="/privacy.html">Privacy</a><a href="/security.html">Security</a><a href="/terms.html">Terms</a></div>
   </div>
 </footer>
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>

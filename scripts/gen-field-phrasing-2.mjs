@@ -154,8 +154,16 @@ function yesNoQ({ id, text, shape, sql, params = [], citationRequired = true }) 
   return { id, text, category: CATEGORY, shape, cmp: "yesno", oracle: { sql, params }, citationRequired };
 }
 
-function rubricQ({ id, text, shape, rubric }) {
-  return { id, text, category: CATEGORY, shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
+function rubricQ({ id, text, shape, rubric, keyFacts }) {
+  // R21 (L4 rubric grader, review fix): `keyFacts` is optional and additive only (see
+  // keyFactGrader.js's own doc comment) — appended last, after `oracle`, so every existing call
+  // with no keyFacts (the overwhelming majority) produces byte-identical output to before, and
+  // this stays in sync with test-docs/scorecard/generalization/field-phrasing-2.json's own
+  // checked-in keyFacts for h138/h139/h163/h166/h167 (verify-field-phrasing-2.mjs's own "not
+  // stale" check compares this generator's output against that file verbatim).
+  const q = { id, text, category: CATEGORY, shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
+  if (keyFacts) q.keyFacts = keyFacts;
+  return q;
 }
 
 /** "last time we were at <address>" — most recent service_date across every document linked to the single
@@ -633,8 +641,8 @@ questions.push({
   id: "h137", text: "list every serial number on file for sunrise valley elementary", category: CATEGORY, shape: "ambiguous_multiunit", cmp: "set",
   oracle: { sql: `SELECT e.data->>'serial_number' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Sunrise Valley Elementary%'`, params: [] },
 });
-questions.push(rubricQ({ id: "h138", text: "whats the refrigerant situation at copper sky dental", shape: "ambiguous_multiunit", rubric: "2 units at Copper Sky Dental (Trane/Carrier) - only the Trane has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one, and must not invent a value for the Carrier." }));
-questions.push(rubricQ({ id: "h139", text: "tonnage on the units at sonoran grill restaurant", shape: "ambiguous_multiunit", rubric: "2 units at Sonoran Grill Restaurant (Carrier/Goodman) - only the Carrier has a tonnage on file (3 ton); must not silently report just one unit as if it were the only one." }));
+questions.push(rubricQ({ id: "h138", text: "whats the refrigerant situation at copper sky dental", shape: "ambiguous_multiunit", rubric: "2 units at Copper Sky Dental (Trane/Carrier) - only the Trane has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one, and must not invent a value for the Carrier.", keyFacts: { required: [{ type: "text", value: "Trane" }, { type: "text", value: "R-410A" }, { type: "text", value: "Carrier" }, { type: "text", value: ["not on file", "no refrigerant"] }] } }));
+questions.push(rubricQ({ id: "h139", text: "tonnage on the units at sonoran grill restaurant", shape: "ambiguous_multiunit", rubric: "2 units at Sonoran Grill Restaurant (Carrier/Goodman) - only the Carrier has a tonnage on file (3 ton); must not silently report just one unit as if it were the only one.", keyFacts: { required: [{ type: "text", value: "Carrier" }, { type: "text", value: "Goodman" }, { type: "text", value: "3 ton" }, { type: "text", value: ["not on file", "no tonnage"] }] } }));
 questions.push({
   id: "h140", text: "when were the units at canyon view dental installed", category: CATEGORY, shape: "ambiguous_multiunit", cmp: "set",
   oracle: { sql: `SELECT e.data->>'installation_date' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Canyon View Dental%'`, params: [] },
@@ -682,15 +690,16 @@ UNION ALL SELECT data->>'phone' AS item FROM entities WHERE entity_type='custome
     params: [],
   },
 });
-questions.push(rubricQ({ id: "h163", text: "can you tell me who installed it and when for 803 e pecos rd", shape: "compound", rubric: "Installer (not on file - no document ever carries one) AND the install date for 803 E Pecos Rd (Joseph Norwood); both parts must be addressed, not just the date." }));
+questions.push(rubricQ({ id: "h163", text: "can you tell me who installed it and when for 803 e pecos rd", shape: "compound", rubric: "Installer (not on file - no document ever carries one) AND the install date for 803 E Pecos Rd (Joseph Norwood); both parts must be addressed, not just the date.", keyFacts: { required: [{ type: "text", value: ["not on file", "no installer"] }, { type: "date", value: "2016-12-04" }] } }));
 questions.push(rubricQ({ id: "h164", text: "quick q, is nakamura still under warranty and whos the tech that did the install", shape: "compound", rubric: "Warranty status AND installer for 'Nakamura' - the bare surname is ambiguous (3 distinct Nakamura customers) and installer is never on file; both parts need honest handling, not a single confident answer." }));
 questions.push(rubricQ({ id: "h165", text: "hows the mesquite table restaurant units looking, both of them still good?", shape: "compound", rubric: "Vague colloquial status check across 2 units at Mesquite Table Restaurant with no field named - must not silently report on only one." }));
 questions.push({
   id: "h166", text: "manufacturer and tonnage for the unit at 692 s higley rd", category: CATEGORY, shape: "compound", cmp: "rubric",
   rubric: "The unit at 692 S Higley Rd (Carol Rios, Trane) has a manufacturer on file (Trane) but no tonnage on file - both parts must be addressed, must not invent a tonnage.",
   oracle: { sql: "SELECT NULL::text AS ref WHERE false" },
+  keyFacts: { required: [{ type: "text", value: "Trane" }, { type: "text", value: "3 ton" }] },
 });
-questions.push(rubricQ({ id: "h167", text: "quick one - warranty status and last visit date for 3282 w camelback rd", shape: "compound", rubric: "Warranty status (expired - registered 2022, expires 2022-11-19) AND the most recent service_date for 3282 W Camelback Rd (Angela Ibarra); both parts must be addressed." }));
+questions.push(rubricQ({ id: "h167", text: "quick one - warranty status and last visit date for 3282 w camelback rd", shape: "compound", rubric: "Warranty status (expired - registered 2022, expires 2022-11-19) AND the most recent service_date for 3282 W Camelback Rd (Angela Ibarra); both parts must be addressed.", keyFacts: { required: [{ type: "date", value: "2022-11-19" }, { type: "text", value: "expired" }, { type: "date", value: "2022-04-25" }] } }));
 questions.push(rubricQ({ id: "h168", text: "wheres the trane unit installed in 2017, not the copper sky dental one", shape: "compound", rubric: "More than one Trane unit was installed in 2017 in this tenant besides Copper Sky Dental's, so 'the 2017 one' is itself still ambiguous even after that one exclusion - must not silently pick a single remaining unit without checking." }));
 
 /* ================================================================== T. conversational_followup_standalone (h169-h178) */

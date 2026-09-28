@@ -272,8 +272,20 @@ async function invoiceTotalFor(customerNumber, today = '2026-09-26') {
     }
   }
 
-  // Negative: a unit whose data.installation_date is populated with NOTHING backing it must
-  // decline honestly, never state that raw value as a fact. R16 (F1): the golden corpus now
+  // R21 (M1, L4 rubric g105/h140 — "install dates on file but omitted"): this negative USED TO
+  // require a full decline for an un-backed data.installation_date (R15/R19's own fabrication
+  // guard, reasoned as "no code change can cite a document that was never extracted without
+  // fabricating one"). g105 (Grace Community Church, 2 of 3 units' real dates on the entity record
+  // ONLY, zero installation_date extractions) and h140 (Canyon View Dental, identical shape) are
+  // both real, golden-data-verified cases where withholding that value is no longer the honest
+  // choice this round wants: the entity's own record is itself a real, citable source (this file's
+  // own answer below still carries the unit in `records`), so STATING it, uncited to a document
+  // (never inventing a document citation for it — that is the one thing this guard must still
+  // catch), is what "install dates on file but omitted" means. deterministicRouter.js's installDate()
+  // was updated accordingly (see its own doc comment) — this test now checks the narrower, still-real
+  // guarantee: the value is stated, but with NO fabricated `sources` on it.
+  //
+  // Original doc comment, still accurate for what this fixture builds: the golden corpus now
   // carries genuine installation_date extractions for most units (from each customer's first
   // "Install ..." invoice), so an un-backed unit at an otherwise-clean, uniquely-named,
   // single-unit customer is no longer reliably present in the corpus to go hunting for — so this
@@ -301,8 +313,8 @@ async function invoiceTotalFor(customerNumber, today = '2026-09-26') {
       await db.raw(`UPDATE entities SET data = jsonb_set(data, '{installation_date}', '"2015-06-01"') WHERE id = $1`, [target.id]);
     });
     const answer = await askDeterministic(`When was the ${target.customer_name} unit installed?`);
-    check('hook fix :: an un-backed installation_date is never stated as a fact', !answer?.facts?.length, JSON.stringify(answer));
-    check('hook fix :: declines with the honest "No install date is recorded" text', /no install date is recorded/i.test(answer?.text ?? ''), answer?.text);
+    check('hook fix :: an un-backed installation_date is still honestly STATED (R21: on-file, not withheld)', /June 1, 2015/.test(answer?.text ?? ''), answer?.text);
+    check('hook fix :: an un-backed installation_date is NEVER given a fabricated document citation', (answer?.facts ?? []).every((f) => !(f.sources ?? []).length), JSON.stringify(answer?.facts));
   }
 }
 

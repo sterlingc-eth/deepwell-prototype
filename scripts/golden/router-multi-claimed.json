@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-27T19:31:11.196Z",
-  "count": 520,
+  "generatedAt": "2026-09-28T03:05:03.305Z",
+  "count": 580,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -1567,6 +1567,17 @@
       "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
     },
     {
+      "id": "breadth-financials-051",
+      "category": "financials",
+      "text": "How much have we quoted compared with how much we've invoiced?",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
       "id": "breadth-financials-053",
       "category": "financials",
       "text": "How many maintenance agreements do we have with a fee on file?",
@@ -2949,7 +2960,8 @@
       "text": "Who's our busiest technician this year?",
       "claimants": [
         "relations",
-        "deterministic"
+        "deterministic",
+        "analytics"
       ],
       "winner": "relations",
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
@@ -4488,9 +4500,31 @@
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
+      "id": "h018",
+      "category": "field-phrasing-2",
+      "text": "phone number for the alvarez account",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
       "id": "h029",
       "category": "field-phrasing-2",
       "text": "whos the manufacturer on the unit at 581 West Thomas Road",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "h041",
+      "category": "field-phrasing-2",
+      "text": "is Amy Isaacson still under warranty",
       "claimants": [
         "fastPath",
         "contactLookup"
@@ -4504,7 +4538,19 @@
       "text": "is Rebecca Montoya's system still covered",
       "claimants": [
         "fastPath",
+        "contactLookup",
         "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "h043",
+      "category": "field-phrasing-2",
+      "text": "is Jessica Bennett still under warranty",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
@@ -4830,12 +4876,22 @@
       "category": "field-phrasing-2",
       "text": "can you tell me who installed it and when for 803 e pecos rd",
       "claimants": [
-        "deterministic",
         "fastPath",
         "docLookup"
       ],
-      "winner": "deterministic",
-      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "h167",
+      "category": "field-phrasing-2",
+      "text": "quick one - warranty status and last visit date for 3282 w camelback rd",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "h182",
@@ -5302,6 +5358,61 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
+      "id": "i105",
+      "category": "field-phrasing-3",
+      "text": "is Kevin Abernathy's system still under warranty",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i106",
+      "category": "field-phrasing-3",
+      "text": "is Nancy Alvarez still covered",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i107",
+      "category": "field-phrasing-3",
+      "text": "is Anthony Bennett's unit still under warranty",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i109",
+      "category": "field-phrasing-3",
+      "text": "is Susan Calloway's system still under warranty",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "i110",
+      "category": "field-phrasing-3",
+      "text": "is Brian Chavez still covered",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
       "id": "i120",
       "category": "field-phrasing-3",
       "text": "install date on the unit at one seven four north college avenue",
@@ -5344,6 +5455,501 @@
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j001",
+      "category": "field-phrasing-4",
+      "text": "how many Carrier units in Tempe have had a preventive maintenance visit since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j002",
+      "category": "field-phrasing-4",
+      "text": "how many Carrier systems in Mesa needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j003",
+      "category": "field-phrasing-4",
+      "text": "since the start of last year, how many Carrier units in Scottsdale needed a repair",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j004",
+      "category": "field-phrasing-4",
+      "text": "how many Lennox systems in Scottsdale have needed a repair since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j005",
+      "category": "field-phrasing-4",
+      "text": "how many Lennox units in Peoria have had a maintenance tune-up since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j006",
+      "category": "field-phrasing-4",
+      "text": "how many York units in Phoenix have needed a repair since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j007",
+      "category": "field-phrasing-4",
+      "text": "since the start of last year, how many York customers in Casa Grande got a preventive maintenance visit",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j008",
+      "category": "field-phrasing-4",
+      "text": "how many Goodman systems in Phoenix have needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j009",
+      "category": "field-phrasing-4",
+      "text": "how many Goodman units in Mesa have had a repair call since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j010",
+      "category": "field-phrasing-4",
+      "text": "how many Goodman systems in Tucson needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j011",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Goodman customers in Casa Grande got a preventive maintenance visit",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j012",
+      "category": "field-phrasing-4",
+      "text": "how many Rheem units in Chandler have needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j013",
+      "category": "field-phrasing-4",
+      "text": "how many Rheem systems in Mesa have had a repair call since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j014",
+      "category": "field-phrasing-4",
+      "text": "how many Rheem units in Gilbert needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j015",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Rheem customers in Tucson got a preventive maintenance visit",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j016",
+      "category": "field-phrasing-4",
+      "text": "how many Daikin systems in Tempe have needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j017",
+      "category": "field-phrasing-4",
+      "text": "how many Daikin units in Glendale have had a repair call since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j018",
+      "category": "field-phrasing-4",
+      "text": "how many Daikin systems in Tucson needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j019",
+      "category": "field-phrasing-4",
+      "text": "how many Mitsubishi units in Chandler have needed a repair since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j020",
+      "category": "field-phrasing-4",
+      "text": "how many Mitsubishi systems in Mesa have had a preventive maintenance visit since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j021",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Mitsubishi customers in Tucson needed a repair",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j022",
+      "category": "field-phrasing-4",
+      "text": "how many Mitsubishi units in Tucson have had a maintenance tune-up since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j023",
+      "category": "field-phrasing-4",
+      "text": "how many Trane systems in Phoenix have needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j024",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Trane customers in Phoenix got a preventive maintenance visit",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j025",
+      "category": "field-phrasing-4",
+      "text": "how many Carrier units in Phoenix have needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j026",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Carrier customers in Phoenix got a preventive maintenance visit",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j027",
+      "category": "field-phrasing-4",
+      "text": "how many Lennox systems in Phoenix needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j028",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Lennox customers in Phoenix got a maintenance tune-up",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j029",
+      "category": "field-phrasing-4",
+      "text": "how many York units in Phoenix have had a preventive maintenance visit since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j030",
+      "category": "field-phrasing-4",
+      "text": "how many York systems in Chandler needed a repair since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j031",
+      "category": "field-phrasing-4",
+      "text": "since the start of last year, how many Goodman customers in Phoenix got a maintenance tune-up",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j032",
+      "category": "field-phrasing-4",
+      "text": "how many Goodman units in Chandler have needed a repair since last January",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j033",
+      "category": "field-phrasing-4",
+      "text": "how many Rheem systems in Phoenix needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j034",
+      "category": "field-phrasing-4",
+      "text": "since last January, how many Rheem customers in Phoenix got a maintenance tune-up",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j035",
+      "category": "field-phrasing-4",
+      "text": "how many Daikin units in Phoenix have needed a repair since the start of last year",
+      "claimants": [
+        "decompose",
+        "analytics"
+      ],
+      "winner": "decompose",
+      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+    },
+    {
+      "id": "j058",
+      "category": "field-phrasing-4",
+      "text": "how many invoices have we sent out in the last 6 weeks",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "j059",
+      "category": "field-phrasing-4",
+      "text": "in the last 6 weeks, how many invoices have gone out",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "j064",
+      "category": "field-phrasing-4",
+      "text": "have we had more service visits this quarter than in the same quarter last year",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j067",
+      "category": "field-phrasing-4",
+      "text": "which Tucson customers don't have a permit on file",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j069",
+      "category": "field-phrasing-4",
+      "text": "how many customers don't have a maintenance agreement on file",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j125",
+      "category": "field-phrasing-4",
+      "text": "how much do we have sitting out there in unpaid invoices right now",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "j172",
+      "category": "field-phrasing-4",
+      "text": "which tech works Ronald Fenwick's account",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j176",
+      "category": "field-phrasing-4",
+      "text": "what's the phone number for Amanda Quinly",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j178",
+      "category": "field-phrasing-4",
+      "text": "what's the service address on file for Ashely Vance",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j180",
+      "category": "field-phrasing-4",
+      "text": "do we have a serial number on file for Nancey Zamora",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "g001",
@@ -5505,7 +6111,63 @@
       "text": "warranty status on Winslow",
       "claimants": [
         "fastPath",
+        "contactLookup",
         "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g036",
+      "category": "field-phrasing",
+      "text": "is Matthew Whitfield out of warranty yet",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g039",
+      "category": "field-phrasing",
+      "text": "warranty status on Ulloa",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g040",
+      "category": "field-phrasing",
+      "text": "is Robert Thornton out of warranty yet",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g043",
+      "category": "field-phrasing",
+      "text": "warranty status on Quintana",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g044",
+      "category": "field-phrasing",
+      "text": "is Richard Pruitt out of warranty yet",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
@@ -5768,12 +6430,11 @@
       "category": "field-phrasing",
       "text": "can u tell me who installed it and when for 1913 E University Dr",
       "claimants": [
-        "deterministic",
         "fastPath",
         "docLookup"
       ],
-      "winner": "deterministic",
-      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "g150",
@@ -5813,12 +6474,11 @@
       "category": "field-phrasing",
       "text": "can u tell me who installed it and when for 3245 S Higley Rd",
       "claimants": [
-        "deterministic",
         "fastPath",
         "docLookup"
       ],
-      "winner": "deterministic",
-      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "g154",

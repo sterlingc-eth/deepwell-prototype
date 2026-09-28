@@ -14,15 +14,19 @@
  *                                            cities} glossary for the calling tenant, rebuilt only when
  *                                            this tenant's own DATA has actually changed (see
  *                                            computeDataVersion below) — never a blind time-based guess.
- *   correctTenantNameTypos(question, vocab)  -> pure: fixes a misspelled technician/customer name
- *                                            immediately before "'s jobs/units/customers/visits" or right
- *                                            after "did"/"is"/"was" naming a person, the same
- *                                            edit-distance-<=1, unambiguous-winner-only rule
- *                                            streetVocab.js's correctStreetTypos already uses — conservative
- *                                            by construction: a token already spelled correctly (a real
- *                                            word, or already an exact name this tenant has on file) is
- *                                            never touched, and a token equidistant from two different
- *                                            names is left alone rather than guessed at.
+ *   correctTenantNameTypos(question, vocab)  -> pure: fixes a misspelled TECHNICIAN name immediately
+ *                                            before "'s jobs/units/customers/visits" or right after
+ *                                            "did"/"is"/"was" naming a person, the same edit-distance-<=1,
+ *                                            unambiguous-winner-only rule streetVocab.js's correctStreetTypos
+ *                                            already uses — conservative by construction: a token already
+ *                                            spelled correctly (a real word, or already an exact name this
+ *                                            tenant has on file) is never touched, and a token equidistant
+ *                                            between two different names is left alone rather than guessed
+ *                                            at. R21 (M1, P0): a CUSTOMER name near-miss is deliberately
+ *                                            never applied to the question text this way (only reported,
+ *                                            unapplied, in `corrections`) — see the function's own doc
+ *                                            comment for why, and contactLookup.js's resolveNamedCustomers
+ *                                            for where a customer near-miss is actually, safely handled.
  *   schemaLinkedVocabLines(question, vocab)  -> a short, question-relevant subset of this tenant's own
  *                                            brand/document-type/city vocabulary, formatted as extra
  *                                            system-prompt lines (see analytics.js's buildAnalyticsSystemPrompt)
@@ -241,12 +245,26 @@ function correctNamePhrase(phrase, glossary) {
 }
 
 /**
- * Pure: corrects a misspelled technician or customer name in `question`, restricted to a possessive
- * ("Vaga's jobs" -> "Vega's jobs") or question-starter-verb ("did Denny Ochoa have..." -> "did Danny
- * Ochoa have...") phrase — never a bare capitalized word anywhere else in the text, and never a name
- * ambiguous between two different people on file. Tries technicians first, then customers (a name that
- * matches neither glossary exactly or fuzzily passes through unchanged). Returns
+ * Pure: corrects a misspelled TECHNICIAN name in `question`, restricted to a possessive ("Denny
+ * Ochoa's jobs" -> "Danny Ochoa's jobs") or question-starter-verb ("did Denny Ochoa have..." ->
+ * "did Danny Ochoa have...") phrase — never a bare capitalized word anywhere else in the text, and
+ * never a name ambiguous between two different people on file. Returns
  * {corrected, corrections: [{from, to, category}]}.
+ *
+ * R21 (M1, P0 — fp-4 cluster 5, r21_blind4_clusters.json C7): a CUSTOMER name is deliberately NEVER
+ * rewritten into the question text here, unlike a technician name above — a one-letter-off,
+ * unambiguous "fix" ("Amanda Quinly" -> "Amanda Quinley") used to be applied silently, in place,
+ * BEFORE contactLookup.js/fastPathQuery.js/docLookup.js ever saw the original text; by the time any
+ * of them ran their own resolution the fuzzy guess already read as an EXACT, user-typed name, so
+ * their own "exact match answers with full confidence" branch fired for a completely different real
+ * customer's PII (phone/email/address). A technician-name correction carries no equivalent PII risk
+ * (it only ever changes which employee a job/count is attributed to, never whose private contact
+ * info gets returned) and stays exactly as it was. A candidate customer fix is still reported in
+ * `corrections` (marked `applied: false`) purely for observability/logging — nothing reads that flag
+ * to change behavior — while the question text itself is left byte-for-byte as typed, so
+ * contactLookup.js's own resolveNamedCustomers (its own fuzzy-tier tracking + "did you mean" +
+ * address/serial corroboration guard) is what actually decides whether a near-miss customer name
+ * resolves at all.
  */
 export function correctTenantNameTypos(question, vocab) {
   const q = String(question ?? '');
@@ -270,13 +288,14 @@ export function correctTenantNameTypos(question, vocab) {
     if (span.start < cursor) continue; // overlapping match from the second regex — first one wins
     const fixTech = vocab.technicians?.phrases?.length ? correctNamePhrase(span.phrase, vocab.technicians) : null;
     const fixCust = !fixTech && vocab.customers?.phrases?.length ? correctNamePhrase(span.phrase, vocab.customers) : null;
-    const fix = fixTech ?? fixCust;
     out += q.slice(cursor, span.start);
-    if (fix) {
-      out += fix;
-      corrections.push({ from: span.phrase, to: fix, category: fixTech ? 'technician' : 'customer' });
+    if (fixTech) {
+      out += fixTech;
+      corrections.push({ from: span.phrase, to: fixTech, category: 'technician' });
     } else {
+      // R21 (M1, P0): never rewritten — see this function's own doc comment above.
       out += span.phrase;
+      if (fixCust) corrections.push({ from: span.phrase, to: fixCust, category: 'customer', applied: false });
     }
     cursor = span.end;
   }

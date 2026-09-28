@@ -27,7 +27,7 @@ import { mergeDocumentVia } from "./routes/customers.js";
 // TEAM C (citations everywhere): every branch below states what it searched / read.
 import { attachCitations, customerRecord, documentRecord } from "./citations/records.js";
 import { documentRecordsFor } from "./citations/enrich.js";
-import { resolveContactCandidates, resolveAddressCandidates, nameTokens } from "./contactLookup.js";
+import { resolveAddressCandidates, nameTokens, resolveNamedCustomers, resolveContactCandidatesDetailed, corroboratesCandidate } from "./contactLookup.js";
 // Team A (2026-09-24): address/name scopes that include EVERY customer and unit at an address (apartments), the same
 // document union the customer profile uses, and legacy-tolerant document-type matching.
 import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitDesignator, docTypeAliases, typeSql } from "./scope.js";
@@ -333,7 +333,13 @@ export function parseDocLookupQuestion(question, opts = {}) {
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const MAX_DOCS = 40;
 
-async function resolveCandidates(db, namePhrase, isAddress) {
+/**
+ * Returns `{ candidates, declined }` — `declined` non-null means the caller must return it as-is
+ * (see resolveNamedCustomers' own doc comment, contactLookup.js). The address branch never goes
+ * through the name-fuzzy guard at all (a house number + street name is never edit-distance
+ * matched — see resolveAddressCandidates), so it always comes back with `declined: null`.
+ */
+async function resolveCandidates(db, question, namePhrase, isAddress) {
   // Reviewer NO-GO (2026-09-22, live 100-question sample): this used to call
   // resolveStreetCandidates, which ILIKEs the WHOLE captured phrase —
   // correct for the street-ONLY shape it was built for ("the guy on
@@ -343,7 +349,10 @@ async function resolveCandidates(db, namePhrase, isAddress) {
   // that broke "322 N Greenfield Rd, Mesa, AZ 85201" even though that exact
   // customer exists). resolveAddressCandidates resolves on the house number
   // + street name alone instead, tolerant of everything after it.
-  return isAddress ? resolveAddressCandidates(db, namePhrase) : resolveContactCandidates(db, namePhrase);
+  if (isAddress) return { candidates: await resolveAddressCandidates(db, namePhrase), declined: null };
+  // R21 (M1, P0 — fp-4 cluster 5): a near-miss customer name must never resolve here with full
+  // confidence just because it's the only fuzzy match — see resolveNamedCustomers.
+  return resolveNamedCustomers(db, question, namePhrase);
 }
 
 /** Every document id reachable for a customer — same three paths ask.js's
@@ -425,7 +434,8 @@ export async function runDocLookup(db, question, opts = {}) {
     const names = [...new Set(customers.map((c) => c.customer_name).filter(Boolean))];
     if (names.length && names.length <= 3) subject += ` (${names.join(", ")})`;
   } else {
-    const candidates = await resolveCandidates(db, namePhrase, false);
+    const { candidates, declined } = await resolveCandidates(db, question, namePhrase, false);
+    if (declined) return declined;
     if (candidates.length === 0) {
       return attachCitations({
         kind: "answer", text: `I couldn't find a customer named ${titleCase(namePhrase)}.`,
@@ -590,8 +600,13 @@ export async function resolveHonestZeroContext(db, question) {
   if (nameMatch) {
     const phrase = nameMatch[1].trim();
     if (nameTokens(phrase).length && !AGGREGATE_WORD_RE.test(phrase)) {
-      const rows = await resolveContactCandidates(db, phrase);
-      if (rows.length === 1) {
+      const { rows, tier } = await resolveContactCandidatesDetailed(db, phrase);
+      // R21 (M1, P0 — fp-4 cluster 5): never name a DIFFERENT real customer here just because
+      // their name is one edit away from what was typed — see resolveNamedCustomers' own doc
+      // comment (contactLookup.js). No corroboration to check against for this phrasing-only
+      // fallback context, so a fuzzy-only match simply contributes no name/address at all —
+      // buildHonestZeroText's own generic "that" wording still answers honestly either way.
+      if (rows.length === 1 && (tier !== "fuzzy" || corroboratesCandidate(raw, rows[0]))) {
         return { name: rows[0].customer_name || phrase, address: rows[0].service_address || null, topic: topicWords(raw, phrase), row: rows[0] /* TEAM C */ };
       }
     }

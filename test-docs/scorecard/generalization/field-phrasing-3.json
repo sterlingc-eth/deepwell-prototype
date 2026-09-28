@@ -2934,6 +2934,21 @@
       "rubric": "Cactus Rose Restaurant has 2 units on file - both parts of the answer must be addressed (whichever has a refrigerant on file and whichever doesn't), never silently reporting on just one unit as if it were the only one.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": "R-410A"
+          },
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no refrigerant"
+            ]
+          }
+        ]
       }
     },
     {

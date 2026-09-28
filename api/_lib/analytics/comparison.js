@@ -58,6 +58,31 @@ function detectWarrantyRegisteredComparison(q) {
   return null;
 }
 
+/**
+ * R21 M2 (deferred list, i095, "do most of our warranty registrations happen within 30 days of the
+ * install"): a MAJORITY phrasing — no "than" at all, just "do most (of our) ... X" — but the same
+ * "one boolean-ish dimension, split into its two complementary sides" shape
+ * detectWarrantyRegisteredComparison just above already answers for registered-vs-unregistered; this
+ * is the day-threshold cousin (leftFilter/rightFilter partition every non-null
+ * warrantyRegistrationDays value exactly once — lte N vs gt N — so "most" is simply leftCount >
+ * rightCount, same yes/no rule runCountComparison already applies to every other comparison here).
+ * Checked before the "than"-split below since this phrasing never contains "than".
+ */
+const WARRANTY_REG_DAYS_MAJORITY_RE =
+  /\bmost\b[\s\S]{0,40}\bwarranty\s+registrations?\b[\s\S]{0,25}\bwithin\s+(\d{1,3})\s*days?\s+of\s+(?:the\s+)?install/i;
+
+function detectWarrantyRegDaysMajority(q) {
+  const m = WARRANTY_REG_DAYS_MAJORITY_RE.exec(q);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return {
+    entity: 'equipment',
+    leftFilter: { field: 'warrantyRegistrationDays', op: 'lte', value: n },
+    rightFilter: { field: 'warrantyRegistrationDays', op: 'gt', value: n },
+    leftLabel: `registrations within ${n} days of install`, rightLabel: `registrations more than ${n} days after install`,
+  };
+}
+
 /** brand vs brand ("do we have more Mitsubishi units installed than Trane", "is Daikin more common
  *  than Goodman in our records") — equipment counted by manufacturer. */
 function detectBrandCountComparison(left, right) {
@@ -120,6 +145,8 @@ export function detectCountComparison(question, today) {
   if (!q || !YESNO_LEAD_RE.test(q)) return null;
   const warrantyReg = detectWarrantyRegisteredComparison(q);
   if (warrantyReg) return warrantyReg;
+  const warrantyRegDaysMajority = detectWarrantyRegDaysMajority(q);
+  if (warrantyRegDaysMajority) return warrantyRegDaysMajority;
   const idx = q.search(THAN_RE);
   if (idx < 0) return null;
   const left = q.slice(0, idx);

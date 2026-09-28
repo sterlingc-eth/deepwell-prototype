@@ -55,6 +55,11 @@ export const REAL_TABLES = Object.freeze([
   "donovan_provider_status", // M3-config/48-donovan-provider-status.sql (R14: provider-outage detection)
   "donovan_promoted_tests", // M3-config/56-donovan-promoted-tests.sql (R17: misses -> permanent exam)
   "tenant_insights_cache", // M3-config/55-insights-cache.sql (R17: proactive insights cache)
+  // M3-config/58-support-access.sql (R22, S2: support-access grants + staff access log) — these two
+  // are ESPECIALLY important to keep denied: they hold who granted/accessed what, not customer
+  // content, but the Donovan agent's generic SQL tool still has no legitimate reason to ever read
+  // them directly (api/_lib/privacy/supportAccess.js's own typed functions are the only sanctioned path).
+  "support_access_grants", "staff_access_log",
 ]);
 
 const DENY_TOKENS = new Set([

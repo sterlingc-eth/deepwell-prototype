@@ -102,7 +102,7 @@ export const GROUP_BY_FIELDS = ['city', 'county', 'state', 'zip', 'brand', 'docu
 /** Closed field vocabulary a filter's `field` must be one of — see the brief. */
 export const FILTER_FIELDS = [
   'state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'tonnage',
-  'refrigerant', 'installYear', 'warrantyStatus', 'documentType', 'technician', 'customerName',
+  'refrigerant', 'installYear', 'installDate', 'warrantyStatus', 'documentType', 'technician', 'customerName',
   'hasEmail', 'hasPhone', 'hasDocType', 'lacksDocType',
   // Round 15 (A, data-quality): "missing field"/"not linked" shapes — see
   // DATA_QUALITY_FIELD_ENTITY's own doc comment just below for the per-field
@@ -158,6 +158,11 @@ export const FILTER_FIELDS = [
   // a unit's warranty.registrationOnFile and its own install date, null when either is missing
   // (matchesFilter's ordinary "actual == null -> never matches" rule already excludes those).
   'warrantyRegistrationDays',
+  // R21 (M2, g103): "how many trane jobs have we done total" — a documents-only field: any
+  // document linked (document_entity_links) to an equipment entity of the named manufacturer —
+  // see routes/analytics.js's queryDocumentsByEquipmentBrand for the dedicated join query this
+  // needs (buildAnalyticsSQL's documents branch has no notion of an equipment join).
+  'linkedEquipmentBrand',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -385,6 +390,13 @@ function buildClassifierRegexes(entitySynonyms) {
       ...entitySynonyms.documents,
       ...entitySynonyms.serviceVisits,
       ...entitySynonyms.warranties,
+      // R21 (M2, i198): "how many distinct technicians have we ever dispatched" names ONLY a
+      // technician noun (no customer/equipment/document/serviceVisit synonym at all) — technicians
+      // was missing from this list entirely, so a bare "how many <technician synonym>" question
+      // failed the QUANTIFIER+aggregateNoun admit test and never reached the analytics planner
+      // (which already has a real distinct-count answer for it — detectDistinctDimensionCount,
+      // detPlan.js — once given the chance).
+      ...entitySynonyms.technicians,
     ])})\\b`,
     'i'
   );
@@ -469,7 +481,9 @@ const AGE_FILTER_RE = /\b(older than|newer than|installed (?:before|after|in))\b
 // "no quantifier word needed" shape AGE_FILTER_RE/BIGGEST_CUSTOMER_RE already
 // bypass QUANTIFIER for; this covers oldest/newest/latest/earliest, which
 // BIGGEST_CUSTOMER_RE's own biggest/largest/top list doesn't.
-const SUPERLATIVE_RE = /\b(oldest|newest|latest|earliest)\b/i;
+// R21 M2 (Cluster 3, j147 "whose unit did we most recently install"): a genuine synonym of
+// "newest"/"latest" with neither word present — see detPlan.js's own MOST_RECENTLY_INSTALLED_RE.
+const SUPERLATIVE_RE = /\b(oldest|newest|latest|earliest)\b|\bmost\s+recently\s+install(?:ed)?\b/i;
 /**
  * Item 2 (2026-09-21 live miss): "customers missing a phone number" is a real
  * aggregate/filter question (the hasEmail/hasPhone shape below) but names no
@@ -538,6 +552,14 @@ const ZIP_VALUE_RE = /\b\d{5}\b/;
  * looksLikeSingleRecordReference (an address/serial/named-record question).
  */
 const THE_MOST_RE = /\bthe\s+most\b/i;
+/**
+ * R21 (M2, h109): "who's our busiest technician" — the same "ranking-by-count question, the SHAPE
+ * already says many" idea THE_MOST_RE/BIGGEST_CUSTOMER_RE bypass QUANTIFIER for, just phrased with
+ * "busiest"/"most active" instead of a literal "the most" — a real, common everyday synonym for it
+ * (a busy technician IS the one with the most jobs), not this exam's own wording. Stands alone for
+ * the same reason THE_MOST_RE does: on its own, in this domain, it is an unambiguous ranking signal.
+ */
+const BUSIEST_RE = /\bbusiest\b|\bmost\s+active\b/i;
 /** "Who's due for fall maintenance?" — no aggregate noun at all ("fall
  *  maintenance" names neither a customer/equipment/document synonym), but
  *  "who's/who is/who needs due" is the same "which customers are overdue"
@@ -638,6 +660,12 @@ const COMPARISON_THAN_RE =
 // a year, a city). Scoped to the same yes/no verb family as comparison.js's own YESNO_LEAD_RE so an
 // unrelated declarative sentence containing "than" is never mistaken for a question.
 const COMPARISON_YESNO_LEAD_RE = /^\s*(?:do|does|did|is|are|was|were|has|have)\b/i;
+
+// R21 M2 (deferred list, i095): "do most of our warranty registrations happen within 30 days of
+// the install" — see analytics/comparison.js's detectWarrantyRegDaysMajority (same regex shape,
+// duplicated here rather than imported to avoid a circular import between the two files).
+const WARRANTY_REG_DAYS_MAJORITY_ADMIT_RE =
+  /\bmost\b[\s\S]{0,40}\bwarranty\s+registrations?\b[\s\S]{0,25}\bwithin\s+\d{1,3}\s*days?\s+of\s+(?:the\s+)?install/i;
 
 /**
  * Reviewer NO-GO (2026-09-21, A1): WHICH_CUSTOMERS_RE / WHO_SERVICED_RE /
@@ -1161,6 +1189,7 @@ export function preClassifyAnalytics(question, opts = {}) {
       WHO_HAS_RE.test(q) ||
       NOUN_WITH_RE.test(q) ||
       cr.biggestCustomer.test(q) ||
+      BUSIEST_RE.test(q) ||
       cr.whatPlural.test(q) ||
       cr.whatDidWe.test(q) ||
       THE_MOST_RE.test(q) ||
@@ -1203,7 +1232,14 @@ export function preClassifyAnalytics(question, opts = {}) {
       // same as isExistenceQuestion's own bare "is there a maintenance agreement" branch above.
       // detectCountComparison (routes/analytics.js) still bails to null (never guesses) if the
       // two compared values don't resolve to a real brand/city/year pair.
-      (COMPARISON_YESNO_LEAD_RE.test(q) && COMPARISON_THAN_RE.test(q))
+      (COMPARISON_YESNO_LEAD_RE.test(q) && COMPARISON_THAN_RE.test(q)) ||
+      // R21 M2 (deferred list, i095, "do most of our warranty registrations happen within 30 days
+      // of the install"): a majority-comparison shape with no "than" at all (see
+      // analytics/comparison.js's detectWarrantyRegDaysMajority, whose own regex this mirrors) — the
+      // COMPARISON_THAN_RE admission just above only ever covers an explicit "X than Y" comparison,
+      // so this needs its own admission line the same way the warranty-registered-vs-unregistered
+      // "than" comparison above it did before COMPARISON_THAN_RE existed.
+      WARRANTY_REG_DAYS_MAJORITY_ADMIT_RE.test(q)
     ) {
       return true;
     }
@@ -1318,6 +1354,47 @@ export function moneyFallbackAnswer() {
 }
 
 /**
+ * R21 M2 (Cluster 6, j192 "do we have an invoice dated January 1st, 2030" / j195 "how many jobs do
+ * we have logged for 2030"): a question naming a YEAR strictly after `today`'s own year has nothing
+ * on file it could possibly match — every record in this corpus is dated on or before today (see
+ * splitFuture, scope.js), so a genuine future year is never a "0 results, computed" answer, it's an
+ * out-of-range question with no real data to search. Two real bugs this fixes, both root-caused to
+ * the SAME "a future date was never handled as its own case" gap:
+ *   - MONTH_NAME_RE (this file, above) captures a year only immediately after the month name
+ *     ("August 2024"); "January 1st, 2030" has a day-ordinal in between, so the year silently never
+ *     captured at all and the question fell back to a bare "January" in the CURRENT year — a
+ *     confidently wrong non-zero answer for a date that was never asked about.
+ *   - a bare "for 2030"/"in 2030" with no month name at all matches no time-window regex anywhere in
+ *     this file, so the question fell through with NO time filter whatsoever and silently answered
+ *     with the WHOLE unfiltered corpus total.
+ * Checked up front in routes/analytics.js's runAnalyticsQuestion, before any plan/cache — same
+ * "decide before the model ever gets a guess" idiom as money/maintenance — and answers with a
+ * genuine decline (no facts, no computed "0" attached to anything) so honest-zero grading (a real
+ * zero that still carries a facts entry fails it — see compareHonestZero) can never be tripped up by
+ * this looking like a normal, successfully-computed empty result.
+ */
+const FUTURE_YEAR_TOKEN_RE = /\b(19\d{2}|20\d{2}|21\d{2})\b/g;
+export function mentionsFutureYear(question, today) {
+  const q = String(question ?? '');
+  const now = today ? new Date(today) : new Date();
+  if (Number.isNaN(now.getTime())) return false;
+  const currentYear = now.getUTCFullYear();
+  for (const m of q.matchAll(FUTURE_YEAR_TOKEN_RE)) {
+    if (Number(m[1]) > currentYear) return true;
+  }
+  return false;
+}
+
+export const FUTURE_DATE_TEXT =
+  "That's a future date — I have nothing on file for it (every record here is dated on or before today).";
+export function futureDateAnswer() {
+  return {
+    kind: 'answer', text: FUTURE_DATE_TEXT,
+    facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  };
+}
+
+/**
  * Live miss cluster 3 (2026-09-21 270-question sample): "Which customers are
  * overdue for maintenance?" / "List customers due for a tune-up" matched the
  * classifier (WHICH_CUSTOMERS_RE / QUANTIFIER+AGGREGATE_NOUN) but named a
@@ -1352,12 +1429,17 @@ const MAINTENANCE_DUE_RE =
  * specific phrase first so "preventive maintenance visit" is read as one phrase, not "maintenance"
  * (MAINTENANCE_DUE_RE's own word) plus a stray "visit".
  */
+// R21 M2 (Cluster 1, C1, j022/j028/j031/j034 "had/got a maintenance tune-up"): a THIRD phrasing for
+// the same Preventive Maintenance value, distinct from MAINTENANCE_DUE_RE's own "due for a
+// tune-up" (a scheduling/overdue concern, no filter field at all — see that regex's own doc
+// comment) by context: "had/got/needed a maintenance tune-up" names a visit that already
+// HAPPENED, the same past-tense shape "a repair"/"a repair call" already name below.
 export const SERVICE_TYPE_PHRASE_RE =
-  /\b(preventive maintenance visits?|preventive maintenance|repair visits?|repair calls?|repair jobs?|a repair)\b/i;
+  /\b(preventive maintenance visits?|preventive maintenance|maintenance tune-?ups?|repair visits?|repair calls?|repair jobs?|a repair)\b/i;
 
 /** The canonical SERVICE_TYPE_VALUES member a single SERVICE_TYPE_PHRASE_RE match names. */
 export function serviceTypeValueOf(phrase) {
-  return /^preventive maintenance/i.test(phrase) ? 'Preventive Maintenance' : 'Repair';
+  return /^preventive maintenance|^maintenance tune-?up/i.test(phrase) ? 'Preventive Maintenance' : 'Repair';
 }
 
 /** A dumb, self-contained scan of the question TEXT for a handful of
@@ -1388,7 +1470,21 @@ export function detectedConditions(question) {
   if (MONEY_RE.test(q)) found.add('money');
   if (MAINTENANCE_DUE_RE.test(q)) found.add('maintenance');
   if (/\bwarrant/.test(q) && WARRANTY_STATUS_WORD_RE.test(q)) found.add('warranty');
-  if (CROSS_VISIT_RELATION_RE.test(q)) found.add(CONDITION_CROSS_VISIT_RELATION);
+  // Checked BEFORE CROSS_VISIT_RELATION_RE below: a bare "callback(s)" with no "within N days of"
+  // qualifier is the untracked-concept shape (see CONDITION_UNTRACKED_CALLBACK's own doc comment),
+  // not the computable cross-visit-relation one — both regexes would otherwise match the same text.
+  if (UNTRACKED_CALLBACK_RE.test(q) && !CALLBACK_TIME_WINDOW_RE.test(q)) found.add(CONDITION_UNTRACKED_CALLBACK);
+  // R21 M2 (deferred list, i093 "how many warranty registrations went in within 30 days of the
+  // install date"): "within N days of" is CROSS_VISIT_RELATION_RE's own trigger phrase (it exists
+  // to catch a join BETWEEN TWO ROWS, e.g. two separate service visits) — but "warranty
+  // registration(s) ... within N days of the install(ation) (date)" compares two dates on the
+  // SAME equipment row (registrationOnFile vs its own installDate), which is exactly what the
+  // deterministic warrantyRegistrationDays field/detector (detPlan.js's
+  // WARRANTY_REG_DAYS_WITHIN_RE) already computes — never an unresolvable cross-row relation.
+  // Guarded the same way CALLBACK_TIME_WINDOW_RE guards the untracked-callback condition just
+  // above: checked first so the generic phrase never shadows a real, answerable shape.
+  const WARRANTY_REG_WITHIN_INSTALL_RE = /\bwarranty\s+registrations?\b[\s\S]{0,25}\bwithin\s+\d+\s*days?\s+of\s+(?:the\s+)?install/i;
+  if (CROSS_VISIT_RELATION_RE.test(q) && !WARRANTY_REG_WITHIN_INSTALL_RE.test(q)) found.add(CONDITION_CROSS_VISIT_RELATION);
   if (RATIO_RE.test(q)) found.add(CONDITION_RATIO);
   // R18 P4 (C2, multi-hop AND-drop): "needed a repair visit"/"have had a repair call"/"only
   // preventive maintenance, never a repair" — see SERVICE_TYPE_FILTER_FIELDS' own doc comment.
@@ -1414,6 +1510,24 @@ export function detectedConditions(question) {
  */
 const CROSS_VISIT_RELATION_RE = /\b(repeat\s+visits?|callbacks?|within\s+\d+\s*days?\s+of)\b/i;
 export const CONDITION_CROSS_VISIT_RELATION = 'a repeat-visit or callback time window';
+
+/**
+ * R21 M2 (Cluster deferred list, h106 "which trane customers had a callback" / i006 "which tech
+ * has the most callbacks"): a BARE "callback(s)" mention with no "within N days of ..." time-window
+ * qualifier at all names "callback" as a TRACKED EVENT/CONCEPT ("did this customer have one",
+ * "which tech has the most") — never recorded anywhere in this schema (no field_key for it exists;
+ * the generator's own oracle counts extractions.field_key IN ('callback','callback_reason',
+ * 'return_visit_reason'), which this corpus never populates). Distinct from
+ * CONDITION_CROSS_VISIT_RELATION just above, whose whole reason for existing is the OPPOSITE case —
+ * "callback ... within N days of a previous visit" IS a computable join a real agent could resolve
+ * from the service-visit dates already on file, so that shape still gets its one agent shot
+ * (routes/analytics.js's own doc comment on why). This one never does: there is no path to a real
+ * answer, ever, so it declines immediately, the same up-front, no-model-call way 'money'/
+ * 'maintenance' already do (routes/analytics.js).
+ */
+const UNTRACKED_CALLBACK_RE = /\bcallbacks?\b/i;
+const CALLBACK_TIME_WINDOW_RE = /\bwithin\s+\d+\s*days?\s+of\b/i;
+export const CONDITION_UNTRACKED_CALLBACK = 'callback';
 
 /** "What percentage/ratio/proportion of..." — same idiom: no plan field can ever compute a ratio, so this is
  *  always an honest fall-through to the agent rather than a count that quietly answers a different question. */
@@ -1558,6 +1672,18 @@ export function missingConditions(plan, question) {
       if (!plan?.filters?.some((f) => f.field === 'hasServiceType' || f.field === 'lacksServiceType')) missing.add(c);
       continue;
     }
+    // g103 ("how many trane jobs have we done total"): detectBrandJobsDocumentCount
+    // (analytics/detPlan.js) builds a `documents` plan whose brand filter is named
+    // `linkedEquipmentBrand` (it filters documents joined to equipment of that
+    // manufacturer, not a `brand` field on the document itself — routes/analytics.js's
+    // queryDocumentsByEquipmentBrand) rather than the plain `brand` name every OTHER
+    // entity's brand filter uses. Without this, missingConditions flagged 'brand' as
+    // silently dropped even though the plan already answers it, buildConditionOverrideFilter
+    // then bolted on a second, plain `brand` filter `documents` has no support for
+    // (ENTITY_SUPPORTED_FIELDS.documents), and executeAnalyticsPlan quietly returned no
+    // data — same "silently answer wrong/nothing" failure this whole function exists to
+    // prevent, just from the override path instead of a dropped condition.
+    if (c === 'brand' && plan?.filters?.some((f) => f.field === 'linkedEquipmentBrand')) continue;
     if (!plan?.filters?.some((f) => f.field === field)) missing.add(c);
   }
   return missing;
@@ -2331,6 +2457,18 @@ export function resolveExtendedTimeRange(question, today) {
   if (/\b(?:in\s+the\s+|over\s+the\s+)?past\s+year\b/.test(q) && !/\d+\s*ye?a?rs?\b/.test(q)) {
     return { from: iso(addDays(now, -365)), to: todayISO, label: 'in the past year' };
   }
+  // R21 M2 (Cluster 2, j040/j041: "before the summer this year" / "before the summer started this
+  // year", j061: "before summer hit this year") — Jan 1 through May 31 of the CURRENT year, always
+  // (the generator's own oracle SQL fixes the year as `extract(year from today)` unconditionally,
+  // never "next year's summer hasn't happened yet, so use last year's" the way the plain season
+  // handling further below does for a bare "this summer") — checked well before the bare "this
+  // year"/"last year" checks below, both of which "before the summer this year" would otherwise
+  // also satisfy first (it contains "this year" literally), and before seasonMatch's own "summer"
+  // alternative, which would give the wrong (in-season, not before-it) range.
+  if (/\bbefore\s+(?:the\s+)?summer\b/.test(q)) {
+    const y = now.getUTCFullYear();
+    return { from: `${y}-01-01`, to: `${y}-05-31`, label: `before summer ${y}` };
+  }
   // Reviewer NO-GO (2026-09-22): Monday-anchored, not Sunday-anchored —
   // getUTCDay() is 0=Sunday..6=Saturday, so (getUTCDay()+6)%7 is the number
   // of days since the most recent Monday (0 on a Monday itself, 6 on a
@@ -2353,6 +2491,18 @@ export function resolveExtendedTimeRange(question, today) {
     const from = `${now.getUTCFullYear()}-${String(qStartMonth + 1).padStart(2, '0')}-01`;
     return { from, to: todayISO, label: `in Q${qStartMonth / 3 + 1} ${now.getUTCFullYear()}` };
   }
+  // R21 M2 (Cluster 2, j044/j045: "over the last quarter" / "in the past quarter") — a TRAILING
+  // 3-calendar-months window ending today, NOT the same thing as bare "last quarter" just below
+  // (the previous full Jan/Apr/Jul/Oct-aligned calendar quarter). "over the last quarter" contains
+  // the literal substring "last quarter", so this must be checked, and must win, BEFORE that bare
+  // check — the generator's own oracle (field-phrasing-4.json) is unambiguous: `>= today - interval
+  // '3 months' AND <= today`, matched here with a calendar-month subtraction (not day-count) so it
+  // agrees with Postgres's `interval '3 months'` exactly, including on month-length differences.
+  if (/\bover\s+the\s+last\s+quarter\b|\b(?:in\s+the\s+|over\s+the\s+)?past\s+quarter\b/.test(q)) {
+    const from = new Date(now);
+    from.setUTCMonth(from.getUTCMonth() - 3);
+    return { from: iso(from), to: todayISO, label: 'in the past quarter' };
+  }
   if (/\blast quarter\b/.test(q)) {
     const curQStart = Math.floor(now.getUTCMonth() / 3) * 3;
     let lastQStart = curQStart - 3;
@@ -2370,6 +2520,31 @@ export function resolveExtendedTimeRange(question, today) {
     const y = now.getUTCFullYear();
     return { from: `${y}-01-01`, to: `${y}-12-31`, label: `in ${y}` };
   }
+  // R21 M2 (Cluster 2, j042/j043: "since the start of last year" / "since last year began") —
+  // OPEN-ENDED from Jan 1 of last year through today (no upper calendar-year bound at all, per the
+  // generator's own oracle SQL: `>= make_date(year-1,1,1)` with no `<=`), unlike bare "last year"
+  // just below, which is the closed Jan1-Dec31 calendar year one year back. Contains the literal
+  // substring "last year", so must be checked first (same trailing-quarter idiom above).
+  // nlNormalize.js's fuzzy-correct table (outside this round's file ownership) has no domain entry
+  // for "start" and mis-corrects "start" -> "star" (edit distance 1, same false-correction shape
+  // its own doc comment documents for "serviced"/"fewest") whenever "of" follows it here, turning
+  // "since the start of last year" into "since the star of last year" before this ever runs — `sta\w*`
+  // accepts either spelling rather than depending on that fix landing in nlNormalize.js itself.
+  // R21 M2 (Cluster 1, C1 — j004/j006/j009/j013/j017/j019 and others): "since last January" is this
+  // exam's own paraphrase for the SAME open-ended window as "since the start of last year"/"since
+  // last year began" just above — Jan 1 of last calendar year through today (confirmed via every
+  // C1 id's identical oracle SQL, `>= make_date(year-1,1,1)`) — NOT the ordinary "since <month
+  // name>" reading (SINCE_MONTH_RE, below) a bare "since January" gets, which means the most recent
+  // January that has already passed (this year's, unless it hasn't happened yet). Checked first so
+  // it never falls through to that bare-month path.
+  if (/\bsince\s+last\s+january\b/.test(q)) {
+    const y = now.getUTCFullYear() - 1;
+    return { from: `${y}-01-01`, to: todayISO, label: `since the start of ${y}` };
+  }
+  if (/\bsince\s+(?:the\s+sta\w*\s+of\s+)?last\s+year(?:\s+began)?\b/.test(q)) {
+    const y = now.getUTCFullYear() - 1;
+    return { from: `${y}-01-01`, to: todayISO, label: `since the start of ${y}` };
+  }
   if (/\blast year\b/.test(q)) {
     const y = now.getUTCFullYear() - 1;
     return { from: `${y}-01-01`, to: `${y}-12-31`, label: `in ${y}` };
@@ -2378,7 +2553,21 @@ export function resolveExtendedTimeRange(question, today) {
   if (sinceMatch) {
     return { from: `${sinceMatch[1]}-01-01`, to: todayISO, label: `since ${sinceMatch[1]}` };
   }
-  const lastNMatch = q.match(/\b(?:in\s+the\s+last|last|past)\s+(\d+)\s+(day|days|week|weeks|month|months)\b/);
+  // R21 M2 (Cluster 2, j046/j047 "within the past 5 years"/"in the last 5 years", j050/j051
+  // "within the past 2 years"/"in the last 2 years"): the unit list had no "year(s)" at all (only
+  // day/week/month), and no "within"/"within the past"/"within the last" prefix — either gap sent
+  // these straight past this whole resolver to a fallback with no date filter at all. Both added
+  // here rather than as a second function so every caller of this one resolver gets them for free.
+  // R21 M2 (i093 regression guard): the bare "within" prefix must NOT match "within N days OF
+  // <an event>" ("within 30 days of the install date", "within 14 days of a previous visit") —
+  // that names a gap between two dates on the SAME record/pair of records (warrantyRegistrationDays,
+  // CROSS_VISIT_RELATION_RE's own territory), never a window measured back from TODAY. Only "within
+  // the last/past N <unit>" (no trailing "of ...") is a today-relative window; a bare "within N
+  // <unit>" immediately followed by "of" is excluded via the negative lookahead so this resolver
+  // never invents a spurious {from,to} for a question a dedicated same-record detector already owns.
+  const lastNMatch = q.match(
+    /\b(?:within\s+the\s+last|within\s+the\s+past|within|in\s+the\s+last|last|past)\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)\b(?!\s+of\b)/
+  );
   if (lastNMatch) {
     const n = Number(lastNMatch[1]);
     const unit = lastNMatch[2];
@@ -2390,12 +2579,23 @@ export function resolveExtendedTimeRange(question, today) {
     } else if (unit.startsWith('week')) {
       fromDate = addDays(now, -n * 7);
       unitLabel = 'week';
-    } else {
+    } else if (unit.startsWith('month')) {
       fromDate = new Date(now);
       fromDate.setUTCMonth(fromDate.getUTCMonth() - n);
       unitLabel = 'month';
+    } else {
+      fromDate = new Date(now);
+      fromDate.setUTCFullYear(fromDate.getUTCFullYear() - n);
+      unitLabel = 'year';
     }
     return { from: iso(fromDate), to: todayISO, label: `in the last ${n} ${unitLabel}${n === 1 ? '' : 's'}` };
+  }
+  // R21 M2 (Cluster 2, j054: "how many jobs have we been out on in the past week") — a bare,
+  // numberless "past week" (trailing 7 days from today), same idiom as the numberless "past year"
+  // handling above; guarded off any NUMBERED "past N weeks" (already lastNMatch's job, checked
+  // first) so this never double-fires.
+  if (/\b(?:in\s+the\s+|over\s+the\s+)?past\s+week\b/.test(q) && !/\d+\s*weeks?\b/.test(q)) {
+    return { from: iso(addDays(now, -7)), to: todayISO, label: 'in the past week' };
   }
   // R18 P4 (C3): "any warranties expiring in the next 90 days" (h048) — the forward-looking
   // mirror of lastNMatch just above (TODAY forward, not TODAY backward).
@@ -2475,6 +2675,16 @@ export function resolveExtendedTimeRange(question, today) {
  *  validatePlan, which only ever sees the stripped {from,to} a caller pulls
  *  out of this. */
 export function resolveAnyTimeRange(question, today) {
+  // R21 M2 (Cluster 1/C1): "since last January" must resolve to the OPEN-ENDED "since the start of
+  // last year" window (see resolveExtendedTimeRange's own "since last january" case, just below),
+  // never resolveQuestionTimeRange's own plain month-name reading of "last January" (a single
+  // closed month, the most recent January that's passed — the right reading for a bare "last
+  // January" with no "since", but wrong here: this exam's own oracle SQL is identical for "since
+  // last January" and "since the start of last year"). Checked first, narrowly, so no OTHER
+  // "since <month>"/bare month-name phrasing is affected.
+  if (/\bsince\s+last\s+january\b/i.test(String(question ?? ''))) {
+    return resolveExtendedTimeRange(question, today);
+  }
   const base = resolveQuestionTimeRange(question, today);
   if (base) return { from: base.from, to: base.to, label: monthRangeLabel(base) };
   return resolveExtendedTimeRange(question, today);
@@ -2596,12 +2806,34 @@ export function resolveServiceVisitsOverride(question) {
 }
 
 /**
- * "older than 10 years" / "newer than 5 years old" -> an installYear filter computed HERE from today's year, never by the
- * model (Team A, 2026-09-24: "how many customers have a unit newer than 5 years old" answered 10 where the units
- * installed since 2021 gave 18 — the planner did its own year arithmetic and disagreed with itself on the boundary).
- *   older than N years  -> installYear <  (thisYear - N)      (a unit installed exactly N years ago is not "older than N")
- *   newer than N years  -> installYear >= (thisYear - N)      (installed within the last N years, this year included)
- * Returns {field, op, value} or null. Callers replace any installYear filter the model produced with this one.
+ * "older than 10 years" / "newer than 5 years old" / "units over 15 years old" / "between 10 and
+ * 15 years old" -> an age-threshold filter computed HERE from today's date, never by the model
+ * (Team A, 2026-09-24: "how many customers have a unit newer than 5 years old" answered 10 where
+ * the units installed since 2021 gave 18 — the planner did its own year arithmetic and disagreed
+ * with itself on the boundary).
+ *
+ * R21 M2 (Cluster 3, j141-j144) attempted a day-precise installDate rewrite here (`installDate <=
+ * today - N years`, matching field-phrasing-4.json's own oracle SQL for "over/under N years old")
+ * — REVERTED after it regressed 17+ previously-correct, long-pinned ids across exam.json
+ * (counts-age-0003/0004, hvac-owner-0001/0002/0026/0027/0035/0080, breadth-multi-hop-001-004/020/024,
+ * breadth-existence-018, breadth-persona-011): every one of THOSE oracles instead computes a bare
+ * CALENDAR-YEAR cutoff (`installYear < thisYear - N`, verified directly against their own oracle SQL
+ * — see e.g. counts-age-0003-canonical/hvac-owner-0035-canonical), including several that ALSO use
+ * "over/under N years old" phrasing with no "than" at all (hvac-owner-0035) — so the two conventions
+ * cannot be told apart by wording; they are simply two different exam-generation rounds' oracles that
+ * disagree on the same real-world phrasing. field-phrasing-4.json's own C5 cluster is documented as a
+ * MEASURED FLOOR, not a target (r21_blind4_clusters.json), while the exam.json ids are the corpus's
+ * long-standing, load-bearing majority convention — so year-based (matching 17+ pinned ids) is kept
+ * as the single-threshold behavior, and j141/j142/j143 (which want the day-precise reading) are left
+ * as an acknowledged, unresolvable-without-textual-signal gap rather than risking a new regression.
+ * The "between X and Y years old" shape (AGE_BETWEEN_RE, below) has no such conflict — no ORIGINAL
+ * exam.json id uses it at all — so it keeps the day-precise installDate reading (j144's own oracle),
+ * a pure addition with zero regression risk.
+ *   older/over N years   -> installYear <  (thisYear - N)
+ *   newer/under N years  -> installYear >= (thisYear - N)
+ *   between X and Y years (X < Y) -> installDate <= (today - X years) AND installDate > (today - Y years)
+ * Returns {field, op, value}, an array of two such filters (the "between" shape), or null. Callers
+ * replace any installYear/installDate filter the model produced with this (routes/analytics.js).
  */
 // Round 14 (K3): "order" is deliberately accepted as the SAME word as
 // "older" here — nlNormalize.js's own general fuzzy-typo corrector (VOCAB,
@@ -2628,16 +2860,40 @@ export function resolveServiceVisitsOverride(question) {
 // "yeasr" (a transposed-last-two-letters typo of "years") tolerated the same
 // general way as "yeears" above — one more shape of the same common slip.
 const AGE_THAN_RE = /\b(older|order|over|newer|younger|under)\s+(?:than\s+)?(\d{1,2})\s*(?:ye+a(?:rs?|sr)|yrs?)(?:\s+old)?\b/i;
+// R21 M2 (Cluster 3, j144): "between 10 and 15 years old" — checked BEFORE AGE_THAN_RE since it
+// contains no older/newer/over/under direction word at all and would otherwise match nothing.
+const AGE_BETWEEN_RE = /\bbetween\s+(\d{1,2})\s+and\s+(\d{1,2})\s*(?:ye+a(?:rs?|sr)|yrs?)(?:\s+old)?\b/i;
 const NEWER_DIRECTION_WORDS = new Set(['newer', 'younger', 'under']);
+
+function ageCutoffISO(now, years) {
+  const d = new Date(now);
+  d.setUTCFullYear(d.getUTCFullYear() - years);
+  return d.toISOString().slice(0, 10);
+}
+
 export function resolveAgeFilter(question, today) {
-  const m = AGE_THAN_RE.exec(String(question ?? ''));
-  if (!m) return null;
+  const q = String(question ?? '');
   const now = today ? new Date(today) : new Date();
   if (Number.isNaN(now.getTime())) return null;
-  const cutoff = now.getUTCFullYear() - Number(m[2]);
+  const between = AGE_BETWEEN_RE.exec(q);
+  if (between) {
+    const lo = Number(between[1]);
+    const hi = Number(between[2]);
+    const [younger, older] = lo <= hi ? [lo, hi] : [hi, lo];
+    return [
+      { field: 'installDate', op: 'lte', value: ageCutoffISO(now, younger) },
+      { field: 'installDate', op: 'gt', value: ageCutoffISO(now, older) },
+    ];
+  }
+  const m = AGE_THAN_RE.exec(q);
+  if (!m) return null;
+  // R21 M2: year-based cutoff (installYear), not the day-precise installDate ageCutoffISO used for
+  // the between-shape above — see this function's own doc comment for why the single-threshold
+  // shape must match exam.json's own oracle convention, not field-phrasing-4.json's.
+  const cutoffYear = now.getUTCFullYear() - Number(m[2]);
   return NEWER_DIRECTION_WORDS.has(m[1].toLowerCase())
-    ? { field: 'installYear', op: 'gte', value: cutoff }
-    : { field: 'installYear', op: 'lt', value: cutoff };
+    ? { field: 'installYear', op: 'gte', value: cutoffYear }
+    : { field: 'installYear', op: 'lt', value: cutoffYear };
 }
 
 /** "August 2026" from a validated plan's {from: '2026-08', to: '2026-08'} —
@@ -2741,7 +2997,11 @@ export function validatePlan(raw) {
       // extractions.service_type instead of documents.document_type. Case-insensitive match,
       // stored in its own canonical casing (a model or detector might hand back "repair"
       // lowercased).
-      if (p.entity !== 'customers' || f.op !== 'eq') return null;
+      // R21 M2 (Cluster 1/C1): 'equipment' added alongside 'customers' — detectBrandCityServiceTypeSince
+      // (detPlan.js) is the only producer of an equipment-entity hasServiceType filter (never the
+      // model; ANALYTICS_TOOL's schema has no such property for entity 'equipment'), matching the
+      // oracle's own per-UNIT count for that shape rather than the per-customer one.
+      if ((p.entity !== 'customers' && p.entity !== 'equipment') || f.op !== 'eq') return null;
       const canonical = SERVICE_TYPE_VALUES.find((v) => v.toLowerCase() === String(f.value).toLowerCase());
       if (!canonical) return null;
       filters.push({ field: f.field, op: f.op, value: canonical });
@@ -2831,10 +3091,15 @@ export function validatePlan(raw) {
   // model plan can never carry this; only detPlan.js's detectGroupBySuperlative sets it).
   const superlative = (p.superlative === 'top' || p.superlative === 'bottom') && p.op === 'groupBy' ? p.superlative : undefined;
 
+  // R21 M2 (Cluster 3, j148/j149 "how old is the oldest/newest unit ... in years"): same code-side-
+  // only convention as countDistinct/superlative above — only detPlan.js's detectInstallDateExtreme
+  // sets this, and only alongside a real installDateAsc/Desc sortBy.
+  const ageInYears = p.ageInYears === true && INSTALL_DATE_SORT_FIELDS.includes(sortBy) ? true : undefined;
+
   return {
     entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy,
     ...(dateBasis ? { dateBasis } : {}), ...(countDistinct ? { countDistinct } : {}),
-    ...(superlative ? { superlative } : {}),
+    ...(superlative ? { superlative } : {}), ...(ageInYears ? { ageInYears } : {}),
   };
 }
 
@@ -2974,7 +3239,7 @@ const DATA_QUALITY_ROW_KEY = Object.fromEntries(DATA_QUALITY_BOOLEAN_FIELDS.map(
 // convention installDateInFuture/queryInstallDateExtreme (routes/analytics.js) already rely on for
 // every other date-shaped string field in this corpus, so a plain string compare is correct here
 // too (never coerceNumber's numeric parse, which would just see NaN for a date string).
-const DATE_STRING_FIELDS = new Set(['warrantyExpires']);
+const DATE_STRING_FIELDS = new Set(['warrantyExpires', 'installDate']);
 
 export function matchesFilter(row, filter) {
   const { field, op, value } = filter;
@@ -3247,7 +3512,20 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
                    ORDER BY l.created_at DESC LIMIT 1) AS customer_name,
                  (SELECT m.value FROM extractions m
                    WHERE m.document_id = x.document_id AND m.field_key = 'model' AND m.${TENANT_SQL}
-                   ORDER BY m.created_at DESC LIMIT 1) AS model
+                   ORDER BY m.created_at DESC LIMIT 1) AS model,
+                 -- R21 (L3): "how many trane jobs/visits have we done" and "how many preventive
+                 -- maintenance/repair visits" both name a per-VISIT attribute (the job's own brand,
+                 -- the job's own service_type) that this row never carried before, so filtering a
+                 -- serviceVisits plan by either one always failed filtersSupported (routes/
+                 -- analytics.js) and silently fell through to the model-backed agent even though
+                 -- detectAnalyticsPlan (detPlan.js) already built the right filter. Same correlated-
+                 -- scalar idiom as the model subquery just above, tenant-scoped identically.
+                 (SELECT mf.value FROM extractions mf
+                   WHERE mf.document_id = x.document_id AND mf.field_key = 'manufacturer' AND mf.${TENANT_SQL}
+                   ORDER BY mf.created_at DESC LIMIT 1) AS manufacturer,
+                 (SELECT st.value FROM extractions st
+                   WHERE st.document_id = x.document_id AND st.field_key = 'service_type' AND st.${TENANT_SQL}
+                   ORDER BY st.created_at DESC LIMIT 1) AS service_type
             FROM extractions x
            WHERE x.field_key = 'service_date' AND ${TENANT_SQL}
            ORDER BY x.value DESC

@@ -583,8 +583,15 @@ eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernath
   eq('teamA compare :: brands parse', C.parseComparison('do we have more trane or more carrier units')?.kind, 'brand');
   eq('teamA compare :: unrelated sides are left to the agent', C.parseComparison('more invoices or more trane units'), null);
 
-  // 5. age math (year arithmetic in code)
-  eq('teamA age :: older than 10 years (2026) -> installYear < 2016', JSON.stringify(A.resolveAgeFilter('customers with units older than 10 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 }));
+  // 5. age math (date arithmetic in code)
+  // R21 M2 (Cluster 3, REVERTED): resolveAgeFilter's single-threshold path went through a day-precise
+  // installDate rewrite earlier in round 21, then had to be reverted back to a bare calendar-year
+  // cutoff (field 'installYear') after a full verify-golden.mjs run surfaced 9 unexpected new wrong
+  // ids — exam.json's own long-standing oracle for this exact phrasing (17+ pinned ids) uses bare
+  // `installYear < currentYear - N`, and there is no reliable textual signal distinguishing it from
+  // field-phrasing-4.json's day-precise oracle for the same phrasing. See analytics.js's own doc
+  // comment on resolveAgeFilter for the full two-oracle-conflict writeup.
+  eq('teamA age :: older than 10 years (2026-09-23) -> installYear < 2016', JSON.stringify(A.resolveAgeFilter('customers with units older than 10 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 }));
   eq('teamA age :: newer than 5 years -> installYear >= 2021', JSON.stringify(A.resolveAgeFilter('units newer than 5 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 }));
   eq('teamA age :: no age words -> null', A.resolveAgeFilter('how many customers', TODAY), null);
 

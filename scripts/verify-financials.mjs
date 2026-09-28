@@ -205,6 +205,42 @@ const TODAY = '2026-09-23';
       'How much of our receivables is current, not yet due?',
     ].every((q) => C.isFinancialQuestion(q.toLowerCase()) || analyticsMod.isMoneyQuestion(q.toLowerCase()))
   );
+  // R21 M2 (breadth-financials-051): "how much have we quoted compared with how much we've
+  // invoiced" used to mis-extract "we've invoiced" as a customer-name-like subject (TIME_STOP was
+  // missing the "we've" contraction and past-tense money words) and routed to the per-customer
+  // quote_vs_invoice shape with a bogus subject instead of the shop-wide comparison. Fixed: TIME_STOP
+  // widened, and a new quote_vs_invoice_total intent (subject: null) answers the whole-portfolio
+  // comparison directly.
+  const quoteVsInvoiceTotalPositives = [
+    "How much have we quoted compared with how much we've invoiced?",
+    'how much have we quoted versus how much we have invoiced',
+    "what's the total we've quoted vs the total we've invoiced",
+    'how much did we quote compared to how much we billed',
+    'total quoted compared with total invoiced',
+  ];
+  for (const q of quoteVsInvoiceTotalPositives) {
+    const got = I(q);
+    check(`intent: "${q}" -> quote_vs_invoice_total, no subject`, got?.intent === 'quote_vs_invoice_total' && got?.subject == null, JSON.stringify(got));
+  }
+  check(
+    'intent negative: a per-customer quote-vs-invoice question keeps its real subject (never the shop-wide total intent)',
+    I('Bracken quote vs invoice')?.intent === 'quote_vs_invoice' && I('Bracken quote vs invoice')?.subject === 'bracken'
+  );
+  check(
+    'intent negative: an ordinary non-comparison money question is unaffected by the new intent',
+    I('how much have we invoiced this month')?.intent !== 'quote_vs_invoice_total'
+  );
+
+  // R21 M2: parsePeriod's weeks-unit support ("last/past N weeks") — j058/j059 shaped ("invoices from
+  // the last 6 weeks"), added alongside the pre-existing days-only regex.
+  const weeksPositives = ['last 6 weeks', 'past 3 weeks', 'the last 1 week', 'past 12 weeks', 'last 8 weeks'];
+  for (const phrase of weeksPositives) {
+    const p = parsePeriod(phrase, TODAY);
+    check(`parsePeriod weeks: "${phrase}" resolves a real {from,to} window`, !!p?.from && !!p?.to, JSON.stringify(p));
+  }
+  check('parsePeriod negative: "last 6 weeks" is not misread as "last 6 days" (7x the window, not 1x)', parsePeriod('last 6 weeks', TODAY)?.from !== parsePeriod('last 6 days', TODAY)?.from);
+  check('parsePeriod negative: a bare "6 weeks ago" with no last/past lead still returns null (unsupported phrasing, unchanged)', parsePeriod('6 weeks ago', TODAY) === null);
+
   eq('fmt: exact currency text from NUMERIC strings', [fmt('1240.5'), fmt('-45'), fmt('0'), fmt(null)], ['$1,240.50', '-$45.00', '$0.00', '—']);
   const sqlGuardMod = await import('../api/_lib/agent/sqlGuard.js');
   check('guard: the new tables are deny-listed and the new views are queryable', sqlGuardMod.REAL_TABLES.includes('document_financials') && sqlGuardMod.REAL_TABLES.includes('document_financial_lines') && sqlGuardMod.VIEW_NAMES.includes('financials') && sqlGuardMod.VIEW_NAMES.includes('invoice_lines') && !sqlGuardMod.guardSql('SELECT * FROM document_financials').ok && sqlGuardMod.guardSql("SELECT to_char(invoice_date, 'YYYY-MM') AS m, sum(total) FILTER (WHERE status IN ('unpaid','partial')) FROM financials WHERE days_past_due > 0 GROUP BY 1").ok);

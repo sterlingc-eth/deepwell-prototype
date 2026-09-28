@@ -74,6 +74,18 @@ export function parsePeriod(q, today) {
     from.setUTCDate(from.getUTCDate() - n);
     return { label: `the last ${n} days`, from: from.toISOString().slice(0, 10), to: today };
   }
+  // R21 M2 (Cluster 2, j058/j059): "how many invoices have we sent out in the last 6 weeks" / "in
+  // the last 6 weeks, how many invoices have gone out" — the days-only regex above never matched a
+  // "weeks" unit at all (RE.totalInvoiced/DOC_COUNT_RE routed these to parsePeriod for the date
+  // window, which came back null, so the question fell through undated to the honest fallback).
+  // Same inclusive [from, today] window shape as the days case, just weeks * 7. Matched separately
+  // (not folded into the regex above) so "days" keeps its own singular/plural label untouched.
+  if ((m = s.match(/\b(?:last|past)\s+(\d{1,3})\s+weeks?\b/))) {
+    const n = Math.min(104, Number(m[1]));
+    const from = new Date(`${today}T00:00:00Z`);
+    from.setUTCDate(from.getUTCDate() - n * 7);
+    return { label: `the last ${n} week${n === 1 ? '' : 's'}`, from: from.toISOString().slice(0, 10), to: today };
+  }
   // "yr to date" added (2026-09-26, hvac-bookkeeper-0011): a bookkeeper's own shorthand for
   // "year to date" - same meaning, just abbreviated the same way "yr" already stands for "year"
   // everywhere else in casual invoicing speech.
@@ -114,6 +126,15 @@ const TIME_STOP = new Set([
   'many', 'all', 'each', 'every', 'anyone', 'anybody', 'everyone', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
   'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'past', 'days', 'day',
   'size', 'ticket', 'average', 'avg', 'from', 'with', 'by', 'per', 'month', 'months', 'monthly', 'revenue', 'sales', 'money', 'amount', 'dollars', 'quote', 'estimate', 'proposal',
+  // R21 M2 (breadth-financials-051): a pronoun CONTRACTION ("we've", "we're") is a separate token
+  // from the bare pronoun it's already built from ("we", already listed above) — split() only
+  // breaks on whitespace, so "we've" was never recognized as the same stop word "we" is, and
+  // survived into a bogus "subject" for a shop-wide question that names no customer at all
+  // ("how much have we quoted compared with how much we've invoiced" -> subject "we've invoiced").
+  // Past-tense "invoiced"/"quoted"/"billed" added alongside the existing bare "invoice"/"quote"/
+  // "bill" entries for the same reason — a real name never IS one of these words.
+  "we've", "we're", "we'd", "we'll", "i've", "i'm", "i'd", "i'll", "you've", "you're", "you'd", "you'll",
+  'invoiced', 'quoted', 'billed',
   // R11 (breadth-connect-072/073, golden tenant): "...have not been invoiced since?" - the
   // "invoice(d)/bill(ed)/charge(d) <phrase>" regex above stops its capture at "since" (already
   // in that regex's own lookahead), but "invoiced" here is immediately followed by "since" with
@@ -307,7 +328,15 @@ export function parseMoneyIntent(question, { today }) {
   // Checked BEFORE RE.agreementFees (which would otherwise sum, not average, the fees).
   if (AVG_AGREEMENT_FEE_RE.test(q)) return mk('avg_agreement_fee', { subject: null });
   if (RE.agreementFees.test(q)) return mk('agreement_fees', { subject: null });
-  if (RE.quoteVsInvoice.test(q)) return mk('quote_vs_invoice');
+  // R21 M2 (breadth-financials-051, "How much have we quoted compared with how much we've
+  // invoiced?"): RE.quoteVsInvoice already matches this shop-wide phrasing (it names no customer at
+  // all), but quoteVsInvoice() (below) is a PER-CUSTOMER comparison that requires subjectGate to
+  // resolve a real name — with no subject, it always returns null (subjectGate's own "unresolved"
+  // case), so this silently fell through to the analytics pre-router and answered an unrelated bare
+  // document count. `subject` (computed above from the raw text) tells the two shapes apart: a real
+  // name -> the existing per-customer comparison; no name -> the new shop-WIDE quote-vs-invoice
+  // total (quoteVsInvoiceTotal, below).
+  if (RE.quoteVsInvoice.test(q)) return subject ? mk('quote_vs_invoice') : mk('quote_vs_invoice_total', { subject: null });
   if (RE.payables.test(q) && !/\bowe us\b|\bowes us\b/.test(q)) return mk('payables_open', { subject: null });
   // "which customer owes us the most" / "who has an overdue balance" - a per-customer
   // ranking, never the global open-invoices dollar sum RE.open below would otherwise give.
@@ -818,6 +847,36 @@ async function quoteVsInvoice(db, intent, ctx) {
   return baseAnswer(text, [...quotes.slice(0, 3).map((r) => invoiceFact(r, `Quote${r.invoice_number ? ` #${r.invoice_number}` : ''}`)), ...invoices.slice(0, 5).map((r) => invoiceFact(r, `Invoice${r.invoice_number ? ` #${r.invoice_number}` : ''}`))],
     { sources: rows.slice(0, 10).map((r) => docSource(r.document_id, r.total_page)), interpretation: `quote vs invoice, ${g.name}`, confidence: multi ? 0.6 : 0.95,
       cite: { records: financeRecords(rows), total: rows.length, claimedCount: quotes.length + invoices.length, basis: `Compared the printed totals of ${plural(quotes.length, 'quote')} and ${plural(invoices.length, 'invoice')} for ${g.name}.` } });
+}
+
+// R21 M2 (breadth-financials-051): shop-wide "how much have we quoted vs how much have we
+// invoiced" — no customer named, so this sums BOTH doc kinds across the whole tenant in one pass,
+// unlike quoteVsInvoice() above (a single customer's own quote(s) vs their own invoice(s)).
+async function quoteVsInvoiceTotal(db, intent, ctx) {
+  const [a] = await q(db,
+    `SELECT COALESCE(sum(f.total) FILTER (WHERE f.doc_kind = 'estimate'), 0) AS quoted,
+            count(*) FILTER (WHERE f.doc_kind = 'estimate' AND f.total IS NOT NULL)::int AS n_quoted,
+            COALESCE(sum(f.total) FILTER (WHERE f.doc_kind = 'invoice'), 0) AS invoiced,
+            count(*) FILTER (WHERE f.doc_kind = 'invoice' AND f.total IS NOT NULL)::int AS n_invoiced
+       FROM financials f WHERE f.doc_kind IN ('estimate', 'invoice') AND f.direction = 'receivable' AND f.currency = 'USD' AND f.total IS NOT NULL`,
+    [], ctx.hu);
+  if (!a || (a.n_quoted === 0 && a.n_invoiced === 0)) {
+    return baseAnswer('No quotes or invoices with a printed total are on file yet, so I can\'t compare them.', [], { confidence: 1, ...zeroCite('Searched every quote and invoice on file; none have a printed total.') });
+  }
+  const docs = await q(db,
+    `SELECT f.* FROM financials f WHERE f.doc_kind IN ('estimate', 'invoice') AND f.direction = 'receivable' AND f.currency = 'USD' AND f.total IS NOT NULL
+      ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [], ctx.hu);
+  const diff = Number(a.invoiced) - Number(a.quoted);
+  const rel = diff === 0 ? 'exactly matches' : diff > 0 ? `${fmt(String(diff))} more than` : `${fmt(String(-diff))} less than`;
+  const text = `We've quoted ${fmt(a.quoted)} (across ${plural(a.n_quoted, 'quote')}) and invoiced ${fmt(a.invoiced)} (across ${plural(a.n_invoiced, 'invoice')}) — invoiced total is ${rel} quoted total.`;
+  return baseAnswer(text, [
+    { label: 'Quoted', value: fmt(a.quoted), status: 'ok', sources: [] },
+    { label: 'Invoiced', value: fmt(a.invoiced), status: 'ok', sources: [] },
+  ], {
+    sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: 'quoted vs invoiced (shop-wide)',
+    cite: { records: financeRecords(docs), total: a.n_quoted + a.n_invoiced, claimedCount: a.n_quoted + a.n_invoiced,
+      basis: `Summed the printed totals of every quote/estimate (${fmt(a.quoted)}) and every invoice (${fmt(a.invoiced)}) on file.` },
+  });
 }
 
 async function topCustomers(db, intent, ctx) {
@@ -1429,6 +1488,7 @@ export async function runMoneyIntent(db, intent, { today }) {
     case 'revenue_year_comparison': return revenueYearComparison(db, intent, ctx);
     case 'agreement_fees': return agreementFees(db, intent, ctx);
     case 'quote_vs_invoice': return quoteVsInvoice(db, intent, ctx);
+    case 'quote_vs_invoice_total': return quoteVsInvoiceTotal(db, intent, ctx);
     case 'top_customers': return topCustomers(db, intent, ctx);
     case 'avg_invoice': return avgInvoice(db, intent, ctx);
     case 'spend_total': return spendTotal(db, intent, ctx);

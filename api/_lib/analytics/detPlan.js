@@ -179,11 +179,22 @@ function buildSafetyNetFilters(question, entity) {
 // mistaking "negated" for "no warranty condition here at all".
 const WARRANTY_STATUS_AMBIGUOUS = Symbol('warrantyStatusAmbiguous');
 
+// R21 M2 (Cluster 2, j047: "in the last 5 years, how many systems have we put in" — a plain
+// install-count question with no warranty mention at all): impliedWarrantyStatus's own "relaxed"
+// fallback below blindly appends " warranty" to try bare phrasings like "still active"/"covered"
+// that only read as a warranty condition once the word is there — but a question ending in a bare
+// trailing preposition ("...have we put in", "...units are still under") forms an ACCIDENTAL "in
+// warranty"/"under warranty" match purely from the concatenation seam, not from anything the
+// question said. Guarded off whenever q's last real word is one of STRICT_ACTIVE_STATUS_RE's own
+// two preposition-led phrases' lead word ("in"/"under") with nothing warranty-related after it.
+const TRAILING_BARE_PREPOSITION_RE = /\b(?:in|under)\s*$/i;
+
 function impliedWarrantyStatus(q, entity) {
   const direct = warrantyStatusFromQuestion(q);
   if (direct) return direct;
   if (hasAmbiguousWarrantyStatusNegation(q)) return WARRANTY_STATUS_AMBIGUOUS;
   if (entity !== 'equipment' && entity !== 'warranties') return null;
+  if (TRAILING_BARE_PREPOSITION_RE.test(q.trim())) return null;
   const relaxed = `${q} warranty`;
   const relaxedStatus = warrantyStatusFromQuestion(relaxed);
   if (relaxedStatus) return relaxedStatus;
@@ -230,12 +241,25 @@ const SINCE_YEAR_RE = /\bsince\s+(\d{4})\b/i;
  * same "code computes the year, never the model" rule resolveAgeFilter/detectWarrantyExpiryWindow
  * already follow).
  */
-const INSTALL_WORD_RE = /\binstall(?:ed|s|ation)?\b/i;
+const INSTALL_WORD_RE = /\binstall(?:ed|s|ation)?\b|\bput\s+in\b|\bput\s+them?\s+in\b/i;
 const THIS_YEAR_INSTALL_RE = /\b(?:so\s+far\s+)?this\s+year\b/i;
 const LAST_YEAR_INSTALL_RE = /\blast\s+year\b/i;
+// R21 M2 (Cluster 2, j040/j041/j061 "before (the) summer ... this year", and every OTHER
+// resolveExtendedTimeRange phrasing — "within the past 5 years", "since ...", "in the last N
+// years", a bare season, etc.): a bare "this year"/"last year" match below is a coarse CALENDAR-
+// YEAR-only filter (installYear eq); any of these more specific phrasings must win first, or (for
+// "before summer ... this year") the "this year" substring inside it would otherwise be caught by
+// THIS_YEAR_INSTALL_RE and silently widen "Jan-May" into the WHOLE year.
+// NOTE: deliberately NOT a bare `\bsince\b` — "since 2020" (a literal 4-digit year) is SINCE_YEAR_RE's
+// own, older, brand-aware territory just below (equipmentLike && SINCE_YEAR_RE), which this must
+// never shadow; only the qualitative "since the start of last year"/"since last year began" shape
+// (no literal year at all) belongs to resolveAnyTimeRange.
+const EXTENDED_TIME_PHRASE_RE =
+  /\bbefore\s+(?:the\s+)?summer\b|\bsince\s+(?:the\s+sta\w*\s+of\s+)?last\s+year(?:\s+began)?\b|\b(?:within|in)\s+the\s+(?:last|past)\s+\d+\s+(?:day|days|week|weeks|month|months|year|years)\b|\b(?:this|last|past)\s+(?:winter|spring|summer|fall|autumn)\b|\bytd\b|\byear[\s-]?to[\s-]?date\b|\bthis\s+quarter\b|\blast\s+quarter\b|\bpast\s+quarter\b/i;
 
 function detectInstallYearRelative(q, today) {
   if (!INSTALL_WORD_RE.test(q) || !EQUIPMENT_NOUN_RE.test(q)) return null;
+  if (EXTENDED_TIME_PHRASE_RE.test(q)) return null;
   const now = today ? new Date(today) : new Date();
   if (Number.isNaN(now.getTime())) return null;
   const currentYear = now.getUTCFullYear();
@@ -244,6 +268,25 @@ function detectInstallYearRelative(q, today) {
   else if (THIS_YEAR_INSTALL_RE.test(q)) year = currentYear;
   if (year === null) return null;
   return { entity: 'equipment', op: opFromShape(q), filters: [{ field: 'installYear', op: 'eq', value: year }] };
+}
+
+/**
+ * R21 M2 (Cluster 2, j040/j041/j046/j061: "before the summer this year", "within the past 5
+ * years", "before summer hit this year" — all naming an install EVENT, not a calendar-year
+ * bucket): resolveAnyTimeRange (analytics.js's ONE central relative-time resolver, extended this
+ * round with before-summer/within-N-years/trailing-quarter/since-last-year/bare-past-week) gives
+ * the exact day-grain {from,to} every one of these phrasings needs; detectInstallYearRelative just
+ * above only ever handles the two COARSE bare "this year"/"last year" cases (a real calendar-year
+ * bucket, not a day-precise window) and now explicitly yields to this for everything else via
+ * EXTENDED_TIME_PHRASE_RE. plan.timeRange is applied against installation_date the same day-grain
+ * way documents/serviceVisits already apply theirs — see routes/analytics.js's equipment branch.
+ */
+function detectInstallDateRelativeRange(q, today) {
+  if (!INSTALL_WORD_RE.test(q) || !EQUIPMENT_NOUN_RE.test(q)) return null;
+  if (!EXTENDED_TIME_PHRASE_RE.test(q)) return null;
+  const range = resolveAnyTimeRange(q, today);
+  if (!range) return null;
+  return { entity: 'equipment', op: opFromShape(q), filters: [], timeRange: { from: range.from, to: range.to } };
 }
 
 /**
@@ -290,6 +333,29 @@ function detectVendorPurchaseOrderCount(q) {
 }
 
 /**
+ * R21 (M2, g103): "how many trane jobs have we done total" — a bare brand-only count of DOCUMENTS
+ * linked to an equipment entity of that manufacturer (see routes/analytics.js's
+ * queryDocumentsByEquipmentBrand for the exact join this oracle wants — no service_date/service-visit
+ * gating at all, unlike every other "<brand> ... visit/repair/tune-up ..." shape below, which counts
+ * actual dated VISITS). Deliberately narrow: ONLY a bare "<brand> jobs (done|completed|run) ... total"
+ * with no OTHER named condition (no city, no service-type, no time window) — a question naming any of
+ * those is cluster 1's own richer multi-constraint shape (a "which visits/jobs" question with a real
+ * time or geo qualifier), never this bare document-count definition, so this bails (null) the moment
+ * detectedConditions sees more than the one brand condition.
+ */
+const BRAND_JOBS_TOTAL_RE =
+  /\bjobs?\b[\s\S]{0,15}\b(?:have\s+we\s+|has\s+(?:the\s+shop|the\s+crew)\s+)?(?:done|completed|performed|run)\b[\s\S]{0,15}\btotal\b|\btotal\b[\s\S]{0,15}\bjobs?\b[\s\S]{0,15}\b(?:have\s+we\s+)?(?:done|completed|performed|run)\b/i;
+
+function detectBrandJobsDocumentCount(q) {
+  if (!BRAND_JOBS_TOTAL_RE.test(q)) return null;
+  const found = detectedConditions(q);
+  if (!found.has('brand') || found.size > 1) return null;
+  const brand = buildConditionOverrideFilter('brand', q, 'equipment');
+  if (!brand) return null;
+  return { entity: 'documents', op: 'count', filters: [{ field: 'linkedEquipmentBrand', op: 'eq', value: brand.value }] };
+}
+
+/**
  * R20 (J3, i094): "how many warranty registrations took longer than 30 days after install" — the
  * per-unit gap (in days) between warranty.registrationOnFile and the unit's own install date,
  * compared against whatever threshold the question actually names (never hard-coded to 30 — a
@@ -300,11 +366,22 @@ function detectVendorPurchaseOrderCount(q) {
  */
 const WARRANTY_REG_DAYS_RE =
   /\bwarranty\s+registrations?\b[\s\S]{0,25}\b(?:took\s+longer\s+than|longer\s+than|more\s+than|over)\s+(\d{1,3})\s*days?\s+after\s+(?:the\s+)?install/i;
+// R21 M2 (deferred list, i093 "how many warranty registrations went in within 30 days of the
+// install date"): the complement of WARRANTY_REG_DAYS_RE just above — "within N days of" names an
+// AT-MOST threshold (op 'lte'), never the "took longer than" over-threshold shape, so this is its
+// own regex/op pair rather than a third alternative folded into that one (the two must never share
+// an op). Matched separately so a paraphrase using "of the install"/"of install" (no "after") still
+// resolves — "within N days of" is unambiguous on its own; "after install" adds nothing WARRANTY_REG_DAYS_RE
+// doesn't already need for ITS OWN "took longer than" phrasing.
+const WARRANTY_REG_DAYS_WITHIN_RE =
+  /\bwarranty\s+registrations?\b[\s\S]{0,25}\bwithin\s+(\d{1,3})\s*days?\s+of\s+(?:the\s+)?install/i;
 
 function detectWarrantyRegistrationDays(q) {
   const m = WARRANTY_REG_DAYS_RE.exec(q);
-  if (!m) return null;
-  return { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'gt', value: Number(m[1]) }] };
+  if (m) return { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'gt', value: Number(m[1]) }] };
+  const w = WARRANTY_REG_DAYS_WITHIN_RE.exec(q);
+  if (w) return { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyRegistrationDays', op: 'lte', value: Number(w[1]) }] };
+  return null;
 }
 
 /* ============================================================ dimension words
@@ -349,8 +426,12 @@ const TECHNICIAN_ACTION_RE =
 // total" — the same named-technician-as-subject shape as TECHNICIAN_ACTION_RE just above, only with
 // a has/have auxiliary (present-perfect) instead of did/do/does, so the verb that follows the name is
 // the PAST-PARTICIPLE form (closed/completed/handled/done/run) rather than the bare one.
+// R21 (M2, cluster 4, j151-j156): "how many jobs total HAS Kevin Pratt BEEN OUT ON" — the same
+// present-perfect, named-technician-as-subject shape, just with "been (out) on" instead of a plain
+// past participle. Genuinely common everyday phrasing ("been out on a job"), not this exam's own
+// wording — added as one more alternative of the SAME verb slot, not a new detector.
 const TECHNICIAN_ACTION_PERFECT_RE =
-  /\b(?:has|have)\s+([a-z][a-z.'-]*(?:\s+[a-z][a-z.'-]*){0,2})\s+(?:done|run|closed(?:\s+out)?|completed|handled)\b/i;
+  /\b(?:has|have)\s+([a-z][a-z.'-]*(?:\s+[a-z][a-z.'-]*){0,2})\s+(?:done|run|closed(?:\s+out)?|completed|handled|been(?:\s+out)?\s+on)\b/i;
 const NON_NAME_STOPWORDS = new Set([
   'we', 'you', 'they', 'it', 'he', 'she', 'the', 'our', 'any', 'each', 'this', 'that',
   'customers', 'clients', 'units', 'equipment', 'jobs', 'work', 'service',
@@ -420,13 +501,25 @@ const DIFFERENT_DIM_RE = new RegExp(`\\bhow many (?:different|distinct)\\s+(${DI
 // takes plan.filters and narrows the candidate set to it before finding the extreme date) — reuses
 // buildConditionOverrideFilter('brand', ...) exactly like every other brand mention in this file
 // rather than a second brand-word table. A question naming no brand gets no filter, same as before.
+// R21 M2 (Cluster 3, j147: "whose unit did we most recently install") — a genuine synonym of
+// "newest"/"latest" that names the same installDateDesc ranking with neither word present at all.
+const MOST_RECENTLY_INSTALLED_RE = /\bmost\s+recently\s+install(?:ed)?\b/i;
+
 function detectInstallDateExtreme(q) {
   if (!EQUIPMENT_NOUN_RE.test(q)) return null;
-  const sortBy = /\b(oldest|earliest)\b/i.test(q) ? 'installDateAsc' : /\b(newest|latest)\b/i.test(q) ? 'installDateDesc' : null;
+  const sortBy = /\b(oldest|earliest)\b/i.test(q)
+    ? 'installDateAsc'
+    : /\b(newest|latest)\b/i.test(q) || MOST_RECENTLY_INSTALLED_RE.test(q)
+      ? 'installDateDesc'
+      : null;
   if (!sortBy) return null;
   const plan = { entity: 'equipment', op: 'list', sortBy };
   const brand = buildConditionOverrideFilter('brand', q, 'equipment');
   if (brand) plan.filters = [brand];
+  // R21 M2 (Cluster 3, j148/j149: "how old is the oldest/newest unit we've got, in years") — same
+  // ranking, but the answer wanted is the AGE IN YEARS of that extreme unit, not the record itself
+  // or its raw install date (routes/analytics.js's formatInstallDateExtremeAnswer branches on this).
+  if (/\bhow\s+old\b/i.test(q)) plan.ageInYears = true;
   return plan;
 }
 
@@ -509,7 +602,10 @@ function detectGroupByPhrase(q) {
  * own rows. Scoped to a genuine dimension word (DIM_ALT) so a question with no groupable dimension is
  * left alone, same discipline as every other detector here.
  */
-const SUPERLATIVE_TOP_RE = new RegExp(`\\b(?:single\\s+)?(?:biggest|largest)\\s+(${DIM_ALT})\\b`, 'i');
+// R21 (M2, h109): "busiest"/"most active" added — "who's our busiest technician" is the same
+// top-superlative groupBy shape as "our biggest city"/"largest brand", just with the everyday
+// synonym a shop actually uses for a technician's own visit count, not this exam's own wording.
+const SUPERLATIVE_TOP_RE = new RegExp(`\\b(?:single\\s+)?(?:biggest|largest|busiest|most\\s+active)\\s+(${DIM_ALT})\\b`, 'i');
 const SUPERLATIVE_BOTTOM_RE = new RegExp(
   `\\b(?:fewest|least|smallest)\\b[\\s\\S]*?\\b(${DIM_ALT})\\b|\\b(${DIM_ALT})\\b[\\s\\S]*?\\b(?:fewest|least|smallest)\\b`,
   'i'
@@ -575,8 +671,15 @@ function detectLockedIntoDocType(q) {
  *  linked to a document of that type (matches queryCustomersByDocTypeCondition's
  *  own hasDocType/lacksDocType semantics, routes/analytics.js) — a customer
  *  count/list, never a raw document count. Negation ("don't have a permit on
- *  file") flips it to lacksDocType. */
-const DOCTYPE_NEGATION_RE = /\b(?:don'?t|doesn'?t|do\s+not|does\s+not|without|no|never|haven'?t|hasn'?t|lack(?:ing)?)\b/i;
+ *  file") flips it to lacksDocType.
+ *
+ *  R21 (M2, j072): "missing" added — "how many customers are missing a startup sheet entirely" is
+ *  the exact same lacksDocType shape as "don't have.../no.../lacking..." just worded with "missing"
+ *  instead, a word this list omitted even though it is the single most common everyday phrasing for
+ *  "we don't have this on file". Its absence made j072 read as a POSITIVE hasDocType mention instead
+ *  (the count of customers WHO HAVE a startup sheet, not who lack one) — silently the wrong count,
+ *  not a decline. */
+const DOCTYPE_NEGATION_RE = /\b(?:don'?t|doesn'?t|do\s+not|does\s+not|without|no|never|haven'?t|hasn'?t|lack(?:ing)?|missing)\b/i;
 
 function detectCustomersHasDocType(q) {
   if (entityFromNouns(q) !== 'customers') return null;
@@ -623,6 +726,46 @@ function detectCustomersHasServiceType(q) {
   if (hasValue) filters.push({ field: 'hasServiceType', op: 'eq', value: hasValue });
   if (lacksValue && lacksValue !== hasValue) filters.push({ field: 'lacksServiceType', op: 'eq', value: lacksValue });
   return { entity: 'customers', op: opFromShape(q), filters };
+}
+
+/**
+ * R21 M2 (deferred list, Cluster 1/C1, r21_blind4_clusters.json — 22 ids, e.g. j001 "how many
+ * Carrier units in Tempe have had a preventive maintenance visit since the start of last year"):
+ * a genuine THREE-way AND — brand + (customer's) city + a service-type visit, always additionally
+ * scoped to a "since <time>" window on that qualifying visit's own service_date. No prior detector
+ * combined all of these: the generic safety-net path (buildSafetyNetFilters) has no notion of a
+ * cross-doc service-type EXISTS at all, and detectCustomersHasServiceType (just above) only
+ * combines brand+city+serviceType for entity 'customers' — with no time-window support once
+ * merged, and the wrong entity for this shape regardless (see below).
+ *
+ * Confirmed via every one of C1's 22 ids' own oracle SQL: the count is ALWAYS distinct EQUIPMENT
+ * entities (`entity_type='equipment'`) matching brand + customer service_address city, with an
+ * EXISTS-linked document of the named service_type in the time window — even for the ids worded
+ * "...customers in <city> got a ... visit" (j007/j011/j015/j021/j028/j031/j034): the question's own
+ * noun is never a reliable entity signal for this shape, so this detector always forces 'equipment'
+ * and never defers to entityFromNouns.
+ *
+ * All FOUR conditions (brand, city, service-type, time) must resolve to a real value; any one
+ * missing bails to null (never a partial/silently-narrower plan) — see buildConditionOverrideFilter
+ * and resolveAnyTimeRange's own "never guess" doc comments, the same discipline this whole file
+ * applies everywhere else.
+ */
+function detectBrandCityServiceTypeSince(q, today) {
+  const brand = buildConditionOverrideFilter('brand', q, 'equipment');
+  if (brand?.op !== 'eq') return null;
+  const city = buildConditionOverrideFilter('city', q, 'equipment');
+  if (city?.op !== 'eq') return null;
+  const stMatch = SERVICE_TYPE_PHRASE_RE.exec(q);
+  if (!stMatch) return null;
+  const serviceType = serviceTypeValueOf(stMatch[1]);
+  const range = resolveAnyTimeRange(q, today);
+  if (!range) return null;
+  return {
+    entity: 'equipment',
+    op: opFromShape(q),
+    filters: [brand, city, { field: 'hasServiceType', op: 'eq', value: serviceType }],
+    timeRange: { from: range.from ?? null, to: range.to ?? null },
+  };
 }
 
 /**
@@ -691,9 +834,16 @@ function mergeDetectedConditions(plan, q) {
  */
 const WARRANTY_EXPIRE_WORD_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,20}\bexpir\w*\b|\bexpir\w*\b[\s\S]{0,20}\bwarrant(?:y|ies)\b/i;
 
-function detectWarrantyExpiryWindow(q) {
+// R21 (review fix): `today` was silently dropped here — every OTHER date-sensitive detector on the
+// same `dedicated` chain below (detectInstallYearRelative, detectInstallDateRelativeRange) already
+// threads the caller's own `today` through; this one fell back to the real wall clock regardless of
+// what detectAnalyticsPlan was given, so a "since january 1st"/"by end of year"/"in the next 90 days"
+// warranty-expiry window silently drifted a day (or a year, for the January-1st lower bound) out of
+// sync with a pinned `today` — exactly the confident-wrong-date failure this file exists to prevent
+// (routes/analytics.js passes its own `today` through to detectAnalyticsPlan for this very reason).
+function detectWarrantyExpiryWindow(q, today) {
   if (!WARRANTY_EXPIRE_WORD_RE.test(q)) return null;
-  const range = resolveAnyTimeRange(q);
+  const range = resolveAnyTimeRange(q, today);
   if (!range) return null;
   const filters = [];
   if (range.from) filters.push({ field: 'warrantyExpires', op: 'gte', value: range.from });
@@ -805,8 +955,17 @@ const CONTENT_SEARCH_DENY_RE =
 // exact same collision class as "older"->"order" (see resolveAgeFilter's own
 // doc comment, analytics.js) — worked around locally here rather than in
 // nlNormalize.js (outside this round's file ownership).
+// R21 (M2): the standalone `no\s+warranty\s+registration` alternative that used to live here
+// blocked EVERY "no warranty registration" question, including the plain, single-condition h052
+// shape ("how many units have no warranty registration on file") that MISSING_FIELD_RULES below
+// already has a real, correct answer for (warrantyRegistered:false) — a coverage regression this
+// deny was never meant to cause. The genuine multi-hop shape this alternative existed for
+// (breadth-connect-048..059: "installed more than 90 days ago ... with no warranty registration on
+// file") is still denied regardless, via the OTHER `installed\s+more\s+than\s+\d+\s+days\s+ago`
+// alternative just below, which every one of those questions also contains — so removing the
+// standalone "no warranty registration" phrase costs that cluster nothing.
 const CONNECT_DENY_RE =
-  /\b(more than once|doesn'?t (?:match|march)|don'?t (?:match|march)|shared by|share[sd]?\s+an?\s+address|different address|address\s+mismatch|no\s+warranty\s+registration|serial\s+numbers?\s+appear|quotes?d?\s+but\s+not\s+installed|replaced\s+more\s+than\s+once|installed\s+more\s+than\s+\d+\s+days\s+ago)\b|\bquotes?d?\b[\s\S]{0,60}\b(?:not\s+had|haven'?t\s+had|has\s+not\s+had|hasn'?t\s+had)\b[\s\S]{0,20}\binstalled\b/i;
+  /\b(more than once|doesn'?t (?:match|march)|don'?t (?:match|march)|shared by|share[sd]?\s+an?\s+address|different address|address\s+mismatch|serial\s+numbers?\s+appear|quotes?d?\s+but\s+not\s+installed|replaced\s+more\s+than\s+once|installed\s+more\s+than\s+\d+\s+days\s+ago)\b|\bquotes?d?\b[\s\S]{0,60}\b(?:not\s+had|haven'?t\s+had|has\s+not\s+had|hasn'?t\s+had)\b[\s\S]{0,20}\binstalled\b/i;
 
 // Round 15 follow-up (regression fix, breadth-connect-120): "how many
 // maintenance agreements have zero service visits behind them" — a count of
@@ -920,21 +1079,27 @@ const MISSING_FIELD_RULES = [
     re: /\bno\s+tonnage\s+(?:on\s+file|listed)\b|\bmissing\s+(?:a\s+|the\s+)?tonnage\b|\btonnage\s+(?:is\s+)?(?:not\s+listed|missing)\b/i,
   },
   {
+    // R20 (J3, i009) + R21 (M2, h052): "how many warranty registrations are we still missing" /
+    // "how many units have NO warranty registration on file" / "don't have a warranty registration
+    // on file" — registrationState !== 'on_file'. Checked BEFORE the positive `warrantyRegistered:
+    // true` rule just below (not merely as a negation of it) specifically because that rule's own
+    // phrase ("warranty registration ... on file") is a plain substring of "no warranty registration
+    // on file" too — h052 used to reach the POSITIVE rule first, match that substring, and (since
+    // hasNearbyNegation only recognizes "not/never/without", never a bare "no") answer the exact
+    // opposite of what was asked. Putting this rule first means a "no.../missing.../don't have..."
+    // question is fully resolved here and never even reaches the positive rule's regex.
+    entity: 'equipment', field: 'warrantyRegistered', value: false,
+    re: /\bwarranty\s+registrations?\b[\s\S]{0,25}\b(?:missing|outstanding|(?:haven'?t|have\s+not)\s+(?:done|completed|filed|submitted))\b|\bmissing\b[\s\S]{0,20}\bwarranty\s+registrations?\b|\bno\s+warranty\s+registrations?\s+(?:on\s+file|recorded|on\s+record)\b|\b(?:don'?t|do\s+not|doesn'?t|does\s+not)\s+have\s+(?:a\s+|any\s+)?warranty\s+registrations?\b/i,
+  },
+  {
     // R18 P4 (h053): "how many units are actually registered for warranty" — data.warranty.
     // registrationState === 'on_file' (see WARRANTY_REGISTERED_ROW_KEY, routes/analytics.js),
     // never the warrantyStatus coverage bucket (a unit can be registered AND expired, or
-    // unregistered AND still active — the two are independent facts).
+    // unregistered AND still active — the two are independent facts). Never matches a "no .../
+    // missing .../don't have..." sentence — the false-value rule just above already claimed every
+    // one of those phrasings and returns before this rule is even tried.
     entity: 'equipment', field: 'warrantyRegistered', value: true,
     re: /\b(?:actually\s+)?registered\s+for\s+warranty\b|\bwarranty\s+registration\s+(?:is\s+)?on\s+file\b/i,
-  },
-  {
-    // R20 (J3, i009): "how many warranty registrations are we still missing" — the exact negation of
-    // the rule just above (registrationState !== 'on_file'). Checked as its own rule (not a bare
-    // negation of the positive phrase) so the ordinary "still missing"/"outstanding"/"haven't done"
-    // wording is recognized directly, the same way every other MISSING_FIELD_RULES entry names its
-    // own negative phrasing rather than inverting a positive one.
-    entity: 'equipment', field: 'warrantyRegistered', value: false,
-    re: /\bwarranty\s+registrations?\b[\s\S]{0,25}\b(?:missing|outstanding|(?:haven'?t|have\s+not)\s+(?:done|completed|filed|submitted))\b|\bmissing\b[\s\S]{0,20}\bwarranty\s+registrations?\b/i,
   },
   {
     // R18 P4 (C4, negation, h134): "how many customers have zero equipment on file" — the
@@ -1024,8 +1189,23 @@ function hasNearbyNegation(before, maxWords = 4) {
   return words.some((w) => /^(?:not|never|without)$/i.test(w) || /n't$/i.test(w));
 }
 
+// R21 (M2, regression guard for h129): "which manufacturer has the most units with no warranty
+// registration on file" names a MISSING_FIELD_RULES condition (no warranty registration) but is
+// really asking for the one extreme GROUP under that condition (a groupBy+superlative shape, "which
+// <dim> has the most/fewest ..."), never a bare portfolio-wide count of it. Narrowing CONNECT_DENY_RE
+// above (h052/j072) now lets this reach detectMissingFieldCondition before the dedicated groupBy/
+// superlative detectors ever get a turn — bailing here (rather than silently answering the bare
+// count and dropping the ranking half of the question) keeps this exactly as it measured before that
+// change (falls through, same as any shape no detector here confidently resolves) rather than
+// making it newly, confidently wrong.
+const GROUPBY_SUPERLATIVE_SHAPE_RE = new RegExp(
+  `\\bwhich\\s+(?:${DIM_ALT})\\b[\\s\\S]{0,40}\\b(?:most|fewest|least|biggest|largest|smallest|highest|lowest)\\b`,
+  'i'
+);
+
 function detectMissingFieldCondition(q) {
   if (READABLE_TEXT_DENY_RE.test(q)) return null;
+  if (GROUPBY_SUPERLATIVE_SHAPE_RE.test(q)) return null;
   for (const rule of MISSING_FIELD_RULES) {
     const m = rule.re.exec(q);
     if (m) {
@@ -1119,11 +1299,22 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
     // many different zip codes do we cover" (a distinct-count, no zip NAMED) used to come back null
     // because buildConditionOverrideFilter('zip'|'county', ...) has nothing to build and reports
     // unresolved. Keep those detectors' results exactly as they build them.
+    // R21 M2 (deferred list, Cluster 1/C1 — 22 ids): checked BEFORE crossDocDedicated just below —
+    // "how many <brand> units/systems/customers in <city> have had/needed a <service-type> since
+    // <time>" always resolves to the SAME oracle-defined equipment count regardless of the
+    // question's own noun ("units"/"systems"/"customers" all count identically — see
+    // detectBrandCityServiceTypeSince's own doc comment), so a "customers"-worded id among the 22
+    // (j007/j011/j015/j021/j028/j031/j034) must never fall to detectCustomersHasServiceType's own
+    // entity:'customers' plan first — that plan can never express the brand+city+time AND this
+    // shape needs all at once.
+    const brandCityServiceType = detectBrandCityServiceTypeSince(q, today);
+    if (brandCityServiceType) return brandCityServiceType;
+
     const crossDocDedicated = detectCustomersHasDocType(q) ?? detectCustomersHasServiceType(q);
     if (crossDocDedicated) return mergeDetectedConditions(crossDocDedicated, q);
 
     const dedicated =
-      detectWarrantyExpiryWindow(q) ??
+      detectWarrantyExpiryWindow(q, today) ??
       detectWarrantyRegistrationDays(q) ??
       detectDistinctYearsCount(q) ??
       detectTechnicianAction(q) ??
@@ -1131,8 +1322,10 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
       detectWarrantyRegDateExtreme(q) ??
       detectInstallDateExtreme(q) ??
       detectInstallYearRelative(q, today) ??
+      detectInstallDateRelativeRange(q, today) ??
       detectMultiUnitCustomers(q) ??
       detectVendorPurchaseOrderCount(q) ??
+      detectBrandJobsDocumentCount(q) ??
       detectDistinctDimensionCount(q) ??
       detectGroupBySuperlative(q) ??
       detectBrandComparison(q) ??

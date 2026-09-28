@@ -69,7 +69,30 @@
     ]
    },
    "rubric": "Says which of the two document types the shop has MORE of (or that they are tied), consistent with the reference counts. Naming the wrong one, or a non-answer, fails.",
-   "persona": "owner"
+   "persona": "owner",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": "invoice"
+     },
+     {
+      "type": "text",
+      "value": "service ticket"
+     },
+     {
+      "type": "text",
+      "value": [
+       "tied",
+       "tie",
+       "equal",
+       "same number",
+       "even",
+       "120"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-owner-0069-typo",
@@ -89,7 +112,30 @@
     ]
    },
    "rubric": "Says which of the two document types the shop has MORE of (or that they are tied), consistent with the reference counts. Naming the wrong one, or a non-answer, fails.",
-   "persona": "owner"
+   "persona": "owner",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": "invoice"
+     },
+     {
+      "type": "text",
+      "value": "service ticket"
+     },
+     {
+      "type": "text",
+      "value": [
+       "tied",
+       "tie",
+       "equal",
+       "same number",
+       "even",
+       "120"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-owner-0069-abbreviated",
@@ -109,7 +155,30 @@
     ]
    },
    "rubric": "Says which of the two document types the shop has MORE of (or that they are tied), consistent with the reference counts. Naming the wrong one, or a non-answer, fails.",
-   "persona": "owner"
+   "persona": "owner",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": "invoice"
+     },
+     {
+      "type": "text",
+      "value": "service ticket"
+     },
+     {
+      "type": "text",
+      "value": [
+       "tied",
+       "tie",
+       "equal",
+       "same number",
+       "even",
+       "120"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "comparisons-0007-canonical",
@@ -1736,7 +1805,30 @@
    },
    "rubric": "Lists up to the 3 most recent SERVICE VISITS (documents with a service_date) for this customer or address, newest first, each with its own date; if fewer than 3 exist, lists what there is and says so. A generic file summary with no visit dates, or dates that do not match what is on record, does not answer this. Must not invent a visit or a date.",
    "citeWhat": "each visit it names",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     },
+     {
+      "type": "date",
+      "value": "2026-07-24"
+     },
+     {
+      "type": "date",
+      "value": "2023-11-23"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-09-21",
+      "2026-07-24",
+      "2023-11-23"
+     ]
+    }
+   }
   },
   {
    "id": "hvac-tech-0052-typo",
@@ -1768,7 +1860,30 @@
    },
    "rubric": "Lists up to the 3 most recent SERVICE VISITS (documents with a service_date) for this customer or address, newest first, each with its own date; if fewer than 3 exist, lists what there is and says so. A generic file summary with no visit dates, or dates that do not match what is on record, does not answer this. Must not invent a visit or a date.",
    "citeWhat": "each visit it names",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     },
+     {
+      "type": "date",
+      "value": "2026-07-24"
+     },
+     {
+      "type": "date",
+      "value": "2023-11-23"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-09-21",
+      "2026-07-24",
+      "2023-11-23"
+     ]
+    }
+   }
   },
   {
    "id": "hvac-tech-0052-abbreviated",
@@ -1800,7 +1915,30 @@
    },
    "rubric": "Lists up to the 3 most recent SERVICE VISITS (documents with a service_date) for this customer or address, newest first, each with its own date; if fewer than 3 exist, lists what there is and says so. A generic file summary with no visit dates, or dates that do not match what is on record, does not answer this. Must not invent a visit or a date.",
    "citeWhat": "each visit it names",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     },
+     {
+      "type": "date",
+      "value": "2026-07-24"
+     },
+     {
+      "type": "date",
+      "value": "2023-11-23"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-09-21",
+      "2026-07-24",
+      "2023-11-23"
+     ]
+    }
+   }
   },
   {
    "id": "hvac-office-0028-canonical",
@@ -1965,7 +2103,30 @@
    },
    "rubric": "Lists up to the 3 most recent SERVICE VISITS (documents with a service_date) for this customer or address, newest first, each with its own date; if fewer than 3 exist, lists what there is and says so. A generic file summary with no visit dates, or dates that do not match what is on record, does not answer this. Must not invent a visit or a date.",
    "citeWhat": "each visit it names",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     },
+     {
+      "type": "date",
+      "value": "2026-08-12"
+     },
+     {
+      "type": "date",
+      "value": "2024-08-04"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-09-21",
+      "2026-08-12",
+      "2024-08-04"
+     ]
+    }
+   }
   },
   {
    "id": "hvac-office-0039-canonical",
@@ -1987,7 +2148,31 @@
     }
    },
    "rubric": "Describes what the shop has on file for this customer or address (document types and service dates) without inventing any; if the reference is empty it says nothing is on file.",
-   "persona": "office"
+   "persona": "office",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": "dispatch note"
+     },
+     {
+      "type": "text",
+      "value": "service ticket"
+     },
+     {
+      "type": "text",
+      "value": "work order"
+     },
+     {
+      "type": "text",
+      "value": "proposal quote"
+     },
+     {
+      "type": "text",
+      "value": "invoice"
+     }
+    ]
+   }
   },
   {
    "id": "hvac-tech-0042-canonical",
@@ -2273,7 +2458,143 @@
      ]
     ]
    },
-   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer."
+   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "live-misses-2026-09-21-0007-canonical",
@@ -2369,7 +2690,143 @@
      ]
     ]
    },
-   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer."
+   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "live-misses-2026-09-21-0002-canonical",
@@ -2473,7 +2930,143 @@
      ]
     ]
    },
-   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer."
+   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "maintenance-due-0003-typo",
@@ -2497,7 +3090,143 @@
      ]
     ]
    },
-   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer."
+   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "maintenance-due-0003-abbreviated",
@@ -2521,7 +3250,143 @@
      ]
     ]
    },
-   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer."
+   "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "live-misses-2026-09-21b-0007-canonical",
@@ -4111,7 +4976,143 @@
     ]
    },
    "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
-   "persona": "office"
+   "persona": "office",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-office-0056-typo",
@@ -4136,7 +5137,143 @@
     ]
    },
    "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
-   "persona": "office"
+   "persona": "office",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-office-0056-abbreviated",
@@ -4161,7 +5298,143 @@
     ]
    },
    "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
-   "persona": "office"
+   "persona": "office",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-office-0090-canonical",
@@ -4186,7 +5459,143 @@
     ]
    },
    "rubric": "Names customers whose most recent completed service visit was more than 12 months ago, consistent with the reference (the reference is the first 15 such customers; naming other customers is fine only if their last visit is also older than 12 months). Must not list customers with a visit in the last 12 months, and must not invent dates. Describing what an agreement covers is not an answer.",
-   "persona": "office"
+   "persona": "office",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Amanda Quinley",
+       "Amanda Redwine",
+       "Amy Isaacson",
+       "Amy Jarvis",
+       "Angela Hutchins",
+       "Angela Ibarra",
+       "Anthony Alvarez",
+       "Anthony Bennett",
+       "Ashley Whitfield",
+       "Barbara Delgado",
+       "Betty Winslow",
+       "Brian Chavez",
+       "Brian Delgado",
+       "Cactus Rose Restaurant",
+       "Carol Rios",
+       "Carol Salazar",
+       "Charles Montoya",
+       "Copper Sky Dental",
+       "Cynthia Kowalski",
+       "Cynthia Larkin",
+       "Daniel Lombardi",
+       "David Quinley",
+       "David Sandoval",
+       "Deborah Ortega",
+       "Deborah Prentiss",
+       "Donald Sorenson",
+       "Donna Ulloa",
+       "Donna Winslow",
+       "Edward Dominguez",
+       "Edward Esparza",
+       "Emily Villegas",
+       "Emily Whitfield",
+       "Gary Villegas",
+       "Gary Wyckoff",
+       "George Hutchins",
+       "Grace Community Church",
+       "Holy Trinity Church",
+       "James Tovar",
+       "Jason Yarborough",
+       "Jason Zamora",
+       "Jessica Chavez",
+       "Joseph Norwood",
+       "Karen Bracken",
+       "Kathleen Jennings",
+       "Kathleen Keller",
+       "Kenneth Fenwick",
+       "Kenneth Gallardo",
+       "Kevin Abernathy",
+       "Kevin Zimmerman",
+       "Laura Lombardi",
+       "Laura Mercer",
+       "Laura Nakamura",
+       "Linda Fitzgerald",
+       "Linda Garrison",
+       "Maria Gallardo",
+       "Maria Holbrook",
+       "Mark Ibarra",
+       "Matthew Whitfield",
+       "Matthew Winslow",
+       "Melissa Pruitt",
+       "Melissa Quintana",
+       "Mesquite Table Restaurant",
+       "Michael Sandoval",
+       "Michelle Sandoval",
+       "Michelle Tovar",
+       "Nancy Zamora",
+       "Patricia Esparza",
+       "Paul Jarvis",
+       "Rebecca Montoya",
+       "Rebecca Norwood",
+       "Richard Osborn",
+       "Robert Salazar",
+       "Ronald Bracken",
+       "Ronald Calloway",
+       "Ronald Dominguez",
+       "Ronald Fenwick",
+       "Sandra Alvarez",
+       "Sandra Wyckoff",
+       "Stephanie Nakamura",
+       "Stephanie Osborn",
+       "Steven Ellison",
+       "Steven Fitzgerald",
+       "Steven Hutchins",
+       "Sunrise Valley Elementary School",
+       "Susan Dominguez",
+       "Thomas Mercer",
+       "Thomas Osborn",
+       "Thomas Quintana",
+       "Timothy Ulloa",
+       "William Rios"
+      ]
+     }
+    ],
+    "forbidden": [
+     {
+      "type": "text",
+      "value": [
+       "Amy Larkin",
+       "Ashley Vance",
+       "Barbara Ellison",
+       "Betty Zimmerman",
+       "Canyon View Dental",
+       "Charles Whitford",
+       "Daniel Keller",
+       "David Prentiss",
+       "Donald Isaacson",
+       "Donna Sorensen",
+       "Donna Vance",
+       "George Garrison",
+       "James Underhill",
+       "Jessica Bennett",
+       "Joseph Ortega",
+       "Karen Abernathy",
+       "Linda Hutchins",
+       "Mark Jennings",
+       "Michael Redwine",
+       "Nancy Alvarez",
+       "Patricia Fenwick",
+       "Paul Kowalski",
+       "Richard Pruitt",
+       "Robert Thornton",
+       "Sandra Yarborough",
+       "Sonoran Grill Restaurant",
+       "Susan Calloway",
+       "Thomas Nakamura",
+       "Timothy Vance",
+       "William Quintana"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-tech-0062-canonical",
@@ -4247,7 +5656,18 @@
     }
    },
    "rubric": "Reports notes/observations that actually appear in the customer's documents, consistent with the reference; says nothing is on file if the reference is empty. Must not invent notes.",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "System operating normally after visit",
+       "Annual maintenance agreement enrollment"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-tech-0085-canonical",
@@ -4358,7 +5778,18 @@
     }
    },
    "rubric": "Reports notes/observations that actually appear in the customer's documents, consistent with the reference; says nothing is on file if the reference is empty. Must not invent notes.",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "System operating normally after visit",
+       "Annual maintenance agreement enrollment"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-tech-0050-typo",
@@ -4380,7 +5811,18 @@
     }
    },
    "rubric": "Reports notes/observations that actually appear in the customer's documents, consistent with the reference; says nothing is on file if the reference is empty. Must not invent notes.",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "System operating normally after visit",
+       "Annual maintenance agreement enrollment"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-tech-0050-abbreviated",
@@ -4402,7 +5844,18 @@
     }
    },
    "rubric": "Reports notes/observations that actually appear in the customer's documents, consistent with the reference; says nothing is on file if the reference is empty. Must not invent notes.",
-   "persona": "tech"
+   "persona": "tech",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "System operating normally after visit",
+       "Annual maintenance agreement enrollment"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "hvac-tech-0036-canonical",
@@ -6601,7 +8054,21 @@
     }
    },
    "rubric": "Gives BOTH totals - what has been quoted and what has been invoiced - and they match the reference figures (rounding to the dollar is fine).",
-   "citeWhat": "the quote and invoice documents behind the two totals"
+   "citeWhat": "the quote and invoice documents behind the two totals",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "number",
+      "value": 86410,
+      "tolerance": 1
+     },
+     {
+      "type": "number",
+      "value": 572212,
+      "tolerance": 1
+     }
+    ]
+   }
   },
   {
    "id": "breadth-financials-052",
@@ -7434,7 +8901,21 @@
     }
    },
    "rubric": "Lists invoiced revenue per month for the current year, consistent with the reference monthly totals (rounding to the dollar is fine; months with no invoices may be omitted).",
-   "citeWhat": "the invoices behind the monthly totals"
+   "citeWhat": "the invoices behind the monthly totals",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "number",
+      "value": 9651,
+      "tolerance": 1
+     },
+     {
+      "type": "number",
+      "value": 17049,
+      "tolerance": 1
+     }
+    ]
+   }
   },
   {
    "id": "breadth-content-001",
@@ -8221,7 +9702,32 @@
     }
    },
    "rubric": "Reports what the documents for this customer actually say was found, replaced, checked or recommended, consistent with the reference; says nothing is on file if the reference is empty. No invented findings.",
-   "citeWhat": "the service ticket / work order the finding came from"
+   "citeWhat": "the service ticket / work order the finding came from",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Install 4 ton Goodman system, R-410A charge",
+       "System operating normally after visit",
+       "Replaced air filter",
+       "Checked refrigerant charge"
+      ]
+     },
+     {
+      "type": "text",
+      "value": [
+       "Install 3 ton Carrier system, R-410A charge",
+       "Annual maintenance agreement enrollment",
+       "System operating normally after visit",
+       "Replaced air filter",
+       "Checked refrigerant charge",
+       "Customer reports weak airflow, tech dispatched today.",
+       "Residential AC change-out"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "breadth-content-033",
@@ -8244,7 +9750,29 @@
     }
    },
    "rubric": "Reports what the documents for this customer actually say was found, replaced, checked or recommended, consistent with the reference; says nothing is on file if the reference is empty. No invented findings.",
-   "citeWhat": "the service ticket / work order the finding came from"
+   "citeWhat": "the service ticket / work order the finding came from",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Install 3 ton Goodman system, R-410A charge",
+       "No cooling, dispatch for diagnosis",
+       "Annual PM: cleaned coil, checked charge",
+       "System operating normally after visit"
+      ]
+     },
+     {
+      "type": "text",
+      "value": [
+       "Install 5 ton Carrier system, R-410A charge",
+       "Annual maintenance agreement enrollment",
+       "Annual PM: cleaned coil, checked charge",
+       "System operating normally after visit"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "breadth-content-034",
@@ -8267,7 +9795,30 @@
     }
    },
    "rubric": "Reports what the documents for this customer actually say was found, replaced, checked or recommended, consistent with the reference; says nothing is on file if the reference is empty. No invented findings.",
-   "citeWhat": "the service ticket / work order the finding came from"
+   "citeWhat": "the service ticket / work order the finding came from",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Install 5 ton Daikin system, R-410A charge",
+       "Checked refrigerant charge",
+       "Replaced air filter",
+       "System operating normally after visit"
+      ]
+     },
+     {
+      "type": "text",
+      "value": [
+       "Install 3 ton Mitsubishi system, R-410A charge",
+       "Annual maintenance agreement enrollment",
+       "Checked refrigerant charge",
+       "Replaced air filter",
+       "System operating normally after visit"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "breadth-content-035",
@@ -8290,7 +9841,31 @@
     }
    },
    "rubric": "Reports what the documents for this customer actually say was found, replaced, checked or recommended, consistent with the reference; says nothing is on file if the reference is empty. No invented findings.",
-   "citeWhat": "the service ticket / work order the finding came from"
+   "citeWhat": "the service ticket / work order the finding came from",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Install 3 ton Trane system, R-410A charge",
+       "Checked refrigerant charge",
+       "Replaced air filter",
+       "System operating normally after visit"
+      ]
+     },
+     {
+      "type": "text",
+      "value": [
+       "Install 4 ton Carrier system, R-410A charge",
+       "Annual maintenance agreement enrollment",
+       "Checked refrigerant charge",
+       "Replaced air filter",
+       "System operating normally after visit",
+       "Residential AC change-out"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "breadth-content-036",
@@ -8313,7 +9888,22 @@
     }
    },
    "rubric": "Reports what the documents for this customer actually say was found, replaced, checked or recommended, consistent with the reference; says nothing is on file if the reference is empty. No invented findings.",
-   "citeWhat": "the service ticket / work order the finding came from"
+   "citeWhat": "the service ticket / work order the finding came from",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Install 4 ton Rheem system, R-410A charge",
+       "Coil clean, no leaks found",
+       "Refrigerant charge within spec",
+       "Checked refrigerant charge",
+       "Replaced air filter",
+       "System operating normally after visit"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "breadth-content-037",
@@ -8336,7 +9926,21 @@
     }
    },
    "rubric": "Reports what the documents for this customer actually say was found, replaced, checked or recommended, consistent with the reference; says nothing is on file if the reference is empty. No invented findings.",
-   "citeWhat": "the service ticket / work order the finding came from"
+   "citeWhat": "the service ticket / work order the finding came from",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "Install 5 ton Lennox system, R-454B charge",
+       "Annual maintenance agreement enrollment",
+       "Checked refrigerant charge",
+       "Replaced air filter",
+       "System operating normally after visit"
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "breadth-semantic-001",
@@ -9252,7 +10856,55 @@
     }
    },
    "rubric": "Describes the month-by-month direction of service calls this year (up, down or flat) consistent with the monthly reference counts; does not invent months.",
-   "citeWhat": "the service documents counted"
+   "citeWhat": "the service documents counted",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "number",
+      "value": 1
+     },
+     {
+      "type": "number",
+      "value": 5
+     },
+     {
+      "type": "number",
+      "value": 1
+     },
+     {
+      "type": "number",
+      "value": 2
+     },
+     {
+      "type": "number",
+      "value": 1
+     },
+     {
+      "type": "number",
+      "value": 4
+     },
+     {
+      "type": "number",
+      "value": 3
+     },
+     {
+      "type": "number",
+      "value": 28
+     },
+     {
+      "type": "text",
+      "value": [
+       "up",
+       "increas",
+       "trending up",
+       "grown",
+       "growing",
+       "rising"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-rankings-001",
@@ -10597,7 +12249,27 @@
     }
    },
    "rubric": "Explains the warranty status of this customer's unit(s) with the actual dates (install date, warranty expiry) from the reference; says so if no warranty date is on file. No invented dates.",
-   "citeWhat": "the unit's warranty record (expiry date) or the warranty document"
+   "citeWhat": "the unit's warranty record (expiry date) or the warranty document",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2019-03-19"
+     },
+     {
+      "type": "date",
+      "value": "2029-03-19"
+     },
+     {
+      "type": "date",
+      "value": "2016-06-10"
+     },
+     {
+      "type": "date",
+      "value": "2021-06-10"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-002",
@@ -10621,7 +12293,27 @@
     }
    },
    "rubric": "Explains the warranty status of this customer's unit(s) with the actual dates (install date, warranty expiry) from the reference; says so if no warranty date is on file. No invented dates.",
-   "citeWhat": "the unit's warranty record (expiry date) or the warranty document"
+   "citeWhat": "the unit's warranty record (expiry date) or the warranty document",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2021-07-07"
+     },
+     {
+      "type": "date",
+      "value": "2031-07-07"
+     },
+     {
+      "type": "date",
+      "value": "2018-10-26"
+     },
+     {
+      "type": "date",
+      "value": "2023-10-26"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-003",
@@ -10645,7 +12337,27 @@
     }
    },
    "rubric": "Explains the warranty status of this customer's unit(s) with the actual dates (install date, warranty expiry) from the reference; says so if no warranty date is on file. No invented dates.",
-   "citeWhat": "the unit's warranty record (expiry date) or the warranty document"
+   "citeWhat": "the unit's warranty record (expiry date) or the warranty document",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2020-08-24"
+     },
+     {
+      "type": "date",
+      "value": "2025-08-24"
+     },
+     {
+      "type": "date",
+      "value": "2017-11-15"
+     },
+     {
+      "type": "date",
+      "value": "2022-11-15"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-004",
@@ -10669,7 +12381,27 @@
     }
    },
    "rubric": "Explains the warranty status of this customer's unit(s) with the actual dates (install date, warranty expiry) from the reference; says so if no warranty date is on file. No invented dates.",
-   "citeWhat": "the unit's warranty record (expiry date) or the warranty document"
+   "citeWhat": "the unit's warranty record (expiry date) or the warranty document",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2016-06-14"
+     },
+     {
+      "type": "date",
+      "value": "2021-06-14"
+     },
+     {
+      "type": "date",
+      "value": "2013-09-05"
+     },
+     {
+      "type": "date",
+      "value": "2023-09-05"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-005",
@@ -10712,7 +12444,15 @@
     }
    },
    "rubric": "Describes the most recent service visit for this customer (date and what was done or found) consistent with the reference; must not describe a different visit or invent work.",
-   "citeWhat": "the service document for that visit"
+   "citeWhat": "the service document for that visit",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2021-03-09"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-006",
@@ -10755,7 +12495,15 @@
     }
    },
    "rubric": "Describes the most recent service visit for this customer (date and what was done or found) consistent with the reference; must not describe a different visit or invent work.",
-   "citeWhat": "the service document for that visit"
+   "citeWhat": "the service document for that visit",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-007",
@@ -10798,7 +12546,15 @@
     }
    },
    "rubric": "Describes the most recent service visit for this customer (date and what was done or found) consistent with the reference; must not describe a different visit or invent work.",
-   "citeWhat": "the service document for that visit"
+   "citeWhat": "the service document for that visit",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-008",
@@ -10841,7 +12597,15 @@
     }
    },
    "rubric": "Describes the most recent service visit for this customer (date and what was done or found) consistent with the reference; must not describe a different visit or invent work.",
-   "citeWhat": "the service document for that visit"
+   "citeWhat": "the service document for that visit",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ]
+   }
   },
   {
    "id": "breadth-explain-009",
@@ -14290,7 +16054,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-130",
@@ -14320,7 +16099,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-131",
@@ -14350,7 +16144,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-132",
@@ -14380,7 +16189,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-133",
@@ -14410,7 +16234,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-134",
@@ -14440,7 +16279,25 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-08-28"
+     },
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-08-28",
+      "2026-09-21"
+     ]
+    }
+   }
   },
   {
    "id": "breadth-connect-135",
@@ -14470,7 +16327,30 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-02-18"
+     },
+     {
+      "type": "date",
+      "value": "2026-02-18"
+     },
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-02-18",
+      "2026-02-18",
+      "2026-09-21"
+     ]
+    }
+   }
   },
   {
    "id": "breadth-connect-136",
@@ -14500,7 +16380,20 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-09-21"
+     ]
+    }
+   }
   },
   {
    "id": "breadth-connect-137",
@@ -14530,7 +16423,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-138",
@@ -14560,7 +16468,22 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "nothing",
+       "no visits",
+       "no activity",
+       "not on file",
+       "no records"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-139",
@@ -14590,7 +16513,20 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-03-20"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-03-20"
+     ]
+    }
+   }
   },
   {
    "id": "breadth-connect-140",
@@ -14620,7 +16556,20 @@
     }
    },
    "rubric": "Narrates the customer's service visits and key documents this year in date order (each with its own date), consistent with the reference; says nothing happened this year if the reference is empty. Must not invent a visit, date or finding not in the reference.",
-   "citeWhat": "each visit or document it narrates"
+   "citeWhat": "each visit or document it narrates",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "date",
+      "value": "2026-09-21"
+     }
+    ],
+    "order": {
+     "dates": [
+      "2026-09-21"
+     ]
+    }
+   }
   },
   {
    "id": "breadth-connect-141",
@@ -14649,7 +16598,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-142",
@@ -14678,7 +16642,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-143",
@@ -14707,7 +16686,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-144",
@@ -14736,7 +16730,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-145",
@@ -14765,7 +16774,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-146",
@@ -14794,7 +16818,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-147",
@@ -14823,7 +16862,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-148",
@@ -14852,7 +16906,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-149",
@@ -14881,7 +16950,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-150",
@@ -14910,7 +16994,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-151",
@@ -14939,7 +17038,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   },
   {
    "id": "breadth-connect-152",
@@ -14968,7 +17082,22 @@
     }
    },
    "rubric": "If the reference shows a document value (address, phone or email) that differs from what is on the customer record, says so and states which one should be trusted (normally the most recently dated one) with a reason; if the reference shows no disagreement, says the records agree. Must not invent a conflict or a value not in the reference.",
-   "citeWhat": "the document whose value differs from the record"
+   "citeWhat": "the document whose value differs from the record",
+   "keyFacts": {
+    "required": [
+     {
+      "type": "text",
+      "value": [
+       "agree",
+       "no disagreement",
+       "match",
+       "consistent",
+       "no conflict"
+      ]
+     }
+    ],
+    "citationRequired": false
+   }
   }
  ]
 }

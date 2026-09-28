@@ -51,9 +51,17 @@ import { logStage } from "./perf.js";
  * ingest.perDay, the same override mechanism every bucket already had.
  */
 export const DEFAULT_LIMITS = Object.freeze({
-  ask:    { perMinute: 20,  perDay: 900 }, // 30% of Solo's 3,000/month — see PLAN_DAILY_ASKS
-  ingest: { perMinute: 60,  perDay: 2000 },
-  read:   { perMinute: 120, perDay: 5000 },
+  ask:     { perMinute: 20,  perDay: 900 }, // 30% of Solo's 3,000/month — see PLAN_DAILY_ASKS
+  ingest:  { perMinute: 60,  perDay: 2000 },
+  read:    { perMinute: 120, perDay: 5000 },
+  // R22 (S1, security audit): api/billing.js's checkout/portal actions each make a real call to
+  // Stripe (CreateCustomer/CreateCheckoutSession/CreatePortalSession) on nothing but a valid Clerk
+  // session — no per-tenant cap existed before this, so an authenticated caller (any solo tenant, or
+  // any shop admin) could loop it and either burn the account's shared Stripe API rate limit for
+  // every tenant or spam abandoned Checkout/Portal Sessions. Sized generously for a human clicking
+  // "Upgrade"/"Manage billing" a few times while comparing plans, nowhere near what a real workflow
+  // needs in a day.
+  billing: { perMinute: 6,   perDay: 60 },
 });
 
 /** Fixed window size for the burst limiter. Exported so callers/tests can

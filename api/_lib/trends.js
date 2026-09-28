@@ -73,6 +73,23 @@ const THAN_RE = /\b(?:than|compared\s+(?:to|with))\b/i;
 const THIS_YEAR_ANY_RE = /\b(?:so\s+far\s+)?this\s+year\b/i;
 const LAST_YEAR_ANY_RE = /\blast\s+year\b/i;
 
+// R21 M2 (Cluster 2, j064: "have we had more service visits this quarter than in the same
+// quarter last year"): grain==='quarter' + COMPARATIVE_RE + THAN_RE used to fall straight into
+// the generic `{kind:'compare', grain:'quarter'}` path below, whose periodBounds ALWAYS means
+// "the last two full completed quarters" (e.g. asked in Q3, that's Q2 vs Q1) — there is no
+// reading of "this quarter" in periodBounds at all, so a genuine "this quarter vs a year ago"
+// question silently got compared against the wrong two quarters entirely (Q2/Q1 instead of the
+// current, still-in-progress Q3 vs Q3 a year back). Same idiom the year-grain THIS_YEAR_ANY_RE
+// exclusion above already uses for installCount/invoiceSum (those two now have their own real
+// year-YoY engines — analytics/comparison.js's detectInstallYearComparison, financials'
+// revenueYearComparison), but serviceCount has no lower-precedence engine that handles this
+// shape, so this file must answer it directly rather than yielding to a fallthrough that doesn't
+// exist. "this quarter" is naturally partial (bounded by today); the same-quarter-last-year side
+// is compared as the FULL quarter a year back — the same "whole other period, only the CURRENT
+// one is trimmed by today" convention detectInstallYearComparison already uses for years.
+const THIS_QUARTER_RE = /\bthis\s+quarter\b/i;
+const SAME_QUARTER_LAST_YEAR_RE = /\bsame\s+quarter\b[\s\S]{0,20}\b(?:last\s+year|a\s+year\s+ago|year\s+ago|year\s+earlier)\b/i;
+
 /** Pure: question -> {kind:'compare', metric, grain} | {kind:'monthMax'|'monthSeries', metric} | null. */
 export function parseTrends(question) {
   const q = String(question ?? '').trim();
@@ -91,6 +108,9 @@ export function parseTrends(question) {
     const grain = detectGrain(q);
     if (metric && grain) {
       if (grain === 'year' && THIS_YEAR_ANY_RE.test(q) && LAST_YEAR_ANY_RE.test(q)) return null;
+      if (grain === 'quarter' && THIS_QUARTER_RE.test(q) && SAME_QUARTER_LAST_YEAR_RE.test(q)) {
+        return { kind: 'compareYoYQuarter', metric };
+      }
       return { kind: 'compare', metric, grain };
     }
   }
@@ -228,6 +248,37 @@ async function runCompare(db, intent, today) {
   });
 }
 
+/** "this quarter" (partial, through today) vs the FULL same quarter a year back. */
+async function runCompareYoYQuarter(db, intent, today) {
+  const rows = await metricRows(db, intent.metric);
+  const thisQStart = truncPeriod(today, 'quarter');
+  const nextDay = new Date(`${today}T00:00:00Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const p0to = nextDay.toISOString().slice(0, 10);
+  const lastYearQStart = shiftPeriod(thisQStart, 'quarter', -4);
+  const lastYearQEnd = shiftPeriod(lastYearQStart, 'quarter', 1);
+  const a = reduceMetric(intent.metric, rows, thisQStart, p0to);
+  const b = reduceMetric(intent.metric, rows, lastYearQStart, lastYearQEnd);
+  const up = a.value > b.value;
+  const flat = a.value === b.value;
+  const noun = metricNoun(intent.metric);
+  const l0 = `${periodLabel('quarter', thisQStart)} so far`;
+  const l1 = periodLabel('quarter', lastYearQStart);
+  const text = flat
+    ? `No — ${l0} and ${l1} both had ${fmtValue(intent.metric, a.value)} ${noun} on file.`
+    : `${up ? 'Yes' : 'No'} — ${l0} had ${fmtValue(intent.metric, a.value)} ${noun}, vs ${fmtValue(intent.metric, b.value)} in ${l1}.`;
+  const facts = [
+    { label: l0, value: fmtValue(intent.metric, a.value) },
+    { label: l1, value: fmtValue(intent.metric, b.value) },
+  ];
+  const docIds = [...new Set([...a.docIds, ...b.docIds])].slice(0, 40);
+  const records = intent.metric === 'installCount' ? [] : await documentRecordsFor(db, docIds);
+  return attachCitations(answerEnvelope({ text, facts }), {
+    records, total: a.docIds.length + b.docIds.length,
+    basis: `Counted ${noun} in ${l0} (${a.docIds.length}) and ${l1} (${b.docIds.length}), by ${intent.metric === 'invoiceSum' ? 'invoice date' : intent.metric === 'installCount' ? 'installation year' : 'service date'}.`,
+  });
+}
+
 async function runMonthMax(db, intent, today) {
   const rows = await metricRows(db, intent.metric);
   const yearStart = `${today.slice(0, 4)}-01-01`;
@@ -272,6 +323,7 @@ async function runMonthSeries(db, intent, today) {
 export async function runTrends(db, intent, { today } = {}) {
   const t = isoDate(today) ?? new Date().toISOString().slice(0, 10);
   if (intent.kind === 'compare') return runCompare(db, intent, t);
+  if (intent.kind === 'compareYoYQuarter') return runCompareYoYQuarter(db, intent, t);
   if (intent.kind === 'monthMax') return runMonthMax(db, intent, t);
   if (intent.kind === 'monthSeries') return runMonthSeries(db, intent, t);
   return null;

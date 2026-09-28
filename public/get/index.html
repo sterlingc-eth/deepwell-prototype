@@ -74,7 +74,8 @@ summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:
 details p{margin:8px 0 0;color:var(--muted);max-width:70ch}
 footer{border-top:1px solid var(--line);padding-block:22px;color:var(--faint);font-size:.88rem}
 footer .wrap{display:flex;flex-wrap:wrap;gap:12px 20px;justify-content:space-between}
-footer a{color:var(--faint);text-decoration:none;margin-right:16px}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 16px;min-width:0}
+footer a{color:var(--faint);text-decoration:none}
 footer a:hover{color:var(--text)}
 /* device-specific blocks: JS sets data-device on <html>; without JS everything shows */
 html[data-device="phone"] .only-desktop{display:none}

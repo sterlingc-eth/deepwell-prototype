@@ -62,6 +62,12 @@ import { promoteMissToExamCandidate, insertPromotedTest, listPromotedTests, rows
 import { semanticStatus, runBackfill } from './_lib/search/store.js';
 // TEAM T2 (2026-09-25): dossiers — status + resumable, budget-aware backfill (api/_lib/search/dossier.js).
 import { dossierStatus, runDossierBackfillPage } from './_lib/search/dossier.js';
+// Round 22 (S2, privacy): time-boxed, revocable, logged staff access to a tenant's own content — see
+// api/_lib/privacy/supportAccess.js's own module doc for the gap this closes and which operator
+// actions below need it (gateSupportAccess) vs. are exempt (SUPPORT-ACCESS-EXEMPT comments).
+import {
+  requireSupportAccess, grantSupportAccess, revokeSupportAccess, getActiveGrant, listGrants, listAccessLog,
+} from './_lib/privacy/supportAccess.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -122,6 +128,30 @@ function requireOperator(auth) {
   }
 }
 
+// Round 22 (S2, privacy): the SECOND gate an operator action needs, beyond requireOperator above —
+// requireOperator only proves the caller IS DeepWell staff; it says nothing about whether THIS
+// tenant (ctx.tenantKey — whichever org the caller's own JWT happens to belong to, see auth.js's
+// deriveAuth) has actually agreed to let staff look at its content right now. See
+// api/_lib/privacy/supportAccess.js's module doc for the full reasoning and the founder-tenant
+// exemption. `payload.emergencyReason` is the documented "break-glass" escape hatch — a non-empty
+// string proceeds with no grant, but is logged with is_emergency=true and surfaced in that tenant's
+// own Access log (Settings), never silently.
+async function gateSupportAccess(auth, ctx, action, payload, recordCount) {
+  const decision = await requireSupportAccess(ctx, {
+    staffUserId: auth.userId,
+    action,
+    recordCount,
+    emergencyReason: payload?.emergencyReason,
+  });
+  if (!decision.allowed) {
+    throw new reviewStore.ReviewError(
+      'This tenant has not granted DeepWell staff support access. Ask the tenant\'s admin to grant time-boxed access in Settings, or resubmit with an emergencyReason for a logged break-glass access.',
+      403
+    );
+  }
+  return decision;
+}
+
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
   // 300 (Vercel Pro, 2026-09-25): reclassify can make up to 20 sequential model calls (see reviewStore.js's
@@ -180,6 +210,13 @@ const ACTIONS = new Set([
   'examPromote',
   'examList',
   'examExport',
+  // Round 22 (S2, privacy): tenant-admin-managed, NOT operator-gated — a tenant's own admin grants/
+  // revokes/reads access to their OWN tenant (requireAdmin below), same as billing or the data export
+  // in AccountSettingsCard already are.
+  'supportAccessGrant',
+  'supportAccessRevoke',
+  'supportAccessStatus',
+  'supportAccessLog',
 ]);
 
 export default async (req, res) => {
@@ -335,6 +372,11 @@ export default async (req, res) => {
         requireAdmin(auth);
         result = await exportMisses(ctx);
         break;
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): cross-tenant AGGREGATE, no single tenant's content —
+      // buildMissDigest merges every tenant's ask_misses together and reports only tenantCount (never
+      // which tenants), with email/phone already redacted out of the question text it groups on (see
+      // api/_lib/missDigest.js's own redactPII). Matches the R22 contract's "platform-wide aggregate
+      // metrics with no tenant content" exception; docs/SECURITY.md names this explicitly.
       case 'missDigest':
         requireOperator(auth);
         result = payload.send === true
@@ -343,6 +385,10 @@ export default async (req, res) => {
         break;
       case 'learningList': {
         requireOperator(auth);
+        // SUPPORT-ACCESS (Round 22, S2): reads THIS tenant's own open misses, replays, and promoted
+        // tests (listOpenMisses/listReplays/listPromotedTests below all run against ctx.tenantKey) —
+        // exactly the "misses/learning data" the R22 contract requires a grant for.
+        await gateSupportAccess(auth, ctx, action, payload);
         // Both the proposal queue AND the currently-active learned items in
         // one round trip — the DonovanLearningCard UI needs both (pending
         // proposals to decide, active items to deactivate) and there is no
@@ -396,6 +442,10 @@ export default async (req, res) => {
         };
         break;
       }
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): donovan_proposals/donovan_learned are PLATFORM-level
+      // tables with no tenant_id column at all (see M3-config/26's own doc comment) — Donovan's own
+      // routing-rule bank, not any one tenant's customer/document content. learningDecide/Deactivate/
+      // RunNow/Export/RejectAllGaps below all read or write only those two tables.
       case 'learningDecide': {
         requireOperator(auth);
         const id = payload.id;
@@ -436,11 +486,17 @@ export default async (req, res) => {
         result = { ok: true, status: 'approved', verification };
         // Approving a "Can't do yet" note must DO something: replay its example question now and, on a
         // grounded answer, create + activate its recipe. The outcome comes back for the card to show.
+        // SUPPORT-ACCESS (Round 22, S2): unlike the rest of learningDecide (see the exemption comment
+        // above), THIS branch runs the example question through the agent against ctx's real
+        // documents (replayCapabilityGap -> replayMisses) — the exemption does not cover it.
         if (proposal.kind === 'capability_gap') {
+          await gateSupportAccess(auth, ctx, 'learningDecide.replay', payload, 1);
           result.replay = await replayCapabilityGap({ ctxArg: ctx, proposal, decidedBy: auth.userId });
         }
         break;
       }
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): donovan_learned is the same platform-level, no-tenant_id
+      // table the learningDecide exemption comment above explains.
       case 'learningDeactivate': {
         requireOperator(auth);
         if (!payload.learnedId) throw new reviewStore.ReviewError('learningDeactivate requires a learnedId.', 400);
@@ -449,10 +505,15 @@ export default async (req, res) => {
         result = { ok: true };
         break;
       }
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): triggers the nightly proposer sweep, which reads
+      // cross-tenant ask_misses aggregates and writes only to the platform-level donovan_proposals
+      // table — same shape as the exemptions above.
       case 'learningRunNow':
         requireOperator(auth);
         result = await runLearningNow();
         break;
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): bulk-decides platform-level donovan_proposals rows
+      // (same table the learningDecide exemption above explains), never a tenant's own content.
       case 'learningRejectAllGaps': {
         // ROUND 14 (brief item 4): bulk-reject "Can't do yet" (capability_gap) notes — the whole
         // pending queue when no `ids` are given (the card's own "Reject all feature requests"), or
@@ -471,9 +532,13 @@ export default async (req, res) => {
       }
       case 'learningReplay': {
         requireOperator(auth);
+        // SUPPORT-ACCESS (Round 22, S2): re-runs this tenant's own open misses through the Donovan
+        // agent against ITS OWN real documents (replayMisses) — a "replay ... against a tenant" in
+        // the R22 contract's own words.
         const questions = Array.isArray(payload.questions)
           ? payload.questions.filter((q) => typeof q === 'string').slice(0, 15).map((q) => q.slice(0, 300))
           : undefined;
+        await gateSupportAccess(auth, ctx, action, payload, questions?.length);
         result = await replayMisses({ ctxArg: ctx, questions, force: payload.force === true, source: 'operator' });
         break;
       }
@@ -490,22 +555,33 @@ export default async (req, res) => {
         }
         break;
       }
+      // SUPPORT-ACCESS (Round 22, S2): "everything runs against the CALLING operator's own tenant"
+      // (see api/_lib/routes/scorecard.js's own module doc) — normally the founder tenant (exempt),
+      // but nothing stops an operator's JWT from belonging to some OTHER tenant instead (exactly the
+      // Clerk-membership gap this file closes), and scorecardRun/Baseline ask real questions of, and
+      // scorecardStatus reads real run results (including answer text) from, THAT tenant's own data.
       case 'scorecardRun':
         requireOperator(auth);
+        await gateSupportAccess(auth, ctx, action, payload);
         result = await scorecardRunAction(ctx, auth, payload);
         break;
       case 'scorecardStatus':
         requireOperator(auth);
+        await gateSupportAccess(auth, ctx, action, payload);
         result = await scorecardStatusAction(ctx, payload);
         break;
       case 'scorecardBaseline':
         requireOperator(auth);
+        await gateSupportAccess(auth, ctx, action, payload);
         result = await scorecardBaselineAction(ctx, auth, payload);
         break;
       // TEAM H (2026-09-24): the autonomous per-tenant learning loop's own operator summary — last
       // night's per-tenant counts (audit_log, no question text), spend vs. the daily caps, and which
       // tenant runs next in tonight's fair rotation. Read-only; the loop itself only ever runs from
       // cron-sweep.js's nightly step.
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): platform-wide aggregate — per-tenant COUNTS and dollar
+      // spend across every tenant in one response, no single tenant singled out, no question/answer
+      // content. Matches the R22 contract's aggregate-metrics exception.
       case 'learningAutopilotStatus': {
         requireOperator(auth);
         const [summaries, eligible, gapReport] = await Promise.all([
@@ -526,6 +602,10 @@ export default async (req, res) => {
         };
         break;
       }
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): cross-tenant aggregate clustering — buildGapReport
+      // groups scorecard/miss failures by CAPABILITY across every tenant, and "never carry raw
+      // question text: ask_misses only ever exposes its own already-redacted question_normalized"
+      // (see gapReport.js's own module doc); tenantCount only, never which tenants.
       case 'learningGapReport': {
         requireOperator(auth);
         // A live rebuild (cross-tenant scan) on demand, or the last one the nightly step stored —
@@ -559,6 +639,8 @@ export default async (req, res) => {
         result = { ...run, status: await dossierStatus(ctx) };
         break;
       }
+      // SUPPORT-ACCESS-EXEMPT (Round 22, S2): donovan_proposals is the same platform-level, no-
+      // tenant_id table the learningDecide exemption comment above explains.
       case 'learningExport':
         requireOperator(auth);
         {
@@ -579,8 +661,12 @@ export default async (req, res) => {
       // cross-tenant. `normalized` should be the exact key a prior `learningList` response gave for
       // this miss (its `answeredNowMisses[].normalized`); a caller with only `question` falls back to
       // using it as its own key (still correct, just not overlay-normalized).
+      // SUPPORT-ACCESS (Round 22, S2): examPromote/List/Export below all read/write THIS tenant's own
+      // donovan_promoted_tests — real production questions and (for examPromote) a real extraction
+      // value from this tenant's own documents (see examPromote.js's own oracleKind doc).
       case 'examPromote': {
         requireOperator(auth);
+        await gateSupportAccess(auth, ctx, action, payload, 1);
         const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 300) : '';
         const normalized = typeof payload.normalized === 'string' && payload.normalized ? payload.normalized.slice(0, 300) : question;
         if (!question) throw new reviewStore.ReviewError('examPromote requires a question.', 400);
@@ -609,18 +695,53 @@ export default async (req, res) => {
         result = { ok: true, id: candidate.question.id, question: candidate.question, oracleKind: candidate.oracleKind };
         break;
       }
-      case 'examList':
+      case 'examList': {
         requireOperator(auth);
-        result = { items: rowsToQuestions(await listPromotedTests(ctx, { limit: payload.limit ?? 500 })) };
+        await gateSupportAccess(auth, ctx, action, payload);
+        const rows = await listPromotedTests(ctx, { limit: payload.limit ?? 500 });
+        result = { items: rowsToQuestions(rows) };
         break;
+      }
       // Returns this tenant's promoted set in the exact JSON shape
       // test-docs/scorecard/generalization/*.json files use (plus `tenantKey`) — an operator saves it
       // as test-docs/scorecard/promoted/<tenant-slug>.json (see that directory's README) the same
       // weekly-repo-sync way learningExport's output gets folded into nlNormalize.js.
-      case 'examExport':
+      case 'examExport': {
         requireOperator(auth);
-        result = buildPromotedExport(ctx.tenantKey, rowsToQuestions(await listPromotedTests(ctx, { limit: 2000 })));
+        await gateSupportAccess(auth, ctx, action, payload);
+        const rows = await listPromotedTests(ctx, { limit: 2000 });
+        result = buildPromotedExport(ctx.tenantKey, rowsToQuestions(rows));
         break;
+      }
+      // Round 22 (S2, privacy): a tenant's own admin managing SUPPORT ACCESS to their OWN tenant —
+      // requireAdmin (same gate as merge/data-export), never requireOperator: this is the tenant
+      // deciding who may look at ITS data, not DeepWell staff acting on someone else's.
+      case 'supportAccessGrant': {
+        requireAdmin(auth);
+        const grant = await grantSupportAccess(ctx, { hours: payload.hours, reason: payload.reason }, auth.userId);
+        if (!grant) throw new reviewStore.ReviewError('Could not create a support-access grant (migration 58 may not be applied yet).', 503);
+        result = { ok: true, grant };
+        break;
+      }
+      case 'supportAccessRevoke': {
+        requireAdmin(auth);
+        if (!payload.grantId) throw new reviewStore.ReviewError('supportAccessRevoke requires a grantId.', 400);
+        const ok = await revokeSupportAccess(ctx, payload.grantId, auth.userId);
+        if (!ok) throw new reviewStore.ReviewError('Grant not found, or already revoked/expired.', 404);
+        result = { ok: true };
+        break;
+      }
+      case 'supportAccessStatus': {
+        requireAdmin(auth);
+        const [active, history] = await Promise.all([getActiveGrant(ctx), listGrants(ctx, { limit: 10 })]);
+        result = { active, history };
+        break;
+      }
+      case 'supportAccessLog': {
+        requireAdmin(auth);
+        result = { items: await listAccessLog(ctx, { limit: payload.limit ?? 200 }) };
+        break;
+      }
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }

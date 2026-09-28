@@ -22,15 +22,35 @@
  * Reports turn-level and dialogue-level accuracy (a dialogue counts as passed only if every one of its
  * turns passed).
  *
- *   node scripts/run-dialogues.mjs [out.json]
+ * ROUND 21 (L1): accepts an optional dialogues FILE (a name under test-docs/scorecard/generalization/,
+ * e.g. "dialogues-2.json", or an absolute/relative path to any {version, category, dialogues} file) so
+ * scripts/verify-dialogues.mjs can gate a second dialogue set (dialogues-2) through this same harness
+ * without duplicating any of the replay/grading logic below. Every existing caller that passes only an
+ * out-path (or nothing) keeps replaying dialogues-1.json exactly as before - this is additive.
+ *
+ *   node scripts/run-dialogues.mjs [out.json] [dialogues-file]
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DIALOGUES_FILE = path.join(ROOT, "test-docs/scorecard/generalization/dialogues-1.json");
+const DEFAULT_DIALOGUES_FILE = path.join(ROOT, "test-docs/scorecard/generalization/dialogues-1.json");
+const GENERALIZATION_DIR = path.join(ROOT, "test-docs/scorecard/generalization");
 const TODAY = "2026-09-26"; // same convention as verify-field-phrasing-2/3.mjs's own standalone runs
+
+/** Resolves `opts.dialoguesFile`/the CLI's 2nd argv to an actual file path: a bare filename (or one with
+ *  no path separators) is looked up under test-docs/scorecard/generalization/ first (so "dialogues-2.json"
+ *  just works), otherwise it is treated as a path relative to ROOT (or absolute). Falls back to
+ *  dialogues-1.json when nothing is given, so every pre-existing call is untouched. */
+function resolveDialoguesFile(nameOrPath) {
+  if (!nameOrPath) return DEFAULT_DIALOGUES_FILE;
+  if (!nameOrPath.includes("/") && !nameOrPath.includes(path.sep)) {
+    const underGen = path.join(GENERALIZATION_DIR, nameOrPath);
+    if (fs.existsSync(underGen)) return underGen;
+  }
+  return path.isAbsolute(nameOrPath) ? nameOrPath : path.resolve(ROOT, nameOrPath);
+}
 
 /** Mirrors src/components/ask/conversationTurn.ts's CLARIFICATION_RE exactly (that file's own doc
  *  comment: every current disambiguation answer uses this phrasing — a stable, cross-cutting UX marker,
@@ -47,6 +67,7 @@ const CLARIFICATION_RE = /which\s+\w+\s+(?:do|did)\s+you\s+mean/i;
 async function main(opts = {}) {
   const outArg = opts.outPath ?? process.argv[2];
   const outPath = outArg ? path.resolve(outArg) : path.join(ROOT, "dialogues-results.json");
+  const dialoguesFile = resolveDialoguesFile(opts.dialoguesFile ?? process.argv[3]);
 
   process.env.NEON_CONNECTION_STRING ||= "postgres://harness:harness@localhost:5432/harness";
   delete process.env.ANTHROPIC_API_KEY;
@@ -139,7 +160,7 @@ async function main(opts = {}) {
     return { passed: false, why: `unknown expect.kind ${expect.kind}` };
   }
 
-  const file = JSON.parse(fs.readFileSync(DIALOGUES_FILE, "utf8"));
+  const file = JSON.parse(fs.readFileSync(dialoguesFile, "utf8"));
   const dialogues = Array.isArray(file.dialogues) ? file.dialogues : [];
 
   const perTurn = [];

@@ -42,7 +42,12 @@ function findAnchor(turns) {
   for (let i = turns.length - 1; i >= 0; i--) {
     const t = turns[i];
     const fromEntities = subjectFromEntities(t.resolvedEntities);
-    if (fromEntities.hasAny && (fromEntities.address || fromEntities.name || fromEntities.candidateUnits?.length)) {
+    // R21 (M3, C9): `listScope` is what a MULTI-entity prior turn (a city-scoped customer count, a
+    // brand-filtered equipment list — neither reduces to a single name/address) carries forward; it
+    // must count as a real anchor exactly like address/name/candidateUnits do below, or an 8-of-10
+    // dialogue shape ("how many customers in Tempe" -> "how many of those have a Carrier unit")
+    // silently loses the whole prior turn (see subjectFromEntities' own doc comment).
+    if (fromEntities.hasAny && (fromEntities.address || fromEntities.name || fromEntities.candidateUnits?.length || fromEntities.listScope)) {
       return { subject: fromEntities, turn: t };
     }
     const fromText = subjectFromText(t.question);
@@ -294,7 +299,13 @@ export function resolveFollowup(context, question) {
   }
 
   const curSubj = subjectFromText(q);
-  if (curSubj.hasAny) {
+  // R21 (M3): a STRONG subject (a real address/name/customer-number/identifier) really does make the
+  // question self-contained — never staple the anchor on top of it. A bare `cityOnly` hit is weaker:
+  // "how many of those are in Mesa" names a place but is still built entirely around a dangling
+  // "those" that needs the anchor's own noun/brand — treating cityOnly alone as "already
+  // self-contained" (the old behavior) silently dropped the anchor's scope on exactly this shape.
+  const hasStrongSubject = Boolean(curSubj.address || curSubj.name || curSubj.customerNumber || curSubj.identifier);
+  if (hasStrongSubject) {
     // The question already names its OWN subject — never staple the anchor's on top of it. Filters
     // (date range / doc type) still merge; the ENTITY never does.
     return { query: clip(q), filters: composeFollowupFilters(priorTurn.resolvedFilters, q), isFollowup: true, kind: 'own-subject', needsClarification: false };

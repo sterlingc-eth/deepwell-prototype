@@ -1,0 +1,2983 @@
+{
+  "version": "2026-09-27.field-phrasing-4-r21",
+  "category": "field-phrasing-4",
+  "source": "Round 21 (L1) blind generalization set - 200 new questions, written blind: no exam.json/field-phrasing.json/field-phrasing-2.json/field-phrasing-3.json question text and no engine regex read while writing them; grounded only in scripts/golden/golden-export.json (queried live) + the exam file format. Emphasis this round (fp-3 now tuned against): mixed multi-constraint questions (brand+city+time+status, 4 conditions at once), relative time phrasing (last 6 weeks, before the summer, since we started, past quarter), counterfactual/\"which don't\" questions, money questions answerable from documents with honest-decline where the data is absent (balance_due/amount_paid/due_date are NULL on every row), equipment age/replacement-candidate questions, technician questions, and 25 adversarial traps (near-miss names, fake addresses one digit off, brands not carried, future dates, mixed real+fake entities).",
+  "questions": [
+    {
+      "id": "j001",
+      "text": "how many Carrier units in Tempe have had a preventive maintenance visit since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Carrier",
+          "Tempe",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j002",
+      "text": "how many Carrier systems in Mesa needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Carrier",
+          "Mesa",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j003",
+      "text": "since the start of last year, how many Carrier units in Scottsdale needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Carrier",
+          "Scottsdale",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j004",
+      "text": "how many Lennox systems in Scottsdale have needed a repair since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Lennox",
+          "Scottsdale",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j005",
+      "text": "how many Lennox units in Peoria have had a maintenance tune-up since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Lennox",
+          "Peoria",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j006",
+      "text": "how many York units in Phoenix have needed a repair since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "York",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j007",
+      "text": "since the start of last year, how many York customers in Casa Grande got a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "York",
+          "Casa Grande",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j008",
+      "text": "how many Goodman systems in Phoenix have needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Goodman",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j009",
+      "text": "how many Goodman units in Mesa have had a repair call since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Goodman",
+          "Mesa",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j010",
+      "text": "how many Goodman systems in Tucson needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Goodman",
+          "Tucson",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j011",
+      "text": "since last January, how many Goodman customers in Casa Grande got a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Goodman",
+          "Casa Grande",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j012",
+      "text": "how many Rheem units in Chandler have needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Rheem",
+          "Chandler",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j013",
+      "text": "how many Rheem systems in Mesa have had a repair call since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Rheem",
+          "Mesa",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j014",
+      "text": "how many Rheem units in Gilbert needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Rheem",
+          "Gilbert",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j015",
+      "text": "since last January, how many Rheem customers in Tucson got a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Rheem",
+          "Tucson",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j016",
+      "text": "how many Daikin systems in Tempe have needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Daikin",
+          "Tempe",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j017",
+      "text": "how many Daikin units in Glendale have had a repair call since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Daikin",
+          "Glendale",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j018",
+      "text": "how many Daikin systems in Tucson needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Daikin",
+          "Tucson",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j019",
+      "text": "how many Mitsubishi units in Chandler have needed a repair since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Mitsubishi",
+          "Chandler",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j020",
+      "text": "how many Mitsubishi systems in Mesa have had a preventive maintenance visit since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Mitsubishi",
+          "Mesa",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j021",
+      "text": "since last January, how many Mitsubishi customers in Tucson needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Mitsubishi",
+          "Tucson",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j022",
+      "text": "how many Mitsubishi units in Tucson have had a maintenance tune-up since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Mitsubishi",
+          "Tucson",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j023",
+      "text": "how many Trane systems in Phoenix have needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Trane",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j024",
+      "text": "since last January, how many Trane customers in Phoenix got a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Trane",
+          "Phoenix",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j025",
+      "text": "how many Carrier units in Phoenix have needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Carrier",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j026",
+      "text": "since last January, how many Carrier customers in Phoenix got a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Carrier",
+          "Phoenix",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j027",
+      "text": "how many Lennox systems in Phoenix needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Lennox",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j028",
+      "text": "since last January, how many Lennox customers in Phoenix got a maintenance tune-up",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Lennox",
+          "Phoenix",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j029",
+      "text": "how many York units in Phoenix have had a preventive maintenance visit since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "York",
+          "Phoenix",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j030",
+      "text": "how many York systems in Chandler needed a repair since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "York",
+          "Chandler",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j031",
+      "text": "since the start of last year, how many Goodman customers in Phoenix got a maintenance tune-up",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Goodman",
+          "Phoenix",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j032",
+      "text": "how many Goodman units in Chandler have needed a repair since last January",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Goodman",
+          "Chandler",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j033",
+      "text": "how many Rheem systems in Phoenix needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Rheem",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j034",
+      "text": "since last January, how many Rheem customers in Phoenix got a maintenance tune-up",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Rheem",
+          "Phoenix",
+          "Preventive Maintenance",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j035",
+      "text": "how many Daikin units in Phoenix have needed a repair since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "multi_constraint",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (\n  SELECT DISTINCT e.id FROM entities e JOIN entities c ON c.id=e.customer_id\n  WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1\n    AND c.data->>'service_address' ILIKE '%, ' || $2 || ',%'\n    AND EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id\n      JOIN extractions sd ON sd.document_id=l.document_id AND sd.field_key='service_date'\n      WHERE x.field_key='service_type' AND x.value=$3 AND (l.entity_id=e.id OR l.entity_id=e.customer_id)\n      AND sd.value::date >= make_date(extract(year from $4::date)::int - 1, 1, 1) AND sd.value::date <= $4::date)\n)\nSELECT count(*) AS n FROM m",
+        "params": [
+          "Daikin",
+          "Phoenix",
+          "Repair",
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j036",
+      "text": "how many service visits have we logged in the last 6 weeks",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '6 weeks') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j037",
+      "text": "in the last 6 weeks, how many jobs have we been out on",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '6 weeks') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j038",
+      "text": "how many jobs have we done in the past 90 days",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '90 days') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j039",
+      "text": "over the past 90 days, how many service calls have we logged",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '90 days') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j040",
+      "text": "how many service visits did we log before the summer this year",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date < make_date(extract(year from $1::date)::int, 6, 1) AND value::date >= make_date(extract(year from $1::date)::int, 1, 1)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j041",
+      "text": "before the summer started this year, how many jobs had we already done",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date < make_date(extract(year from $1::date)::int, 6, 1) AND value::date >= make_date(extract(year from $1::date)::int, 1, 1)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j042",
+      "text": "how many service visits have we had since the start of last year",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j043",
+      "text": "since last year began, how many jobs have we logged",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j044",
+      "text": "how many service calls have we had over the last quarter",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '3 months') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j045",
+      "text": "in the past quarter, how many jobs have we logged",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '3 months') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j046",
+      "text": "how many units have we installed within the past 5 years",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date >= ($1::date - interval '5 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j047",
+      "text": "in the last 5 years, how many systems have we put in",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date >= ($1::date - interval '5 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j048",
+      "text": "since we started, how many service visits have we logged in total",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j049",
+      "text": "all told, since day one, how many jobs have we been out on",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j050",
+      "text": "how many service visits have we logged within the past 2 years",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '2 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j051",
+      "text": "in the last 2 years, how many jobs have we done",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '2 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j052",
+      "text": "how many jobs have we logged so far this month",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int, extract(month from $1::date)::int, 1) AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j053",
+      "text": "so far this month, how many service calls have we had",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int, extract(month from $1::date)::int, 1) AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j054",
+      "text": "how many jobs have we been out on in the past week",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '7 days') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j055",
+      "text": "over the last week, how many service visits have we logged",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '7 days') AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j056",
+      "text": "how many service visits have we logged this quarter",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= '2026-07-01'::date AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j057",
+      "text": "so far this quarter, how many jobs have we done",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= '2026-07-01'::date AND value::date <= $1::date",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j058",
+      "text": "how many invoices have we sent out in the last 6 weeks",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND invoice_date >= ($1::date - interval '6 weeks')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j059",
+      "text": "in the last 6 weeks, how many invoices have gone out",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND invoice_date >= ($1::date - interval '6 weeks')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j060",
+      "text": "how many units did we install before the summer this year",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date < make_date(extract(year from $1::date)::int, 6, 1) AND (data->>'installation_date')::date >= make_date(extract(year from $1::date)::int, 1, 1)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j061",
+      "text": "before summer hit this year, how many installs had we done",
+      "category": "field-phrasing-4",
+      "shape": "relative_time",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date < make_date(extract(year from $1::date)::int, 6, 1) AND (data->>'installation_date')::date >= make_date(extract(year from $1::date)::int, 1, 1)",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j062",
+      "text": "have we had more service visits in the last 90 days than in the 90 days before that",
+      "category": "field-phrasing-4",
+      "shape": "relative_time_comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '90 days') AND value::date <= $1::date)\n    >\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '180 days') AND value::date < ($1::date - interval '90 days'))\n  AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j063",
+      "text": "did we do more jobs in the last 6 weeks than in the 6 weeks before that",
+      "category": "field-phrasing-4",
+      "shape": "relative_time_comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '6 weeks') AND value::date <= $1::date)\n    >\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= ($1::date - interval '12 weeks') AND value::date < ($1::date - interval '6 weeks'))\n  AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j064",
+      "text": "have we had more service visits this quarter than in the same quarter last year",
+      "category": "field-phrasing-4",
+      "shape": "relative_time_comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= '2026-07-01'::date AND value::date <= $1::date)\n    >\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= '2025-07-01'::date AND value::date <= '2025-09-26'::date)\n  AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j065",
+      "text": "has most of our service history happened before last year, rather than since",
+      "category": "field-phrasing-4",
+      "shape": "relative_time_comparison",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT\n    ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)))\n    >\n    (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))\n  AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j066",
+      "text": "how many Daikin customers have never once had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'daikin'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j067",
+      "text": "which Tucson customers don't have a permit on file",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Tucson,%'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='permit' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "citationRequired": true,
+      "maxItems": 12
+    },
+    {
+      "id": "j068",
+      "text": "which customers of ours aren't even in Arizona",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' NOT ILIKE '%, AZ %'",
+        "params": []
+      },
+      "citationRequired": true,
+      "maxItems": 10
+    },
+    {
+      "id": "j069",
+      "text": "how many customers don't have a maintenance agreement on file",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='maintenance-agreement' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j070",
+      "text": "how many customers have never had a repair call",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j071",
+      "text": "how many customers don't have a single work order on file",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='work-order' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j072",
+      "text": "how many customers are missing a startup sheet entirely",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='startup-sheet' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j073",
+      "text": "which Peoria customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Peoria,%'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "citationRequired": true,
+      "maxItems": 10
+    },
+    {
+      "id": "j074",
+      "text": "how many Trane customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Trane'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j075",
+      "text": "how many Carrier customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Carrier'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j076",
+      "text": "how many Lennox customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Lennox'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j077",
+      "text": "how many York customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'York'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j078",
+      "text": "how many Goodman customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Goodman'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j079",
+      "text": "how many Rheem customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Rheem'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j080",
+      "text": "how many Mitsubishi customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Mitsubishi'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j081",
+      "text": "how many Trane customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Trane'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j082",
+      "text": "how many Carrier customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Carrier'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j083",
+      "text": "how many Lennox customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Lennox'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j084",
+      "text": "how many York customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'York'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j085",
+      "text": "how many Goodman customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Goodman'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j086",
+      "text": "how many Rheem customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Rheem'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j087",
+      "text": "which Glendale customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Glendale,%'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "citationRequired": true,
+      "maxItems": 10
+    },
+    {
+      "id": "j088",
+      "text": "which Scottsdale customers have never had a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Scottsdale,%'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Preventive Maintenance' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "citationRequired": true,
+      "maxItems": 10
+    },
+    {
+      "id": "j089",
+      "text": "how many Mitsubishi customers have never once needed a repair",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE 'Mitsubishi'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN extractions x ON x.document_id=l.document_id WHERE x.field_key='service_type' AND x.value='Repair' AND (l.entity_id=e.id OR l.entity_id=c.id))",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j090",
+      "text": "how many Mesa customers don't have an inspection report on file",
+      "category": "field-phrasing-4",
+      "shape": "counterfactual",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE '%, Mesa,%'\nAND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id=l.document_id WHERE d.document_type='inspection-report' AND l.entity_id=c.id)",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j091",
+      "text": "what's the total on Michelle Tovar's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Michelle Tovar%",
+          "INV-20084"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j092",
+      "text": "what's the total on Steven Hutchins's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Steven Hutchins%",
+          "INV-60007"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j093",
+      "text": "what's the total on Ronald Bracken's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Ronald Bracken%",
+          "INV-20003"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j094",
+      "text": "what's the total on Rebecca Norwood's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Rebecca Norwood%",
+          "INV-20076"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j095",
+      "text": "what's the total on Nancy Zamora's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Nancy Zamora%",
+          "INV-20042"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j096",
+      "text": "what's the total on Matthew Whitfield's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Matthew Whitfield%",
+          "INV-20031"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j097",
+      "text": "what's the total on James Underhill's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%James Underhill%",
+          "INV-20077"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j098",
+      "text": "what's the total on Donna Vance's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Donna Vance%",
+          "INV-20102"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j099",
+      "text": "what's the total on Kathleen Keller's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Kathleen Keller%",
+          "INV-20072"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j100",
+      "text": "what's the total on Karen Abernathy's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Karen Abernathy%",
+          "INV-20010"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j101",
+      "text": "what's the total on Michael Sandoval's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Michael Sandoval%",
+          "INV-20091"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j102",
+      "text": "what's the total on Patricia Fenwick's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Patricia Fenwick%",
+          "INV-20082"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j103",
+      "text": "what's the total on Amanda Quinley's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Amanda Quinley%",
+          "INV-20048"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j104",
+      "text": "what's the total on Betty Zimmerman's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Betty Zimmerman%",
+          "INV-20074"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j105",
+      "text": "what's the total on Donna Sorensen's invoice",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='invoice' AND customer_name ILIKE $1 AND invoice_number = $2",
+        "params": [
+          "%Donna Sorensen%",
+          "INV-20002"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j106",
+      "text": "what's the total on purchase order PO-9026, the one for Rebecca Montoya",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9026",
+          "%Rebecca Montoya%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j107",
+      "text": "what's the total on purchase order PO-9015, the one for Daniel Keller",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9015",
+          "%Daniel Keller%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j108",
+      "text": "what's the total on purchase order PO-9087, the one for Richard Pruitt",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9087",
+          "%Richard Pruitt%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j109",
+      "text": "what's the total on purchase order PO-9059, the one for Robert Thornton",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9059",
+          "%Robert Thornton%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j110",
+      "text": "what's the total on purchase order PO-9054, the one for Amy Jarvis",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9054",
+          "%Amy Jarvis%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j111",
+      "text": "what's the total on purchase order PO-9098, the one for Amanda Redwine",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9098",
+          "%Amanda Redwine%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j112",
+      "text": "what's the total on purchase order PO-9010, the one for Karen Abernathy",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9010",
+          "%Karen Abernathy%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j113",
+      "text": "what's the total on purchase order PO-9043, the one for George Garrison",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='po' AND po_number = $1 AND customer_name ILIKE $2",
+        "params": [
+          "PO-9043",
+          "%George Garrison%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j114",
+      "text": "what's the annual cost on Donna Ulloa's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Donna Ulloa%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j115",
+      "text": "what's the annual cost on Grace Community Church's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Grace Community Church%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j116",
+      "text": "what's the annual cost on Paul Jarvis's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Paul Jarvis%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j117",
+      "text": "what's the annual cost on Cactus Rose Restaurant's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Cactus Rose Restaurant%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j118",
+      "text": "what's the annual cost on Anthony Bennett's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Anthony Bennett%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j119",
+      "text": "what's the annual cost on Barbara Delgado's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Barbara Delgado%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j120",
+      "text": "what's the annual cost on Michael Sandoval's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Michael Sandoval%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j121",
+      "text": "what's the annual cost on Melissa Quintana's maintenance agreement",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT total::numeric AS n FROM document_financials WHERE doc_kind='agreement' AND customer_name ILIKE $1",
+        "params": [
+          "%Melissa Quintana%"
+        ]
+      },
+      "tolerance": 0.01,
+      "anyNumber": true
+    },
+    {
+      "id": "j122",
+      "text": "what's the balance due on Amanda Quinley's account",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE balance_due IS NOT NULL) AS n",
+        "params": []
+      },
+      "note": "balance_due is NULL on every document_financials row in this corpus"
+    },
+    {
+      "id": "j123",
+      "text": "has Kevin Abernathy's invoice been paid yet",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE amount_paid IS NOT NULL) AS n",
+        "params": []
+      },
+      "note": "amount_paid is NULL on every document_financials row in this corpus - payment status is never tracked"
+    },
+    {
+      "id": "j124",
+      "text": "when is Nancy Zamora's invoice due",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE due_date IS NOT NULL) AS n",
+        "params": []
+      },
+      "note": "due_date is NULL on every document_financials row in this corpus"
+    },
+    {
+      "id": "j125",
+      "text": "how much do we have sitting out there in unpaid invoices right now",
+      "category": "field-phrasing-4",
+      "shape": "money",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM document_financials WHERE balance_due IS NOT NULL) AS n",
+        "params": []
+      },
+      "note": "balance_due is NULL on every document_financials row in this corpus - there is no owed-amount figure to report"
+    },
+    {
+      "id": "j126",
+      "text": "how old is the unit at 100 E Main St, Phoenix",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "100 E Main St%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j127",
+      "text": "how old is the system at 2764 E University Dr, Maricopa",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "2764 E University Dr%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j128",
+      "text": "how old is the unit at 1432 W Thomas Rd, Tempe",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "1432 W Thomas Rd%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j129",
+      "text": "how old is the system at 2098 W Baseline Rd, Peoria",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "2098 W Baseline Rd%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j130",
+      "text": "how old is the unit at 766 N Val Vista Dr, Gilbert",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "766 N Val Vista Dr%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j131",
+      "text": "how old is the unit at 2283 W Thomas Rd, San Tan Valley",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "2283 W Thomas Rd%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j132",
+      "text": "how old is the system at 3615 E University Dr, Oro Valley",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "3615 E University Dr%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j133",
+      "text": "how old is the unit at 951 E Main St, Chandler",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "951 E Main St%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j134",
+      "text": "how old is the system at 2949 W Baseline Rd, Maricopa",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "2949 W Baseline Rd%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j135",
+      "text": "how old is the unit at 285 E Elliot Rd, Phoenix",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "285 E Elliot Rd%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j136",
+      "text": "is the unit at 100 E Main St, Phoenix due for replacement",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'installation_date')::date <= ($2::date - interval '15 years') AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "100 E Main St%",
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j137",
+      "text": "is the system at 1432 W Thomas Rd, Tempe a likely replacement candidate",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'installation_date')::date <= ($2::date - interval '15 years') AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "1432 W Thomas Rd%",
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j138",
+      "text": "should we be talking to 766 N Val Vista Dr, Gilbert about replacing their unit",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'installation_date')::date <= ($2::date - interval '15 years') AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "766 N Val Vista Dr%",
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j139",
+      "text": "is the unit at 2283 W Thomas Rd, San Tan Valley due for replacement",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'installation_date')::date <= ($2::date - interval '15 years') AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "2283 W Thomas Rd%",
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j140",
+      "text": "is the system at 951 E Main St, Chandler a likely replacement candidate",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'installation_date')::date <= ($2::date - interval '15 years') AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "951 E Main St%",
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j141",
+      "text": "how many units on our books are over 15 years old",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date <= ($1::date - interval '15 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j142",
+      "text": "how many units on our books are over 10 years old",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date <= ($1::date - interval '10 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j143",
+      "text": "how many units on our books are under 5 years old",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date > ($1::date - interval '5 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j144",
+      "text": "how many units are between 10 and 15 years old",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'\n   AND (data->>'installation_date')::date <= ($1::date - interval '10 years') AND (data->>'installation_date')::date > ($1::date - interval '15 years')",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j145",
+      "text": "do we have more units over 10 years old than units under 5 years old",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT\n    (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date <= ($1::date - interval '10 years'))\n    >\n    (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' AND (data->>'installation_date')::date > ($1::date - interval '5 years'))\n  AS v",
+        "params": [
+          "@today"
+        ]
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j146",
+      "text": "whose unit is the oldest one we've got on the books",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id=e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'\nORDER BY e.data->>'installation_date' ASC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j147",
+      "text": "whose unit did we most recently install",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id=e.customer_id\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'\nORDER BY e.data->>'installation_date' DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j148",
+      "text": "how old is the oldest unit we've got, in years",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT extract(year from age($1::date, min((data->>'installation_date')::date)))::int AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 1,
+      "citationRequired": false
+    },
+    {
+      "id": "j149",
+      "text": "how old is the newest unit we've got, in years",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT extract(year from age($1::date, max((data->>'installation_date')::date)))::int AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "@today"
+        ]
+      },
+      "tolerance": 1,
+      "citationRequired": false
+    },
+    {
+      "id": "j150",
+      "text": "how old is Kevin Abernathy's unit",
+      "category": "field-phrasing-4",
+      "shape": "equipment_age",
+      "cmp": "number",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT extract(year from age($2::date, (e.data->>'installation_date')::date))::int AS n FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'",
+        "params": [
+          "2579 W Ocotillo Rd%",
+          "@today"
+        ]
+      },
+      "tolerance": 1
+    },
+    {
+      "id": "j151",
+      "text": "how many jobs total has Kevin Pratt been out on",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Kevin Pratt'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j152",
+      "text": "how many jobs total has Marisol Vega been out on",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Marisol Vega'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j153",
+      "text": "how many jobs total has Danny Ochoa been out on",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Danny Ochoa'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j154",
+      "text": "how many jobs total has Wyatt Coburn been out on",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j155",
+      "text": "how many jobs total has Denise Ford been out on",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Denise Ford'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j156",
+      "text": "how many jobs total has Ray Sutton been out on",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Ray Sutton'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j157",
+      "text": "has Danny Ochoa ever done a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Danny Ochoa') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j158",
+      "text": "has Denise Ford ever done a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Denise Ford') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j159",
+      "text": "has Ray Sutton ever done a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Ray Sutton') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j160",
+      "text": "has Marisol Vega ever done a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Marisol Vega') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j161",
+      "text": "which technicians have never once logged a preventive maintenance visit",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "set",
+      "oracle": {
+        "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician'\nEXCEPT\nSELECT DISTINCT t.value AS item FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+        "params": []
+      },
+      "citationRequired": true,
+      "maxItems": 8
+    },
+    {
+      "id": "j162",
+      "text": "how many jobs has Danny Ochoa done in Phoenix",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Danny Ochoa' AND c.data->>'service_address' ILIKE '%, Phoenix,%'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j163",
+      "text": "how many jobs has Denise Ford done in Tempe",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Tempe,%'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j164",
+      "text": "how many jobs has Kevin Pratt done in Phoenix",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Kevin Pratt' AND c.data->>'service_address' ILIKE '%, Phoenix,%'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j165",
+      "text": "how many jobs has Marisol Vega done in Tucson",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Marisol Vega' AND c.data->>'service_address' ILIKE '%, Tucson,%'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j166",
+      "text": "how many jobs has Ray Sutton done in Tucson",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Tucson,%'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j167",
+      "text": "how many jobs has Wyatt Coburn done in Tucson",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "number",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Wyatt Coburn' AND c.data->>'service_address' ILIKE '%, Tucson,%'",
+        "params": []
+      },
+      "tolerance": 0,
+      "citationRequired": false
+    },
+    {
+      "id": "j168",
+      "text": "has Kevin Pratt done more jobs total than Ray Sutton",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j169",
+      "text": "has Marisol Vega done more jobs total than Wyatt Coburn",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "yesno",
+      "oracle": {
+        "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS v",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j170",
+      "text": "who's been out to Steven Hutchins' place",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT DISTINCT t.value AS v FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nWHERE t.field_key='technician' AND l.entity_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "%Steven Hutchins%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+          "params": [
+            "%Steven Hutchins%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j171",
+      "text": "who normally handles Thomas Quintana's account",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT DISTINCT t.value AS v FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nWHERE t.field_key='technician' AND l.entity_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "%Thomas Quintana%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+          "params": [
+            "%Thomas Quintana%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j172",
+      "text": "which tech works Ronald Fenwick's account",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT DISTINCT t.value AS v FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nWHERE t.field_key='technician' AND l.entity_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "%Ronald Fenwick%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+          "params": [
+            "%Ronald Fenwick%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j173",
+      "text": "who's serviced Sandra Alvarez's place before",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "value",
+      "oracle": {
+        "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1)\nSELECT DISTINCT t.value AS v FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nWHERE t.field_key='technician' AND l.entity_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m) = 1",
+        "params": [
+          "%Sandra Alvarez%"
+        ],
+        "requires": {
+          "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+          "params": [
+            "%Sandra Alvarez%"
+          ]
+        }
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j174",
+      "text": "which technician has logged the most preventive maintenance visits",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT t.value AS v FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' GROUP BY t.value ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j175",
+      "text": "which technician has done the most repair calls",
+      "category": "field-phrasing-4",
+      "shape": "technician",
+      "cmp": "value",
+      "oracle": {
+        "sql": "SELECT t.value AS v FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' GROUP BY t.value ORDER BY count(*) DESC LIMIT 1",
+        "params": []
+      },
+      "citationRequired": true
+    },
+    {
+      "id": "j176",
+      "text": "what's the phone number for Amanda Quinly",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_near_miss",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Amanda Quinly%"
+        ]
+      },
+      "note": "\"Amanda Quinly\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+    },
+    {
+      "id": "j177",
+      "text": "pull up the file for Kenith Fenwick",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_near_miss",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Kenith Fenwick%"
+        ]
+      },
+      "note": "\"Kenith Fenwick\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+    },
+    {
+      "id": "j178",
+      "text": "what's the service address on file for Ashely Vance",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_near_miss",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Ashely Vance%"
+        ]
+      },
+      "note": "\"Ashely Vance\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+    },
+    {
+      "id": "j179",
+      "text": "whats the warranty status for Micheal Redwine",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_near_miss",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Micheal Redwine%"
+        ]
+      },
+      "note": "\"Micheal Redwine\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+    },
+    {
+      "id": "j180",
+      "text": "do we have a serial number on file for Nancey Zamora",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_near_miss",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+        "params": [
+          "%Nancey Zamora%"
+        ]
+      },
+      "note": "\"Nancey Zamora\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+    },
+    {
+      "id": "j181",
+      "text": "what's the model number for the unit at 1877 N College Ave",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_fake_address",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+        "params": [
+          "1877 N College Ave%"
+        ]
+      },
+      "note": "\"1877 N College Ave\" is one house-number digit off a real address in this corpus and matches zero customers - never guess the real neighbor's address"
+    },
+    {
+      "id": "j182",
+      "text": "what's on file for 1507 E McKellips Rd",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_fake_address",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+        "params": [
+          "1507 E McKellips Rd%"
+        ]
+      },
+      "note": "\"1507 E McKellips Rd\" is one house-number digit off a real address in this corpus and matches zero customers - never guess the real neighbor's address"
+    },
+    {
+      "id": "j183",
+      "text": "who's the customer at 1322 E Chandler Blvd",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_fake_address",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+        "params": [
+          "1322 E Chandler Blvd%"
+        ]
+      },
+      "note": "\"1322 E Chandler Blvd\" is one house-number digit off a real address in this corpus and matches zero customers - never guess the real neighbor's address"
+    },
+    {
+      "id": "j184",
+      "text": "what's the warranty expiry for 1655 E Pecos Rd",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_fake_address",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+        "params": [
+          "1655 E Pecos Rd%"
+        ]
+      },
+      "note": "\"1655 E Pecos Rd\" is one house-number digit off a real address in this corpus and matches zero customers - never guess the real neighbor's address"
+    },
+    {
+      "id": "j185",
+      "text": "what unit do we have on file at 3653 W Guadalupe Rd",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_fake_address",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+        "params": [
+          "3653 W Guadalupe Rd%"
+        ]
+      },
+      "note": "\"3653 W Guadalupe Rd\" is one house-number digit off a real address in this corpus and matches zero customers - never guess the real neighbor's address"
+    },
+    {
+      "id": "j186",
+      "text": "is Betty Winslow's unit an Amana",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_brand_not_carried",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'customer_name' ILIKE $2",
+        "params": [
+          "amana",
+          "%Betty Winslow%"
+        ]
+      },
+      "note": "Betty Winslow's own equipment record carries a different manufacturer - this shop has never installed a amana for them"
+    },
+    {
+      "id": "j187",
+      "text": "is the system at Joseph Ortega's place a Bryant",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_brand_not_carried",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'customer_name' ILIKE $2",
+        "params": [
+          "bryant",
+          "%Joseph Ortega%"
+        ]
+      },
+      "note": "Joseph Ortega's own equipment record carries a different manufacturer - this shop has never installed a bryant for them"
+    },
+    {
+      "id": "j188",
+      "text": "does William Quintana have a Ruud unit",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_brand_not_carried",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'customer_name' ILIKE $2",
+        "params": [
+          "ruud",
+          "%William Quintana%"
+        ]
+      },
+      "note": "William Quintana's own equipment record carries a different manufacturer - this shop has never installed a ruud for them"
+    },
+    {
+      "id": "j189",
+      "text": "is Donna Sorensen's system an American Standard",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_brand_not_carried",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'customer_name' ILIKE $2",
+        "params": [
+          "american standard",
+          "%Donna Sorensen%"
+        ]
+      },
+      "note": "Donna Sorensen's own equipment record carries a different manufacturer - this shop has never installed a american standard for them"
+    },
+    {
+      "id": "j190",
+      "text": "is Kevin Zimmerman's unit a Payne",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_brand_not_carried",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'customer_name' ILIKE $2",
+        "params": [
+          "payne",
+          "%Kevin Zimmerman%"
+        ]
+      },
+      "note": "Kevin Zimmerman's own equipment record carries a different manufacturer - this shop has never installed a payne for them"
+    },
+    {
+      "id": "j191",
+      "text": "what work did we do on March 15th, 2027",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_future_date",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+        "params": []
+      },
+      "note": "no record in this corpus is dated past 2026-08-28 (its own real max date) - any 2027-or-later question has nothing on file to answer from"
+    },
+    {
+      "id": "j192",
+      "text": "do we have an invoice dated January 1st, 2030",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_future_date",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+        "params": []
+      },
+      "note": "no record in this corpus is dated past 2026-08-28 (its own real max date) - any 2027-or-later question has nothing on file to answer from"
+    },
+    {
+      "id": "j193",
+      "text": "is there a service call scheduled for June 2028",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_future_date",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+        "params": []
+      },
+      "note": "no record in this corpus is dated past 2026-08-28 (its own real max date) - any 2027-or-later question has nothing on file to answer from"
+    },
+    {
+      "id": "j194",
+      "text": "was there a warranty registration filed in 2027",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_future_date",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+        "params": []
+      },
+      "note": "no record in this corpus is dated past 2026-08-28 (its own real max date) - any 2027-or-later question has nothing on file to answer from"
+    },
+    {
+      "id": "j195",
+      "text": "how many jobs do we have logged for 2030",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_future_date",
+      "cmp": "honest-zero",
+      "oracle": {
+        "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+        "params": []
+      },
+      "note": "no record in this corpus is dated past 2026-08-28 (its own real max date) - any 2027-or-later question has nothing on file to answer from"
+    },
+    {
+      "id": "j196",
+      "text": "compare the warranty status of Amanda Quinley's unit and Amanda Quinly's unit",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_mixed",
+      "cmp": "rubric",
+      "rubric": "Amanda Quinley is a real customer in this corpus; Amanda Quinly is not (zero matches - a near-miss of the real name). The honest answer reports Amanda Quinley's real warranty status and clearly states Amanda Quinly isn't on file, never conflating the two or inventing data for the fake one.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "j197",
+      "text": "what's on file for 1876 N College Ave versus 1877 N College Ave",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_mixed",
+      "cmp": "rubric",
+      "rubric": "1876 N College Ave (Amanda Quinley) is a real address in this corpus; 1877 N College Ave is one digit off and matches zero customers. The honest answer reports what's on file for 1876 and clearly states 1877 isn't a customer address on file, never fabricating a record for it.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "j198",
+      "text": "is Betty Winslow's unit a Trane or an Amana",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_mixed",
+      "cmp": "rubric",
+      "rubric": "Betty Winslow's own equipment record shows a Trane unit; Amana is never installed for her (or anywhere in this corpus). The honest answer names Trane and does not hedge toward Amana as if it were an open possibility on file.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "j199",
+      "text": "do we have service history for Kenneth Fenwick or Kenith Fenwick",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_mixed",
+      "cmp": "rubric",
+      "rubric": "Kenneth Fenwick is a real customer in this corpus; Kenith Fenwick (one letter different) matches zero customers. The honest answer reports on Kenneth Fenwick and clearly states Kenith Fenwick isn't on file, never assuming they're the same person without saying so.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    },
+    {
+      "id": "j200",
+      "text": "was Nancy Zamora's invoice from this year, or was the 2030 invoice hers",
+      "category": "field-phrasing-4",
+      "shape": "adversarial_mixed",
+      "cmp": "rubric",
+      "rubric": "Nancy Zamora has a real invoice on file (INV-20042); no invoice in this corpus is dated 2030 (the corpus's own latest date is 2026-08-28). The honest answer reports Nancy Zamora's real invoice and clearly states there is no 2030 invoice for anyone, never inventing one.",
+      "oracle": {
+        "sql": "SELECT NULL::text AS ref WHERE false"
+      }
+    }
+  ]
+}

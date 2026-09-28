@@ -419,6 +419,20 @@ eq(
   detectAnalyticsPlan('how many units older than 10 yeears do we have'),
   { entity: 'equipment', op: 'count', filters: [] }
 );
+// R21 M2 (Cluster 3, REVERTED this round): resolveAgeFilter's single-threshold path ("older/newer
+// than N years", "over/under N years old") went through a day-precise installDate rewrite earlier in
+// this round, then had to be reverted back to a bare calendar-year cutoff (field 'installYear') after
+// a full verify-golden.mjs run surfaced 9 unexpected new wrong ids (hvac-owner-0001/0002/0026/0027/
+// 0035/0080, counts-age-0003/0004, breadth-multi-hop-001/002/003/004/020/024, breadth-existence-018,
+// breadth-persona-011). Root cause: exam.json's own long-standing oracle for this exact phrasing
+// (17+ pinned ids, confirmed via direct oracle SQL) uses `installYear < currentYear - N` — bare
+// calendar year, ignoring month/day — even for "over 10 years old" phrasing with no "than" at all
+// (hvac-owner-0035-canonical). Only field-phrasing-4.json's NEWER oracle (j141/j142/j143) wants
+// day-precision for this same phrasing, and there is no reliable textual signal distinguishing the
+// two; given the "zero new wrong ids" rule and the 17-to-3 imbalance, the single-threshold path stays
+// year-based, and j141/j142/j143 are left in KNOWN_WRONG_IDS as a documented, non-regressed gap. The
+// "between X and Y years old" shape (Cluster 3's j144, no corresponding original-exam id) is the one
+// case with zero regression risk, so it alone keeps day-precision (field 'installDate').
 check(
   'resolveAgeFilter tolerates "yeears" (doubled vowel) the same as "years"',
   JSON.stringify(resolveAgeFilter('units older than 10 yeears', '2026-09-26')) ===
@@ -443,6 +457,46 @@ check(
   'resolveAgeFilter direction bug fix: "younger than N years" means NEWER, not older',
   JSON.stringify(resolveAgeFilter('a unit younger than 5 years', '2026-09-26')) ===
     JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 })
+);
+check(
+  'resolveAgeFilter (own paraphrase): "units over 15 years old" -> year-based installYear lt',
+  JSON.stringify(resolveAgeFilter('how many units on our books are over 15 years old', '2026-09-25')) ===
+    JSON.stringify({ field: 'installYear', op: 'lt', value: 2011 })
+);
+check(
+  'resolveAgeFilter (own paraphrase): "units under 5 years old" -> year-based installYear gte',
+  JSON.stringify(resolveAgeFilter('how many units on our books are under 5 years old', '2026-09-25')) ===
+    JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 })
+);
+check(
+  'resolveAgeFilter (own paraphrase): "replacement candidates over 15 years old" -> same year-based shape regardless of the "candidates" noun',
+  JSON.stringify(resolveAgeFilter('how many replacement candidates are over 15 years old', '2026-09-25')) ===
+    JSON.stringify({ field: 'installYear', op: 'lt', value: 2011 })
+);
+check(
+  'resolveAgeFilter negative: "newer than 5 years" (not "under") still resolves the same newer-direction gte shape',
+  JSON.stringify(resolveAgeFilter('units newer than 5 years', '2026-09-25')) ===
+    JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 })
+);
+check(
+  'resolveAgeFilter (Cluster 3, own paraphrase): "between 10 and 15 years old" -> two installDate filters',
+  JSON.stringify(resolveAgeFilter('how many units are between 10 and 15 years old', '2026-09-25')) ===
+    JSON.stringify([
+      { field: 'installDate', op: 'lte', value: '2016-09-25' },
+      { field: 'installDate', op: 'gt', value: '2011-09-25' },
+    ])
+);
+check(
+  'resolveAgeFilter (Cluster 3, own paraphrase): "between" tolerates the bounds given in either order',
+  JSON.stringify(resolveAgeFilter('how many units are between 15 and 10 years old', '2026-09-25')) ===
+    JSON.stringify([
+      { field: 'installDate', op: 'lte', value: '2016-09-25' },
+      { field: 'installDate', op: 'gt', value: '2011-09-25' },
+    ])
+);
+check(
+  'resolveAgeFilter negative: no age phrase at all -> null',
+  resolveAgeFilter('how many units do we have', '2026-09-25') === null
 );
 
 check(
@@ -665,23 +719,31 @@ eq(
 );
 
 eq(
+  // Pinned `today` (matches this suite's own '2026-09-27' convention used elsewhere in this file,
+  // e.g. the install-year-relative checks below) — the real wall-clock default this call used to
+  // fall through to drifts a day at a time and desyncs from this test's own hardcoded expected
+  // dates, a real (not flaky-by-nature) failure, not a timing fluke.
   'time-window (own paraphrase): "how many units have their warranty expiring since january 1st" resolves a real gte/lte warrantyExpires window, not the unfiltered portfolio',
-  detectAnalyticsPlan('how many units have their warranty expiring since january 1st'),
+  detectAnalyticsPlan('how many units have their warranty expiring since january 1st', {}, '2026-09-27'),
   { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-01-01' }, { field: 'warrantyExpires', op: 'lte', value: '2026-09-27' }] }
 );
 eq(
+  // Pinned `today` (year, not just day, drifts this one — see the doc comment on the "since
+  // january 1st" check above) so this doesn't flip to 2027 once the calendar turns.
   'time-window (own paraphrase): "how many units warranty expires this spring" resolves the season to a month range',
-  detectAnalyticsPlan('how many units warranty expires this spring'),
+  detectAnalyticsPlan('how many units warranty expires this spring', {}, '2026-09-27'),
   { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-03-01' }, { field: 'warrantyExpires', op: 'lte', value: '2026-05-31' }] }
 );
 eq(
+  // Pinned `today` — see the doc comment on the "since january 1st" check just above.
   'time-window (own paraphrase): "how many units warranty expires by end of year" resolves today..year-end',
-  detectAnalyticsPlan('how many units warranty expires by end of year'),
+  detectAnalyticsPlan('how many units warranty expires by end of year', {}, '2026-09-27'),
   { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-09-27' }, { field: 'warrantyExpires', op: 'lte', value: '2026-12-31' }] }
 );
 eq(
+  // Pinned `today` — see the doc comment on the "since january 1st" check above.
   'time-window (own paraphrase): "how many units warranty expires in the next 90 days" resolves today..+90d',
-  detectAnalyticsPlan('how many units warranty expires in the next 90 days'),
+  detectAnalyticsPlan('how many units warranty expires in the next 90 days', {}, '2026-09-27'),
   { entity: 'equipment', op: 'count', filters: [{ field: 'warrantyExpires', op: 'gte', value: '2026-09-27' }, { field: 'warrantyExpires', op: 'lte', value: '2026-12-26' }] }
 );
 eq(
@@ -893,6 +955,140 @@ check('nlNormalize negative: a genuine "newest" question is unaffected (still sa
   normalizeQuestionNL('whats the newest install we have on file').normalized.includes('newest'));
 check('nlNormalize negative: an actual typo\'d "newest" ("neweat") still recovers to "newest", not "fewest"',
   normalizeQuestionNL('whats the neweat unit we have').normalized.includes('newest'));
+
+// --- R21 (L3, i005 shape): serviceVisits + hasServiceType filter now reaches execution ---
+// detectAnalyticsPlan already built this filter before this round; the bug was downstream in
+// executeAnalyticsPlan's ENTITY_SUPPORTED_FIELDS whitelist (routes/analytics.js), which had no
+// 'hasServiceType' entry for the serviceVisits entity, so a syntactically-correct plan was always
+// silently discarded (filtersSupported -> false -> return null), costing a model call even though
+// the plan itself was right every time. Fixed by adding a 'service_type' correlated-scalar subquery
+// to buildAnalyticsSQL's serviceVisits branch (analytics.js) and widening the whitelist. This test
+// only covers the plan shape (pure, no DB); the end-to-end execution is covered by offline-exam id
+// i005 ("which tech is racking up the most repair calls").
+// NOTE: op varies with phrasing ("who has logged"/"who is doing" -> count, "which tech is racking
+// up" -> list) — both ops carry the same filter and both execute through the same widened
+// whitelist, so these check the filter, not the exact op shape.
+const hasServiceTypePositives = [
+  ['which tech is racking up the most repair calls', 'Repair'],
+  ['who has logged the most repair calls', 'Repair'],
+  ['who is doing the most repair jobs', 'Repair'],
+  ['which tech has done the most repair calls this year', 'Repair'],
+  ['who logged the most repair visits', 'Repair'],
+  ['who has the most preventive maintenance calls', 'Preventive Maintenance'],
+];
+for (const [q, want] of hasServiceTypePositives) {
+  const p = detectAnalyticsPlan(q);
+  check(`serviceVisits+hasServiceType plan: "${q}"`,
+    !!p && p.entity === 'serviceVisits' && (p.filters ?? []).some(f => f.field === 'hasServiceType' && f.op === 'eq' && f.value === want),
+    JSON.stringify(p));
+}
+check('serviceVisits+hasServiceType negative: no service-type word at all -> a bare technician-ranking question stays a plain technician groupby (no hasServiceType filter)',
+  (() => {
+    const p = detectAnalyticsPlan('which technician has done the most visits');
+    return !p || !(p.filters ?? []).some(f => f.field === 'hasServiceType');
+  })());
+check('serviceVisits+hasServiceType negative: a warranty question naming "repair" only as an unrelated word never gets this plan',
+  (() => {
+    const p = detectAnalyticsPlan('which units need a repair estimate before the warranty expires');
+    return !p || p.entity !== 'serviceVisits' || !(p.filters ?? []).some(f => f.field === 'hasServiceType' && f.value === 'Repair');
+  })());
+
+/* ============================================================ R21 M2: Cluster 1 (brand+city+serviceType+time, all 4 required) */
+// detectBrandCityServiceTypeSince — the oracle's real definition counts DISTINCT EQUIPMENT linked to
+// a matching service_type document within the resolved time window, regardless of which noun
+// ("units"/"systems"/"customers") the question itself used. All four conditions (brand, city,
+// service-type, time) must independently resolve or this detector returns null (falls through to a
+// different, partial-answer path) rather than ever answering with a subset of the conditions.
+const c1Positives = [
+  'how many trane units in Mesa had a repair visit since last January',
+  'how many carrier systems in Riverside had a preventive maintenance visit since the start of last year',
+  'how many lennox units in Mesa have had a repair call since last January',
+  'how many goodman customers in Riverside got a maintenance tune-up since last January',
+  'how many trane systems in Mesa have had a repair job since last january',
+];
+for (const q of c1Positives) {
+  const p = detectAnalyticsPlan(q, {}, '2026-09-25');
+  check(`Cluster 1 (own paraphrase): "${q}" -> equipment count with brand+city+hasServiceType+timeRange, all 4 conditions`,
+    !!p && p.entity === 'equipment' && p.op === 'count' && !!p.timeRange &&
+      (p.filters ?? []).some(f => f.field === 'brand') &&
+      (p.filters ?? []).some(f => f.field === 'city') &&
+      (p.filters ?? []).some(f => f.field === 'hasServiceType'),
+    JSON.stringify(p));
+}
+check('Cluster 1 negative: two brands named (ambiguous) -> never guesses one, this detector bails to null',
+  detectAnalyticsPlan('how many trane and carrier units in Mesa had a repair visit since last january', {}, '2026-09-25') === null);
+check('Cluster 1 negative: missing brand -> falls through to a DIFFERENT (partial) detector, never fabricates a brand condition',
+  (() => {
+    const p = detectAnalyticsPlan('how many units in Mesa had a repair visit since last january', {}, '2026-09-25');
+    return !p || !(p.filters ?? []).some(f => f.field === 'brand');
+  })());
+check('Cluster 1 negative: missing time phrase -> the C1 detector itself never fires with a partial/no timeRange result standing in for all 4',
+  (() => {
+    const p = detectAnalyticsPlan('how many trane units in Mesa had a repair visit', {}, '2026-09-25');
+    return !p || !p.timeRange; // falls to crossDocDedicated (no timeRange), not a guessed C1 plan
+  })());
+
+/* ============================================================ R21 M2: i093/i095 (warranty registration days) */
+// i093: "warranty registrations within N days of install" -> a real lte count (never confused with a
+// today-relative "within N days" window, which is a different, unrelated shape).
+const i093Positives = [
+  'how many warranty registrations happened within 30 days of the install',
+  'how many warranty registrations were within 14 days of install date',
+  'how many warranty registrations were within 45 days of the install date',
+  'how many warranty registrations came within 7 days of install',
+  'how many warranty registrations happened within 60 days of the installation date',
+];
+for (const q of i093Positives) {
+  const p = detectAnalyticsPlan(q, {}, '2026-09-25');
+  check(`i093 (own paraphrase): "${q}" -> equipment count, warrantyRegistrationDays lte`,
+    !!p && p.entity === 'equipment' && p.op === 'count' &&
+      (p.filters ?? []).some(f => f.field === 'warrantyRegistrationDays' && f.op === 'lte'),
+    JSON.stringify(p));
+}
+check('i093 negative: "warranty registrations that took longer than N days after install" is the complement (gt), never lte',
+  (() => {
+    const p = detectAnalyticsPlan('how many warranty registrations took longer than 30 days after install', {}, '2026-09-25');
+    return !!p && (p.filters ?? []).some(f => f.field === 'warrantyRegistrationDays' && f.op === 'gt');
+  })());
+
+// i095: "do most warranty registrations happen within N days of install" -> a majority count
+// comparison (lte N vs gt N), reusing the existing count-comparison execution engine.
+const i095Positives = [
+  'do most warranty registrations happen within 30 days of the install',
+  'do most of our warranty registrations happen within 14 days of install',
+  'do most warranty registrations occur within 45 days of the install date',
+  'are most warranty registrations within 7 days of install',
+  'do most warranty registrations happen within 60 days of the installation date',
+];
+for (const q of i095Positives) {
+  const p = detectCountComparison(q, '2026-09-25');
+  check(`i095 (own paraphrase): "${q}" -> majority comparison, lte N vs gt N`,
+    !!p && p.entity === 'equipment' && p.leftFilter?.field === 'warrantyRegistrationDays' && p.leftFilter?.op === 'lte' &&
+      p.rightFilter?.field === 'warrantyRegistrationDays' && p.rightFilter?.op === 'gt',
+    JSON.stringify(p));
+}
+check('i095 admission gate: preClassifyAnalytics admits this shape (no "than", no bare existence lead) so it ever reaches the planner',
+  preClassifyAnalytics('do most warranty registrations happen within 30 days of the install', {}) === true);
+check('i095 negative: an ordinary count-comparison question ("more trane than carrier") is unaffected by the new majority detector',
+  (() => {
+    const p = detectCountComparison('do we have more trane units than carrier units', '2026-09-25');
+    return !!p && p.leftFilter?.field !== 'warrantyRegistrationDays';
+  })());
+
+/* ============================================================ R21 M2: Cluster 2 additions (since last January + the "within N of" fix) */
+const { resolveAnyTimeRange } = await import('../api/_lib/analytics.js');
+check('Cluster 2 (own paraphrase): "since last January" resolves to Jan 1 of LAST calendar year, not this year',
+  JSON.stringify(resolveAnyTimeRange('since last January', '2026-09-25')) ===
+    JSON.stringify({ from: '2025-01-01', to: '2026-09-25', label: 'since the start of 2025' }));
+check('Cluster 2 (own paraphrase): "since last january" (lowercase) resolves the same way',
+  resolveAnyTimeRange('how many units since last january', '2026-09-25')?.from === '2025-01-01');
+check('Cluster 2 negative: a bare "last January" with no "since" is read as the most recent January (THIS convention is unchanged, deliberately different from "since last January")',
+  resolveAnyTimeRange('how many visits happened last January', '2026-09-25')?.from !== '2025-01-01' ||
+    resolveAnyTimeRange('how many visits happened last January', '2026-09-25') == null);
+check('Cluster 2 fix: "warranty registrations within 30 days of the install" never gets a spurious today-relative timeRange (the "of" lookahead fix)',
+  detectAnalyticsPlan('how many warranty registrations happened within 30 days of the install', {}, '2026-09-25')?.timeRange === undefined);
+check('Cluster 2 negative: an ordinary "within the last 30 days" (no "of <event>") still resolves a real today-relative window',
+  resolveAnyTimeRange('how many invoices within the last 30 days', '2026-09-25')?.to === '2026-09-25');
 
 console.log('');
 console.log(failures ? `${failures} check(s) FAILED.` : `${passes} checks passed.`);

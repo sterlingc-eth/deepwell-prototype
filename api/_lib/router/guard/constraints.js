@@ -80,6 +80,24 @@ const SUPERLATIVE_RE = new RegExp(
   'i'
 );
 
+/** A TIME-WINDOW phrase — "last year", "this month", "next quarter", "so far this year" — never a
+ *  superlative-over-a-date request even though it shares the bare word "last"/"this"/"next" with
+ *  SUPERLATIVE_WORD_ALT. i002 ("how many units did we install last year"): SUPERLATIVE_RE's own
+ *  FIELD-then-WORD branch matched "install" immediately followed by "last" (zero filler words between
+ *  them) and mis-read the trailing "year" as if it were naming an extreme-VALUE request ("the last
+ *  install[ation]") instead of what it actually is — a plain, already-handled time window (this file's
+ *  own 'month' constraint two lines above, resolveAnyTimeRange/detectedConditions' own vocabulary) — and
+ *  sent a perfectly answerable count to needs-model. Masked out of the text SUPERLATIVE_RE tests against
+ *  (not deleted from `q` itself — every other detector in this file still sees the real question) so
+ *  "install last year" can never satisfy the WORD+FIELD adjacency test, while "the last install[ation]
+ *  date" (an actual superlative, no time unit right after "last") is untouched. See
+ *  verify-precision-guard.mjs for the false-positive regression (i002 and this file's own paraphrases) and
+ *  the true-positive case ("the latest install date this year" still fires) it must never weaken. */
+const TIME_WINDOW_PHRASE_RE = /\b(?:last|this|next)\s+(?:year|month|week|quarter|season)\b|\bso\s+far\s+this\s+year\b/gi;
+function maskTimeWindows(q) {
+  return q.replace(TIME_WINDOW_PHRASE_RE, (m) => ' '.repeat(m.length));
+}
+
 /** A named customer/business account mentioned generically ("for the Amy Isaacson account", "on file for
  *  the Bracken job", "at the Sonoran Grill account") — a fallback for when the caller has no tenant
  *  vocabulary (or the tenant vocab lookup missed this exact name): titlecase word(s) immediately before
@@ -110,7 +128,7 @@ export function extractConstraints(question, opts = {}) {
   if (NEGATION_OF_COUNT_RE.test(q)) found.set('negation', { type: 'negation' });
   if (COMPARATOR_RE.test(q)) found.set('comparator', { type: 'comparator' });
   if (DISTINCT_RE.test(q)) found.set('distinct', { type: 'distinct' });
-  if (SUPERLATIVE_RE.test(q)) found.set('superlative', { type: 'superlative' });
+  if (SUPERLATIVE_RE.test(maskTimeWindows(q))) found.set('superlative', { type: 'superlative' });
 
   const tenantVocab = opts?.tenantVocab;
   let namedEntity = null;

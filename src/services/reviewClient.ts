@@ -904,7 +904,49 @@ export const reviewClient = {
   examExport() {
     return postJson<{ version: string; tenantKey: string; category: string; questions: ExamCandidateQuestion[] }>({ action: 'examExport' });
   },
+
+  /** Round 22 (S2, privacy): admin-only, this tenant's own grant/revoke of time-boxed DeepWell
+   *  staff support access — see api/_lib/privacy/supportAccess.js's module doc. */
+  supportAccessGrant(opts: { hours?: number; reason?: string }) {
+    return postJson<{ ok: boolean; grant: SupportAccessGrant }>({ action: 'supportAccessGrant', ...opts });
+  },
+  supportAccessRevoke(grantId: string) {
+    return postJson<{ ok: boolean }>({ action: 'supportAccessRevoke', grantId });
+  },
+  /** The tenant's current active grant (if any) plus its last 10 grants (active/expired/revoked). */
+  supportAccessStatus() {
+    return postJson<{ active: SupportAccessGrant | null; history: SupportAccessGrant[] }>({ action: 'supportAccessStatus' });
+  },
+  /** Every staff access to this tenant's data — who, when, what action, how many records; never content. */
+  supportAccessLog(opts?: { limit?: number }) {
+    return postJson<{ items: StaffAccessLogEntry[] }>({ action: 'supportAccessLog', limit: opts?.limit });
+  },
 };
+
+/** api/_lib/privacy/supportAccess.js's own grant row shape, camelCase over the wire (postJson never
+ *  re-cases — these field names match exactly what api/review.js's JSON.stringify sends). */
+export interface SupportAccessGrant {
+  id: string;
+  granted_by: string;
+  reason: string | null;
+  expires_at: string;
+  revoked_at?: string | null;
+  revoked_by?: string | null;
+  created_at: string;
+}
+
+/** One staff_access_log row — who, when, what action, how many records. Never contains the
+ *  underlying question/answer/document content, only this metadata. */
+export interface StaffAccessLogEntry {
+  id: string;
+  staff_user_id: string | null;
+  action: string;
+  record_count: number | null;
+  is_emergency: boolean;
+  emergency_reason: string | null;
+  grant_id: string | null;
+  created_at: string;
+}
 
 /** Replays every open miss (operator only): calls learningReplay until nothing is left, a budget/cost stop
  *  is reported, or `maxRounds` is hit. `onProgress` gets the running totals after each round. */

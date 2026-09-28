@@ -226,7 +226,7 @@ export async function loadExportIntoNewTenant(lite, exportData, { tenantKey = "o
 const PASS_THROUGH_CMP = new Set(["number", "set", "value", "yesno", "honest-zero", "count-with-unknown"]);
 
 function emptyBucket() {
-  return { total: 0, answeredWithoutModel: 0, correct: 0, wrong: 0, needsModel: 0, needsGrader: 0, skipped: 0, oracleError: 0, cited: 0, citationChecked: 0, citationSupportRate: [], latenciesMs: [] };
+  return { total: 0, answeredWithoutModel: 0, correct: 0, wrong: 0, needsModel: 0, needsGrader: 0, skipped: 0, oracleError: 0, cited: 0, citationChecked: 0, citationSupportRate: [], latenciesMs: [], keyFactGraded: 0 };
 }
 
 function fold(bucket, r) {
@@ -237,6 +237,7 @@ function fold(bucket, r) {
   bucket.answeredWithoutModel += 1;
   bucket.latenciesMs.push(r.latencyMs);
   if (r.status === "needs-grader") { bucket.needsGrader += 1; return; }
+  if (r.gradedBy === "keyfacts") bucket.keyFactGraded += 1;
   if (r.status === "correct") bucket.correct += 1; else bucket.wrong += 1;
   if (r.cited) bucket.cited += 1;
   if (typeof r.citationPrecision === "number") { bucket.citationChecked += 1; bucket.citationSupportRate.push(r.citationPrecision); }
@@ -257,6 +258,7 @@ function summarize(bucket) {
     needsGrader: bucket.needsGrader,
     skipped: bucket.skipped,
     oracleError: bucket.oracleError,
+    keyFactGraded: bucket.keyFactGraded,
     citationPresenceRate: bucket.answeredWithoutModel - bucket.needsGrader > 0 ? Math.round((bucket.cited / (bucket.answeredWithoutModel - bucket.needsGrader)) * 1000) / 1000 : null,
     citationSupportRate: avg(bucket.citationSupportRate),
     latencyMsAvg: avg(bucket.latenciesMs),
@@ -278,18 +280,27 @@ function summarize(bucket) {
  * @param {object[]} p.questions  exam.json's `questions` (or a subset)
  * @param {string} p.today  'YYYY-MM-DD'
  * @param {{n: number}} p.modelCounter  from installModelBlock()
- * @returns {Promise<{perQuestion: object[], overall: object, byCategory: object}>}
+ * @param {boolean} [p.calibrate]  R21 (build item 2, "calibration mode"): when true, every rubric question
+ *   graded deterministically via `keyFacts` is ALSO graded by the real LLM grader (api/_lib/scorecard/
+ *   runner.js's `gradeAnswer`, unmodified) and the two verdicts are compared. This makes a REAL model call
+ *   per keyFacts-graded question — never on by default, never reachable from any verify-*.mjs script, and
+ *   only take effect via the CLI's explicit `--calibrate` flag (see main() below), for once credits return.
+ * @returns {Promise<{perQuestion: object[], overall: object, byCategory: object, calibration?: object}>}
  */
-export async function runOfflineExam({ ctx, questions, today, modelCounter }) {
+export async function runOfflineExam({ ctx, questions, today, modelCounter, calibrate = false }) {
   const { withTenant } = await import("../api/_lib/recordsStore.js");
   const { runOracle } = await import("../api/_lib/scorecard/oracle.js");
   const { compareAnswer, summarizeExpected } = await import("../api/_lib/scorecard/compare.js");
   const { checkCitationPrecision } = await import("../api/_lib/scorecard/citationCheck.js");
+  const { gradeKeyFacts, calibrationRow, summarizeCalibration } = await import("../api/_lib/scorecard/keyFactGrader.js");
   const { askViaHandler } = await import("../api/_lib/scorecard/askCall.js");
   const { default: askHandler } = await import("../api/ask.js");
+  // Only imported/invoked when `calibrate` is true — see the doc comment above.
+  const { gradeAnswer } = calibrate ? await import("../api/_lib/scorecard/runner.js") : {};
 
   const auth = { tenantId: ctx.tenantKey, orgId: ctx.tenantName ?? ctx.tenantKey, userId: null };
   const perQuestion = [];
+  const calibrationRows = [];
 
   for (const q of questions) {
     const base = { id: q.id, category: q.category, cmp: q.cmp, question: q.text };
@@ -318,6 +329,26 @@ export async function runOfflineExam({ ctx, questions, today, modelCounter }) {
       perQuestion.push({ ...base, status: "wrong", expected: summarizeExpected({ ...q, expected: oracle.expected }), got: `error: ${asked.error ?? "no response"}`, latencyMs });
       continue;
     }
+    if (q.cmp === "rubric" && q.keyFacts) {
+      const graded = gradeKeyFacts({ question: q, data: asked.data });
+      let citationPrecision;
+      if (graded.cited) {
+        const cp = await checkCitationPrecision(withTenant, ctx, asked.data);
+        if (typeof cp.precision === "number") citationPrecision = cp.precision;
+      }
+      perQuestion.push({
+        ...base, status: graded.passed ? "correct" : "wrong", gradedBy: "keyfacts",
+        cited: Boolean(graded.cited), citationPrecision,
+        expected: graded.expectedSummary, got: graded.got, why: graded.why,
+        partialCredit: graded.partialCredit, missingRequired: graded.missingRequired, forbiddenFound: graded.forbiddenFound,
+        latencyMs,
+      });
+      if (calibrate) {
+        const llm = await gradeAnswer({ ctx, question: q, expected: oracle.expected, data: asked.data, alts: oracle.alts, deadlineAt: Date.now() + 20_000 });
+        calibrationRows.push(calibrationRow(q.id, graded.passed, llm.passed));
+      }
+      continue;
+    }
     if (q.cmp === "rubric" || !PASS_THROUGH_CMP.has(q.cmp)) {
       perQuestion.push({ ...base, status: "needs-grader", latencyMs });
       continue;
@@ -344,7 +375,7 @@ export async function runOfflineExam({ ctx, questions, today, modelCounter }) {
   }
   const byCategory = Object.fromEntries([...catBuckets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, summarize(v)]));
 
-  return { perQuestion, overall: summarize(overallBucket), byCategory };
+  return { perQuestion, overall: summarize(overallBucket), byCategory, calibration: calibrate ? summarizeCalibration(calibrationRows) : undefined };
 }
 
 /* ============================================================== markdown report */
@@ -358,7 +389,7 @@ export function renderMarkdownReport({ tenantKey, examVersion, generatedAt, dura
     `Tenant: \`${tenantKey}\` · exam version \`${examVersion}\` · generated ${generatedAt} · run took ${Math.round(durationMs / 1000)}s`,
     counts ? `Loaded from export: ${counts.documents} documents, ${counts.entities} entities, ${counts.extractions} extractions, ${counts.links} links, ${counts.financials} money documents.` : "",
     ``,
-    `**$0 in model calls.** Only questions Donovan's no-model paths (fast path, deterministic router, financials, relations, analytics, contact/doc lookup) could answer on their own are graded; anything that would have reached the agent or model-based retrieval synthesis is counted under **needs-model**, not wrong. Free-text \`rubric\` questions cannot be graded without the LLM grader and are counted under **needs-grader**.`,
+    `**$0 in model calls.** Only questions Donovan's no-model paths (fast path, deterministic router, financials, relations, analytics, contact/doc lookup) could answer on their own are graded; anything that would have reached the agent or model-based retrieval synthesis is counted under **needs-model**, not wrong. Free-text \`rubric\` questions with a \`keyFacts\` field (R21) are graded deterministically (see api/_lib/scorecard/keyFactGrader.js, ${overall.keyFactGraded ?? 0} graded this run) and counted as correct/wrong; the rest cannot be graded without the LLM grader and are counted under **needs-grader**.`,
     ``,
     `| Category | N | Answered w/o model | Correct | Wrong | Accuracy | Needs model | Needs grader | Skipped | Citation presence | Avg ms |`,
     `|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|`,
@@ -478,9 +509,14 @@ export async function loadFullExam(tenantKey = null) {
 /* ============================================================== CLI */
 
 async function main() {
-  const [exportPath, outJsonArg, outMdArg] = process.argv.slice(2);
+  // R21 (build item 2): --calibrate is the ONLY way this script ever calls a real model — off by
+  // default, never passed by verify-offline-exam.mjs or any verify:* script, and only meaningful once
+  // credits are back (each keyFacts-graded rubric question then also costs one real Haiku grader call).
+  const rawArgs = process.argv.slice(2);
+  const calibrate = rawArgs.includes("--calibrate");
+  const [exportPath, outJsonArg, outMdArg] = rawArgs.filter((a) => a !== "--calibrate");
   if (!exportPath) {
-    console.error("Usage: node scripts/offline-exam.mjs <export.json> [out.json] [out.md]");
+    console.error("Usage: node scripts/offline-exam.mjs <export.json> [out.json] [out.md] [--calibrate]");
     process.exit(2);
   }
   const outJson = outJsonArg ?? path.join(path.dirname(path.resolve(exportPath)), "offline-exam-results.json");
@@ -504,17 +540,18 @@ async function main() {
 
   const started = Date.now();
   const { ctx, counts } = await loadExportIntoNewTenant(lite, exportData, { tenantKey: exportData.tenantKey ? `offline:${exportData.tenantKey}` : "offline-exam", tenantName: "Offline Exam" });
-  const today = new Date().toISOString().slice(0, 10);
-  const { perQuestion, overall, byCategory } = await runOfflineExam({ ctx, questions: exam.questions, today, modelCounter });
+  const today = process.env.EXAM_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.EXAM_TODAY) ? process.env.EXAM_TODAY : new Date().toISOString().slice(0, 10); // EXAM_TODAY pins the date (verify-golden uses 2026-09-25)
+  const { perQuestion, overall, byCategory, calibration } = await runOfflineExam({ ctx, questions: exam.questions, today, modelCounter, calibrate });
   const durationMs = Date.now() - started;
 
-  const resultsJson = { version: exam.version, tenantKey: exportData.tenantKey ?? null, exportedAt: exportData.exportedAt ?? null, generatedAt: new Date().toISOString(), durationMs, counts, overall, byCategory, perQuestion };
+  const resultsJson = { version: exam.version, tenantKey: exportData.tenantKey ?? null, exportedAt: exportData.exportedAt ?? null, generatedAt: new Date().toISOString(), durationMs, counts, overall, byCategory, perQuestion, calibration };
   fs.mkdirSync(path.dirname(path.resolve(outJson)), { recursive: true });
   fs.writeFileSync(outJson, JSON.stringify(resultsJson, null, 2));
   fs.writeFileSync(outMd, renderMarkdownReport({ tenantKey: exportData.tenantKey ?? "(unknown)", examVersion: exam.version, generatedAt: resultsJson.generatedAt, durationMs, overall, byCategory, perQuestion, counts }));
 
   console.log(`offline-exam: ${exam.questions.length} questions in ${Math.round(durationMs / 1000)}s -> ${outJson}, ${outMd}`);
   console.log(JSON.stringify(overall));
+  if (calibration) console.log("calibration:", JSON.stringify(calibration));
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

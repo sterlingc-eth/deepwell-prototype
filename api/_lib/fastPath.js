@@ -415,11 +415,33 @@ const POSSESSIVE_NAME_RE = new RegExp(`\\b(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?
 const THE_NAME_NOUN_RE =
   /\bthe\s+([A-Z][A-Za-z'-]+(?:\s+[A-Za-z'-]+){0,2})\s+(?:unit|account|job|customer|install(?:ation)?|condenser|furnace|job site)\b/i;
 // "does Henderson have/need/take" — a name with no leading preposition at all.
-const DOES_NAME_HAVE_RE = new RegExp(`\\bdoes\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2})\\s+(?:have|need|take)\\b`);
+// R21 (L2, h041/h043 — "is Amy Isaacson still under warranty" wrongly resolving to NO customer):
+// the trailing `{0,2}` name-continuation words are never required to be capitalized (unlike
+// NAME_HINT_RE/POSSESSIVE_NAME_RE just above, which DO require a capital on every extra word), so
+// a GREEDY quantifier tries the most extra words first and, since a filler adverb right before the
+// trigger phrase (an ordinary lowercase word like "still"/"already"/"also") satisfies
+// `[A-Za-z'-]+` just as well as a real second name word, it locks onto that longer, wrong capture
+// the moment the shorter required tail ("have"/"under warranty"/...) also happens to still match
+// after it — e.g. "is Amy Isaacson still under warranty": greedy first tries name="Isaacson still"
+// (2 extra words), and the mandatory tail right after it, " under warranty", still matches the
+// "under warranty" alternative, so the regex never backtracks to the correct, shorter name="Amy
+// Isaacson" it would have found by trying 0/1 extra words first. resolveFastPathSubject's own
+// `data->>'customer_name' ILIKE '%Amy Isaacson still%'` then matches nothing, `resolution.kind`
+// comes back 'none', and the whole intent falls through to needs-model even though the customer
+// resolves uniquely and the answer is on file. A LAZY quantifier tries the fewest extra words
+// FIRST and only grows the capture when the tail genuinely fails to match without them — it can
+// never make the regex match anything it didn't already match (same alternation, same anchors),
+// only change WHICH capture wins when more than one length would satisfy the tail, so a real
+// 2-3-word name is unaffected (see verify-lookups-r21.mjs's own regression paraphrases). Left
+// THE_NAME_NOUN_RE (line above) alone — no confirmed failure from it this round, and rewriting a
+// working detector on spec-only risk contradicts the guard's own "never weaken/broaden without a
+// real case" discipline.
+const DOES_NAME_HAVE_RE = new RegExp(`\\bdoes\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2}?)\\s+(?:have|need|take)\\b`);
 // R18 (H1, field-phrasing g036/g040/g044): "is Matthew Whitfield out of warranty yet" — same
 // no-leading-preposition shape as DOES_NAME_HAVE_RE above, just for the warranty_out/warranty_status
-// is/are phrasing instead of "does ... have".
-const IS_NAME_WARRANTY_RE = new RegExp(`\\b(?:is|are|was|were)\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2})\\s+(?:out of warranty|still under warranty|under warranty|still covered)\\b`);
+// is/are phrasing instead of "does ... have". Lazy `{0,2}?` — see DOES_NAME_HAVE_RE's own doc
+// comment just above (identical over-greedy-filler-word bug, same fix).
+const IS_NAME_WARRANTY_RE = new RegExp(`\\b(?:is|are|was|were)\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2}?)\\s+(?:out of warranty|still under warranty|under warranty|still covered)\\b`);
 
 // R16 (F1, field-phrasing "ambiguous_multiunit"/"two_value" — a commercial customer's own BUSINESS
 // NAME used as the location, typed exactly as a dispatcher would ("at holy trinity church", "at

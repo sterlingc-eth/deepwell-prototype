@@ -37,6 +37,9 @@ import { financialsTableExists } from './financials/store.js';
 // audience/probe.js's own header on why this imports THAT file and never audience/store.js).
 import { documentsHaveAudience } from './audience/probe.js';
 import { AUDIENCE_FALLBACK_FIELD_KEY } from './audience/sql.js';
+// Round 22 (S2, privacy): the skip-shop-address log below used to print the raw tenant id and a
+// normalized ADDRESS out of the request — a real (if the shop's own) street address — into the log.
+import { hashForLog } from './privacy/redact.js';
 
 let pool;
 
@@ -1293,7 +1296,7 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
 
   const ctx = shopContext ?? await computeShopAddressContext(db, tenantId);
   if (isLikelyShopAddress(addrKey, ctx)) {
-    console.log(JSON.stringify({ event: 'integrity.skip_shop_address', tenantId, addrKey }));
+    console.log(JSON.stringify({ event: 'integrity.skip_shop_address', tenantIdHash: hashForLog(tenantId), addrKeyHash: hashForLog(addrKey) }));
     return null;
   }
 

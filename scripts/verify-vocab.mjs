@@ -41,8 +41,18 @@ const A = await import('../api/_lib/analytics.js');
   check('correctTenantNameTypos: possessive technician-name typo corrected ("Denny Ochoa\'s" -> "Danny Ochoa\'s")',
     a.corrected.includes("Danny Ochoa's") && a.corrections.some((c) => c.category === 'technician'), a.corrected);
 
+  // R21 (M1, P0 — fp-4 cluster 5): a CUSTOMER name near-miss is deliberately NEVER rewritten into
+  // the question text (unlike a technician name, above) — see correctTenantNameTypos' own doc
+  // comment for why (a silent text rewrite here used to make a fuzzy guess indistinguishable from
+  // an exact, user-typed customer name by the time contactLookup.js/fastPathQuery.js/docLookup.js
+  // ran their own resolution, so a near-miss name silently returned a DIFFERENT real customer's
+  // PII with full confidence). The candidate fix is still reported in `corrections` for
+  // observability (marked `applied: false`), but the text itself stays exactly as typed.
   const b = Vocab.correctTenantNameTypos('Did Vaga\'s jobs have a repeat visit?', { technicians: Vocab.buildNameGlossary([]), customers: Vocab.buildNameGlossary(['Marisol Vega']) });
-  check('correctTenantNameTypos: possessive customer-name typo corrected ("Vaga\'s" -> "Vega\'s")', /Vega's/.test(b.corrected), b.corrected);
+  check('correctTenantNameTypos: a customer-name near-miss is reported but never rewritten into the question text ("Vaga\'s" stays "Vaga\'s")',
+    /Vaga's/.test(b.corrected) && !/Vega's/.test(b.corrected)
+      && b.corrections.length === 1 && b.corrections[0].category === 'customer' && b.corrections[0].applied === false,
+    JSON.stringify(b));
 
   const c = Vocab.correctTenantNameTypos("Did Danny Ochoa have a repeat visit?", vocab);
   eq('correctTenantNameTypos: an already-correct name is never touched', c.corrections, []);

@@ -2307,6 +2307,73 @@ for (const q of [
   }
 }
 
+/* ======================================================================
+ * R21 M2: j064 (trends.js compareYoYQuarter), j192/j195 (mentionsFutureYear),
+ * h106/i006 (CONDITION_UNTRACKED_CALLBACK) — none of these had dedicated
+ * paraphrase/negative coverage anywhere yet.
+ * ====================================================================== */
+{
+  const { parseTrends } = await import('../api/_lib/trends.js');
+  // j064: "this quarter vs the same quarter a year back" needed its OWN engine
+  // (compareYoYQuarter) because periodBounds' generic quarter-compare always
+  // means "the last two full completed quarters" — it has no notion of "this
+  // quarter" (naturally partial, bounded by today) at all.
+  const compareYoYQuarterPositives = [
+    'have we had more service visits this quarter than in the same quarter last year',
+    'did we do more service calls this quarter compared to the same quarter a year ago',
+    'are we seeing more jobs this quarter than the same quarter last year',
+    'did we get more service visits this quarter than the same quarter last year',
+    'have we had more service calls this quarter than the same quarter last year',
+  ];
+  for (const q of compareYoYQuarterPositives) {
+    check(`j064 (own paraphrase): "${q}" -> compareYoYQuarter/serviceCount`,
+      JSON.stringify(parseTrends(q)) === JSON.stringify({ kind: 'compareYoYQuarter', metric: 'serviceCount' }));
+  }
+  check('j064 negative: "this quarter than LAST quarter" (no "same quarter ... last year") stays the generic compare, not YoY',
+    JSON.stringify(parseTrends('have we had more service visits this quarter than last quarter')) ===
+      JSON.stringify({ kind: 'compare', metric: 'serviceCount', grain: 'quarter' }));
+  check('j064 negative: a year-grain "this year vs last year" comparison yields null (two lower-precedence engines own it, not this file)',
+    parseTrends('did we do more service calls this year than last year') === null);
+
+  // j192/j195: a question naming a future year must decline honestly, never compute a confident 0.
+  const { mentionsFutureYear, futureDateAnswer, FUTURE_DATE_TEXT } = await import('../api/_lib/analytics.js');
+  const futureYearPositives = [
+    'how many units did we install in 2027',
+    'how many invoices do we have from 2030',
+    'how many service visits happened in 2099',
+    'what warranties expire in 2028',
+    'how many customers signed up in 2040',
+  ];
+  for (const q of futureYearPositives) {
+    check(`j192/j195 (own paraphrase): "${q}" names a future year -> mentionsFutureYear true`, mentionsFutureYear(q, '2026-09-25') === true);
+  }
+  check('j192/j195 negative: a past/current year is never treated as future', mentionsFutureYear('how many units did we install in 2025', '2026-09-25') === false);
+  check('j192/j195 negative: no year token at all -> false', mentionsFutureYear('how many units did we install last month', '2026-09-25') === false);
+  check('futureDateAnswer(): a genuine decline, not a computed zero (no facts entry to trip honest-zero grading)',
+    (() => {
+      const a = futureDateAnswer();
+      return a.kind === 'answer' && a.text === FUTURE_DATE_TEXT && Array.isArray(a.facts) && a.facts.length === 0;
+    })());
+
+  // h106/i006: the untracked-callback condition — a filter word with no real field in the closed
+  // vocabulary must decline, never silently execute as an unfiltered (wrong) count.
+  const { CONDITION_UNTRACKED_CALLBACK, missingConditions } = await import('../api/_lib/analytics.js');
+  const untrackedCallbackPositives = [
+    'which customers are due for a callback',
+    'how many customers need a callback scheduled',
+    'list customers waiting on a callback',
+    'which customers have a callback pending',
+    'how many callbacks are overdue',
+  ];
+  for (const q of untrackedCallbackPositives) {
+    const found = missingConditions({}, q);
+    check(`h106/i006 (own paraphrase): "${q}" -> CONDITION_UNTRACKED_CALLBACK detected (declines rather than guessing)`,
+      found.has(CONDITION_UNTRACKED_CALLBACK), JSON.stringify([...found]));
+  }
+  check('h106/i006 negative: an ordinary question naming no callback word at all never trips this condition',
+    !missingConditions({}, 'how many customers do we have in Mesa').has(CONDITION_UNTRACKED_CALLBACK));
+}
+
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {
   console.error(`${failures} FAILURE(S)`);

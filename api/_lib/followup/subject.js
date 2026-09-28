@@ -9,6 +9,7 @@
  */
 import { extractSubject } from '../fastPath.js';
 import { BRAND_RULES } from '../warrantyRules.js';
+import { KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from '../analytics.js';
 
 /** Which plural noun a pronoun ("those"/"them"/"these") most likely stands for, guessed from the
  *  words actually in the sentence it appeared in — never a claim, just the best available guess for
@@ -22,7 +23,7 @@ export function inferNoun(text) {
   return 'units';
 }
 
-/** @returns {{address:?string, name:?string, customerNumber:?string, identifier:?string, unitType:?string, noun:string, hasAny:boolean}} */
+/** @returns {{address:?string, name:?string, customerNumber:?string, identifier:?string, unitType:?string, cityOnly:?string, noun:string, hasAny:boolean}} */
 export function subjectFromText(question) {
   const s = extractSubject(question);
   return {
@@ -31,6 +32,13 @@ export function subjectFromText(question) {
     customerNumber: s.customerNumber || null,
     identifier: s.identifier || null,
     unitType: s.unitType || null,
+    // R21 (M3): fastPath.js's extractSubject already recognizes a BARE city name (no street address)
+    // via its own cityOnly field — exposed here (previously dropped) so callers can tell "this
+    // question names a real, specific entity" (address/name/customerNumber/identifier) apart from
+    // "this question merely mentions a place", the same distinction resolve.js's own-subject gate
+    // needs (see hasStrongSubject there) to avoid treating a bare city mention as a fully
+    // self-contained question when a dangling pronoun/refinement is still sitting right next to it.
+    cityOnly: s.cityOnly || null,
     noun: inferNoun(question),
     hasAny: Boolean(s.hasAny),
   };
@@ -58,6 +66,12 @@ export function subjectFromEntities(entities) {
     hasAny: list.length > 0,
     candidateCustomers: customers,
     candidateUnits: units,
+    // R21 (M3, C9 — "how many customers do we have in Tempe" / "how many of those have a Carrier
+    // unit"): set below when a MULTI-entity prior turn (a city-scoped count, a brand-filtered
+    // equipment list, ...) shares one grouping value across EVERY candidate — the scope the whole
+    // list was actually narrowed to. Null whenever nothing here disambiguates further (a plain,
+    // ungrouped list) — never guessed from a majority, only unanimous agreement.
+    listScope: null,
   };
   if (customers.length === 1) {
     out.name = customers[0].label || null;
@@ -67,7 +81,53 @@ export function subjectFromEntities(entities) {
     out.name = out.name || units[0].sublabel?.split('·')[0]?.trim() || null;
     out.unitType = units[0].label || null;
   }
+  // A city-filtered customer LIST puts the shared city somewhere in every row's own sublabel — a bare
+  // city name for the simple single-filter analytics path (routes/analytics.js's shapeCustomerRow/
+  // recordFor), a full "street, City, AZ zip" address for the multi-filter decompose path (citations/
+  // enrich.js) — so rather than requiring the sublabel strings to match VERBATIM (which only the first
+  // shape would ever satisfy), pull the known city TOKEN out of each one and require every candidate to
+  // name the SAME one. Never guessed from a majority, and never claims a city no candidate's own text
+  // actually contains.
+  if (!out.address && customers.length >= 2) {
+    const cities = customers.map((c) => cityTokenIn(c.sublabel));
+    const first = cities[0];
+    if (first && cities.every((c) => c === first)) {
+      out.listScope = { noun: 'customers', place: titleCaseCity(first) };
+    }
+  }
+  // Same idea for a brand-filtered EQUIPMENT list: every unit's own label (e.g. "Trane condenser")
+  // names the same manufacturer only when the whole list really was filtered to that brand.
+  if (!out.listScope && !out.unitType && units.length >= 2) {
+    const firstBrand = brandMentionIn(units[0]?.label);
+    if (firstBrand && units.every((u) => brandMentionIn(u.label)?.key === firstBrand.key)) {
+      out.listScope = { noun: 'units', brand: firstBrand };
+    }
+  }
   return out;
+}
+
+// ---------------------------------------------------------------------- shared-city detection
+// Built from analytics.js's own KNOWN_AZ_CITY_NAMES/KNOWN_US_CITY_NAMES — the same closed vocabulary
+// the rest of the deterministic layer already recognizes a city by, longest name first so a two-word
+// city ("San Tan Valley") wins over a shorter false-positive substring.
+const CITY_WORD_ENTRIES = [...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].sort((a, b) => b.length - a.length);
+
+/** The first known city name found in `text` (as a whole word/phrase), lower-cased, or null. Matches
+ *  a bare city ("Tempe") equally well as a full address that merely CONTAINS one ("753 W Guadalupe Rd,
+ *  Phoenix, AZ 85001"). */
+function cityTokenIn(text) {
+  const s = String(text ?? '');
+  if (!s) return null;
+  for (const c of CITY_WORD_ENTRIES) {
+    if (new RegExp(`\\b${escapeRe(c)}\\b`, 'i').test(s)) return c;
+  }
+  return null;
+}
+
+/** Title-cases a lower-case city token ("san tan valley" -> "San Tan Valley") for use in composed
+ *  question text — the known-city lists themselves are all lower-case keys. */
+function titleCaseCity(city) {
+  return String(city ?? '').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ---------------------------------------------------------------------- brand mentions
@@ -137,6 +197,21 @@ export function pronounNeedsBrandFromEarlierTurn(question) {
 export function pronounReplacement(subject) {
   if (!subject) return null;
   const noun = subject.noun || 'units';
+  // R21 (M3, C9): a multi-entity prior turn with no single name/address of its own (see
+  // subjectFromEntities' listScope) still has real scope worth carrying forward — a shared city
+  // ("the customers in Tempe") or a shared brand ("the Trane units") — expressed as a plain noun
+  // phrase rather than the address/name/customerNumber possessive forms below, since there is no
+  // single entity's raw text to guarantee stays present the way anchorAlreadyPresent checks for those.
+  if (!subject.address && !subject.name && !subject.customerNumber && subject.listScope) {
+    const { noun: scopeNoun, place, brand } = subject.listScope;
+    const phrase = brand ? `${brand.label} ${scopeNoun}` : place ? `${scopeNoun} in ${place}` : scopeNoun;
+    return {
+      place: place ? `in ${place}` : '',
+      singular: `the ${phrase}`,
+      plural: `the ${phrase}`,
+      possessive: `the ${scopeNoun}'s`,
+    };
+  }
   if (subject.address) {
     return {
       place: `at ${subject.address}`,

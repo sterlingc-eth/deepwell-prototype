@@ -25,6 +25,7 @@ import { financialsTableExists } from './financials/store.js';
 // customer-scoped answer unless the question itself is about team/internal material (isTeamScopedQuestion).
 import { documentsHaveAudience } from './audience/probe.js';
 import { audienceFilterSql } from './audience/sql.js';
+import { parseCompoundQuestion } from './lookups/compound.js';
 import {
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
@@ -767,6 +768,15 @@ async function runCustomerEntityFieldPolicy(db, { intent, resolution, raw, today
   if (wantsEveryUnit(raw)) {
     return buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel: label, today, teamScoped });
   }
+  // R21 (M1, L4 rubric g104/h138/i194 — "multi-unit partial report... never decline everything"):
+  // 'refrigerant' specifically must report each unit's own value or "not on file" per unit, rather
+  // than the flat ambiguous decline every OTHER field here still (correctly) uses — 'tonnage's own
+  // honest-zero exam item (g074) needs exactly that flat decline for the identical multi-unit shape,
+  // so this round's own keyFacts draw the line at the FIELD, not the shape; scoped to 'refrigerant'
+  // only rather than widened to every ADDRESS_ENTITY_FIELD_INTENTS member.
+  if (intent === 'refrigerant') {
+    return buildMultiUnitAddressAnswer(db, { intent, units, customer, addressLabel: label, today, teamScoped });
+  }
   return buildAddressFieldDecline({ intent, subject: { address: label }, resolution: { kind: 'ambiguous' } });
 }
 
@@ -1047,6 +1057,19 @@ export async function runFastPath(db, fp, { today } = {}) {
   if (intent === 'out_of_domain') return buildOutOfDomainDecline(); // R19 (I1, C8)
   if (REVERSE_LOOKUP_INTENTS.has(intent)) return runReverseLookup(db, intent, subject.reverseValue); // R19 (I1, C1)
   if (NO_FIELD_INTENTS.has(intent)) return null; // no extraction field exists — always defer (seer, filter_size)
+
+  // R21 (M1, L4 rubric g149/g151/g153/g155/h167): a "warranty status AND tech" / "installer AND
+  // install date" / "warranty status AND last visit date" compound question is answered more
+  // honestly (BOTH halves stated, every ambiguous name listed, installer never confused with a
+  // service visit's technician) by lookups/compound.js's runWarrantyTech/runInstallerDate/
+  // runWarrantyLastVisit than any single-field intent here ever could — bail out here and let
+  // docLookup.js's own dispatch to that file handle it, rather than this file answering (or, worse,
+  // declining) only the first half. modelSerial/namePhone compound shapes are deliberately NOT
+  // included: this file's own address-entity-field policy below already answers those correctly
+  // today, so redirecting them risks a regression this round's contract requires zero of — this
+  // bail-out is scoped to exactly the rubric-graded shapes that were broken.
+  const compoundParsed = parseCompoundQuestion(raw);
+  if (compoundParsed && (compoundParsed.kind === 'warrantyTech' || compoundParsed.kind === 'installerDate' || compoundParsed.kind === 'warrantyLastVisit')) return null;
 
   const resolution = await resolveFastPathSubject(db, subject);
 

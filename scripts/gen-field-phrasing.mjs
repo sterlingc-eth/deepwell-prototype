@@ -140,8 +140,14 @@ function yesNoQ({ id, text, shape, sql, params = [], citationRequired = true }) 
   return { id, text, category: "field-phrasing", shape, cmp: "yesno", oracle: { sql, params }, citationRequired };
 }
 
-function rubricQ({ id, text, shape, rubric }) {
-  return { id, text, category: "field-phrasing", shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
+function rubricQ({ id, text, shape, rubric, keyFacts }) {
+  // R21 (L4 rubric grader, review fix): `keyFacts` optional/additive, appended last — see
+  // gen-field-phrasing-2.mjs's identical rubricQ change for the full reasoning; keeps this in
+  // sync with test-docs/scorecard/generalization/field-phrasing.json's own checked-in keyFacts
+  // for g099/g100/g101/g104/g105/g149/g151/g153/g155.
+  const q = { id, text, category: "field-phrasing", shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
+  if (keyFacts) q.keyFacts = keyFacts;
+  return q;
 }
 
 /* ============================================================== the 158 questions */
@@ -423,16 +429,16 @@ questions.push(decline({ id: "g097", text: "serial killer documentary recommenda
 questions.push(decline({ id: "g098", text: "who installed the app on this phone", shape: "out_of_domain", guardSql: NEVER_HVAC_CONTENT, why: "must not trigger the 'installer' intent" }));
 
 /* ---- content (g099-g103) ------------------------------------------------------------------------------- */
-questions.push(rubricQ({ id: "g099", text: "what was found on the job at 100 e main st", shape: "content", rubric: "A summary of what the technician found/did on the job at 100 E Main St (Linda Fitzgerald), drawn from that job's work_performed/notes text." }));
-questions.push(rubricQ({ id: "g100", text: "any notes on the install at 137 w southern ave", shape: "content", rubric: "Thomas Mercer's install (invoice) document itself carries no 'notes' field - the answer must not borrow a note from an unrelated later visit (a service-ticket says 'System operating normally after visit', dated 2017, well after the install) and present it as being about the install." }));
-questions.push(rubricQ({ id: "g101", text: "whats the work order say for 174 n college ave", shape: "content", rubric: "The work_performed text from whatever job document covers 174 N College Ave (Donna Sorensen)." }));
+questions.push(rubricQ({ id: "g099", text: "what was found on the job at 100 e main st", shape: "content", rubric: "A summary of what the technician found/did on the job at 100 E Main St (Linda Fitzgerald), drawn from that job's work_performed/notes text.", keyFacts: { required: [{ type: "text", value: "no cooling" }, { type: "text", value: "install 2 ton trane" }, { type: "text", value: "annual pm" }, { type: "text", value: "system operating normally after visit" }] } }));
+questions.push(rubricQ({ id: "g100", text: "any notes on the install at 137 w southern ave", shape: "content", rubric: "Thomas Mercer's install (invoice) document itself carries no 'notes' field - the answer must not borrow a note from an unrelated later visit (a service-ticket says 'System operating normally after visit', dated 2017, well after the install) and present it as being about the install.", keyFacts: { required: [{ type: "text", value: ["no notes", "not on file", "no notes field"] }, { type: "text", value: ["3 ton carrier", "install 3 ton carrier"] }], forbidden: [{ type: "text", value: "system operating normally after visit" }] } }));
+questions.push(rubricQ({ id: "g101", text: "whats the work order say for 174 n college ave", shape: "content", rubric: "The work_performed text from whatever job document covers 174 N College Ave (Donna Sorensen).", keyFacts: { required: [{ type: "text", value: ["checked refrigerant charge", "replaced air filter", "system operating normally after visit", "coil clean", "refrigerant charge within spec"] }] } }));
 questions.push(numberQ({ id: "g102", text: "how many jobs have we done for copper sky dental", shape: "content", tolerance: 0, sql: `SELECT count(DISTINCT l.document_id) AS n FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'customer_name' ILIKE '%copper sky dental%'`, params: [] }));
 questions.push(numberQ({ id: "g103", text: "how many trane jobs have we done total", shape: "content", tolerance: 0, sql: `SELECT count(DISTINCT d.id) AS n FROM documents d JOIN document_entity_links l ON l.document_id=d.id JOIN entities e ON e.id=l.entity_id WHERE e.entity_type='equipment' AND e.data->>'manufacturer' ILIKE 'trane'`, params: [] }));
 
 /* ---- two_value (g104-g106) — rubric: no single mechanically-checkable string covers "list every value,
  *      note what's missing, never silently pick one" for a 2-3-unit site. ------------------------------- */
-questions.push(rubricQ({ id: "g104", text: "whats the refrigerant at holy trinity church", shape: "two_value", rubric: "3 units at Holy Trinity Church (Goodman/Rheem/Lennox) - only the Goodman has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one." }));
-questions.push(rubricQ({ id: "g105", text: "when was the unit installed at grace community church", shape: "two_value", rubric: "3 units at Grace Community Church installed 2016-06-22/25/28 - must not silently pick a single date." }));
+questions.push(rubricQ({ id: "g104", text: "whats the refrigerant at holy trinity church", shape: "two_value", rubric: "3 units at Holy Trinity Church (Goodman/Rheem/Lennox) - only the Goodman has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one.", keyFacts: { required: [{ type: "text", value: "Goodman" }, { type: "text", value: "R-410A" }, { type: "text", value: ["not on file", "no refrigerant"] }] } }));
+questions.push(rubricQ({ id: "g105", text: "when was the unit installed at grace community church", shape: "two_value", rubric: "3 units at Grace Community Church installed 2016-06-22/25/28 - must not silently pick a single date.", keyFacts: { required: [{ type: "date", value: "2016-06-22" }, { type: "date", value: "2016-06-28" }, { type: "date", value: "2016-06-25" }] } }));
 questions.push(rubricQ({ id: "g106", text: "tonnage on the unit at cactus rose restaurant", shape: "two_value", rubric: "2 units at Cactus Rose Restaurant (Rheem/Lennox) - only the Lennox has a tonnage on file (4 ton); must not silently report just one unit as if it were the only one." }));
 
 /* ---- existence (g107-g109) ----------------------------------------------------------------------------- */
@@ -502,7 +508,7 @@ SELECT e.data->>'${field2}' AS item FROM entities e WHERE e.entity_type='equipme
   };
 }
 questions.push(twoFieldAtAddress("g148", "hey quick one — whats the model and serial on the unit at 1580 w camelback rd", "1580 W Camelback Rd%", "model", "serial_number"));
-questions.push(rubricQ({ id: "g149", text: "can u tell me who installed it and when for 1913 E University Dr", shape: "compound", rubric: "Installer (not on file - no document ever carries one) AND the install date for 1913 E University Dr (Jason Yarborough); both parts must be addressed, not just the date." }));
+questions.push(rubricQ({ id: "g149", text: "can u tell me who installed it and when for 1913 E University Dr", shape: "compound", rubric: "Installer (not on file - no document ever carries one) AND the install date for 1913 E University Dr (Jason Yarborough); both parts must be addressed, not just the date.", keyFacts: { required: [{ type: "text", value: ["not on file", "no installer"] }, { type: "date", value: "2010-06-22" }] } }));
 questions.push({
   id: "g150", text: "whats the customers name and phone for 2246 E Ray Rd", category: "field-phrasing", shape: "compound", cmp: "set",
   oracle: {
@@ -511,9 +517,9 @@ UNION ALL SELECT data->>'phone' AS item FROM entities WHERE entity_type='custome
     params: [],
   },
 });
-questions.push(rubricQ({ id: "g151", text: "quick q, is Abernathy still under warranty and whos the tech that did it", shape: "compound", rubric: "Warranty status AND installer for 'Abernathy' - the bare surname is ambiguous (Karen and Kevin Abernathy) and installer is never on file; both parts need honest handling, not a single confident answer." }));
+questions.push(rubricQ({ id: "g151", text: "quick q, is Abernathy still under warranty and whos the tech that did it", shape: "compound", rubric: "Warranty status AND installer for 'Abernathy' - the bare surname is ambiguous (Karen and Kevin Abernathy) and installer is never on file; both parts need honest handling, not a single confident answer.", keyFacts: { required: [{ type: "date", value: "2035-03-07" }, { type: "text", value: "active" }, { type: "date", value: "2015-12-16" }, { type: "text", value: "expired" }, { type: "text", value: ["installer", "not on file", "no installer"] }] } }));
 questions.push(twoFieldAtAddress("g152", "hey quick one — whats the model and serial on the unit at 2912 e broadway rd", "2912 E Broadway Rd%", "model", "serial_number"));
-questions.push(rubricQ({ id: "g153", text: "can u tell me who installed it and when for 3245 S Higley Rd", shape: "compound", rubric: "Installer (not on file) AND the install date for 3245 S Higley Rd (Anthony Bennett); both parts must be addressed." }));
+questions.push(rubricQ({ id: "g153", text: "can u tell me who installed it and when for 3245 S Higley Rd", shape: "compound", rubric: "Installer (not on file) AND the install date for 3245 S Higley Rd (Anthony Bennett); both parts must be addressed.", keyFacts: { required: [{ type: "text", value: ["not on file", "no installer"] }, { type: "date", value: "2010-06-10" }] } }));
 questions.push({
   id: "g154", text: "whats the customers name and phone for 3578 N College Ave", category: "field-phrasing", shape: "compound", cmp: "set",
   oracle: {
@@ -522,7 +528,7 @@ UNION ALL SELECT data->>'phone' AS item FROM entities WHERE entity_type='custome
     params: [],
   },
 });
-questions.push(rubricQ({ id: "g155", text: "quick q, is Dominguez still under warranty and whos the tech that did it", shape: "compound", rubric: "Warranty status AND installer for 'Dominguez' - 3 distinct Dominguez customers and installer never on file; both parts need honest handling." }));
+questions.push(rubricQ({ id: "g155", text: "quick q, is Dominguez still under warranty and whos the tech that did it", shape: "compound", rubric: "Warranty status AND installer for 'Dominguez' - 3 distinct Dominguez customers and installer never on file; both parts need honest handling.", keyFacts: { required: [{ type: "date", value: "2017-04-16" }, { type: "date", value: "2025-01-25" }, { type: "date", value: "2015-12-04" }, { type: "text", value: ["installer", "not on file", "no installer"] }] } }));
 
 /* ---- dropped_condition (g156-g158) — all rubric: each needs a multi-part or exclusion answer that a
  *      single mechanical comparator can't safely verify. ------------------------------------------------- */

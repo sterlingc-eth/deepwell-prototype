@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CreateOrganization, OrganizationProfile, useAuth, useOrganization } from '@clerk/clerk-react';
-import { Bell, ChevronDown, ChevronUp, Download, Loader2, Users } from 'lucide-react';
+import { Bell, ChevronDown, ChevronUp, Clock, Download, History, Loader2, ShieldAlert, ShieldCheck, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus } from '../services/teamClient';
@@ -9,6 +9,7 @@ import { downloadTenantExportJson } from '../services/exportClient';
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
+import { reviewClient, type StaffAccessLogEntry, type SupportAccessGrant } from '../services/reviewClient';
 
 /**
  * Team screen (handoffs/ORG_INVITES_AUDIT.md): Clerk's own
@@ -153,6 +154,177 @@ function AccountSettingsCard() {
   );
 }
 
+/** en-US, minute precision — an expiry/access-log timestamp people are deciding "is this still
+ *  active" or "did I recognize this" from, not just a calendar date. */
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * Round 22 (S2, privacy) — "Support access" + "Access log", the tenant-facing half of
+ * api/_lib/privacy/supportAccess.js: an admin GRANTS DeepWell staff time-boxed, revocable access to
+ * this shop's own documents/misses/learning data (never on by default), and can always see every
+ * staff access to it — granted or "break-glass" emergency — in the log below. Same collapsed-by-
+ * default dw-card shape as AccountSettingsCard right above it, and admin-only for the same reason:
+ * this is an account-lifecycle/trust setting, not a people/seats one.
+ */
+export function SupportAccessCard() {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState<SupportAccessGrant | null>(null);
+  const [log, setLog] = useState<StaffAccessLogEntry[] | null>(null);
+  const [hours, setHours] = useState(24);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+
+  const refresh = () => {
+    setLoading(true);
+    setError(null);
+    Promise.all([reviewClient.supportAccessStatus(), reviewClient.supportAccessLog({ limit: 50 })])
+      .then(([status, logRes]) => {
+        setActive(status.active);
+        setLog(logRes.items);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load support access.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (open) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const grant = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await reviewClient.supportAccessGrant({ hours, reason: reason.trim() || undefined });
+      setReason('');
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not grant access.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (!active) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await reviewClient.supportAccessRevoke(active.id);
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not revoke access.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="dw-card p-4 space-y-3">
+      <button type="button" className="w-full flex items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
+        <span className="text-body font-medium text-ink flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4" aria-hidden="true" /> Support access
+        </span>
+        {open ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
+      </button>
+
+      {open && (
+        <div className="space-y-4 pt-1">
+          <p className="text-caption text-ink-3">
+            By default, DeepWell staff cannot look at this shop&apos;s documents, answers, or learning data. Grant
+            time-boxed access below when you want help from support — it expires on its own, or you can revoke it
+            any time. Every staff access is recorded in the Access log below, including any emergency access.
+          </p>
+
+          {loading && !active && !log ? (
+            <p className="text-caption text-ink-3 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading…</p>
+          ) : active ? (
+            <div className="dw-card bg-forest-50 dark:bg-forest-900/20 border-forest-700/30 p-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-start gap-2">
+                <Clock className="w-4 h-4 mt-0.5 shrink-0 text-forest-700" aria-hidden="true" />
+                <div>
+                  <p className="text-body text-ink">Access active until {fmtDateTime(active.expires_at)}</p>
+                  {active.reason && <p className="text-caption text-ink-3">Reason: {active.reason}</p>}
+                </div>
+              </div>
+              <button type="button" className="dw-btn-secondary shrink-0" disabled={busy} onClick={() => void revoke()}>
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : null} Revoke now
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-body text-ink-2" htmlFor="support-access-hours">Grant for</label>
+                <select
+                  id="support-access-hours"
+                  className="dw-input w-auto"
+                  value={hours}
+                  onChange={(e) => setHours(Number(e.target.value))}
+                >
+                  <option value={24}>24 hours</option>
+                  <option value={72}>72 hours</option>
+                  <option value={168}>7 days</option>
+                </select>
+                <input
+                  type="text"
+                  className="dw-input flex-1 min-w-[10rem]"
+                  placeholder="Reason (optional) — e.g. helping debug a missing invoice"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  maxLength={500}
+                />
+              </div>
+              <button type="button" className="dw-btn-primary" disabled={busy} onClick={() => void grant()}>
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <ShieldCheck className="w-4 h-4" aria-hidden="true" />} Grant support access
+              </button>
+            </div>
+          )}
+
+          {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
+
+          <div className="pt-2 border-t border-line">
+            <button type="button" className="w-full flex items-center justify-between text-left" onClick={() => setShowLog((v) => !v)}>
+              <span className="text-body font-medium text-ink flex items-center gap-2">
+                <History className="w-4 h-4" aria-hidden="true" /> Access log{log ? ` (${log.length})` : ''}
+              </span>
+              {showLog ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
+            </button>
+            {showLog && (
+              <ul className="divide-y divide-line mt-2">
+                {(log ?? []).map((row) => (
+                  <li key={row.id} className="py-2 flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-body text-ink">
+                        {row.action}
+                        {row.is_emergency && (
+                          <span className="dw-pill-warn ml-2 inline-flex items-center gap-1">
+                            <ShieldAlert className="w-3 h-3" aria-hidden="true" /> emergency
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-caption text-ink-3">
+                        {fmtDateTime(row.created_at)}
+                        {row.record_count != null ? ` · ${row.record_count} record${row.record_count === 1 ? '' : 's'}` : ''}
+                      </p>
+                      {row.emergency_reason && <p className="text-caption text-ink-3">Reason: {row.emergency_reason}</p>}
+                    </div>
+                  </li>
+                ))}
+                {log && log.length === 0 && <p className="text-caption text-ink-3 py-2">No staff access recorded yet.</p>}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TeamScreen() {
   const { orgRole } = useAuth();
   const admin = isAdminRole(orgRole ?? null);
@@ -212,6 +384,7 @@ export function TeamScreen() {
             section, until it has a Billing/Settings home this pass doesn't
             own (see AccountSettingsCard's file comment). */}
         {admin && <AccountSettingsCard />}
+        {admin && <SupportAccessCard />}
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">

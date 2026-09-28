@@ -57,3 +57,4 @@ test-docs/business-small/*.pdf
 test-docs/business-small/*.txt
 test-docs/business-small-topup/*.pdf
 test-docs/business-small-topup/*.txt
+dialogues-results.json

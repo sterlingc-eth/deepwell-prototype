@@ -134,8 +134,13 @@ function yesNoQ({ text, shape, sql, params = [], citationRequired = true }) {
   return { id: nextId(), text, category: CATEGORY, shape, cmp: "yesno", oracle: { sql, params }, citationRequired };
 }
 
-function rubricQ({ text, shape, rubric }) {
-  return { id: nextId(), text, category: CATEGORY, shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
+function rubricQ({ text, shape, rubric, keyFacts }) {
+  // R21 (L4 rubric grader, review fix): `keyFacts` optional/additive, appended last — see
+  // gen-field-phrasing-2.mjs's identical rubricQ change for the full reasoning; keeps this in
+  // sync with test-docs/scorecard/generalization/field-phrasing-3.json's own checked-in i194.
+  const q = { id: nextId(), text, category: CATEGORY, shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
+  if (keyFacts) q.keyFacts = keyFacts;
+  return q;
 }
 
 function warrantyExpiresAtAddress(text, addressPrefix) {
@@ -746,6 +751,7 @@ questions.push({
 questions.push(rubricQ({
   text: "whats the refrigerant situation at Cactus Rose Restaurant", shape: "ambiguous_multiunit",
   rubric: "Cactus Rose Restaurant has 2 units on file - both parts of the answer must be addressed (whichever has a refrigerant on file and whichever doesn't), never silently reporting on just one unit as if it were the only one.",
+  keyFacts: { required: [{ type: "text", value: "R-410A" }, { type: "text", value: ["not on file", "no refrigerant"] }] },
 }));
 questions.push({
   id: nextId(), text: "when were the units at Sonoran Grill Restaurant installed", category: CATEGORY, shape: "ambiguous_multiunit", cmp: "set",

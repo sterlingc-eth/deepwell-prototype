@@ -1678,6 +1678,26 @@
       "rubric": "A summary of what the technician found/did on the job at 100 E Main St (Linda Fitzgerald), drawn from that job's work_performed/notes text.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": "no cooling"
+          },
+          {
+            "type": "text",
+            "value": "install 2 ton trane"
+          },
+          {
+            "type": "text",
+            "value": "annual pm"
+          },
+          {
+            "type": "text",
+            "value": "system operating normally after visit"
+          }
+        ]
       }
     },
     {
@@ -1689,6 +1709,31 @@
       "rubric": "Thomas Mercer's install (invoice) document itself carries no 'notes' field - the answer must not borrow a note from an unrelated later visit (a service-ticket says 'System operating normally after visit', dated 2017, well after the install) and present it as being about the install.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": [
+              "no notes",
+              "not on file",
+              "no notes field"
+            ]
+          },
+          {
+            "type": "text",
+            "value": [
+              "3 ton carrier",
+              "install 3 ton carrier"
+            ]
+          }
+        ],
+        "forbidden": [
+          {
+            "type": "text",
+            "value": "system operating normally after visit"
+          }
+        ]
       }
     },
     {
@@ -1700,6 +1745,20 @@
       "rubric": "The work_performed text from whatever job document covers 174 N College Ave (Donna Sorensen).",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": [
+              "checked refrigerant charge",
+              "replaced air filter",
+              "system operating normally after visit",
+              "coil clean",
+              "refrigerant charge within spec"
+            ]
+          }
+        ]
       }
     },
     {
@@ -1735,6 +1794,25 @@
       "rubric": "3 units at Holy Trinity Church (Goodman/Rheem/Lennox) - only the Goodman has a refrigerant on file (R-410A); must not silently report just one unit as if it were the only one.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": "Goodman"
+          },
+          {
+            "type": "text",
+            "value": "R-410A"
+          },
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no refrigerant"
+            ]
+          }
+        ]
       }
     },
     {
@@ -1746,6 +1824,22 @@
       "rubric": "3 units at Grace Community Church installed 2016-06-22/25/28 - must not silently pick a single date.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "date",
+            "value": "2016-06-22"
+          },
+          {
+            "type": "date",
+            "value": "2016-06-28"
+          },
+          {
+            "type": "date",
+            "value": "2016-06-25"
+          }
+        ]
       }
     },
     {
@@ -2183,6 +2277,21 @@
       "rubric": "Installer (not on file - no document ever carries one) AND the install date for 1913 E University Dr (Jason Yarborough); both parts must be addressed, not just the date.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no installer"
+            ]
+          },
+          {
+            "type": "date",
+            "value": "2010-06-22"
+          }
+        ]
       }
     },
     {
@@ -2205,6 +2314,34 @@
       "rubric": "Warranty status AND installer for 'Abernathy' - the bare surname is ambiguous (Karen and Kevin Abernathy) and installer is never on file; both parts need honest handling, not a single confident answer.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "date",
+            "value": "2035-03-07"
+          },
+          {
+            "type": "text",
+            "value": "active"
+          },
+          {
+            "type": "date",
+            "value": "2015-12-16"
+          },
+          {
+            "type": "text",
+            "value": "expired"
+          },
+          {
+            "type": "text",
+            "value": [
+              "installer",
+              "not on file",
+              "no installer"
+            ]
+          }
+        ]
       }
     },
     {
@@ -2229,6 +2366,21 @@
       "rubric": "Installer (not on file) AND the install date for 3245 S Higley Rd (Anthony Bennett); both parts must be addressed.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "text",
+            "value": [
+              "not on file",
+              "no installer"
+            ]
+          },
+          {
+            "type": "date",
+            "value": "2010-06-10"
+          }
+        ]
       }
     },
     {
@@ -2251,6 +2403,30 @@
       "rubric": "Warranty status AND installer for 'Dominguez' - 3 distinct Dominguez customers and installer never on file; both parts need honest handling.",
       "oracle": {
         "sql": "SELECT NULL::text AS ref WHERE false"
+      },
+      "keyFacts": {
+        "required": [
+          {
+            "type": "date",
+            "value": "2017-04-16"
+          },
+          {
+            "type": "date",
+            "value": "2025-01-25"
+          },
+          {
+            "type": "date",
+            "value": "2015-12-04"
+          },
+          {
+            "type": "text",
+            "value": [
+              "installer",
+              "not on file",
+              "no installer"
+            ]
+          }
+        ]
       }
     },
     {
