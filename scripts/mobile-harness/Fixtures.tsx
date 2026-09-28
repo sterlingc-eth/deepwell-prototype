@@ -2,7 +2,7 @@
 // hooks, useGraph.seed, the fetch stub) — oxlint's react-refresh rule wants a
 // component's own file to only export components (same reason
 // scripts/answer-harness/Fixtures.tsx exists).
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { FileText, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { useAppStore } from '../../src/store/appStore'
 import type { Answer } from '../../src/core/types'
@@ -36,18 +36,26 @@ export function Shell() {
     }
     return 'ask'
   })
-  const setTab = (t: MobileTab) => {
+  // useCallback here (not just plain closures) matters for more than tidiness:
+  // MobileApp.tsx memoizes these exact same handlers so DocRow's React.memo
+  // (DocsTab.tsx) actually holds across an unrelated state change (e.g.
+  // opening a sheet) instead of re-rendering every row in the list. A plain
+  // inline closure here would make THIS shell re-create them every render and
+  // silently defeat that memoization for anyone testing against it (round 23,
+  // M1 fluidity walk) — this fixture would then be measuring its own
+  // re-render churn instead of the real app's.
+  const setTab = useCallback((t: MobileTab) => {
     setTabState(t)
     try {
       window.localStorage.setItem(LAST_TAB_KEY, t)
     } catch {
       /* ignore */
     }
-  }
+  }, [])
   const [sheet, setSheet] = useState<{ kind: 'doc'; id: string } | { kind: 'customer'; ref: string } | null>(null)
-  const openDoc = (id: string) => setSheet({ kind: 'doc', id })
-  const openCustomer = (ref: string) => setSheet({ kind: 'customer', ref })
-  const closeSheet = () => setSheet(null)
+  const openDoc = useCallback((id: string) => setSheet({ kind: 'doc', id }), [])
+  const openCustomer = useCallback((ref: string) => setSheet({ kind: 'customer', ref }), [])
+  const closeSheet = useCallback(() => setSheet(null), [])
 
   const tabs: { id: MobileTab; label: string; Icon: typeof MessageCircle }[] = [
     { id: 'ask', label: 'Ask', Icon: MessageCircle },

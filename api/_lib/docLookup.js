@@ -42,7 +42,7 @@ import { parseCompoundQuestion, runCompound } from "./lookups/compound.js";
 // customer-scoped document-list answer here unless the question itself is about team/internal
 // material — see fastPath.js's isTeamScopedQuestion and audience/sql.js's own header.
 import { documentsHaveAudience } from "./audience/probe.js";
-import { audienceFilterSql } from "./audience/sql.js";
+import { audienceFilterSql, AUDIENCE_FALLBACK_FIELD_KEY } from "./audience/sql.js";
 import { isTeamScopedQuestion } from "./fastPath.js";
 
 /* ============================================================ shape detection */
@@ -61,6 +61,79 @@ import { isTeamScopedQuestion } from "./fastPath.js";
 // this file already imports from contactLookup.js, so defining it here too and having
 // contactLookup.js import it from here would create a genuine circular import).
 export { DOCTYPE_TRIGGER_WORDS };
+
+// R23 (D1, needs-model cluster C1: field-phrasing-3 i142-i157, shape "team_scoped"):
+// "any memos for Kevin Pratt this week", "what did dispatch broadcast to the crew this
+// morning", "any internal-only documents in the system at all". None of these name a
+// recognized document TYPE — "memo"/"notice"/"writeup" are not in DOCUMENT_TYPE_SYNONYMS
+// (documentTypes.js's own doc comment explains why 'internal' only lists "shop record[s]":
+// an internal memo is free-text content, not one of the structured document types this
+// file resolves) — so DOCTYPE_WORD_RE never fires and these fall all the way through to
+// the model today. audience/sql.js's audienceFilterSql already exists to filter internal
+// documents OUT of a customer-scoped answer (its own doc comment literally cites "any
+// memos for Carlos this week" as the shape it was built for), but nothing before this
+// round ever asked whether an internal-audience document exists AT ALL. This golden
+// corpus has zero (verified against the identical COUNT the field-phrasing-3 oracle for
+// these ids uses: documents.audience='internal' + the pre-migration _audience marker),
+// so every one of these currently-needs-model questions has one honest, deterministic,
+// citable answer. A tenant that DOES have internal documents gets `null` here (defer to
+// the model) — there is no generalized "search internal documents by keyword/date"
+// builder yet, and guessing at one would risk exactly the confident-wrong result the
+// precision guard exists to catch.
+//
+// Deliberately excludes a bare "memo(s)" that collides with a business's own proper name
+// ("invoices for Memo's Auto Repair", "invoices for Memos Auto Repair") — same collision
+// class fastPath.js's TEAM_SCOPED_RE narrowing (the "for THE <word>" fix) exists for. THREE
+// guards, all needed: (1) never match right before a possessive apostrophe ("Memo's");
+// (2) the bare memo pattern is deliberately case-SENSITIVE (no /i) — genuine usage is
+// always lowercase mid-sentence ("any memos for Kevin Pratt"), while a proper noun keeps
+// its capital mid-sentence ("for Memos Auto Repair"). isInternalMemoQuestion lowercases
+// only the question's OWN first character first, so a sentence-initial "Any memos..." still
+// matches without also laundering a mid-sentence business name's capital letter.
+// (3) (post-review hardening) never match right after "for "/"for the ": guards (1) and (2)
+// both still let a real, casually-typed, all-lowercase business name through — "list invoices
+// for memos auto repair" (no apostrophe, no capital — an entirely ordinary way a dispatcher
+// types a company name in this app, per this whole file's own casual-phrasing conventions) — and
+// that falsely swallowed a genuine document-type lookup (was answering "I couldn't find a
+// customer named Memos Auto Repair" before this shape existed) into a flat "no internal
+// documents" decline. Every genuine memo-question phrasing in this corpus (and everywhere else
+// in this file) puts "for" AFTER "memo(s)" ("any memos FOR Kevin Pratt"), never before it, so
+// excluding "for (the) memo(s)" closes this collision the same way the apostrophe/case guards
+// close theirs, with no known-good phrasing lost.
+const INTERNAL_MEMO_PATTERNS = [
+  /(?<!\bfor )(?<!\bfor the )\bmemos?\b(?!')/,
+  /\binternal(?:-only)?\s+(?:notes?|documents?|writeups?|write-?ups?|paperwork)\b/i,
+  /\bstaff-only\s+paperwork\b/i,
+  /\bteam-wide\s+notice\b/i,
+  /\bteam\s+memo\b/i,
+  /\bdispatch\s+(?:send|sent|broadcast(?:ed)?|circulate[ds]?)\b/i,
+  /\b(?:office|management)\s+send\b/i,
+];
+
+function isInternalMemoQuestion(q) {
+  const raw = String(q ?? "");
+  if (!raw) return false;
+  const s = raw.charAt(0).toLowerCase() + raw.slice(1);
+  return INTERNAL_MEMO_PATTERNS.some((re) => re.test(s));
+}
+
+/** Count of internal-audience documents on file, tenant-scoped, summing both the
+ *  post-migration `documents.audience` column and the pre-migration `_audience`
+ *  extractions marker (same two sources audienceFilterSql filters by, and the exact
+ *  shape the field-phrasing-3 i142-i157 oracle uses to compute its expected zero). */
+async function countInternalDocuments(db) {
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
+  const queries = [
+    db.raw(
+      `SELECT count(*)::int AS n FROM extractions WHERE ${TENANT_SQL} AND field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}' AND value = 'internal'`
+    ),
+  ];
+  if (hasAudienceColumn) {
+    queries.push(db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND audience = 'internal'`));
+  }
+  const results = await Promise.all(queries);
+  return results.reduce((sum, r) => sum + Number(r.rows?.[0]?.n ?? 0), 0);
+}
 
 const DOCTYPE_ALT = docTypeSynonymAlternation();
 // A trailing plural "s" is optional and NOT part of the alternation itself
@@ -288,6 +361,12 @@ export function parseDocLookupQuestion(question, opts = {}) {
   const raw = String(question ?? "").trim();
   if (!raw) return null;
 
+  // R23 (D1): flag the internal-memo shape here too (see isInternalMemoQuestion's own doc
+  // comment) — this function is the ONLY thing the router's classifyAll.js calls to decide
+  // whether ask.js's docLookupIntent gate is truthy at all; if this pure/sync function doesn't
+  // recognize the shape, runDocLookup (and its own `parsed.internalMemo` branch) never runs.
+  if (isInternalMemoQuestion(raw)) return { internalMemo: true };
+
   // R16 F3: a compound question ("model and serial", "name and phone", "under
   // warranty and whos the tech") never names a document TYPE at all, so it
   // has to be tried before the cheap DOCTYPE_WORD_RE reject just below would
@@ -404,6 +483,24 @@ const YES_NO_SHAPE_RE = /^\s*(?:do|does|did|is there|are there|have we|has anyon
 export async function runDocLookup(db, question, opts = {}) {
   const parsed = parseDocLookupQuestion(question, opts);
   if (!parsed) return null;
+  // R23 (D1): parseDocLookupQuestion flags this shape (see isInternalMemoQuestion's own doc
+  // comment) but can't itself resolve it — answering needs a COUNT, and that pure/sync function
+  // never touches `db` by design — so the actual decline is built here, in the async
+  // orchestration, exactly like the `compound` dispatch right below handles its own shape.
+  if (parsed.internalMemo) {
+    const n = await countInternalDocuments(db);
+    if (n === 0) {
+      return attachCitations(
+        {
+          kind: "no-answer",
+          text: "No internal-only documents (memos, dispatch notices, internal notes) are on file at all — there's nothing here to answer that with.",
+          facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
+        },
+        { records: [], total: 0, kind: "searched", basis: "Checked for any internal-audience document on file (documents.audience = 'internal', or the pre-migration _audience marker); none exist." }
+      );
+    }
+    return null; // real internal documents exist on this tenant — defer to the model
+  }
   // R16 F3: a compound question was already split out in parseDocLookupQuestion
   // above — dispatch to its own splitter/resolver rather than the document-
   // type machinery below, which has no `doctype` to work with here at all.

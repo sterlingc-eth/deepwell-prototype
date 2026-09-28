@@ -343,14 +343,24 @@ function closestDocs(ctx: Ctx, q: string, n = 3): SourceRef[] {
   const scored = Object.values(ctx.g.docs)
     .filter((d) => isAnswerable(d, true))
     .map((d) => {
-      const text = normalize(`${d.filename} ${d.preview}`);
+      // R23 M1 fix: a document with no `preview` yet (freshly uploaded, or —
+      // as found by the mobile fluidity walk's own fixture — any doc built
+      // without one) used to crash this whole function with "Cannot read
+      // properties of undefined (reading 'split')" the moment its FILENAME
+      // happened to match a query token with no direct fact answer (a common
+      // "closest match" case, not a rare one). That crash surfaced to the
+      // tech as "Couldn't reach DeepWell. Check your connection and try
+      // again." — a dead-end, and actively wrong: nothing about it was a
+      // network problem. `d.preview ?? ''` throughout keeps a doc with no
+      // preview yet matchable on its filename alone, same as before.
+      const text = normalize(`${d.filename} ${d.preview ?? ''}`);
       const score = tokens.reduce((acc, t) => acc + (text.includes(t) ? 1 : 0), 0);
       return { d, score };
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, n);
-  return scored.map(({ d }) => ({ documentId: d.id, location: { page: 1 }, excerpt: d.preview.split('\n')[0] ?? d.filename }));
+  return scored.map(({ d }) => ({ documentId: d.id, location: { page: 1 }, excerpt: (d.preview ?? '').split('\n')[0] || d.filename }));
 }
 
 // ---------------------------------------------------------------------------

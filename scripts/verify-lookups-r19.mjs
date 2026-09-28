@@ -160,11 +160,28 @@ for (const q of [
   "what's on the dispatch notes for the Ellison job",
   "is there a staff-only note on this account",
   "anything for the crew about the Isaacson install",
+  // R23 (D1): own paraphrases confirming the narrowed "for THE <word>" pattern still catches every
+  // everyday phrasing of a genuine dispatcher/team reference (never removed, only tightened).
+  "is there a note for the team about this account",
+  "what did dispatch leave for the techs on this job",
+  "any instructions for the technicians before they go out",
+  "was there anything for the dispatch team about Prentiss",
+  "did we leave a checklist for the crew before the install",
 ]) check(`isTeamScopedQuestion (positive) :: "${q}"`, isTeamScopedQuestion(q) === true);
 for (const q of [
   "whats Prentiss's phone number",
   "is Bracken still under warranty",
   "list every serial number on file for sunrise valley elementary",
+  // R23 (D1, over-trigger narrowing): a BUSINESS customer whose own name happens to start with one
+  // of the five team/dispatch words — "for <word>" with no "the" is that business's own proper name,
+  // never a genuine internal-material reference (which always reads "for THE <word>" — see this
+  // file's own isTeamScopedQuestion doc comment). Real customer-invoice/service-history phrasing,
+  // never keyed to any specific exam question text.
+  "how many invoices do we have for Crew Electric",
+  "what's the service history for Dispatch Solutions Inc",
+  "list every document on file for Team Fitness Gym",
+  "how many service tickets for Technicians United LLC",
+  "what's the phone number on file for Tech Depot",
 ]) check(`isTeamScopedQuestion (negative) :: "${q}"`, isTeamScopedQuestion(q) === false);
 
 // ---- R19 follow-up (i137/i191): detectMultiFieldNames names every field, never just the first

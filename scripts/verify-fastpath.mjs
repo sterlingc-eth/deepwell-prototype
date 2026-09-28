@@ -594,5 +594,78 @@ for (const intent of NO_FIELD_INTENTS) {
 for (const intent of WARRANTY_INTENTS) check(`${intent} is not in FIELD_BY_INTENT`, !(intent in FIELD_BY_INTENT));
 for (const intent of LIST_INTENTS) check(`${intent} is not in FIELD_BY_INTENT`, !(intent in FIELD_BY_INTENT));
 
+/* ======================================================================
+ * R23 (D1, fp-5 k029/k067/k071/k075/k079/k083): own paraphrases + negatives for two trigger fixes
+ * this round's blind measurement caught — see fastPath.js's own comments next to each regex.
+ * ====================================================================== */
+const MODEL_AND_SERIAL_PLUS = [
+  'whats the model plus serial on file for 100 e main st',
+  'model plus serial number for the unit at 803 e pecos rd',
+  'can I get the serial plus model for the unit at 951 e main st',
+  'model plus serial for Amy Isaacson please',
+  'quick one, serial plus model for Amy Isaacson',
+];
+for (const q of MODEL_AND_SERIAL_PLUS) {
+  eq(`model_and_serial (positive, "plus") :: "${q}"`, classifyFastPath(q)?.intent, 'model_and_serial');
+}
+const MODEL_AND_SERIAL_PLUS_NEGATIVES = [
+  'whats the serial number for 100 e main st', // serial only, no "plus"/"and" with model
+  'whats the model number for 100 e main st', // model only
+  'plus is the unit still under warranty', // "plus" present but no model/serial pairing at all
+  'whats 2 plus 2', // arithmetic, not a field pairing
+  'model number for the unit, and by the way is it under warranty', // "and" links model to an unrelated field, not serial
+];
+for (const q of MODEL_AND_SERIAL_PLUS_NEGATIVES) {
+  check(`model_and_serial (negative) :: "${q}" not model_and_serial`, classifyFastPath(q)?.intent !== 'model_and_serial', JSON.stringify(classifyFastPath(q)));
+}
+
+const WARRANTY_OUT_EXPIRED_YET = [
+  "has Amy Isaacson's warranty expired yet",
+  "has the warranty on the unit at 951 e main st expired",
+  "had Gary Villegas's warranty already expired",
+  "has Amy Isaacson's warranty already expired",
+  "has Amy Isaacson's warranty expired yet or is she still covered",
+];
+for (const q of WARRANTY_OUT_EXPIRED_YET) {
+  eq(`warranty_out (positive, "expired yet") :: "${q}"`, classifyFastPath(q)?.intent, 'warranty_out');
+}
+const WARRANTY_OUT_EXPIRED_YET_NEGATIVES = [
+  'when does the warranty expire for this unit', // asks WHEN, a date, not yes/no
+  'when does the compressor warranty expire at 3247 Elm St',
+  'whens the warranty up on this account',
+  'does the Goodman warranty expire this year', // "does...expire" — a date question, not "has...expired"
+  'is the unit still under warranty', // ordinary warranty_status, no "expired" at all
+];
+for (const q of WARRANTY_OUT_EXPIRED_YET_NEGATIVES) {
+  check(`warranty_out (negative) :: "${q}" not warranty_out`, classifyFastPath(q)?.intent !== 'warranty_out', JSON.stringify(classifyFastPath(q)));
+}
+
+// Adversarial-review fix (Round 23 D1, post-integration): "did X's warranty expire yet" is the
+// grammatically NORMAL way to ask this with "did" (the auxiliary already carries the past tense, so
+// the main verb stays bare — "did it expire", never "did it expiRED", exactly like "did it happen"
+// is never "did it happened"). The original round's own trigger required literal "expired" after
+// "did" too, so this extremely ordinary phrasing silently fell through to the bare-date
+// warranty_expires trigger instead — the exact bug this whole intent exists to prevent, for the one
+// verb its own leading-verb list already claimed to cover. Confirmed via a direct r23base A/B: this
+// exact phrasing produced the SAME unfixed bare-date answer on both branches before this fix.
+const WARRANTY_OUT_DID_EXPIRE = [
+  "did Thomas Mercer's warranty expire yet",
+  "did the warranty on the unit at 137 w southern ave expire yet",
+  "did Amy Isaacson's warranty already expire",
+  "did Gary Villegas's warranty expire yet for that account",
+  "did Robert Thornton's warranty expire yet",
+];
+for (const q of WARRANTY_OUT_DID_EXPIRE) {
+  eq(`warranty_out (positive, "did ... expire yet") :: "${q}"`, classifyFastPath(q)?.intent, 'warranty_out');
+}
+// "did...expired" (the ungrammatical but sometimes-typed past-participle form) must keep working too
+// — the fix accepts either verb form after "did", never REQUIRES the bare one.
+eq('warranty_out (positive, "did ... expired" ungrammatical form still works) :: "did Amy Isaacson\'s warranty expired yet"', classifyFastPath("did Amy Isaacson's warranty expired yet")?.intent, 'warranty_out');
+// "does" must stay fully excluded — this is the exact collision an earlier draft of this trigger
+// introduced and scripts/verify-fastpath.mjs's own pinned corpus caught (see WARRANTY_OUT_EXPIRED_YET_NEGATIVES
+// above); re-asserted here specifically for the bare-verb form this fix adds, so a future edit that
+// widens "did" into "does" (or merges the two) gets caught immediately.
+check('warranty_out (negative) :: "does the warranty expire yet" not warranty_out (case sensitive to the earlier does/expire? regression)', classifyFastPath('does the warranty expire yet')?.intent !== 'warranty_out', JSON.stringify(classifyFastPath('does the warranty expire yet')));
+
 console.log(failures === 0 ? `\nAll fast-path checks passed (${CORPUS.length} corpus phrasings).` : `\n${failures} FAILURE(S).`);
 process.exit(failures === 0 ? 0 : 1);

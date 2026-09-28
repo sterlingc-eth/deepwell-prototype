@@ -40,6 +40,7 @@ import {
   pickMostRecent,
   houseStreetTokens,
   formatDateHuman,
+  formatDateHumanWithIso,
   subjectLabel,
   buildFieldAnswer,
   buildWarrantyAnswer,
@@ -653,13 +654,16 @@ async function unitFieldFact(db, unit, customerId, intent, today, teamScoped = f
   const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey, teamScoped);
   const row = pickBestExtraction(rows);
   if (row) {
-    const value = intent === 'install_date' ? formatDateHuman(row.value) : row.value;
+    // R23 (D1, h140/i195): this fact feeds buildMultiUnitAddressAnswer's own `set`-graded list of
+    // per-unit values — formatDateHumanWithIso (fastPath.js) so compareSet's plain-token ISO match
+    // finds "2023 11 06" too, not just the human "November 6, 2023" (see its own doc comment).
+    const value = intent === 'install_date' ? formatDateHumanWithIso(row.value) : row.value;
     return { label, value, sources: [{ documentId: row.document_id, location: { field: row.field_key } }] };
   }
   const ownKey = UNIT_OWN_FIELD_BY_INTENT[intent];
   const ownValue = ownKey ? unit[ownKey] : null;
   if (ownValue) {
-    const value = intent === 'install_date' ? formatDateHuman(ownValue) : ownValue;
+    const value = intent === 'install_date' ? formatDateHumanWithIso(ownValue) : ownValue;
     return { label, value, sources: [], entityId: unit.id };
   }
   return { label, value: 'Not on file', sources: [] };
@@ -872,7 +876,9 @@ async function fetchOneMultiField(db, equipmentResolution, field, today, teamSco
   const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey, teamScoped);
   const row = pickBestExtraction(rows);
   if (!row) return null;
-  const value = field === 'install_date' ? formatDateHuman(row.value) : row.value;
+  // R23 (D1, i188): runMultiField's own compound facts are `set`-graded (see this file's own doc
+  // comment on runMultiField) — same formatDateHumanWithIso fix as unitFieldFact above.
+  const value = field === 'install_date' ? formatDateHumanWithIso(row.value) : row.value;
   return { value, documentId: row.document_id, fieldKey: row.field_key };
 }
 

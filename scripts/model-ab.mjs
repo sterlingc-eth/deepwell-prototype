@@ -160,7 +160,7 @@ export async function estimatePlan(needsModelRows, { budgetUsd = DEFAULT_BUDGET_
 
 /* ============================================================== 2. dry-run driver */
 
-async function dryRunWithExport(exportPath, opts) {
+export async function dryRunWithExport(exportPath, opts) {
   await installPgHarness();
   const modelCounter = await installModelBlock(); // physically cannot spend, even if something tried
   const lite = await createPGlite();
@@ -193,16 +193,35 @@ async function dryRunNoExport(opts) {
 
 /* ============================================================== 3. live driver (credits required)
  *
- * WRITTEN, NOT EXERCISED THIS ROUND: Anthropic credits are out (R11_RULES.md/R20_CONTRACT.md hard rule
- * — nothing this round builds may require a real model call to test), so this function has never
- * actually run against a live API key. It is built entirely from scorecard/runner.js's own, already-
- * tested `runScorecard` (the exact production /api/ask path, its own real budget/latency/cost
- * accounting, already exercised end-to-end by scripts/verify-scorecard.mjs) — nothing new is invented
- * here, only wired together and diffed against the rules-only pass above. Treat this as reviewed-by-
- * reading code, not verified-by-running code, until the first real run — see
- * handoffs/CREDIT_RETURN_PLAYBOOK.md for exactly how to run that first one safely.
+ * ROUND 23 (T1, live-credit test day prep): EXERCISED under a mocked Anthropic client this round —
+ * scripts/verify-live-test-day.mjs's own "model-ab --live" check installs scripts/lib/mockAnthropicClient.mjs
+ * in place of the real SDK client (the same shared-prototype patch point offline-exam.mjs's
+ * installModelBlock uses) and runs this exact function end to end: real runScorecard paging, real
+ * budget/cost accounting, real confident-wrong diffing — just with zero Anthropic credits spent and zero
+ * network calls. Still never run against a REAL API key by this round (credits are out) — that first run
+ * is scripts/live-test-day.mjs's job (docs/LIVE_TEST_DAY.md) — but "written, not exercised" no longer
+ * applies: a bug in this wiring would now be caught by `npm run verify:live-test-day`, not discovered
+ * live. Built entirely from scorecard/runner.js's own, already-tested `runScorecard` (the exact production
+ * /api/ask path, its own real budget/latency/cost accounting) — nothing new is invented here, only wired
+ * together and diffed against the rules-only pass above.
  */
-async function liveRun(ctx, questions, today, budgetUsd, rulesOnlyById) {
+
+/**
+ * A NEW confident-wrong: rules-only had no GRADED answer at all for this id (status !== "correct"/"wrong"
+ * — i.e. needs-model/needs-grader/skipped/oracle-error), but rules+model came back both graded AND wrong.
+ * This is the exact go/no-go signal: the model path must never turn "we didn't know" into "we said the
+ * wrong thing confidently" — the #1 metric every report this round produces (model-ab's own live diff,
+ * and scripts/live-test-day.mjs's report) counts by this SAME definition, imported from here rather than
+ * redefined, so "confident-wrong" never means two slightly different things in two reports.
+ * @param {{status: string}|undefined} before  the matching row from the rules-only pass's `perQuestion` (or undefined — an id the rules-only pass never saw at all, e.g. a dialogue turn, counts as "not previously answerable")
+ * @param {{skipped?: boolean, passed?: boolean}} result  the rules+model result for the SAME question id
+ */
+export function isNewConfidentWrong(before, result) {
+  const wasAnswerable = before?.status === "correct" || before?.status === "wrong";
+  return !wasAnswerable && !result.skipped && result.passed === false;
+}
+
+export async function liveRun(ctx, questions, today, budgetUsd, rulesOnlyById) {
   const { runScorecard } = await import("../api/_lib/scorecard/runner.js");
   const { default: askHandler } = await import("../api/ask.js");
   const auth = { tenantId: ctx.tenantKey, orgId: ctx.tenantName ?? ctx.tenantKey, userId: null };
@@ -228,11 +247,7 @@ async function liveRun(ctx, questions, today, budgetUsd, rulesOnlyById) {
   // i.e. needs-model/needs-grader/skipped/oracle-error), but rules+model came back both graded AND wrong.
   // This is the exact go/no-go signal: the model path must never turn "we didn't know" into "we said the
   // wrong thing confidently" (R20_CONTRACT.md's #1 problem, this time on the MODEL side of the fence).
-  const newConfidentWrong = pageResults.filter((r) => {
-    const before = rulesOnlyById.get(r.questionId);
-    const wasAnswerable = before?.status === "correct" || before?.status === "wrong";
-    return !wasAnswerable && !r.skipped && r.passed === false;
-  });
+  const newConfidentWrong = pageResults.filter((r) => isNewConfidentWrong(rulesOnlyById.get(r.questionId), r));
 
   const byCategory = new Map();
   for (const r of pageResults) {

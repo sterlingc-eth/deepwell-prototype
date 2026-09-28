@@ -36,6 +36,14 @@ const doc: Doc = {
   receivedAt: new Date('2026-06-12T00:00:00Z'),
   typeId: 'warranty-registration',
   stage: 'verified',
+  // Required on Doc (src/core/types.ts) — was missing here, which this
+  // harness's own scripts/tsx transpile-only tooling never catches (no
+  // tsconfig here is type-checked; see tsconfig.app.json's "include": ["src"]).
+  // A doc with no preview isn't a fixture-only case either: it crashed
+  // src/domains/hvac/answer.ts's closestDocs() for real (round 23, M1 —
+  // fixed there too) the moment a query's tokens matched this doc's filename
+  // with no direct fact to answer from.
+  preview: 'Trane XR16 outdoor unit, warranty registration for Carol Rios at 2847 N 24th St, Mesa, AZ 85213.',
   extracted: [
     { name: 'brand', value: 'Trane', confidence: 0.95, location: {} },
     { name: 'model', value: 'XR16', confidence: 0.95, location: {} },

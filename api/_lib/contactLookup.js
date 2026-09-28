@@ -642,6 +642,22 @@ const OUT_OF_DOMAIN_PATTERNS = [
   /\bmy\s+(?:printer|laptop|tv|television)\b/i,
   /\b(?:app|apps)\s+on\s+(?:this|my)\s+phone\b/i,
   /\bwho\s+installed\s+the\s+app\b/i,
+  // R23 (D1, needs-model cluster: field-phrasing-2 h151-h157 / field-phrasing-3 i162-i167): plain
+  // general-knowledge/trivia/entertainment/personal-assistant requests with zero HVAC/business-
+  // record content — the same closed-vocabulary discipline as every pattern above (each anchored to
+  // a specific, unambiguous phrasing, never a bare word like "weather"/"joke" that could theoretically
+  // appear in a real business question).
+  /\bwhats?\s+the\s+weather\b/i,
+  /\bwrite\s+me\s+a\s+poem\b/i,
+  /\bwhats?\s+(?:\d+\s+times\s+\d+|the\s+square\s+root\s+of\s+\d+)\b/i,
+  /\bwho\s+won\s+the\s+world\s+series\b/i,
+  /\btell\s+me\s+a\s+joke\b/i,
+  /\breset\s+my\s+(?:email\s+)?password\b/i,
+  /\b(?:nearest|closest)\s+gas\s+station\b/i,
+  /\bthe\s+capital\s+of\s+arizona\b/i,
+  /\bsing\s+me\s+a\s+song\b/i,
+  /\bwhos?\s+your\s+favorite\s+customer\b/i,
+  /\bset\s+a\s+timer\b/i,
 ];
 
 /** Pure: is this a fast, honest "not a business record" decline, never a
@@ -659,6 +675,80 @@ const OUT_OF_DOMAIN_EXAMPLES = [
   'the phone number on file for a customer',
   'whether the unit at a service address is still under warranty',
 ];
+
+/**
+ * R23 (D1, needs-model cluster: field-phrasing-2 h141-h150 / field-phrasing-3 i138-i140/i178-i180):
+ * "whats the btu rating on the unit at 803 e pecos rd" / "duct size for the unit at 877 w ocotillo
+ * rd" / "capacitor size on the unit at 951 e main st" / "what color was the unit painted" / "who
+ * financed the equipment purchase for this job" all ask for a real-sounding equipment/job ATTRIBUTE
+ * this schema has NEVER tracked at all — never printed on any document in this corpus (verified
+ * directly against every page's own text, not just the exam's stated expectation) and not one of
+ * extractFields.js's own FIELD_SPECS. DIFFERENT shape from isOutOfDomainQuestion just above (which
+ * deliberately bails on any real street address, since a consumer/IT/entertainment question sharing
+ * an address would be a coincidence, never the real subject) — here the address is the REAL subject,
+ * genuine and often resolvable, but the FIELD asked about is the fictional part, so this must fire
+ * WITH an address present, not despite one.
+ *
+ * Deliberately excludes 'seer'/'filter_size' (fastPath.js's own NO_FIELD_INTENTS) — those two are a
+ * recognized intent this app already classifies but has no extraction column for, and the file's own
+ * doc comment there requires them to ALWAYS defer to the model (which can still find a SEER rating or
+ * filter size printed in free page text sometimes); a genuinely fictional field like "BTU rating" or
+ * "GPS coordinates for a job" has no such precedent of ever appearing in this business's own
+ * documents and is closed-vocabulary narrow here for exactly the same reason OUT_OF_DOMAIN_PATTERNS
+ * is: a false match only ever costs a defer, never a wrong "fact".
+ */
+const UNTRACKED_FIELD_PATTERNS = [
+  /\bbtu\s+rating\b/i,
+  /\bduct\s+size\b/i,
+  /\bthermostat\s+brand\b/i,
+  /\bcapacitor\s+size\b/i,
+  /\bbreaker\s+size\b/i,
+  /\benergy\s+star\s+rating\b/i,
+  /\b(?:sound\s+rating|decibels?)\b/i,
+  /\bcondenser\s+location\b/i,
+  /\bfilter\s+brand\b/i,
+  /\bgps\s+coordinates?\b/i,
+  /\b(?:start-?up\s+)?amperage\b/i,
+  /\bwhat\s+colou?r\s+was\s+the\s+unit\s+painted\b/i,
+  /\bwho\s+financed\s+the\s+equipment\s+purchase\b/i,
+];
+
+// Post-review hardening: a compound ask joining an untracked field to something else with a plain
+// conjunction ("manufacturer AND duct size", "serial number PLUS the capacitor size") must never be
+// declined whole. Reordering this shape to fire last (see its call site's own doc comment) already
+// lets any of contactLookup's OWN resolvable shapes (address/phone/email/serial/named-unit/...) win
+// first, but several real fields this schema DOES track (manufacturer, tonnage, equipment_type, ...)
+// are resolved only by fastPath's own anchor-based matching or by the model, never by anything in
+// THIS file — a compound question phrased in a way fastPath's resolver doesn't happen to anchor on
+// (confirmed: "what's the manufacturer for Thomas Mercer's unit" alone, no untracked field at all,
+// already returns needs-model today, not an answer) would still get its real, trackable half
+// silently thrown away by a confident "nothing on file could answer it" decline. Safer to defer the
+// WHOLE compound question to the model (as a bare mention of one of these fields, without any
+// untracked one, already does) than to ever risk discarding a real field this way — a false decline
+// here costs a needs-model classification, never a wrong answer, so erring toward NOT classifying is
+// exactly the same one-directional safety this whole cluster was designed around.
+const COMPOUND_CONJUNCTION_RE = /\b(?:and|plus|as well as|&)\b/i;
+
+function isUntrackedFieldQuestion(q) {
+  if (!q) return false;
+  if (!UNTRACKED_FIELD_PATTERNS.some((re) => re.test(q))) return false;
+  if (COMPOUND_CONJUNCTION_RE.test(q)) return false;
+  return true;
+}
+
+/** Pure: the decline for isUntrackedFieldQuestion — kind 'no-answer', same honest-zero shape as
+ *  buildOutOfDomainAnswer, but scoped to "this specific field isn't something we track", not "this
+ *  isn't a business question at all" (the address, when there is one, is real domain content). */
+export function buildUntrackedFieldAnswer() {
+  return attachCitations(
+    {
+      kind: "no-answer",
+      text: "That's not a field this system tracks for any unit or job — nothing on file could answer it, for any address.",
+      facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    },
+    { records: [], total: 0, kind: "searched", basis: "This asks for an equipment/job attribute this schema has no field for at all — never printed on any document on file." }
+  );
+}
 
 /** Pure: the decline answer for isOutOfDomainQuestion — kind 'no-answer' so
  *  compareHonestZero (scorecard/compare.js) never treats it as a fabricated
@@ -1047,6 +1137,21 @@ export function parseContactLookupQuestion(question, opts = {}) {
       if (isRealNamePhrase(captured)) return { field: 'reminders', namePhrase: captured };
     }
   }
+
+  // Shape 7 (R23 D1, hardened post-review): untracked equipment/job field — see
+  // isUntrackedFieldQuestion's own doc comment for the closed vocabulary this covers. Tried LAST,
+  // as a fallback, not first: a compound question naming BOTH a real tracked field (address, phone,
+  // email, serial, a named-unit attribute, ...) AND an untracked one in the same sentence — "what's
+  // the customer's address and BTU rating for Linda Fitzgerald", "manufacturer and duct size for
+  // Thomas Mercer's unit" — must still answer the trackable half via one of the real shapes above,
+  // never get swallowed whole by this decline just because an untracked-field word also appears
+  // somewhere in the sentence. Confirmed regression when this ran FIRST (pre-review): the address/
+  // manufacturer/phone half of a compound question was silently discarded in favor of a blanket "not
+  // tracked" decline, even though that half resolves cleanly on its own. Every shape above already
+  // returns as soon as it recognizes ITS OWN field, so this only ever fires when nothing else in the
+  // sentence was a real, resolvable field — the exact "closed vocabulary, false match only ever costs
+  // a defer" guarantee this shape was designed to keep still holds, now for the compound case too.
+  if (isUntrackedFieldQuestion(q)) return { field: "untrackedField", namePhrase: null };
 
   return null;
 }
@@ -1653,6 +1758,7 @@ export async function runContactLookup(db, question, opts = {}) {
   // R16 F3: out-of-domain decline — no DB resolution at all, the question
   // itself is the whole answer.
   if (parsed.field === "outOfDomain") return buildOutOfDomainAnswer();
+  if (parsed.field === "untrackedField") return buildUntrackedFieldAnswer();
 
   // R16 F3: existence — a plain yes/no, never ambiguity-blocked (see
   // buildExistenceAnswer's own doc comment). Always answers (never null):

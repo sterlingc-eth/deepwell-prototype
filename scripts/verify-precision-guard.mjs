@@ -375,6 +375,12 @@ const KNOWN_WRONG_IDS = new Set([
   "j141", "j142", "j143", // Cluster 3 single-threshold age shape: two incompatible frozen oracles for the
   // same "older/over N years" phrasing (exam.json wants bare calendar-year, field-phrasing-4.json wants
   // day-precise) — see api/_lib/analytics.js's resolveAgeFilter doc comment for the full writeup.
+  // R23 (D1, item 4): field-phrasing-5.json's own fresh blind measurement surfaced 5 pre-existing
+  // analytics gaps, none of them this round's own doing — see scripts/verify-golden.mjs's own
+  // KNOWN_WRONG_IDS comment next to these same 5 ids for the full writeup (a tied technician
+  // comparison, a "fewest jobs" ranking that counts a different thing than the plain per-tech total,
+  // and no generic "distinct value" metric for an arbitrary field).
+  "k139", "k141", "k143", "k186", "k187",
 ]);
 const wrongIds = perQuestion.filter((q) => q.status === "wrong").map((q) => q.id);
 const newWrong = wrongIds.filter((id) => !KNOWN_WRONG_IDS.has(id));

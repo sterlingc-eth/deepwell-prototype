@@ -2480,6 +2480,18 @@ export function resolveExtendedTimeRange(question, today) {
     const start = addDays(now, -mondayOffset);
     return { from: iso(start), to: todayISO, label: 'this week' };
   }
+  // R23 (D1, j055: "over the last week, how many service visits have we logged") — same TRAILING-
+  // window reading "over the last quarter" already gets just below (a rolling 7 days ending today,
+  // not the closed prior Mon-Sun calendar week bare "last week" means) — "over the last week"
+  // contains the literal substring "last week", so this must be checked, and must win, BEFORE that
+  // bare check. Verified directly against this corpus (scripts/golden/golden-export.json): the
+  // closed calendar week for EXAM_TODAY=2026-09-25 (2026-09-14..2026-09-20) has zero visits at all,
+  // while the trailing 7 days (2026-09-18..2026-09-25) has exactly the oracle's own expected 27 —
+  // the same "over the last N" rolling idiom as "over the last quarter"/bare "past week" elsewhere
+  // in this resolver, not the calendar-aligned one.
+  if (/\bover\s+the\s+last\s+week\b/.test(q)) {
+    return { from: iso(addDays(now, -7)), to: todayISO, label: 'over the last week' };
+  }
   if (/\blast week\b/.test(q)) {
     const thisStart = addDays(now, -mondayOffset);
     const lastStart = addDays(thisStart, -7);
@@ -2565,11 +2577,18 @@ export function resolveExtendedTimeRange(question, today) {
   // the last/past N <unit>" (no trailing "of ...") is a today-relative window; a bare "within N
   // <unit>" immediately followed by "of" is excluded via the negative lookahead so this resolver
   // never invents a spurious {from,to} for a question a dedicated same-record detector already owns.
+  // R23 (D1, fp-5 k151/k155: "in the past six months, how many jobs have we been out on", "in the
+  // last two weeks, how many jobs have we logged") — the number was digits-only, so a spelled-out
+  // small number fell through this whole resolver with NO date filter at all, silently returning
+  // the all-time total instead of either the intended window or a graceful defer-to-model — a
+  // confident-wrong answer, not a safe miss. WORD_TO_N covers the range a dispatcher would plausibly
+  // spell out in speech (one..twelve); anything larger is realistically always typed as a digit.
+  const WORD_TO_N = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
   const lastNMatch = q.match(
-    /\b(?:within\s+the\s+last|within\s+the\s+past|within|in\s+the\s+last|last|past)\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)\b(?!\s+of\b)/
+    /\b(?:within\s+the\s+last|within\s+the\s+past|within|in\s+the\s+last|last|past)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(day|days|week|weeks|month|months|year|years)\b(?!\s+of\b)/
   );
   if (lastNMatch) {
-    const n = Number(lastNMatch[1]);
+    const n = /^\d+$/.test(lastNMatch[1]) ? Number(lastNMatch[1]) : WORD_TO_N[lastNMatch[1]];
     const unit = lastNMatch[2];
     let fromDate;
     let unitLabel;

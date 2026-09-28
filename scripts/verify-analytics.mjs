@@ -1864,6 +1864,25 @@ for (const q of ['how many customers do we have', 'list customers in Mesa']) {
 // anchored, not Sunday-anchored. 2026-09-22 is a Tuesday.
 eq('item 5 this week :: Monday-anchored (today Tue 2026-09-22)', resolveExtendedTimeRange('this week', '2026-09-22'), { from: '2026-09-21', to: '2026-09-22', label: 'this week' });
 eq('item 5 last week :: Monday-anchored (today Tue 2026-09-22)', resolveExtendedTimeRange('last week', '2026-09-22'), { from: '2026-09-14', to: '2026-09-20', label: 'last week' });
+// R23 (D1, fp-5 k151/k155): "in the past six months, how many jobs have we been out on" / "in the
+// last two weeks, how many jobs have we logged" fell through this resolver with NO date filter at
+// all (a spelled-out number, not a digit) — own paraphrases below, never keyed to the exam's own
+// wording, proving the fix generalizes and the pre-existing digit form still works unchanged.
+eq('item 5 spelled-out :: "in the last two weeks" == digit "2 weeks"', resolveExtendedTimeRange('in the last two weeks', '2026-09-22'), resolveExtendedTimeRange('in the last 2 weeks', '2026-09-22'));
+eq('item 5 spelled-out :: "in the past six months" == digit "6 months"', resolveExtendedTimeRange('in the past six months', '2026-09-22'), resolveExtendedTimeRange('in the past 6 months', '2026-09-22'));
+eq('item 5 spelled-out :: "within the last three days" == digit "3 days"', resolveExtendedTimeRange('within the last three days', '2026-09-22'), resolveExtendedTimeRange('within the last 3 days', '2026-09-22'));
+eq('item 5 spelled-out :: "past four years" == digit "4 years"', resolveExtendedTimeRange('past four years', '2026-09-22'), resolveExtendedTimeRange('past 4 years', '2026-09-22'));
+eq('item 5 spelled-out :: "last five weeks" == digit "5 weeks"', resolveExtendedTimeRange('last five weeks', '2026-09-22'), resolveExtendedTimeRange('last 5 weeks', '2026-09-22'));
+// negatives: the plain digit forms must still resolve exactly as before (no regression), and a
+// number word outside the supported one..twelve range must never silently coerce to some other N.
+check('item 5 spelled-out (negative) :: digit "2 weeks" still resolves', Boolean(resolveExtendedTimeRange('in the last 2 weeks', '2026-09-22')));
+check('item 5 spelled-out (negative) :: digit "6 months" still resolves', Boolean(resolveExtendedTimeRange('in the past 6 months', '2026-09-22')));
+{
+  const twenty = resolveExtendedTimeRange('in the last twenty days', '2026-09-22');
+  check('item 5 spelled-out (negative) :: "twenty" (outside one..twelve) never resolves to a 20-day window', !twenty || !/20\s*day/.test(twenty.label ?? ''), JSON.stringify(twenty));
+}
+check('item 5 spelled-out (negative) :: "how many customers do we have" has no time window', resolveExtendedTimeRange('how many customers do we have', '2026-09-22') == null);
+check('item 5 spelled-out (negative) :: bare "warranty" question has no time window', resolveExtendedTimeRange('is the unit still under warranty', '2026-09-22') == null);
 // withinTimeRange: day-grain compares the row's own date; month-grain falls
 // back to the row's month, exactly as before this existed.
 {

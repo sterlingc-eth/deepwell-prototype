@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FileText, Loader2, Mail, MapPin, Phone } from 'lucide-react'
 import { customerClient, type CustomerDetail, type CustomerDocument } from '../services/customerClient'
-import { typeLabel } from './docUtils'
+import { DATE_FORMATTER, typeLabel } from './docUtils'
 import { Sheet } from './Sheet'
 
 /** customerClient's CustomerDocument doesn't declare `displayName` yet — round 12 hook for
@@ -14,7 +14,7 @@ type NamedCustomerDocument = CustomerDocument & { displayName?: string | null }
 
 function warrantyStatus(daysLeft: number | null, expires: string | null): { text: string; cls: string } | null {
   if (!expires) return null
-  const date = new Date(expires).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const date = DATE_FORMATTER.format(new Date(expires))
   if (daysLeft == null) return { text: `Warranty to ${date}`, cls: 'bg-surface-2 text-ink-2' }
   if (daysLeft < 0) return { text: `Warranty expired ${date}`, cls: 'bg-bad-bg text-bad-ink' }
   if (daysLeft <= 90) return { text: `Warranty ends ${date}`, cls: 'bg-warn-bg text-warn-ink' }

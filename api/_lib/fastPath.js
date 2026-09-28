@@ -169,6 +169,33 @@ const TRIGGERS = [
   // wording ("out of", not "under"/"still covered") decides which template answers correctly (see
   // buildWarrantyAnswer's own doc comment).
   ['warranty_out', /\b(?:is|are|was|were)\b[^?.!]*\bout of warranty\b/i],
+  // R23 (D1, fp-5 k071/k083: "has Gary Villegas's warranty expired yet") — same INVERTED "yes means
+  // expired" framing as "out of warranty" just above, just phrased as "has ... expired" instead.
+  // Without this, "expired" anywhere after "warranty" matched the plain warranty_expires trigger
+  // below FIRST — a DATE-only intent with no yes/no template at all, so a future expiry date came
+  // back as a bare "Expires <date>" fact with no "Yes"/"No" the way every other warranty phrasing
+  // gives, and a past expiry date came back with no leading word either — both graded as an
+  // ambiguous, non-committal answer to what is, in the question's own words, a yes/no ask. Checked
+  // here, before warranty_expires, for the same reason the "out of warranty" trigger is.
+  //
+  // Deliberately PAST TENSE ONLY ("expired", never "does...expire") and no "does": the fastpath
+  // corpus's own "When does the warranty ... expire?" / "does the Goodman warranty expire for
+  // C-00003" are genuine WHEN-does-it-expire date questions, not this yes/no framing — an earlier
+  // draft's `expired?` (optional "d") COMBINED WITH "does" in the leading-verb list matched those
+  // too and mis-routed them here; caught by scripts/verify-fastpath.mjs's own pinned corpus.
+  //
+  // Post-review hardening: "did" needs its OWN verb form, not "expired" — standard English puts the
+  // past tense on the auxiliary for a "did" question ("did the warranty EXPIRE yet", never "did the
+  // warranty expiRED yet"), the same way "did it happen" is never "did it happened". Requiring the
+  // literal "-ed" form after "did" (as the original draft above did) meant this branch could never
+  // actually fire for the grammatically normal phrasing — confirmed dead: "did Thomas Mercer's
+  // warranty expire yet" fell through to the plain warranty_expires bare-date trigger below with no
+  // yes/no framing at all, the exact bug this whole trigger exists to fix, for the one auxiliary
+  // ("did") whose correct grammar this trigger's own leading-verb list already claimed to cover.
+  // Scoped to ONLY the "did" auxiliary (never "does", which stays fully excluded per the paragraph
+  // above) so the earlier draft's real collision can't come back: "does" is still nowhere in either
+  // alternative below.
+  ['warranty_out', /\b(?:has|had)\b[^?.!]*\bwarranty\b[^?.!]*\bexpired\b|\bdid\b[^?.!]*\bwarranty\b[^?.!]*\bexpired?\b|\bwarranty\b[^?.!]*\bexpired\s+yet\b/i],
   ['warranty_status', /\b(is|are)\b[^?.!]*\b(under warranty|still covered|in warranty|warranty status)\b/i],
   ['warranty_status', /\bstill (covered|under warranty|good|valid)\b/i],
   ['warranty_status', /\bdoes\b[^?.!]*\bhave (?:a )?warranty\b/i],
@@ -188,7 +215,11 @@ const TRIGGERS = [
   // standalone 'serial'/'model' triggers below (first match wins) so a bare "serial" substring
   // match never silently drops the model half (or vice versa), which the exam's own "set"
   // comparison (both values expected) grades as a confident-but-incomplete WRONG, not needs-model.
-  ['model_and_serial', /\bmodel\b[^?.!]{0,20}\band\b[^?.!]{0,20}\bserial\b|\bserial\b[^?.!]{0,20}\band\b[^?.!]{0,20}\bmodel\b/i],
+  // R23 (D1, fp-5 k029: "whats the model plus serial on file for ...") — "plus" is the same
+  // conjunction as "and" here (a dispatcher joining two fields in one ask); without it this fell
+  // through to the standalone 'serial' trigger below and silently dropped the model half, the exact
+  // confident-but-incomplete WRONG this whole intent exists to prevent.
+  ['model_and_serial', /\bmodel\b[^?.!]{0,20}\b(?:and|plus)\b[^?.!]{0,20}\bserial\b|\bserial\b[^?.!]{0,20}\b(?:and|plus)\b[^?.!]{0,20}\bmodel\b/i],
   ['serial', /\bserial\b|\bs\/n\b|\bseriel\b|\bserail\b/i],
   ['model', /\bmodel\b|\bmodle\b/i],
   ['manufacturer', /\bwhat (?:brand|make)\b|\bmanufacturer\b|\bmanufaturer\b|\bwho makes\b/i],
@@ -1169,6 +1200,28 @@ export function formatDateHuman(ymd) {
   return s;
 }
 
+/**
+ * R23 (D1, h140/i195/i188): same spoken-style date as formatDateHuman, with the raw ISO form
+ * appended in parens ("November 6, 2023 (2023-11-06)") — for the specific install-date shapes
+ * (buildMultiUnitAddressAnswer's per-unit facts, runMultiField's compound facts) whose answers are
+ * graded by the exam's `set` comparator (compareSet/itemPresent, scripts/scorecard/compare.js).
+ * That comparator does its own plain-token substring match (no datesIn date-parsing the way
+ * compareValue's cmp:'value' path already has) — it normalizes an expected "2023-11-06" into the
+ * literal space-separated token sequence "2023 11 06" and requires exactly that run of tokens
+ * contiguously in the answer text/facts, so a purely human "November 6, 2023" (which normalizes to
+ * "november 6 2023") can never satisfy it even though the date is stated correctly. Appending the
+ * ISO form is additive only (never removes the human-readable prefix every other caller/verify
+ * script already matches against) and scoped to exactly the two call sites that feed a `set`-graded
+ * multi-value shape — every other formatDateHuman caller (single-value warranty/value-cmp answers,
+ * already satisfied by compareValue's own date-aware matching) is untouched. Anything that isn't a
+ * bare YYYY-MM-DD (a YYYY-MM month, or an unparseable value formatDateHuman already returns as-is)
+ * gets no parenthetical — there is no useful ISO day form to add for those.
+ */
+export function formatDateHumanWithIso(ymd) {
+  const human = formatDateHuman(ymd);
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(ymd ?? '')) ? `${human} (${ymd})` : human;
+}
+
 /** Pure: "1234.5" -> "$1,234.50". Non-numeric input passed through as-is. */
 export function formatMoney(v) {
   const n = Number(v);
@@ -1571,8 +1624,24 @@ export function buildDocumentListAnswer({ resolution, documents, documentTypeLab
  * document may feed the answer at all (see audienceFilterSql's own `teamScoped` param) — default
  * false, so a customer-scoped answer excludes internal documents unless the question plainly asks
  * for team/internal material.
+ *
+ * R23 (D1): "for (?:the )?(?:team|techs?|technicians|dispatch|crew)" used to make "the" optional —
+ * "for crew"/"for dispatch"/"for team" alone were enough. That over-triggers on exactly the shape a
+ * real HVAC shop's own customer list can contain: a BUSINESS named starting with one of these plain
+ * words ("Crew Electric", "Dispatch Solutions Inc", "Team Fitness Gym", "Technicians United LLC") —
+ * "how many invoices do we have for Crew Electric" would wrongly flip a plain, single-customer
+ * invoice question to team-scoped (widening it to see internal-only documents) purely because the
+ * business's own name happens to start with "Crew". Every existing required-positive phrasing for
+ * this exact shape ("anything for the crew about the Isaacson install", "any memos for the techs
+ * this week" — verify-lookups-r19.mjs/verify-analytics.mjs) already says "for THE <word>", never a
+ * bare "for <word>" — a genuine dispatcher/team reference reads naturally with "the" ("notes for the
+ * crew", "a memo for the techs"); a business's own proper name after "for" never takes a "the" this
+ * way ("invoices for the Crew Electric" is not how anyone phrases a company name). Requiring "the"
+ * closes the whole word-collision class for all five words at once without dropping any known-good
+ * phrasing — see this file's own isTeamScopedQuestion tests (scripts/verify-lookups-r19.mjs) for the
+ * customer-name negatives this narrowing adds.
  */
-const TEAM_SCOPED_RE = /\b(?:internal|team[- ]only|staff[- ]only|for (?:the )?(?:team|techs?|technicians|dispatch|crew)|dispatch(?:'s)?\s+(?:notes?|memo)|tech(?:s|nicians)?[' ]?\s*(?:only\s+)?notes?)\b/i;
+const TEAM_SCOPED_RE = /\b(?:internal|team[- ]only|staff[- ]only|for\s+the\s+(?:team|techs?|technicians|dispatch|crew)|dispatch(?:'s)?\s+(?:notes?|memo)|tech(?:s|nicians)?[' ]?\s*(?:only\s+)?notes?)\b/i;
 export function isTeamScopedQuestion(question) {
   return TEAM_SCOPED_RE.test(String(question ?? ''));
 }

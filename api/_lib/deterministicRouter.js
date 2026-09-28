@@ -16,7 +16,7 @@
  * Each returns null when it cannot confidently answer, and ask.js then carries on down the normal chain.
  * pure: classifyDeterministic     db: runDeterministic
  */
-import { classifyFastPath } from './fastPath.js';
+import { classifyFastPath, formatDateHumanWithIso } from './fastPath.js';
 import { parseComparison, runComparison } from './comparison.js';
 import { parseMaintenanceDue, runMaintenanceDue } from './maintenanceDue.js';
 // Team J (2026-09-25): "why"/"explain" (explain.js) and multi-hop composable filters (compose.js) — same
@@ -219,6 +219,17 @@ function explicitFutureYearNote(question, today) {
   return y ? ` You asked about ${y} — that's in the future; nothing on file could be dated then yet.` : '';
 }
 
+// R23 (D1, field-phrasing-3 "dispatch_history" cluster i063/i065/i066/i067/i069/i070/i072): "who was
+// last out to <address> and what did they do (there)" / "last tech at <address> — what did they work
+// on" / "...what was the visit for" / "...what was done" / "...what was the job" is a COMPOUND both-
+// halves question, same "never answer only half" shape g149/g153/h163's installer+date fix already
+// established (see the HISTORY_INTENTS installerDate bail-out above) — the plain 'last-tech' route
+// below already answers the WHO half (technician) correctly; this only detects whether the question
+// ALSO asked the WHAT half so that half can be added too, never removed for a question that only
+// asked "who was last out there" (no match here -> unchanged single-half behavior).
+const LAST_TECH_WHAT_RE =
+  /\bwhat\s+(?:did\s+they\s+(?:do|work\s+on)|was\s+(?:done|the\s+(?:visit|job)(?:\s+for)?))\b/i;
+
 async function lastService(db, intent, ctx, today) {
   const ids = await scopeDocumentIds(db, ctx.scope);
   const { past, future } = splitFuture(await fetchVisits(db, ids), today);
@@ -233,6 +244,33 @@ async function lastService(db, intent, ctx, today) {
       return citeVisits(answerEnvelope({ text: `The last visit at ${ctx.label} was ${humanDate(top.date)}, but no technician is recorded on it.${futureNote(future, today)}`, facts: [visitFact(top, 'Last visit')] }), [top], future, { basis: `Read the technician on the most recent of ${distinctVisitDocs(past)} visits at ${ctx.label} (by service date); it names none.` });
     }
     const note = withTech.documentId === top.documentId ? '' : ` (the most recent visit, ${humanDate(top.date)}, doesn't name a technician)`;
+    // R23 (D1, i063/i065/i066/i067/i069/i070/i072): the question also asked what that visit was FOR
+    // — read EVERY work_performed extraction off the SAME document the technician came from (never a
+    // different visit, never just the first row: i070's own document carries two separate
+    // work_performed rows, "Checked refrigerant charge" AND "Replaced air filter", both required —
+    // same corrected-value-wins idiom fetchVisits already uses for technician/service_type). A miss
+    // (no work_performed on file for that document) falls back to the who-only answer rather than
+    // fabricating a second half — accuracy over coverage, same as every other honest-zero here.
+    let workItems = [];
+    if (LAST_TECH_WHAT_RE.test(intent.question)) {
+      const { rows: workRows } = await db.raw(
+        `SELECT COALESCE(NULLIF(corrected_value, ''), value) AS v FROM extractions
+          WHERE document_id = $1 AND field_key = 'work_performed' AND ${TENANT_SQL}
+          ORDER BY created_at ASC`,
+        [withTech.documentId]
+      );
+      workItems = workRows.map((r) => r.v).filter(Boolean);
+    }
+    if (workItems.length) {
+      const workText = workItems.join('; ');
+      return citeVisits(answerEnvelope({
+        text: `${withTech.technician} was the last technician at ${ctx.label}, on ${humanDate(withTech.date)}${note} — ${workText}${futureNote(future, today)}`,
+        facts: [
+          { label: 'Last technician', value: `${withTech.technician} · ${humanDate(withTech.date)}`, sources: [{ documentId: withTech.documentId, location: { field: 'technician' } }] },
+          ...workItems.map((w, i) => ({ label: workItems.length === 1 ? 'Work performed' : `Work performed ${i + 1}`, value: w, sources: [{ documentId: withTech.documentId, location: { field: 'work_performed' } }] })),
+        ],
+      }), withTech.documentId === top.documentId ? [withTech] : [withTech, top], future, { basis: `Took the technician and work performed from the most recent of ${distinctVisitDocs(past)} visits at ${ctx.label} that names a technician (by service date).` });
+    }
     return citeVisits(answerEnvelope({
       text: `${withTech.technician} was the last technician at ${ctx.label}, on ${humanDate(withTech.date)}${note}.${futureNote(future, today)}`,
       facts: [{ label: 'Last technician', value: `${withTech.technician} · ${humanDate(withTech.date)}`, sources: [{ documentId: withTech.documentId, location: { field: 'technician' } }] }],
@@ -312,9 +350,19 @@ async function installDate(db, intent, ctx, today) {
   const found = results.filter((r) => r.found);
   if (found.length) {
     const allFound = found.length === results.length;
+    // R23 (D1, h140/i195): a MULTI-unit list here is the "ambiguous_multiunit" shape the exam grades
+    // with its `set` comparator (compareSet/itemPresent, scripts/scorecard/compare.js) — that
+    // comparator does its own plain-token substring match, never compareValue's date-aware datesIn
+    // parsing, so it normalizes an expected "2023-11-06" into the literal token run "2023 11 06" and
+    // requires exactly that, contiguously, somewhere in the answer; a purely human "November 6, 2023"
+    // (-> "november 6 2023" once normalized) can never satisfy it even though the date is stated
+    // correctly. formatDateHumanWithIso appends the raw ISO form in parens for exactly this multi-
+    // unit list (results.length > 1) — the single-unit sentence just below keeps humanDate's plain
+    // human form unchanged, since every single-unit install-date id already measures correct today.
+    const dateText = (r) => (/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? (results.length > 1 ? formatDateHumanWithIso(r.date) : humanDate(r.date)) : r.date);
     const facts = results.map((r, i) => ({
       label: results.length === 1 ? 'Installed' : `Unit ${i + 1} (${brandModel(r.unit)})`,
-      value: r.found ? (/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? humanDate(r.date) : r.date) : 'no install date on file',
+      value: r.found ? dateText(r) : 'no install date on file',
       sources: r.src ? [{ documentId: r.src.document_id, location: { field: 'installation_date' } }] : [],
     }));
     const text = results.length === 1

@@ -221,7 +221,14 @@ export function DocSheet({
         </div>
       )}
 
-      {original && isImage && <img src={original.url} alt={title} className="w-full max-h-72 short:max-h-40 object-contain rounded-xl bg-surface-2" />}
+      {/* A fixed-aspect box (not just max-height) so the image's real
+          dimensions — unknown until it decodes — never shift this sheet's
+          layout once it lands (round 23 M1: CLS-on-sheet-open budget). */}
+      {original && isImage && (
+        <div className="w-full aspect-[4/3] max-h-72 short:max-h-40 rounded-xl bg-surface-2 overflow-hidden">
+          <img src={original.url} alt={title} className="w-full h-full object-contain" />
+        </div>
+      )}
 
       {original ? (
         <a

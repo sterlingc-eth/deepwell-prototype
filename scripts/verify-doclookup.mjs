@@ -662,6 +662,139 @@ eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernath
   }
 }
 
+/* ======================================================================
+ * R23 (D1, needs-model cluster C1: field-phrasing-3 i142-i157, shape
+ * "team_scoped"): "any memos for <name>/<time>", "what did dispatch/office/
+ * management send|broadcast|circulate to the techs/crew/everybody", "any
+ * internal-only documents at all" — see docLookup.js's isInternalMemoQuestion
+ * and countInternalDocuments for the full rationale. Own paraphrases below,
+ * never keyed to the exam's own wording.
+ * ====================================================================== */
+{
+  const POSITIVES = [
+    'any memos for Priya Nair this week',
+    "what's in the internal notes for the Alvarado job",
+    'is there a team memo about the schedule change',
+    'did dispatch send anything to the techs today',
+    'any staff-only paperwork on this account',
+    'is there an internal-only writeup on file for anything',
+    'what did the office send around last week',
+  ];
+  for (const q of POSITIVES) {
+    const parsed = parseDocLookupQuestion(q);
+    check(`item C1 (positive) :: "${q}" flagged internalMemo`, parsed?.internalMemo === true, JSON.stringify(parsed));
+  }
+
+  // A business's own proper name must never collide with the bare "memo(s)" noun —
+  // same collision class fastPath.js's TEAM_SCOPED_RE narrowing exists for.
+  const NEGATIVES = [
+    'how many invoices do we have for Memos Auto Repair',
+    "how many invoices do we have for Memo's Auto Repair",
+    'list invoices for Fitzgerald',
+    'do we have a permit for 322 N Greenfield Rd',
+    'what proposal did we give Amy Isaacson',
+    'is Bracken still under warranty',
+    // Post-review hardening: the capitalized/apostrophe guards above never covered a business name
+    // typed the SAME casual, all-lowercase way this whole app's own dispatcher phrasing is designed
+    // for elsewhere ("whats", "im", no capitals) — confirmed regression: "list invoices for memos
+    // auto repair" was silently swallowed into the internal-memo decline instead of resolving (or
+    // honestly failing to find) a customer named "memos auto repair", the exact "business name
+    // collides with a closed-vocabulary trigger word" failure class this whole shape is built to
+    // avoid. Fixed by also excluding "memo(s)" right after "for"/"for the" — every genuine
+    // memo-question phrasing (see POSITIVES above) puts "for" AFTER "memo(s)", never before it.
+    'list invoices for memos auto repair',
+    'how many invoices do we have for memos auto repair',
+  ];
+  for (const q of NEGATIVES) {
+    const parsed = parseDocLookupQuestion(q);
+    check(`item C1 (negative) :: "${q}" not flagged internalMemo`, parsed?.internalMemo !== true, JSON.stringify(parsed));
+  }
+
+  // End to end: zero internal documents on file -> honest, citable decline, no model call.
+  {
+    const mockDb = {
+      raw: async (sql) => {
+        if (/information_schema\.columns/i.test(sql)) return { rowCount: 0 };
+        if (/FROM extractions/i.test(sql)) return { rows: [{ n: 0 }] };
+        return { rows: [] };
+      },
+    };
+    const answer = await runDocLookup(mockDb, 'any memos for Priya Nair this week');
+    check('item C1 :: zero internal docs -> no-answer decline', answer?.kind === 'no-answer', JSON.stringify(answer));
+    check('item C1 :: decline never fabricates a document', !/\d+\s+memo/i.test(answer?.text ?? ''), answer?.text);
+  }
+
+  // End to end: a real internal document DOES exist on this tenant -> defer to the model
+  // (no generalized "search internal documents by keyword/date" builder exists yet).
+  {
+    const mockDb = {
+      raw: async (sql) => {
+        if (/information_schema\.columns/i.test(sql)) return { rowCount: 0 };
+        if (/FROM extractions/i.test(sql)) return { rows: [{ n: 2 }] };
+        return { rows: [] };
+      },
+    };
+    const answer = await runDocLookup(mockDb, 'any memos for Priya Nair this week');
+    eq('item C1 :: nonzero internal docs -> defers to model (null)', answer, null);
+  }
+}
+
+/* ======================================================================
+ * Adversarial-review fix (Round 23 D1, post-integration): isUntrackedFieldQuestion
+ * (contactLookup.js) fired FIRST in parseContactLookupQuestion, before any of the file's own
+ * real field/name shapes got a chance to match — a compound question naming BOTH a real, tracked
+ * field (address/phone/email/serial/a named-unit attribute) AND an untracked one in the same
+ * sentence ("what's the customer's address and BTU rating for X") was swallowed whole into the
+ * untracked-field decline, silently discarding the trackable half instead of answering it (or, for
+ * a field this file itself can't resolve, at least deferring to the model the way a bare mention of
+ * that same field already does). Fixed two ways: (1) the check now runs LAST, as a fallback, so
+ * every real shape above gets first refusal; (2) isUntrackedFieldQuestion itself now declines to
+ * fire at all when the question also carries a plain conjunction ("and"/"plus"/"as well as"/"&"),
+ * erring toward a needs-model defer rather than ever risking a real field's answer for a shape this
+ * file has no compound-field builder for at all. Confirmed via a direct r23base A/B run through the
+ * real ask.js handler (not just this parser): the address/phone answers this bug drops are
+ * reproduced end-to-end, not just as a unit-test artifact of this parser alone.
+ * ====================================================================== */
+{
+  // Bare, single-field untracked asks must still decline (this cluster's whole point) — unaffected
+  // by fallback ordering since no other shape claims these words at all.
+  const BARE_UNTRACKED = [
+    'whats the BTU rating on the unit at 100 E Main St',
+    'what duct size does the unit at 951 E Main St use',
+    'what color was the unit painted',
+  ];
+  for (const q of BARE_UNTRACKED) {
+    const parsed = parseContactLookupQuestion(q);
+    eq(`untrackedField (bare, still declines) :: "${q}"`, parsed?.field, 'untrackedField');
+  }
+
+  // Compound: a real, THIS-FILE-resolvable field (phone/email/address) named alongside an untracked
+  // one must resolve to the REAL field, never to untrackedField.
+  const COMPOUND_REAL_FIELD_WINS = [
+    ["what's the customer's address and BTU rating for Linda Fitzgerald", 'address'],
+    ["what's the phone number and capacitor size for Karen Abernathy", 'phone'],
+    ["whats the email and duct size on file for Amy Isaacson", 'email'],
+  ];
+  for (const [q, expectedField] of COMPOUND_REAL_FIELD_WINS) {
+    const parsed = parseContactLookupQuestion(q);
+    check(`untrackedField (compound, real field wins) :: "${q}" -> field "${expectedField}", not untrackedField`, parsed?.field === expectedField, JSON.stringify(parsed));
+  }
+
+  // Compound: an untracked field named alongside a field THIS FILE can't itself resolve (e.g.
+  // manufacturer, which lives in fastPath's own anchor-based resolution, not here) must NOT be
+  // swallowed into a confident "nothing on file could answer it" decline — safer to defer entirely
+  // (parseContactLookupQuestion returns null, exactly as a bare mention of that same field already
+  // does) than to risk discarding a real answer.
+  const COMPOUND_UNRESOLVABLE_FIELD_DEFERS = [
+    "what's the manufacturer and duct size for Thomas Mercer's unit",
+    'give me the tonnage plus the GPS coordinates for this unit',
+  ];
+  for (const q of COMPOUND_UNRESOLVABLE_FIELD_DEFERS) {
+    const parsed = parseContactLookupQuestion(q);
+    check(`untrackedField (compound, unresolvable real field -> defer, never a false decline) :: "${q}"`, parsed?.field !== 'untrackedField', JSON.stringify(parsed));
+  }
+}
+
 console.log(`\n${count - failures}/${count} checks passed.`);
 if (failures > 0) {
   console.error(`${failures} FAILURE(S)`);

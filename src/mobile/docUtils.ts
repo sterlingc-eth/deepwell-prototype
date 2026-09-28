@@ -44,7 +44,18 @@ export function searchText(doc: Doc, entities: Record<EntityId, Entity>): string
   return `${doc.filename} ${name} ${typeLabel(doc.typeId)} ${cust} ${fields}`.toLowerCase()
 }
 
+// `Intl.DateTimeFormat` (what `Date#toLocaleDateString` builds fresh under the
+// hood on every single call) does one-time ICU work the first time any
+// formatter is constructed in the whole page's life — tens of milliseconds,
+// worse under CPU throttling. Building ONE instance here, at module scope
+// (this file is a static import of DocSheet.tsx, itself a static import of
+// MobileApp.tsx, so it's evaluated during the mobile entry's own initial
+// parse/eval, before a tech can tap anything) means that cost lands during
+// app boot instead of during a DocSheet or CustomerSheet open, and every
+// later date format is then just cheap formatter reuse instead of a rebuild.
+export const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+
 export function formatDate(d: Date | null | undefined): string {
   if (!d || Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return DATE_FORMATTER.format(d)
 }
