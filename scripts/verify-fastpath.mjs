@@ -303,6 +303,38 @@ const CORPUS = [
   ["What documents do we have for C-00007?", 'document_list_for_subject', { customerNumber: 'C-00007' }],
   ["What do we have on Henderson?", 'document_list_for_subject', { name: 'Henderson' }],
   ["Show me everything on C-00009.", 'document_list_for_subject', { customerNumber: 'C-00009' }],
+
+  // ---- invoice_total, order-independent phrasing (R24) ---------------------
+  ["What's the total on Henderson's invoice?", 'invoice_total', { name: 'Henderson' }],
+  ["What's the total on C-00012's invoice?", 'invoice_total', { customerNumber: 'C-00012' }],
+
+  // ---- po_total (R24, 4) ----------------------------------------------------
+  ["How much does purchase order PO-1029 total?", 'po_total', { poNumber: 'PO-1029' }],
+  ["Total for purchase order PO-2200?", 'po_total', { poNumber: 'PO-2200' }],
+  ["What's the total on the purchase order for Henderson, PO-4471?", 'po_total', { poNumber: 'PO-4471', name: 'Henderson' }],
+  ["What's the purchase order total for Henderson's PO-6673?", 'po_total', { poNumber: 'PO-6673' }],
+
+  // ---- agreement_cost (R24, 5) -----------------------------------------------
+  ["What's the annual cost of Henderson's maintenance agreement?", 'agreement_cost', { name: 'Henderson' }],
+  ["How much is the yearly fee on C-00012's agreement?", 'agreement_cost', { customerNumber: 'C-00012' }],
+  ["What's the annual price on the maintenance agreement for C-00003?", 'agreement_cost', { customerNumber: 'C-00003' }],
+  ["What's the annual cost on C-00005's maintenance agreement?", 'agreement_cost', { customerNumber: 'C-00005' }],
+  ["How much is the yearly cost on C-00007's maintenance agreement?", 'agreement_cost', { customerNumber: 'C-00007' }],
+
+  // ---- equipment_age (R24, 6) ------------------------------------------------
+  ["How old is the unit at 3247 Elm St?", 'equipment_age', { address: '3247 Elm St' }],
+  ["How old is Henderson's system?", 'equipment_age', { name: 'Henderson' }],
+  ["How old is C-00012's equipment?", 'equipment_age', { customerNumber: 'C-00012' }],
+  ["How old is the unit for C-00003?", 'equipment_age', { customerNumber: 'C-00003' }],
+  ["How old is the system at 1519 W Juniper?", 'equipment_age', { address: '1519 W Juniper' }],
+  ["How old is the equipment for C-00005?", 'equipment_age', { customerNumber: 'C-00005' }],
+
+  // ---- brand_match (R24, 5) --------------------------------------------------
+  ["Is the unit at 3247 Elm St a Trane?", 'brand_match', { address: '3247 Elm St', askedBrand: 'trane' }],
+  ["Does C-00012 have a Lennox?", 'brand_match', { customerNumber: 'C-00012', askedBrand: 'lennox' }],
+  ["Is the unit for C-00003 a Rheem?", 'brand_match', { customerNumber: 'C-00003', askedBrand: 'rheem' }],
+  ["Do we have a Goodman installed at 1519 W Juniper?", 'brand_match', { address: '1519 W Juniper', askedBrand: 'goodman' }],
+  ["Is C-00005's unit an American Standard?", 'brand_match', { customerNumber: 'C-00005', askedBrand: 'american standard' }],
 ];
 
 check(`corpus has >= 150 phrasings (has ${CORPUS.length})`, CORPUS.length >= 150);
@@ -666,6 +698,49 @@ eq('warranty_out (positive, "did ... expired" ungrammatical form still works) ::
 // above); re-asserted here specifically for the bare-verb form this fix adds, so a future edit that
 // widens "did" into "does" (or merges the two) gets caught immediately.
 check('warranty_out (negative) :: "does the warranty expire yet" not warranty_out (case sensitive to the earlier does/expire? regression)', classifyFastPath('does the warranty expire yet')?.intent !== 'warranty_out', JSON.stringify(classifyFastPath('does the warranty expire yet')));
+
+/* ======================================================================
+ * R24: regression guards for the families closed this round. Own wording,
+ * never copied from the exam corpus.
+ * ====================================================================== */
+
+// manufacturer must NOT claim a thermostat/filter brand question — the unit's
+// overall manufacturer is not necessarily the thermostat's or filter's brand,
+// and contactLookup's own decline for these untracked fields must run instead.
+const MANUFACTURER_UNTRACKED_FIELD_NEGATIVES = [
+  "What brand is the thermostat at Henderson's place?",
+  "What brand is the filter on C-00012's unit?",
+  "What brand thermostat does the Henderson job have?",
+  "What filter brand is installed at 3247 Elm St?",
+];
+for (const q of MANUFACTURER_UNTRACKED_FIELD_NEGATIVES) {
+  check(`manufacturer excludes thermostat/filter :: "${q}"`, classifyFastPath(q)?.intent !== 'manufacturer', `got ${classifyFastPath(q)?.intent}`);
+}
+
+// equipment_age must NOT claim a portfolio-wide oldest/newest superlative —
+// that's analytics.js's job (it scans every unit, not one resolved subject).
+const EQUIPMENT_AGE_SUPERLATIVE_NEGATIVES = [
+  "How old is the oldest unit we've got, in years?",
+  "How old is the newest system on file?",
+  "What's the age of our oldest piece of equipment?",
+];
+for (const q of EQUIPMENT_AGE_SUPERLATIVE_NEGATIVES) {
+  check(`equipment_age excludes oldest/newest :: "${q}"`, classifyFastPath(q)?.intent !== 'equipment_age', `got ${classifyFastPath(q)?.intent}`);
+}
+
+// invoice_total must classify regardless of "total"/"invoice" word order.
+eq('invoice_total order-independent :: "What\'s the total on Henderson\'s invoice?"', classifyFastPath("What's the total on Henderson's invoice?")?.intent, 'invoice_total');
+
+// po_total requires a PO number; a bare "purchase order" mention with no
+// number must defer rather than guess which one.
+check('po_total defers with no PO number :: "What is the total on the purchase order?"', classifyFastPath('What is the total on the purchase order?')?.intent !== 'po_total', `got ${classifyFastPath('What is the total on the purchase order?')?.intent}`);
+
+// brand_match requires exactly one recognized brand word; a question naming
+// two brands is ambiguous about which one is being asked about, so
+// extractAskedBrand must come back null even though the trigger itself still
+// fires on "is/are ... unit ... a <brand>" — runBrandMatch (fastPathQuery.js)
+// treats a null askedBrand as an automatic defer (`if (!askedBrand) return null;`).
+check('brand_match: two brands named -> askedBrand is null (ambiguous, must defer downstream) :: "Is the Henderson unit a Trane or a Carrier?"', classifyFastPath('Is the Henderson unit a Trane or a Carrier?')?.subject.askedBrand === null, `got ${JSON.stringify(classifyFastPath('Is the Henderson unit a Trane or a Carrier?')?.subject.askedBrand)}`);
 
 console.log(failures === 0 ? `\nAll fast-path checks passed (${CORPUS.length} corpus phrasings).` : `\n${failures} FAILURE(S).`);
 process.exit(failures === 0 ? 0 : 1);

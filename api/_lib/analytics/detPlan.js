@@ -554,18 +554,119 @@ function detectWarrantyRegDateExtreme(q) {
   return { entity: 'equipment', op: 'list', sortBy };
 }
 
+// R20 (J3, i030): "how many distinct document types do we actually track" used to fall through
+// to the 'customers' default below — documents have no per-customer documentType column at all,
+// so that silently answered a bare customer count instead. documentType is its own entity, same
+// as brand/technician just below. Shared by every DIM_WORD_TO_FIELD-driven distinct-value
+// detector (count, list) so the entity mapping never drifts apart between them.
+function entityForDimension(field) {
+  return field === 'brand' ? 'equipment' : field === 'technician' ? 'serviceVisits' : field === 'documentType' ? 'documents' : 'customers';
+}
+
 function detectDistinctDimensionCount(q) {
   const m = DIFFERENT_DIM_RE.exec(q);
   if (!m) return null;
   const field = DIM_WORD_TO_FIELD[m[1].toLowerCase()];
   if (!field) return null;
-  // R20 (J3, i030): "how many distinct document types do we actually track" used to fall through
-  // to the 'customers' default below — documents have no per-customer documentType column at all,
-  // so that silently answered a bare customer count instead. documentType is its own entity, same
-  // as brand/technician just below.
-  const entity =
-    field === 'brand' ? 'equipment' : field === 'technician' ? 'serviceVisits' : field === 'documentType' ? 'documents' : 'customers';
-  return { entity, op: 'groupBy', groupBy: field, countDistinct: true };
+  return { entity: entityForDimension(field), op: 'groupBy', groupBy: field, countDistinct: true };
+}
+
+/**
+ * R23 (D2, field-phrasing-5.json k143/k186/k187): "how many technicians do we have logging jobs
+ * in this system" / "which manufacturers do we service, across every unit on the books" / "list
+ * every technician we've got logging jobs in the system" — a bare (no "different"/"distinct")
+ * "how many <dim>"/"which <dim> do we ..."/"list every <dim>" question about the technician or
+ * manufacturer/brand dimension ITSELF still means "the distinct values of that dimension", exactly
+ * like DIFFERENT_DIM_RE's own shape just above — but with no "different"/"distinct" word to key
+ * off. Left entityFromNouns' generic fallback (below) used to win these instead: "jobs"/"service"/
+ * "unit" is also a genuine SERVICE_VISIT_NOUN_RE/EQUIPMENT_NOUN_RE word in the SAME sentence, so a
+ * bare "how many technicians ... jobs ..." question silently became a plain, unfiltered
+ * service-visit COUNT ("You have 317 service visits") instead of the technician dimension's own
+ * distinct value the question actually named — confident, but a completely different number.
+ * Scoped to ONLY technician/brand (never city/state/zip/month/documentType/warrantyStatus, which
+ * already have their own tested, narrower bare-phrasing paths elsewhere in this file — widening
+ * this to every GROUP_BY_FIELDS dimension is unnecessary risk this round never needed to take) —
+ * and guarded against a genuine per-technician THRESHOLD question ("how many technicians logged
+ * more than 50 jobs each") that only happens to start the same way, which this file has no plan
+ * shape for at all and must never guess at (return null, not a wrong distinct count).
+ */
+const BARE_COUNT_DIMS = ['technician', 'technicians', 'tech', 'techs', 'brand', 'brands', 'manufacturer', 'manufacturers'];
+const BARE_COUNT_DIM_ALT = altOf(BARE_COUNT_DIMS);
+const BARE_DIM_COUNT_RE = new RegExp(`\\bhow many\\s+(${BARE_COUNT_DIM_ALT})\\b`, 'i');
+const BARE_DIM_PER_ITEM_THRESHOLD_RE = /\b(?:more|fewer|less)\s+than\b|\bat least\b|\bover\s+\d|\bunder\s+\d|\beach\b/i;
+
+function detectBareDimensionDistinctCount(q) {
+  if (!BARE_DIM_COUNT_RE.test(q) || BARE_DIM_PER_ITEM_THRESHOLD_RE.test(q)) return null;
+  const m = BARE_DIM_COUNT_RE.exec(q);
+  const field = DIM_WORD_TO_FIELD[m[1].toLowerCase()];
+  if (!field) return null;
+  return { entity: entityForDimension(field), op: 'groupBy', groupBy: field, countDistinct: true };
+}
+
+/** Same dimension/scope as detectBareDimensionDistinctCount just above, for the LIST shape instead
+ *  of the bare count: "which manufacturers/technicians do we <verb>" or "list every/all
+ *  manufacturer(s)/technician(s) ...". Never the "which technician has the most jobs" superlative
+ *  shape (detectGroupBySuperlative, tried first in the chain below) — that names a RANKING word
+ *  ("most"/"fewest"/...) this regex doesn't match at all. */
+const LIST_DISTINCT_DIM_RE = new RegExp(
+  `\\bwhich\\s+(${BARE_COUNT_DIM_ALT})\\b[\\s\\S]{0,40}\\b(?:do we|have we|are on)\\b|` +
+    `\\blist\\s+(?:every|all(?:\\s+of)?)\\b[\\s\\S]{0,10}(${BARE_COUNT_DIM_ALT})\\b`,
+  'i'
+);
+
+function detectDistinctDimensionList(q) {
+  const m = LIST_DISTINCT_DIM_RE.exec(q);
+  if (!m) return null;
+  const word = (m[1] ?? m[2] ?? '').toLowerCase();
+  const field = DIM_WORD_TO_FIELD[word];
+  if (!field) return null;
+  return { entity: entityForDimension(field), op: 'groupBy', groupBy: field, distinctList: true };
+}
+
+/**
+ * R23 (D2, field-phrasing-5.json k139): "has Denise Ford done more jobs than Ray Sutton" — a
+ * technician HEAD-TO-HEAD yes/no comparison. Tried BEFORE detectTechnicianAction (this file's own
+ * dedicated chain, below) specifically because that detector's own aux+NAME+verb regex already
+ * matches the LEFT half of this exact same sentence ("has Denise Ford done") and, tried first,
+ * would silently answer with just Denise Ford's own bare visit count — always a nonzero, always-
+ * "truthy" answer that happens to grade "correct" whenever the true comparison is "yes" and WRONG
+ * whenever it's actually "no" (a tie or the left technician trailing), never a real comparison at
+ * all. Builds a single 'count' plan (never 'groupBy' — see validatePlan's own doc comment on why
+ * that matters here) filtered to `technician in [left, right]`, so routes/analytics.js's existing,
+ * already-tested dateless-technician-row correction (only ever applied for a non-groupBy plan that
+ * carries a `technician` filter) counts both sides the SAME correct way a single named technician's
+ * own bare total already does — never the groupBy/superlative join h115/k141 document as
+ * undercounting some technicians. formatAnalyticsAnswer's own `plan.headToHead` branch re-splits
+ * the two technicians' rows back apart by their own `technician` value to get each side's real
+ * count and states Yes/No accordingly (correct on a genuine tie, in both directions).
+ */
+const TECH_HEAD_TO_HEAD_VERB = "(?:done|run|closed(?:\\s+out)?|completed|handled|logged|worked|had|been(?:\\s+out)?\\s+on)";
+const TECH_NAME_TOKEN = "[a-z][a-z.'-]*(?:\\s+[a-z][a-z.'-]*){1,2}";
+const TECH_HEAD_TO_HEAD_RE = new RegExp(
+  `^\\s*(?:has|have|does|do|did)\\s+(${TECH_NAME_TOKEN})\\s+${TECH_HEAD_TO_HEAD_VERB}\\b` +
+    `[\\s\\S]*?\\bmore\\s+(?:jobs?|visits?|calls?|service\\s+calls?)\\b[\\s\\S]*?\\bthan\\b\\s+(${TECH_NAME_TOKEN})\\s*[?.]?\\s*$`,
+  'i'
+);
+
+function detectTechnicianHeadToHead(q) {
+  const m = TECH_HEAD_TO_HEAD_RE.exec(q);
+  if (!m) return null;
+  const left = titleCaseWords(m[1].trim().split(/\s+/).map(dedupeLeadingLetter).join(' '));
+  const right = titleCaseWords(m[2].trim().split(/\s+/).map(dedupeLeadingLetter).join(' '));
+  if (!left || !right || left.toLowerCase() === right.toLowerCase()) return null;
+  // R24 review: "has the new tech done more jobs than the old crew" is not two names — never compare
+  // (and never state "0 jobs") for phrases that start with an article/pronoun/generic noun.
+  const HEAD_TO_HEAD_EXTRA_STOPWORDS = new Set(['a', 'an', 'my', 'your', 'their', 'his', 'her', 'new', 'old', 'other', 'another', 'every', 'all', 'some', 'no']);
+  for (const n of [left, right]) {
+    const first = n.split(/\s+/)[0].toLowerCase();
+    if (NON_NAME_STOPWORDS.has(first) || HEAD_TO_HEAD_EXTRA_STOPWORDS.has(first)) return null;
+  }
+  return {
+    entity: 'serviceVisits',
+    op: 'count',
+    filters: [{ field: 'technician', op: 'in', value: [left, right] }],
+    headToHead: { left, right, leftLabel: `${left}'s jobs`, rightLabel: `${right}'s jobs` },
+  };
 }
 
 /** "what zip codes do we serve/cover" / "customers by county" / "jobs per
@@ -1317,6 +1418,7 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
       detectWarrantyExpiryWindow(q, today) ??
       detectWarrantyRegistrationDays(q) ??
       detectDistinctYearsCount(q) ??
+      detectTechnicianHeadToHead(q) ??
       detectTechnicianAction(q) ??
       detectTechnicianGroupBy(q) ??
       detectWarrantyRegDateExtreme(q) ??
@@ -1328,6 +1430,11 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
       detectBrandJobsDocumentCount(q) ??
       detectDistinctDimensionCount(q) ??
       detectGroupBySuperlative(q) ??
+      // R23 (D2): tried AFTER detectGroupBySuperlative — "which manufacturer do we have the
+      // FEWEST units of" (h113) must keep winning that ranking, never fall to a plain distinct
+      // list just because it also happens to name "which manufacturer ... do we have".
+      detectBareDimensionDistinctCount(q) ??
+      detectDistinctDimensionList(q) ??
       detectBrandComparison(q) ??
       detectGroupByPhrase(q);
     if (dedicated) return dedicated;

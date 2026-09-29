@@ -603,7 +603,9 @@ const KNOWN_WRONG_IDS = new Set([
   //     technicians/manufacturers" or "how many technicians" question is actually asking for.
   // All 5 are confident-but-wrong (never a fabricated dollar amount or a false compliance claim), and
   // all 5 are new information this round's own blind set discovered, not a regression it caused.
-  "k139", "k141", "k143", "k186", "k187",
+  // R24: k139 (tie-safe technician head-to-head), k143 (distinct count), k186/k187 (distinct list)
+  // fixed in analytics.js/detPlan.js — removed. k141 stays (same two-oracle conflict as h115).
+  "k141",
 ]);
 
 if (examExport) {
@@ -845,8 +847,11 @@ if (examExport) {
     // last two weeks") fell through with NO time filter at all instead of either the intended window
     // or a graceful defer-to-model (k151/k155). Measured 1387/1352, wrong 11 -> 16 (5 new, documented,
     // pre-existing gaps — see KNOWN_WRONG_IDS) → floor RAISED to 1380/1345.
-    check(`no-model coverage floor: correct ≥ 1345 (got ${overall.correct})`, overall.correct >= 1345, JSON.stringify(overall));
-    check(`no-model coverage floor: answeredWithoutModel ≥ 1380 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1380, JSON.stringify(overall));
+    // R24: distinct-count/list + head-to-head metrics (analytics) and six new no-model families
+    // (fastPath/docLookup: possessive-name fix, invoice/PO totals, agreement cost, equipment age,
+    // "is there X on file", brand yes/no). Measured 1457/1426, wrong 16 -> 12 → floor RAISED to 1450/1420.
+    check(`no-model coverage floor: correct ≥ 1420 (got ${overall.correct})`, overall.correct >= 1420, JSON.stringify(overall));
+    check(`no-model coverage floor: answeredWithoutModel ≥ 1450 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1450, JSON.stringify(overall));
     check(`no-model coverage floor: correct ≥ 1165 (got ${overall.correct})`, overall.correct >= 1165, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 

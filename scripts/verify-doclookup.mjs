@@ -77,6 +77,39 @@ for (const q of DOC_LOOKUP_NEGATIVES) {
 }
 
 /* ======================================================================
+ * R24 (E3): "is/are there ... on file for X" shape — own wording, mirroring
+ * the "do/does we have" shape already covered above.
+ * ====================================================================== */
+const DOC_LOOKUP_R24_POSITIVES = [
+  ['is there a maintenance agreement on file for Fitzgerald', 'maintenance-agreement', 'Fitzgerald', false],
+  ['are there any invoices on file for the Prentiss job', 'invoice', 'Prentiss', false],
+  ['is there a permit for 322 N Greenfield Rd', 'permit', '322 N Greenfield Rd', true],
+  ['is there a proposal on file for Amy Isaacson', 'proposal-quote', 'Amy Isaacson', false],
+];
+for (const [q, doctype, namePhrase, isAddress] of DOC_LOOKUP_R24_POSITIVES) {
+  const parsed = parseDocLookupQuestion(q);
+  check(`R24 (positive) :: "${q}" detected`, Boolean(parsed), JSON.stringify(parsed));
+  if (parsed) {
+    eq(`R24 (positive) :: "${q}" doctype`, parsed.doctype, doctype);
+    eq(`R24 (positive) :: "${q}" namePhrase`, parsed.namePhrase.toLowerCase(), namePhrase.toLowerCase());
+    eq(`R24 (positive) :: "${q}" isAddress`, parsed.isAddress, isAddress);
+  }
+}
+
+// Regression guard (breadth-existence-019 class): "is there X on file for
+// anyone/anybody/..." must NOT be parsed as a doc-lookup for a literal
+// customer named "Anyone" — the indefinite pronoun is a portfolio-wide
+// existence question for analytics, not a doc-lookup subject.
+const DOC_LOOKUP_R24_PRONOUN_NEGATIVES = [
+  'is there a maintenance agreement on file for anyone',
+  'are there any permits on file for anybody',
+  'is there an invoice on file for someone',
+];
+for (const q of DOC_LOOKUP_R24_PRONOUN_NEGATIVES) {
+  eq(`R24 (negative, indefinite pronoun) :: "${q}" not hijacked`, parseDocLookupQuestion(q), null);
+}
+
+/* ======================================================================
  * Item 1: runDocLookup end to end against a mock db.
  * ====================================================================== */
 {

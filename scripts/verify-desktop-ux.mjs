@@ -162,13 +162,76 @@ try {
     await page.close();
   }
 
+  // ---------------------------------------------------- header @ 768 tablet --
+  // Guards the R2 header-overflow fix directly: every header control stays a
+  // real, clickable size (>=44px) even once squeezed to icon-only at tablet
+  // width — this round's fix must never "solve" the overflow by shrinking
+  // controls below that floor.
+  {
+    const page = await newPage({ width: 768, height: 1024 });
+    await go(page, 'dashboard');
+    await page.waitForSelector('#expiry-heading');
+    const small = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll('header button, header a'));
+      return els
+        .filter((el) => el.getClientRects().length > 0)
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0 && (r.width < 44 || r.height < 44));
+    });
+    check('768x1024: every header control is still >=44px (icon-only, not shrunk)', small.length === 0, JSON.stringify(small));
+    await page.close();
+  }
+
+  // ------------------------------------------------- Tooltip focus-visible --
+  // Guards the R2 fix to components/Tooltip.tsx: its trigger had a bare
+  // `outline-none` with no `focus-visible:` counterpart, so Tab-ing to it
+  // (e.g. CustomersScreen's warranty-alerts badge) showed no focus ring at
+  // all — a silent violation of index.css's own "Focus: visible everywhere,
+  // never removed" rule. Real Tab-key navigation, not .focus() (Chromium's
+  // :focus-visible heuristic doesn't reliably engage for scripted focus).
+  {
+    const page = await newPage({ width: 1440, height: 900 });
+    await go(page, 'browse');
+    await page.waitForSelector('table');
+    const trigger = page.locator('span[tabindex="0"]').first();
+    check('Tooltip trigger (customer alerts badge) is present', (await trigger.count()) > 0);
+    await page.keyboard.press('Tab');
+    const handle = await trigger.elementHandle();
+    let reached = false;
+    for (let guard = 0; guard < 120; guard++) {
+      if (await page.evaluate((el) => document.activeElement === el, handle)) { reached = true; break; }
+      await page.keyboard.press('Tab');
+    }
+    if (!reached) {
+      // Keyboard modality is already established by the Tabs above; land on the trigger via the element
+      // before it so :focus-visible still comes from a real key press (R24: de-flaked).
+      await trigger.evaluate((el) => el.focus());
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+    }
+    // Poll briefly: the style can lag a frame behind the focus change under load.
+    await page.waitForFunction((el) => getComputedStyle(el).outlineColor !== 'rgba(0, 0, 0, 0)' && getComputedStyle(el).outlineStyle !== 'none', handle, { timeout: 1500 }).catch(() => {});
+    const outline = await trigger.evaluate((el) => getComputedStyle(el).outlineColor);
+    check('Tooltip trigger shows a real (non-transparent) focus outline on Tab', outline !== 'rgba(0, 0, 0, 0)', outline);
+    await page.close();
+  }
+
   // ------------------------------------------------------------ screenshots
   const screens = [
     { screen: 'dashboard', name: 'dashboard', ready: '#expiry-heading' },
     { screen: 'browse', name: 'records-customers', ready: 'table' },
     { screen: 'warranty-export', name: 'warranty-export', ready: '#units-heading' },
   ];
-  const viewports = [{ w: 1280, h: 800, tag: '1280x800' }, { w: 1440, h: 900, tag: '1440x900' }];
+  // 768x1024 (iPad-portrait-ish tablet width): R2 UX round found the header's
+  // secondary action labels (Billing/Team/Donovan/field-mode/Sign out) used
+  // `md:inline` (768px) — exactly the viewport this crowds hardest at, since
+  // that's also where they all switch on at once alongside the primary nav's
+  // own `sm:inline` labels, overflowing the whole page horizontally. Fixed by
+  // moving every header label (primary nav included) to `lg:inline` (1024px)
+  // and tightening the header row's gap/padding below `lg`. This viewport
+  // stays in the same loop below so dashboard/records/warranty-export are
+  // all screenshotted and overflow-checked at it too, not just Dashboard.
+  const viewports = [{ w: 1280, h: 800, tag: '1280x800' }, { w: 1440, h: 900, tag: '1440x900' }, { w: 768, h: 1024, tag: '768x1024' }];
   const themes = [{ isDark: true, tag: 'office-dark' }, { isDark: false, tag: 'field-light' }];
 
   for (const vp of viewports) {

@@ -9,7 +9,7 @@ import { SerialCapture } from '../components/SerialCapture';
 import type { Answer, AnswerRecord, SourceRef } from '../core/types';
 import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
-import { buildSuggestions, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
+import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
 import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, type ThreadTurn } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
 import { asksUsedFraction, resetsOnShortLabel } from '../services/billingClient';
@@ -90,7 +90,10 @@ export function AskScreen() {
   const askRole = fieldMode ? 'tech' : 'office';
   const { prompts: samplePrompts, loading: samplesLoading } = useSamplePrompts(askRole, !asked, tenantKey);
   const { completions, hint } = useTypeahead(input);
-  const didYouMean = useDidYouMean(answer?.kind === 'no-answer' ? asked : null);
+  const serverDidYouMean = useDidYouMean(answer?.kind === 'no-answer' ? asked : null);
+  // A near-miss customer name ("Did you mean Sandra Wyckoff?") becomes a one-tap corrected re-ask.
+  const nearMiss = useMemo(() => nearMissRetryChips(asked, answer?.text), [asked, answer?.text]);
+  const didYouMean = nearMiss.length ? nearMiss : serverDidYouMean;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const showDropdown = dropdownOpen && completions.length > 0;
@@ -375,7 +378,7 @@ export function AskScreen() {
               onOpenRecord={openRecord}
               onAsk={(q) => void submit(q)}
             />
-            {answer.kind === 'no-answer' && didYouMean.length > 0 && (
+            {(answer.kind === 'no-answer' || nearMiss.length > 0) && didYouMean.length > 0 && (
               <DidYouMeanChips chips={didYouMean} onPick={(q) => void submit(q)} />
             )}
           </>

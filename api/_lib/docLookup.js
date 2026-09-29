@@ -172,6 +172,16 @@ const SHAPES = [
     `^(?:do|does|did)\\s+(?:we|you)\\s+have\\s+(?:an?\\s+)?${DOCTYPE_RE_SRC}s?\\s*(?:on\\s+file\\s*)?(?:for|of)\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})${TRAILING_JOB_RE_SRC}\\s*\\??$`,
     "i"
   ),
+  // R24 (E3, field-phrasing-3 i041-i047: "is there a permit on file for the Amy Jarvis job") — the
+  // identical "do we have X on file for Y" shape just above, but framed as "is/are there" instead
+  // of "do/does/did we/you have"; YES_NO_SHAPE_RE (below, used by runDocLookup's own yes/no
+  // phrasing) already anticipated this exact opener, but nothing in SHAPES itself ever matched it,
+  // so parseDocLookupQuestion returned null before runDocLookup's yes/no branch was ever reached at
+  // all. Never overlaps the shape above (that one requires "do/does/did", this one "is/are").
+  new RegExp(
+    `^(?:is|are)\\s+there\\s+(?:an?\\s+|any\\s+)?${DOCTYPE_RE_SRC}s?\\s*(?:on\\s+file\\s*)?(?:for|of)\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})${TRAILING_JOB_RE_SRC}\\s*\\??$`,
+    "i"
+  ),
   // "did we pull a permit for 322 N Greenfield Rd"
   new RegExp(
     `^did\\s+we\\s+pull\\s+(?:an?\\s+)?${DOCTYPE_RE_SRC}\\s*(?:on\\s+file\\s*)?(?:for|of)\\s+(?:the\\s+)?(${NAME_OR_ADDRESS_SRC})${TRAILING_JOB_RE_SRC}\\s*\\??$`,
@@ -269,8 +279,16 @@ const KNOWN_CITY_NAMES = new Set(
 // never itself a stopword) and got captured as if it were a customer name —
 // a real hijack of the "list all our X" analytics statement form. "pull",
 // "need" and "get" added here for exactly that reason.
+// R24 (E3, breadth-existence-019 regression — "is there a maintenance agreement on file for
+// ANYONE?"): an indefinite pronoun, never a real customer name — this question is a portfolio-wide
+// existence check ("does this exist for ANY customer at all"), correctly answered elsewhere
+// (analytics), not a single-customer lookup. Before this round's new "is there ... on file for the
+// ... job" SHAPES entry (see SHAPES below), no shape here ever reached this phrase at all, so the
+// gap was harmless; now that one does, "anyone" was never in this list (only the bare "any" was)
+// and slipped through as if it were a captured customer name, producing a confidently wrong "I
+// couldn't find a customer named Anyone" instead of ever falling through to the real answer.
 const NAME_STOPWORD_RE =
-  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|why|when|does|do|did|is|are|was|were|list|show|has|have|had|in|on|at|of|for|with|without|any|some|all|last|next|first|second|third|most|many|few|several|pull|need|get)$/i;
+  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|why|when|does|do|did|is|are|was|were|list|show|has|have|had|in|on|at|of|for|with|without|any|anyone|anybody|everyone|everybody|someone|somebody|some|all|last|next|first|second|third|most|many|few|several|pull|need|get)$/i;
 
 const AGGREGATE_WORD_RE = new RegExp(
   `\\b(${[...new Set([

@@ -3,7 +3,7 @@ import { ArrowUp, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
 import { authHeader } from '../services/authToken'
 import { asksUsedFraction, resetsOnShortLabel, type BillingStatus } from '../services/billingClient'
-import { buildSuggestions, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
+import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
 import { PreflightPill, TypeaheadDropdown, DidYouMeanChips, SamplePromptRowsPlaceholder, turnFrom, type ThreadTurn } from '../components/ask'
 import { useGraph } from '../core/entityGraph'
 import { DonovanMark } from '../components/DonovanMark'
@@ -210,12 +210,15 @@ const TurnView = memo(function TurnView({
   onAsk: (q: string) => void
 }) {
   // Round 14 K1: "Did you mean…" chips once this turn's own answer has actually come back with nothing.
-  const didYouMean = useDidYouMean(turn.answer?.kind === 'no-answer' ? turn.question : null)
+  const serverDidYouMean = useDidYouMean(turn.answer?.kind === 'no-answer' ? turn.question : null)
+  // R24: a near-miss customer name ("Did you mean Sandra Wyckoff?") becomes a one-tap corrected re-ask.
+  const nearMiss = useMemo(() => nearMissRetryChips(turn.question, turn.answer?.text), [turn.question, turn.answer?.text])
+  const didYouMean = nearMiss.length ? nearMiss : serverDidYouMean
   return (
     <div className="grid grid-cols-1 gap-2 min-w-0 scroll-mt-3" data-turn={turn.id}>
       <div className="justify-self-end max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-forest-600 text-stone-0 text-body-lg break-words">{turn.question}</div>
       {turn.answer && <MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onAsk={onAsk} />}
-      {turn.answer?.kind === 'no-answer' && didYouMean.length > 0 && <DidYouMeanChips chips={didYouMean} onPick={onAsk} />}
+      {(turn.answer?.kind === 'no-answer' || nearMiss.length > 0) && didYouMean.length > 0 && <DidYouMeanChips chips={didYouMean} onPick={onAsk} />}
       {turn.error && (
         <div role="alert" className="rounded-2xl bg-bad-bg text-bad-ink p-4 text-body grid gap-2">
           <span>{turn.error}</span>

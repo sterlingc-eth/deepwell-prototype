@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-28T06:08:50.396Z",
-  "count": 621,
+  "generatedAt": "2026-09-28T14:37:39.390Z",
+  "count": 650,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -647,6 +647,28 @@
       "id": "live-misses-2026-09-22b-0005-canonical",
       "category": "live-misses-2026-09-22b",
       "text": "Is the Chavez unit under warranty",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "live-misses-2026-09-22b-0008-canonical",
+      "category": "live-misses-2026-09-22b",
+      "text": "how old is the Bracken unit",
+      "claimants": [
+        "fastPath",
+        "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "live-misses-2026-09-22b-0008-typo",
+      "category": "live-misses-2026-09-22b",
+      "text": "how old is the brackne unit",
       "claimants": [
         "fastPath",
         "contactLookup"
@@ -4965,6 +4987,7 @@
       "text": "is there a permit on file for the Cactus Rose Restaurant job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -4976,6 +4999,7 @@
       "text": "is there a permit on file for the Canyon View Dental job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -4987,6 +5011,7 @@
       "text": "is there a permit on file for the Copper Sky Dental job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -4998,6 +5023,7 @@
       "text": "is there a permit on file for the Grace Community Church job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5009,6 +5035,7 @@
       "text": "is there a permit on file for the Holy Trinity Church job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5021,10 +5048,11 @@
       "claimants": [
         "decompose",
         "fastPath",
+        "docLookup",
         "analytics"
       ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "i040",
@@ -5033,10 +5061,11 @@
       "claimants": [
         "decompose",
         "fastPath",
+        "docLookup",
         "analytics"
       ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
       "id": "i041",
@@ -5044,6 +5073,7 @@
       "text": "is there a permit on file for the Amy Jarvis job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5055,6 +5085,7 @@
       "text": "is there a permit on file for the Ashley Vance job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5066,6 +5097,7 @@
       "text": "is there a permit on file for the Anthony Alvarez job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5077,6 +5109,7 @@
       "text": "is there a permit on file for the Linda Fitzgerald job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5088,6 +5121,7 @@
       "text": "is there a permit on file for the Kenneth Fenwick job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5099,6 +5133,7 @@
       "text": "is there a permit on file for the Michael Redwine job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5110,6 +5145,7 @@
       "text": "is there a permit on file for the Nancy Zamora job",
       "claimants": [
         "fastPath",
+        "docLookup",
         "analytics"
       ],
       "winner": "fastPath",
@@ -5897,6 +5933,171 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
+      "id": "j091",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Michelle Tovar's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j092",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Steven Hutchins's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j093",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Ronald Bracken's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j094",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Rebecca Norwood's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j095",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Nancy Zamora's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j096",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Matthew Whitfield's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j097",
+      "category": "field-phrasing-4",
+      "text": "what's the total on James Underhill's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j098",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Donna Vance's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j099",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Kathleen Keller's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j100",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Karen Abernathy's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j101",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Michael Sandoval's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j102",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Patricia Fenwick's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j103",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Amanda Quinley's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j104",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Betty Zimmerman's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j105",
+      "category": "field-phrasing-4",
+      "text": "what's the total on Donna Sorensen's invoice",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
       "id": "j125",
       "category": "field-phrasing-4",
       "text": "how much do we have sitting out there in unpaid invoices right now",
@@ -5947,6 +6148,28 @@
       "claimants": [
         "fastPath",
         "contactLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j186",
+      "category": "field-phrasing-4",
+      "text": "is Betty Winslow's unit an Amana",
+      "claimants": [
+        "fastPath",
+        "analytics"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j198",
+      "category": "field-phrasing-4",
+      "text": "is Betty Winslow's unit a Trane or an Amana",
+      "claimants": [
+        "fastPath",
+        "analytics"
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
@@ -6164,6 +6387,116 @@
       "id": "k055",
       "category": "field-phrasing-5",
       "text": "do we have a permit on file for Betty Zimmerman",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k056",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Linda Fitzgerald",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k057",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Donna Sorensen",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k058",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Ronald Bracken",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k059",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Amy Isaacson",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k060",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for David Prentiss",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k061",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Sandra Wyckoff",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k062",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Laura Lombardi",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k063",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Robert Salazar",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k064",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Steven Ellison",
+      "claimants": [
+        "fastPath",
+        "docLookup"
+      ],
+      "winner": "fastPath",
+      "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "k065",
+      "category": "field-phrasing-5",
+      "text": "is there a permit on file for Barbara Delgado",
       "claimants": [
         "fastPath",
         "docLookup"

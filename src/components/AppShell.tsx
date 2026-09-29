@@ -91,7 +91,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
       </a>
 
       <header className="sticky top-0 z-40 bg-forest-700 text-stone-0 border-b border-forest-800">
-        <div className="max-w-content mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center gap-4">
+        <div className="max-w-content mx-auto px-3 lg:px-6 h-14 sm:h-16 flex items-center gap-0.5 lg:gap-4">
           <button
             type="button"
             onClick={() => setCurrentScreen('ask')}
@@ -125,7 +125,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
                     onClick={() => setCurrentScreen(screen)}
                     aria-current={active ? 'page' : undefined}
                     className={[
-                      'inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 sm:px-3 rounded-md text-body-lg font-medium transition-colors duration-quick whitespace-nowrap focus-visible:outline-brass-300',
+                      'inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 lg:px-3 rounded-md text-body-lg font-medium transition-colors duration-quick whitespace-nowrap focus-visible:outline-brass-300',
                       active
                         ? 'text-stone-0 shadow-[inset_0_-2px_0_0_#C99C5C]'
                         : 'text-forest-100 hover:text-stone-0 hover:bg-forest-800',
@@ -140,8 +140,8 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
                     ) : (
                       <Icon className="w-[18px] h-[18px]" />
                     )}
-                    <span className="hidden sm:inline">{label}</span>
-                    <span className="sr-only sm:hidden">{label}</span>
+                    <span className="hidden lg:inline">{label}</span>
+                    <span className="sr-only lg:hidden">{label}</span>
                     {screen === 'ingest' && inboxBadge > 0 && (
                       <span
                         className={[
@@ -175,6 +175,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               above it is hidden (gated), same as it would sit after NAV
               otherwise. */}
           <button
+            aria-label="Billing"
             type="button"
             onClick={() => setCurrentScreen('billing')}
             aria-current={currentScreen === 'billing' ? 'page' : undefined}
@@ -184,7 +185,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             ].join(' ')}
           >
             <CreditCard className="w-5 h-5" aria-hidden="true" />
-            <span className="hidden md:inline text-body">Billing</span>
+            <span className="hidden lg:inline text-body">Billing</span>
           </button>
 
           {/* Team (invite/manage members) — admin-only in the UI. A member
@@ -193,13 +194,14 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               here, same reasoning as Billing living outside the primary nav. */}
           {isAdmin && (
             <button
+              aria-label="Team"
               type="button"
               onClick={() => setCurrentScreen('team')}
               aria-current={currentScreen === 'team' ? 'page' : undefined}
               className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
             >
               <Users className="w-5 h-5" aria-hidden="true" />
-              <span className="hidden md:inline text-body">Team</span>
+              <span className="hidden lg:inline text-body">Team</span>
             </button>
           )}
 
@@ -211,12 +213,13 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               see DonovanScreen.tsx's file comment for why. */}
           {isAdmin && !billingGateActive && (
             <button
+              aria-label="Donovan"
               type="button"
               onClick={() => setDonovanOpen(true)}
               className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
             >
               <Sparkles className="w-5 h-5" aria-hidden="true" />
-              <span className="hidden md:inline text-body">Donovan</span>
+              <span className="hidden lg:inline text-body">Donovan</span>
             </button>
           )}
 
@@ -230,7 +233,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
             {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
-            <span className="hidden md:inline text-body">{fieldMode ? 'Field view' : 'Office view'}</span>
+            <span className="hidden lg:inline text-body">{fieldMode ? 'Field view' : 'Office view'}</span>
           </button>
 
           {/* A tech who works two shops switches their active org here — the
@@ -258,13 +261,13 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
             <LogOut className="w-5 h-5" aria-hidden="true" />
-            <span className="hidden md:inline text-body">Sign out</span>
+            <span className="hidden lg:inline text-body">Sign out</span>
           </button>
         </div>
       </header>
 
       {activeLabel && (
-        <div className="sm:hidden bg-surface-2 border-b border-line px-4 py-1.5 text-caption text-ink-2 font-medium">
+        <div className="lg:hidden bg-surface-2 border-b border-line px-4 py-1.5 text-caption text-ink-2 font-medium">
           {activeLabel}
         </div>
       )}

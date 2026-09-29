@@ -2776,6 +2776,16 @@ export function reconcileTimeRange(rawTimeRange, question, today) {
 const SERVICE_VISITS_OVERRIDE_RE =
   /\b(?:had|got|were|received)\s+service(?:d|s)?\b|\b(?:did|do)\s+we\s+service\b|\bwe\s+service(?:d)?\b|\bservice\s+calls?\b/i;
 
+// R23 (D2, k186): "which manufacturers do we service, across every unit on the books" — the SAME
+// "do we service" = "cover"/"work on" ambiguity GEO_WORD_RE's own doc comment just below already
+// documents for a place name ("do we service Nevada"), just for the DIMENSION itself (which
+// manufacturers/technicians do we service/cover) rather than a location. Scoped to the bare
+// dimension noun only ("manufacturer(s)"/"brand(s)"/"technician(s)"/"tech(s)") — a SPECIFIC brand
+// NAME (BRAND_RE's own Trane/Carrier/... vocabulary) still means a real, time-scoped service visit
+// ("which Trane units did we service this month", SERVICE_VISITS_LIVE_MISSES' own pinned shape) and
+// is deliberately left alone.
+const COVERAGE_DIMENSION_WORD_RE = /\b(?:manufacturers?|brands?|technicians?|techs?)\b/i;
+
 /** True for any question this session's live-miss cluster named — exported
  *  so scripts/verify-analytics.mjs can pin the exact shapes down directly.
  *
@@ -2794,6 +2804,7 @@ export function isServiceVisitsQuestion(question) {
   const q = String(question ?? '');
   if (!SERVICE_VISITS_OVERRIDE_RE.test(q)) return false;
   if (GEO_WORD_RE.test(q) || ZIP_VALUE_RE.test(q) || ZIP_CODE_WORD_RE.test(q)) return false;
+  if (COVERAGE_DIMENSION_WORD_RE.test(q)) return false;
   return true;
 }
 
@@ -3115,10 +3126,41 @@ export function validatePlan(raw) {
   // sets this, and only alongside a real installDateAsc/Desc sortBy.
   const ageInYears = p.ageInYears === true && INSTALL_DATE_SORT_FIELDS.includes(sortBy) ? true : undefined;
 
+  // R23 (D2, k186/k187): "which manufacturers do we service" / "list every technician ... in the
+  // system" — the DIMENSION's own distinct VALUES, printed as a plain list (never the per-group
+  // counts a bare groupBy answers with, and never just the single number countDistinct answers
+  // with) — see formatAnalyticsAnswer's own use of this flag. Same code-side-only convention as
+  // countDistinct/superlative above (ANALYTICS_TOOL's schema has no such property) — only
+  // detPlan.js's detectDistinctDimensionList sets this.
+  const distinctList = p.distinctList === true && p.op === 'groupBy' ? true : undefined;
+
+  // R23 (D2, k139): "has Denise Ford done more jobs than Ray Sutton" — a technician HEAD-TO-HEAD
+  // yes/no comparison, resolved via the SAME plain per-technician 'count' plan/execution path a
+  // single named technician already uses (routes/analytics.js's own dateless-technician-row
+  // correction only ever applies when the plan is NOT a groupBy and DOES carry a `technician`
+  // filter — exactly this shape — so both sides count the same way the individually-passing
+  // per-technician totals do, never the groupBy/superlative join that h115/k141 document as
+  // undercounting some technicians). Same code-side-only convention as the flags above — only
+  // detPlan.js's detectTechnicianHeadToHead sets this, and only alongside a real 'in' filter naming
+  // exactly those two technicians.
+  let headToHead;
+  if (p.headToHead && typeof p.headToHead === 'object' && p.op === 'count' && p.entity === 'serviceVisits') {
+    const left = String(p.headToHead.left ?? '').trim();
+    const right = String(p.headToHead.right ?? '').trim();
+    if (left && right) {
+      headToHead = {
+        left, right,
+        leftLabel: String(p.headToHead.leftLabel ?? left),
+        rightLabel: String(p.headToHead.rightLabel ?? right),
+      };
+    }
+  }
+
   return {
     entity: p.entity, op: p.op, groupBy, filters, timeRange, limit, sortBy,
     ...(dateBasis ? { dateBasis } : {}), ...(countDistinct ? { countDistinct } : {}),
     ...(superlative ? { superlative } : {}), ...(ageInYears ? { ageInYears } : {}),
+    ...(distinctList ? { distinctList } : {}), ...(headToHead ? { headToHead } : {}),
   };
 }
 
@@ -3378,12 +3420,18 @@ function pushColumnFilter(where, params, column, filter) {
  * one carve-out — narrow and closed-vocabulary on purpose, same discipline as every other detector
  * in this file: a miss here just means "assume customer-scoped" (the safe default), never a guess
  * that widens what a customer answer can see.
+ *
+ * R23 (D2): this used to be a second, OLDER copy of the same regex (`for\s+(?:the\s+)?(?:team|
+ * techs?|...)` — "the" optional) that R23 D1 already fixed once in fastPath.js's own copy (requiring
+ * a literal "the" so a business's own name — "Crew Electric", "Dispatch Solutions Inc" — is never
+ * mistaken for a team/dispatch reference; see that file's own doc comment) without ever coming back
+ * to unify this file's copy with it, so the two had quietly drifted apart. Re-exporting fastPath.js's
+ * own function here (never a second, hand-duplicated regex) means a future narrowing/widening of
+ * this vocabulary only ever needs to happen once. Verified behavior-safe against every existing
+ * pinned case in this file's own test suite (scripts/verify-analytics.mjs) before making this swap —
+ * see that file's own isTeamScopedQuestion checks, all still passing unchanged.
  */
-const TEAM_SCOPED_RE =
-  /\b(?:internal|team-only|tech-only)\b|\bfor\s+(?:the\s+)?(?:team|techs?|technicians?|dispatch)\b|\b(?:team|dispatch)\s+(?:notes?|memos?)\b/i;
-export function isTeamScopedQuestion(question) {
-  return TEAM_SCOPED_RE.test(String(question ?? ''));
-}
+export { isTeamScopedQuestion } from './fastPath.js';
 
 /** @returns {{sql: string, params: any[]}}
  *  @param opts.audienceClause  a WHERE-safe SQL fragment (audienceFilterSql, api/_lib/audience/sql.js)
@@ -3727,6 +3775,40 @@ function formatAnalyticsAnswerBase(plan, opts) {
   } = opts ?? {};
   const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
 
+  // R23 (D2, k139): technician head-to-head yes/no — `rows` is already scoped (by plan.filters'
+  // `technician in [left, right]`) to just these two people's own visits (dateless-row correction
+  // included, same as any other single-named-technician count — see validatePlan's own doc comment
+  // on why this is never the groupBy/superlative path); split it back apart here by each row's own
+  // `technician` value to get each side's real count, so a genuine TIE is reported as "No" (neither
+  // one has done MORE than the other) rather than falling back to a bare, always-truthy single count.
+  if (plan.op === 'count' && plan.headToHead) {
+    const { left, right, leftLabel, rightLabel } = plan.headToHead;
+    const leftLower = left.toLowerCase();
+    const rightLower = right.toLowerCase();
+    const leftCount = rows.filter((r) => String(r.technician ?? '').toLowerCase() === leftLower).length;
+    const rightCount = rows.filter((r) => String(r.technician ?? '').toLowerCase() === rightLower).length;
+    // R24 review: a side with no jobs on file may simply not be a technician here (a misspelling, a
+    // non-name) — never state "X has 0 jobs" as a comparison; say what's missing instead.
+    if (leftCount === 0 || rightCount === 0) {
+      const missing = [leftCount === 0 ? left : null, rightCount === 0 ? right : null].filter(Boolean).join(' or ');
+      return {
+        kind: 'answer',
+        text: `I don't have any jobs on file for ${missing}, so I can't compare them.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      };
+    }
+    const yes = leftCount > rightCount;
+    const text = `${yes ? 'Yes' : 'No'}, ${left} has ${leftCount} job${leftCount === 1 ? '' : 's'} on file and ${right} has ${rightCount} job${rightCount === 1 ? '' : 's'} on file.`;
+    return {
+      kind: 'answer', text,
+      facts: [
+        { label: leftLabel, value: String(leftCount), sources: [] },
+        { label: rightLabel, value: String(rightCount), sources: [] },
+      ],
+      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
+
   // "who's our biggest customer" (round 4, item 1) — a ranked list, not a
   // filtered/counted one; its own wording so the answer reads as a ranking
   // ("Your top 3 customers by equipment count:") rather than a bare count.
@@ -3837,6 +3919,25 @@ function formatAnalyticsAnswerBase(plan, opts) {
     return {
       kind: 'answer', text: `You have ${distinctCount} different ${label}${distinctCount === 1 ? '' : 's'}.`,
       facts: [{ label: `Distinct ${label}s`, value: String(distinctCount), sources: [] }],
+      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+  }
+
+  if (plan.op === 'groupBy' && plan.distinctList) {
+    // R23 (D2, k186/k187): "which manufacturers do we service" / "list every technician ... in the
+    // system" — the plain distinct VALUES themselves (never a per-group count breakdown, and never
+    // just the single distinct-count number countDistinct answers with just above). The "Unknown"
+    // bucket (an unassigned/blank value) is never a real, nameable value on file, so it's dropped
+    // here exactly like formatGroupBySuperlativeAnswer (routes/analytics.js) already excludes it
+    // from ever being picked as an extreme group.
+    const named = groups.filter((g) => g.key !== UNKNOWN_BUCKET);
+    const label = GROUP_LABEL[plan.groupBy] ?? plan.groupBy;
+    const text = named.length
+      ? `You have ${named.length} ${label}${named.length === 1 ? '' : 's'} on file: ${named.map((g) => g.key).join(', ')}.`
+      : `No ${label}s on file.`;
+    return {
+      kind: 'answer', text,
+      facts: named.map((g) => ({ label, value: g.key, sources: [] })),
       sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     };
   }

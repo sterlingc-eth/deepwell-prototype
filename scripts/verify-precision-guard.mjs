@@ -380,7 +380,9 @@ const KNOWN_WRONG_IDS = new Set([
   // KNOWN_WRONG_IDS comment next to these same 5 ids for the full writeup (a tied technician
   // comparison, a "fewest jobs" ranking that counts a different thing than the plain per-tech total,
   // and no generic "distinct value" metric for an arbitrary field).
-  "k139", "k141", "k143", "k186", "k187",
+  // R24: k139 (tie-safe technician head-to-head), k143 (distinct count), k186/k187 (distinct list)
+  // fixed in analytics.js/detPlan.js — removed. k141 stays (same two-oracle conflict as h115).
+  "k141",
 ]);
 const wrongIds = perQuestion.filter((q) => q.status === "wrong").map((q) => q.id);
 const newWrong = wrongIds.filter((id) => !KNOWN_WRONG_IDS.has(id));

@@ -26,7 +26,7 @@ export function Tooltip({ label, children, className }: TooltipProps) {
       <span
         tabIndex={0}
         aria-describedby={open ? id : undefined}
-        className="inline-flex outline-none rounded-sm"
+        className="inline-flex outline-none rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass-300"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}

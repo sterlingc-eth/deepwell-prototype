@@ -1571,6 +1571,8 @@ function nearMissNames(rows) {
  * back to the caller. Deliberately builds its own citation-free records (name only, no address/
  * phone/serial) rather than reusing citeCandidates/customerRecord, which would attach the real
  * match's own address as a `sublabel` — exactly the PII leak this function exists to prevent.
+ * The text's exact shape is parsed client-side into one-tap corrected re-asks (src/core/suggestions.ts
+ * nearMissRetryChips; guarded by scripts/verify-near-miss-chips.mjs) — change both together.
  */
 export function buildNearMissDeclineAnswer(namePhrase, rows) {
   const names = nearMissNames(rows);

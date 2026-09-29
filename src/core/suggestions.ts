@@ -293,6 +293,29 @@ export function useSamplePrompts(role: AskRole, enabled = true, tenantKey: strin
 
 /** "Did you mean…" chips for the question that just failed. Pass `null` to clear (a fresh question, or
  *  one that DID get an answer). */
+/**
+ * R24 (P0 typo tolerance, the no-risk half): when a customer name matched nobody exactly but ONE-to-
+ * three similarly-spelled customers exist, the server honestly declines with
+ *   I don't have a customer named "sanrda wyckoff". Did you mean Sandra Wyckoff?
+ * (api/_lib/contactLookup.js buildNearMissDeclineAnswer — keep the two in sync). Auto-answering for
+ * the closest name was measured to break the exam's adversarial "near-miss name" honest-zero questions
+ * (a typo and a different person are indistinguishable by spelling alone), so instead this turns each
+ * suggested name into a one-tap re-ask of the SAME question with the name corrected: the tech confirms
+ * with one tap, and Donovan never guesses who they meant. Pure: no network, no model.
+ */
+const NEAR_MISS_RE = /^I don't have a customer named "([^"]+)"\.\s*Did you mean (.+)\?\s*$/;
+
+export function nearMissRetryChips(question: string | null | undefined, answerText: string | null | undefined): DidYouMeanChip[] {
+  if (!question || !answerText) return [];
+  const m = NEAR_MISS_RE.exec(answerText.trim());
+  if (!m) return [];
+  const typed = m[1]!;
+  const at = question.toLowerCase().indexOf(typed.toLowerCase());
+  if (at === -1) return [];
+  const names = m[2]!.split(/,\s*/).map((n) => n.trim()).filter(Boolean).slice(0, 3);
+  return names.map((name) => ({ text: `${question.slice(0, at)}${name}${question.slice(at + typed.length)}` }));
+}
+
 export function useDidYouMean(question: string | null): DidYouMeanChip[] {
   const [chips, setChips] = useState<DidYouMeanChip[]>([]);
   useEffect(() => {

@@ -26,6 +26,11 @@ import { financialsTableExists } from './financials/store.js';
 import { documentsHaveAudience } from './audience/probe.js';
 import { audienceFilterSql } from './audience/sql.js';
 import { parseCompoundQuestion } from './lookups/compound.js';
+// R24 (E3): brandMatches is the same case/synonym-aware brand comparison deterministicRouter.js's
+// own narrowByBrand already uses — reused, not reimplemented, for runBrandMatch below. No import
+// cycle: analytics.js imports scope.js (not this file), and scope.js's own fastPath.js import is
+// the cycle fastPath.js's header warns about avoiding FROM fastPath.js, not from here.
+import { brandMatches } from './analytics.js';
 import {
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
@@ -58,6 +63,11 @@ import {
   wantsEveryUnit,
   isTeamScopedQuestion,
   MULTI_FIELD_LABELS,
+  ageYearsBetween,
+  buildEquipmentAgeAnswer,
+  buildPoTotalAnswer,
+  buildBrandMismatchAnswer,
+  buildBrandMatchYesAnswer,
 } from './fastPath.js';
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -417,6 +427,141 @@ async function fetchInvoiceTotal(db, resolution, teamScoped = false) {
   const rows = [...finRows.filter((r) => r.value != null && String(r.value).trim() !== ''), ...extractionRows];
   const invoiceRows = rows.filter((r) => r.document_type === 'invoice');
   return pickMostRecent(invoiceRows.length ? invoiceRows : rows);
+}
+
+/**
+ * R24 (E3, field-phrasing-4 j114-j121 "what's the annual cost on X's maintenance agreement"): same
+ * shape/plumbing as fetchInvoiceTotal just above (a resolved customer/equipment's own document set,
+ * the same document_financials-corrections-first read), scoped to the maintenance-agreement
+ * document type instead of invoice. Deliberately NO "fall back to any document type" the way
+ * fetchInvoiceTotal's own last line does for invoices — an invoice total answering an "annual cost"
+ * question because it happened to be the only cost on file would be a confidently WRONG dollar
+ * figure, not a defensible substitute; returning null (defer to the model) is the safe failure here.
+ */
+async function fetchAgreementCost(db, resolution, teamScoped = false) {
+  const documentIds = await documentIdsForResolution(db, resolution);
+  if (!documentIds.length) return null;
+
+  const finRows = (await financialsTableExists(db)) ? await fetchEffectiveFinancialTotals(db, documentIds) : [];
+  const finCoveredIds = new Set(finRows.map((r) => r.document_id));
+  const remainingIds = documentIds.filter((id) => !finCoveredIds.has(id));
+  const extractionRows = remainingIds.length ? await fetchFieldRowsByDocumentIds(db, remainingIds, 'cost', teamScoped) : [];
+
+  const rows = [...finRows.filter((r) => r.value != null && String(r.value).trim() !== ''), ...extractionRows];
+  const agreementRows = rows.filter((r) => r.document_type === 'maintenance-agreement');
+  return agreementRows.length ? pickMostRecent(agreementRows) : null;
+}
+
+/**
+ * R24 (E3, field-phrasing-4 j106-j113 "what's the total on purchase order PO-9026, the one for
+ * Rebecca Montoya"): unlike every other money intent in this file, a PO is identified by its OWN
+ * number, not by resolving a customer/equipment subject first — resolveFastPathSubject is never
+ * called for this intent at all (see runFastPath's own dispatch). Reads document_financials
+ * directly (the same corrections-first `total` read fetchEffectiveFinancialTotals uses, reimplemented
+ * here rather than shared since this query is keyed by po_number, not a document-id list) scoped to
+ * `doc_kind = 'po'`. The customer name in the question ("...the one for Rebecca Montoya") is used
+ * only to confirm/disambiguate when the bare PO number match isn't already unique — never required,
+ * and never enough on its own to pick a document the PO number itself didn't already narrow to one.
+ */
+async function fetchPoTotal(db, poNumber, customerNamePhrase) {
+  if (!poNumber || !(await financialsTableExists(db))) return null;
+  const { rows } = await db.raw(
+    `SELECT f.document_id, f.customer_name, f.confidence, d.stage,
+            (CASE WHEN f.corrections ? 'total' THEN NULLIF(f.corrections->>'total', '') ELSE f.total::text END) AS value,
+            COALESCE(
+              (CASE WHEN f.corrections ? 'invoice_date' THEN NULLIF(f.corrections->>'invoice_date', '') ELSE f.invoice_date::text END),
+              d.created_at::date::text
+            ) AS date
+       FROM document_financials f JOIN documents d ON d.id = f.document_id
+      WHERE f.doc_kind = 'po' AND f.po_number ILIKE $1 AND f.${TENANT_SQL}
+      LIMIT 5`,
+    [poNumber]
+  );
+  const withValue = rows.filter((r) => r.value != null && String(r.value).trim() !== '');
+  if (!withValue.length) return null;
+  let candidates = withValue;
+  if (customerNamePhrase) {
+    const needle = normalizeMatchText(customerNamePhrase);
+    const named = withValue.filter((r) => normalizeMatchText(r.customer_name).includes(needle));
+    if (named.length) candidates = named;
+  }
+  // More than one PO shares this exact number in this tenant (should not happen in practice — PO
+  // numbers are meant to be unique — but never guess which one the caller meant) or the customer
+  // name given doesn't confirm any of them: decline rather than pick arbitrarily.
+  if (candidates.length !== 1) return null;
+  return pickMostRecent(candidates);
+}
+
+/**
+ * R24 (E3, field-phrasing-4 j126-j135/j150 "how old is the unit at <address>"/"how old is X's
+ * unit"): the one already-resolved unit an age can be computed for, or null when the resolution
+ * doesn't narrow to exactly one (a 'customer' resolution with zero or more than one piece of
+ * equipment on file — never guess which unit the caller meant, same as every other multi-unit
+ * ambiguity in this file).
+ */
+async function fetchEquipmentAgeUnit(db, resolution) {
+  if (resolution.kind === 'equipment') {
+    const d = resolution.equipment?.data ?? {};
+    return { id: resolution.equipment.id, customer_id: resolution.equipment.customer_id ?? null, installation_date: d.installation_date ?? null };
+  }
+  if (resolution.kind === 'customer') {
+    const units = await fetchCustomerUnits(db, resolution.customer.id);
+    return units.length === 1 ? units[0] : null;
+  }
+  return null;
+}
+
+async function runEquipmentAge(db, resolution, today, teamScoped = false) {
+  const unit = await fetchEquipmentAgeUnit(db, resolution);
+  if (!unit) return null;
+  const installIso = isoDate(unit.installation_date);
+  if (!installIso) return null; // no (clean) install date on file — defer rather than guess
+
+  const t = isoDate(today) ?? new Date().toISOString().slice(0, 10);
+  const years = ageYearsBetween(installIso, t);
+  if (years == null || years < 0) return null;
+
+  const equipmentResolution = { kind: 'equipment', equipment: { id: unit.id, customer_id: unit.customer_id ?? null, data: unit } };
+  const rows = await fetchFieldRowsForResolution(db, equipmentResolution, 'installation_date', teamScoped);
+  const row = pickBestExtraction(rows);
+  const label = subjectLabel(equipmentResolution);
+  return buildEquipmentAgeAnswer({ label, years, installIso, row });
+}
+
+/**
+ * R24 (E3, field-phrasing-4/-5 j186-j190/k176-k180 "is Betty Winslow's unit an Amana"/"does William
+ * Quintana have a Ruud unit"): checks EVERY unit on file for the resolved customer (or the single
+ * resolved unit) against the one brand `askedBrand` names — a "yes" needs only ONE matching unit,
+ * same as the oracle's own EXISTS-shaped SQL; a customer with several units and none matching is
+ * still a clean "no", never an "ambiguous, which unit did you mean" (there is nothing to
+ * disambiguate — the answer is the same regardless of which unit is "the" one). Returns null (defer)
+ * only when there is literally no manufacturer on file at all for this customer's equipment — never
+ * enough to say yes OR no.
+ */
+async function runBrandMatch(db, resolution, askedBrand) {
+  if (!askedBrand) return null;
+  let manufacturers = [];
+  if (resolution.kind === 'equipment') {
+    const m = resolution.equipment?.data?.manufacturer;
+    if (m) manufacturers = [m];
+  } else if (resolution.kind === 'customer') {
+    const units = await fetchCustomerUnits(db, resolution.customer.id);
+    manufacturers = units.map((u) => u.manufacturer).filter(Boolean);
+  }
+  if (!manufacturers.length) return null;
+
+  const label = subjectLabel(resolution);
+  const match = manufacturers.find((m) => brandMatches(m, askedBrand));
+  if (match) {
+    const equipmentResolution = resolution.kind === 'equipment' ? resolution : null;
+    const rows = equipmentResolution ? await fetchFieldRowsForResolution(db, equipmentResolution, 'manufacturer', false) : [];
+    const row = pickBestExtraction(rows);
+    return buildBrandMatchYesAnswer({ label, manufacturer: match, row });
+  }
+  // R24 review: a multi-unit customer with several brands (none matching) — list them all rather than
+  // letting one arbitrary unit's brand read as "the" unit's brand.
+  const distinctBrands = [...new Map(manufacturers.map((m) => [String(m).trim().toLowerCase(), String(m).trim()])).values()];
+  return buildBrandMismatchAnswer({ label, askedBrand, actualManufacturer: distinctBrands.join(', ') });
 }
 
 async function runWarranty(db, resolution, intent, today, labelOverride, teamScoped = false) {
@@ -1064,6 +1209,17 @@ export async function runFastPath(db, fp, { today } = {}) {
   if (REVERSE_LOOKUP_INTENTS.has(intent)) return runReverseLookup(db, intent, subject.reverseValue); // R19 (I1, C1)
   if (NO_FIELD_INTENTS.has(intent)) return null; // no extraction field exists — always defer (seer, filter_size)
 
+  // R24 (E3, field-phrasing-4 j106-j113): a purchase order is identified by its OWN number, never
+  // by resolving a customer/equipment subject first — see fetchPoTotal's own doc comment. Handled
+  // here, before resolveFastPathSubject is even called, since that whole customer/equipment
+  // resolution machinery is simply the wrong question for this intent.
+  if (intent === 'po_total') {
+    if (!subject.poNumber) return null; // no PO number in the question at all — never guess which one
+    const row = await fetchPoTotal(db, subject.poNumber, subject.name);
+    if (!row) return null;
+    return buildPoTotalAnswer({ poNumber: subject.poNumber, row });
+  }
+
   // R21 (M1, L4 rubric g149/g151/g153/g155/h167): a "warranty status AND tech" / "installer AND
   // install date" / "warranty status AND last visit date" compound question is answered more
   // honestly (BOTH halves stated, every ambiguous name listed, installer never confused with a
@@ -1132,6 +1288,13 @@ export async function runFastPath(db, fp, { today } = {}) {
 
   if (WARRANTY_INTENTS.has(intent)) return runWarranty(db, resolution, intent, today, undefined, teamScoped);
 
+  // R24 (E3): a computed fact (today minus installation_date), never a plain extraction row — its
+  // own answer shape, built and returned directly rather than through buildFieldAnswer below.
+  if (intent === 'equipment_age') return runEquipmentAge(db, resolution, today, teamScoped);
+  // R24 (E3): a yes/no check across every unit's manufacturer, never a single bare fact — its own
+  // answer shape (Yes/No), built and returned directly rather than through buildFieldAnswer below.
+  if (intent === 'brand_match') return runBrandMatch(db, resolution, subject.askedBrand);
+
   const fieldKey = FIELD_BY_INTENT[intent];
   if (!fieldKey) return null;
 
@@ -1140,6 +1303,7 @@ export async function runFastPath(db, fp, { today } = {}) {
   else if (intent === 'last_service_tech') row = await fetchLastServiceTech(db, resolution, teamScoped);
   else if (intent === 'last_service_date') row = await fetchLastServiceDate(db, resolution, today, teamScoped);
   else if (intent === 'invoice_total') row = await fetchInvoiceTotal(db, resolution, teamScoped);
+  else if (intent === 'agreement_cost') row = await fetchAgreementCost(db, resolution, teamScoped); // R24 (E3)
   else row = pickBestExtraction(await fetchFieldRowsForResolution(db, resolution, fieldKey, teamScoped));
 
   if (!row) return null;

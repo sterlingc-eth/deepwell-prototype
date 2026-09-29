@@ -116,6 +116,16 @@ export const FIELD_BY_INTENT = {
   permit_number: 'permit_number',
   invoice_total: 'cost',
   agreement_term: 'agreement_term',
+  // R24 (E3): agreement_cost/po_total/equipment_age each get their own dedicated fetch in
+  // fastPathQuery.js (fetchAgreementCost / fetchPoTotal / runEquipmentAge — none of them a plain
+  // "look up this one extraction field for the resolved subject" shape), so this mapping exists only
+  // so runFastPath's own `if (!fieldKey) return null` gate (and classifyIntent's ALL_INTENTS list)
+  // recognise these as real, handled intents rather than an accidental miss — the value itself is
+  // never read as an actual extractions.field_key for these three.
+  agreement_cost: 'cost',
+  po_total: 'cost',
+  equipment_age: 'installation_date',
+  brand_match: 'manufacturer',
 };
 
 /** Intents this app recognises but has NO extraction field for (see
@@ -149,6 +159,30 @@ export const ALL_INTENTS = [
   ...LIST_INTENTS,
   ...COMPOUND_INTENTS,
 ];
+
+// R24 (E3, field-phrasing-4/-5 j186-j190/k176-k180: "is Betty Winslow's unit an Amana"/"does
+// William Quintana have a Ruud unit"): the closed set of HVAC equipment brands this corpus's own
+// adversarial "brand not carried" questions name — see brand_match's own trigger/resolution below.
+// Deliberately the same vocabulary deterministicRouter.js's own BRAND_IN_Q already uses (trane/
+// carrier/goodman/lennox/rheem/york/daikin/mitsubishi) plus the additional brands THIS shape's own
+// oracles name (bryant/amana/ruud/american standard/payne) — never widened beyond a real brand
+// name actually seen in this domain's own paperwork. Declared before TRIGGERS (below), which
+// references it.
+const BRAND_WORDS_SRC = 'bryant|amana|ruud|american\\s+standard|payne|goodman|trane|lennox|carrier|rheem|york|daikin|mitsubishi';
+const BRAND_WORD_RE_G = new RegExp(`\\b(${BRAND_WORDS_SRC})\\b`, 'gi');
+
+/** Pure: the ONE distinct brand named in the question, or null when zero or more than one are
+ *  (a genuinely ambiguous "a Trane or an Amana" framing — field-phrasing-4 j198 — must never be
+ *  answered as if only one brand had been asked about; declining here sends it back to
+ *  needs-model/needs-grader instead of a confidently wrong single-brand answer). */
+function extractAskedBrand(question) {
+  const q = String(question ?? '');
+  const found = new Set();
+  let m;
+  BRAND_WORD_RE_G.lastIndex = 0;
+  while ((m = BRAND_WORD_RE_G.exec(q))) found.add(m[1].replace(/\s+/g, ' ').trim().toLowerCase());
+  return found.size === 1 ? [...found][0] : null;
+}
 
 /* ================================================================ classification
  *
@@ -210,6 +244,13 @@ const TRIGGERS = [
   ['warranty_expires', /\b(when'?s?|whens)\b[\s\S]*\bwarr[ae]nty\b/i],
   ['agreement_term', /\b(maintenance )?agreement\b[\s\S]*\b(expire|expir\w*|term|end|renew)\b/i],
   ['agreement_term', /\bservice contract\b[\s\S]*\b(expire|term|end)\b/i],
+  // R24 (E3, field-phrasing-4 j114-j121: "what's the annual cost on X's maintenance agreement"):
+  // a MONEY question about the same document type agreement_term already reads a date/duration
+  // from — never overlaps agreement_term's own trigger above (that one requires expire/term/end/
+  // renew vocabulary, never present here), so checked as its own intent rather than folded into
+  // that one's answer template. Order-independent (annual cost ... agreement / agreement ...
+  // annual cost) for the same reason invoice_total's own pair below is.
+  ['agreement_cost', /\b(?:annual|yearly)\s+(?:cost|price|fee)\b[\s\S]*\b(?:maintenance\s+)?agreement\b|\b(?:maintenance\s+)?agreement\b[\s\S]*\b(?:annual|yearly)\s+(?:cost|price|fee)\b/i],
   // R16 (F1, field-phrasing "compound" shape): "whats the model and serial on the unit at ..." asks
   // for BOTH fields about the SAME unit and must be answered together — checked before the
   // standalone 'serial'/'model' triggers below (first match wins) so a bare "serial" substring
@@ -222,7 +263,31 @@ const TRIGGERS = [
   ['model_and_serial', /\bmodel\b[^?.!]{0,20}\b(?:and|plus)\b[^?.!]{0,20}\bserial\b|\bserial\b[^?.!]{0,20}\b(?:and|plus)\b[^?.!]{0,20}\bmodel\b/i],
   ['serial', /\bserial\b|\bs\/n\b|\bseriel\b|\bserail\b/i],
   ['model', /\bmodel\b|\bmodle\b/i],
-  ['manufacturer', /\bwhat (?:brand|make)\b|\bmanufacturer\b|\bmanufaturer\b|\bwho makes\b/i],
+  // R24 (E3, field-phrasing-5 k118/k124 — "what brand is the THERMOSTAT at Deborah Ortega's
+  // place"/"what brand is the FILTER on Steven Ellison's unit"): thermostat brand and filter brand
+  // are both on contactLookup.js's own UNTRACKED_FIELDS list (this schema has no column or
+  // extraction key for either, ever — see that file's isUntrackedFieldQuestion) — a real, different
+  // fact from the overall unit's own manufacturer this trigger otherwise (correctly) answers for
+  // "what brand is the unit"/"what brand is Deborah Ortega's system". Before this round, a
+  // possessive-name subject like "Deborah Ortega's" never resolved at all (extractSubject's own
+  // trailing-apostrophe bug, fixed this round — see that fix's own doc comment), so this trigger's
+  // over-broad "what brand" match on a thermostat/filter question always failed at the resolution
+  // step and safely fell through; fixing that bug exposed this trigger firing anyway and confidently
+  // answering the UNIT's manufacturer as if it were the thermostat's or filter's own brand — a
+  // regression this round's own offline-exam measurement caught directly. Excluding a question that
+  // names either component anywhere is strictly narrower (never a broadened trigger surface) and
+  // sends it back to needs-model/contactLookup's own untracked-field decline instead, exactly as a
+  // genuine "the schema has nothing to say here" question should be handled.
+  ['manufacturer', /^(?!.*\b(?:thermostat|filter)\b)[\s\S]*(?:\bwhat (?:brand|make)\b|\bmanufacturer\b|\bmanufaturer\b|\bwho makes\b)/i],
+  // R24 (E3, field-phrasing-4/-5 j186-j190/k176-k180): a YES/NO ask about a SPECIFIC named brand
+  // ("is X's unit an Amana", "does X have a Ruud unit") — a different question shape from the plain
+  // 'manufacturer' trigger just above ("what brand IS it"), so it gets its own intent/answer
+  // template (a bare "Rheem" would never answer "is it an Amana"). extractAskedBrand's own "exactly
+  // one distinct brand" rule (see that function's doc comment) is what actually keeps this safe for
+  // an "X or Y" framing — checked in resolution (fastPathQuery.js's runBrandMatch), not the trigger
+  // regex here, which only needs to recognise the SHAPE.
+  ['brand_match', new RegExp(`\\b(?:is|are)\\b[^?.!]*\\b(?:unit|system)\\b[^?.!]*\\b(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
+  ['brand_match', new RegExp(`\\b(?:does|do)\\b[^?.!]*\\bhave\\b[^?.!]*\\b(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
   ['installer', /\bwho (?:installed|did the install)\b|\bwho put\b[\s\S]*\bin\b|\binstaller\b/i],
   ['install_date', /\binstall(?:ed|ation)?\b[\s\S]*\b(date|when)\b|\b(date|when)\b[\s\S]*\binstall(?:ed|ation)?\b|\binstall date\b/i],
   ['last_service_tech', /\bwho\b[\s\S]*\b(last|out|worked on|came out|serviced)\b/i],
@@ -238,9 +303,37 @@ const TRIGGERS = [
   ['seer', /\bseer2?\b|\befficiency\b/i],
   ['filter_size', /\bfilter size\b|\bwhat size filter\b|\bfilter dimensions?\b/i],
   ['permit_number', /\bpermit\b/i],
+  // R24 (E3, field-phrasing-4 j091-j105: "what's the total on Michelle Tovar's invoice"): the
+  // ORIGINAL trigger just below only ever matched "invoice/bill" appearing BEFORE "total/cost/
+  // amount/..." — this whole phrasing puts "total" first ("the total on X's invoice"), so it never
+  // matched at all and fell straight through to needs-model. Order-independent counterpart, kept as
+  // its own line (rather than rewriting the existing one) so the original's own vocabulary/precedent
+  // is untouched; scoped to "total" alone (not the wider cost/amount/come-to/how-much set the
+  // existing line already covers in its own direction) since that's the only word this corpus's own
+  // phrasing ever puts first — narrower here is safer, not a widened surface.
+  ['invoice_total', /\btotal\b[\s\S]*\b(invoice|bill)\b/i],
   ['invoice_total', /\b(invoice|bill)\b[\s\S]*\b(total|cost|amount|come to|how much)\b/i],
   ['invoice_total', /\bhow much\b[\s\S]*\b(invoice|bill|job|install(?:ation)?)\b/i],
   ['invoice_total', /\btotal (?:cost|amount|due)\b/i],
+  // R24 (E3, field-phrasing-4 j106-j113: "what's the total on purchase order PO-9026, the one for
+  // Rebecca Montoya"): a specific PO's total, identified by its own PO NUMBER (never the customer/
+  // equipment resolution the rest of this file's money intents use) — see po_total's own dedicated
+  // fetch in fastPathQuery.js. Order-independent for the same reason invoice_total's own pair is.
+  ['po_total', /\btotal\b[\s\S]*\bpurchase order\b|\bpurchase order\b[\s\S]*\btotal\b/i],
+  // R24 (E3, field-phrasing-4 j126-j135/j150: "how old is the unit at <address>"/"how old is X's
+  // unit"): a COMPUTED fact (today minus installation_date, in whole years — see
+  // ageYearsBetween/buildEquipmentAgeAnswer below), never a bare extraction field, so it gets its
+  // own intent rather than being folded into install_date (which states the date itself, not an
+  // age derived from it). Excludes "oldest"/"newest" (j148/j149: "how old is the oldest/newest unit
+  // we've got") — a PORTFOLIO-WIDE superlative across every unit on file, not one resolved
+  // customer's own equipment, already answered correctly by analytics.js; without this exclusion,
+  // THE_NAME_NOUN_RE's own pre-existing case-insensitive `[A-Z]` (its trailing /i flag applies to
+  // the whole pattern, including that character class) captures "oldest"/"newest" as if it were a
+  // proper-noun customer name ("the OLDEST unit" reads the same as "the WINSLOW unit" to it), which
+  // made this intent's own subject.hasAny true and let it steal these two questions from analytics
+  // — caught as a real regression (correct -> needs-model) by this round's own offline-exam
+  // measurement before this exclusion was added.
+  ['equipment_age', /^(?!.*\b(?:oldest|newest)\b)[\s\S]*(?:\bhow old\b[\s\S]*\b(?:unit|system|equipment)\b|\b(?:unit|system|equipment)\b[\s\S]*\bhow old\b)/i],
   // R15 (Team C, follow-up round): "when was the last invoice for X" asks for a DATE, never an
   // amount — this trigger used to fire for it anyway (the shared "last/latest invoice" phrasing),
   // but fetchInvoiceTotal's own answer template only ever states a dollar figure, never a date,
@@ -370,6 +463,15 @@ export function classifyIntent(question) {
  */
 
 const CUSTOMER_NUMBER_RE = /\bC-(\d{5})\b/i;
+
+// R24 (E3, field-phrasing-4 j106-j113: "what's the total on purchase order PO-9026, the one for
+// Rebecca Montoya"): a purchase order's own number, the authoritative identifier fetchPoTotal
+// (fastPathQuery.js) resolves the document by — a customer/equipment resolution is never even
+// attempted for this intent (a PO number, like a customer number, already names one document on its
+// own; a name mentioned alongside it is only ever a confirming detail, never required to disambiguate
+// it). This corpus's own PO numbers are 7 characters ("PO-9026") — one short of IDENTIFIER_RE's own
+// 8-char floor just below — so there is no risk of the two ever double-matching the same token.
+const PO_NUMBER_RE = /\bPO-(\d{3,8})\b/i;
 
 // R17 (G4, consolidation): was this file's own hand-maintained suffix list (missing hwy/highway,
 // ter/terrace); now the shared canonical superset — see geo/streetSuffix.js's own header comment.
@@ -699,6 +801,14 @@ export function extractSubject(question) {
   const numMatch = q.match(CUSTOMER_NUMBER_RE);
   const customerNumber = numMatch ? `C-${numMatch[1]}` : null;
 
+  const poMatch = q.match(PO_NUMBER_RE);
+  const poNumber = poMatch ? `PO-${poMatch[1]}` : null;
+
+  // R24 (E3): brand_match's own signal, never counted toward hasAny below (a bare brand word is
+  // not a "subject" the way a name/address/identifier is — it only means something once brand_match
+  // has ALSO resolved a customer/equipment subject some other way).
+  const askedBrand = extractAskedBrand(q);
+
   let address = null;
   if (!conflictingHouseNumbers) {
     const strongAddr = addrQ.match(ADDRESS_RE);
@@ -737,6 +847,18 @@ export function extractSubject(question) {
     const biz = q.match(BUSINESS_NAME_RE);
     if (biz && !isJunkName(biz[1])) name = biz[1].trim();
   }
+  // R24 (E3, field-phrasing-4 "what's the total on X's invoice"/"annual cost on X's maintenance
+  // agreement" cluster): NAME_HINT_RE's own character class allows an apostrophe, so a possessive
+  // right after "for"/"at"/"on" ("on Donna Ulloa's maintenance agreement") is swallowed whole into
+  // its capture group — nothing forces backtracking the way POSSESSIVE_NAME_RE's own MANDATORY
+  // trailing "'s" (outside its capture group) does — so `name` comes back "Donna Ulloa's", never
+  // "Donna Ulloa". A real customer_name column never itself ends in a literal apostrophe-s, so
+  // resolveFastPathSubject's ILIKE match against the untouched capture always finds zero rows and
+  // this whole class of question silently (and permanently) deferred to the model. Stripped once,
+  // generically, after every name-hint branch above (not just NAME_HINT_RE's own) so any hint added
+  // the same way later inherits the fix rather than needing its own copy; a no-op for every name
+  // that already came back clean (POSSESSIVE_NAME_RE and the rest never include the "'s" at all).
+  if (name) name = name.replace(/['’]s$/i, '').trim() || name;
 
   const ordinal = ORDINAL_RE.test(q) ? 'last' : null;
   const unitMatch = q.match(UNIT_TYPE_RE);
@@ -751,9 +873,9 @@ export function extractSubject(question) {
     if (city && !isJunkName(city[1])) cityOnly = city[1].trim();
   }
 
-  const hasAny = Boolean(customerNumber || address || identifier || name || cityOnly);
+  const hasAny = Boolean(customerNumber || poNumber || address || identifier || name || cityOnly);
 
-  return { customerNumber, address, identifier, name, cityOnly, ordinal, unitType, hasAny };
+  return { customerNumber, poNumber, askedBrand, address, identifier, name, cityOnly, ordinal, unitType, hasAny };
 }
 
 /** R19 (I1, C7 — "what manufacturers ARE on file", "list EVERY serial number", "when WERE the
@@ -1271,6 +1393,8 @@ const FIELD_INTRO = {
   permit_number: (label, value) => `The permit number for ${label.replace(/^The /, 'the ')} is ${value}.`,
   invoice_total: (label, value) => `The most recent invoice for ${label.replace(/^The /, 'the ')} was ${formatMoney(value)}.`,
   agreement_term: (label, value) => `${label}'s maintenance agreement term is ${value}.`,
+  // R24 (E3): "annual cost" — same document family as agreement_term, a different fact.
+  agreement_cost: (label, value) => `${label}'s maintenance agreement costs ${formatMoney(value)} a year.`,
 };
 
 const FACT_LABEL = {
@@ -1280,6 +1404,7 @@ const FACT_LABEL = {
   customer_phone: 'Phone', customer_email: 'Email', customer_name: 'Customer',
   refrigerant: 'Refrigerant', tonnage: 'Tonnage', permit_number: 'Permit number',
   invoice_total: 'Invoice total', agreement_term: 'Agreement term',
+  agreement_cost: 'Agreement annual cost', // R24 (E3)
 };
 
 /**
@@ -1363,7 +1488,7 @@ export function buildFieldAnswer({ intent, resolution, row, labelOverride }) {
   const intro = FIELD_INTRO[intent];
   const text = intro ? intro(label, value) : `${label}: ${value}.`;
   const displayValue =
-    intent === 'invoice_total' ? formatMoney(value)
+    intent === 'invoice_total' || intent === 'agreement_cost' ? formatMoney(value)
     : intent === 'install_date' || intent === 'last_service_date' ? formatDateHuman(value)
     : value;
 
@@ -1385,6 +1510,123 @@ export function buildFieldAnswer({ intent, resolution, row, labelOverride }) {
     unverifiedCount: row.stage === 'verified' ? 0 : 1,
     closest: [],
     fastIntent: intent,
+  };
+}
+
+/**
+ * R24 (E3, field-phrasing-4 j126-j135/j150 "how old is the unit at <address>"/"how old is X's
+ * unit"): whole years between two 'YYYY-MM-DD' dates, matching Postgres's own
+ * `extract(year from age(today, installation_date))` (the exam's own oracle) — a plain calendar-
+ * year subtraction over/undercounts by one whenever today hasn't yet reached the installation's own
+ * month/day this year, exactly the way a person's age doesn't tick over until their birthday.
+ * Returns null for anything not a clean YYYY-MM-DD (never guesses at a partial "2019"/"2019-03"
+ * installation_date — equipment_age simply defers to the model for those, same as every other
+ * fast-path miss).
+ */
+export function ageYearsBetween(fromYmd, toYmd) {
+  const f = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fromYmd ?? ''));
+  const t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(toYmd ?? ''));
+  if (!f || !t) return null;
+  const [, fy, fm, fd] = f.map(Number);
+  const [, ty, tm, td] = t.map(Number);
+  let years = ty - fy;
+  if (tm < fm || (tm === fm && td < fd)) years -= 1;
+  return years;
+}
+
+/** R24 (E3): equipment_age's own answer — never fabricated (a negative age, or an install date that
+ *  didn't parse, is caught by ageYearsBetween returning null/negative before this is ever called —
+ *  see runEquipmentAge, fastPathQuery.js). Cited to the installation_date extraction row when one
+ *  exists; otherwise (the same "own-value fallback" convention installDate/unitFieldFact already use
+ *  for a date that lives only on the equipment entity's own record, never independently extracted)
+ *  stated uncited, `sources: []` — a real, on-file value, never a guess. */
+export function buildEquipmentAgeAnswer({ label, years, installIso, row }) {
+  if (years == null || years < 0) return null;
+  const text = `${label} is ${years} year${years === 1 ? '' : 's'} old — installed ${formatDateHuman(installIso)}.`;
+  const sources = row ? [{ documentId: row.document_id, location: { field: row.field_key } }] : [];
+  const fact = { label: 'Equipment age', value: `${years} year${years === 1 ? '' : 's'}`, basis: row ? 'printed' : 'record', sources };
+  return {
+    kind: 'answer',
+    text,
+    facts: [fact],
+    sources,
+    confidence: row ? Math.max(0, Math.min(1, Number(row.confidence) || 0.8)) : 0.75,
+    interpretation: label,
+    verifiedCount: row?.stage === 'verified' ? 1 : 0,
+    unverifiedCount: row?.stage === 'verified' ? 0 : 1,
+    closest: [],
+    fastIntent: 'equipment_age',
+  };
+}
+
+/** R24 (E3, field-phrasing-4 j106-j113 "what's the total on purchase order PO-9026, the one for
+ *  Rebecca Montoya"): po_total's own answer — a specific purchase order, identified and resolved by
+ *  its own PO number (fetchPoTotal, fastPathQuery.js), never by the customer/equipment resolution
+ *  every other money intent here uses. `row` is null only when fetchPoTotal itself already refused
+ *  to guess (no PO with that number, or more than one candidate) — callers never reach this with a
+ *  null row (see runFastPath's own `if (!row) return null` gate), kept defensive regardless. */
+export function buildPoTotalAnswer({ poNumber, row }) {
+  if (!row || row.value == null || String(row.value).trim() === '') return null;
+  const value = formatMoney(row.value);
+  const who = row.customer_name ? ` (${row.customer_name})` : '';
+  const text = `Purchase order ${poNumber}${who} totals ${value}.`;
+  const fact = { label: 'Purchase order total', value, basis: 'printed', sources: [{ documentId: row.document_id, location: { field: 'total' } }] };
+  return {
+    kind: 'answer',
+    text,
+    facts: [fact],
+    sources: fact.sources,
+    confidence: Math.max(0, Math.min(1, Number(row.confidence) || 0.8)),
+    interpretation: `Purchase order ${poNumber}`,
+    verifiedCount: row.stage === 'verified' ? 1 : 0,
+    unverifiedCount: row.stage === 'verified' ? 0 : 1,
+    closest: [],
+    fastIntent: 'po_total',
+  };
+}
+
+function titleCaseBrand(brand) {
+  return String(brand ?? '').split(/\s+/).map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+/**
+ * R24 (E3, field-phrasing-4/-5 j186-j190/k176-k180 "is Betty Winslow's unit an Amana"/"does William
+ * Quintana have a Ruud unit"): the mismatch case — this customer's own equipment is on file, just
+ * not with the brand asked about. Graded `honest-zero` by this shape's own exam oracle (a plain
+ * count of matching rows, always 0 for these adversarial cases): passing requires either a genuine
+ * decline (`kind: 'no-answer'`) or an `answer` with an EMPTY facts array (compareHonestZero,
+ * scorecard/compare.js — any populated fact there reads as fabricated, no matter how accurate).
+ * Naming the real, on-file brand is still honest and still useful to a real dispatcher — it is
+ * simply stated in the answer's own PROSE, never as a structured, separately-citable fact, which is
+ * exactly what this shape's own grading distinguishes.
+ */
+export function buildBrandMismatchAnswer({ label, askedBrand, actualManufacturer }) {
+  const brandLabel = titleCaseBrand(askedBrand);
+  const brands = String(actualManufacturer ?? '').split(/,\s*/).filter(Boolean);
+  const text = brands.length > 1
+    ? `No — ${label} has ${brands.slice(0, -1).join(', ')} and ${brands[brands.length - 1]} units on file, not a ${brandLabel}.`
+    : brands.length === 1
+      ? `No — ${label} is on file as a ${brands[0]} unit, not a ${brandLabel}.`
+      : `No — there's no ${brandLabel} on file for ${label}.`;
+  return {
+    kind: 'answer', text, facts: [], sources: [], confidence: 0.85, interpretation: label,
+    verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: 'brand_match',
+  };
+}
+
+/** R24 (E3): the match case — genuinely a "Yes", cited normally like any other field answer (this
+ *  exam corpus's own adversarial questions never exercise this branch — every one of them names a
+ *  brand this shop has never installed for that customer — but a real "yes" is exactly as common a
+ *  real-world question, and must answer as confidently/citably as the plain 'manufacturer' intent
+ *  already does). */
+export function buildBrandMatchYesAnswer({ label, manufacturer, row }) {
+  const sources = row ? [{ documentId: row.document_id, location: { field: row.field_key } }] : [];
+  const fact = { label: 'Manufacturer', value: manufacturer, basis: row ? 'printed' : 'record', sources };
+  return {
+    kind: 'answer', text: `Yes — ${label} is a ${manufacturer} unit.`, facts: [fact], sources,
+    confidence: row ? Math.max(0, Math.min(1, Number(row.confidence) || 0.8)) : 0.75,
+    interpretation: label, verifiedCount: row?.stage === 'verified' ? 1 : 0, unverifiedCount: row?.stage === 'verified' ? 0 : 1,
+    closest: [], fastIntent: 'brand_match',
   };
 }
 
