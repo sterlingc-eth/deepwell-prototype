@@ -266,7 +266,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 @keyframes dw-sweep{0%{left:-60%;opacity:.9}70%{opacity:.4}100%{left:120%;opacity:0}}
 .plan .tier{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
 .plan h3{font-size:1.6rem}
-.plan .for{color:var(--muted);font-size:.92rem;min-height:2.4em}
+.plan .for{color:var(--text);font-size:.95rem;font-weight:600;margin:0}
 .plan ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:.92rem;border-top:1px solid var(--line);padding-top:10px}
 .plan li{display:flex;gap:10px}
 .plan li::before{content:"—";color:var(--brass-text);flex:none}
@@ -280,7 +280,17 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .annual{margin:12px 0 0;font-size:.92rem;color:var(--muted)}
 .annual b{color:var(--text)}
 .plan .math{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--brass-text);border-top:1px solid var(--line);padding-top:8px;margin:0}
-.trial-badge{align-self:flex-start;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
+.plan-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
+.badge-pop{padding:3px 10px;border-radius:999px;border:1px solid var(--brass-text);color:var(--brass-text);font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.plan .grp{border-top:1px solid var(--line);padding-top:8px}
+.plan .grp h4{margin:0 0 6px;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.plan .grp ul{border-top:0;padding-top:0}
+.plan .grp.plus{flex:1}
+.plan .grp.plus li{display:block;position:relative;padding-left:16px;font-size:.84rem;line-height:1.45;color:var(--text)}
+.plan .grp.plus li::before{content:"+";position:absolute;left:0;top:0}
+.plan .grp.plus li .pill-soon{margin-left:6px;padding:1px 7px;font-size:.58rem;vertical-align:1px}
+.plan .math{min-height:5.2em}
+.trial-badge{white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
 .pill-soon{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;border:1px dashed var(--line-strong);color:var(--faint);background:transparent;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
 .rescue{margin-top:14px;border:1px solid var(--line);background:var(--surface);padding:16px 22px;display:flex;gap:24px;align-items:center;justify-content:space-between}
 .rescue h3{font-size:1.3rem;margin:6px 0}
@@ -425,6 +435,9 @@ footer a{color:var(--muted);text-decoration:none}
   *{animation:none!important;transition:none!important}
   .hero-micro .hm-arrow{stroke-dashoffset:0!important}
 }
+.plans-every{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:0 0 18px;padding:12px 16px;border:1px solid var(--line);background:var(--surface);font-size:.92rem;color:var(--text)}
+.plans-every .pe-label{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-text)}
+.plans-every > span:not(.pe-label)::before{content:"\2713";color:var(--brass-text);margin-right:6px}
 </style>
 
 <style>
@@ -635,18 +648,6 @@ h3{font-size:1.25rem}
 /* platform / steps */
 .step{padding-block:4px;gap:6px}
 .mm-marquee{margin:10px 0 6px;padding:8px 0}
-.dwflow-grid{gap:clamp(20px,3vw,36px)}
-.dwflow-stage{max-width:300px}
-@media (min-width:881px){
-  #how-it-works .wrap{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);column-gap:clamp(24px,3.5vw,44px);align-content:center}
-  #how-it-works .sec-head{grid-column:2;grid-row:1;grid-template-columns:1fr;margin-bottom:6px;align-self:end}
-  #how-it-works .dwflow-grid{display:contents}
-  #how-it-works .dwflow-stage{grid-column:1;grid-row:1 / span 2;align-self:center}
-  #how-it-works .dwflow-beats{grid-column:2;grid-row:2;align-self:start}
-}
-.dwflow-beats li{padding-block:8px}
-@media (max-width:880px){.dwflow-grid{gap:20px}.dwflow-beats li{padding-block:12px}.dwflow-stage{max-width:300px}}
-
 /* demo */
 .demo-wrap{gap:12px}
 .demo{min-height:0}
@@ -664,7 +665,6 @@ h3{font-size:1.25rem}
 .plans-4{gap:14px}
 .plan{padding:14px;gap:8px}
 .plan ul{gap:4px;padding-top:8px}
-.plan .for{min-height:0}
 .onboard{margin-top:12px;padding:12px 20px;gap:10px 24px}
 .onboard .eyebrow{margin-bottom:6px}
 .onboard .mm-ticks{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;gap:4px 22px;margin:0}
@@ -954,140 +954,160 @@ h3{font-size:1.25rem}
 
 <style>
 /* ==================================================================== */
-/*  How it works — "the well in section"                                */
-/*  A vertical cutaway: a record drops down the shaft, forks into two    */
-/*  chambers of visibly different shape (a stack of pages vs a table of  */
-/*  rows), and a brass thread ties the row to the page it points at.     */
-/*  Inline SVG + CSS keyframes only. Everything namespaced dwflow-.      */
+/*  How it works — "chain reaction"                                      */
+/*  A brass token carrying a document is set rolling by a click and      */
+/*  trips every step: read -> file in two places -> link -> ask -> cited */
+/*  answer. One camera follows it across a dotted canvas, then pulls     */
+/*  back to show the whole chain. Vanilla JS, transform + opacity only.  */
+/*  Everything namespaced hiw-.                                          */
 /* ==================================================================== */
 
-.dwflow-grid{
-  display:grid;
-  grid-template-columns:minmax(0,300px) minmax(0,1fr);
-  gap:clamp(24px,3.5vw,44px);
-  align-items:center;
+#how-it-works{
+  --hiw-canvas:#F4F7F4;--hiw-card:#FFFFFF;--hiw-key:#FFFFFF;--hiw-keyedge:rgba(22,60,44,.28);
+  --hiw-dot:rgba(22,60,44,.17);--hiw-track:rgba(22,60,44,.14);--hiw-tickoff:rgba(22,60,44,.28);
+  --hiw-tip:#0F1F19;--hiw-tip-t:#F4F7F4;--hiw-cardsh:0 10px 24px -14px rgba(11,22,19,.45);
+  --hiw-on:#0B1613;
 }
-.dwflow-stage{min-width:0;max-width:300px;width:100%;margin-inline:auto}
-.dwflow-svg{display:block;width:100%;height:auto}
-
-/* screen-reader-only summary of the flow */
-.dwflow-sr{
-  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
-  overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
-}
-
-/* the three beats, as real HTML text beside the diagram */
-.dwflow-beats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;min-width:0}
-.dwflow-beats li{
-  display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 18px;
-  padding-block:10px;border-top:1px solid var(--line);
-}
-.dwflow-beats li:first-child{border-top:0;padding-top:0}
-.dwflow-beats .dwflow-n{
-  grid-row:1 / span 2;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-  font-size:.78rem;letter-spacing:.14em;color:var(--brass);padding-top:.35em;
-}
-.dwflow-beats h3{font-size:1.25rem}
-.dwflow-beats p{color:var(--muted);font-size:.95rem;margin-top:6px}
-.dwflow-beats code{
-  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-  font-size:.86em;color:var(--text);
-  border-bottom:1px solid var(--line-strong);white-space:nowrap;
-}
-.dwflow-beats .dwflow-key{color:var(--brass);border-bottom-color:var(--brass)}
-
-.dwflow-thesis{
-  margin-top:clamp(32px,4vw,52px);padding:24px 28px;
-  border:1px solid var(--line-strong);border-left:4px solid var(--brass);
-  background:var(--surface);
-  font-family:"Newsreader",Georgia,serif;font-size:clamp(1.15rem,2.1vw,1.5rem);
-  line-height:1.35;color:var(--text);max-width:70ch;
-}
-.dwflow-thesis b{font-weight:500;color:var(--brass)}
-
-@media (max-width:880px){
-  .dwflow-grid{grid-template-columns:1fr;gap:36px}
-  .dwflow-beats li{padding-block:18px}
-}
-
-/* ---------- SVG type ---------- */
-.dwflow-svg text{fill:var(--text)}
-.dwflow-mono,.dwflow-k,.dwflow-v,.dwflow-sub,.dwflow-cap,.dwflow-beat,.dwflow-key-t,.dwflow-path-t{
-  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-}
-.dwflow-name{font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-weight:600;font-size:19px}
-.dwflow-sub{font-size:10.5px;fill:var(--muted)}
-.dwflow-k{font-size:10.5px;fill:var(--faint)}
-.dwflow-v{font-size:10.5px;fill:var(--text)}
-.dwflow-cap{font-size:10px;fill:var(--faint)}
-.dwflow-mono{font-size:10.5px;fill:var(--text)}
-.dwflow-beat{font-size:11.5px;fill:var(--brass);letter-spacing:.14em}
-.dwflow-key-t{font-size:10px;fill:var(--brass);letter-spacing:.04em}
-.dwflow-path-t{font-size:9px;fill:var(--text);letter-spacing:.01em}
-.dwflow-ask{font-family:"Newsreader",Georgia,serif;font-style:italic;font-size:15px;fill:var(--text)}
-.dwflow-ans{font-family:"Newsreader",Georgia,serif;font-size:16px;fill:var(--text)}
-.dwflow-brass{fill:var(--brass)}
-
-/* ---------- SVG structure ---------- */
-.dwflow-panel{fill:var(--surface);fill-opacity:.6;stroke:var(--line-strong);stroke-width:1}
-.dwflow-hair{stroke:var(--line);stroke-width:1;fill:none}
-.dwflow-rule{stroke:var(--line-strong);stroke-width:1;fill:none}
-.dwflow-page{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
-.dwflow-page-top{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.4}
-.dwflow-ink{fill:var(--faint);fill-opacity:.5}
-.dwflow-wire{fill:none;stroke:var(--line-strong);stroke-width:1.1}
-.dwflow-band{fill:var(--brass);fill-opacity:.1;stroke:var(--brass);stroke-opacity:.55;stroke-width:1}
-.dwflow-tick{fill:var(--brass)}
-.dwflow-chip{fill:none;stroke:var(--brass);stroke-opacity:.5;stroke-width:1;stroke-dasharray:4 3}
-
-/* the pointer: always drawn, so the relationship reads even when still */
-.dwflow-ptr{fill:none;stroke:var(--brass);stroke-opacity:.6;stroke-width:1.4}
-.dwflow-node{fill:var(--brass)}
-
-/* travelling signals */
-.dwflow-sig{fill:none;stroke:var(--brass);stroke-width:2.2;stroke-linecap:round;
-  stroke-dasharray:11 100;stroke-dashoffset:11;
-  animation-duration:var(--dwflow-dur);animation-iteration-count:infinite;animation-timing-function:ease-in-out}
-.dwflow-sig-a{animation-name:dwflow-run-split}
-.dwflow-sig-b{animation-name:dwflow-run-split}
-.dwflow-sig-p1{animation-name:dwflow-run-ptr1}
-.dwflow-sig-q{animation-name:dwflow-run-query}
-.dwflow-sig-p2{animation-name:dwflow-run-ptr2}
-.dwflow-sig-r{animation-name:dwflow-run-back}
-
-/* focus swells — a soft brass outline that walks the story */
-.dwflow-glow{fill:none;stroke:var(--brass);stroke-width:1.6;opacity:0;
-  animation-duration:var(--dwflow-dur);animation-iteration-count:infinite;animation-timing-function:ease-in-out}
-.dwflow-g-doc{animation-name:dwflow-lit-doc}
-.dwflow-g-vault{animation-name:dwflow-lit-store}
-.dwflow-g-index{animation-name:dwflow-lit-store}
-.dwflow-g-key{animation-name:dwflow-lit-key}
-.dwflow-g-ask{animation-name:dwflow-lit-ask}
-.dwflow-g-page{animation-name:dwflow-lit-page}
-.dwflow-g-src{animation-name:dwflow-lit-src}
-
-@keyframes dwflow-run-split{ 0%,13%{stroke-dashoffset:11} 34%,100%{stroke-dashoffset:-100} }
-@keyframes dwflow-run-ptr1{  0%,46%{stroke-dashoffset:11} 57%,100%{stroke-dashoffset:-100} }
-@keyframes dwflow-run-query{ 0%,67%{stroke-dashoffset:11} 78%,100%{stroke-dashoffset:-100} }
-@keyframes dwflow-run-ptr2{  0%,79%{stroke-dashoffset:11} 86%,100%{stroke-dashoffset:-100} }
-@keyframes dwflow-run-back{  0%,87%{stroke-dashoffset:11} 97%,100%{stroke-dashoffset:-100} }
-
-@keyframes dwflow-lit-doc{   0%{opacity:0} 5%,13%{opacity:.85} 20%,100%{opacity:0} }
-@keyframes dwflow-lit-store{ 0%,30%{opacity:0} 36%,45%{opacity:.8} 52%,100%{opacity:0} }
-@keyframes dwflow-lit-key{   0%,43%{opacity:0} 48%,58%{opacity:.9} 64%,77%{opacity:0} 82%,88%{opacity:.9} 94%,100%{opacity:0} }
-@keyframes dwflow-lit-ask{   0%,61%{opacity:0} 66%,74%{opacity:.85} 80%,100%{opacity:0} }
-@keyframes dwflow-lit-page{  0%,82%{opacity:0} 87%,92%{opacity:.85} 97%,100%{opacity:0} }
-@keyframes dwflow-lit-src{   0%{opacity:.85} 5%,93%{opacity:0} 97%,100%{opacity:.85} }
-
-/* ---------- reduced motion: a complete, still diagram ---------- */
-@media (prefers-reduced-motion: reduce){
-  .dwflow-sig{
-    animation:none!important;
-    stroke-dasharray:none!important;stroke-dashoffset:0!important;
-    stroke-width:1.4;stroke-opacity:.7;
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) #how-it-works{
+    --hiw-canvas:#08100D;--hiw-card:#12241C;--hiw-key:#1A3128;--hiw-keyedge:rgba(0,0,0,.55);
+    --hiw-dot:rgba(230,238,233,.11);--hiw-track:rgba(230,238,233,.14);--hiw-tickoff:rgba(230,238,233,.24);
+    --hiw-tip:#22392F;--hiw-tip-t:#E6EEE9;--hiw-cardsh:0 10px 24px -12px rgba(0,0,0,.8);
   }
-  .dwflow-glow{animation:none!important;opacity:.5;stroke-width:1.2}
-  .dwflow-ptr{stroke-opacity:.85}
+}
+:root[data-theme="dark"] #how-it-works{
+  --hiw-canvas:#08100D;--hiw-card:#12241C;--hiw-key:#1A3128;--hiw-keyedge:rgba(0,0,0,.55);
+  --hiw-dot:rgba(230,238,233,.11);--hiw-track:rgba(230,238,233,.14);--hiw-tickoff:rgba(230,238,233,.24);
+  --hiw-tip:#22392F;--hiw-tip-t:#E6EEE9;--hiw-cardsh:0 10px 24px -12px rgba(0,0,0,.8);
+}
+
+.hiw{max-width:1100px;margin-inline:auto}
+.hiw-stage{
+  position:relative;overflow:hidden;isolation:isolate;contain:layout paint;
+  width:100%;aspect-ratio:1100/420;
+  border:1px solid var(--line-strong);border-radius:16px;background:var(--hiw-canvas);
+}
+@media (max-width:900px){.hiw-stage{aspect-ratio:16/10}}
+@media (max-width:640px){.hiw-stage{aspect-ratio:358/520;border-radius:14px}}
+.hiw-stage::after{ /* soft edge, static */
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(130% 110% at 50% 50%,transparent 62%,var(--hiw-canvas) 100%);opacity:.75;
+}
+.hiw-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;will-change:transform;visibility:hidden}
+.hiw.is-ready .hiw-world{visibility:visible}
+.hiw-world>*{position:absolute;left:0;top:0;transform-origin:50% 50%;margin:0}
+
+.hiw-grid{left:-460px;top:-340px;width:2100px;height:1500px;
+  background-image:radial-gradient(circle,var(--hiw-dot) 1.4px,transparent 1.9px);background-size:28px 28px}
+
+/* captions shown in the pulled-back overview */
+.hiw-cap{font:500 15px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.16em;color:var(--brass-text);white-space:nowrap;opacity:0}
+
+/* the Scan button (the "toggle") */
+.hiw-btn{border-radius:999px;background:var(--hiw-card);border:1px solid var(--line-strong);box-shadow:var(--hiw-cardsh);will-change:transform}
+.hiw-btn-on{position:absolute;inset:-1px;border-radius:999px;background:var(--brass);opacity:0}
+.hiw-lab{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;
+  font:500 17px/1 "IBM Plex Sans",-apple-system,sans-serif;color:var(--text);white-space:nowrap}
+.hiw-lab2{color:var(--hiw-on);opacity:0}
+.hiw-lab svg{width:20px;height:20px;flex:none}
+.hiw-tag{display:flex;align-items:center;gap:8px;height:28px;padding:0 11px 0 9px;border-radius:8px;opacity:0;
+  background:var(--hiw-card);border:1px solid var(--line-strong);color:var(--text);
+  font:500 12.5px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;white-space:nowrap}
+.hiw-tag svg{width:14px;height:16px;flex:none}
+
+/* slider */
+.hiw-track{height:8px;border-radius:4px;background:var(--hiw-track)}
+.hiw-fill{height:8px;border-radius:4px;background:var(--brass);transform-origin:0 50%;will-change:transform;opacity:0}
+.hiw-tick{width:2px;height:12px;border-radius:1px;background:var(--hiw-tickoff)}
+.hiw-tick i{position:absolute;inset:0;border-radius:1px;background:var(--brass);opacity:0}
+.hiw-slab{font:500 11.5px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.12em;color:var(--faint);white-space:nowrap;opacity:.9}
+.hiw-tip{min-width:52px;height:28px;padding:0 10px;border-radius:8px;background:var(--hiw-tip);color:var(--hiw-tip-t);
+  font:600 14px/28px "IBM Plex Sans",-apple-system,sans-serif;text-align:center;opacity:0;will-change:transform,opacity;
+  font-variant-numeric:tabular-nums}
+.hiw-tip::after{content:"";position:absolute;left:50%;bottom:-4px;width:8px;height:8px;margin-left:-4px;background:inherit;transform:rotate(45deg);border-radius:0 0 2px 0}
+
+/* notification cards */
+.hiw-card{display:flex;align-items:center;gap:12px;padding:0 14px;border-radius:14px;opacity:0;
+  background:var(--hiw-card);border:1px solid var(--line);box-shadow:var(--hiw-cardsh);will-change:transform,opacity}
+.hiw-ic{width:30px;height:30px;border-radius:8px;background:var(--brass);flex:none;display:flex;align-items:center;justify-content:center}
+.hiw-ic svg{width:17px;height:17px}
+.hiw-ct{min-width:0;flex:1;font-family:"IBM Plex Sans",-apple-system,sans-serif}
+.hiw-ct b{display:block;font-weight:600;font-size:14px;line-height:1.25;color:var(--text)}
+.hiw-ct span{display:block;font-size:12.5px;line-height:1.3;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hiw-now{font:400 11px/1 "IBM Plex Sans",sans-serif;color:var(--faint);align-self:flex-start;margin-top:12px}
+
+/* ask pill -> field */
+.hiw-pill{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;opacity:0;
+  background:var(--hiw-card);border:1px solid var(--line-strong);color:var(--muted);
+  font:500 14px/1 "IBM Plex Sans",sans-serif;box-shadow:var(--hiw-cardsh);will-change:transform,opacity}
+.hiw-pill i{width:8px;height:8px;border-radius:50%;background:var(--brass)}
+.hiw-field{border-radius:999px;background:var(--hiw-card);border:1.5px solid var(--brass);opacity:0;box-shadow:var(--hiw-cardsh);will-change:transform,opacity}
+.hiw-fc{opacity:0;will-change:opacity}
+.hiw-ph,.hiw-txt{position:absolute;left:18px;top:0;height:100%;display:flex;align-items:center;white-space:nowrap;
+  font:500 15px/1 "IBM Plex Sans",sans-serif}
+.hiw-ph{color:var(--faint)}
+.hiw-txt{color:var(--text)}
+.hiw-caret{display:inline-block;width:2px;height:18px;margin-left:2px;background:var(--brass);opacity:0}
+.hiw-send{position:absolute;right:6px;top:6px;width:32px;height:32px;border-radius:50%;background:var(--brass);display:flex;align-items:center;justify-content:center;opacity:.35}
+.hiw-send svg{width:16px;height:16px}
+
+/* keyboard */
+.hiw-kb{opacity:0;will-change:transform,opacity}
+.hiw-key{position:absolute;left:0;top:0;border-radius:7px;background:var(--hiw-key);border:1px solid var(--line);
+  box-shadow:0 2px 0 var(--hiw-keyedge);color:var(--text);display:flex;align-items:center;justify-content:center;
+  font:500 15px/1 "IBM Plex Sans",sans-serif;text-transform:uppercase}
+.hiw-key i{position:absolute;inset:-1px;border-radius:7px;background:var(--brass);opacity:0}
+.hiw-key svg{width:18px;height:18px;position:relative}
+.hiw-key small{position:absolute;right:7px;bottom:6px;font:500 10px/1 "IBM Plex Sans",sans-serif;text-transform:none;color:var(--faint)}
+
+/* chat: user bubble + Donovan's answer */
+.hiw-bubble{display:flex;align-items:center;justify-content:center;border-radius:18px 18px 4px 18px;background:var(--brass);color:var(--hiw-on);
+  font:500 14px/1 "IBM Plex Sans",sans-serif;white-space:nowrap;opacity:0;will-change:transform,opacity}
+.hiw-ans{border-radius:16px;background:var(--hiw-card);border:1px solid var(--line-strong);box-shadow:var(--hiw-cardsh);opacity:0;will-change:transform,opacity}
+.hiw-ans>*{position:absolute}
+.hiw-ah{left:18px;top:14px;right:18px;display:flex;align-items:center;gap:8px;
+  font:500 11.5px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.12em;color:var(--brass-text);text-transform:uppercase}
+.hiw-ah i{margin-left:auto;font:400 11px/1 "IBM Plex Sans",sans-serif;letter-spacing:0;text-transform:none;color:var(--faint);font-style:normal}
+.hiw-ah svg{width:16px;height:16px}
+.hiw-ad{left:18px;top:36px;font:500 31px/1.1 "Newsreader",Georgia,serif;letter-spacing:-.01em;color:var(--text);opacity:0;white-space:nowrap}
+.hiw-al{left:18px;top:78px;font:400 13.5px/1.3 "IBM Plex Sans",sans-serif;color:var(--muted);opacity:0;white-space:nowrap}
+.hiw-chip{left:18px;top:106px;height:30px;padding:0 12px 0 8px;display:flex;align-items:center;gap:8px;border-radius:8px;opacity:0;
+  border:1px solid color-mix(in srgb,var(--brass) 60%,transparent);background:color-mix(in srgb,var(--brass) 10%,transparent);
+  color:var(--text);font:500 12px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;white-space:nowrap}
+.hiw-chip svg{width:14px;height:16px}
+
+/* the traveling token */
+.hiw-ball{width:40px;height:40px;opacity:0;will-change:transform,opacity}
+.hiw-ghost{width:40px;height:40px;border-radius:50%;background:var(--brass);opacity:0;will-change:transform,opacity}
+.hiw-sq{position:absolute;inset:0;transform-origin:50% 100%}
+.hiw-bd{position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#F3DCB0 0,#D3A462 42%,#B98A4E 72%,#8E6530 100%);
+  box-shadow:0 7px 14px -5px rgba(0,0,0,.55),inset 0 -3px 5px rgba(90,55,15,.35)}
+.hiw-bd svg{position:absolute;left:11px;top:9px;width:18px;height:22px}
+
+/* cursor */
+.hiw-cur{width:24px;height:32px;opacity:0;transform-origin:0 0;will-change:transform,opacity;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+.hiw-cur svg{display:block;width:100%;height:100%}
+.hiw-rip{width:34px;height:34px;border-radius:50%;border:2px solid var(--brass);opacity:0;will-change:transform,opacity}
+
+/* the three beats, as real text under the stage */
+.hiw-steps{list-style:none;margin:clamp(14px,2vw,22px) 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(16px,3vw,40px)}
+.hiw-steps li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;padding-top:12px;border-top:1px solid var(--line-strong);position:relative}
+.hiw-steps li::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:var(--brass);transform:scaleX(0);transform-origin:0 50%;transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+.hiw-n{grid-row:1 / span 2;font:500 .78rem/1.6 "IBM Plex Mono",ui-monospace,Menlo,monospace;letter-spacing:.14em;color:var(--brass-text)}
+.hiw-steps h3{font-size:1.12rem}
+.hiw-steps p{color:var(--muted);font-size:.9rem;line-height:1.45;margin-top:3px}
+.hiw.is-js .hiw-steps li h3,.hiw.is-js .hiw-steps li p{opacity:.62;transition:opacity .5s}
+.hiw.is-js .hiw-steps li[data-on] h3,.hiw.is-js .hiw-steps li[data-on] p{opacity:1}
+.hiw-steps li[data-on]::before{transform:scaleX(1)}
+@media (max-width:760px){
+  .hiw-steps{grid-template-columns:1fr;gap:0}
+  .hiw-steps li{padding-block:10px}
+  .hiw-steps p{font-size:.88rem}
+}
+.hiw-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+@media (prefers-reduced-motion:reduce){
+  .hiw-steps li::before{transition:none}.hiw.is-js .hiw-steps li h3,.hiw.is-js .hiw-steps li p{transition:none}
 }
 </style>
 
@@ -1102,173 +1122,487 @@ h3{font-size:1.25rem}
       <p class="lede">One upload, two destinations.</p>
     </div>
 
-    <div class="dwflow-grid">
+    <div class="hiw" id="hiw">
+      <p class="hiw-sr">Animated diagram of the DeepWell data flow, which loops. A person taps Scan on an invoice. The page is read, then written to the vault under a key scoped to the account, while the facts about it are written to the index and linked to the customer and the equipment. Later someone asks Donovan when the Smith warranty expires, and Donovan answers, March 14, 2027, with the invoice and page number attached as the source.</p>
 
-      <div class="dwflow-stage">
-        <p class="dwflow-sr">Diagram of the DeepWell data flow. A document is uploaded. The page itself is written to the vault under a key scoped to the account, while the facts about it are written to the index as a single record that holds the key. Later, a question queries the index, the matching record’s key is followed to the vault, and the original page is returned with the answer as the cited source.</p>
+      <div class="hiw-stage" aria-hidden="true">
+        <div class="hiw-world">
+          <div class="hiw-grid"></div>
+          <div class="hiw-cap" data-n="cap0">01 · CAPTURE</div>
+          <div class="hiw-cap" data-n="cap1">02 · LINK</div>
+          <div class="hiw-cap" data-n="cap2">03 · ASK</div>
 
-        <svg class="dwflow-svg" viewBox="0 0 430 800" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+          <div class="hiw-btn" data-n="btn">
+            <i class="hiw-btn-on" data-n="btnOn"></i>
+            <span class="hiw-lab hiw-lab1" data-n="lab1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>Scan a record</span>
+            <span class="hiw-lab hiw-lab2" data-n="lab2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Scanned</span>
+          </div>
+          <div class="hiw-tag" data-n="tag"><svg viewBox="0 0 14 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2 1h6.5L12 4.5V15H2z"/><path d="M4.5 9h5M4.5 12h3" stroke-linecap="round"/></svg>Invoice_1042.pdf</div>
 
-          <!-- ============ BEAT 1 — a record arrives at the surface ============ -->
-          <text class="dwflow-beat" x="20" y="26">1 · A RECORD ARRIVES</text>
+          <div class="hiw-track" data-n="track"></div>
+          <div class="hiw-fill" data-n="fill"></div>
+          <div class="hiw-slab" data-n="slab">READING · INVOICE_1042.PDF</div>
 
-          <rect class="dwflow-panel" x="138" y="44" width="156" height="50" rx="3"/>
-          <g>
-            <rect class="dwflow-page" x="150" y="56" width="20" height="26" rx="1.5"/>
-            <rect class="dwflow-ink" x="154" y="61" width="12" height="1.6"/>
-            <rect class="dwflow-ink" x="154" y="66" width="12" height="1.6"/>
-            <rect class="dwflow-ink" x="154" y="71" width="8"  height="1.6"/>
-          </g>
-          <text class="dwflow-mono" x="181" y="68">invoice_4471.pdf</text>
-          <text class="dwflow-cap"  x="181" y="82">184.2 KB · PDF</text>
-          <rect class="dwflow-glow dwflow-g-doc" x="138" y="44" width="156" height="50" rx="3"/>
+          <div class="hiw-card" data-n="c0"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg></span><span class="hiw-ct"><b>The vault</b><span>Page stored, unchanged</span></span><span class="hiw-now">now</span></div>
+          <div class="hiw-card" data-n="c1"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="hiw-ct"><b>The index</b><span>6 facts recorded</span></span><span class="hiw-now">now</span></div>
+          <div class="hiw-card" data-n="c2"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="hiw-ct"><b>Linked</b><span>Smith residence · Trane XR16</span></span><span class="hiw-now">now</span></div>
 
-          <!-- the mouth of the well, seen from above -->
-          <g class="dwflow-hair">
-            <ellipse cx="216" cy="112" rx="96" ry="11"/>
-            <ellipse cx="216" cy="112" rx="70" ry="8"/>
-            <ellipse cx="216" cy="112" rx="46" ry="5.5"/>
-            <ellipse cx="216" cy="112" rx="24" ry="3"/>
-          </g>
+          <div class="hiw-ans" data-n="ans">
+            <div class="hiw-ah"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.4"/><circle cx="8" cy="8" r="2.6" fill="currentColor" stroke="none"/></svg>Donovan<i>now</i></div>
+            <div class="hiw-ad" data-n="ad">March 14, 2027</div>
+            <div class="hiw-al" data-n="al">Smith warranty ends · Trane XR16 at 118 Oak St.</div>
+            <div class="hiw-chip" data-n="chip"><svg viewBox="0 0 14 16" fill="none" stroke="var(--brass-text)" stroke-width="1.4" stroke-linejoin="round"><path d="M2 1h6.5L12 4.5V15H2z"/><path d="M4.5 9h5M4.5 12h3" stroke-linecap="round"/></svg>Source: Invoice_1042.pdf, p. 1</div>
+          </div>
+          <div class="hiw-bubble" data-n="bub">smith warranty</div>
 
-          <!-- ============ BEAT 2 — it splits ============ -->
-          <text class="dwflow-beat" x="20" y="152">2 · IT SPLITS</text>
+          <div class="hiw-pill" data-n="pill"><i></i>Ask Donovan</div>
+          <div class="hiw-field" data-n="fbg"></div>
+          <div class="hiw-fc" data-n="fc">
+            <span class="hiw-ph" data-n="ph">Ask Donovan…</span>
+            <span class="hiw-txt"><span data-n="txt"></span><span class="hiw-caret" data-n="caret"></span></span>
+            <span class="hiw-send" data-n="send"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span>
+          </div>
+          <div class="hiw-kb" data-n="kb"></div>
 
-          <path class="dwflow-wire" d="M216 118 C216 172 113 176 113 248"/>
-          <path class="dwflow-wire" d="M216 118 C216 172 317 176 317 248"/>
-          <path class="dwflow-sig dwflow-sig-a" pathLength="100" d="M216 118 C216 172 113 176 113 248"/>
-          <path class="dwflow-sig dwflow-sig-b" pathLength="100" d="M216 118 C216 172 317 176 317 248"/>
-
-          <text class="dwflow-mono" x="86"  y="200" text-anchor="middle">bytes</text>
-          <text class="dwflow-cap"  x="86"  y="215" text-anchor="middle">the page itself</text>
-          <text class="dwflow-mono" x="346" y="200" text-anchor="middle">facts</text>
-          <text class="dwflow-cap"  x="346" y="215" text-anchor="middle">what it says</text>
-
-          <!-- ============ TWO CHAMBERS ============ -->
-
-          <!-- LEFT — the vault, drawn as a stack of pages -->
-          <rect class="dwflow-panel" x="20" y="250" width="186" height="310" rx="3"/>
-          <text class="dwflow-name" x="32" y="280">The vault</text>
-          <text class="dwflow-sub"  x="32" y="296">object storage</text>
-          <text class="dwflow-key-t" x="32" y="318">acme-hvac/2026/</text>
-          <text class="dwflow-key-t" x="32" y="331">invoice_4471.pdf</text>
-
-          <g>
-            <rect class="dwflow-page" x="58" y="370" width="92" height="130" rx="2"/>
-            <rect class="dwflow-page" x="64" y="364" width="92" height="130" rx="2"/>
-            <rect class="dwflow-page" x="70" y="358" width="92" height="130" rx="2"/>
-            <rect class="dwflow-page-top" x="76" y="352" width="92" height="130" rx="2"/>
-            <g class="dwflow-ink">
-              <rect x="86" y="368" width="60" height="2"/>
-              <rect x="86" y="378" width="72" height="2"/>
-              <rect x="86" y="388" width="72" height="2"/>
-              <rect x="86" y="398" width="44" height="2"/>
-              <rect x="86" y="416" width="72" height="2"/>
-              <rect x="86" y="426" width="52" height="2"/>
-              <rect x="86" y="444" width="36" height="2"/>
-            </g>
-            <rect class="dwflow-glow dwflow-g-page" x="76" y="352" width="92" height="130" rx="2"/>
-          </g>
-          <text class="dwflow-cap" x="32" y="524">the bytes, unchanged</text>
-          <rect class="dwflow-glow dwflow-g-vault" x="20" y="250" width="186" height="310" rx="3"/>
-
-          <!-- RIGHT — the index, drawn as a table of rows -->
-          <rect class="dwflow-panel" x="224" y="250" width="186" height="310" rx="3"/>
-          <text class="dwflow-name" x="236" y="280">The index</text>
-          <text class="dwflow-sub"  x="236" y="296">one record</text>
-
-          <path class="dwflow-rule" d="M236 310 H398"/>
-          <g class="dwflow-hair">
-            <path d="M236 340 H398"/><path d="M236 364 H398"/>
-            <path d="M236 388 H398"/><path d="M236 412 H398"/>
-          </g>
-          <text class="dwflow-k" x="236" y="332">filename</text>
-          <text class="dwflow-v" x="398" y="332" text-anchor="end">invoice_4471.pdf</text>
-          <text class="dwflow-k" x="236" y="356">size</text>
-          <text class="dwflow-v" x="398" y="356" text-anchor="end">184.2 KB</text>
-          <text class="dwflow-k" x="236" y="380">sha256</text>
-          <text class="dwflow-v" x="398" y="380" text-anchor="end">9f4c…a71b</text>
-          <text class="dwflow-k" x="236" y="404">account</text>
-          <text class="dwflow-v" x="398" y="404" text-anchor="end">acme-hvac</text>
-          <text class="dwflow-k" x="236" y="428">uploaded_at</text>
-          <text class="dwflow-v" x="398" y="428" text-anchor="end">2026-03-14</text>
-
-          <!-- the pointer column -->
-          <rect class="dwflow-band" x="230" y="438" width="176" height="44" rx="2"/>
-          <rect class="dwflow-tick" x="230" y="438" width="2.5" height="44"/>
-          <text class="dwflow-key-t"  x="240" y="456">storage_key</text>
-          <text class="dwflow-path-t" x="240" y="472">acme-hvac/2026/invoice_4471.pdf</text>
-          <rect class="dwflow-glow dwflow-g-key" x="230" y="438" width="176" height="44" rx="2"/>
-
-          <text class="dwflow-cap" x="236" y="524">the facts, plus an address</text>
-          <rect class="dwflow-glow dwflow-g-index" x="224" y="250" width="186" height="310" rx="3"/>
-
-          <!-- ============ THE POINTER — row → object ============ -->
-          <path class="dwflow-ptr" d="M232 460 C212 460 200 404 182 403"/>
-          <path class="dwflow-sig dwflow-sig-p1" pathLength="100" d="M232 460 C212 460 200 404 182 403"/>
-          <path class="dwflow-sig dwflow-sig-p2" pathLength="100" d="M232 460 C212 460 200 404 182 403"/>
-          <circle class="dwflow-node" cx="232" cy="460" r="3"/>
-          <polygon class="dwflow-node" points="170,403 182,398 182,408"/>
-
-          <!-- ============ BEAT 3 — later, someone asks ============ -->
-          <text class="dwflow-beat" x="22" y="592">3 · LATER, SOMEONE ASKS</text>
-          <text class="dwflow-cap"  x="404" y="592" text-anchor="end">the query</text>
-
-          <rect class="dwflow-panel" x="20" y="608" width="390" height="46" rx="3"/>
-          <text class="dwflow-ask" x="36" y="637">“What did we pay Carrier in March?”</text>
-          <rect class="dwflow-glow dwflow-g-ask" x="20" y="608" width="390" height="46" rx="3"/>
-
-          <!-- query rail: up the outer casing into the index -->
-          <path class="dwflow-wire" d="M410 631 C422 631 422 606 422 566 L422 352 C422 326 416 316 404 314"/>
-          <path class="dwflow-sig dwflow-sig-q" pathLength="100"
-                d="M410 631 C422 631 422 606 422 566 L422 352 C422 326 416 316 404 314"/>
-          <polygon class="dwflow-node" points="396,314 408,309 408,319"/>
-
-          <!-- return rail: back out of the vault, down to the cited source -->
-          <path class="dwflow-wire" d="M50 562 C22 568 10 582 10 606 L10 690 C10 726 12 750 22 757"/>
-          <path class="dwflow-sig dwflow-sig-r" pathLength="100"
-                d="M50 562 C22 568 10 582 10 606 L10 690 C10 726 12 750 22 757"/>
-          <text class="dwflow-cap" x="404" y="690" text-anchor="end">the original page comes back</text>
-
-          <!-- ============ THE ANSWER ============ -->
-          <text class="dwflow-ans" x="26" y="700">Paid Carrier $14,206 in March.</text>
-          <rect class="dwflow-chip" x="24" y="740" width="252" height="34" rx="3"/>
-          <g>
-            <rect class="dwflow-page" x="36" y="748" width="16" height="18" rx="1"/>
-            <rect class="dwflow-ink" x="39" y="752" width="10" height="1.4"/>
-            <rect class="dwflow-ink" x="39" y="756" width="10" height="1.4"/>
-            <rect class="dwflow-ink" x="39" y="760" width="6"  height="1.4"/>
-          </g>
-          <text class="dwflow-mono" x="62"  y="763">invoice_4471.pdf</text>
-          <text class="dwflow-cap"  x="172" y="763">· page 1</text>
-          <text class="dwflow-cap"  x="288" y="763">cited source</text>
-          <rect class="dwflow-glow dwflow-g-src" x="24" y="740" width="252" height="34" rx="3"/>
-
-        </svg>
+          <div class="hiw-tip" data-n="tip">0%</div>
+          <div class="hiw-ghost" data-n="g0"></div>
+          <div class="hiw-ghost" data-n="g1"></div>
+          <div class="hiw-ghost" data-n="g2"></div>
+          <div class="hiw-ball" data-n="ball"><div class="hiw-sq" data-n="sq"><div class="hiw-bd" data-n="bd"><svg viewBox="0 0 18 22"><path d="M1.5 1h9.2l5.8 5.8V21h-15z" fill="#FBF3E4"/><path d="M10.7 1v5.8h5.8z" fill="#E4CFA8"/><path d="M4.5 11.5h8.6M4.5 15h6" stroke="#B98A4E" stroke-width="1.6" stroke-linecap="round"/></svg></div></div></div>
+          <div class="hiw-rip" data-n="rip"></div>
+          <div class="hiw-cur" data-n="cur"><svg viewBox="0 0 24 32"><path d="M3 2v22l5.6-5.2 3.6 8.4 4-1.7-3.6-8.2H20z" fill="#0b0b0b" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+        </div>
       </div>
 
-      <ol class="dwflow-beats">
+      <ol class="hiw-steps">
         <li>
-          <span class="dwflow-n">01</span>
+          <span class="hiw-n">01</span>
           <h3>A record arrives</h3>
-          <p>Any format, from anywhere.</p>
+          <p>Scan it, snap a nameplate, or drop the file in. Any format, from anywhere.</p>
         </li>
         <li>
-          <span class="dwflow-n">02</span>
+          <span class="hiw-n">02</span>
           <h3>It goes two places at once</h3>
-          <p>The page itself is stored under a key scoped to your account. What it <i>says</i> is recorded separately, alongside that key.</p>
+          <p>The page is stored under a key scoped to your account. What it <i>says</i> is recorded separately, and linked to the customer and the equipment.</p>
         </li>
         <li>
-          <span class="dwflow-n">03</span>
+          <span class="hiw-n">03</span>
           <h3>Later, someone asks</h3>
-          <p>Donovan answers from the record, and the key leads back to the original page — attached to the answer as its source.</p>
+          <p>Donovan answers from the record, and the key leads back to the original page, attached to the answer as its source.</p>
         </li>
       </ol>
-
     </div>
 
   </div>
 </section>
+
+<script>
+/* How it works — chain-reaction timeline. Deterministic render(t): every
+   element's transform/opacity is a pure function of loop time, so a single
+   rAF controller (with a run token) can play, pause and seek it. */
+(function(){
+  'use strict';
+  var root=document.getElementById('how-it-works');
+  if(!root) return;
+  var hiw=root.querySelector('.hiw'),stage=root.querySelector('.hiw-stage'),world=root.querySelector('.hiw-world');
+  if(!hiw||!stage||!world) return;
+
+  var T=12,STATIC_T=10.4,Q='smith warranty',R=20;
+  var mq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
+
+  /* ---------- easing + keyframes ---------- */
+  var E={
+    lin:function(u){return u},
+    in2:function(u){return u*u},
+    out2:function(u){return 1-(1-u)*(1-u)},
+    out3:function(u){var v=1-u;return 1-v*v*v},
+    io2:function(u){return u<.5?2*u*u:1-2*(1-u)*(1-u)},
+    io3:function(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2},
+    back:function(u){var v=u-1;return 1+2.7*v*v*v+1.7*v*v},
+    spring:function(u){return u>=1?1:1-Math.exp(-6.5*u)*Math.cos(11*u)},
+    soft:function(u){return u>=1?1:1-Math.exp(-8*u)*Math.cos(8.5*u)},
+    sl:function(u){return 1-Math.pow(1-u,2.2)}
+  };
+  function cl(v,a,b){return v<a?a:v>b?b:v}
+  function sg(t,a,b,e){return E[e||'lin'](cl((t-a)/(b-a),0,1))}
+  function kf(K,t){
+    var n=K.length;
+    if(t<=K[0][0]) return K[0][1];
+    if(t>=K[n-1][0]) return K[n-1][1];
+    for(var i=1;i<n;i++){
+      if(t<=K[i][0]){
+        var a=K[i-1],b=K[i],u=(t-a[0])/(b[0]-a[0]);
+        return a[1]+(b[1]-a[1])*E[b[2]||'lin'](u);
+      }
+    }
+    return K[n-1][1];
+  }
+  function bump(dt,d){d=d||.28;return dt>0&&dt<d?Math.sin(Math.PI*dt/d)*(1-.4*dt/d):0}
+  function f2(v){return Math.round(v*100)/100}
+
+  /* ---------- nodes ---------- */
+  var N={};
+  [].forEach.call(world.querySelectorAll('[data-n]'),function(el){N[el.getAttribute('data-n')]={el:el,tr:'',o:''}});
+  var ticks=[],keys={},keyList=[],retKey=null;
+  function put(n,x,y,sx,sy,o,rot){
+    var tr='translate3d('+f2(x)+'px,'+f2(y)+'px,0)'+(rot?' rotate('+f2(rot)+'deg)':'')+((sx!==1||sy!==1)?' scale('+f2(sx)+','+f2(sy)+')':'');
+    if(tr!==n.tr){n.el.style.transform=tr;n.tr=tr}
+    if(o!==undefined){var os=String(f2(o));if(os!==n.o){n.el.style.opacity=os;n.o=os}}
+  }
+  function op(n,o){var os=String(f2(o));if(os!==n.o){n.el.style.opacity=os;n.o=os}}
+  function txt(n,s){if(n.s!==s){n.el.textContent=s;n.s=s}}
+
+  /* ---------- build keys once ---------- */
+  var ROWS=['qwertyuiop','asdfghjkl','zxcvbnm'];
+  (function(){
+    var kb=N.kb.el;
+    function mk(label,cls){
+      var k=document.createElement('div');k.className='hiw-key'+(cls?' '+cls:'');
+      var i=document.createElement('i');k.appendChild(i);
+      var rec={el:k,tr:'',o:'',hi:{el:i,o:''},ch:label};
+      return {rec:rec,k:k};
+    }
+    ROWS.forEach(function(row,r){
+      row.split('').forEach(function(ch,i){
+        var m=mk(ch);m.k.appendChild(document.createTextNode(ch));kb.appendChild(m.k);
+        m.rec.r=r;m.rec.i=i;keys[ch]=m.rec;keyList.push(m.rec);
+      });
+    });
+    var sp=mk(' ');kb.appendChild(sp.k);sp.rec.r=3;keys[' ']=sp.rec;keyList.push(sp.rec);
+    var rt=mk('return');
+    rt.k.insertAdjacentHTML('beforeend','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:16px;top:12px"><path d="M19 6v6a2 2 0 0 1-2 2H6m0 0l3.5-3.5M6 14l3.5 3.5"/></svg><small>return</small>');
+    kb.appendChild(rt.k);rt.rec.r=0;retKey=rt.rec;keyList.push(rt.rec);
+    for(var i=0;i<11;i++){
+      var t=document.createElement('div');t.className='hiw-tick';
+      var l=document.createElement('i');t.appendChild(l);
+      world.insertBefore(t,N.track.el.nextSibling);
+      ticks.push({el:t,tr:'',o:'',lit:{el:l,o:''}});
+    }
+  })();
+
+  /* ---------- layout (world units) ---------- */
+  var L=null,kind='',SW=0,SH=0,Z={},B={},TK=[];
+  function layoutFor(k){
+    if(k==='wide') return {kind:k,W:1100,H:540,btn:{x:20,y:40,w:190,h:64},sl:{x0:300,x1:620,y:72},
+      cards:{x:670,w:290,h:52,ys:[104,164,224],fx:[.74,.5,.68]},ask:{x:800,y:318,fw:420},
+      kb:{pitch:49,kw:44,kh:38,ry:44,ky:352,x0:518},
+      bub:{x:300,y:236,w:160,h:34},ans:{x:20,y:284,w:440,h:150},caps:[[20,12],[670,80],[20,244]]};
+    return {kind:k,W:480,H:980,btn:{x:20,y:40,w:180,h:60},sl:{x0:44,x1:436,y:186},
+      cards:{x:90,w:300,h:52,ys:[280,340,400],fx:[.74,.5,.68]},ask:{x:240,y:500,fw:420},
+      kb:{pitch:38,kw:34,kh:36,ry:41,ky:536,x0:22},
+      bub:{x:300,y:742,w:160,h:36},ans:{x:20,y:796,w:440,h:150},caps:[[20,14],[90,252],[20,714]]};
+  }
+  function sz(n,w,h){n.el.style.width=w+'px';n.el.style.height=h+'px'}
+  function applyLayout(){
+    var b=L.btn,s=L.sl,c=L.cards,k=L.kb,a=L.ans,bb=L.bub;
+    sz(N.btn,b.w,b.h);
+    B.btn=[b.x,b.y];
+    B.tag=[b.x,b.y+b.h+14];
+    sz(N.track,s.x1-s.x0,8);B.track=[s.x0,s.y-4];
+    sz(N.fill,s.x1-s.x0,8);B.fill=[s.x0,s.y-4];
+    ticks.forEach(function(t,i){B['t'+i]=[s.x0+1+(s.x1-s.x0-2)*i/10-1,s.y+16]});
+    B.slab=[s.x0,s.y+44];
+    for(var i=0;i<3;i++){sz(N['c'+i],c.w,c.h);B['c'+i]=[c.x,c.ys[i]]}
+    sz(N.ans,a.w,a.h);B.ans=[a.x,a.y];
+    sz(N.bub,bb.w,bb.h);B.bub=[bb.x,bb.y];
+    var fw=Math.min(L.ask.fw,L.W-40);L.ask.fw=fw;
+    sz(N.pill,140,44);B.pill=[L.ask.x-70,L.ask.y-22];
+    sz(N.fbg,fw,44);B.fbg=[L.ask.x-fw/2,L.ask.y-22];
+    sz(N.fc,fw,44);B.fc=B.fbg;
+    // keyboard
+    var kx=k.x0,ky=k.ky,p=k.pitch;
+    keyList.forEach(function(r){
+      var x,y,w=k.kw,h=k.kh;
+      if(r===retKey){x=kx+10*p;y=ky;w=1.5*p-(p-k.kw);h=k.ry+k.kh}
+      else if(r.ch===' '){x=kx+2.5*p;y=ky+3*k.ry;w=5*p-(p-k.kw)}
+      else{x=kx+[0,.5,1.5][r.r]*p+r.i*p;y=ky+r.r*k.ry}
+      r.el.style.width=w+'px';r.el.style.height=h+'px';
+      r.x=x;r.y=y;r.w=w;r.h=h;r.cx=x+w/2;r.top=y;
+      r.el.style.fontSize=(k.kw<40?13:15)+'px';
+    });
+    for(var j=0;j<3;j++) B['cap'+j]=L.caps[j];
+  }
+  function prepare(){
+    var r=stage.getBoundingClientRect();
+    if(!r.width||!r.height) return false;
+    SW=r.width;SH=r.height;
+    var k=SW/SH>=1.25?'wide':'tall';
+    if(k!==kind){kind=k;L=layoutFor(k);applyLayout()}
+    var W=L.W,H=L.H,kb=L.kb,pk=kb.pitch;
+    var kbW=10*pk+1.5*pk;
+    var zc=Math.min(1.5,SW/400,SH/280);
+    var fieldTop=L.ask.y-22,kbBottom=kb.ky+3*kb.ry+kb.kh;
+    var zk=Math.min(zc*.9,.92*SW/(kbW+10),.92*SH/(kbBottom-fieldTop+16));
+    var a=L.ans,bb=L.bub,chatTop=bb.y,chatBot=a.y+a.h,chatL=Math.min(a.x,bb.x),chatR=a.x+a.w;
+    var za=Math.min(zc*.95,.92*SW/(chatR-chatL),.92*SH/(chatBot-chatTop+12));
+    var zo=Math.min(.94*SW/W,.94*SH/H);
+    Z={c:zc,k:zk,a:za,o:zo,s:Math.min(zc*1.08,zc+.2)};
+    var b=L.btn;
+    Z.fBtn=[b.x+b.w*.62,b.y+b.h*.5+6];
+    Z.fKb=[kb.x0+kbW/2,(fieldTop+kbBottom)/2];
+    Z.fAns=[(chatL+chatR)/2,(chatTop+chatBot)/2];
+    Z.fOv=[W/2,H/2];
+    buildBall();buildCam();
+    return true;
+  }
+
+  /* ---------- token path ---------- */
+  var S=[],IMP=[];
+  var LAND={};
+  function buildBall(){
+    var b=L.btn,s=L.sl,c=L.cards,k=L.kb,a=L.ans;
+    var btnC={x:b.x+b.w/2,y:b.y+b.h/2},pop={x:btnC.x+62,y:btnC.y-74};
+    var slS={x:s.x0,y:s.y},slE={x:s.x1,y:s.y};
+    var cl_=[0,1,2].map(function(i){return{x:c.x+c.w*c.fx[i],y:c.ys[i]-R}});
+    var askL={x:L.ask.x+6,y:L.ask.y-22-R};
+    S=[];IMP=[];
+    function add(a_,b_,f,t,o){var q={a:a_,b:b_,f:f,t:t};for(var x in o)q[x]=o[x];S.push(q)}
+    add(0,.62,btnC,btnC);
+    add(.62,1.0,btnC,pop,{ex:'out3',ey:'back'});
+    add(1.0,1.3,pop,slS,{ex:'io2',ey:'in2'});IMP.push([1.3,.3]);
+    add(1.3,2.75,slS,slE,{ex:'sl',ey:'lin',slider:1});
+    add(2.75,2.85,slE,slE);
+    add(2.85,3.10,slE,cl_[0],{arc:38});IMP.push([3.10,.28]);
+    add(3.10,3.28,cl_[0],cl_[1],{arc:22});IMP.push([3.28,.26]);
+    add(3.28,3.46,cl_[1],cl_[2],{arc:22});IMP.push([3.46,.26]);
+    add(3.46,3.85,cl_[2],askL,{arc:44});IMP.push([3.85,.3]);
+    add(3.85,4.05,askL,askL);
+    // typing
+    TK=[];
+    var prev=askL,t0=4.25;
+    for(var i=0;i<Q.length;i++){
+      var kr=keys[Q[i]],tc=t0+i*.15,land={x:kr.cx,y:kr.top-R+3};
+      TK.push(tc);
+      var ah=i===0?4.05:tc-.13;
+      if(ah>S[S.length-1].b) add(S[S.length-1].b,ah,prev,prev);
+      add(ah,tc,prev,land,{arc:i===0?26:15});IMP.push([tc,.16]);
+      prev=land;
+    }
+    var lastT=TK[TK.length-1];
+    add(lastT,6.30,prev,prev);
+    var rl={x:retKey.cx,y:retKey.top-R+3};LAND.ret=rl;
+    add(6.30,6.65,prev,rl,{arc:34});IMP.push([6.65,.2]);
+    add(6.65,6.72,rl,rl);
+    var chip={x:a.x+18+15,y:a.y+106+15};LAND.chip=chip;
+    add(6.72,7.45,rl,chip,{ex:'io2',ey:'io2',arc:96});
+    LAND.cards=cl_;
+  }
+  function bpos(t){
+    var n=S.length;
+    for(var i=0;i<n;i++){
+      var s=S[i];
+      if(t<=s.b||i===n-1){
+        var u=cl((t-s.a)/(s.b-s.a),0,1),ex=E[s.ex||'lin'],ey=E[s.ey||s.ex||'lin'];
+        var x=s.f.x+(s.t.x-s.f.x)*ex(u),y=s.f.y+(s.t.y-s.f.y)*ey(u);
+        if(s.arc) y-=s.arc*4*u*(1-u);
+        return [x,y,s.slider?1:0];
+      }
+    }
+  }
+
+  /* ---------- camera ---------- */
+  var CX,CY,CZ,CW;
+  function buildCam(){
+    var F=Z;
+    CX=[[0,F.fBtn[0]],[.9,F.fBtn[0]],[3.4,F.fKb[0],'io2'],[6.5,F.fKb[0]],[7.6,F.fAns[0],'io2'],[8.6,F.fAns[0]],[9.6,F.fOv[0],'io3'],[11.2,F.fOv[0]],[11.95,F.fBtn[0],'io3']];
+    CY=[[0,F.fBtn[1]],[.9,F.fBtn[1]],[3.4,F.fKb[1],'io2'],[6.5,F.fKb[1]],[7.6,F.fAns[1],'io2'],[8.6,F.fAns[1]],[9.6,F.fOv[1],'io3'],[11.2,F.fOv[1]],[11.95,F.fBtn[1],'io3']];
+    CZ=[[0,F.s],[.9,F.c,'io2'],[3.5,F.c],[4.2,F.k,'io2'],[6.3,F.k],[7.5,F.a,'io2'],[8.6,F.a],[9.6,F.o,'io3'],[11.2,F.o],[11.95,F.s,'io3']];
+    CW=[[0,0],[.5,0],[1.1,1,'io2'],[3.6,1],[4.2,.22,'io2'],[6.2,.22],[6.75,1,'io2'],[7.4,1],[7.9,0,'io2']];
+  }
+  var SM=[-.12,-.04,.04,.12,.2,.28,.36,.44];
+  function camera(t){
+    var w=kf(CW,t),x=kf(CX,t),y=kf(CY,t),z=kf(CZ,t);
+    if(w>0){
+      var sx=0,sy=0;
+      for(var i=0;i<SM.length;i++){var p=bpos(cl(t+SM[i],0,7.45));sx+=p[0];sy+=p[1]}
+      sx/=SM.length;sy/=SM.length;
+      x=x*(1-w)+sx*w;y=y*(1-w)+sy*w;
+    }
+    return [x,y,z];
+  }
+
+  /* ---------- steps (HTML captions) ---------- */
+  var lis=[].slice.call(hiw.querySelectorAll('.hiw-steps li')),onState=[];
+  function stepsOn(t,all){
+    var st=[.5,2.98,3.85];
+    for(var i=0;i<lis.length;i++){
+      var on=all||(t>=st[i]&&t<11.45);
+      if(onState[i]!==on){onState[i]=on;if(on)lis[i].setAttribute('data-on','');else lis[i].removeAttribute('data-on')}
+    }
+  }
+
+  /* ---------- render ---------- */
+  var lastCam='';
+  function render(t){
+    if(!L) return;
+    var fo=1-sg(t,11.2,11.65,'io2');
+    var c=camera(t);
+    var tr='translate3d('+f2(SW/2-c[0]*c[2])+'px,'+f2(SH/2-c[1]*c[2])+'px,0) scale('+(Math.round(c[2]*1000)/1000)+')';
+    if(tr!==lastCam){world.style.transform=tr;lastCam=tr}
+
+    var b=L.btn,s=L.sl,cd=L.cards,a=L.ans,bb=L.bub,as=L.ask;
+    /* cursor + click */
+    var hx=b.x+b.w*.62,hy=b.y+b.h*.62,sx0=b.x-140,sy0=b.y+150,ax=b.x+b.w*.8,ay=b.y+b.h+70;
+    var cx=kf([[0,sx0],[.46,hx,'out3'],[.95,hx],[1.8,ax,'io2']],t),cy=kf([[0,sy0],[.46,hy,'out3'],[.95,hy],[1.8,ay,'io2']],t);
+    var co=kf([[0,0],[.16,1,'out2'],[1.0,1],[1.8,0]],t);
+    var cs=kf([[.44,1],[.53,.8,'out2'],[.72,1,'out2']],t);
+    put(N.cur,cx-3,cy-2,cs,cs,co);
+    var rp=sg(t,.5,1.0,'out3');
+    put(N.rip,hx-17,hy-17,.35+1.6*rp,.35+1.6*rp,t>.5&&t<1.0?.75*(1-rp):0);
+    /* button */
+    var press=kf([[.48,1],[.56,.94,'out2'],[.95,1,'spring']],t);
+    var ov=sg(t,.5,.6,'out2')*fo;
+    put(N.btn,B.btn[0],B.btn[1],press,press);
+    op(N.btnOn,ov);op(N.lab1,1-ov);op(N.lab2,ov);
+    var tg=sg(t,.9,1.3,'soft');
+    put(N.tag,B.tag[0],B.tag[1]+8*(1-tg),1,1,sg(t,.9,1.05,'out2')*fo);
+
+    /* token */
+    var bp=bpos(t),bx=bp[0],by=bp[1],insl=bp[2];
+    var bs=kf([[.56,0],[.62,.15],[1.0,1,'back']],t)*kf([[7.2,1],[7.45,.45,'in2']],t);
+    var bo=(t<.56?0:1)*(1-sg(t,7.38,7.52));
+    var pp=bpos(t+.016),pm=bpos(t-.016),vx=(pp[0]-pm[0])/.032,vy=(pp[1]-pm[1])/.032,v=Math.sqrt(vx*vx+vy*vy);
+    var st=cl(v/3000,0,.2)*(insl?0:1)*(t<.7?0:1),ang=Math.atan2(vy,vx)*180/Math.PI;
+    var sq=0;
+    for(var i=0;i<IMP.length;i++) sq=Math.max(sq,IMP[i][1]*bump(t-IMP[i][0],.24));
+    put(N.ball,bx-R,by-R,bs,bs,bo);
+    put(N.sq,0,0,1+sq*.6,1-sq);
+    var bdt=st>.01?'rotate('+f2(ang)+'deg) scale('+f2(1+st)+','+f2(1-st*.55)+') rotate('+f2(-ang)+'deg)':'';
+    if(N.bd.tr!==bdt){N.bd.el.style.transform=bdt;N.bd.tr=bdt}
+    for(var g=0;g<3;g++){
+      var q=bpos(cl(t-.02*(g+1),0,7.45));
+      var go=cl((v-380)/700,0,1)*[.3,.16,.07][g]*bo*(bs>.5?1:0);
+      put(N['g'+g],q[0]-R,q[1]-R,.92-.1*g,.92-.1*g,go);
+    }
+
+    /* slider */
+    var p=cl((bx-s.x0)/(s.x1-s.x0),0,1);
+    if(t<1.3) p=0;else if(t>=2.75) p=1;
+    put(N.track,B.track[0],B.track[1],1,1,1);
+    put(N.fill,B.fill[0],B.fill[1],Math.max(p,.0001),1,(t>=1.3?1:0)*fo);
+    for(i=0;i<ticks.length;i++){
+      var tk=ticks[i];
+      put(tk,B['t'+i][0],B['t'+i][1],1,1);
+      op(tk.lit,cl((p*10-i+.12)*6,0,1)*fo);
+    }
+    put(N.slab,B.slab[0],B.slab[1],1,1,.9);
+    var tipO=kf([[1.28,0],[1.4,1,'out2'],[2.9,1],[3.05,0,'in2']],t);
+    var tp=1+.16*bump(t-2.72,.3);
+    put(N.tip,s.x0+p*(s.x1-s.x0)-26,s.y-R-46,tp,tp,tipO);
+    txt(N.tip,Math.round(p*100)+'%');
+
+    /* cards */
+    var ct=[2.98,3.16,3.34];
+    for(i=0;i<3;i++){
+      var u=sg(t,ct[i],ct[i]+.46,'soft'),dip=5*bump(t-[3.10,3.28,3.46][i]);
+      put(N['c'+i],B['c'+i][0],B['c'+i][1]-16*(1-u)+dip,.94+.06*u,.94+.06*u,sg(t,ct[i],ct[i]+.16,'out2')*fo);
+    }
+    /* ask pill -> field */
+    var pillO=sg(t,3.4,3.55,'out2')*(1-sg(t,3.95,4.08,'out2'))*fo;
+    var pd=bump(t-3.85,.26);
+    put(N.pill,B.pill[0],B.pill[1]+2*pd,1+.04*pd,1-.12*pd,pillO);
+    var fx=.333+.667*sg(t,3.92,4.38,'soft');
+    put(N.fbg,B.fbg[0],B.fbg[1],fx,1,sg(t,3.92,4.02,'out2')*fo);
+    var fcO=sg(t,4.12,4.32,'out2')*fo;
+    put(N.fc,B.fc[0],B.fc[1],1,1,fcO);
+    var n=0;
+    if(t<6.72){for(i=0;i<TK.length;i++) if(t>=TK[i]) n=i+1}
+    txt(N.txt,Q.slice(0,n));
+    op(N.ph,n===0?1:0);
+    var blink=(t>=4.3&&t<6.72)?(Math.floor(t*2.2)%2?.25:1):0;
+    op(N.caret,blink);
+    var sendO=kf([[4.2,.35],[4.28,1],[6.8,1],[6.95,.35]],t),sendS=1+.22*bump(t-6.65,.3);
+    var sst=sendS>1.001?'scale('+f2(sendS)+')':'';
+    if(N.send.tr!==sst){N.send.el.style.transform=sst;N.send.tr=sst}
+    op(N.send,sendO);
+    /* keyboard */
+    var ku=sg(t,3.7,4.15,'out3');
+    put(N.kb,0,44*(1-ku),1,1,ku*fo);
+    for(i=0;i<keyList.length;i++){
+      var kr=keyList[i],tc=kr===retKey?6.65:-1;
+      var pr=0;
+      if(kr===retKey){pr=kf([[tc-.02,0],[tc+.03,1,'out2'],[tc+.16,0,'io2']],t)}
+      else{
+        for(var j=0;j<TK.length;j++){
+          if(Q[j]===kr.ch&&t>TK[j]-.03&&t<TK[j]+.16){pr=Math.max(pr,kf([[TK[j]-.02,0],[TK[j]+.03,1,'out2'],[TK[j]+.15,0,'io2']],t))}
+        }
+      }
+      put(kr,kr.x,kr.y+2.5*pr,1,1);
+      op(kr.hi,.8*pr);
+    }
+    /* bubble + answer */
+    var bu=cl((t-6.72)/.55,0,1),be=E.io2(bu);
+    var sx1=B.fbg[0]+14,sy1=as.y-18;
+    var bX=sx1+(bb.x-sx1)*be,bY=sy1+(bb.y-sy1)*be-46*4*bu*(1-bu);
+    var bsq=bump(t-7.27,.24)*.18,bsc=.8+.2*E.out2(sg(t,6.72,6.9));
+    put(N.bub,bX,bY,bsc*(1+bsq*.6),bsc*(1-bsq),(t<6.72?0:sg(t,6.72,6.8))*fo);
+    var au=sg(t,7.15,7.65,'soft');
+    put(N.ans,B.ans[0],B.ans[1]+26*(1-au),.95+.05*au,.95+.05*au,sg(t,7.15,7.32,'out2')*fo);
+    op(N.ad,sg(t,7.3,7.5,'out2')*fo);op(N.al,sg(t,7.4,7.6,'out2')*fo);
+    var chu=sg(t,7.42,7.85,'soft');
+    put(N.chip,0,0,.6+.4*chu,.6+.4*chu,sg(t,7.42,7.52)*fo);
+    /* captions */
+    for(i=0;i<3;i++){
+      var cu=sg(t,9.0+.15*i,9.45+.15*i,'out2');
+      put(N['cap'+i],B['cap'+i][0],B['cap'+i][1]+6*(1-cu),1,1,cu*fo);
+    }
+    stepsOn(t,false);
+  }
+
+  /* ---------- controller ---------- */
+  var tLoop=0,last=0,rid=0,token=0,running=false,inView=false,manual=false,loops=0;
+  function frame(my){
+    return function(now){
+      if(my!==token) return;
+      var dt=Math.min((now-last)/1000,.08);last=now;
+      tLoop+=dt;
+      if(tLoop>=T){tLoop-=T;loops++;stage.setAttribute('data-loops',String(loops))}
+      render(tLoop);
+      rid=requestAnimationFrame(frame(my));
+    };
+  }
+  function play(){
+    if(running||manual||mq.matches||!inView||document.hidden||!L) return;
+    running=true;var my=++token;last=performance.now();
+    stage.setAttribute('data-state','playing');
+    rid=requestAnimationFrame(frame(my));
+  }
+  function pause(state){
+    running=false;token++;cancelAnimationFrame(rid);
+    stage.setAttribute('data-state',state||'paused');
+  }
+  function showStatic(){pause('static');tLoop=STATIC_T;render(STATIC_T);stepsOn(STATIC_T,true)}
+  function sync(){
+    if(mq.matches){showStatic();return}
+    if(inView&&!document.hidden&&!manual) play();
+    else if(running) pause('paused');
+  }
+  function refresh(){
+    if(!prepare()) return;
+    hiw.classList.add('is-ready');
+    render(mq.matches?STATIC_T:tLoop);
+    if(mq.matches) stepsOn(STATIC_T,true);
+  }
+
+  hiw.classList.add('is-js');
+  refresh();
+  if(window.ResizeObserver){new ResizeObserver(function(){refresh();sync()}).observe(stage)}
+  else window.addEventListener('resize',function(){refresh()});
+  if(window.IntersectionObserver){
+    new IntersectionObserver(function(es){inView=es[es.length-1].isIntersecting;sync()},{threshold:.15}).observe(stage);
+  }else{inView=true}
+  document.addEventListener('visibilitychange',sync);
+  if(mq.addEventListener) mq.addEventListener('change',function(){if(mq.matches)showStatic();else{tLoop=0;refresh();sync()}});
+  if(mq.matches) showStatic(); else if(!window.IntersectionObserver) sync();
+
+  /* test hook */
+  root.__hiw={T:T,
+    seek:function(t){manual=true;pause('seek');tLoop=cl(t,0,T-.001);render(tLoop);stepsOn(tLoop,false)},
+    resume:function(){manual=false;sync()},
+    loops:function(){return loops}
+  };
+})();
+</script>
 
 
 <section id="demo">
@@ -1337,78 +1671,133 @@ h3{font-size:1.25rem}
         <div class="eyebrow">Pricing</div>
         <h2>Pick your plan by team size.</h2>
       </div>
-      <p class="lede">Every plan includes unlimited Donovan, a monthly document-scan allowance sized to your plan, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 30-day free trial on Solo — card required, you won't be charged until the trial ends.</p>
+      <p class="lede">Every plan includes unlimited Donovan &mdash; answers from your own records, always with sources &mdash; a monthly document-scan allowance, white-glove setup and self-serve export of your data. Plans differ by logins, storage, scan volume and support. 30-day free trial on Solo &mdash; card required, you won't be charged until the trial ends.</p>
+    </div>
+    <div class="plans-every" aria-label="Included with every plan">
+      <span class="pe-label">Every plan includes</span>
+      <span>Unlimited Donovan, with sources</span>
+      <span>White-glove setup by our team</span>
+      <span>Export your data anytime</span>
+      <span>Public status page <span class="pill-soon">Coming soon</span></span>
     </div>
     <div class="plans plans-4">
       <div class="plan dw-observe dw-once">
-        <div class="tier">Solo</div>
-        <span class="trial-badge">30-day free trial</span>
+        <div class="plan-top"><div class="tier">Solo</div><span class="trial-badge">30-day free trial</span></div>
         <h3>$99<span class="per">/mo</span></h3>
-        <p class="for">For the one-person operation. Up to 2 logins, one price, your full archive.</p>
-        <ul class="spec">
-          <li><span>Logins</span><b>up to 2</b></li>
-          <li><span>Donovan</span><b>Unlimited</b></li>
-          <li><span>Documents stored</span><b>25,000</b></li>
-          <li><span>New pages / month</span><b>750</b></li>
-          <li><span>API access</span><b>—</b></li>
-          <li><span>Support</span><b>In-app + email</b></li>
-          <li><span>Onboarding</span><b>Self-serve</b></li>
-        </ul>
-        <p class="math">One prevented callback covers 3–6 months.</p>
+        <p class="for">Owner-operator</p>
+        <div class="grp"><h4>Team</h4>
+          <ul class="spec">
+            <li><span>Logins</span><b>up to 2</b></li>
+          </ul></div>
+        <div class="grp"><h4>Donovan &amp; documents</h4>
+          <ul class="spec">
+            <li><span>Donovan</span><b>Unlimited</b></li>
+            <li><span>Documents stored</span><b>25,000</b></li>
+            <li><span>New pages / month</span><b>750</b></li>
+            <li><span>API access</span><b>—</b></li>
+          </ul></div>
+        <div class="grp"><h4>Support &amp; protection</h4>
+          <ul class="spec">
+            <li><span>Support</span><b>Email</b></li>
+            <li><span>Response</span><b>Next business day</b></li>
+          </ul></div>
+        <div class="grp plus"><h4>Included</h4>
+          <ul>
+            <li>Everything under &ldquo;Every plan includes&rdquo; above</li>
+          </ul>
+        </div>
+        <p class="math">One prevented callback covers 3&ndash;6 months.</p>
         <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Get started</a>
       </div>
       <div class="plan featured dw-observe dw-once">
-        <div class="tier">Shop · most popular</div>
+        <div class="plan-top"><div class="tier">Shop</div><span class="badge-pop">Most popular</span></div>
         <h3>$199<span class="per">/mo</span></h3>
-        <p class="for">For a small crew, up to 5 logins. One price. Stop the callback chain.</p>
-        <ul class="spec">
-          <li><span>Logins</span><b>up to 5</b></li>
-          <li><span>Donovan</span><b>Unlimited</b></li>
-          <li><span>Documents stored</span><b>100,000</b></li>
-          <li><span>New pages / month</span><b>2,000</b></li>
-          <li><span>API access</span><b>—</b></li>
-          <li><span>Email intake</span><span class="pill-soon">Coming soon</span></li>
-          <li><span>Support</span><b>Email, next day</b></li>
-          <li><span>Onboarding</span><b>Guided</b></li>
-        </ul>
-        <p class="math">Three techs preventing one callback a month each: $3,600–7,200 saved. You pay $199.</p>
+        <p class="for">Small shop</p>
+        <div class="grp"><h4>Team</h4>
+          <ul class="spec">
+            <li><span>Logins</span><b>up to 5</b></li>
+          </ul></div>
+        <div class="grp"><h4>Donovan &amp; documents</h4>
+          <ul class="spec">
+            <li><span>Donovan</span><b>Unlimited</b></li>
+            <li><span>Documents stored</span><b>100,000</b></li>
+            <li><span>New pages / month</span><b>2,000</b></li>
+            <li><span>API access</span><b>—</b></li>
+          </ul></div>
+        <div class="grp"><h4>Support &amp; protection</h4>
+          <ul class="spec">
+            <li><span>Support</span><b>Email + chat</b></li>
+            <li><span>Response</span><b>Same business day</b></li>
+          </ul></div>
+        <div class="grp plus"><h4>Everything in Solo, plus</h4>
+          <ul>
+            <li>Email intake <span class="pill-soon">Coming soon</span></li>
+          </ul></div>
+        <p class="math">Three techs preventing one callback a month each: $3,600&ndash;7,200 saved. You pay $199.</p>
         <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Get started</a>
       </div>
       <div class="plan dw-observe dw-once">
-        <div class="tier">Crew</div>
+        <div class="plan-top"><div class="tier">Crew</div></div>
         <h3>$399<span class="per">/mo</span></h3>
-        <p class="for">For growing teams, up to 10 logins. Multiple locations, phone support.</p>
-        <ul class="spec">
-          <li><span>Logins</span><b>up to 10</b></li>
-          <li><span>Donovan</span><b>Unlimited</b></li>
-          <li><span>Documents stored</span><b>500,000</b></li>
-          <li><span>New pages / month</span><b>5,000</b></li>
-          <li><span>API access</span><b>—</b></li>
-          <li><span>Google Drive sync</span><span class="pill-soon">Coming soon</span></li>
-          <li><span>Branch scoping</span><span class="pill-soon">Coming soon</span></li>
-          <li><span>Support</span><b>Phone + email</b></li>
-        </ul>
+        <p class="for">Growing crew</p>
+        <div class="grp"><h4>Team</h4>
+          <ul class="spec">
+            <li><span>Logins</span><b>up to 10</b></li>
+          </ul></div>
+        <div class="grp"><h4>Donovan &amp; documents</h4>
+          <ul class="spec">
+            <li><span>Donovan</span><b>Unlimited</b></li>
+            <li><span>Documents stored</span><b>500,000</b></li>
+            <li><span>New pages / month</span><b>5,000</b></li>
+            <li><span>API access</span><b>—</b></li>
+          </ul></div>
+        <div class="grp"><h4>Support &amp; protection</h4>
+          <ul class="spec">
+            <li><span>Support</span><b>Email, chat, phone</b></li>
+            <li><span>Response</span><b>2 hrs, urgent issues</b></li>
+          </ul></div>
+        <div class="grp plus"><h4>Everything in Shop, plus</h4>
+          <ul>
+            <li>Scheduled onboarding call</li>
+            <li>Daily off-site backups, 30-day restore <span class="pill-soon">Coming soon</span></li>
+            <li>Google Drive sync <span class="pill-soon">Coming soon</span></li>
+            <li>Branch scoping <span class="pill-soon">Coming soon</span></li>
+          </ul></div>
         <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
         <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Get started</a>
       </div>
       <div class="plan dw-observe dw-once">
-        <div class="tier">Fleet</div>
+        <div class="plan-top"><div class="tier">Fleet</div></div>
         <h3>$899<span class="per">+/mo</span></h3>
-        <p class="for">For 11+ logins or multi-location. Custom fit.</p>
-        <ul class="spec">
-          <li><span>Logins</span><b>11+</b></li>
-          <li><span>Donovan</span><b>Unlimited</b></li>
-          <li><span>Documents stored</span><b>Unlimited</b></li>
-          <li><span>New pages / month</span><b>10,000</b></li>
-          <li><span>API access</span><b>Yes</b></li>
-          <li><span>Branches</span><b>Unlimited</b></li>
-          <li><span>Support</span><b>Dedicated + SLA</b></li>
-        </ul>
-        <p class="math">Per-tech pricing is what's killing you. This isn't per tech.</p>
+        <p class="for">Multi-crew teams</p>
+        <div class="grp"><h4>Team</h4>
+          <ul class="spec">
+            <li><span>Logins</span><b>11+</b></li>
+          </ul></div>
+        <div class="grp"><h4>Donovan &amp; documents</h4>
+          <ul class="spec">
+            <li><span>Donovan</span><b>Unlimited</b></li>
+            <li><span>Documents stored</span><b>Unlimited</b></li>
+            <li><span>New pages / month</span><b>10,000</b></li>
+            <li><span>API access</span><b>Yes</b></li>
+          </ul></div>
+        <div class="grp"><h4>Support &amp; protection</h4>
+          <ul class="spec">
+            <li><span>Support</span><b>Named contact</b></li>
+            <li><span>Response</span><b>1 hr, urgent, 24/7</b></li>
+          </ul></div>
+        <div class="grp plus"><h4>Everything in Crew, plus</h4>
+          <ul>
+            <li>Named contact (Sterling) from first sample to go-live</li>
+            <li>99.5% uptime SLA with service credits <span class="pill-soon">Coming soon</span></li>
+            <li>Backups every 6 hours + 12 monthly archives <span class="pill-soon">Coming soon</span></li>
+            <li>Per-shop restore <span class="pill-soon">Coming soon</span></li>
+          </ul></div>
+        <p class="math">Per-tech pricing is what&rsquo;s killing you. This isn&rsquo;t per tech.</p>
         <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
-    <p class="plans-note">The owner account doesn't count toward logins.</p>
+    <p class="plans-note">The owner account doesn't count toward logins. Donovan is unlimited, subject to a fair-use safety limit ordinary use never reaches. Dashed <span class="pill-soon">Coming soon</span> tags mark features still being built.</p>
     <div class="onboard">
       <div>
         <div class="eyebrow">Included with every plan</div>

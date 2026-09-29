@@ -20,6 +20,7 @@
     "verify:warranty": "node scripts/verify-warranty.mjs",
     "verify:warranty-status": "node scripts/verify-warranty-status.mjs",
     "verify:answer": "node scripts/verify-answer.mjs",
+    "verify:how-it-works-ui": "node scripts/verify-how-it-works.mjs",
     "verify:customer": "node scripts/verify-customer-link.mjs",
     "verify:customers": "node scripts/verify-customers.mjs",
     "verify:multiunit": "node scripts/verify-multiunit.mjs",
