@@ -584,6 +584,121 @@ footer a{color:var(--muted);text-decoration:none}
 .sec-head,.person,.founder,.plan,.principle,.cost-card,.cost-calc,.mm-ticks{opacity:1!important;transform:none!important}
 .mm-ticks path{stroke-dashoffset:0!important}
 </style></noscript>
+<style id="dw-tighten">
+/* ==== Vertical rhythm tightening (density pass) ==== */
+section{padding-block:clamp(24px,2.8vw,38px)}
+#platform,#who,#cost{padding-block:clamp(22px,2.6vw,34px)}
+h1{font-size:clamp(2rem,3.5vw,2.85rem)}
+h2{font-size:clamp(1.6rem,2.7vw,2.1rem)}
+h3{font-size:1.25rem}
+.sec-head{grid-template-columns:minmax(0,1.05fr) minmax(0,1.15fr);gap:10px 32px;margin-bottom:clamp(12px,1.5vw,16px)}
+.sec-head .eyebrow{margin-bottom:8px}
+.lede{font-size:1.05rem;line-height:1.5}
+
+/* hero */
+.hero .wrap{padding-block:clamp(20px,2.6vw,32px);gap:32px}
+@media (min-width:861px){.hero .wrap{grid-template-columns:1.4fr .6fr}}
+.hero-copy{gap:14px}
+.hero-facts{gap:24px;padding-top:8px}
+.well{max-width:300px}
+@media (max-width:860px){
+  .hero .wrap{gap:14px}
+  .well{max-width:170px}
+  .hero-copy{gap:12px}
+}
+
+@media (max-width:560px){.hero-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.fact b{font-size:1.1rem}.fact span{font-size:.62rem;letter-spacing:.02em}}
+
+@media (min-width:640px) and (max-width:980px){.founders{grid-template-columns:repeat(2,minmax(0,1fr))}.founder{grid-template-columns:120px minmax(0,1fr);gap:14px;padding:12px}.founder p{font-size:.9rem}}
+
+/* problem: art beside the heading, ledger as a tight 3-up */
+#problem .wrap{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:32px;align-items:start}
+#problem .sec-head{grid-column:1;grid-row:1}
+#problem .prob-art{grid-column:2;grid-row:1;width:112px;margin:0;align-self:center}
+#problem .ledger{grid-column:1/-1;grid-row:2;margin-top:14px}
+.ledger > div{padding:14px 16px;gap:6px}
+.ledger p{font-size:.92rem;line-height:1.5}
+@media (max-width:860px){
+  #problem .wrap{grid-template-columns:minmax(0,1fr);position:relative}
+  #problem .prob-art{position:absolute;right:clamp(16px,4vw,40px);top:0;width:64px;grid-column:1}
+  .ledger > div{padding:12px 14px;gap:4px}
+}
+
+/* founders */
+#team .sec-head{margin-bottom:12px}
+@media (min-width:981px){.founder{grid-template-columns:clamp(130px,14vw,190px) minmax(0,1fr)}}
+.founders{gap:16px}
+.founder{padding:14px}
+@media (max-width:560px){.founder{gap:12px}.founder-img{width:min(180px,52%)}}
+
+/* platform / steps */
+.step{padding-block:4px;gap:6px}
+.mm-marquee{margin:10px 0 6px;padding:8px 0}
+.dwflow-grid{gap:clamp(20px,3vw,36px)}
+.dwflow-stage{max-width:300px}
+@media (min-width:881px){
+  #how-it-works .wrap{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);column-gap:clamp(24px,3.5vw,44px);align-content:center}
+  #how-it-works .sec-head{grid-column:2;grid-row:1;grid-template-columns:1fr;margin-bottom:6px;align-self:end}
+  #how-it-works .dwflow-grid{display:contents}
+  #how-it-works .dwflow-stage{grid-column:1;grid-row:1 / span 2;align-self:center}
+  #how-it-works .dwflow-beats{grid-column:2;grid-row:2;align-self:start}
+}
+.dwflow-beats li{padding-block:8px}
+@media (max-width:880px){.dwflow-grid{gap:20px}.dwflow-beats li{padding-block:12px}.dwflow-stage{max-width:300px}}
+
+/* demo */
+.demo-wrap{gap:12px}
+.demo{min-height:0}
+.demo-side{padding:12px;gap:6px}
+.q{padding:9px 12px}
+.demo-main{padding:12px 14px;gap:8px}
+.kv > div{padding:7px 10px}
+.src{padding:5px 10px}
+
+/* who */
+.person{padding:12px 14px;gap:6px}
+.person blockquote{font-size:1.2rem}
+
+/* plans */
+.plans-4{gap:14px}
+.plan{padding:14px;gap:8px}
+.plan ul{gap:4px;padding-top:8px}
+.plan .for{min-height:0}
+.onboard{margin-top:12px;padding:12px 20px;gap:10px 24px}
+.onboard .eyebrow{margin-bottom:6px}
+.onboard .mm-ticks{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;gap:4px 22px;margin:0}
+.annual{margin:8px 0 0}
+.rescue{margin-top:10px;padding:12px 20px}
+.rescue h3{margin:4px 0}
+@media (max-width:860px){.rescue{gap:12px}}
+
+@media (min-width:1101px){#plans .sec-head{grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr)}}
+
+/* cost calculator: three cards across, summary as a side rail */
+#cost .sec-head{margin-bottom:10px}
+.cost-calc{gap:14px;margin-top:0}
+.cost-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:stretch}
+.cost-lines > .cost-line:first-child{grid-row:1 / span 2}
+.cost-summary{position:sticky;top:84px}
+.cost-line-total{margin-top:auto}
+.cost-line{padding:12px 14px;gap:8px}
+.cost-summary{padding:16px 18px;gap:10px}
+.cost-card{margin-top:12px;max-width:none;padding:12px 16px}
+.cost-note{margin-top:8px;max-width:none}
+@media (max-width:1100px){
+  .cost-calc{grid-template-columns:1fr}
+  .sec-head{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}
+  .cost-lines{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cost-summary{position:static}
+}
+@media (max-width:860px){.sec-head{grid-template-columns:1fr}}
+@media (max-width:760px){.cost-lines{grid-template-columns:1fr;gap:10px}.cost-lines > .cost-line:first-child{grid-row:auto}}
+
+/* principles + close */
+.principles{gap:10px 24px}
+.close .wrap{gap:32px}
+.logo-card{padding:12px}
+</style>
 </head>
 <body>
 
