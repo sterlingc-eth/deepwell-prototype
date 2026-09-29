@@ -13,7 +13,6 @@ import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, 
 import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, type ThreadTurn } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
 import { friendlyErrorMessage } from '../services/httpError';
-import { asksUsedFraction, resetsOnShortLabel } from '../services/billingClient';
 import { useAppStore } from '../store/appStore';
 
 // TEAM T2 / Round 18 P2: matches api/_lib/conversation.js's own MAX_CONTEXT_TURNS (that module isn't
@@ -41,7 +40,6 @@ export function AskScreen() {
   const setIncludeUnverified = useAppStore((s) => s.setIncludeUnverified);
   const openEntity = useAppStore((s) => s.openEntity);
   const openCustomer = useAppStore((s) => s.openCustomer);
-  const billingStatus = useAppStore((s) => s.billingStatus);
   const fieldMode = useAppStore((s) => s.fieldMode);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   // Re-run the current question whenever the graph changes (a review correction changes the answer)
@@ -49,11 +47,6 @@ export function AskScreen() {
   const docCount = Object.keys(graphVersion).length;
   const entities = useGraph((s) => s.entities);
   const suggestions = useMemo(() => buildSuggestions(Object.values(entities)), [entities]);
-  // Monthly question allowance (owner decision, 2026-09-21): a quiet caption
-  // once 80% of the plan's asksPerMonth is used, so the tech sees it coming
-  // before hitting the hard 402 the gateAsk block below already renders via
-  // error/billingUrl (reused as-is — see that branch's own comment).
-  const askPct = asksUsedFraction(billingStatus);
 
   const [input, setInput] = useState('');
   const [asked, setAsked] = useState<string | null>(null);
@@ -332,16 +325,6 @@ export function AskScreen() {
                 <li key={i} className="text-caption text-ink-3/70 line-through decoration-ink-3/40">{s}</li>
               ))}
             </ul>
-          )}
-          {askPct != null && askPct >= 0.8 && !billingUrl && (
-            <p className="text-caption text-ink-3">
-              {Math.round(Math.min(askPct, 1) * 100)}% of this month's usage
-              {(() => {
-                const resets = resetsOnShortLabel(billingStatus?.usage.resetsOn);
-                return resets ? ` · resets ${resets}` : '';
-              })()}
-              .
-            </p>
           )}
         </form>
 

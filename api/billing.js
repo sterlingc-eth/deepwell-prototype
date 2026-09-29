@@ -14,7 +14,8 @@ import {
   needsBillingReconcile,
   reconcileTenantBilling,
 } from "./_lib/billing.js";
-import { PLAN_LIMITS, planStateFor } from "./_lib/plan.js";
+import { clientLimits, planStateFor, loginCapForPlan } from "./_lib/plan.js";
+import { getSeatState, syncOrgMemberLimit, syncTenantAfterBilling, guardedInvite } from "./_lib/seats.js";
 import { getUsage, estimateCostUsd, getAsksThisMonth, resetsOnIso } from "./_lib/usage.js";
 import { limit as rateLimit } from "./_lib/rateLimit.js";
 
@@ -127,9 +128,8 @@ async function computeStatus(auth) {
     const documentsStored = await store.countDocuments();
     const monthStartIso = new Date(Date.now() - MONTH_MS).toISOString();
     const pagesThisMonth = await store.countPagesSince(monthStartIso);
-    // Monthly question allowance (owner decision, 2026-09-21) — see
-    // usage.js's getAsksThisMonth doc comment for why this reads
-    // rate_limit_windows rather than usage_counters.
+    // Monthly ask count — feeds only the hidden Donovan safety ceiling (plan.js DONOVAN_SAFETY); there is no
+    // per-plan allowance any more. See usage.js's getAsksThisMonth for why this reads rate_limit_windows.
     const asksThisMonth = await getAsksThisMonth(store);
 
     // Owner ask (2026-09-20): "make sure we're not wasting money asking
@@ -159,19 +159,12 @@ async function computeStatus(auth) {
       trialEndsAt: tenantRow?.trial_ends_at ?? null,
       currentPeriodEnd: tenantRow?.current_period_end ?? null,
       cancelAtPeriodEnd: !!tenantRow?.cancel_at_period_end,
-      // asksPerMonth is always freshly computed from the live PLAN_LIMITS
-      // table, never from the tenantRow.limits snapshot — a tenant whose
-      // limits JSONB predates this build (no webhook has re-applied
-      // billing_apply() since) would otherwise report a stale/missing cap
-      // even though gateAsk (plan.js) already enforces the current one.
-      limits: {
-        ...(tenantRow?.limits ?? PLAN_LIMITS[tenantRow?.plan] ?? {}),
-        asksPerMonth: PLAN_LIMITS[tenantRow?.plan]?.asksPerMonth ?? null,
-      },
+      // Round 26: limits always come from the live plan table (logins, documents, pages) — never from the
+      // tenants.limits snapshot, which may predate a plan-table change. Donovan has no per-plan allowance.
+      limits: clientLimits(tenantRow),
       // aiCostEstimateUsd: last-30-days estimate, NOT a bill — see
       // usage.js's estimateCostUsd doc comment for what it blends and why.
-      // resetsOn: ISO date of next month's 1st UTC — the ask meter's reset
-      // point (see usage.js's resetsOnIso).
+      // resetsOn: ISO date of next month's 1st UTC (page-allowance reset).
       usage: { documentsStored, pagesThisMonth, asksThisMonth, aiCostEstimateUsd, resetsOn: resetsOnIso() },
     };
   });
@@ -198,6 +191,8 @@ async function handleStatus(req, res, auth) {
     }
     if (outcome?.applied) {
       bustTenantCache(row.id);
+      // A reconcile that applied a plan is a plan change: keep Clerk's member limit in step (non-fatal, never throws).
+      await syncTenantAfterBilling(getPool(), row.id);
       ({ result } = await computeStatus(auth));
       result.reconciled = true;
     }
@@ -207,6 +202,59 @@ async function handleStatus(req, res, auth) {
   // cache + ETag — this is polled on every load plus the post-checkout
   // confirmation loop above, and doesn't change on most of those polls.
   return sendPrivateCacheableJson(res, req, result, 15);
+}
+
+
+/**
+ * GET/POST ?action=seats — admin-only. Live login usage for the Team screen ("3 of 5 logins used (owner not
+ * counted)") computed on the server from Clerk (owner excluded via org.createdBy, extra admins and pending
+ * invites counted — see api/_lib/seats.js), plus the LAZY Clerk sync: every call (throttled per org) makes sure
+ * the org's maxAllowedMemberships is cap + 1, so an org whose plan changed before this build shipped still
+ * converges. Never fails the screen because of Clerk: on a Clerk error it answers 200 with `seats: null`.
+ */
+async function handleSeats(req, res, auth) {
+  if (!hasShop(auth)) return handleCors(res, req).status(200).json({ plan: null, cap: null, seats: null });
+  requireRole(auth, "admin");
+  const plan = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (store) => (await getTenantBillingRow(store))?.plan ?? null);
+  const cap = loginCapForPlan(plan);
+  let seats = null;
+  let clerkSync = null;
+  try {
+    const { org, ...view } = await getSeatState({ orgId: auth.orgId, plan });
+    seats = view;
+    clerkSync = await syncOrgMemberLimit({ orgId: auth.orgId, plan, org });
+  } catch (err) {
+    console.error("billing seats: could not read seats from Clerk (non-fatal):", err?.message);
+  }
+  return handleCors(res, req).status(200).json({ plan, cap: cap ?? null, seats, clerkSync: clerkSync ? { action: clerkSync.action, ok: clerkSync.ok } : null });
+}
+
+/** POST ?action=invite body {email, role?} — admin-only; the server-side seat guard (seats.js guardedInvite). */
+async function handleInvite(req, res, auth) {
+  if (!hasShop(auth)) return res.status(400).json({ error: "Create your shop first to invite people." });
+  requireRole(auth, "admin");
+  if (!(await rateLimit(req, res, auth, "billing"))) return; // 429 already written
+  let body;
+  try {
+    body = JSON.parse((await readRawBody(req)).toString("utf8") || "{}");
+  } catch {
+    return res.status(400).json({ error: "Invalid request body" });
+  }
+  const row = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (store) => getTenantBillingRow(store));
+  const state = planStateFor(row ?? {});
+  if (state === "none" || state === "canceled") {
+    return res.status(402).json({ error: "Choose a plan to get started", url: "/app/?screen=billing" });
+  }
+  const result = await guardedInvite({
+    orgId: auth.orgId,
+    plan: row?.plan ?? null,
+    email: body.email,
+    role: body.role === "admin" ? "admin" : "member",
+    inviterUserId: auth.userId,
+  });
+  handleCors(res, req);
+  if (!result.ok) return res.status(result.status).json({ error: result.error, seats: result.seats ?? null, url: result.url });
+  return res.status(200).json({ ok: true, invitation: result.invitation, seats: result.seats });
 }
 
 /** No Clerk auth: identified by Stripe customer id via the SECURITY DEFINER
@@ -257,6 +305,10 @@ async function handleWebhook(req, res) {
     // otherwise) are what bound staleness on every OTHER instance, since a
     // webhook has no way to reach them from here.
     bustTenantCache(tenantId);
+    // Round 26: a subscription create/update (plan change, trial start) re-syncs the Clerk org's
+    // maxAllowedMemberships to cap + 1. Best effort — syncTenantAfterBilling never throws, and a Clerk
+    // rejection must never turn a successfully applied billing event into a webhook failure.
+    if (mapped.patch.plan) await syncTenantAfterBilling(pool, tenantId, { plan: mapped.patch.plan });
     return res.status(200).json({ received: true, handled: true });
   } catch (err) {
     console.error("billing webhook: apply failed:", err?.message);
@@ -284,6 +336,8 @@ export default async function handler(req, res) {
     if (action === "checkout" && req.method === "POST") return await handleCheckout(req, res, auth);
     if (action === "portal" && req.method === "POST") return await handlePortal(req, res, auth);
     if (action === "status" && (req.method === "GET" || req.method === "POST")) return await handleStatus(req, res, auth);
+    if (action === "seats" && (req.method === "GET" || req.method === "POST")) return await handleSeats(req, res, auth);
+    if (action === "invite" && req.method === "POST") return await handleInvite(req, res, auth);
     return res.status(404).json({ error: "Unknown billing action" });
   } catch (error) {
     if (error?.status) return handleCors(res, req).status(error.status).json({ error: error.message });

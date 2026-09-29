@@ -15,7 +15,8 @@ import { formatYmd } from '../src/core/answer';
 import { parseDeepLink, resolveDeepLinkRedirectPath, freshPersistedDeepLinkSearch, DEEP_LINK_TTL_MS } from '../src/hooks/useDeepLink';
 import {
   annualPrice,
-  asksUsedFraction,
+  loginsLabel,
+  hasApiAccess,
   billingBannerFor,
   daysUntil,
   isValidPlanId,
@@ -780,29 +781,19 @@ function listFilesRecursive(dir: string): string[] {
   );
   eq('billingBannerFor: canceled shows no banner (upload/ask already hard-block with their own 402)', billingBannerFor(status({ status: 'canceled' }), NOW), null);
 
-  // ---- monthly question allowance (owner decision, 2026-09-21) -----------
-  eq('asksUsedFraction: no cap on file -> null', asksUsedFraction(status({ limits: {} })), null);
-  eq('asksUsedFraction: 412 of 3,000', asksUsedFraction(status({ limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 412 } })), 412 / 3000);
+  // ---- Round 26: Donovan is unlimited on every plan — no usage banners, whatever the count --------------
   eq(
-    'billingBannerFor: active, under 80% asks -> no banner',
-    billingBannerFor(status({ plan: 'solo', status: 'active', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 2000 } }), NOW),
+    'billingBannerFor: a very busy month on an active plan -> no banner (no Donovan allowance any more)',
+    billingBannerFor(status({ plan: 'solo', status: 'active', usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 25000 } }), NOW),
     null,
   );
   eq(
-    'billingBannerFor: exactly 80% asks used -> the warning banner (percentage only, never says "questions")',
-    billingBannerFor(status({ plan: 'solo', status: 'active', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 2400 } }), NOW),
-    { kind: 'asks_warn', message: "Donovan is at 80% of this month's usage." },
+    'billingBannerFor: a trial still shows its countdown regardless of asks',
+    billingBannerFor(status({ plan: 'solo', status: 'trialing', trialEndsAt: '2026-09-23T12:00:00Z', usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 50000 } }), NOW)?.kind,
+    'trialing',
   );
-  eq(
-    'billingBannerFor: 100% asks used -> the exhausted banner, taking priority over a trial countdown, with the reset date and no raw count',
-    billingBannerFor(status({ plan: 'solo', status: 'trialing', trialEndsAt: '2026-09-23T12:00:00Z', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 3000, resetsOn: '2026-10-01' } }), NOW),
-    { kind: 'asks_exhausted', message: "This month's Donovan usage is used up — resets Oct 1. Need more? See plans." },
-  );
-  eq(
-    'billingBannerFor: 100% asks used with no resetsOn on file -> still reads cleanly, no dangling dash',
-    billingBannerFor(status({ plan: 'solo', status: 'active', limits: { asksPerMonth: 3000 }, usage: { documentsStored: 0, pagesThisMonth: 0, asksThisMonth: 3000 } }), NOW),
-    { kind: 'asks_exhausted', message: "This month's Donovan usage is used up. Need more? See plans." },
-  );
+  eq('loginsLabel: caps read "up to N", Fleet reads "11+"', [loginsLabel(2), loginsLabel(5), loginsLabel(10), loginsLabel(null)], ['up to 2', 'up to 5', 'up to 10', '11+']);
+  eq('hasApiAccess: Fleet only', [hasApiAccess('solo'), hasApiAccess('shop'), hasApiAccess('crew'), hasApiAccess('fleet'), hasApiAccess(null)], [false, false, false, true, false]);
   eq('resetsOnShortLabel: formats an ISO date as "Mon D"', resetsOnShortLabel('2026-10-01'), 'Oct 1');
   eq('resetsOnShortLabel: missing input -> null', resetsOnShortLabel(null), null);
 
@@ -885,13 +876,13 @@ function listFilesRecursive(dir: string): string[] {
   check('isAdminRole: an unrecognized custom role is not admin (least privilege, same as the server)', !isAdminRole('org:billing_manager'));
   check('isAdminRole: null/undefined/empty is not admin', !isAdminRole(null) && !isAdminRole(undefined) && !isAdminRole(''));
 
-  eq('seatStatus: under cap is not at cap, "N of M seats" label', seatStatus(3, 4), { count: 3, cap: 4, atCap: false, label: '3 of 4 seats' });
-  eq('seatStatus: exactly at cap IS at cap', seatStatus(4, 4), { count: 4, cap: 4, atCap: true, label: '4 of 4 seats' });
-  eq('seatStatus: over cap (a seat removed on Clerk\'s side after billing downgraded) is still at cap, not negative', seatStatus(5, 4), { count: 5, cap: 4, atCap: true, label: '5 of 4 seats' });
-  eq('seatStatus: null cap (Fleet, uncapped) is never at cap', seatStatus(50, null), { count: 50, cap: null, atCap: false, label: '50 members' });
-  eq('seatStatus: undefined cap (billing status not loaded yet) behaves like null', seatStatus(2, undefined), { count: 2, cap: null, atCap: false, label: '2 members' });
-  eq('seatStatus: singular "1 of 1 seat" / "1 member" wording', [seatStatus(1, 1).label, seatStatus(1, null).label], ['1 of 1 seat', '1 member']);
-  eq('seatStatus: zero members on a solo plan', seatStatus(0, 1), { count: 0, cap: 1, atCap: false, label: '0 of 1 seat' });
+  eq('seatStatus: under cap is not at cap, "N of M logins used (owner not counted)"', seatStatus(3, 5), { count: 3, cap: 5, atCap: false, overCap: false, label: '3 of 5 logins used (owner not counted)' });
+  eq('seatStatus: exactly at cap IS at cap (not over)', seatStatus(5, 5), { count: 5, cap: 5, atCap: true, overCap: false, label: '5 of 5 logins used (owner not counted)' });
+  eq('seatStatus: over cap (a downgrade) is at cap AND over cap, never negative', seatStatus(7, 5), { count: 7, cap: 5, atCap: true, overCap: true, label: '7 of 5 logins used (owner not counted)' });
+  eq('seatStatus: null cap (Fleet, 11+) is never at cap', seatStatus(50, null), { count: 50, cap: null, atCap: false, overCap: false, label: '50 logins used (owner not counted)' });
+  eq('seatStatus: undefined cap (billing status not loaded yet) behaves like null', seatStatus(2, undefined), { count: 2, cap: null, atCap: false, overCap: false, label: '2 logins used (owner not counted)' });
+  eq('seatStatus: singular wording', [seatStatus(1, 1).label, seatStatus(1, null).label], ['1 of 1 login used (owner not counted)', '1 login used (owner not counted)']);
+  eq('seatStatus: zero logins used on a solo plan', seatStatus(0, 2), { count: 0, cap: 2, atCap: false, overCap: false, label: '0 of 2 logins used (owner not counted)' });
 
   // The primary nav stays exactly 4 items (checked above) — Team is
   // deliberately NOT one of them; it lives in the account-area row next to

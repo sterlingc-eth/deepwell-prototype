@@ -229,10 +229,9 @@ export async function getUsage(ctx, days = 30) {
 }
 
 /**
- * Monthly question allowance (owner decision, 2026-09-21): a % meter per
- * plan that resets on the 1st UTC, replacing the old daily ask cap (see
- * rateLimit.js's PLAN_DAILY_ASKS, now a 30%-of-monthly runaway guard instead
- * of the primary limit).
+ * Monthly ask counter (Round 26: no longer a per-plan allowance — Donovan is
+ * unlimited on every plan; this count only feeds the hidden safety ceiling in
+ * plan.js's gateAsk / DONOVAN_SAFETY).
  *
  * WHY THIS DOESN'T LIVE IN usage_counters: that table (10-api-keys.sql) has
  * no bucket dimension — `requests`/`model_calls` are incremented by every

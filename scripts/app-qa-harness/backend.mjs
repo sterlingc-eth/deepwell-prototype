@@ -43,7 +43,7 @@ export function makeData({ docs = 12, customers = 6, longNames = false } = {}) {
 const billing = (status, extra = {}) => ({
   plan: status === 'none' ? null : 'solo', status, trialEndsAt: status === 'trialing' ? iso(NOW + 10 * day) : null,
   currentPeriodEnd: iso(NOW + 20 * day), cancelAtPeriodEnd: false,
-  limits: { technicians: 1, documentsStored: 25000, pagesPerMonth: 750, asksPerMonth: 3000 },
+  limits: { logins: 2, documentsStored: 25000, pagesPerMonth: 750 },
   usage: { documentsStored: 12, pagesThisMonth: 40, asksThisMonth: 3, resetsOn: iso(NOW + 20 * day) }, ...extra,
 });
 
@@ -94,7 +94,7 @@ export async function installBackend(page, opts = {}) {
       return ok({});
     }
     if (p === '/api/document-status') return ok({ documents: [] });
-    if (p === '/api/billing') return ok(action === 'status' ? billing(o.billing) : {});
+    if (p === '/api/billing') return ok(action === 'status' ? billing(o.billing) : action === 'seats' ? { plan: 'solo', cap: 2, seats: { cap: 2, members: 1, pending: 1, used: 2, remaining: 0, atCap: true, overCap: false, label: '2 of 2 logins used (owner not counted)' } } : {});
     if (p === '/api/v1/customers') return ok({ customers: d.custRows, duplicates: [], possibleDuplicates: [] });
     if (p === '/api/v1/customer') {
       const ref = url.searchParams.get('id') || url.searchParams.get('number');

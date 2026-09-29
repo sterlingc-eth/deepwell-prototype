@@ -34,7 +34,7 @@
  * lowest-priority layer added underneath.
  */
 import { getAuxPool } from "./apiKeyAuth.js";
-import { PLAN_LIMITS } from "./plan.js";
+import { PLAN_LIMITS, DONOVAN_SAFETY, DONOVAN_SAFETY_MESSAGE } from "./plan.js";
 import { getTenantContext } from "./recordsStore.js";
 import { logStage } from "./perf.js";
 
@@ -51,7 +51,9 @@ import { logStage } from "./perf.js";
  * ingest.perDay, the same override mechanism every bucket already had.
  */
 export const DEFAULT_LIMITS = Object.freeze({
-  ask:     { perMinute: 20,  perDay: 900 }, // 30% of Solo's 3,000/month — see PLAN_DAILY_ASKS
+  // Round 26: Donovan is unlimited on every plan, so this is NOT a plan allowance — it is the hidden,
+  // plan-independent runaway/abuse ceiling (plan.js DONOVAN_SAFETY). Env: RATE_LIMIT_ASK_PER_DAY.
+  ask:     { perMinute: 20,  perDay: DONOVAN_SAFETY.perDay },
   ingest:  { perMinute: 60,  perDay: 2000 },
   read:    { perMinute: 120, perDay: 5000 },
   // R22 (S1, security audit): api/billing.js's checkout/portal actions each make a real call to
@@ -129,24 +131,14 @@ export function envLimits(bucket, env = process.env) {
  * anything else in an override is ignored rather than trusted blindly.
  */
 /**
- * Per-plan daily ask RUNAWAY GUARD (owner decision, 2026-09-21): the ask
- * bucket's daily cap is no longer its own budget — the real limit is now
- * plan.js's PLAN_LIMITS.asksPerMonth, a % meter that resets the 1st UTC,
- * because techs don't work every day and a flat daily number punished a
- * shop's busy Monday for its own quiet weekend. This derived table just
- * catches a single day's loop/bug from burning the WHOLE month in hours:
- * 30% of the monthly allowance, rounded, so three unusually heavy days could
- * exhaust a month but one bad script can't. Keyed on the same PLAN_LIMITS
- * shape billing_apply() stores under tenants.limits (pagesPerMonth
- * 750/2000/5000/10000 identifies the tier without a new column). Ingest
- * stays bounded by the plan's monthly page cap; its daily default is scaled
- * the same way so a big shop's bulk upload isn't throttled to Solo size. An
- * explicit `limits.<bucket>.perDay` override on the tenant still wins over
- * all of this.
+ * Per-plan scaling of the INGEST daily default only. (Round 26: the ask
+ * bucket is no longer plan-scaled — Donovan is unlimited on every plan; its
+ * daily value is the flat hidden safety ceiling DEFAULT_LIMITS.ask.perDay,
+ * plan.js DONOVAN_SAFETY.) Keyed on the PLAN_LIMITS shape billing_apply()
+ * stores under tenants.limits (pagesPerMonth 750/2000/5000/10000 identifies
+ * the tier without a new column). An explicit `limits.<bucket>.perDay`
+ * override on the tenant still wins over all of this.
  */
-export const PLAN_DAILY_ASKS = Object.freeze(
-  Object.fromEntries(Object.entries(PLAN_LIMITS).map(([tier, l]) => [tier, Math.round(l.asksPerMonth * 0.3)]))
-);
 const PLAN_BY_PAGES = Object.freeze(
   Object.fromEntries(Object.entries(PLAN_LIMITS).map(([tier, l]) => [l.pagesPerMonth, tier]))
 );
@@ -154,7 +146,7 @@ const PLAN_INGEST_MULTIPLIER = Object.freeze({ solo: 1, shop: 2.5, crew: 6, flee
 
 /** Pure: which plan tier a tenants.limits row describes, or null. */
 export function planTierFromLimits(tenantLimits) {
-  if (tenantLimits?.plan && PLAN_DAILY_ASKS[tenantLimits.plan]) return tenantLimits.plan;
+  if (tenantLimits?.plan && Object.prototype.hasOwnProperty.call(PLAN_LIMITS, tenantLimits.plan)) return tenantLimits.plan;
   const pages = Number(tenantLimits?.pagesPerMonth);
   return PLAN_BY_PAGES[pages] ?? null;
 }
@@ -167,8 +159,8 @@ export function planTierFromLimits(tenantLimits) {
  * @param {{pagesPerMonth?: number|null, plan?: string}|null|undefined} tenantLimits
  */
 export function scaleDailyLimitForPlan(bucket, baseDaily, tenantLimits) {
+  if (bucket === 'ask') return baseDaily;
   const tier = planTierFromLimits(tenantLimits);
-  if (bucket === 'ask') return tier ? PLAN_DAILY_ASKS[tier] : PLAN_DAILY_ASKS.solo;
   if (!tier || !Number.isFinite(baseDaily)) return baseDaily;
   return Math.round(baseDaily * (PLAN_INGEST_MULTIPLIER[tier] ?? 1));
 }
@@ -185,7 +177,7 @@ export function limitsFromTenantContext(tenantLimits, bucket, overrides) {
   const base = envLimits(bucket);
   const tenantOverride = tenantLimits?.[bucket] ?? {};
   const callerOverride = overrides ?? {};
-  // Plan-sized daily ceilings — see PLAN_DAILY_ASKS above. An explicit
+  // Plan-sized INGEST daily ceilings (ask is flat — see scaleDailyLimitForPlan). An explicit
   // `limits.<bucket>.perDay` override on the tenant still wins.
   const scaled = scaleDailyLimitForPlan(bucket, base.perDay, tenantLimits);
   return {
@@ -340,10 +332,14 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
     }
 
     if (requestsToday != null && requestsToday > limits.perDay) {
-      send429(res, secondsUntilUtcMidnight(now), {
-        details: `Daily limit of ${limits.perDay} ${bucket} units reached for this tenant.`,
-        scope: "per-day",
-      });
+      // Donovan's daily ceiling is the hidden safety net, never a plan limit: polite, no "upgrade".
+      send429(
+        res,
+        secondsUntilUtcMidnight(now),
+        bucket === "ask"
+          ? { error: DONOVAN_SAFETY_MESSAGE, scope: "safety" }
+          : { details: `Daily limit of ${limits.perDay} ${bucket} units reached for this tenant.`, scope: "per-day" }
+      );
       return false;
     }
   }

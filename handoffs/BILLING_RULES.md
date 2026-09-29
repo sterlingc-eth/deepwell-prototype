@@ -32,12 +32,14 @@ Ask is read-only, so it is far more permissive than upload:
 Every 402 body is `{ error, url: "/app/?screen=billing" }`.
 
 ## Plan catalog (api/_lib/billing.js, api/_lib/plan.js)
-| Plan | Monthly | Annual (11×, one month free) | Technicians | Documents stored | Pages/month | Trial |
+| Plan | Monthly | Annual (11×, one month free) | Logins (owner not counted) | Documents stored | Pages/month | Trial |
 |---|---|---|---|---|---|---|
-| solo  | $99  | $1,089 | 1  | 25,000  | 750   | 30-day, card required |
-| shop  | $199 | $2,189 | 4  | 100,000 | 2,000 | none |
+| solo  | $99  | $1,089 | 2  | 25,000  | 750   | 30-day, card required |
+| shop  | $199 | $2,189 | 5  | 100,000 | 2,000 | none |
 | crew  | $399 | $4,389 | 10 | 500,000 | 5,000 | none |
-| fleet | $899 | $9,889 | ∞  | ∞       | 10,000| none |
+| fleet | $899 | $9,889 | 11+ | ∞       | 10,000| none |
+
+Round 26: Donovan is unlimited on every plan (hidden safety ceiling only); API access is Fleet-only. See handoffs/ROUND26_PLAN_TIERS.md.
 
 Records Rescue: one-time, $0.12/page, 4,167-page minimum (~$500), enforced in code (`resolveRecordsRescueQuantity`) since Stripe prices have no built-in floor.
 

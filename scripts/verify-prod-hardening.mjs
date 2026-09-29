@@ -344,7 +344,7 @@ END; $$;`);
   const r = await postEvent('customer.subscription.created', sub({ status: 'trialing', trial_end: inFuture(30), items: { data: [planItem('solo')] } }));
   check('PRE-MIGRATION: subscription.created still returns 200 handled and applies', r.res.statusCode === 200 && r.res.body?.handled === true, JSON.stringify(r.res.body));
   const row = await tenantRow();
-  eq('PRE-MIGRATION: tenant is trialing on solo with limits set', [row.plan, row.billing_status, row.trial_used, row.limits?.asksPerMonth], ['solo', 'trialing', true, 3000]);
+  eq('PRE-MIGRATION: tenant is trialing on solo with limits set', [row.plan, row.billing_status, row.trial_used, row.limits?.logins], ['solo', 'trialing', true, 2]);
   check('PRE-MIGRATION: the ledger outage was logged (not silent) and did not fail the webhook', r.errors.some((m) => /idempotency ledger unavailable/.test(m)));
   eq('PRE-MIGRATION: no dedupe row (ledger unavailable) — expected', await ledger(r.id), 0);
   await lite.query(`UPDATE tenants SET plan = NULL, billing_status = NULL, trial_used = false, limits = '{}'::jsonb, stripe_subscription_id = NULL WHERE id = $1`, [billTenant]);
@@ -371,12 +371,12 @@ check('14-billing.sql (fresh installs) now carries the same fix', /v_rows intege
   r = await postEvent('customer.subscription.created', sub({ status: 'trialing', trial_end: trialEnd, items: { data: [planItem('solo')] } }));
   let row = await tenantRow();
   eq('subscription.created (trial): 200 + plan/status/trial flags applied', [r.res.statusCode, row.plan, row.billing_status, row.trial_used, row.cancel_at_period_end], [200, 'solo', 'trialing', true, false]);
-  eq('subscription.created (trial): trial_ends_at and limits applied', [Math.abs(new Date(row.trial_ends_at).getTime() / 1000 - trialEnd) < 2, row.limits?.technicians], [true, 1]);
+  eq('subscription.created (trial): trial_ends_at and limits applied', [Math.abs(new Date(row.trial_ends_at).getTime() / 1000 - trialEnd) < 2, row.limits?.logins], [true, 2]);
   check('subscription.created: no apply error logged', !r.errors.length, r.errors.join('|'));
 
   r = await postEvent('customer.subscription.updated', sub({ status: 'active', trial_end: trialEnd, items: { data: [planItem('shop')] } }));
   row = await tenantRow();
-  eq('subscription.updated (trial -> active, shop): applied', [r.res.statusCode, row.plan, row.billing_status, row.limits?.asksPerMonth], [200, 'shop', 'active', BL.patchForEvent({ type: 'customer.subscription.updated', data: { object: sub({ items: { data: [planItem('shop')] } }) } }).patch.limits.asksPerMonth]);
+  eq('subscription.updated (trial -> active, shop): applied', [r.res.statusCode, row.plan, row.billing_status, row.limits?.logins], [200, 'shop', 'active', BL.patchForEvent({ type: 'customer.subscription.updated', data: { object: sub({ items: { data: [planItem('shop')] } }) } }).patch.limits.logins]);
 
   r = await postEvent('customer.subscription.updated', sub({ status: 'active', items: { data: [ADDON, planItem('crew')] } }));
   row = await tenantRow();

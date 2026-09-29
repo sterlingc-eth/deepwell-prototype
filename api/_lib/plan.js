@@ -11,29 +11,84 @@
  * keep the two in sync.
  */
 import { getTenantContext } from './recordsStore.js';
-import { resetsOnLabel } from './usage.js';
 import { TTLCache, memoAsync, logStage, registerTenantCache } from './perf.js';
 
-/** Per-plan caps, written to tenants.limits by billing_apply() on every
+/** Per-plan entitlements, written to tenants.limits by billing_apply() on every
  * subscription create/update webhook. Exported so api/_lib/billing.js's
  * webhook handler and scripts/verify-billing.mjs share one source of truth.
- * `null` = uncapped (Fleet has no seat/document ceiling; its own page cap is
- * a real number because it's what deep-storage overage would be sold against
- * later, per the brief).
+ * `null` = uncapped.
  *
- * asksPerMonth (owner decision, 2026-09-21): replaces the old flat daily ask
- * cap (rateLimit.js's PLAN_DAILY_ASKS) with a monthly allowance shown as a %
- * meter that resets the 1st UTC — "techs don't work every day," so a hard
- * daily number punished a shop that asks 200 questions on a busy Monday and
- * zero over the weekend even though its monthly total was fine. The old
- * daily cap still exists underneath as a runaway guard (30% of this number —
- * see rateLimit.js's scaleDailyLimitForPlan), not a separate budget. */
+ * ROUND 26 (owner decisions, 2026-09-28) — plan tiers:
+ *  - `logins` (was `technicians`): how many people besides the ONE owner
+ *    account can sign in. Solo 2, Shop 5, Crew 10, Fleet 11+ (null = no
+ *    DeepWell cap). Enforced for real — see api/_lib/seats.js (server-side
+ *    invite guard + Clerk maxAllowedMemberships) and TeamScreen.tsx.
+ *  - Donovan (asks) is UNLIMITED on every plan. There is deliberately no
+ *    per-plan ask allowance any more; DONOVAN_SAFETY below is a hidden
+ *    abuse/runaway ceiling, identical for every plan.
+ *  - Document scans keep their monthly page allowances (750/2,000/5,000/10,000).
+ *  - API access is Fleet-only (hasApiAccess below).
+ * Stored tenants.limits rows written before Round 26 still carry the old
+ * `technicians` / `asksPerMonth` keys; nothing reads them — every reader takes
+ * caps from this live table by plan (see loginCapForPlan). */
 export const PLAN_LIMITS = Object.freeze({
-  solo:  Object.freeze({ technicians: 1,    documentsStored: 25_000,  pagesPerMonth: 750,    asksPerMonth: 3_000 }),
-  shop:  Object.freeze({ technicians: 4,    documentsStored: 100_000, pagesPerMonth: 2_000,  asksPerMonth: 9_000 }),
-  crew:  Object.freeze({ technicians: 10,   documentsStored: 500_000, pagesPerMonth: 5_000,  asksPerMonth: 22_500 }),
-  fleet: Object.freeze({ technicians: null, documentsStored: null,    pagesPerMonth: 10_000, asksPerMonth: 60_000 }),
+  solo:  Object.freeze({ logins: 2,    documentsStored: 25_000,  pagesPerMonth: 750 }),
+  shop:  Object.freeze({ logins: 5,    documentsStored: 100_000, pagesPerMonth: 2_000 }),
+  crew:  Object.freeze({ logins: 10,   documentsStored: 500_000, pagesPerMonth: 5_000 }),
+  fleet: Object.freeze({ logins: null, documentsStored: null,    pagesPerMonth: 10_000 }),
 });
+
+/** Login cap (people besides the owner) for a plan: a number, `null` for
+ * Fleet (no DeepWell cap), or `undefined` when the plan is unknown/absent
+ * (no subscription yet — callers must not enforce or sync anything). */
+export function loginCapForPlan(plan) {
+  if (typeof plan !== 'string' || !Object.prototype.hasOwnProperty.call(PLAN_LIMITS, plan)) return undefined;
+  return PLAN_LIMITS[plan].logins;
+}
+
+/** The limits object the API reports to clients / stores for a plan: always
+ * the live table, never a stale tenants.limits snapshot. */
+export function limitsForPlan(plan) {
+  return Object.prototype.hasOwnProperty.call(PLAN_LIMITS, plan ?? '') ? { ...PLAN_LIMITS[plan] } : null;
+}
+
+/** Limits object for /api/billing?action=status and the bootstrap payload:
+ * the live plan table (never the stale tenants.limits snapshot) plus the
+ * outreachAuto add-on flag carried on the stored row. */
+export function clientLimits(tenantRow) {
+  const base = limitsForPlan(tenantRow?.plan) ?? {};
+  return tenantRow?.limits?.outreachAuto === true ? { ...base, outreachAuto: true } : base;
+}
+
+/** API access (v1 API + API keys) is included on Fleet only (Round 26). */
+export const API_ACCESS_MESSAGE = 'API access is included on the Fleet plan';
+export function hasApiAccess(plan) {
+  return plan === 'fleet';
+}
+
+/**
+ * Hidden Donovan safety ceiling (Round 26): Donovan is "Unlimited" to
+ * customers on every plan, but a runaway script or abuse must still be
+ * stoppable. These are per-tenant, plan-independent, generous enough that no
+ * normal shop reaches them (a 10-login shop asking ~100 questions a day is
+ * ~2,200 a month), and env-overridable:
+ *   RATE_LIMIT_ASK_PER_DAY        daily requests on the ask bucket (rateLimit.js; existing env)
+ *   DONOVAN_SAFETY_ASKS_PER_MONTH monthly model-reaching asks (gateAsk below)
+ * Existing daily $ spend caps (rateLimit.js assertModelBudget /
+ * maxModelCallsPerDay) still apply underneath, unchanged.
+ * Hitting a ceiling is never an "upgrade your plan" message — see
+ * DONOVAN_SAFETY_MESSAGE.
+ */
+export const DONOVAN_SAFETY = Object.freeze({ perDay: 3_000, perMonth: 30_000 });
+export const DONOVAN_SAFETY_MESSAGE =
+  "Donovan is seeing unusually high usage on your account. Please contact support@deepwelltechnology.com and we'll get you sorted out.";
+
+/** Monthly safety ceiling, with DONOVAN_SAFETY_ASKS_PER_MONTH layered on top
+ * (a positive number, anything else falls back to the default). */
+export function donovanSafetyPerMonth(env = process.env) {
+  const n = Number(env?.DONOVAN_SAFETY_ASKS_PER_MONTH);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : DONOVAN_SAFETY.perMonth;
+}
 
 /**
  * Add-on entitlements a tenant may hold independently of their plan tier
@@ -173,33 +228,24 @@ export function gateUpload(tenantRow, usage, now = new Date()) {
  * Gate for POST /api/ask. Ask is read-only in nature, so it stays available
  * through past-due grace AND past-grace — only a never-subscribed tenant that
  * has exhausted its free preview, or a canceled subscription, blocks it.
- * Layered on top of that (owner decision, 2026-09-21): a plan-sized MONTHLY
- * question allowance, independent of subscription health — trialing, active,
- * and past_due (grace or not) all get gated by it identically, since it is a
- * usage cap, not a billing-health one.
+ * Round 26: there is NO plan-sized ask allowance any more (Donovan is
+ * unlimited on every plan). The only other check is the hidden safety
+ * ceiling — a very high monthly count that stops runaway automation — and its
+ * message is deliberately a polite support contact, never an upgrade prompt.
  * @param {object} tenantRow
  * @param {{documentsStored: number, asksThisMonth?: number}} usage
  * @param {Date} [now]
+ * @param {NodeJS.ProcessEnv} [env]
  */
-export function gateAsk(tenantRow, usage, now = new Date()) {
+export function gateAsk(tenantRow, usage, now = new Date(), env = process.env) {
   const state = planStateFor(tenantRow, now);
 
   if ((state === 'none' && freePreviewExhausted(usage)) || state === 'canceled') {
     return requireActiveBilling(tenantRow, now);
   }
 
-  const cap = PLAN_LIMITS[tenantRow?.plan]?.asksPerMonth ?? null;
-  if (cap != null && (Number(usage?.asksThisMonth) || 0) >= cap) {
-    // Owner correction (2026-09-21): never say "questions" — a customer may
-    // just be requesting information, not "asking" in a way that should feel
-    // metered. "Donovan usage" reads as a feature name using up its
-    // allowance, not the customer being counted.
-    return {
-      allowed: false,
-      status: 402,
-      error: `This month's Donovan usage is used up — resets ${resetsOnLabel(now)}`,
-      url: '/app/?screen=billing',
-    };
+  if ((Number(usage?.asksThisMonth) || 0) >= donovanSafetyPerMonth(env)) {
+    return { allowed: false, status: 429, error: DONOVAN_SAFETY_MESSAGE, scope: 'safety' };
   }
   return { allowed: true };
 }

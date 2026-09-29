@@ -18,7 +18,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth, denyAuth } from './_lib/auth.js';
 import { withTenant } from './_lib/recordsStore.js';
-import { PLAN_LIMITS, planStateFor } from './_lib/plan.js';
+import { clientLimits, planStateFor } from './_lib/plan.js';
 import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
 
 export const config = {
@@ -91,10 +91,7 @@ async function runBootstrap(db: any, auth: any, payload: any): Promise<any> {
       trialEndsAt: tenantRow?.trial_ends_at ?? null,
       currentPeriodEnd: tenantRow?.current_period_end ?? null,
       cancelAtPeriodEnd: !!tenantRow?.cancel_at_period_end,
-      limits: {
-        ...(tenantRow?.limits ?? (PLAN_LIMITS as any)[tenantRow?.plan] ?? {}),
-        asksPerMonth: (PLAN_LIMITS as any)[tenantRow?.plan]?.asksPerMonth ?? null,
-      },
+      limits: clientLimits(tenantRow),
       usage: { documentsStored, pagesThisMonth, asksThisMonth, resetsOn: resetsOnIso() },
     },
     notifications: { items: notifRows.items ?? [], unreadCount: Number(notifRows.unread_count) || 0 },

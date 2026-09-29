@@ -82,6 +82,9 @@ export interface ResponseLike {
 export function messageFromResponse(res: ResponseLike, body: unknown, fallback: string): string {
   const message = baseMessage(body, fallback);
   if (res.status !== 429) return message;
+  // Donovan's hidden safety ceiling (api/_lib/plan.js DONOVAN_SAFETY): the message already says what to do
+  // (contact support) — no "try again" hint, and never an upgrade prompt.
+  if ((body as ErrorBody | null)?.scope === 'safety') return message;
 
   if (isDailyCap(body)) return `${message} Try again tomorrow.`;
 

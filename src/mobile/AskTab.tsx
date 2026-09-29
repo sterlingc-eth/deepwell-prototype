@@ -3,7 +3,6 @@ import { ArrowUp, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
 import { friendlyErrorMessage } from '../services/httpError'
 import { authHeader } from '../services/authToken'
-import { asksUsedFraction, resetsOnShortLabel, type BillingStatus } from '../services/billingClient'
 import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
 import { PreflightPill, TypeaheadDropdown, DidYouMeanChips, SamplePromptRowsPlaceholder, turnFrom, type ThreadTurn } from '../components/ask'
 import { useGraph } from '../core/entityGraph'
@@ -79,8 +78,8 @@ interface ComposerHandle {
 
 /** Owns its own text state so typing never re-renders the answer thread. */
 const Composer = memo(
-  forwardRef<ComposerHandle, { busy: boolean; onSubmit: (q: string) => void; usageNote: string | null }>(function Composer(
-    { busy, onSubmit, usageNote },
+  forwardRef<ComposerHandle, { busy: boolean; onSubmit: (q: string) => void }>(function Composer(
+    { busy, onSubmit },
     ref
   ) {
     const [input, setInput] = useState('')
@@ -189,7 +188,6 @@ const Composer = memo(
             <ArrowUp className="w-5 h-5" />
           </button>
         </form>
-        {usageNote && <p className="m-0 max-w-2xl mx-auto px-4 pb-1.5 text-caption text-ink-3 short:hidden">{usageNote}</p>}
       </div>
     )
   })
@@ -249,14 +247,12 @@ const TurnView = memo(function TurnView({
 export function AskTab({
   onOpenDoc,
   onOpenCustomer,
-  billing,
   tenantKey = null,
   emptyShop = false,
   onOpenScan,
 }: {
   onOpenDoc: (id: string) => void
   onOpenCustomer: (ref: string) => void
-  billing: BillingStatus | null
   /** orgId ?? userId from MobileApp (a prop, like ScanTab's, so this tab renders without a ClerkProvider in tests). */
   tenantKey?: string | null
   /** True once the records sync has finished and this shop has no documents at all (first run). */
@@ -343,12 +339,6 @@ export function AskTab({
 
   const send = useCallback((q: string) => void submit(q), [submit])
 
-  const pct = asksUsedFraction(billing)
-  const usageNote =
-    pct != null && pct >= 0.8
-      ? `${Math.round(Math.min(pct, 1) * 100)}% of this month's usage${resetsOnShortLabel(billing?.usage.resetsOn) ? ` · resets ${resetsOnShortLabel(billing?.usage.resetsOn)}` : ''}`
-      : null
-
   return (
     <div className="h-full flex flex-col">
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
@@ -413,7 +403,7 @@ export function AskTab({
           </button>
         </div>
       )}
-      <Composer ref={composerRef} busy={busy} onSubmit={send} usageNote={usageNote} />
+      <Composer ref={composerRef} busy={busy} onSubmit={send} />
     </div>
   )
 }

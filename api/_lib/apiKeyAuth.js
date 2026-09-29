@@ -81,6 +81,7 @@ import crypto from "node:crypto";
 import { getPool } from "./recordsStore.js";
 import { requireAuth, AuthError } from "./auth.js";
 import { logStage } from "./perf.js";
+import { getCachedBillingRow, hasApiAccess, API_ACCESS_MESSAGE } from "./plan.js";
 
 export const KEY_PREFIX = "dw_live_";
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -169,6 +170,19 @@ export async function verifyApiKey(rawKey) {
     console.error(`api key ${row.id}: tenant ${row.tenant_id} has no clerk_org_id`);
     throw new AuthError("Server is not configured for authentication", 500);
   }
+
+  // Round 26: API access is a Fleet-only entitlement. A key minted on a lower tier (or before this rule) stops
+  // working the moment the tenant is not on Fleet — same message the create endpoint returns. The plan comes from
+  // plan.js's short-TTL billing-row cache (2 min; 30 s once blocked), so a Fleet upgrade takes effect within
+  // minutes and a downgrade within the TTL. FAILS CLOSED: an unreadable plan is a 503, never free API access.
+  let billingRow;
+  try {
+    billingRow = await getCachedBillingRow({ tenantKey: row.tenant_key });
+  } catch (err) {
+    console.error("API key plan lookup failed (failing closed):", err?.message);
+    throw new AuthError("Billing check unavailable, try again", 503);
+  }
+  if (!hasApiAccess(billingRow?.plan)) throw new AuthError(API_ACCESS_MESSAGE, 403);
 
   return {
     userId: `key:${row.id}`,

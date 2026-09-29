@@ -73,10 +73,10 @@ export type BillingInterval = 'month' | 'year';
 export type BillingState = 'trialing' | 'active' | 'past_due' | 'canceled' | 'none';
 
 export interface PlanLimits {
-  technicians: number | null;
+  /** People who can sign in besides the ONE owner account; null = 11+ (Fleet, no cap). */
+  logins: number | null;
   documentsStored: number | null;
   pagesPerMonth: number | null;
-  asksPerMonth: number | null;
 }
 
 export interface BillingStatus {
@@ -85,10 +85,11 @@ export interface BillingStatus {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
-  limits: Partial<PlanLimits>;
+  limits: Partial<PlanLimits> & { outreachAuto?: boolean };
   // resetsOn: ISO date of next month's 1st UTC — mirrors api/billing.js's
   // usage.resetsOn (api/_lib/usage.js's resetsOnIso).
   usage: { documentsStored: number; pagesThisMonth: number; asksThisMonth?: number; resetsOn?: string };
+  // Donovan is unlimited on every plan (Round 26): asksThisMonth is informational only — nothing renders a meter from it.
 }
 
 /** Monthly USD price per plan — mirrors api/_lib/billing.js's PLAN_CATALOG. */
@@ -99,13 +100,23 @@ export const PLAN_CATALOG: Record<BillingPlanId, { name: string; monthly: number
   fleet: { name: 'DeepWell Fleet', monthly: 899, trialEligible: false },
 };
 
-/** Mirrors api/_lib/plan.js's PLAN_LIMITS — display only. */
+/** Mirrors api/_lib/plan.js's PLAN_LIMITS — display only. Round 26: Solo 2 / Shop 5 / Crew 10 logins (owner not counted), Fleet 11+. */
 export const PLAN_LIMITS: Record<BillingPlanId, PlanLimits> = {
-  solo: { technicians: 1, documentsStored: 25_000, pagesPerMonth: 750, asksPerMonth: 3_000 },
-  shop: { technicians: 4, documentsStored: 100_000, pagesPerMonth: 2_000, asksPerMonth: 9_000 },
-  crew: { technicians: 10, documentsStored: 500_000, pagesPerMonth: 5_000, asksPerMonth: 22_500 },
-  fleet: { technicians: null, documentsStored: null, pagesPerMonth: 10_000, asksPerMonth: 60_000 },
+  solo: { logins: 2, documentsStored: 25_000, pagesPerMonth: 750 },
+  shop: { logins: 5, documentsStored: 100_000, pagesPerMonth: 2_000 },
+  crew: { logins: 10, documentsStored: 500_000, pagesPerMonth: 5_000 },
+  fleet: { logins: null, documentsStored: null, pagesPerMonth: 10_000 },
 };
+
+/** "up to 5" / "11+" — the login wording used on every plan card and the pricing page. */
+export function loginsLabel(cap: number | null | undefined): string {
+  return cap == null ? '11+' : `up to ${cap}`;
+}
+
+/** API access (API keys + the v1 API) is included on Fleet only — mirrors api/_lib/plan.js's hasApiAccess. */
+export function hasApiAccess(plan: string | null | undefined): boolean {
+  return plan === 'fleet';
+}
 
 /** One month free: annual = 11 * monthly (mirrors api/_lib/billing.js's annualPrice). */
 export function annualPrice(monthly: number): number {
@@ -143,17 +154,8 @@ export function daysUntil(iso: string | null | undefined, now: Date = new Date()
 }
 
 export interface BillingBanner {
-  kind: 'trialing' | 'past_due' | 'cap' | 'asks_exhausted' | 'asks_warn';
+  kind: 'trialing' | 'past_due' | 'cap';
   message: string;
-}
-
-/** Fraction of the plan's monthly question allowance used so far, or null
- *  when the plan has no cap on file yet. Pure, exported for
- *  scripts/verify-ui.ts. */
-export function asksUsedFraction(status: BillingStatus | null): number | null {
-  const cap = status?.limits.asksPerMonth;
-  if (!cap) return null;
-  return (status?.usage.asksThisMonth ?? 0) / cap;
 }
 
 /** "Oct 1" from an ISO date (status.usage.resetsOn) — UTC so it never drifts
@@ -179,20 +181,6 @@ export const FREE_PREVIEW_DOCUMENTS = 3;
  */
 export function billingBannerFor(status: BillingStatus | null, now: Date = new Date()): BillingBanner | null {
   if (!status) return null;
-  // Monthly question allowance (owner decision, 2026-09-21): a tenant that
-  // has used up the whole month's questions needs to know before anything
-  // else, including a trial countdown — Ask is fully blocked until it
-  // resets or they upgrade. Checked first, ahead of trialing/past_due.
-  const asksPct = asksUsedFraction(status);
-  if (asksPct != null && asksPct >= 1) {
-    // Owner correction (2026-09-21): never say "questions" — read as a
-    // feature ("Donovan") using up its usage, not the customer being counted.
-    const resets = resetsOnShortLabel(status.usage.resetsOn);
-    return {
-      kind: 'asks_exhausted',
-      message: `This month's Donovan usage is used up${resets ? ` — resets ${resets}` : ''}. Need more? See plans.`,
-    };
-  }
   if (status.status === 'trialing') {
     const days = daysUntil(status.trialEndsAt, now);
     const message =
@@ -206,16 +194,36 @@ export function billingBannerFor(status: BillingStatus | null, now: Date = new D
   if (status.status === 'past_due') {
     return { kind: 'past_due', message: 'Your last payment failed. Update billing to keep uploading.' };
   }
-  if (asksPct != null && asksPct >= 0.8) {
-    return { kind: 'asks_warn', message: `Donovan is at ${Math.round(asksPct * 100)}% of this month's usage.` };
-  }
   if (status.status === 'none' && status.usage.documentsStored >= FREE_PREVIEW_DOCUMENTS) {
     return { kind: 'cap', message: 'Free preview used up. Start your 30-day trial to keep going.' };
   }
   return null;
 }
 
+/** Server-computed login usage (api/_lib/seats.js): owner excluded, extra admins + pending invites counted. */
+export interface SeatsView {
+  cap: number | null;
+  members: number;
+  pending: number;
+  used: number;
+  remaining: number | null;
+  atCap: boolean;
+  overCap: boolean;
+  label: string;
+}
+export interface SeatsResponse {
+  plan: BillingPlanId | null;
+  cap: number | null;
+  seats: SeatsView | null;
+}
+
 export const billingClient = {
+  seats() {
+    return getAction<SeatsResponse>('seats');
+  },
+  invite(email: string, role: 'admin' | 'member' = 'member') {
+    return postAction<{ ok: true; seats: SeatsView }>('invite', { email, role });
+  },
   checkout(plan: string, interval: BillingInterval = 'month', quantity?: number) {
     return postAction<{ url: string }>('checkout', { plan, interval, quantity });
   },

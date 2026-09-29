@@ -3,7 +3,8 @@ import { CreateOrganization, OrganizationProfile, useAuth, useOrganization } fro
 import { Bell, ChevronDown, ChevronUp, Clock, Download, History, Loader2, ShieldAlert, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
-import { isAdminRole, seatStatus } from '../services/teamClient';
+import { isAdminRole, seatStatus, type SeatStatus } from '../services/teamClient';
+import { billingClient, BillingApiError, type SeatsView } from '../services/billingClient';
 import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
 import { deleteShopData, downloadTenantExportJson } from '../services/exportClient';
 import { memberDisplayName } from '../core/memberNames';
@@ -16,9 +17,9 @@ import { reviewClient, type StaffAccessLogEntry, type SupportAccessGrant } from 
  * `<OrganizationProfile />` IS the invite/manage UI — it sends the invite
  * email, hosts the invitee's sign-up, and is the source of truth for who's
  * in the org and what role they hold. This screen's job is only to (1) put
- * that behind an admin-only door in our own UI, (2) show DeepWell's seat
- * cap next to Clerk's own member count since Clerk has no concept of our
- * plan limits, and (3) give a non-admin a read-only view instead of the
+ * that behind an admin-only door in our own UI, (2) show DeepWell's login
+ * usage ("3 of 5 logins used (owner not counted)", computed server-side) and enforce
+ * the plan's cap through our own seat-guarded invite form, and (3) give a non-admin a read-only view instead of the
  * management UI (Clerk's own permission system would likely hide the
  * invite/remove controls for a plain "member" anyway, but this doesn't rely
  * on that — a member here never even mounts <OrganizationProfile />).
@@ -31,6 +32,9 @@ const clerkAppearance = {
     rootBox: 'w-full',
     cardBox: 'w-full shadow-none border-0',
     card: 'w-full shadow-none border-0',
+    // Round 26: invites go through our own seat-guarded form (InviteForm below → POST /api/billing?action=invite),
+    // which counts pending invites and refuses past the plan's login cap. Clerk's own invite button would bypass it.
+    membersPageInviteButton: { display: 'none' },
   },
   variables: {
     colorPrimary: '#0D3827',
@@ -387,6 +391,78 @@ export function SupportAccessCard() {
   );
 }
 
+/**
+ * Round 26: the seat-guarded invite form. Disabled at/over the plan's login cap with an upgrade message; the
+ * server (api/_lib/seats.js guardedInvite) re-checks live, so a stale count here can never over-invite.
+ */
+function InviteForm({ seats, onInvited, onUpgrade }: { seats: SeatStatus; onInvited: () => void; onUpgrade: () => void }) {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'member' | 'admin'>('member');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const blocked = seats.atCap;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (blocked || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await billingClient.invite(email.trim(), role);
+      setMessage({ ok: true, text: `Invite sent to ${email.trim()}.` });
+      setEmail('');
+      onInvited();
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof BillingApiError || err instanceof Error ? err.message : 'Could not send that invite.' });
+      if (err instanceof BillingApiError && err.status === 402) onInvited();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => void submit(e)} className="dw-card p-4 space-y-3" aria-labelledby="invite-heading">
+      <h2 id="invite-heading" className="text-h3">Invite someone</h2>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="block">
+          <span className="dw-label block mb-1.5">Email</span>
+          <input
+            type="email"
+            required
+            className="dw-input w-64"
+            value={email}
+            disabled={blocked}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="tech@yourshop.com"
+          />
+        </label>
+        <label className="block">
+          <span className="dw-label block mb-1.5">Role</span>
+          <select className="dw-input" value={role} disabled={blocked} onChange={(e) => setRole(e.target.value === 'admin' ? 'admin' : 'member')}>
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <button type="submit" className="dw-btn-primary" disabled={blocked || busy || !email.trim()}>
+          {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+          Send invite
+        </button>
+      </div>
+      {blocked && (
+        <p className="text-caption text-warn-ink dark:text-brass-200">
+          Your plan&apos;s login limit is reached — upgrade to invite more people.{' '}
+          <button type="button" onClick={onUpgrade} className="underline font-medium">Go to Billing</button>
+        </p>
+      )}
+      {message && (
+        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-caption text-ink-2' : 'text-caption text-bad-ink'}>
+          {message.text}
+        </p>
+      )}
+    </form>
+  );
+}
+
 export function TeamScreen() {
   const { orgRole, orgId } = useAuth();
   const admin = isAdminRole(orgRole ?? null);
@@ -395,7 +471,21 @@ export function TeamScreen() {
   const { organization, isLoaded, memberships } = useOrganization(admin ? undefined : { memberships: { pageSize: 50 } });
   const billingStatus = useAppStore((s) => s.billingStatus);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
-  const cap = billingStatus?.limits?.technicians ?? null;
+  const planCap = billingStatus?.limits?.logins ?? null;
+  // Server-computed login usage (owner excluded; extra admins + pending invites counted). Admin-only endpoint; it
+  // also lazily syncs the Clerk org's member limit. null until loaded / if Clerk is unreachable.
+  const [seatsView, setSeatsView] = useState<SeatsView | null>(null);
+  const [seatsTick, setSeatsTick] = useState(0);
+  const refreshSeats = () => setSeatsTick((n) => n + 1);
+  useEffect(() => {
+    if (!admin) return;
+    let live = true;
+    billingClient
+      .seats()
+      .then((r) => { if (live) setSeatsView(r.seats); })
+      .catch(() => { if (live) setSeatsView(null); });
+    return () => { live = false; };
+  }, [admin, orgId, seatsTick]);
 
   // Defensive fallback: App.tsx already gates on `orgId` before this screen
   // can render, so `organization` should always be set here — this only
@@ -411,9 +501,12 @@ export function TeamScreen() {
     );
   }
 
-  const count = organization?.membersCount ?? 0;
-  const pending = organization?.pendingInvitationsCount ?? 0;
-  const seats = seatStatus(count, cap);
+  const membersCount = organization?.membersCount ?? 0;
+  const pendingInvites = organization?.pendingInvitationsCount ?? 0;
+  // Fallback while the server count is unavailable: everyone but the owner (approx.) + pending invites.
+  const used = seatsView?.used ?? Math.max(0, membersCount - 1) + pendingInvites;
+  const seats = seatStatus(used, seatsView ? seatsView.cap : planCap);
+  const pending = seatsView?.pending ?? pendingInvites;
 
   return (
     <AppShell>
@@ -424,8 +517,8 @@ export function TeamScreen() {
             Team
           </h1>
           <span className={seats.atCap ? 'dw-pill-warn' : 'dw-pill-muted'}>
-            {seats.label}
-            {pending > 0 ? ` · ${pending} pending invite${pending === 1 ? '' : 's'}` : ''}
+            {admin ? seats.label : `${membersCount} member${membersCount === 1 ? '' : 's'}`}
+            {admin && pending > 0 ? ` · ${pending} pending invite${pending === 1 ? '' : 's'}` : ''}
           </span>
         </div>
 
@@ -450,7 +543,11 @@ export function TeamScreen() {
 
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink dark:text-brass-200 flex items-center justify-between gap-3 flex-wrap">
-            <span>You&apos;re at your plan&apos;s seat limit ({seats.label}). Upgrade to invite more technicians.</span>
+            <span>
+              {seats.overCap
+                ? `Your team is over your plan's login limit: ${seats.label}. Nobody is locked out, but new invites are paused until you're under the limit or upgrade.`
+                : `You've reached your plan's login limit: ${seats.label}. Upgrade to invite more people.`}
+            </span>
             <button type="button" onClick={() => setCurrentScreen('billing')} className="underline font-medium shrink-0">
               Go to Billing
             </button>
@@ -460,10 +557,11 @@ export function TeamScreen() {
         {admin ? (
           <>
             <p className="text-caption text-ink-3">
-              Clerk sends the invite email and handles sign-up — anyone who accepts lands in this shop with the
-              role you pick below, not their own separate account. The seat count above is DeepWell&apos;s plan
-              limit; Clerk itself does not enforce it, so it is still possible to invite past it here.
+              Invites are sent by email and handled by our sign-up — anyone who accepts lands in this shop with the role
+              you pick. Your plan includes {seats.cap == null ? '11 or more' : `up to ${seats.cap}`} logins. The owner
+              account doesn&apos;t count, but extra admins and pending invites do.
             </p>
+            <InviteForm seats={seats} onInvited={() => { refreshSeats(); void organization?.reload(); }} onUpgrade={() => setCurrentScreen('billing')} />
             <div className="dw-card p-1 sm:p-3 overflow-hidden">
               <OrganizationProfile appearance={clerkAppearance} />
             </div>

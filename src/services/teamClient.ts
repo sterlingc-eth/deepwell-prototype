@@ -1,13 +1,12 @@
 /**
  * Pure helpers for the Team screen (src/screens/TeamScreen.tsx): role gating
- * and seat math. No network calls of its own — member count comes straight
- * off Clerk's own Organization resource (`organization.membersCount`, which
- * Clerk keeps accurate as people are invited/accepted/removed) and the seat
- * cap from billingClient's already-fetched BillingStatus.limits.technicians
- * (api/_lib/plan.js's PLAN_LIMITS.technicians, mirrored there the same way
- * documentTypes.ts mirrors api/_lib/documentTypes.js — src/ can't import
- * api/). See handoffs/ORG_INVITES_AUDIT.md for why no new server endpoint
- * was needed for the "N of M seats" display.
+ * and login math. No network calls of its own. The login COUNT comes from the
+ * server (GET /api/billing?action=seats, api/_lib/seats.js) because the one
+ * owner account must be excluded and Clerk's frontend org object does not
+ * expose who created the org; the cap is PLAN_LIMITS.logins from
+ * billingClient's already-fetched BillingStatus.limits (mirrored from
+ * api/_lib/plan.js the same way documentTypes.ts mirrors
+ * api/_lib/documentTypes.js — src/ can't import api/).
  */
 
 /**
@@ -26,13 +25,16 @@ export interface SeatStatus {
   count: number;
   cap: number | null;
   atCap: boolean;
+  overCap: boolean;
   label: string;
 }
 
 /**
- * `cap` is PLAN_LIMITS[plan].technicians — `null` on an uncapped plan (Fleet)
- * or before billing status has loaded, in which case seats are never
- * reported "at cap" (nothing to block against yet).
+ * Round 26: logins are really capped (Solo 2 / Shop 5 / Crew 10 / Fleet 11+). `count` is the number of
+ * logins USED — every member except the ONE owner account, plus pending invitations (the server computes
+ * it: api/_lib/seats.js). `cap` is the plan's login cap — `null` on Fleet (no DeepWell cap) or before
+ * billing status has loaded, in which case nothing is ever "at cap". Label mirrors api/_lib/seats.js's
+ * seatLabel exactly: "3 of 5 logins used (owner not counted)".
  */
 export function seatStatus(count: number, cap: number | null | undefined): SeatStatus {
   const c = cap ?? null;
@@ -40,6 +42,10 @@ export function seatStatus(count: number, cap: number | null | undefined): SeatS
     count,
     cap: c,
     atCap: c != null && count >= c,
-    label: c == null ? `${count} member${count === 1 ? '' : 's'}` : `${count} of ${c} seat${c === 1 ? '' : 's'}`,
+    overCap: c != null && count > c,
+    label:
+      c == null
+        ? `${count} login${count === 1 ? '' : 's'} used (owner not counted)`
+        : `${count} of ${c} login${c === 1 ? '' : 's'} used (owner not counted)`,
   };
 }

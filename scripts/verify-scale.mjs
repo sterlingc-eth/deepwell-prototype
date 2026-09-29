@@ -26,9 +26,9 @@ import {
   secondsUntilUtcMidnight,
 } from '../api/_lib/rateLimit.js';
 import { R2Error } from '../api/_lib/r2.js';
-import { scaleDailyLimitForPlan, planTierFromLimits, PLAN_DAILY_ASKS, DEFAULT_LIMITS as RL_DEFAULTS } from '../api/_lib/rateLimit.js';
+import { scaleDailyLimitForPlan, planTierFromLimits, DEFAULT_LIMITS as RL_DEFAULTS } from '../api/_lib/rateLimit.js';
 import { IngestError } from '../api/_lib/readDocument.js';
-import { PLAN_LIMITS, gateAsk } from '../api/_lib/plan.js';
+import { PLAN_LIMITS, gateAsk, donovanSafetyPerMonth } from '../api/_lib/plan.js';
 import { monthStartUtc, nextMonthStartUtc, resetsOnIso, resetsOnLabel, isCountableAskSource } from '../api/_lib/usage.js';
 
 let failures = 0;
@@ -450,23 +450,17 @@ const eq = (name, got, want) =>
     /withBackoff\(\(\) => client\.messages\.create[\s\S]{0,800}attempts:\s*modelAttempts/.test(extractDocText));
 }
 
-/* ------------------------------------------- plan-sized daily limits
- * (owner decision, 2026-09-21): PLAN_DAILY_ASKS is no longer its own budget
- * — it's a runaway guard, 30% of PLAN_LIMITS[tier].asksPerMonth, rounded.
- * solo 3000*0.3=900, shop 9000*0.3=2700, crew 22500*0.3=6750, fleet
- * 60000*0.3=18000. */
+/* ------------------------------------------- daily limits
+ * Round 26: Donovan is unlimited on every plan. The ask bucket's daily value is
+ * ONE flat, hidden safety ceiling (plan.js DONOVAN_SAFETY.perDay) — never
+ * plan-scaled. Only the ingest daily default still scales by plan. */
 {
   const ask = RL_DEFAULTS.ask.perDay;
-  check('ask default is Solo-sized (900/day = 30% of 3,000/month)', ask === 900 && PLAN_DAILY_ASKS.solo === 900);
-  check('no plan on file -> Solo ask budget', scaleDailyLimitForPlan('ask', ask, {}) === 900);
-  check('null limits -> Solo ask budget', scaleDailyLimitForPlan('ask', ask, null) === 900);
-  check('Solo (750 pages) -> 900 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 750 }) === 900);
-  check('Shop (2000 pages) -> 2700 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 2000 }) === 2700);
-  check('Crew (5000 pages) -> 6750 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 5000 }) === 6750);
-  check('Fleet (10000 pages) -> 18000 asks/day', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 10000 }) === 18000);
-  check('explicit plan name wins over pages', scaleDailyLimitForPlan('ask', ask, { plan: 'fleet', pagesPerMonth: 750 }) === 18000);
-  check('garbage pagesPerMonth -> Solo budget', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 'lots' }) === 900);
-  check('unknown page count -> Solo budget', scaleDailyLimitForPlan('ask', ask, { pagesPerMonth: 4242 }) === 900);
+  check('ask default is the flat safety ceiling (3000/day)', ask === 3000);
+  for (const [label, limits] of [['no plan on file', {}], ['null limits', null], ['Solo', { pagesPerMonth: 750 }], ['Shop', { pagesPerMonth: 2000 }],
+    ['Crew', { pagesPerMonth: 5000 }], ['Fleet', { pagesPerMonth: 10000 }], ['explicit plan name', { plan: 'fleet', pagesPerMonth: 750 }]]) {
+    check(`ask daily ceiling is identical on every plan (${label})`, scaleDailyLimitForPlan('ask', ask, limits) === ask);
+  }
   const ingest = RL_DEFAULTS.ingest.perDay;
   check('ingest: Solo unchanged', scaleDailyLimitForPlan('ingest', ingest, { pagesPerMonth: 750 }) === ingest);
   check('ingest: Fleet 12x', scaleDailyLimitForPlan('ingest', ingest, { pagesPerMonth: 10000 }) === ingest * 12);
@@ -474,14 +468,13 @@ const eq = (name, got, want) =>
   check('planTierFromLimits maps every tier', ['solo','shop','crew','fleet'].every((t, i) => planTierFromLimits({ pagesPerMonth: [750,2000,5000,10000][i] }) === t));
 }
 
-/* ------------------------------------------- PLAN_LIMITS.asksPerMonth shape */
+/* ------------------------------------------- PLAN_LIMITS shape (Round 26) */
 {
-  eq('PLAN_LIMITS.asksPerMonth by tier', {
-    solo: PLAN_LIMITS.solo.asksPerMonth, shop: PLAN_LIMITS.shop.asksPerMonth,
-    crew: PLAN_LIMITS.crew.asksPerMonth, fleet: PLAN_LIMITS.fleet.asksPerMonth,
-  }, { solo: 3000, shop: 9000, crew: 22500, fleet: 60000 });
-  check('30% of asksPerMonth, rounded, is exactly PLAN_DAILY_ASKS for every tier',
-    ['solo', 'shop', 'crew', 'fleet'].every((t) => PLAN_DAILY_ASKS[t] === Math.round(PLAN_LIMITS[t].asksPerMonth * 0.3)));
+  eq('PLAN_LIMITS.logins by tier (owner not counted)', {
+    solo: PLAN_LIMITS.solo.logins, shop: PLAN_LIMITS.shop.logins, crew: PLAN_LIMITS.crew.logins, fleet: PLAN_LIMITS.fleet.logins,
+  }, { solo: 2, shop: 5, crew: 10, fleet: null });
+  check('no per-plan ask allowance exists any more', ['solo', 'shop', 'crew', 'fleet'].every((t) => !('asksPerMonth' in PLAN_LIMITS[t]) && !('technicians' in PLAN_LIMITS[t])));
+  eq('page allowances unchanged', ['solo', 'shop', 'crew', 'fleet'].map((t) => PLAN_LIMITS[t].pagesPerMonth), [750, 2000, 5000, 10000]);
 }
 
 /* --------------------------------------------------------- resetsOn / month math */
@@ -514,22 +507,25 @@ const eq = (name, got, want) =>
   check('the money gate (no model call) does not count', !isCountableAskSource('money'));
 }
 
-/* ------------------------------------------------------------------ gateAsk at 0/79/80/99/100% */
+/* ------------------------------------------------------------------ gateAsk: safety ceiling only (Round 26) */
 {
   const tenant = { plan: 'solo', billing_status: 'active' };
-  const cap = PLAN_LIMITS.solo.asksPerMonth; // 3000
-  check('gateAsk: 0% used -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: 0 }).allowed);
-  check('gateAsk: 79% used -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: Math.round(cap * 0.79) }).allowed);
-  check('gateAsk: 80% used -> still allowed (warning-only threshold, not a gate)', gateAsk(tenant, { documentsStored: 1, asksThisMonth: Math.round(cap * 0.8) }).allowed);
-  check('gateAsk: 99% used -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: Math.round(cap * 0.99) }).allowed);
-  const blocked = gateAsk(tenant, { documentsStored: 1, asksThisMonth: cap });
-  check('gateAsk: 100% used -> blocked', !blocked.allowed);
-  eq('gateAsk: 100% used -> 402', blocked.status, 402);
-  check('gateAsk: 402 message never says "questions" and names the reset date', /^This month's Donovan usage is used up — resets /.test(blocked.error), blocked.error);
-  eq('gateAsk: 100% used -> points at Billing', blocked.url, '/app/?screen=billing');
-  check('gateAsk: over 100% (stale read) is still blocked, not a crash', !gateAsk(tenant, { documentsStored: 1, asksThisMonth: cap + 500 }).allowed);
-  check('gateAsk: a tenant with no plan on file skips the monthly cap (no cap to check)', gateAsk({ billing_status: 'active' }, { documentsStored: 1, asksThisMonth: 999_999 }).allowed);
-  check('gateAsk: trialing is still subject to the monthly cap', !gateAsk({ plan: 'solo', billing_status: 'trialing', trial_ends_at: new Date(Date.now() + 86400000).toISOString() }, { documentsStored: 1, asksThisMonth: cap }).allowed);
+  const cap = donovanSafetyPerMonth({});
+  check('safety ceiling default is far above any normal shop (>= 20,000/month)', cap >= 20_000);
+  check('gateAsk: a busy month on Solo (5,000 asks) -> allowed (no plan allowance)', gateAsk(tenant, { documentsStored: 1, asksThisMonth: 5000 }, new Date(), {}).allowed);
+  check('gateAsk: just under the ceiling -> allowed', gateAsk(tenant, { documentsStored: 1, asksThisMonth: cap - 1 }, new Date(), {}).allowed);
+  const blocked = gateAsk(tenant, { documentsStored: 1, asksThisMonth: cap }, new Date(), {});
+  check('gateAsk: at the ceiling -> blocked', !blocked.allowed);
+  eq('gateAsk: safety block is a 429, not a 402 billing wall', blocked.status, 429);
+  check('gateAsk: safety message is polite and points at support', /unusually high usage/.test(blocked.error) && /support@deepwelltechnology\.com/.test(blocked.error), blocked.error);
+  check('gateAsk: safety message never says upgrade', !/upgrade|plan/i.test(blocked.error), blocked.error);
+  check('gateAsk: safety block has no billing url', blocked.url === undefined);
+  eq('gateAsk: safety block carries scope=safety', blocked.scope, 'safety');
+  check('gateAsk: env override lowers the ceiling', !gateAsk(tenant, { documentsStored: 1, asksThisMonth: 100 }, new Date(), { DONOVAN_SAFETY_ASKS_PER_MONTH: '100' }).allowed);
+  check('gateAsk: garbage env override falls back to the default', gateAsk(tenant, { documentsStored: 1, asksThisMonth: 100 }, new Date(), { DONOVAN_SAFETY_ASKS_PER_MONTH: 'lots' }).allowed);
+  check('gateAsk: Fleet is identical to Solo (no plan-sized allowance)', gateAsk({ plan: 'fleet', billing_status: 'active' }, { documentsStored: 1, asksThisMonth: 5000 }, new Date(), {}).allowed);
+  check('gateAsk: a tenant with no plan on file still gets the safety ceiling', !gateAsk({ billing_status: 'active' }, { documentsStored: 1, asksThisMonth: 999_999 }, new Date(), {}).allowed);
+  check('gateAsk: canceled is still a billing 402', gateAsk({ plan: 'solo', billing_status: 'canceled' }, { documentsStored: 1, asksThisMonth: 0 }).status === 402);
 }
 
 /* ------------------------------------------------------------------ done */

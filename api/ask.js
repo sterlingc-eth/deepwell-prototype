@@ -1120,7 +1120,7 @@ export default async function handler(req, res) {
     const gate = await gatePromise;
     if (!gate.allowed) {
       if (retrievalPromise) await retrievalPromise; // don't leak an in-flight transaction on the way out
-      return send(gate.status, { error: gate.error, url: gate.url });
+      return send(gate.status, { error: gate.error, url: gate.url, ...(gate.scope ? { scope: gate.scope } : {}) });
     }
 
     // ---- 0. meta-question pre-router (no model, no retrieval) --------------

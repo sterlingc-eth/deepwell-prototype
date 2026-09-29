@@ -116,7 +116,7 @@ const BILLING_STATUS = {
   trialEndsAt: null,
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
-  limits: { technicians: 4, documentsStored: 100000, pagesPerMonth: 2000, asksPerMonth: 9000 },
+  limits: { logins: 5, documentsStored: 100000, pagesPerMonth: 2000 },
   usage: { documentsStored: 412, pagesThisMonth: 88, asksThisMonth: 61, resetsOn: NOW_ISO.slice(0, 10) },
 };
 

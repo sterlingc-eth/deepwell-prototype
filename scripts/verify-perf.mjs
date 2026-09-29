@@ -195,7 +195,7 @@ const eq = (name, got, want) =>
   const base = DEFAULT_LIMITS.ask;
   eq('no tenant limits at all falls back to the env/hardcoded default', limitsFromTenantContext({}, 'ask', undefined), {
     perMinute: base.perMinute,
-    perDay: Math.round(3000 * 0.3), // solo's ask allowance, scaled — see scaleDailyLimitForPlan
+    perDay: base.perDay, // Round 26: flat hidden safety ceiling, not plan-scaled
   });
 
   const tenantOverride = limitsFromTenantContext({ ask: { perMinute: 5 } }, 'ask', undefined);

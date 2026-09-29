@@ -184,13 +184,13 @@ try {
     await page.context().close();
   }
 
-  // ------------------------------------------------ 7. Team seat-limit alert readable in the dark theme
+  // ------------------------------------------------ 7. Team login-limit alert readable in the dark theme
   {
     const page = await open({ backend: { billing: 'active' } });
     await go(page, 'team');
-    const alert = page.getByRole('alert').filter({ hasText: /seat limit/ }).first();
+    const alert = page.getByRole('alert').filter({ hasText: /login limit/ }).first();
     const color = await alert.evaluate((el) => getComputedStyle(el).color);
-    check('Team seat-limit alert (Office/dark) text is light enough to read', luminance(color) > 0.35, color);
+    check('Team login-limit alert (Office/dark) text is light enough to read', luminance(color) > 0.35, color);
     await shot(page, 'team-seat-limit-dark');
     await page.context().close();
   }

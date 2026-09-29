@@ -2,6 +2,7 @@ import { serializeClient, assertTenantUuid } from '../util/pgClient.js';
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
 import { handleCors, handleError } from "../claude.js";
 import { getAuxPool, generateKey, SCOPES } from "../apiKeyAuth.js";
+import { hasApiAccess, API_ACCESS_MESSAGE } from "../plan.js";
 
 /**
  * POST /api/keys
@@ -9,7 +10,8 @@ import { getAuxPool, generateKey, SCOPES } from "../apiKeyAuth.js";
  *       { action: 'list' }                  -> { keys: [...] }        (never includes key material)
  *       { action: 'revoke', id }             -> { id, revoked: true }
  *
- * Minting, listing and revoking API keys. DELIBERATELY Clerk-session-only —
+ * Minting, listing and revoking API keys. Minting is Fleet-only (403 "API access is included on the Fleet
+ * plan" otherwise); listing and revoking stay open on every plan so a downgraded shop can still see and kill old keys. DELIBERATELY Clerk-session-only —
  * this route calls requireAuth() directly, never requireAuthOrKey() — because
  * a key that could mint more keys would let a single leaked credential
  * self-propagate into an unbounded number of credentials with the same or
@@ -73,6 +75,60 @@ async function logAudit(client, tenantId, { action, resource_type, resource_id, 
   );
 }
 
+/**
+ * Mint a key for the caller's tenant. Exported (and free of req/res) so scripts/verify-plan-tiers-r26.mjs can
+ * exercise the Fleet-only rule against a real Postgres. Returns { status, body }.
+ */
+export async function createApiKey(ctx, auth, body) {
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!NAME_RE.test(name)) {
+    return { status: 400, body: { error: "name is required (1-100 characters)" } };
+  }
+  const scopes = [...new Set(Array.isArray(body.scopes) ? body.scopes : [])];
+  if (!scopes.length || !scopes.every((s) => SCOPES.includes(s))) {
+    return { status: 400, body: { error: `scopes must be a non-empty array drawn from: ${SCOPES.join(", ")}` } };
+  }
+
+  const { rawKey, keyPrefix, keyHash } = generateKey();
+
+  const result = await withTenantTx(ctx, async (client, tenantId) => {
+    // Round 26: API access is Fleet-only. Checked inside the same tenant transaction, before anything is written.
+    const { rows: planRows } = await client.query("SELECT plan FROM tenants WHERE id = $1", [tenantId]);
+    if (!hasApiAccess(planRows[0]?.plan)) return null;
+    const { rows } = await client.query(
+      `INSERT INTO api_keys (tenant_id, name, key_prefix, key_hash, scopes, created_by, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,NOW())
+       RETURNING id, name, key_prefix, scopes, created_at`,
+      [tenantId, name, keyPrefix, keyHash, scopes, auth.userId]
+    );
+    const row = rows[0];
+    await logAudit(client, tenantId, {
+      action: "api_key.create",
+      resource_type: "api_key",
+      resource_id: row.id,
+      clerk_user_id: auth.userId,
+      changes: { name, scopes },
+    });
+    return row;
+  });
+
+  if (!result) return { status: 403, body: { error: API_ACCESS_MESSAGE, url: "/app/?screen=billing" } };
+
+  return {
+    status: 201,
+    body: {
+      id: result.id,
+      name: result.name,
+      keyPrefix: result.key_prefix,
+      scopes: result.scopes,
+      createdAt: result.created_at,
+      // Shown exactly once. The caller must copy it now — it cannot be
+      // retrieved again, by anyone, ever; only its hash is stored.
+      key: rawKey,
+    },
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -92,45 +148,8 @@ export default async function handler(req, res) {
 
   try {
     if (body.action === "create") {
-      const name = typeof body.name === "string" ? body.name.trim() : "";
-      if (!NAME_RE.test(name)) {
-        return res.status(400).json({ error: "name is required (1-100 characters)" });
-      }
-      const scopes = [...new Set(Array.isArray(body.scopes) ? body.scopes : [])];
-      if (!scopes.length || !scopes.every((s) => SCOPES.includes(s))) {
-        return res.status(400).json({ error: `scopes must be a non-empty array drawn from: ${SCOPES.join(", ")}` });
-      }
-
-      const { rawKey, keyPrefix, keyHash } = generateKey();
-
-      const result = await withTenantTx(ctx, async (client, tenantId) => {
-        const { rows } = await client.query(
-          `INSERT INTO api_keys (tenant_id, name, key_prefix, key_hash, scopes, created_by, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,NOW())
-           RETURNING id, name, key_prefix, scopes, created_at`,
-          [tenantId, name, keyPrefix, keyHash, scopes, auth.userId]
-        );
-        const row = rows[0];
-        await logAudit(client, tenantId, {
-          action: "api_key.create",
-          resource_type: "api_key",
-          resource_id: row.id,
-          clerk_user_id: auth.userId,
-          changes: { name, scopes },
-        });
-        return row;
-      });
-
-      return handleCors(res, req).status(201).json({
-        id: result.id,
-        name: result.name,
-        keyPrefix: result.key_prefix,
-        scopes: result.scopes,
-        createdAt: result.created_at,
-        // Shown exactly once. The caller must copy it now — it cannot be
-        // retrieved again, by anyone, ever; only its hash is stored.
-        key: rawKey,
-      });
+      const out = await createApiKey(ctx, auth, body);
+      return handleCors(res, req).status(out.status).json(out.body);
     }
 
     if (body.action === "list") {

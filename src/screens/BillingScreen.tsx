@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { ApiAccessCard } from '../components/ApiAccessCard';
 import { useAppStore } from '../store/appStore';
 import {
   billingClient,
@@ -13,7 +14,7 @@ import {
   annualPrice,
   daysUntil,
   recordsRescueTotalCents,
-  resetsOnShortLabel,
+  loginsLabel,
   resolveRecordsRescueQuantity,
   type BillingInterval,
   type BillingPlanId,
@@ -28,6 +29,9 @@ function formatCents(cents: number): string {
 }
 function formatCap(n: number | null | undefined): string {
   return n == null ? 'Unlimited' : n.toLocaleString('en-US');
+}
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 const STATUS_LABEL: Record<BillingStatus['status'], string> = {
@@ -191,8 +195,8 @@ export function BillingScreen() {
               <>
                 <dl className="grid grid-cols-3 gap-3 text-body">
                   <div>
-                    <dt className="text-caption text-ink-3">Technicians</dt>
-                    <dd>{formatCap(status.limits.technicians)}</dd>
+                    <dt className="text-caption text-ink-3">Logins</dt>
+                    <dd title="The owner account doesn't count toward logins.">{capitalize(loginsLabel(status.limits.logins))}</dd>
                   </div>
                   <div>
                     <dt className="text-caption text-ink-3">Documents stored</dt>
@@ -208,42 +212,7 @@ export function BillingScreen() {
                   </div>
                 </dl>
 
-                {/* Monthly Donovan usage meter (owner decision, 2026-09-21):
-                    resets the 1st UTC, replacing the old daily ask cap —
-                    techs don't work every day. Owner correction, same day:
-                    the customer sees a PERCENTAGE only, never a raw question
-                    count ("don't intimidate them") — the exact numbers exist
-                    only in the title/aria-label, for an admin who hovers or
-                    uses a screen reader. */}
-                {status.limits.asksPerMonth != null && (() => {
-                  const cap = status.limits.asksPerMonth as number;
-                  const used = status.usage.asksThisMonth ?? 0;
-                  const pct = Math.round((used / cap) * 100);
-                  const resets = resetsOnShortLabel(status.usage.resetsOn);
-                  const barColor = pct >= 100 ? 'bg-bad-ink' : pct >= 80 ? 'bg-warn-ink' : 'bg-forest-700';
-                  const rawDetail = `${used.toLocaleString()} of ${formatCap(cap)}`;
-                  return (
-                    <div className="space-y-1.5" title={rawDetail}>
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-body">
-                        <dt className="text-caption text-ink-3">Donovan usage</dt>
-                        <dd>
-                          {pct}% this month{resets ? ` · resets ${resets}` : ''}
-                        </dd>
-                      </div>
-                      <div
-                        role="progressbar"
-                        aria-label={`Donovan usage: ${rawDetail} this month (${pct}%)${resets ? `, resets ${resets}` : ''}`}
-                        aria-valuenow={Math.min(pct, 100)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        title={rawDetail}
-                        className="h-1.5 rounded-full bg-surface-2 overflow-hidden"
-                      >
-                        <div className={['h-full rounded-full', barColor].join(' ')} style={{ width: `${Math.min(pct, 100)}%` }} />
-                      </div>
-                    </div>
-                  );
-                })()}
+                <p className="text-caption text-ink-3">Donovan: unlimited on every plan. The owner account doesn&apos;t count toward logins.</p>
               </>
             )}
 
@@ -305,9 +274,11 @@ export function BillingScreen() {
                     <span className="text-ink-3 text-body">/{interval === 'year' ? 'yr' : 'mo'}</span>
                   </p>
                   <ul className="text-body text-ink-2 space-y-1 flex-1">
-                    <li>{formatCap(limits.technicians)} technician{limits.technicians === 1 ? '' : 's'}</li>
+                    <li>Logins: {loginsLabel(limits.logins)}</li>
+                    <li>Donovan: unlimited</li>
                     <li>{formatCap(limits.documentsStored)} documents stored</li>
                     <li>{formatCap(limits.pagesPerMonth)} pages/month</li>
+                    <li>API access: {planId === 'fleet' ? 'Yes' : '—'}</li>
                   </ul>
                   <button
                     type="button"
@@ -324,6 +295,10 @@ export function BillingScreen() {
             })}
           </div>
         </section>
+
+        {!gated && <p className="text-caption text-ink-3">The owner account doesn&apos;t count toward logins.</p>}
+
+        {!gated && <ApiAccessCard plan={status?.plan ?? null} onUpgrade={() => document.getElementById('plans-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />}
 
         <section className="dw-card p-5 space-y-3" aria-labelledby="rescue-heading">
           <h2 id="rescue-heading" className="text-h3">
