@@ -62,3 +62,17 @@ export async function downloadTenantExportJson(): Promise<void> {
   const blob = await res.blob();
   downloadBlob(blob, filenameFrom(res.headers.get('Content-Disposition'), 'deepwell-export.json'));
 }
+
+/**
+ * R25: permanent whole-shop deletion (POST /api/tenant-delete). The server refuses unless `confirm`
+ * equals the caller's own tenant id from their verified token (api/_lib/routes/tenant-delete.js), cancels
+ * the Stripe subscription first, then deletes every row and file. Admin only (server-enforced).
+ */
+export async function deleteShopData(tenantId: string): Promise<void> {
+  const res = await fetch('/api/tenant-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify({ confirm: tenantId }),
+  });
+  if (!res.ok) throw new Error(await messageFromErrorResponse(res));
+}

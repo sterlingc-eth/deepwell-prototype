@@ -124,7 +124,7 @@ export function BillingScreen() {
         <header>
           <h1 className="text-h1">{gated ? 'Pick a plan to open your account' : 'Billing'}</h1>
           <p className="text-ink-2 mt-1">
-            {gated ? 'Start your 30-day Solo trial, or choose a plan below, to unlock DeepWell.' : 'Your DeepWell plan, trial, and usage.'}
+            {gated ? (trialEligible ? 'Start your 30-day Solo trial, or choose a plan below, to unlock DeepWell.' : 'Choose a plan below to unlock DeepWell again.') : 'Your DeepWell plan, trial, and usage.'}
           </p>
         </header>
 
@@ -298,7 +298,7 @@ export function BillingScreen() {
                 <div key={planId} className={['dw-card p-4 space-y-3 flex flex-col', isHighlighted ? 'ring-2 ring-focus' : ''].join(' ')}>
                   <div>
                     <h3 className="text-h3">{plan.name.replace('DeepWell ', '')}</h3>
-                    {planId === 'solo' && <span className="dw-pill-info mt-1 inline-block">30-day free trial</span>}
+                    {planId === 'solo' && trialEligible && <span className="dw-pill-info mt-1 inline-block">30-day free trial</span>}
                   </div>
                   <p>
                     <span className="font-display text-h1">{formatUSD(price)}</span>

@@ -121,6 +121,38 @@ export function classifyProviderError(error) {
 }
 
 /**
+ * Is this an error the Anthropic SDK (or a mock of it) threw for an HTTP/API failure, as opposed to
+ * one of OUR errors (a Postgres error, a ReviewError, an R2 failure)? Used so the broader
+ * "provider hiccup" handling below never swallows an unrelated 4xx/5xx of our own.
+ */
+export function isAnthropicApiError(error) {
+  if (!error || typeof error !== "object") return false;
+  if (/^(APIError|APIConnectionError|APIConnectionTimeoutError|InternalServerError|RateLimitError|BadRequestError|PermissionDeniedError|UnprocessableEntityError|AuthenticationError|APIUserAbortError)$/.test(String(error.name))) return true;
+  if (typeof error.error?.type === "string" || typeof error.request_id === "string" || typeof error.requestID === "string") return true;
+  return false;
+}
+
+/**
+ * Plain-language, secret-free text for a provider failure — what a customer (or a stored
+ * document.error column that the UI shows) should read INSTEAD of the SDK's raw
+ * `400 {"type":"error","error":{...},"request_id":"req_..."}` message. Honest: it says the AI
+ * service was unavailable; it never implies an answer was found. Returns null for anything that is
+ * not a provider failure (caller keeps its own handling).
+ * @returns {string|null}
+ */
+export function providerFailureMessage(error) {
+  if (error?.name === "ProviderUnavailableError" || classifyProviderError(error)) {
+    return "The AI service is temporarily unavailable, so this could not be completed. Nothing was lost — please try again in a few minutes.";
+  }
+  if (isAnthropicApiError(error)) {
+    const status = Number(error.status ?? 0);
+    if (status === 429) return "The AI service is busy right now. Please try again in a moment.";
+    return "The AI service had a temporary problem, so this could not be completed. Please try again in a moment.";
+  }
+  return null;
+}
+
+/**
  * A short-lived, IN-PROCESS "the provider is down" flag. Deliberately not a queue or a circuit
  * breaker — just enough state that the SAME request/process that just watched a model call fail with
  * classifyProviderError doesn't have to re-derive that fact from a generic "no answer" a moment later
@@ -432,6 +464,16 @@ export function handleError(res, error, req, extra = {}) {
       error: "This feature needs a database update that hasn't been applied yet. Please try again later.",
       code: "migration_pending",
     });
+  }
+
+  // Any OTHER Anthropic API failure that survived withBackoff (rate limited, 500/502/503/504, a 400 that is not a
+  // credit problem, a dropped connection): say plainly the AI service failed — never the SDK's raw JSON, never a
+  // fabricated answer. Deliberately does NOT flip the process-wide outage flag (a single 500 must not make every
+  // other request skip the model for minutes); only credits/auth/overloaded do that above.
+  // (429 keeps its own branch below — same friendly body the UI already handles.)
+  if (isAnthropicApiError(error) && Number(status ?? 0) !== 429) {
+    console.error("provider error (non-fatal to the platform):", error?.name, Number(status ?? 0) || "", String(error?.error?.type ?? ""));
+    return handleCors(res, req).status(503).json({ error: providerFailureMessage(error), code: "provider_error" });
   }
 
   if (status === 401 || msg.includes("401") || msg.includes("authentication") || msg.includes("API key") || msg.includes("CLAUDE_API_KEY")) {

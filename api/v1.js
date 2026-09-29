@@ -1,3 +1,4 @@
+import { armResponseDeadline } from "./_lib/util/deadline.js";
 import equipment from "./_lib/routes/v1-equipment.js";
 import warranty from "./_lib/routes/v1-warranty.js";
 import ingest from "./_lib/routes/v1-ingest.js";
@@ -42,5 +43,6 @@ export default async function handler(req, res) {
   const resource = String(req.query?.resource ?? "");
   const target = Object.prototype.hasOwnProperty.call(RESOURCES, resource) ? RESOURCES[resource] : null;
   if (!target) return res.status(404).json({ error: "Unknown resource", resources: Object.keys(RESOURCES) });
+  armResponseDeadline(res, 52_000); // maxDuration is 60s
   return target(req, res);
 }

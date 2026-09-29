@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { withTenant } from "./recordsStore.js";
 import { getObject } from "./r2.js";
-import { getApiKey, MODEL_TIMEOUT_MS } from "./claude.js";
+import { getApiKey, MODEL_TIMEOUT_MS, providerFailureMessage } from "./claude.js";
 import { captureException } from "./telemetry.js";
 import { recordModelCall } from "./usage.js";
 import { withCache } from "./promptCache.js";
@@ -545,7 +545,7 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
 export async function recordIngestFailure(ctx, documentId, error) {
   await captureException(error, { route: "ingestDocument", documentId, tenant: ctx?.tenantKey });
   await withTenant(ctx, (db) =>
-    db.markExtracted(documentId, { error: String(error?.message ?? error).slice(0, 500) })
+    db.markExtracted(documentId, { error: (providerFailureMessage(error) ?? String(error?.message ?? error)).slice(0, 500) })
   ).catch(() => {});
 }
 

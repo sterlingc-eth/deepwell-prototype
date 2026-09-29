@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- Dev-only harness for scripts/verify-app-qa.mjs: the REAL src/App.tsx (non-demo path) with a mutable Clerk mock. Never shipped. -->
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <script>try{if(localStorage.getItem("deepwell.fieldMode")==="1"){document.documentElement.classList.remove("dark");document.documentElement.classList.add("field")}}catch(e){}</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DeepWell mobile QA harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./mobile-main.tsx"></script>
+  </body>
+</html>

@@ -1,3 +1,4 @@
+import { serializeClient, assertTenantUuid } from "../util/pgClient.js";
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
 import { handleCors, handleError, sendPrivateCacheableJson } from "../claude.js";
 import { getPool, getTenantContext } from "../recordsStore.js";
@@ -32,10 +33,10 @@ async function withTenantTx(ctx, fn) {
   // alongside only because `notifications` has no curated store method (see
   // the file header).
   const tenantId = (await getTenantContext(ctx.tenantKey, ctx.tenantName)).id;
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query("BEGIN");
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
     const result = await fn(client, tenantId);
     await client.query("COMMIT");
     return result;

@@ -1,6 +1,7 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { ArrowUp, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
+import { friendlyErrorMessage } from '../services/httpError'
 import { authHeader } from '../services/authToken'
 import { asksUsedFraction, resetsOnShortLabel, type BillingStatus } from '../services/billingClient'
 import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
@@ -250,12 +251,18 @@ export function AskTab({
   onOpenCustomer,
   billing,
   tenantKey = null,
+  emptyShop = false,
+  onOpenScan,
 }: {
   onOpenDoc: (id: string) => void
   onOpenCustomer: (ref: string) => void
   billing: BillingStatus | null
   /** orgId ?? userId from MobileApp (a prop, like ScanTab's, so this tab renders without a ClerkProvider in tests). */
   tenantKey?: string | null
+  /** True once the records sync has finished and this shop has no documents at all (first run). */
+  emptyShop?: boolean
+  /** Jumps to the Scan tab — the only way a phone adds its first document. */
+  onOpenScan?: () => void
 }) {
   const [turns, setTurns] = useState<Turn[]>([])
   // Counter, not a boolean: a "Try again" can start while another ask is still in flight.
@@ -324,9 +331,7 @@ export function AskTab({
         ? 'That took too long — probably a weak signal. Try again.'
         : err instanceof TypeError
           ? "Couldn't reach DeepWell. Check your connection and try again."
-          : err instanceof Error
-            ? err.message
-            : 'Something went wrong.'
+          : friendlyErrorMessage(err, 'Something went wrong.')
       const billingUrl = err instanceof AskApiError && err.status === 402 ? (err.url ?? '/app/?screen=billing') : undefined
       update(id, { error: message, billingUrl })
     } finally {
@@ -353,7 +358,20 @@ export function AskTab({
               <DonovanMark size={64} className="short:hidden" />
               <h2 className="text-h3 font-semibold mt-3 short:mt-0 mb-1">Ask Donovan</h2>
               <p className="text-body text-ink-2 m-0 max-w-xs short:hidden">A customer, an address, a serial number, or any question about your records.</p>
-              <div className="mt-4 short:mt-2 w-full short:hidden"><InsightsCard onAsk={send} /></div>
+              {emptyShop ? (
+                // A brand-new shop has nothing to ask about; "All clear" here read as if it did. Point at the one next step.
+                <div className="mt-4 short:mt-2 w-full rounded-xl border border-line bg-surface p-4 text-left" data-testid="mobile-first-run">
+                  <p className="font-semibold m-0">No documents yet.</p>
+                  <p className="text-body text-ink-2 mt-1 mb-3">Scan a work order, warranty card or nameplate and Donovan can answer questions about it.</p>
+                  {onOpenScan && (
+                    <button type="button" onClick={onOpenScan} className="min-h-touch inline-flex items-center px-5 rounded-lg bg-accent text-forest-950 font-semibold">
+                      Scan your first document
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-4 short:mt-2 w-full short:hidden"><InsightsCard onAsk={send} /></div>
+              )}
               {suggestions === null ? (
                 <div className="mt-5 short:mt-2 w-full"><SamplePromptRowsPlaceholder /></div>
               ) : (

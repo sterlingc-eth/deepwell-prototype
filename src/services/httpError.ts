@@ -90,3 +90,29 @@ export function messageFromResponse(res: ResponseLike, body: unknown, fallback: 
 
   return message;
 }
+
+/** Shown when the browser could not reach the API at all (offline, DNS, dropped connection). Same wording ingestClient uses. */
+export const UNREACHABLE_MESSAGE = "Couldn't reach DeepWell — check your connection and try again.";
+
+/**
+ * Turns whatever an API-calling screen caught into a sentence a shop owner can act on. Browsers throw
+ * "Failed to fetch" / "Load failed" (Safari) / "NetworkError when attempting to fetch resource" for an
+ * offline request, and every client here falls back to a bare status line ("500 Internal Server Error")
+ * when the server sent no JSON error — neither means anything to a non-technical person. A message the
+ * server wrote on purpose (anything else) passes through untouched.
+ */
+export function friendlyErrorMessage(err: unknown, fallback = 'Something went wrong. Try again in a moment.'): string {
+  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  const message = raw.trim();
+  if (!message) return fallback;
+  if (/^(failed to fetch|load failed|network ?error|networkerror when attempting to fetch resource|network request failed|fetch failed)/i.test(message)) return UNREACHABLE_MESSAGE;
+  if (/^(bootstrap failed: |api error )?(401|403)\b/i.test(message)) return 'Your session has expired. Reload the page and sign in again.';
+  if (/^(bootstrap failed: |api error )?[45]\d\d\b/i.test(message)) return 'Something went wrong on our end. Try again in a moment.';
+  return message;
+}
+
+/** `text` ending in exactly one sentence terminator, so it can be followed by another sentence. */
+export function withPeriod(text: string): string {
+  const t = text.trim();
+  return /[.!?…]$/.test(t) ? t : `${t}.`;
+}

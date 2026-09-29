@@ -1,5 +1,5 @@
 import { ingestDocument, recordIngestFailure } from "../readDocument.js";
-import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeys } from "../opsStore.js";
+import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeysWithSource } from "../opsStore.js";
 import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { assertActiveBilling } from "../plan.js";
 import { captureMessage, captureException } from "../telemetry.js";
@@ -32,15 +32,12 @@ import { runKnowledgeReportSweepStep } from "../search/mapReduce.js";
  * for a cron trigger, and a route that only checked for the ABSENCE of a
  * user token would be open to anyone.
  *
- * CROSS-TENANT LIMITATION (see HANDOFF.md and opsStore.listTenantKeys' own
- * doc comment for the full explanation): the app's Postgres role is RLS-
- * restricted and cannot list `tenants` across tenants in production, so
- * listTenantKeys() returns an empty list there today. As a fallback, POSTing
- * `{ "tenants": ["org_abc", ...] }` (Clerk org ids, or {tenant_key,
- * tenant_name} objects) runs the sweep against exactly those tenants. Once
- * listTenantKeys() has a real cross-tenant path, this fallback becomes dead
- * code that can simply be deleted — it does not need to be threaded through
- * anywhere else.
+ * CROSS-TENANT LISTING: the app's Postgres role is RLS-restricted and cannot read `tenants` across
+ * tenants, so opsStore.listTenantKeysWithSource() calls the SECURITY DEFINER list_all_tenant_keys()
+ * (M3-config/60 — identifiers only). Before that SQL is pasted the listing is empty in production;
+ * POSTing `{ "tenants": ["org_abc", ...] }` (Clerk org ids, or {tenant_key, tenant_name} objects) then
+ * runs the sweep against exactly those tenants. The summary's `tenantSource` reports which path was
+ * used: "definer" | "fallback" | "body" | "none".
  *
  * SCALE-READINESS ADDITION (2026-09): also finds and re-attempts documents
  * the ingest queue deliberately deferred because a tenant's daily model-spend
@@ -88,18 +85,27 @@ export default async function handler(req, res) {
   // (REVIEW FIX 2026-09-20) — it receives this and stops before crossing it,
   // logging + reporting how many tenants it had to leave for next run.
   const deadlineAt = Date.now() + 45_000;
+  // Stuck-document re-reads (model calls) get their own, longer budget: api/account.js runs this on a 300s
+  // ceiling, so 200s leaves ~100s for the integrity/notification/outreach steps and the response.
+  const docRetryDeadlineAt = Date.now() + 200_000;
 
-  let tenants = await listTenantKeys();
+  // M3-config/60's list_all_tenant_keys() (SECURITY DEFINER) is the production path; `tenantSource` in the
+  // summary says which path answered so a sweep that visited nobody is visible, not silent.
+  const listed = await listTenantKeysWithSource();
+  let tenants = listed.tenants;
+  let tenantSource = listed.source;
 
   const bodyTenants = Array.isArray(req.body?.tenants) ? req.body.tenants : [];
   if (!tenants.length && bodyTenants.length) {
     tenants = bodyTenants
       .map((t) => (typeof t === "string" ? { tenant_key: t, tenant_name: t } : t))
       .filter((t) => t && typeof t.tenant_key === "string" && t.tenant_key);
+    tenantSource = "body";
   }
 
   const summary = {
     tenantsChecked: tenants.length,
+    tenantSource,
     stuckFound: 0,
     recovered: 0,
     stillFailing: 0,
@@ -180,6 +186,13 @@ export default async function handler(req, res) {
     let recovered = 0;
     let stillFailing = 0;
     for (const doc of docs.slice(0, MAX_DOCS_PER_TENANT)) {
+      // Deadline-aware (was only the notification step): each ingestDocument is a model call that can take
+      // 30-60s, so an unbounded loop over tenants x 25 documents is what ran the sweep past maxDuration.
+      // Skipped documents are left untouched (still stuck/deferred) and are picked up by tomorrow's sweep.
+      if (Date.now() >= docRetryDeadlineAt) {
+        summary.docsLeftForNextRun = (summary.docsLeftForNextRun ?? 0) + 1;
+        continue;
+      }
       try {
         await ingestDocument(ctx, doc.id);
         recovered += 1;

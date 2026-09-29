@@ -97,13 +97,13 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE v_inserted boolean;
+DECLARE v_rows integer;  -- 59-billing-record-event-fix.sql: was `boolean`, so `> 0` threw "boolean > integer"
 BEGIN
   INSERT INTO billing_events (id, type, tenant_id, payload)
   VALUES (p_id, p_type, p_tenant_id, p_payload)
   ON CONFLICT (id) DO NOTHING;
-  GET DIAGNOSTICS v_inserted = ROW_COUNT;
-  RETURN v_inserted > 0;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  RETURN v_rows > 0;
 END;
 $$;
 

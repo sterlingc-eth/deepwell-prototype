@@ -82,7 +82,13 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   // The one-line sub-bar shown below `sm`, so a phone-width session always
   // has a legible label for the active screen instead of relying on the
   // underline-only active state in the icon-only nav row above it.
-  const activeLabel = NAV.find((item) => item.matches.includes(currentScreen))?.label;
+  // While the billing gate is active the screen shown is Billing (or Team) whatever `currentScreen` still
+  // says — App.tsx falls back to Billing — so label what is actually on screen, not the stale 'Ask'.
+  const activeLabel = billingGateActive
+    ? currentScreen === 'team'
+      ? 'Team'
+      : 'Billing'
+    : NAV.find((item) => item.matches.includes(currentScreen))?.label;
 
   return (
     <div className="min-h-screen flex flex-col bg-bg text-ink">
@@ -90,8 +96,8 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
         Skip to main content
       </a>
 
-      <header className="sticky top-0 z-40 bg-forest-700 text-stone-0 border-b border-forest-800">
-        <div className="max-w-content mx-auto px-3 lg:px-6 h-14 sm:h-16 flex items-center gap-0.5 lg:gap-4">
+      <header className="relative sm:sticky sm:top-0 z-40 bg-forest-700 text-stone-0 border-b border-forest-800">
+        <div className="max-w-content mx-auto px-3 lg:px-6 min-h-14 sm:min-h-16 flex flex-wrap xl:flex-nowrap items-center gap-x-0.5 lg:gap-x-4 gap-y-0">
           <button
             type="button"
             onClick={() => setCurrentScreen('ask')}

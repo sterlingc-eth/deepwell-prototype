@@ -102,14 +102,12 @@ const eq = (name, got, want) =>
 // and, if the order were ever inverted, would rely entirely on CASCADE to
 // paper over it.
 {
-  // Eight content tables from 01-create-schema.sql, plus the four that later
-  // migrations add (users' tenant scoping, api_keys, usage_counters,
-  // document_entity_links). All twelve hold per-tenant data and all twelve
-  // must go on a "delete all my data" request — the tenants row is kept, so
-  // nothing cascades on its own.
-  const TENANT_TABLES = ['api_keys', 'audit_log', 'document_entity_links', 'document_pages', 'documents', 'entities', 'extractions', 'facets', 'proposals', 'schema_versions', 'usage_counters', 'users'];
-  eq('DELETE_ORDER contains exactly the twelve tenant-scoped tables, no more, no fewer',
-    [...DELETE_ORDER].sort(), TENANT_TABLES);
+  // The twelve tables this list started with (01-create-schema.sql plus users, api_keys, usage_counters,
+  // document_entity_links). Round 25 extended DELETE_ORDER to EVERY table with a tenant_id column; the full
+  // schema-derived completeness check (fails if any tenant table is missing) lives in scripts/verify-readiness.mjs.
+  const ORIGINAL_TWELVE = ['api_keys', 'audit_log', 'document_entity_links', 'document_pages', 'documents', 'entities', 'extractions', 'facets', 'proposals', 'schema_versions', 'usage_counters', 'users'];
+  check('DELETE_ORDER still contains the original twelve tenant-scoped tables (and now more: see verify-readiness)',
+    ORIGINAL_TWELVE.every((t) => DELETE_ORDER.includes(t)) && DELETE_ORDER.length > ORIGINAL_TWELVE.length);
 
   // child -> [parents that must come later in the order]
   const MUST_PRECEDE = {

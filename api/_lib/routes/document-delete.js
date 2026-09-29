@@ -36,6 +36,7 @@
  * ReviewError to get the right HTTP status back to the caller instead of a
  * generic 500.
  */
+import { serializeClient, assertTenantUuid } from '../util/pgClient.js';
 import { getPool } from '../recordsStore.js';
 import { deleteObject } from '../r2.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
@@ -84,7 +85,7 @@ export async function deleteDocuments(ctx, { documentIds } = {}, auth) {
 
   const ids = validateDocumentIds(documentIds);
 
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   let tenantId;
   let storageKeys;
   let deletedCount;
@@ -95,7 +96,7 @@ export async function deleteDocuments(ctx, { documentIds } = {}, auth) {
       ctx.tenantName ?? ctx.tenantKey,
     ]);
     tenantId = rows[0].id;
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
 
     // Collect storage keys BEFORE the delete — there is no row left to read
     // them from after.

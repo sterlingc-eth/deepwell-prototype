@@ -19,6 +19,7 @@
  *     should make that redundant; it is here so a future `NO FORCE` or a
  *     platform role with BYPASSRLS cannot silently open a cross-tenant read.
  */
+import { serializeClient, assertTenantUuid, isNonBlankId, explicitPgSsl } from './util/pgClient.js';
 import pg from 'pg';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
@@ -98,8 +99,11 @@ export function getPool() {
     const connectionString = process.env.NEON_CONNECTION_STRING;
     if (!connectionString) throw new Error('NEON_CONNECTION_STRING is not set');
     warnIfNotPooledHost(connectionString);
+    // Explicit verify-full-equivalent ssl (no behavior change, no pg SECURITY WARNING) — see explicitPgSsl.
+    const { connectionString: pgConnectionString, ssl } = explicitPgSsl(connectionString);
     pool = new pg.Pool({
-      connectionString,
+      connectionString: pgConnectionString,
+      ...(ssl ? { ssl } : {}),
       // 3 (Reviewer NO-GO, 2026-09-22 — was 10, and 5 before that). CAUTION,
       // read before changing again: this was raised to 10 on 2026-09-20
       // after 5 was exhausted under one user's UI polling + one Ask under
@@ -179,14 +183,19 @@ async function fetchRequestContextRow(tenantKey, tenantName) {
       const { rows } = await getPool().query('SELECT * FROM get_request_context($1, $2)', [tenantKey, tenantName]);
       requestContextFnExists = true;
       const row = rows[0];
-      return {
-        id: row.tenant_id,
-        plan: row.plan ?? null,
-        billingStatus: row.billing_status ?? null,
-        trialEndsAt: row.trial_ends_at ?? null,
-        currentPeriodEnd: row.current_period_end ?? null,
-        limits: row.limits ?? {},
-      };
+      // Empty/absent id (function returned no row, or a blank id): never hand
+      // it to a caller that will feed it to SQL as a uuid — take the
+      // multi-query path below, which validates the id itself.
+      if (row && isNonBlankId(row.tenant_id)) {
+        return {
+          id: row.tenant_id,
+          plan: row.plan ?? null,
+          billingStatus: row.billing_status ?? null,
+          trialEndsAt: row.trial_ends_at ?? null,
+          currentPeriodEnd: row.current_period_end ?? null,
+          limits: row.limits ?? {},
+        };
+      }
     } catch (err) {
       if (isUndefinedFunctionError(err)) {
         // undefined_function — migration 27 not pasted yet. Fall through to
@@ -209,13 +218,13 @@ async function fetchRequestContextRow(tenantKey, tenantName) {
   // every request — RLS's current_setting('app.tenant_id')::uuid cast on an
   // empty/absent GUC — and took every endpoint down with a 500).
   const { rows: idRows } = await getPool().query('SELECT resolve_tenant($1, $2) AS id', [tenantKey, tenantName]);
-  const id = idRows[0].id;
+  const id = assertTenantUuid(idRows[0]?.id);
   const { rows: lRows } = await getPool().query('SELECT get_tenant_limits($1) AS limits', [id]);
   let t = {};
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query('BEGIN');
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [id]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(id)]);
     const { rows: tRows } = await client.query(
       'SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1',
       [id]
@@ -248,12 +257,21 @@ async function fetchRequestContextRow(tenantKey, tenantName) {
  * @returns {Promise<{id: string, plan: string|null, billingStatus: string|null, trialEndsAt: *, currentPeriodEnd: *, limits: object}>}
  */
 export async function getTenantContext(tenantKey, tenantName) {
+  // An empty/whitespace/non-string key must never reach SQL (or the cache): it
+  // used to surface as `invalid input syntax for type uuid: ""` 500s. A clean
+  // 401 (handlers honor err.status) is the honest answer — there is no tenant.
+  if (!isNonBlankId(tenantKey)) {
+    const err = new Error('Sign in required');
+    err.status = 401;
+    err.code = 'NO_TENANT';
+    throw err;
+  }
   const start = Date.now();
   const cacheKeyBefore = tenantContextCache.get(tenantKey) !== undefined;
   const result = await memoAsync(
     tenantContextCache,
     tenantKey,
-    () => fetchRequestContextRow(tenantKey, tenantName ?? tenantKey),
+    () => fetchRequestContextRow(tenantKey, isNonBlankId(tenantName) ? tenantName : tenantKey),
     TENANT_CONTEXT_TTL_MS
   );
   // Learn the uuid<->tenantKey mapping every time — see uuidToTenantKey's own
@@ -902,11 +920,11 @@ export async function withTenant(ctx, fn) {
   // nothing about its result or its one-row-per-org guarantee.
   const tenantId = (await getTenantContext(ctx.tenantKey, ctx.tenantName)).id;
 
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query('BEGIN');
     // `true` = SET LOCAL: reverts on COMMIT/ROLLBACK, never outlives the request.
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
 
     const result = await fn(makeStore(client, tenantId));
     await client.query('COMMIT');
@@ -2816,8 +2834,10 @@ function makeStore(db, tenantId) {
      * so a customer whose only recent event is a new/edited piece of
      * equipment doesn't read as stale.
      */
-    listCustomersSummary: ({ like = null, sort = 'recent', limit = 200 } = {}) => {
+    listCustomersSummary: ({ like = null, sort = 'recent', limit = 200, offset = 0 } = {}) => {
       const lim = Math.min(Math.max(Number(limit) || 200, 1), 200);
+      // `offset` (default 0 = the historical behaviour) backs the paging API: GET /api/v1/customers?limit=&cursor=.
+      const off = Math.max(Math.trunc(Number(offset)) || 0, 0);
       const orderBy = sort === 'name' ? "c.data->>'customer_name' ASC NULLS LAST, c.id"
         : sort === 'docs' ? 'doc_count DESC NULLS LAST, c.id'
         : 'last_activity DESC NULLS LAST, c.id';
@@ -2879,9 +2899,22 @@ function makeStore(db, tenantId) {
            LEFT JOIN service_agg sa ON sa.customer_id = c.id
            LEFT JOIN equip_agg ea ON ea.customer_id = c.id
           ORDER BY ${orderBy}
-          LIMIT $2`,
-        [like, lim]
+          LIMIT $2 OFFSET $3`,
+        [like, lim, off]
       );
+    },
+
+    /** How many customers match `like` (same filter as listCustomersSummary) — the paging API's `total`. */
+    countCustomersSummary: async ({ like = null } = {}) => {
+      const { rows } = await db.query(
+        `SELECT COUNT(*)::int AS n FROM entities
+          WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+            AND ($1::text IS NULL OR data->>'customer_name' ILIKE $1
+                                  OR data->>'service_address' ILIKE $1
+                                  OR customer_number ILIKE $1)`,
+        [like]
+      );
+      return rows[0]?.n ?? 0;
     },
 
     // ---- warranty ---------------------------------------------------------

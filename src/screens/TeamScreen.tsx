@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { CreateOrganization, OrganizationProfile, useAuth, useOrganization } from '@clerk/clerk-react';
-import { Bell, ChevronDown, ChevronUp, Clock, Download, History, Loader2, ShieldAlert, ShieldCheck, Users } from 'lucide-react';
+import { Bell, ChevronDown, ChevronUp, Clock, Download, History, Loader2, ShieldAlert, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus } from '../services/teamClient';
 import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
-import { downloadTenantExportJson } from '../services/exportClient';
+import { deleteShopData, downloadTenantExportJson } from '../services/exportClient';
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
@@ -61,8 +61,12 @@ const clerkAppearance = {
  * (export it) into BillingScreen.tsx and dropping this section + that export
  * from here.
  */
-function AccountSettingsCard() {
+function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; shopName: string }) {
   const [open, setOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTyped, setDeleteTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [emailDigest, setEmailDigestState] = useState<boolean | null>(null);
   const [savingDigest, setSavingDigest] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -147,6 +151,64 @@ function AccountSettingsCard() {
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Download data export (JSON)
             </button>
             {exportError && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportError}</p>}
+          </div>
+
+          {/* R25: self-serve deletion (promised on /security). Typed confirmation here; the server
+              independently requires the caller's own tenant id and admin role. */}
+          <div className="space-y-2 pt-2 border-t border-line">
+            <h3 className="text-body font-medium text-ink flex items-center gap-2">
+              <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete this shop
+            </h3>
+            <p className="text-caption text-ink-3">
+              Cancels your subscription and permanently deletes every document, file, customer record and answer
+              history for this shop. This can't be undone — download the export above first.
+            </p>
+            {!deleteOpen ? (
+              <button type="button" className="dw-btn-secondary shrink-0" onClick={() => setDeleteOpen(true)} disabled={!tenantId}>
+                Delete shop data…
+              </button>
+            ) : (
+              <form
+                className="space-y-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!tenantId || deleteTyped.trim() !== shopName.trim() || deleting) return;
+                  setDeleting(true);
+                  setDeleteError(null);
+                  try {
+                    await deleteShopData(tenantId);
+                    window.location.assign('/?deleted=1');
+                  } catch (err) {
+                    setDeleteError(err instanceof Error ? err.message : 'Could not delete the shop. Nothing was deleted — try again.');
+                    setDeleting(false);
+                  }
+                }}
+              >
+                <label htmlFor="dw-delete-confirm" className="block text-caption text-ink-2">
+                  Type <strong className="text-ink">{shopName}</strong> to confirm
+                </label>
+                <input
+                  id="dw-delete-confirm"
+                  value={deleteTyped}
+                  onChange={(e) => setDeleteTyped(e.target.value)}
+                  autoComplete="off"
+                  className="w-full min-h-touch rounded-md border border-line-2 bg-surface px-3 text-ink"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    disabled={deleting || deleteTyped.trim() !== shopName.trim()}
+                    className="dw-btn-secondary shrink-0 text-bad border-bad disabled:opacity-50"
+                  >
+                    {deleting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Trash2 className="w-4 h-4" aria-hidden="true" />} Permanently delete
+                  </button>
+                  <button type="button" className="dw-btn-secondary shrink-0" onClick={() => { setDeleteOpen(false); setDeleteTyped(''); setDeleteError(null); }}>
+                    Cancel
+                  </button>
+                </div>
+                {deleteError && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{deleteError}</p>}
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -326,7 +388,7 @@ export function SupportAccessCard() {
 }
 
 export function TeamScreen() {
-  const { orgRole } = useAuth();
+  const { orgRole, orgId } = useAuth();
   const admin = isAdminRole(orgRole ?? null);
   // Only a non-admin needs the paginated memberships list fetched here — an
   // admin gets it for free inside <OrganizationProfile />'s own Members tab.
@@ -383,11 +445,11 @@ export function TeamScreen() {
             data export) stays here too, in its own separated, collapsed
             section, until it has a Billing/Settings home this pass doesn't
             own (see AccountSettingsCard's file comment). */}
-        {admin && <AccountSettingsCard />}
+        {admin && <AccountSettingsCard tenantId={organization?.name ? (orgId ?? null) : null} shopName={organization?.name ?? ''} />}
         {admin && <SupportAccessCard />}
 
         {admin && seats.atCap && (
-          <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center justify-between gap-3 flex-wrap">
+          <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink dark:text-brass-200 flex items-center justify-between gap-3 flex-wrap">
             <span>You&apos;re at your plan&apos;s seat limit ({seats.label}). Upgrade to invite more technicians.</span>
             <button type="button" onClick={() => setCurrentScreen('billing')} className="underline font-medium shrink-0">
               Go to Billing

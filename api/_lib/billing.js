@@ -44,15 +44,25 @@ export function lookupKeyFor(plan, interval) {
  * REQUEST 2b (2026-09-21, owner brief): "Maybe they can add the automated
  * portion that auto-sends if they pay extra." The Stripe price lookup_key
  * for that add-on, added to a tenant's subscription as its own line item
- * alongside their base plan — the single named place this codebase needs
- * to know it exists. No product/price is created here or by
- * scripts/stripe-setup.mjs: the owner creates it in the Stripe dashboard
- * (or CLI) with exactly this lookup_key, whenever they're ready to sell it.
- * Until then patchForEvent() below simply never sees it on a subscription's
- * items and `limits.outreachAuto` stays unset (see plan.js's
+ * alongside their base plan.
+ *
+ * CANONICAL KEY: `outreach_auto` — the name the owner checklist
+ * (handoffs/START_HERE_NEXT_CHAT.md) tells the owner to create in the Stripe
+ * dashboard. scripts/stripe-setup.mjs does NOT create this price (nothing
+ * creates it but the owner). The pre-2026-09-28 code expected
+ * `outreach_auto_addon_monthly`, which never matched the checklist; that name
+ * is still accepted as an alias so a price created under either name
+ * grants the entitlement. No product/price is created here: until the owner
+ * creates one, patchForEvent() below simply never sees it on a
+ * subscription's items and `limits.outreachAuto` stays unset (see plan.js's
  * hasOutreachAutoEntitlement).
  */
-export const OUTREACH_AUTO_ADDON_LOOKUP_KEY = 'outreach_auto_addon_monthly';
+export const OUTREACH_AUTO_ADDON_LOOKUP_KEY = 'outreach_auto';
+/** Every lookup_key that means "the auto-send add-on" (canonical first). */
+export const OUTREACH_AUTO_ADDON_LOOKUP_KEYS = Object.freeze([OUTREACH_AUTO_ADDON_LOOKUP_KEY, 'outreach_auto_addon_monthly']);
+export function isOutreachAutoAddOnKey(key) {
+  return OUTREACH_AUTO_ADDON_LOOKUP_KEYS.includes(String(key ?? ''));
+}
 
 export const RECORDS_RESCUE = Object.freeze({
   lookupKey: 'records_rescue_page',
@@ -175,7 +185,7 @@ export function chooseExistingCustomerId({ tenantRow, foundByMetadata }) {
  * `chooseExistingCustomerId` finding nothing and creating a new customer,
  * same as if the search had legitimately found none.
  */
-export async function findOrCreateCustomer(stripe, { tenantRow, tenantId, name }) {
+export async function findOrCreateCustomer(stripe, { tenantRow, tenantId, name, email }) {
   if (tenantRow?.stripe_customer_id) return tenantRow.stripe_customer_id;
 
   let foundByMetadata = null;
@@ -189,7 +199,10 @@ export async function findOrCreateCustomer(stripe, { tenantRow, tenantId, name }
   const existing = chooseExistingCustomerId({ tenantRow, foundByMetadata });
   if (existing) return existing;
 
-  const customer = await stripe.customers.create({ name: name ?? tenantId, metadata: { tenantId } });
+  const params = { name: name ?? tenantId, metadata: { tenantId } };
+  // The admin's email lands on Stripe receipts/invoices and lets Stripe's own dunning emails reach a human.
+  if (typeof email === 'string' && email.includes('@')) params.email = email;
+  const customer = await stripe.customers.create(params);
   return customer.id;
 }
 
@@ -250,8 +263,21 @@ export function verifyStripeSignature(rawBody, sigHeader, secret, opts = {}) {
 // ---------------------------------------------------------------------------
 
 function planFromSubscriptionItem(sub) {
-  const item = sub?.items?.data?.[0];
-  return item?.price?.metadata?.plan ?? null;
+  // Every item, not just the first: the auto-send add-on can be listed before
+  // the base plan. Prefer price.metadata.plan; fall back to the lookup_key
+  // scheme (solo_monthly / shop_annual / ...) so a price created without
+  // metadata still resolves a plan instead of silently applying none.
+  for (const item of sub?.items?.data ?? []) {
+    const fromMeta = item?.price?.metadata?.plan;
+    if (fromMeta && PLAN_CATALOG[fromMeta]) return fromMeta;
+  }
+  for (const item of sub?.items?.data ?? []) {
+    const key = String(item?.price?.lookup_key ?? '');
+    const prefix = key.split('_')[0];
+    if (!isOutreachAutoAddOnKey(key) && PLAN_CATALOG[prefix]) return prefix;
+  }
+  const first = sub?.items?.data?.[0]?.price?.metadata?.plan;
+  return first ?? null;
 }
 
 function isoOrNull(unixSeconds) {
@@ -300,13 +326,14 @@ export function patchForEvent(event) {
       // same subscription. Detected by lookup_key so this needs no Stripe
       // product id, same idiom as priceIdFor()'s plan lookups.
       const hasOutreachAutoAddOn = (obj.items?.data ?? []).some(
-        (item) => item?.price?.lookup_key === OUTREACH_AUTO_ADDON_LOOKUP_KEY
+        (item) => isOutreachAutoAddOnKey(item?.price?.lookup_key)
       );
       const patch = {
         stripe_customer_id: customerId,
         stripe_subscription_id: obj.id,
         billing_status,
-        current_period_end: isoOrNull(obj.current_period_end),
+        // Newer Stripe API versions moved current_period_end onto the item.
+        current_period_end: isoOrNull(obj.current_period_end ?? obj.items?.data?.[0]?.current_period_end),
         trial_ends_at: isoOrNull(obj.trial_end),
         cancel_at_period_end: !!obj.cancel_at_period_end,
       };
@@ -372,3 +399,244 @@ export const WEBHOOK_EVENTS = Object.freeze([
   'invoice.paid',
   'invoice.payment_failed',
 ]);
+
+/**
+ * Record the event in the idempotency ledger AND apply its patch in ONE
+ * transaction. Why one transaction: recording first and applying second (two
+ * autocommit statements) meant that if the apply failed after the ledger row
+ * was written, Stripe's retry was answered "duplicate" and the subscription
+ * change was lost forever. Now a failed apply rolls the ledger row back too,
+ * so the retry applies it.
+ *
+ * Ledger failure is non-fatal: if billing_record_event() itself errors (the
+ * "boolean > integer" bug in the pre-59 function, a missing migration, a
+ * transient blip) we log it and apply anyway — billing_apply() is a
+ * present-key-wins merge patch, so a replayed event only re-writes the same
+ * values. A paying customer's subscription state must never fail to apply
+ * because a dedupe ledger is unavailable.
+ * @returns {Promise<"applied"|"duplicate">}
+ */
+export async function recordAndApplyEvent(pool, event, tenantId, patch) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    let fresh = true;
+    await client.query("SAVEPOINT billing_ledger");
+    try {
+      const { rows } = await client.query("SELECT billing_record_event($1, $2, $3, $4::jsonb) AS fresh", [
+        event.id,
+        event.type,
+        tenantId,
+        JSON.stringify({ type: event.type }), // never the full payload — see billing_events comment; no PII, no card data
+      ]);
+      fresh = rows[0]?.fresh !== false;
+      await client.query("RELEASE SAVEPOINT billing_ledger");
+    } catch (ledgerErr) {
+      await client.query("ROLLBACK TO SAVEPOINT billing_ledger");
+      console.error("billing webhook: idempotency ledger unavailable, applying without it:", ledgerErr?.message);
+      fresh = true;
+    }
+    if (!fresh) {
+      await client.query("ROLLBACK");
+      return "duplicate";
+    }
+    await client.query("SELECT billing_apply($1, $2::jsonb)", [tenantId, JSON.stringify(patch)]);
+    await client.query("COMMIT");
+    return "applied";
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Customer identity for Stripe (receipts, invoices, dunning emails)
+// ---------------------------------------------------------------------------
+
+const withTimeout = (promise, ms) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms).unref?.())]);
+
+/**
+ * The shop name and admin email to put on the Stripe customer, instead of the Clerk org id ("org_2abc…") that
+ * used to be the customer's name with no email at all. Looked up from Clerk's Backend API (best effort, 4 s
+ * each, never fatal): a lookup that fails falls back to the previous behavior — the org id as the name, no
+ * email — so checkout can never be blocked by Clerk being slow.
+ *
+ * Checkout is admin-gated, so the requesting user IS a shop admin: their primary email is the admin email.
+ * @param {{userId?: string, orgId?: string|null, tenantId: string, email?: string}} auth
+ * @param {{clerk?: any}} [opts]  inject a Clerk client (tests); default builds one from CLERK_SECRET_KEY
+ * @returns {Promise<{name: string, email: string|undefined}>}
+ */
+export async function resolveBillingIdentity(auth, opts = {}) {
+  let name = auth?.orgId ?? auth?.tenantId;
+  let email = typeof auth?.email === 'string' && auth.email.includes('@') ? auth.email : undefined;
+  let clerk = opts.clerk;
+  if (!clerk) {
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) return { name, email };
+    try {
+      const { createClerkClient } = await import('@clerk/backend');
+      clerk = createClerkClient({ secretKey });
+    } catch (err) {
+      console.error('billing identity: Clerk client unavailable:', err?.message);
+      return { name, email };
+    }
+  }
+  if (auth?.orgId) {
+    try {
+      const org = await withTimeout(clerk.organizations.getOrganization({ organizationId: auth.orgId }), 4000);
+      if (typeof org?.name === 'string' && org.name.trim()) name = org.name.trim();
+    } catch (err) {
+      console.error('billing identity: org name lookup failed (using org id):', err?.message);
+    }
+  }
+  if ((!email || !auth?.orgId) && auth?.userId) {
+    try {
+      const user = await withTimeout(clerk.users.getUser(auth.userId), 4000);
+      const addrs = user?.emailAddresses ?? [];
+      const primary = addrs.find((a) => a?.id === user?.primaryEmailAddressId) ?? addrs[0];
+      if (!email && typeof primary?.emailAddress === 'string') email = primary.emailAddress;
+      if (!auth?.orgId) {
+        const full = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+        if (full) name = full;
+      }
+    } catch (err) {
+      console.error('billing identity: user lookup failed:', err?.message);
+    }
+  }
+  return { name, email };
+}
+
+// ---------------------------------------------------------------------------
+// Tenant deletion: stop the billing
+// ---------------------------------------------------------------------------
+
+const DEAD_SUBSCRIPTION_STATUSES = new Set(['canceled', 'incomplete_expired']);
+const isMissing = (err) => err?.code === 'resource_missing' || err?.statusCode === 404;
+
+/**
+ * Cancel every live Stripe subscription of a tenant IMMEDIATELY (no proration credit, no final invoice) so a
+ * customer who deletes their data is not billed again. Looks at the tenant's recorded subscription AND lists the
+ * Stripe customer's subscriptions, so a subscription the database never learned about (missed webhook) is
+ * still caught. "Already gone" is success. Never throws: returns what happened; the caller decides whether a
+ * failure should stop the deletion.
+ * @returns {Promise<{canceled: string[], alreadyGone: string[], failed: {id: string|null, message: string}[], skipped: string|null}>}
+ */
+export async function cancelTenantSubscriptions(stripe, { customerId, subscriptionId }) {
+  const result = { canceled: [], alreadyGone: [], failed: [], skipped: null };
+  if (!customerId && !subscriptionId) { result.skipped = 'no-subscription'; return result; }
+
+  const ids = new Set();
+  if (subscriptionId) ids.add(subscriptionId);
+  if (customerId) {
+    try {
+      const { data } = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+      for (const sub of data ?? []) if (!DEAD_SUBSCRIPTION_STATUSES.has(sub.status)) ids.add(sub.id);
+    } catch (err) {
+      // A customer that no longer exists has nothing to bill. Anything else means we cannot be sure we found
+      // every subscription: report it as a failure rather than pretending the customer is clean.
+      if (!isMissing(err)) result.failed.push({ id: null, message: `could not list subscriptions: ${err?.message ?? 'unknown error'}` });
+    }
+  }
+  if (!ids.size && !result.failed.length) { result.skipped = 'no-live-subscription'; return result; }
+
+  for (const id of ids) {
+    try {
+      await stripe.subscriptions.cancel(id, {
+        invoice_now: false,
+        prorate: false,
+        cancellation_details: { comment: 'Customer deleted their DeepWell data' },
+      });
+      result.canceled.push(id);
+    } catch (err) {
+      if (isMissing(err)) result.alreadyGone.push(id);
+      // Stripe answers 400 "already canceled" when a subscription is dead but still retrievable.
+      else if (/already (been )?cancel/i.test(String(err?.message))) result.alreadyGone.push(id);
+      else result.failed.push({ id, message: err?.message ?? 'unknown error' });
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Pull-based reconcile: a missed webhook must not lock out a paying customer
+// ---------------------------------------------------------------------------
+
+const LIVE_FIRST = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused', 'canceled', 'incomplete_expired'];
+
+/** Pick the subscription that best describes a customer's current state: live ones first, newest first. */
+export function pickSubscription(subs) {
+  const list = [...(subs ?? [])].filter((s) => s && s.id);
+  list.sort((a, b) => {
+    const ra = LIVE_FIRST.indexOf(a.status);
+    const rb = LIVE_FIRST.indexOf(b.status);
+    return (ra < 0 ? 99 : ra) - (rb < 0 ? 99 : rb) || (b.created ?? 0) - (a.created ?? 0);
+  });
+  return list[0] ?? null;
+}
+
+/**
+ * Should the status endpoint ask Stripe what this tenant's subscription looks like? Yes when the tenant has a
+ * Stripe customer (created when checkout starts) but the database still says nothing useful: state 'none',
+ * or no subscription id recorded. That is exactly "paid, but the webhook never arrived".
+ */
+export function needsBillingReconcile(row) {
+  if (!row?.stripe_customer_id) return false;
+  const status = row.billing_status ?? 'none';
+  return status === 'none' || status === 'incomplete' || (!row.stripe_subscription_id && status !== 'canceled');
+}
+
+const _reconcileAt = new Map();
+export const RECONCILE_MIN_INTERVAL_MS = 15_000;
+/** Test hook: forget throttle state. */
+export function _resetReconcileThrottle() { _reconcileAt.clear(); }
+
+/**
+ * Fetch the tenant's subscription from Stripe and apply it through the SAME event->patch mapping and
+ * billing_apply() the webhook uses (a synthetic customer.subscription.updated), so the two paths cannot
+ * disagree. Idempotent (present-key-wins merge), throttled per tenant, writes only when something changed, never
+ * throws (a Stripe outage must not break the status endpoint). Returns { applied, reason?, status?, plan? }.
+ * @param {{query: Function}} pool  pg pool (billing_apply is SECURITY DEFINER)
+ * @param {object} stripe            Stripe client (or a fake with subscriptions.retrieve/list)
+ */
+export async function reconcileTenantBilling(pool, stripe, { tenantId, row, now = Date.now() }) {
+  const last = _reconcileAt.get(tenantId) ?? 0;
+  if (now - last < RECONCILE_MIN_INTERVAL_MS) return { applied: false, reason: 'throttled' };
+  _reconcileAt.set(tenantId, now);
+  try {
+    let sub = null;
+    if (row?.stripe_subscription_id) {
+      try {
+        sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+      } catch (err) {
+        if (!isMissing(err)) throw err;
+      }
+    }
+    if (!sub && row?.stripe_customer_id) {
+      const { data } = await stripe.subscriptions.list({ customer: row.stripe_customer_id, status: 'all', limit: 10 });
+      sub = pickSubscription(data);
+    }
+    if (!sub) return { applied: false, reason: 'no-subscription' };
+    // An abandoned checkout (never paid) is not news: leave the tenant at 'none' rather than flipping it to 'canceled'.
+    if (sub.status === 'incomplete' || sub.status === 'incomplete_expired') return { applied: false, reason: 'incomplete' };
+
+    const mapped = patchForEvent({ type: 'customer.subscription.updated', data: { object: sub } });
+    if (!mapped) return { applied: false, reason: 'unmapped' };
+    const p = mapped.patch;
+    const same =
+      row?.stripe_subscription_id === p.stripe_subscription_id &&
+      row?.billing_status === p.billing_status &&
+      (p.plan == null || row?.plan === p.plan) &&
+      !!row?.cancel_at_period_end === !!p.cancel_at_period_end &&
+      (row?.current_period_end ? new Date(row.current_period_end).toISOString() : null) === (p.current_period_end ?? null);
+    if (same) return { applied: false, reason: 'already-current' };
+
+    await pool.query('SELECT billing_apply($1, $2::jsonb)', [tenantId, JSON.stringify(p)]);
+    return { applied: true, status: p.billing_status, plan: p.plan ?? row?.plan ?? null };
+  } catch (err) {
+    console.error('billing reconcile failed (non-fatal):', err?.message);
+    return { applied: false, reason: 'error' };
+  }
+}

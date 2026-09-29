@@ -21,6 +21,7 @@
  * that needs a raw client. The transaction/RLS-scoping logic below is
  * unchanged; only where the connection comes from moved.
  */
+import { serializeClient, assertTenantUuid } from './util/pgClient.js';
 import { getPool } from "./recordsStore.js";
 
 /**
@@ -60,7 +61,7 @@ function toUsersRole(orgRole) {
 export async function upsertMember(auth) {
   if (!auth?.orgId || !auth?.userId) return;
 
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query("BEGIN");
 
@@ -77,7 +78,7 @@ export async function upsertMember(auth) {
     // `true` = SET LOCAL: reverts at COMMIT, never outlives this transaction
     // or leaks into the next request on a warm connection — same reasoning as
     // recordsStore.js's withTenant().
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
 
     const email = auth.email ?? `${auth.userId}@users.clerk.deepwell.invalid`;
     const role = toUsersRole(auth.orgRole);

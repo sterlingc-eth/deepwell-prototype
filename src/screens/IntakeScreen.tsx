@@ -128,6 +128,7 @@ export function IntakeBody() {
   const receiveDocs = useGraph((s) => s.receiveDocs);
   const classifyDoc = useGraph((s) => s.classifyDoc);
   const reconcileIntakeDoc = useGraph((s) => s.reconcileIntakeDoc);
+  const removeDoc = useGraph((s) => s.removeDoc);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
 
@@ -254,7 +255,14 @@ export function IntakeBody() {
     results.forEach((result, i) => {
       const tempId = tempIds[i];
       if (tempId) {
-        reconcileIntakeDoc(tempId, patchFromIngestResult(result));
+        if (result.error && !result.documentId) {
+          // Never reached the server (402, offline, 5xx before a document row existed): there is no
+          // document. Leaving the placeholder in the graph made the pipeline read "Uploaded N" and the
+          // Inbox badge count files that were never stored; the failure row above still says why.
+          removeDoc(tempId);
+        } else {
+          reconcileIntakeDoc(tempId, patchFromIngestResult(result));
+        }
         setUploadDocId(result.filename, result.documentId ?? tempId);
       }
       if (result.documentId && !result.error) trackProcessingDocs([result.documentId]);
@@ -333,7 +341,9 @@ export function IntakeBody() {
               trackProcessingDocs([s.documentId]);
             } else if (s.status === 'failed' || s.status === 'cancelled') {
               bulkReconciledRef.current.add(i);
-              reconcileIntakeDoc(tempId, { preview: `${s.name}\n\n${s.error ?? (s.status === 'cancelled' ? 'Cancelled' : 'Not uploaded')}` });
+              // Same reason as the single-file path: no document row means nothing to keep counting.
+              if (!s.documentId) removeDoc(tempId);
+              else reconcileIntakeDoc(tempId, { preview: `${s.name}\n\n${s.error ?? (s.status === 'cancelled' ? 'Cancelled' : 'Not uploaded')}` });
             }
           });
         },
@@ -419,6 +429,28 @@ export function IntakeBody() {
             </button>
           </div>
         )}
+
+        {/* A bulk/multi-file upload that failed reports per file, far below the fold (under the bulk drop zone).
+            Say it at the top too — otherwise a failed first upload just looks like nothing happened. The
+            single-file path already has the billing banner above. */}
+        {!billingNotice && !bulkRunning && bulkSummary.failed > 0 && (() => {
+          const first = bulkStates.find((f) => f.status === 'failed');
+          const reason = first?.error ?? 'Try again.';
+          const planIssue = /\b(plan|subscription|upgrade|billing)\b/i.test(reason);
+          return (
+            <div role="alert" className="dw-card border-bad/40 px-5 py-4 text-bad-ink dark:text-bad-bg flex flex-wrap items-center gap-3" data-testid="bulk-failed-alert">
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <p className="flex-1 min-w-[16rem]">
+                <span className="font-medium">{bulkSummary.failed === 1 ? "1 file couldn't be added." : `${bulkSummary.failed} files couldn't be added.`}</span> {reason}
+              </p>
+              {planIssue && (
+                <button type="button" onClick={() => setCurrentScreen('billing')} className="dw-btn-primary !min-h-[36px] !py-1">
+                  See plans
+                </button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* First-run: nothing added yet anywhere in the account. A big,
             unmissable call to action instead of the ordinary batch/bulk-import

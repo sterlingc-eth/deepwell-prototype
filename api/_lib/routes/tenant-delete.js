@@ -1,6 +1,8 @@
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
 import { handleCors, handleError } from "../claude.js";
 import { deleteTenantData, recordTenantDeletion } from "../opsStore.js";
+import { withTenant, getPool, bustTenantCache } from "../recordsStore.js";
+import { getStripe, cancelTenantSubscriptions } from "../billing.js";
 import { deleteObject } from "../r2.js";
 import { captureException } from "../telemetry.js";
 
@@ -20,7 +22,15 @@ import { captureException } from "../telemetry.js";
  * ADMIN-GATED: inside a shop only the admin role may delete (requireRole below), same as tenant-export.js.
  * (Comment was stale — the guard has been in place since the keys.js pattern landed.)
  *
- * Order of operations, and why: (1) delete every Postgres row for the tenant,
+ * BILLING: a customer who deletes their data must not be billed again, so step 0 cancels the tenant's Stripe
+ * subscription(s) IMMEDIATELY (api/_lib/billing.js cancelTenantSubscriptions — the recorded subscription plus
+ * any live one Stripe lists for the customer; "already canceled" counts as done; no Stripe customer/subscription
+ * or no Stripe configured -> skipped). If Stripe genuinely fails, NOTHING is deleted and the caller gets a 502
+ * to retry: deleting the data while the card keeps being charged is the one outcome to rule out. After the
+ * wipe, one `tenant.deleted` audit_log row records what happened (counts and Stripe subscription ids — no
+ * content), since the tenant's earlier audit rows are gone with everything else.
+ *
+ * Order of operations, and why: (0) cancel billing; (1) delete every Postgres row for the tenant,
  * in FK-safe order, inside one transaction — see opsStore.deleteTenantData
  * and its DELETE_ORDER; (2) only once that has COMMITTED, delete the R2
  * objects those documents pointed at; (3) write the one row that survives —
@@ -65,7 +75,57 @@ export default async function handler(req, res) {
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
 
   try {
-    const { storageKeys, counts } = await deleteTenantData(ctx);
+    // 0) Stop the billing first (see the header). Read the ids before the wipe; the tenants row survives it.
+    const billing = { subscriptionsCanceled: 0, skipped: null };
+    const tenantRow = await withTenant(ctx, async (store) => {
+      const { rows } = await store.raw(
+        `SELECT id, stripe_customer_id, stripe_subscription_id FROM tenants WHERE id = $1`,
+        [store.tenantId]
+      );
+      return rows[0] ?? null;
+    });
+    let canceledIds = [];
+    if (tenantRow?.stripe_customer_id || tenantRow?.stripe_subscription_id) {
+      let stripe = null;
+      try {
+        stripe = getStripe();
+      } catch (err) {
+        if (err?.name !== "ConfigError") throw err;
+        billing.skipped = "stripe-not-configured";
+      }
+      if (stripe) {
+        const outcome = await cancelTenantSubscriptions(stripe, {
+          customerId: tenantRow.stripe_customer_id,
+          subscriptionId: tenantRow.stripe_subscription_id,
+        });
+        if (outcome.failed.length) {
+          await captureException(new Error(`tenant-delete: Stripe cancel failed: ${outcome.failed.map((f) => f.message).join("; ")}`), {
+            route: "/api/tenant-delete",
+            tenantId: auth.tenantId,
+          });
+          return handleCors(res, req).status(502).json({
+            error:
+              "We could not cancel your subscription with our payment provider, so nothing was deleted and you have not been charged anything new. Please try again in a minute.",
+            code: "billing_cancel_failed",
+          });
+        }
+        canceledIds = outcome.canceled;
+        billing.subscriptionsCanceled = outcome.canceled.length;
+        billing.skipped = outcome.skipped;
+        if (outcome.canceled.length) {
+          // The subscription.deleted webhook will say the same; apply it now so the gate is consistent immediately.
+          await getPool()
+            .query("SELECT billing_apply($1, $2::jsonb)", [tenantRow.id, JSON.stringify({ billing_status: "canceled", cancel_at_period_end: true })])
+            .catch((err) => console.error("tenant-delete: could not mark billing canceled:", err?.message));
+          bustTenantCache(tenantRow.id);
+        }
+      }
+    } else {
+      billing.skipped = "no-subscription";
+    }
+
+    const { storageKeys, counts, tenantId } = await deleteTenantData(ctx);
+    bustTenantCache(tenantId);
 
     const failedObjects = [];
     for (const key of storageKeys) {
@@ -90,11 +150,29 @@ export default async function handler(req, res) {
       failedObjects,
     }).catch((err) => console.error("Failed to write tenant_deletions row:", err?.message));
 
+    // The one audit row that exists after the wipe (the tenant's earlier ones were just deleted). Counts and
+    // Stripe subscription ids only. Best-effort, same as the receipt above.
+    await withTenant(ctx, (db) =>
+      db.logAction({
+        action: "tenant.deleted",
+        resource_type: "tenant",
+        clerk_user_id: auth.userId,
+        changes: {
+          documents: documentsDeleted,
+          objects: storageKeys.length,
+          objectsFailed: failedObjects.length,
+          stripeSubscriptionsCanceled: canceledIds,
+          stripeSkipped: billing.skipped,
+        },
+      })
+    ).catch((err) => console.error("Failed to write tenant.deleted audit row:", err?.message));
+
     return handleCors(res, req).status(200).json({
       deleted: true,
       documents: documentsDeleted,
       objectsRemoved: storageKeys.length - failedObjects.length,
       objectsFailed: failedObjects.length,
+      billing,
     });
   } catch (error) {
     return handleError(res, error, req, { tenantId: auth.tenantId });

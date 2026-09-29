@@ -6,6 +6,7 @@ import { fetchDocumentStatus, isProcessingTerminal, pollDocumentStatusChunked } 
 import { useAppStore } from './store/appStore';
 import { DEFAULT_CUSTOMER_FILTERS } from './core/customerFilters';
 import { billingClient } from './services/billingClient';
+import { friendlyErrorMessage, withPeriod } from './services/httpError';
 import { usePostgresSync } from './hooks/usePostgresSync';
 import { useBootstrap } from './hooks/useBootstrap';
 import { useDeepLink, clearPersistedDeepLinkSearch } from './hooks/useDeepLink';
@@ -444,7 +445,7 @@ function App() {
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
             <span className="font-medium">Couldn't load your records.</span>{' '}
-            <span className="text-body">{sync.error} Showing whatever loaded earlier this session, if anything.</span>
+            <span className="text-body">{withPeriod(friendlyErrorMessage(sync.error))} Showing whatever loaded earlier this session, if anything.</span>
           </p>
         </div>
       )}

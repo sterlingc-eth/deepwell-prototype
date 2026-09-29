@@ -133,7 +133,7 @@ a{color:inherit}
      color:var(--text);background:#F4F7F4;border-bottom:1px solid var(--line)}
 :root[data-theme="dark"] .nav .brand .word i{color:var(--well)}
 .navcta{display:flex;align-items:center;gap:12px}
-@media (max-width:760px){.navlinks{display:none}}
+@media (max-width:1000px){.navlinks{display:none}}
 @media (max-width:520px){.navcta .btn-primary{display:none}}
 
 /* hero */
@@ -349,6 +349,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .ask button{all:unset;cursor:pointer;padding:0 22px;background:var(--well);color:#fff;font-weight:600;font-size:.95rem;display:flex;align-items:center;min-height:48px}
 .ask button:hover{background:var(--navy)}
 .ask:focus-within{box-shadow:0 0 0 2px var(--brass)}
+.ask button:focus-visible,.q:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 .ask-hint{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--faint);margin-top:10px}
 .demo-wrap{display:flex;flex-direction:column;gap:18px}
 /* demo */
@@ -427,8 +428,8 @@ footer{padding-block:18px;font-size:.84rem;color:var(--faint)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
 footer a{color:var(--muted);text-decoration:none}
-
 @media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
   *{animation:none!important;transition:none!important}
   .hero-micro .hm-arrow{stroke-dashoffset:0!important}
 }
@@ -567,9 +568,22 @@ footer a{color:var(--muted);text-decoration:none}
 .nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
   letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
 .nav-dropdown-menu .tag.live{color:var(--well);background:color-mix(in srgb,var(--well) 16%,transparent)}
-:root[data-theme="dark"] .nav-dropdown-menu .tag.live{color:#9DC4B2}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .nav-dropdown-menu .tag.live{color:#9DC4B2}}
-.nav-dropdown-menu .tag.soon{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
+
+/* Tablet: tighten the header so links + CTAs fit between 761 and 900px. */
+@media (max-width:1100px){.nav .wrap{gap:12px}.navlinks{gap:18px}.navcta .btn{padding:10px 14px}}
+@media (max-width:360px){.brand .word{font-size:1.25rem}.brand{gap:8px}.navcta{gap:6px}.navcta .btn,.nav-menu-toggle{padding-inline:10px}}
+.brand{flex:none}.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+/* Phone: a real menu button instead of silently hiding every nav link. */
+.nav-menu-toggle{display:none;min-height:44px;padding:0 14px;border:1px solid var(--line-strong);border-radius:4px;background:transparent;color:var(--text);font:inherit;font-weight:600;font-size:.9rem;cursor:pointer}
+@media (max-width:1000px){
+  .nav-menu-toggle{display:inline-flex;align-items:center}
+  .nav.menu-open .navlinks{display:flex;position:absolute;top:68px;left:0;right:0;flex-direction:column;align-items:flex-start;gap:6px;padding:12px clamp(16px,4vw,40px) 18px;background:#F4F7F4;border-bottom:1px solid var(--line);box-shadow:0 12px 24px rgba(0,0,0,.12);font-size:1rem}
+  .nav.menu-open .navlinks a,.nav.menu-open .nav-dropdown-toggle{display:flex;align-items:center;min-height:44px;font-size:1rem}
+  .nav.menu-open .nav-dropdown{width:100%}
+  .nav.menu-open .nav-dropdown-menu{position:static;display:none;transform:none;min-width:0;width:100%;box-shadow:none;opacity:1;visibility:visible;pointer-events:auto;margin-top:2px}
+  .nav.menu-open .nav-dropdown.open .nav-dropdown-menu{display:block;transform:none}
+}
 </style>
 
 <noscript><style>
@@ -621,7 +635,7 @@ footer a{color:var(--muted);text-decoration:none}
       </svg>
       <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
     </a>
-    <div class="navlinks">
+    <div class="navlinks" id="navLinks">
       <a href="#problem">The problem</a>
       <a href="#platform">Platform</a>
       <a href="#demo">What it feels like</a>
@@ -649,9 +663,11 @@ footer a{color:var(--muted);text-decoration:none}
     <div class="navcta">
       <a class="btn btn-ghost" href="/app/">Log in</a>
       <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+      <button type="button" class="nav-menu-toggle" id="navMenuToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
     </div>
   </div>
 </nav>
+<main id="main">
 
 <header class="hero" id="top">
   <div class="wrap">
@@ -684,10 +700,10 @@ footer a{color:var(--muted);text-decoration:none}
         <a class="btn btn-ghost" href="#demo">See what it feels like</a>
       </div>
       <p class="hero-trial">30-day free trial on Solo, card required, cancel anytime.</p>
-      <div class="hero-facts" aria-label="Typical results">
-        <div class="fact"><b>&lt; 3 s</b><span>Question to answer</span></div>
-        <div class="fact"><b>&lt; 5 min</b><span>Upload to searchable</span></div>
-        <div class="fact"><b>100%</b><span>Answers cite the source</span></div>
+      <div class="hero-facts" aria-label="What to expect">
+        <div class="fact"><b>Seconds</b><span>Question to answer</span></div>
+        <div class="fact"><b>Minutes</b><span>Upload to searchable</span></div>
+        <div class="fact"><b>Every answer</b><span>Shows its source</span></div>
       </div>
     </div>
     <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
@@ -753,13 +769,12 @@ footer a{color:var(--muted);text-decoration:none}
     </div>
 
     <div class="founders">
-      <!-- PLACEHOLDER COPY — replace both bios before launch. -->
       <div class="founder dw-observe dw-once">
         <div class="founder-ph" aria-hidden="true"><span>S</span></div>
         <div>
           <h3>Sterling Chapman</h3>
           <div class="role">Co-founder</div>
-          <p>Placeholder bio. Years in IT infrastructure — systems integration, networks, and the unglamorous work of making records in one system reachable from another. Started DeepWell after watching the same filing problem repeat at every company he worked in.</p>
+          <p>Background in IT infrastructure — systems integration, API and database troubleshooting, and network support. Builds and runs the platform day to day.</p>
         </div>
       </div>
 
@@ -768,7 +783,7 @@ footer a{color:var(--muted);text-decoration:none}
         <div>
           <h3>Hilton Chapman</h3>
           <div class="role">Co-founder</div>
-          <p>Placeholder bio. Add a couple of sentences — what he did before DeepWell, what he owns day to day, and one thing that makes him the person you'd want picking up at 7am.</p>
+          <p>Owns customer relationships and marketing. He is the person you'll work with from your first sample box through go-live.</p>
         </div>
       </div>
     </div>
@@ -1213,9 +1228,9 @@ footer a{color:var(--muted);text-decoration:none}
     <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">Pricing</div>
-        <h2>Pick your plan by team size. Everything else is unlimited.</h2>
+        <h2>Pick your plan by team size.</h2>
       </div>
-      <p class="lede">Every plan includes unlimited logins, unlimited questions, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 30-day free trial on Solo — card required, you won't be charged until the trial ends.</p>
+      <p class="lede">Every plan includes unlimited logins, a monthly Donovan usage allowance sized to your plan, hosting, backups and setup by our team. A callback costs $300–600 in lost revenue and wasted time — prevent one a month and any plan pays for itself. 30-day free trial on Solo — card required, you won't be charged until the trial ends.</p>
     </div>
     <div class="plans plans-4">
       <div class="plan dw-observe dw-once">
@@ -1226,7 +1241,7 @@ footer a{color:var(--muted);text-decoration:none}
         <ul class="spec">
           <li><span>Technicians</span><b>1</b></li>
           <li><span>Logins</span><b>Unlimited</b></li>
-          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Donovan usage / month</span><b>3,000</b></li>
           <li><span>Documents stored</span><b>25,000</b></li>
           <li><span>New pages / month</span><b>750</b></li>
           <li><span>Support</span><b>In-app + email</b></li>
@@ -1242,7 +1257,7 @@ footer a{color:var(--muted);text-decoration:none}
         <ul class="spec">
           <li><span>Technicians</span><b>2–4</b></li>
           <li><span>Logins</span><b>Unlimited</b></li>
-          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Donovan usage / month</span><b>9,000</b></li>
           <li><span>Documents stored</span><b>100,000</b></li>
           <li><span>New pages / month</span><b>2,000</b></li>
           <li><span>Email intake</span><span class="pill-soon">Coming soon</span></li>
@@ -1259,7 +1274,7 @@ footer a{color:var(--muted);text-decoration:none}
         <ul class="spec">
           <li><span>Technicians</span><b>5–10</b></li>
           <li><span>Logins</span><b>Unlimited</b></li>
-          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Donovan usage / month</span><b>22,500</b></li>
           <li><span>Documents stored</span><b>500,000</b></li>
           <li><span>New pages / month</span><b>5,000</b></li>
           <li><span>Google Drive sync</span><span class="pill-soon">Coming soon</span></li>
@@ -1276,9 +1291,9 @@ footer a{color:var(--muted);text-decoration:none}
         <ul class="spec">
           <li><span>Technicians</span><b>11+</b></li>
           <li><span>Logins</span><b>Unlimited</b></li>
-          <li><span>Questions</span><b>Unlimited</b></li>
+          <li><span>Donovan usage / month</span><b>60,000</b></li>
           <li><span>Documents stored</span><b>Unlimited</b></li>
-          <li><span>New pages / month</span><b>10,000+</b></li>
+          <li><span>New pages / month</span><b>10,000</b></li>
           <li><span>API access</span><b>Yes</b></li>
           <li><span>Branches</span><b>Unlimited</b></li>
           <li><span>Support</span><b>Dedicated + SLA</b></li>
@@ -1458,7 +1473,7 @@ footer a{color:var(--muted);text-decoration:none}
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
-        <div><h3>Measured before you rely on it.</h3><p>During setup we score your account against the questions your team actually asks and show you the number. Under 95% on your own set, we keep working before go-live.</p></div>
+        <div><h3>Measured before you rely on it.</h3><p>During setup we score your account against the questions your team actually asks and show you the result. If it isn't good enough on your own set, we keep working before go-live.</p></div>
       </div>
     </div>
   </div>
@@ -1478,10 +1493,12 @@ footer a{color:var(--muted);text-decoration:none}
   </div>
 </section>
 
+</main>
+
 <footer>
   <div class="wrap">
     <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
-    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/industries/hvac.html">HVAC</a><a href="/get">Mobile app</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
   </div>
 </footer>
 
@@ -1549,10 +1566,10 @@ const DEMO=[
  {q:"Serial 4N2119-08772 — what is it and where is it?",
   answer:"That's a Carrier 59TP6 96% gas furnace, 80k BTU, installed 14 Mar 2019 at 3247 Elm St (customer: Okafor). It has been serviced four times; parts coverage is active.",
   fields:[["Model","59TP6A080V17--20","",""],["Location","3247 Elm St · basement","",""],["Customer","Okafor, T.","",""],["Age","7 yrs 6 mo","",""],["Parts warranty","Through Mar 2029","ok","Active"],["Service events","4 (last: Nov 2025)","",""]],
-  sources:[["IMG","Nameplate photo, 03/14/2019","serial read 99%"],["PDF","Startup sheet, Carrier 59TP6","model/BTU"],["WO","4 work orders linked by serial","2019–2025"]]},
+  sources:[["IMG","Nameplate photo, 03/14/2019","serial read from photo"],["PDF","Startup sheet, Carrier 59TP6","model/BTU"],["WO","4 work orders linked by serial","2019–2025"]]},
  {q:"Which Carrier units we installed expire in the next 90 days?",
-  answer:"Six Carrier units have parts coverage ending before 11 Dec 2026. Two are on active maintenance agreements; four are not — those are the ones worth a call this month.",
-  fields:[["Units expiring","6 of 214 Carrier","warn","90-day window"],["On agreement","2","ok","Covered"],["Not on agreement","4","warn","Call list"],["Earliest","24 Sep 2026 · 1120 Pine","",""],["Est. warranty value","$4,800 in parts","",""],["Export","CSV · dispatch list","",""]],
+  answer:"Six Carrier units have parts coverage ending before 27 Dec 2026. Two are on active maintenance agreements; four are not — those are the ones worth a call this month.",
+  fields:[["Units expiring","6 of 214 Carrier","warn","90-day window"],["On agreement","2","ok","Covered"],["Not on agreement","4","warn","Call list"],["Earliest","9 Oct 2026 · 1120 Pine","",""],["Est. warranty value","$4,800 in parts","",""],["Export","CSV · dispatch list","",""]],
   sources:[["PDF","6 warranty registrations, 2016–2017","expiry dates"],["XLS","Maintenance agreements 2026.xlsx","agreement status"],["WO","Install work orders (6)","addresses"]]}
 ];
 (function(){
@@ -1564,7 +1581,7 @@ const DEMO=[
     btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.i===i)));
     main.classList.remove('demo-reveal');
     main.innerHTML=`
-      <div class="answer-head"><div class="eyebrow">Answer</div><div class="t">4 sources · 1.4 s</div></div>
+      <div class="answer-head"><div class="eyebrow">Answer</div><div class="t">${d.sources.length} sources</div></div>
       <p class="answer">${d.answer}</p>
       <div class="kv">${d.fields.map(([k,v,cls,label],idx)=>`<div style="--i:${idx}"><span class="k">${k}</span><span class="v">${v}</span>${cls?`<span class="pill ${cls}">${label}</span>`:''}</div>`).join('')}</div>
       <div class="sources">${d.sources.map(([t,n,w],idx)=>`<div class="src" style="--i:${idx}"><span class="ic">${t}</span><span><b>${n}</b> · ${w}</span></div>`).join('')}</div>
@@ -1601,7 +1618,7 @@ const DEMO=[
     const i=match(q);
     if(i>=0){render(i);return;}
     btns.forEach(b=>b.setAttribute('aria-pressed','false'));
-    main.innerHTML=`<div class="answer-head"><div class="eyebrow">Answer</div><div class="t">0 sources · 0.3 s</div></div>
+    main.innerHTML=`<div class="answer-head"><div class="eyebrow">Answer</div><div class="t">0 sources</div></div>
       <p class="answer">Nothing in the sample records matches "${q.replace(/</g,'&lt;')}". In your own account this would search every document you've uploaded — try one of the four questions on the left to see how an answer is built.</p>
       <div class="demo-note">This preview holds a handful of example records. Your account answers from your files.</div>`;
   });
@@ -1659,7 +1676,7 @@ const DEMO=[
   })();
 
   /* 3) stat count-up on scroll into view — keeps the exact final string
-     (hero "< 3 s" / "< 5 min" / "100%" facts, and the cost-section total). */
+     (cost-section total; hero facts are now words, so they are skipped). */
   (function(){
     if(reduce || !hasIO) return;
     var els = Array.prototype.slice.call(document.querySelectorAll('.hero-facts .fact b, .cost-total b'));
@@ -1805,6 +1822,17 @@ const DEMO=[
     }, {threshold:.4});
     io.observe(ticks);
   })();
+})();
+</script>
+<script>
+/* Phone menu toggle (<=760px). Links close the menu on tap; Escape closes it. */
+(function(){
+  var nav=document.querySelector('.nav'),btn=document.getElementById('navMenuToggle');
+  if(!nav||!btn)return;
+  function set(o){nav.classList.toggle('menu-open',o);btn.setAttribute('aria-expanded',String(o));btn.textContent=o?'Close':'Menu';}
+  btn.addEventListener('click',function(){set(!nav.classList.contains('menu-open'));});
+  document.getElementById('navLinks').addEventListener('click',function(e){var a=e.target.closest('a');if(a&&nav.classList.contains('menu-open'))set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&nav.classList.contains('menu-open')){set(false);btn.focus();}});
 })();
 </script>
 <script>

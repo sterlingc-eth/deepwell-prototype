@@ -1,6 +1,10 @@
 User-agent: *
 Allow: /
-Disallow: /app
+Disallow: /app/
+Disallow: /app$
 Disallow: /api
+Disallow: /expenses
+Disallow: /expense-tracker.html
+Disallow: /m/
 
 Sitemap: https://deepwelltechnology.com/sitemap.xml

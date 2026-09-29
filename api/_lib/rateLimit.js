@@ -214,9 +214,11 @@ export function limitsFromTenantContext(tenantLimits, bucket, overrides) {
  */
 async function resolveTenantAndLimits(tenantKey, bucket, overrides) {
   const base = envLimits(bucket);
-  if (!tenantKey) return { tenantUuid: null, limits: base };
+  if (typeof tenantKey !== "string" || !tenantKey.trim()) return { tenantUuid: null, limits: base };
   try {
     const ctx = await getTenantContext(tenantKey, tenantKey);
+    // A blank id must never reach increment_*() as a uuid parameter.
+    if (typeof ctx?.id !== "string" || !ctx.id.trim()) return { tenantUuid: null, limits: base };
     return { tenantUuid: ctx.id, limits: limitsFromTenantContext(ctx.limits, bucket, overrides) };
   } catch (err) {
     console.error("rateLimit: could not resolve tenant/limits, using defaults:", err?.message);
@@ -281,6 +283,12 @@ export function logOnce(table, err) {
 
 export async function limit(req, res, auth, bucket, overrides, cost) {
   const tenantKey = auth?.tenantId;
+  // Auth resolved but produced no tenant identity: there is nothing to meter
+  // and nothing safe to do — answer 401 (never fail open, never hit SQL with "").
+  if (typeof tenantKey !== "string" || !tenantKey.trim()) {
+    res.status(401).json({ error: "Sign in required" });
+    return false;
+  }
   const now = Date.now();
   const units = Number.isFinite(cost) && cost > 0 ? Math.trunc(cost) : 1;
   const stageStart = now;

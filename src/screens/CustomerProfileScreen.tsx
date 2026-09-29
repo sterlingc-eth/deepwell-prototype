@@ -78,11 +78,14 @@ interface EditableFieldProps {
   value: string | null;
   placeholder: string;
   onSave: (value: string) => Promise<void>;
+  /** When set and there is a value, a small "Call"/"Email" link sits beside the click-to-edit text. */
+  actionHref?: (value: string) => string;
+  actionLabel?: string;
 }
 
 /** One inline-editable header field (name/address/phone/email) — click to
  *  edit, Enter or the check to save, Escape or the X to cancel. */
-function EditableField({ label, value, placeholder, onSave }: EditableFieldProps) {
+function EditableField({ label, value, placeholder, onSave, actionHref, actionLabel }: EditableFieldProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
@@ -107,7 +110,7 @@ function EditableField({ label, value, placeholder, onSave }: EditableFieldProps
   };
 
   if (!editing) {
-    return (
+    const edit = (
       <button
         type="button"
         onClick={() => setEditing(true)}
@@ -115,8 +118,17 @@ function EditableField({ label, value, placeholder, onSave }: EditableFieldProps
         aria-label={`Edit ${label}`}
       >
         <span className={value ? '' : 'text-ink-3 italic'}>{value || placeholder}</span>
-        <Pencil className="w-3.5 h-3.5 text-ink-3 opacity-0 group-hover:opacity-100" aria-hidden="true" />
+        <Pencil className="w-3.5 h-3.5 text-ink-3 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
       </button>
+    );
+    if (!actionHref || !value) return edit;
+    return (
+      <span className="inline-flex items-center gap-2">
+        {edit}
+        <a href={actionHref(value)} className="text-caption font-medium underline underline-offset-2 text-ink-2 hover:text-ink" aria-label={`${actionLabel} ${value}`}>
+          {actionLabel}
+        </a>
+      </span>
     );
   }
 
@@ -388,8 +400,8 @@ export function CustomerProfileScreen() {
           </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-2">
             <EditableField label="Address" value={customer.serviceAddress} placeholder="Add an address" onSave={saveField('serviceAddress')} />
-            <EditableField label="Phone" value={customer.phone} placeholder="Add a phone number" onSave={saveField('phone')} />
-            <EditableField label="Email" value={customer.email} placeholder="Add an email" onSave={saveField('email')} />
+            <EditableField label="Phone" value={customer.phone} placeholder="Add a phone number" onSave={saveField('phone')} actionLabel="Call" actionHref={(v) => `tel:${v.replace(/[^\d+]/g, '')}`} />
+            <EditableField label="Email" value={customer.email} placeholder="Add an email" onSave={saveField('email')} actionLabel="Email" actionHref={(v) => `mailto:${v.trim()}`} />
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button

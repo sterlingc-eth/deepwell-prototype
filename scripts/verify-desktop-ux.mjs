@@ -172,7 +172,9 @@ try {
     await go(page, 'dashboard');
     await page.waitForSelector('#expiry-heading');
     const small = await page.evaluate(() => {
-      const els = Array.from(document.querySelectorAll('header button, header a'));
+      // The harness's clerk-mock OrganizationSwitcher is a bare <button> (the real Clerk trigger gets
+      // min-h-touch from AppShell's `appearance`), so it is not a real header control to measure.
+      const els = Array.from(document.querySelectorAll('header button:not([title="Org switcher (mock)"]), header a'));
       return els
         .filter((el) => el.getClientRects().length > 0)
         .map((el) => el.getBoundingClientRect())

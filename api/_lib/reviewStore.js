@@ -78,6 +78,7 @@
  *                       whose type is null or a legacy id; never touches an
  *                       already-canonical value.
  */
+import { serializeClient, assertTenantUuid } from './util/pgClient.js';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   getPool, withTenant as withRecordsTenant, linkDocumentToCustomer, documentsHaveUpdatedAt, linkedByForMatchBasis,
@@ -169,7 +170,7 @@ export function nextStageAfterCorrection(currentStage) {
 // ---------------------------------------------------------------------------
 
 async function withTenant(ctx, fn) {
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query('BEGIN');
     const { rows } = await client.query('SELECT resolve_tenant($1, $2) AS id', [
@@ -177,7 +178,7 @@ async function withTenant(ctx, fn) {
       ctx.tenantName ?? ctx.tenantKey,
     ]);
     const tenantId = rows[0].id;
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
     const result = await fn(client, tenantId);
     await client.query('COMMIT');
     return result;

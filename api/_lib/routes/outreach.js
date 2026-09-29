@@ -23,6 +23,7 @@
  * decision. generate / list / skip / preview / optOut are open to any
  * signed-in member, same as reading or triaging the Inbox.
  */
+import { serializeClient, assertTenantUuid } from "../util/pgClient.js";
 import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from "../auth.js";
 import { handleCors, handleError } from "../claude.js";
 import { getPool } from "../recordsStore.js";
@@ -95,12 +96,12 @@ async function outreachSettingsHaveShopFields(client) {
 }
 
 async function withTenantTx(ctx, fn) {
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query("BEGIN");
     const { rows } = await client.query("SELECT resolve_tenant($1, $2) AS id", [ctx.tenantKey, ctx.tenantName ?? ctx.tenantKey]);
     const tenantId = rows[0].id;
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
     const result = await fn(client, tenantId);
     await client.query("COMMIT");
     return result;

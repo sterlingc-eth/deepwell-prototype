@@ -1,3 +1,4 @@
+import { armResponseDeadline } from "./_lib/util/deadline.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { isValidDocumentId } from "./_lib/readDocument.js";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
@@ -42,6 +43,7 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  armResponseDeadline(res, 52_000); // maxDuration is 60s
 
   let auth;
   try {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { CreateOrganization, OrganizationList, useClerk } from '@clerk/clerk-react';
 import { ArrowLeft, Building2, LogOut, Users } from 'lucide-react';
 import { Wordmark } from '../components/Wordmark';
@@ -20,6 +20,21 @@ const clerkAppearance = {
     colorPrimary: '#0D3827',
     colorBackground: PLATE,
   },
+} as const;
+
+/** The plate is a fixed light surface, but a first-time visitor lands here in the default Office (dark) theme,
+ *  where the ink/surface tokens are light-on-dark — the intro copy and both option cards became near-invisible
+ *  pale-on-pale. Re-pin the light token values for everything inside the plate. */
+const LIGHT_PLATE_TOKENS = {
+  '--dw-bg': '#f6f8f6',
+  '--dw-surface': '#ffffff',
+  '--dw-surface-2': '#ecf0ed',
+  '--dw-ink': '#0d110e',
+  '--dw-ink-2': '#3c463f',
+  '--dw-ink-3': '#5f6d64',
+  '--dw-line': '#dce3de',
+  '--dw-line-2': '#c2ccc5',
+  color: '#0d110e',
 } as const;
 
 /**
@@ -59,7 +74,7 @@ export function OnboardingScreen() {
 
       <div
         className="dw-rise dw-rise-late w-full max-w-md rounded-lg shadow-xl p-6 sm:p-8 flex flex-col gap-5"
-        style={{ background: PLATE }}
+        style={{ background: PLATE, ...LIGHT_PLATE_TOKENS } as CSSProperties}
       >
         {mode === 'choose' && (
           <>

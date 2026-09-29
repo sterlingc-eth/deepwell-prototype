@@ -14,6 +14,7 @@
  * Embedding calls happen OUTSIDE any database transaction: a Voyage round trip
  * can take seconds and must not hold one of the pool's few connections.
  */
+import { serializeClient, assertTenantUuid } from '../util/pgClient.js';
 import { getPool, getTenantContext } from '../recordsStore.js';
 import {
   chunkPages, embedConfig, estimateTokens, toVectorLiteral, voyageEmbed, EmbedError,
@@ -32,10 +33,10 @@ const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
  */
 export async function withTenantRaw(ctx, fn) {
   const tenantId = (await getTenantContext(ctx.tenantKey, ctx.tenantName)).id;
-  const client = await getPool().connect();
+  const client = serializeClient(await getPool().connect());
   try {
     await client.query('BEGIN');
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
     const result = await fn(client, tenantId);
     await client.query('COMMIT');
     return result;

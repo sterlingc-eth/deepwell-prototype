@@ -329,6 +329,33 @@ export async function loadDismissedAlertKeys(db) {
   return resolveDismissedAlertKeys(rows);
 }
 
+/* ------------------------------------------------- paging cursor (pure) --
+ * GET /api/v1/customers?limit=&cursor=&q=  ->  { customers, nextCursor, total }
+ * The cursor is opaque to callers: base64url JSON { o: <offset>, k: "<sort>|<q>" }. `k` pins the sort and
+ * filter it was issued for, so a cursor replayed against a different q/sort is refused (400) instead of
+ * silently paging a different list. The sort orders all end in `c.id`, so the offset is stable between pages. */
+export function encodeCustomerCursor(offset, sort, q) {
+  return Buffer.from(JSON.stringify({ o: offset, k: `${sort}|${q ?? ""}` }), "utf8").toString("base64url");
+}
+
+/** @returns {number} the offset, or throws CustomerLookupError(400) for a malformed / mismatched cursor. */
+export function decodeCustomerCursor(cursor, sort, q) {
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.from(String(cursor), "base64url").toString("utf8"));
+  } catch {
+    throw new CustomerLookupError("Invalid cursor.", 400);
+  }
+  const o = parsed?.o;
+  if (!Number.isInteger(o) || o < 0 || o > 10_000_000 || typeof parsed?.k !== "string") {
+    throw new CustomerLookupError("Invalid cursor.", 400);
+  }
+  if (parsed.k !== `${sort}|${q ?? ""}`) {
+    throw new CustomerLookupError("This cursor was issued for a different q/sort; start again without a cursor.", 400);
+  }
+  return o;
+}
+
 const clampLimit = (v, fallback, max) => {
   const n = Number(v);
   return Number.isFinite(n) && n >= 1 ? Math.min(Math.trunc(n), max) : fallback;
@@ -360,14 +387,19 @@ export async function customers(req, res) {
     const q = typeof query.q === "string" && query.q.trim() ? query.q.trim() : null;
     const sort = ["name", "recent", "docs"].includes(query.sort) ? query.sort : "recent";
     const lim = clampLimit(query.limit, 200, 200);
+    // Paging mode (QA/API callers): only when `limit` or `cursor` is supplied. Without either, the request and the
+    // response are exactly what they always were (first 200, no extra fields).
+    const paging = query.limit !== undefined || query.cursor !== undefined;
+    const offset = query.cursor !== undefined && query.cursor !== "" ? decodeCustomerCursor(query.cursor, sort, q) : 0;
     const today = new Date().toISOString().slice(0, 10);
 
-    const [rows, keepSeparatePairs, dismissedAlertKeys] = await withTenant(
+    const [rows, keepSeparatePairs, dismissedAlertKeys, total] = await withTenant(
       { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
       async (db) => [
-        await db.listCustomersSummary({ like: q ? `%${q}%` : null, sort, limit: lim }),
+        await db.listCustomersSummary({ like: q ? `%${q}%` : null, sort, limit: lim, offset }),
         await loadKeepSeparatePairs(db),
         await loadDismissedAlertKeys(db),
+        paging ? await db.countCustomersSummary({ like: q ? `%${q}%` : null }) : null,
       ]
     );
 
@@ -410,8 +442,14 @@ export async function customers(req, res) {
     // chip and both customer profiles read this field to stop showing 0.
     const possibleDuplicates = planPossibleDuplicates(customersForPairs, { keepSeparatePairs });
 
-    return handleCors(res, req).status(200).json({ customers: data, duplicates, possibleDuplicates });
+    const body = { customers: data, duplicates, possibleDuplicates };
+    if (paging) {
+      body.total = total;
+      body.nextCursor = offset + rows.length < total ? encodeCustomerCursor(offset + rows.length, sort, q) : null;
+    }
+    return handleCors(res, req).status(200).json(body);
   } catch (error) {
+    if (error instanceof CustomerLookupError) return handleCors(res, req).status(error.status).json({ error: error.message });
     return handleError(res, error, req);
   }
 }

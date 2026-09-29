@@ -49,8 +49,17 @@ enforced by Postgres itself, on every query, including one a bug might otherwise
 calls the `resolve_tenant()` `SECURITY DEFINER` function to map your Clerk organization id to your
 tenant row, and sets `app.tenant_id` for that transaction only — every read/write in this codebase
 goes through it. Row deletion (`api/_lib/routes/tenant-delete.js`) and full data export
-(`api/_lib/routes/tenant-export.js`) are the same story: a fixed, reviewed list of every tenant-scoped
-table, run inside the same tenant-scoped transaction.
+(`api/_lib/routes/tenant-export.js`) are the same story: they run inside the same tenant-scoped
+transaction(s). The delete list is checked against the schema by `scripts/verify-readiness.mjs`, which
+derives every table that has a `tenant_id` column from the migrations and fails the build if one is
+neither deleted nor deliberately retained (see "Data export & deletion").
+
+The one cross-tenant read the app needs — the nightly maintenance sweep visiting every shop — goes
+through a single narrow `SECURITY DEFINER` function, `list_all_tenant_keys()`
+(`M3-config/60-list-all-tenant-keys.sql`), that returns **only identifiers** (the tenant's uuid and its
+Clerk key): no names, plans, billing state, settings or content, and `EXECUTE` is granted to the app
+role only. Row-level security on `tenants` itself is unchanged. `scripts/verify-readiness.mjs` proves
+the sweep reaches every tenant under forced RLS and that the function exposes nothing else.
 
 The Donovan Q&A agent's own SQL tool (`api/_lib/agent/sqlGuard.js`) adds a second, independent layer
 on top of RLS: its generated queries are parsed and every real table name is **denied outright** — the
@@ -73,7 +82,9 @@ merely scoped correctly by RLS.
 - **Document access:** nobody, including a browser with a stolen bearer token to some *other* API
   route, can construct a link straight to R2 and download a file. Every file read/write goes through a
   short-lived, HMAC-signed URL DeepWell's own server mints per request (`api/_lib/r2.js`'s `presign()`,
-  SigV4) — 120 seconds for a read, 60 for a delete — scoped to one object key, never a bucket listing.
+  SigV4), scoped to one object key, never a bucket listing: 15 minutes for the upload link and for the
+  "open original" link a signed-in user requests (`api/upload-url.js`), 120 seconds for the server's own
+  read while extracting, 60 seconds for a delete.
 
 ## Support access — the only path to staff seeing your data
 
@@ -148,12 +159,79 @@ scrubbing above), so the redaction rule only has to be right in one place.
 
 ## Data export & deletion
 
-Any tenant admin can download every document, extraction, customer/unit record, and audit-log entry
-DeepWell holds for their shop as one JSON file, on demand, from **Settings** — see
-`api/_lib/routes/tenant-export.js`. A tenant can also be fully deleted (`api/_lib/routes/tenant-delete.js`),
-which wipes every tenant-scoped table (documents, extractions, entities, misses, learned data, usage
-counters, members, API keys — the full list is `opsStore.js`'s own `DELETE_ORDER`) behind a
-confirmation step that requires typing the tenant id back, and is itself audit-logged.
+### Export
+
+A shop admin (or a solo account's owner) can download their data as one JSON file:
+`POST /api/tenant-export` (`api/_lib/routes/tenant-export.js`, `api/_lib/opsStore.js`). The file holds
+every document row, page text, extraction, customer/unit record, document link, OCR facet, financial
+record and audit-log entry for the shop. There is **no row cap**: each table is read in pages of 1,000
+rows (keyset order) and streamed to the browser, so a shop with tens of thousands of documents gets all
+of it.
+
+- **Original files are listed, not embedded.** The export contains `manifest.originals`: one entry per
+  stored original with its document id, filename, SHA-256 and size. To download an original, a signed-in
+  admin requests a fresh 15-minute signed link with `POST /api/upload-url {"mode":"get","documentId":...}`
+  or uses "Open original" on the document in the app. No link, storage key or secret is written into the
+  export. Bundling the originals into one zip is not built yet (follow-up: an async job that writes a zip
+  to storage and emails a signed link).
+- **Time limit, never silently short.** The stream runs for at most 240 seconds. A tenant so large that
+  it hits that limit gets a file marked `"truncated": true` with an `incomplete` resume point and a note;
+  POSTing `{"resume": <incomplete>}` continues from exactly that row.
+- Export is admin-only and is audit-logged (`tenant.exported`, with the true document count).
+
+### Deletion
+
+`POST /api/tenant-delete` with `{"confirm": "<your tenant id>"}` (shop admins only; the server refuses
+unless the caller types the tenant id back). There is no delete button in the app today — the
+endpoint is what runs. In this order:
+
+1. **Billing is stopped first.** Every live Stripe subscription for the shop is cancelled immediately
+   (no proration credit, no final invoice): the recorded subscription plus any live one Stripe lists for
+   the customer. If Stripe genuinely fails, **nothing is deleted** and the caller gets a 502 to retry, so
+   the data is never deleted while the card keeps being charged. A shop with no Stripe customer or
+   subscription (or an environment with Stripe unconfigured) skips this step.
+2. **Every tenant-scoped table is emptied in one transaction** (all or nothing), child tables before
+   parents (`DELETE_ORDER` in `api/_lib/opsStore.js`): `extractions`, `facets`, `document_pages`,
+   `page_chunks`, `document_financial_lines`, `document_financials`, `intake_needs_info`,
+   `intake_field_inferences`, `document_entity_links`, `kg_edges`, `documents`, `notifications_sent`,
+   `notifications`, `outreach_messages`, `tenant_outreach_settings`, `entity_merge_suggestions`,
+   `dossiers`, `knowledge_reports`, `tenant_rollups`, `tenant_insights_cache`, `ask_miss_replays`,
+   `ask_misses`, `ask_answer_cache`, `ask_semantic_cache`, `embedding_usage`, `rate_limit_windows`,
+   `donovan_gap_promotions`, `donovan_learned_tenant`, `donovan_promoted_tests`,
+   `donovan_scorecard_results`, `donovan_scorecard_runs`, `staff_access_log`, `support_access_grants`,
+   `proposals`, `schema_versions`, `entities`, `audit_log`, `users`, `api_keys`, `usage_counters`.
+   The shop's stored settings (the known-shop-contacts list, follow-up and digest settings) are cleared.
+   The delete also sweeps any other table that carries a `tenant_id` column but is not on that list, so a
+   table added by a later migration cannot be missed at runtime; and `scripts/verify-readiness.mjs` fails
+   the build if a table is missing from the list, so it cannot be forgotten in code review either.
+3. **Original files are deleted from storage** after the database commit (a crash between the two leaves
+   orphaned files, never a half-deleted database). Any file that could not be deleted is recorded by key
+   in the deletion receipt; nothing retries it automatically yet.
+
+**What is retained, on purpose:**
+
+- The `tenants` row itself (id, shop name / Clerk organization id, plan and billing status, Stripe
+  customer and subscription ids). It keeps the account able to sign in to an empty workspace and keeps
+  billing history attributable.
+- `tenant_deletions`: one receipt row (when, how many documents and files, which file keys failed).
+- `billing_events`: the Stripe webhook idempotency ledger — event id and event type only, no payload.
+- One `audit_log` row written **after** the wipe, `tenant.deleted`: counts and the ids of the Stripe
+  subscriptions that were cancelled. No content.
+- Stripe itself keeps the customer record and past invoices (financial-records retention); DeepWell
+  cannot erase those from Stripe here.
+- Database backups (Neon point-in-time history) age out on the provider's retention window and are not
+  rewritten.
+
+**What deletion does not do:** it does not delete the Clerk organization or the people's Clerk sign-in
+accounts (removed separately in Clerk); it does not delete the tenant row (above).
+
+## Health check and operations
+
+`GET /api/account?action=health` is an unauthenticated uptime endpoint. It returns exactly
+`{"ok": true, "db": true, "time": "<ISO timestamp>"}` — no tenant data, versions, environment names or
+error text — with HTTP 200 when a `SELECT 1` against the database succeeds within 3 seconds and HTTP 503
+when it fails or times out. The database ping is cached for 5 seconds per instance. Point UptimeRobot or
+Better Stack at it; see `docs/OPERATIONS.md` for monitor settings and the nightly-sweep health field.
 
 ## Subprocessors
 

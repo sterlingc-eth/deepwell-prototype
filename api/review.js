@@ -21,6 +21,7 @@
  *      is a separate value this file derives from `auth.userId` and appends
  *      itself, exactly as api/records.ts appends `clerk_user_id`.
  */
+import { armResponseDeadline } from './_lib/util/deadline.js';
 import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from './_lib/auth.js';
 import * as reviewStore from './_lib/reviewStore.js';
 import { deleteDocuments } from './_lib/routes/document-delete.js';
@@ -244,6 +245,9 @@ export default async (req, res) => {
   }
 
   const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+
+  // maxDuration is 300s: answer 504 (honest message) at 290s instead of being hard-killed with no response.
+  armResponseDeadline(res, 290_000);
 
   // Operator-only actions are gated BEFORE the rate limiter so a forged
   // non-operator request never causes a resolve_tenant / counter write on its

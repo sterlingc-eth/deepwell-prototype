@@ -236,7 +236,7 @@ export function OutreachScreen() {
         )}
 
         {settings?.migrationPending && (
-          <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink flex items-center gap-2">
+          <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink dark:text-brass-200 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
             Needs a database update. Ask whoever manages DeepWell's database to apply the latest migration, then
             reload this page.

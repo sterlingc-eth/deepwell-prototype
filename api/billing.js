@@ -8,7 +8,11 @@ import {
   findOrCreateCustomer,
   verifyStripeSignature,
   patchForEvent,
+  recordAndApplyEvent,
   PLAN_CATALOG,
+  resolveBillingIdentity,
+  needsBillingReconcile,
+  reconcileTenantBilling,
 } from "./_lib/billing.js";
 import { PLAN_LIMITS, planStateFor } from "./_lib/plan.js";
 import { getUsage, estimateCostUsd, getAsksThisMonth, resetsOnIso } from "./_lib/usage.js";
@@ -60,6 +64,9 @@ async function handleCheckout(req, res, auth) {
   if (!(await rateLimit(req, res, auth, "billing"))) return; // 429 already written
 
   const stripe = getStripe();
+  // Shop name + admin email for the Stripe customer (receipts/invoices read "Acme HVAC", not "org_2abc…").
+  // Best effort and bounded — a Clerk hiccup falls back to the org id and never blocks checkout.
+  const identity = await resolveBillingIdentity(auth);
   const result = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (store) => {
     // Serialize concurrent checkouts for this tenant: two simultaneous
     // requests with no stripe_customer_id yet must not each create a Stripe
@@ -73,7 +80,8 @@ async function handleCheckout(req, res, auth) {
     const customerId = await findOrCreateCustomer(stripe, {
       tenantRow,
       tenantId: store.tenantId,
-      name: auth.orgId ?? auth.tenantId,
+      name: identity.name,
+      email: identity.email,
     });
     if (!tenantRow?.stripe_customer_id) {
       await store.raw(`UPDATE tenants SET stripe_customer_id = $1 WHERE id = $2`, [customerId, store.tenantId]);
@@ -111,9 +119,11 @@ async function handlePortal(req, res, auth) {
   return handleCors(res, req).status(200).json({ url: result });
 }
 
-async function handleStatus(req, res, auth) {
+async function computeStatus(auth) {
+  let billingRow = null;
   const result = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (store) => {
     const tenantRow = await getTenantBillingRow(store);
+    billingRow = tenantRow;
     const documentsStored = await store.countDocuments();
     const monthStartIso = new Date(Date.now() - MONTH_MS).toISOString();
     const pagesThisMonth = await store.countPagesSince(monthStartIso);
@@ -165,6 +175,33 @@ async function handleStatus(req, res, auth) {
       usage: { documentsStored, pagesThisMonth, asksThisMonth, aiCostEstimateUsd, resetsOn: resetsOnIso() },
     };
   });
+  return { result, row: billingRow };
+}
+
+/**
+ * GET/POST ?action=status — also the pull-based safety net for a missed Stripe webhook. This is the call the
+ * app's post-checkout polling loop (?billing=success) makes: if the tenant has a Stripe customer but the database
+ * still says "none" (or has no subscription recorded), ask Stripe directly and apply what it says through the
+ * same mapping + billing_apply() the webhook uses, then recompute. A customer who paid can therefore never be
+ * stuck behind a lost webhook. Throttled per tenant; a Stripe error is logged and the plain status returned.
+ */
+async function handleStatus(req, res, auth) {
+  const first = await computeStatus(auth);
+  const row = first.row;
+  let result = first.result;
+  if (needsBillingReconcile(row) && process.env.STRIPE_SECRET_KEY) {
+    let outcome;
+    try {
+      outcome = await reconcileTenantBilling(getPool(), getStripe(), { tenantId: row.id, row });
+    } catch (err) {
+      console.error("billing status: reconcile skipped:", err?.message);
+    }
+    if (outcome?.applied) {
+      bustTenantCache(row.id);
+      ({ result } = await computeStatus(auth));
+      result.reconciled = true;
+    }
+  }
   handleCors(res, req);
   // Startup performance (handoffs/STARTUP_PERF_R13.md): private, short-lived
   // cache + ETag — this is polled on every load plus the post-checkout
@@ -208,16 +245,10 @@ async function handleWebhook(req, res) {
       console.error("billing webhook: no tenant for customer", mapped.customerId);
       return res.status(200).json({ received: true, handled: false, reason: "unknown customer" });
     }
-    const { rows: recRows } = await pool.query("SELECT billing_record_event($1, $2, $3, $4) AS fresh", [
-      event.id,
-      event.type,
-      tenantId,
-      JSON.stringify({ type: event.type }), // never the full payload — see billing_events comment; no PII, no card data
-    ]);
-    if (!recRows[0]?.fresh) {
+    const outcome = await recordAndApplyEvent(pool, event, tenantId, mapped.patch);
+    if (outcome === "duplicate") {
       return res.status(200).json({ received: true, handled: false, reason: "duplicate" });
     }
-    await pool.query("SELECT billing_apply($1, $2::jsonb)", [tenantId, JSON.stringify(mapped.patch)]);
     // Reviewer NO-GO (2026-09-22): billing_apply() just changed this tenant's
     // plan/billing_status, but api/_lib/plan.js's and recordsStore.js's
     // in-process caches (see handoffs/API_PERF_2026-09-22.md) don't know that

@@ -1,5 +1,6 @@
+import { armResponseDeadline } from "./_lib/util/deadline.js";
 import crypto from "node:crypto";
-import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } from "./_lib/claude.js";
+import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff, providerFailureMessage } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
@@ -690,7 +691,6 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, ques
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
   // Server-Timing + the ASK_DEBUG_TIMINGS escape hatch (both handoffs/
   // ASK_LATENCY_2026-09-20.md) — ms only, no PII, no question text.
   const timer = startTimer();
@@ -762,6 +762,9 @@ export default async function handler(req, res) {
   // Scorecard call (hook.js): null for every real request. When set it supplies the auth, skips the rate
   // limiter / billing gate, never counts against the monthly allowance and never touches the answer cache.
   const scorecardCall = takeScorecardCall(req);
+  // maxDuration is 300s: answer 504 (honest message) at 290s instead of being hard-killed with no response.
+  // Not for in-process scorecard calls (mock res, long-lived caller).
+  if (!scorecardCall) armResponseDeadline(res, 290_000);
   const incrementAsksThisMonth = scorecardCall ? async () => {} : incrementAsksThisMonthRaw;
   const ASK_CACHE_ENABLED = ASK_CACHE_ENABLED_RAW && !scorecardCall;
   // Non-streaming clients (an API key integration, the scorecard runner) never set this — see the
@@ -2081,7 +2084,7 @@ export default async function handler(req, res) {
       // send() would have used for an error.
       if (streaming && !res.writableEnded) {
         try {
-          const message = error?.name === "ModelBudgetExceededError" ? (error.message ?? "Daily AI budget reached") : "Something went wrong answering that.";
+          const message = error?.name === "ModelBudgetExceededError" ? (error.message ?? "Daily AI budget reached") : (providerFailureMessage(error) ?? "Something went wrong answering that.");
           res.write(`${JSON.stringify({ type: "final", success: false, error: message })}\n`);
         } catch { /* the client may already be gone */ }
         try { res.end(); } catch { /* the client may already be gone */ }

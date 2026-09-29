@@ -508,7 +508,7 @@ export function CustomersScreen() {
           <tbody className="divide-y divide-line">
             {shown.map((c) => (
               <tr key={c.id} className="hover:bg-surface-2 cursor-pointer" onClick={() => openCustomer(c.id)}>
-                <td className="px-3 py-2 align-top font-mono text-data">{c.customerNumber ?? '—'}</td>
+                <td className="px-3 py-2 align-top font-mono text-data whitespace-nowrap">{c.customerNumber ?? '—'}</td>
                 <td className="px-3 py-2 align-top">
                   <button type="button" className="text-ink underline decoration-line-2 underline-offset-4 hover:decoration-forest-700 text-left" onClick={(ev) => { ev.stopPropagation(); openCustomer(c.id); }}>
                     {c.name ?? 'Unnamed'}

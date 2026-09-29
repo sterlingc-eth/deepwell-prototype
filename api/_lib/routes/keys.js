@@ -1,3 +1,4 @@
+import { serializeClient, assertTenantUuid } from '../util/pgClient.js';
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
 import { handleCors, handleError } from "../claude.js";
 import { getAuxPool, generateKey, SCOPES } from "../apiKeyAuth.js";
@@ -34,7 +35,7 @@ export const config = { api: { bodyParser: { sizeLimit: "8kb" } } };
 const NAME_RE = /^.{1,100}$/s;
 
 async function withTenantTx(ctx, fn) {
-  const client = await getAuxPool().connect();
+  const client = serializeClient(await getAuxPool().connect());
   try {
     await client.query("BEGIN");
     const { rows } = await client.query("SELECT resolve_tenant($1, $2) AS id", [
@@ -42,7 +43,7 @@ async function withTenantTx(ctx, fn) {
       ctx.tenantName ?? ctx.tenantKey,
     ]);
     const tenantId = rows[0].id;
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(tenantId)]);
     const result = await fn(client, tenantId);
     await client.query("COMMIT");
     return result;

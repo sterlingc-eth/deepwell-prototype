@@ -1166,7 +1166,7 @@ async function debounceLinkSweep(ctx) {
       const cutoff = new Date(now - LINK_SWEEP_DEBOUNCE_MS).toISOString();
       const r = await db.raw(
         `UPDATE tenants
-            SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('integrity_last_link_sweep', $2)
+            SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('integrity_last_link_sweep', $2::text)
           WHERE id = (current_setting('app.tenant_id', true))::uuid
             AND ( settings->>'integrity_last_link_sweep' IS NULL
                   OR (settings->>'integrity_last_link_sweep')::timestamptz < $1::timestamptz )

@@ -15,7 +15,7 @@
     --dw-surface-2: #ecf0ed;   /* stone-100 */
     --dw-ink: #0d110e;         /* stone-950 */
     --dw-ink-2: #3c463f;       /* stone-700 */
-    --dw-ink-3: #6e7c72;       /* stone-500 */
+    --dw-ink-3: #5f6d64;       /* between stone-500 and stone-600: #6e7c72 was 3.8-4.4:1 on the light surfaces (< AA for caption/helper text) */
     --dw-line: #dce3de;        /* stone-200 */
     --dw-line-2: #c2ccc5;      /* stone-300 */
     --dw-accent: #b98a4e;      /* brass-500 */

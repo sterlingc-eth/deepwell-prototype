@@ -74,10 +74,17 @@ export class ScreenLoadBoundary extends Component<Props, State> {
         <div className="min-h-screen bg-bg flex items-center justify-center p-6">
           <div className="dw-card px-6 py-5 max-w-sm text-center space-y-3">
             <p className="font-medium">Something went wrong</p>
-            <p className="text-body text-ink-2">Try reloading the page.</p>
-            <button type="button" onClick={() => window.location.reload()} className="dw-btn bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950">
-              Reload
-            </button>
+            <p className="text-body text-ink-2">Try again, or reload the page.</p>
+            <div className="flex items-center justify-center gap-2">
+              {/* Re-renders the screen that threw (a bad response from one card is often gone on the next try)
+                  instead of forcing a full reload; if it throws again this card simply comes back. */}
+              <button type="button" onClick={() => this.setState({ kind: 'none' })} className="dw-btn-secondary">
+                Try again
+              </button>
+              <button type="button" onClick={() => window.location.reload()} className="dw-btn bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950">
+                Reload
+              </button>
+            </div>
           </div>
         </div>
       );

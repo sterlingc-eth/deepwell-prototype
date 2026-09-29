@@ -12,6 +12,7 @@ import { useGraph } from '../core/entityGraph';
 import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
 import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, type ThreadTurn } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
+import { friendlyErrorMessage } from '../services/httpError';
 import { asksUsedFraction, resetsOnShortLabel } from '../services/billingClient';
 import { useAppStore } from '../store/appStore';
 
@@ -45,6 +46,7 @@ export function AskScreen() {
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   // Re-run the current question whenever the graph changes (a review correction changes the answer)
   const graphVersion = useGraph((s) => s.docs);
+  const docCount = Object.keys(graphVersion).length;
   const entities = useGraph((s) => s.entities);
   const suggestions = useMemo(() => buildSuggestions(Object.values(entities)), [entities]);
   // Monthly question allowance (owner decision, 2026-09-21): a quiet caption
@@ -148,7 +150,7 @@ export function AskScreen() {
         }
       } catch (e) {
         if (id === requestId.current) {
-          setError(e instanceof Error ? e.message : 'Something went wrong answering that.');
+          setError(friendlyErrorMessage(e, 'Something went wrong answering that.'));
           if (e instanceof AskApiError && e.status === 402) setBillingUrl(e.url ?? '/app/?screen=billing');
         }
       } finally {
@@ -412,12 +414,18 @@ export function AskScreen() {
                     </li>
                   ))}
                 </ul>
-                <p className="text-ink-3">
-                  Nothing added yet. Add a document, then ask about it.{' '}
-                  <button type="button" onClick={() => setCurrentScreen('ingest')} className="dw-btn-primary !min-h-[36px] !py-1 ml-1 align-middle">
-                    Add a document <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                  </button>
-                </p>
+                {docCount === 0 ? (
+                  <p className="text-ink-3">
+                    Nothing added yet. Add a document, then ask about it.{' '}
+                    <button type="button" onClick={() => setCurrentScreen('ingest')} className="dw-btn-primary !min-h-[36px] !py-1 ml-1 align-middle">
+                      Add a document <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  </p>
+                ) : (
+                  // Documents exist (the server just had no ready-made suggestions, or couldn't be reached):
+                  // never tell an owner with records that nothing has been added.
+                  <p className="text-ink-3">Type an address, a serial number, or a customer name above.</p>
+                )}
               </>
             )}
           </section>

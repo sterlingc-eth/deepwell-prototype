@@ -231,7 +231,7 @@ export function writeCachedSamplePrompts(tenantKey: string | null, role: AskRole
 export interface SamplePromptsState {
   prompts: SamplePrompt[];
   /** True only while there is nothing to show yet for this tenant+role this visit (no cache, and the
-   *  first-ever fetch for it hasn't resolved). False the instant either a cache or a fresh fetch has
+   *  first-ever fetch for it hasn't resolved — a resolved-but-empty or failed fetch ends it too). False the instant either a cache or a fresh fetch has
    *  produced something — including for the rest of THIS visit even while a background refetch silently
    *  updates the cache for the next one. Lets the caller render a fixed-height placeholder instead of a
    *  second, competing "instant" guess. */
@@ -264,6 +264,10 @@ function snapshotFor(tenantKey: string | null, role: AskRole, enabled: boolean):
 export function useSamplePrompts(role: AskRole, enabled = true, tenantKey: string | null = null): SamplePromptsState {
   const scopeKey = `${tenantKey ?? ''}::${role}`;
   const [snap, setSnap] = useState<SamplesSnapshot>(() => snapshotFor(tenantKey, role, enabled));
+  // Which scope's FIRST fetch has already come back (with prompts, empty, or failed). Without this a brand-new
+  // shop (server has nothing to suggest yet), an offline phone, or a failing API left `loading` true forever:
+  // a permanent pulsing skeleton under "Try asking" and the empty-state fallback below it unreachable.
+  const [settledScope, setSettledScope] = useState<string | null>(null);
 
   if (snap.scopeKey !== scopeKey) {
     setSnap(snapshotFor(tenantKey, role, enabled));
@@ -273,6 +277,8 @@ export function useSamplePrompts(role: AskRole, enabled = true, tenantKey: strin
     if (!enabled) return;
     const controller = new AbortController();
     void fetchSamplePrompts(role, controller.signal).then((data) => {
+      if (controller.signal.aborted) return; // unmounted / scope moved on — not this scope's answer
+      setSettledScope(scopeKey);
       if (!data?.prompts?.length) return; // offline/error/empty — keep showing whatever this scope already has
       writeCachedSamplePrompts(tenantKey, role, data.prompts); // silent refresh — for the NEXT visit only
       setSnap((s) => {
@@ -288,7 +294,7 @@ export function useSamplePrompts(role: AskRole, enabled = true, tenantKey: strin
   }, [role, enabled, scopeKey, tenantKey]);
 
   const prompts = enabled ? snap.prompts : [];
-  return { prompts, loading: enabled && prompts.length === 0 };
+  return { prompts, loading: enabled && prompts.length === 0 && settledScope !== scopeKey };
 }
 
 /** "Did you mean…" chips for the question that just failed. Pass `null` to clear (a fresh question, or

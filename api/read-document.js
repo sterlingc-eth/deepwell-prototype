@@ -1,3 +1,4 @@
+import { armResponseDeadline } from "./_lib/util/deadline.js";
 import { denyAuth } from "./_lib/auth.js";
 import { handleCors, handleError } from "./_lib/claude.js";
 import { ingestDocument, recordIngestFailure, isTransientError, isValidDocumentId } from "./_lib/readDocument.js";
@@ -50,6 +51,7 @@ export const config = {
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  armResponseDeadline(res, 52_000); // maxDuration is 60s
 
   let auth;
   try {

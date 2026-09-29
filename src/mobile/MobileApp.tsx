@@ -3,6 +3,7 @@ import { SignIn, UserButton, useAuth, useOrganization } from '@clerk/clerk-react
 import { FileText, Loader2, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { setAuthTokenProvider } from '../services/authToken'
 import { billingClient, type BillingStatus } from '../services/billingClient'
+import { friendlyErrorMessage, withPeriod } from '../services/httpError'
 import { usePostgresSync } from '../hooks/usePostgresSync'
 import { useAppStore } from '../store/appStore'
 import { Wordmark } from '../components/Wordmark'
@@ -53,6 +54,9 @@ function FullScreenMessage({ title, body, action }: { title: string; body: strin
           {action.label}
         </a>
       )}
+      {/* A tech stopped here by the plan gate (or a shop with no plan) had no way to sign out or switch to a
+          shop that IS subscribed — the app header with the account menu never renders. */}
+      <UserButton afterSignOutUrl="/m/" />
     </div>
   )
 }
@@ -216,7 +220,7 @@ export function MobileApp() {
       {sync.status === 'error' && (
         <div role="alert" className="shrink-0 bg-bad-bg text-bad-ink text-caption">
           <div className="max-w-2xl mx-auto px-4 min-h-11 flex items-center gap-2">
-            <span className="flex-1">Couldn't load your records{sync.error ? `: ${sync.error}` : ''}.</span>
+            <span className="flex-1">Couldn't load your records{sync.error ? `: ${withPeriod(friendlyErrorMessage(sync.error))}` : '.'}</span>
             <button type="button" className="min-h-11 px-2 underline font-semibold" onClick={() => void sync.refresh()}>
               Retry
             </button>
@@ -228,7 +232,7 @@ export function MobileApp() {
         {/* All three stay mounted so an upload keeps going and the Ask
             thread survives while the tech flips between tabs. */}
         <div className={tab === 'ask' ? 'h-full' : 'hidden'}>
-          <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} billing={billing} tenantKey={orgId ?? userId ?? null} />
+          <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} billing={billing} tenantKey={orgId ?? userId ?? null} emptyShop={sync.status === 'ready' && sync.isEmpty} onOpenScan={() => setTab('scan')} />
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
           <ScanTab
