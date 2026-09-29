@@ -11,7 +11,7 @@
 // full subject line (which can carry a customer's name, e.g. a warranty digest subject) verbatim.
 import { hashForLog, describeForLog } from "./privacy/redact.js";
 
-export const EMAIL_FROM = "alerts@deepwelltechnology.com";
+export const EMAIL_FROM = "alert@deepwelltechnology.com";
 export const EMAIL_FROM_NAME = "DeepWell Technology";
 
 /**

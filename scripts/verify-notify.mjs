@@ -166,7 +166,7 @@ eq('orderByLastNotified: does not mutate its input', (() => { const input = [{ t
   delete process.env.RESEND_API_KEY;
   const result = await sendEmail({ to: ['owner@shop.com'], subject: 'test', text: 'test', html: '<p>test</p>' });
   eq('sendEmail: no RESEND_API_KEY -> log-only, channel in-app, not sent', result, { sent: false, channel: 'in-app' });
-  check('EMAIL_FROM is the deepwelltechnology.com sending address', EMAIL_FROM === 'alerts@deepwelltechnology.com');
+  check('EMAIL_FROM is the deepwelltechnology.com sending address', EMAIL_FROM === 'alert@deepwelltechnology.com');
   if (originalKey !== undefined) process.env.RESEND_API_KEY = originalKey;
 }
 
