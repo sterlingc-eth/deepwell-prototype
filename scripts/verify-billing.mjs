@@ -179,8 +179,11 @@ eq('active status -> active', planStateFor({ billing_status: 'active' }, now), '
 eq('canceled status -> canceled', planStateFor({ billing_status: 'canceled' }, now), 'canceled');
 eq('trialing with future trial_ends_at -> trialing',
   planStateFor({ billing_status: 'trialing', trial_ends_at: new Date(now.getTime() + DAY).toISOString() }, now), 'trialing');
-eq('trialing with past trial_ends_at -> none (does not wait on a webhook)',
-  planStateFor({ billing_status: 'trialing', trial_ends_at: new Date(now.getTime() - DAY).toISOString() }, now), 'none');
+// R30 M4: 48h grace after trial_ends_at (the trial->paid conversion webhook can lag); beyond it, expired without a webhook.
+eq('trialing 1 day past trial_ends_at -> still trialing (48h conversion grace)',
+  planStateFor({ billing_status: 'trialing', trial_ends_at: new Date(now.getTime() - DAY).toISOString() }, now), 'trialing');
+eq('trialing 3 days past trial_ends_at -> none (does not wait on a webhook forever)',
+  planStateFor({ billing_status: 'trialing', trial_ends_at: new Date(now.getTime() - 3 * DAY).toISOString() }, now), 'none');
 
 check('past_due within 7-day grace is not past grace',
   !isPastGrace({ billing_status: 'past_due', current_period_end: new Date(now.getTime() - 3 * DAY).toISOString() }, now));

@@ -45,6 +45,7 @@ export function resolveConfig(env = process.env) {
     appPerDay: posInt(env?.RATE_LIMIT_SUPPORT_PER_DAY) ?? RATE.appPerDay,
     handoffPublicPerDay: posInt(env?.SUPPORT_HANDOFF_PUBLIC_PER_DAY) ?? RATE.handoffPublicPerDay,
     handoffAppPerDay: posInt(env?.SUPPORT_HANDOFF_APP_PER_DAY) ?? RATE.handoffAppPerDay,
+    clientErrorPerDay: posInt(env?.SUPPORT_CLIENT_ERROR_PER_DAY) ?? RATE.clientErrorPerDay,
     tenantDailyUsd: num(env?.SUPPORT_DAILY_USD) ?? SPEND.tenantDailyUsd,
     tenantMonthlyUsd: num(env?.SUPPORT_MONTHLY_USD) ?? SPEND.tenantMonthlyUsd,
     platformDailyUsd: num(env?.SUPPORT_PLATFORM_DAILY_USD) ?? SPEND.platformDailyUsd,
@@ -200,6 +201,14 @@ export function createLimiter(deps = {}) {
       }
       const n = await tenant.bumpWindow(auth, `support_h_${hashUser(auth.userId)}`, dayStart(now), 1);
       return n != null && n > c.handoffAppPerDay ? { ok: false, scope: 'day', retryAfterSec: secondsToNextDay(now) } : { ok: true };
+    },
+
+    /** Count one browser error report (signed-in only) against the user's daily cap so a crash loop cannot flood the logs. */
+    async checkClientError({ auth }) {
+      const now = nowFn();
+      const c = cfg();
+      const n = await tenant.bumpWindow(auth, `support_e_${hashUser(auth.userId)}`, dayStart(now), 1);
+      return n != null && n > c.clientErrorPerDay ? { ok: false, scope: 'day', retryAfterSec: secondsToNextDay(now) } : { ok: true };
     },
 
     /**

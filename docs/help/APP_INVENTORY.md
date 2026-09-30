@@ -4,7 +4,7 @@ Not part of the knowledge base: `scripts/build-support-kb.mjs` only reads `NN-sl
 It is the source of truth for the help articles. Every action id (`A-...`) below must be named by at least one KB entry through a
 `!covers:` line in `docs/help/NN-*.md`, and `scripts/verify-support-app-coverage.mjs` fails when one is not.
 
-Derived by reading `src/` (desktop) and `src/mobile/` (phone) on 2026-09-29 plus the API strings the UI shows. Labels are copied
+Derived by reading `src/` (desktop) and `src/mobile/` (phone) on 2026-09-29 (re-synced with the Round 30 app changes the same day) plus the API strings the UI shows. Labels are copied
 from the code. "Admin" = Clerk org role `admin` (`isAdminRole`); "Member" = any other role. The owner is the admin who created the
 shop. Where a panel is rendered by Clerk (our sign-in provider) the layout and labels come from Clerk, not this code, and are marked
 "(provider panel)".
@@ -18,7 +18,7 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 - **S-ASK** Ask (desktop nav "Ask", phone tab "Ask"). Heading "Ask Donovan."
 - **S-DASH** Dashboard (nav "Dashboard"): Data health tiles, Financials, Alerts, Overview, Warranty expiry table, Equipment at risk, Customer outreach summary.
 - **S-INBOX** Inbox (nav "Inbox", badge = items needing a person). Two tabs: **Add files**, **Needs you**.
-- **S-RECORDS** Records (nav "Records"). Four tabs: **Customers** (default), **Documents**, **Grid**, **Graph**.
+- **S-RECORDS** Records (nav "Records"). Four tabs: **Documents** (default for a user who has not chosen), **Customers**, **Grid**, **Graph**; the last tab used is remembered per user on this browser.
 - **S-CUSTOMER** Customer profile (opens from a customer row). Tabs Documents, Equipment, Timeline, Graph, Notes.
 - **S-ENTITY** Equipment / property / technician record page ("Graph" toggle, related records, linked documents).
 - **S-BILLING** Billing (icon + "Billing" in the header). Admin actions; every member can open the page.
@@ -39,8 +39,8 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 
 - **A-SIGNIN** Sign in. Desktop: open `deepwelltechnology.com/app` (or **Log in** on the website). Phone: the installed DeepWell app or `deepwelltechnology.com/m`. The home-screen phone app keeps its own sign-in. Anyone.
 - **A-RESETPW** Reset a forgotten password: on the sign-in form use the provider's password option / "Forgot password?" link. DeepWell staff cannot see or set passwords; never send one in chat.
-- **A-SIGNOUT** Sign out. Desktop: header **Sign out**. Phone: profile button at the top right, then sign out (provider menu).
-- **A-SWITCHORG** Switch shop (a person who works two shops). Desktop: shop switcher in the header (no personal account is offered). Phone: not available; sign out and back in, or use the desktop.
+- **A-SIGNOUT** Sign out. Desktop: header **Sign out**. Phone: round profile button (initial) at the top right opens the **Account** sheet, then **Sign out**; with unsent scans it warns first (see A-M-ACCOUNT).
+- **A-SWITCHORG** Switch shop (a person who works two shops). Desktop: shop switcher in the header (no personal account is offered). Phone: Account sheet (round profile button) -> **Switch shop** list, shown only with more than one shop (see A-M-ACCOUNT).
 - **A-CREATESHOP** Create a shop: after first sign-in, **Create your shop**. Then you are the owner/admin.
 - **A-JOINSHOP** Join a shop you were invited to: accept the invite email, or **I was invited** on the join screen. The phone says "Join your shop first" and points to the desktop if you have no shop.
 - **A-FIELDVIEW** Office view (dark) / Field view (light, larger type for outdoors). Desktop header toggle; phone header sun/moon button. Remembered on the device.
@@ -53,12 +53,13 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 
 - **A-INVITE** Invite a teammate: admin opens **Team → Invite someone**, types the email, picks a Role (Member or Admin), **Send invite**. The person gets an email; accepting puts them in the shop. Admin only. Desktop only.
 - **A-INVITE-ROLE** Member vs Admin choice on the invite form (default Member). Admin can manage billing, invites, exports, deletions, support access, Donovan admin, merges. Member can ask, upload, browse, fix records.
-- **A-ROLE-CHANGE** Change a person's role: **Team**, member list below the invite form (provider panel). Admin only.
-- **A-USER-REMOVE** Remove a user: **Team**, member list (provider panel), that person's menu. Frees the login. Admin only.
-- **A-INVITE-MANAGE** See, resend or revoke a pending invitation: **Team** member panel (provider panel). Pending invites count toward the login cap.
+- **A-ROLE-CHANGE** Change a person's role: **Team**, member list below the invite form (provider panel, **Members** tab). Admin only.
+- **A-USER-REMOVE** Remove a user: **Team**, **Members** tab of the provider panel, that person's menu. Frees the login. Admin only.
+- **A-INVITE-MANAGE** See, resend or revoke a pending invitation: **Team**, **Invitations** tab of the provider panel (Team text: "use the Members and Invitations tabs of the panel below the form"). Pending invites count toward the login cap.
 - **A-SEATS** Login usage: **Team** header pill "3 of 5 logins used (owner not counted)" and "N pending invites". Members see "N members" only.
 - **A-SEATCAP** At the cap the invite form is disabled and says "Your plan's login limit is reached — upgrade to invite more people." (Go to Billing). Over the cap: "Your team is over your plan's login limit ... Nobody is locked out, but new invites are paused until you're under the limit or upgrade." Server error text: "Your Shop plan includes up to 5 logins (the owner account isn't counted). Upgrade your plan to invite more people." Caps: Solo 2, Shop 5, Crew 10, Fleet no DeepWell cap.
-- **A-TEAM-MEMBER** A member who reaches Team directly sees a read-only "Members of <shop>" list; nothing in the nav points there.
+- **A-TEAM-MEMBER** A member who reaches Team directly sees a read-only "Members of <shop>" list with "Only a shop admin can invite people, change roles or remove someone. Ask an admin."; nothing in the nav points there.
+- **A-MEMBER-GATE** What a member sees instead of a 403: admin-only buttons are visible but disabled with the note **Ask an admin** (tooltip "Only a shop admin can do this. Ask an admin."): Records -> Documents **Export CSV**, Records -> Customers **Export CSV**, Data health export, customer **Merge into <name>** (Inbox -> Needs you and customer profile), every **Billing** action (note: "Only a shop admin can start a plan, change it or manage billing. Ask an admin."), API access ("API keys are managed by a shop admin. Ask an admin." on Fleet). Hidden from members entirely: **Empty this shop's documents / Empty documents**, **Delete document**, the whole-shop **Duplicate customers** scan. The server still returns "This action requires the 'admin' role in your shop." if a request gets through.
 - **A-PHONE-CARD** Team → "Phone app for your techs": QR code, **Copy install link**, **See install steps**.
 
 ## Actions: billing and plan
@@ -82,7 +83,8 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 - **A-UPLOAD-WEB** Upload on desktop: **Inbox → Add files** tab, **Add files** (top right, or inside a batch), or drag files onto **Bulk import**. A batch is created around the drop; **New batch** lets you name one (Name, Source: Filing cabinet / Email / Shared drive / Truck, From, To dates). First-run shops land here with "Add your first document."
 - **A-UPLOAD-BULK** Bulk import: **Choose files or a .zip** or drag a .zip / folder. Accepts .zip .pdf .jpg .jpeg .png .webp .tiff .tif .txt .csv. Skips: macOS archive metadata, hidden files, folders, empty files, too large, unsupported type. **Cancel** stops a run. Shows counts "N files · N uploaded · N queued · N skipped · N failed".
 - **A-UPLOAD-LIMITS** Limits: PDFs and photos under 24 MB, text/CSV under 20 MB, 100 MB hard ceiling; 50 files per upload request; per-page monthly allowance by plan; daily upload limit ("Today's upload limit has been reached. Uploading has stopped ... Try again after the limit resets (UTC midnight)").
-- **A-UPLOAD-STATUS** Watching progress: per-file status (Checking…, Uploading…, Reading…, Queued…), stage pill (Uploaded, Sorted, Read, Matched, Checked; "AI verified"), header pill "Processing N of M…" (or "Still working on N — check Inbox" after ten minutes), and the six-number pipeline row with "N documents · N answerable and counted". Bell for later changes.
+- **A-UPLOAD-STATUS** Watching progress: per-file status (Checking…, Uploading…, Reading…, Queued…), stage pill (Uploaded, Sorted, Read, Matched, Checked; "AI verified"), header pill "Processing N of M…" (or "Still working on N — check Inbox" after ten minutes), the note "Still processing — check Inbox in a few minutes" next to a file that was accepted but not finished (with a **See Needs you** button that opens Inbox -> Needs you), and the six-number pipeline row with "N documents · N answerable and counted". Bell for later changes.
+- **A-CLASSIFY** Inbox -> Add files, inside a batch that has files still at Uploaded: **Classify received** (demo mode: "Guess type from file name"). Runs server classification (same path as Records' classify), never overwrites a type a person chose, then reports "Classified N of M." or "Classified N of M. The rest need a person: open them under Needs you." or "Nothing could be classified automatically. Open each file under Needs you to set its type."; "These files are still uploading. Try again in a moment." / "Could not classify right now. Try again."
 - **A-UPLOAD-DUP** A file already uploaded is recognized by content: "Already on file (matched by content)". No second copy.
 - **A-UPLOAD-ERR** Upload errors: "Choose a plan to get started", "Monthly page limit reached (N) — upgrade your plan for more.", "Subscription required", "File is larger than 100 MB", "PDFs and photos have to be under 24 MB to be read...", "Text and spreadsheet files have to be under 20 MB...", "Daily AI budget reached — resumes tomorrow", "Waiting for the server's rate limit…", "Couldn't reach DeepWell — check your connection and try again." Billing errors show **See plans**.
 - **A-SCAN** Scan on the phone: **Scan** tab, **Take photo** (rear camera) / **Add another page**, or **Choose photos or PDFs**. Photos are shrunk on the phone. Several photos: toggle "One document, N pages" vs "N separate documents", then **Upload N pages**. Result rows: "Uploaded and read", "Uploaded — still being read", "Already in DeepWell — nothing new to add". Then **Scan another** or **View docs**. Phone accepts images and PDFs only (no zip, no CSV).
@@ -104,7 +106,7 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 - **A-DUP-CUSTOMER** Duplicate customers: **Duplicate customers** panel in Inbox → Needs you (Merge into <name>, Keep separate) and Records → Customers (banner: Merge into <name>, **Not the same**, **Merge all**; whole-shop **Duplicate customers** scan for admins with Undo). Merging is admin.
 - **A-AI-VERIFY** **Verify with AI** on a document not yet checked: "Verified by AI." or "Not confident enough yet — this still needs a person." Verified-by-AI shows as "AI verified".
 - **A-OPEN-ORIGINAL** **Open original** (review panel) / **Download <filename>** (preview dialog). Phone: **Open original** in the document sheet. One file at a time.
-- **A-DELETE-DOC** Delete one document: open it (Inbox → Needs you → the document), **Delete document**, then **Confirm delete** ("Delete this document? This can't be undone."). Admin only; a member gets "This action requires the 'admin' role in your shop."
+- **A-DELETE-DOC** Delete one document: open it (Inbox → Needs you → the document), **Delete document**, then **Confirm delete** ("Delete this document? This can't be undone."). Admin only; the button is hidden from members.
 - **A-MONEY-FIX** Money on this document (invoice number, dates, Subtotal, Tax, Total, Paid, Balance due, Status): **Correct <field>**.
 - **A-REMINDERS** **Find reminders** on the Needs linking chip scans documents for reminders and attaches them to customers; a customer profile lists "Open reminders".
 - **A-HIDE-SHOP** "Hide shop records" checkbox and a technician filter on the Shop records chip (shop's own paperwork, not customer jobs).
@@ -112,7 +114,7 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 
 ## Actions: finding records
 
-- **A-RECORDS-TABS** **Records** has tabs **Customers** (opens first), **Documents**, **Grid**, **Graph**. Search boxes live in the Customers and Documents tabs (the old Search screen was folded into them and the palette).
+- **A-RECORDS-TABS** **Records** has tabs **Documents** (opens first for a new user), **Customers**, **Grid**, **Graph**; it then reopens on the last tab the person used (remembered per user in the browser). Search boxes live in the Customers and Documents tabs (the old Search screen was folded into them and the palette).
 - **A-SEARCH-DOCS** **Records → Documents**: search box "Search filename, customer, address, technician, brand, contents…". Results as a table (Name, Type, Customer, Address, Date, Tech, Status, Amount) or cards; row click opens the preview.
 - **A-FILTER-DOCS** **Filters** button (panel): Type, Status (Verified / Needs review / Missing info), Warranty (Expired / Expiring (90 days) / Active / No warranty on file), Customer, Site, Technician, Brand, Money (Has money, Open balance), My uploads, Service date range, Upload date range. Active filters appear as chips; **Clear all**.
 - **A-SORT-GROUP** **Sort**: Newest upload, Newest service date, Customer A–Z, Type, Amount. **Group**: No grouping, Customer, Type, Month, Site. Table/Card view buttons. **Audience** control: Customer, Internal, All (Internal = team-only documents, badged "Team only").
@@ -122,7 +124,8 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 - **A-CUSTOMER-PROFILE** Customer profile: edit Name/Address/Phone/Email (click the value, save), Call / Email links, **Assign a document to this customer**, tabs Documents / Equipment / Timeline / Graph / Notes (**Save notes**), overview tiles (Documents, Equipment, Next warranty expiry, Open alerts), "Open reminders".
 - **A-GRID** **Records → Grid**: spreadsheet of Documents or Units, "Filter by model or serial…", **Columns** picker (remembered), **Load more rows** / **Load all (up to 5,000)**, **Export CSV (N rows)**.
 - **A-GRAPH** **Records → Graph** and the **Graph** toggle on a record/customer: knowledge graph of customers, properties, equipment, documents.
-- **A-EQUIPMENT-PAGE** Unit page: fields with sources, related service visits, linked documents ("Documents linked to this record"). Reached from a serial anywhere. Note: no editing of a unit's install date on this page.
+- **A-EQUIPMENT-PAGE** Unit page: fields with sources, related service visits, linked documents ("Documents linked to this record"). Reached from a serial anywhere. Has an **Install date** field (see A-INSTALL-DATE).
+- **A-INSTALL-DATE** Unit page **Install date** section: shows the date (or "Not on file") with its source ("From the documents below" / "Entered by <name> on <date>"); **Add install date** / **Change install date** opens a date box, **Save** / **Cancel**. Not admin-gated: anyone signed in who can correct facts (members too). Date must be a real day, 1950 or later, at most ~3 months ahead ("That install date is too far back. Check the year." / "...in the future..."). Saving audits it, stores "entered by", and re-derives the warranty when a verified brand rule exists (a printed expiry from a document is kept; an unverified brand keeps the date but no computed expiry). Result note: "Saved. Warranty now ends <date>." or "Saved. DeepWell could not work out a warranty end date from it (no verified warranty term for this brand), so the unit stays under "No warranty on file"." The Dashboard link **Add install date** (**Change install date** when one exists) opens this page with the box focused.
 - **A-M-DOCS** Phone **Docs** tab: search "Customer, address, serial…", **Filters** sheet (Type, Status, Warranty, Site / address, Apply / Clear), **Sort**, **Group by customer**, refresh button, tap a row for the document sheet (customer button, missing fields, **Open original**), customer sheet (Equipment, Recent documents, Call).
 
 ## Actions: asking Donovan
@@ -142,11 +145,12 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 
 - **A-DASH** Dashboard sections (each collapses): **Data health** (Documents, AI verified, Needs linking, Missing info, Conflicts; duplicates held out of every count), **Financials** (admin), **Alerts** cards, **Overview** (Documents, Units on record), **Warranty expiry · next to expire first**, **Equipment at risk**, **Customer outreach**.
 - **A-DASH-ALERTS** Alert cards: **Expired**, **This quarter (30+90d)**, **Expiring in 30 days**, **Expiring in 90 days**, **Expiring in 12 months**, **Registration closing**, **Upsell candidates**. Open a card to see its units. Per unit: **View customer**, **Ask about this unit**, **Open in Outreach**, **Dismiss** (then **Undo**), checkbox to select for the claim packet. Empty text like "No units expiring this quarter right now."
-- **A-DASH-EXPIRY** Warranty table: **All** / **This quarter**, columns Unit, Location, Expires, Status, **Copy link**, **Ask**, **Ask: next 12 months**. "Covered" and "No warranty on file — needs install date" lists (**Add install date** opens the unit page).
+- **A-DASH-EXPIRY** Warranty table: **All** / **This quarter**, columns Unit, Location, Expires, Status, **Copy link**, **Ask**, **Ask: next 12 months**. "Covered" and "No warranty on file — needs install date" lists (**Add install date** / **Change install date** opens the unit page with the date box ready, A-INSTALL-DATE).
 - **A-CLAIM-PACKET** Warranty claim packet: tick units (Dashboard alerts or table), **Prepare claim packet (N)** opens **Warranty claim packet**: "Add a unit…" picker, **Select all**/**Clear**, remove x, "Packet preview", **Download PDF** (disabled until every unit has verified documents; shows "Warranty expired" / "Missing ..." / "No verified documents"). "Ask about this unit" link.
 - **A-OUTREACH** Outreach: **Dashboard → Open Outreach** (or **Open in Outreach** on an alert). Settings (collapsed): Send outreach emails on/off, **Review first** vs **Automatic** (add-on), days before expiry, shop name, phone, From name, signature, reply-to, offer text; only admins can change. **Generate drafts**, open a draft, **Copy email** / **Open in mail**, **Approve** / **Approve all**, **Send approved (N)** (admin, needs the email add-on/sending set up), **Skip**. **Sent log**. "Needs an email on file" count.
 - **A-BELL** Bell (header, unread count): warranty/attention notifications with time ago; click one to go to it; **Mark all read**; "Nothing needs your attention." Polls every five minutes.
-- **A-DIGEST** Daily warranty email digest: **Team → Settings → Notifications → Email me warranty digests** switch (shop-wide, admin). One email a day, only when something needs attention. Sent to shop admins.
+- **A-DIGEST** Daily warranty email digest: **Team → Settings → Notifications → Send the shop's daily warranty digest (every admin)** switch (shop-wide, admin; formerly "Email me warranty digests"). One email a day, only when something needs attention. Sent to every shop admin who has not muted it.
+- **A-DIGEST-MUTE** Same card: **Mute my daily digest** switch (per person, independent of the shop-wide switch): stops the digest for that admin only; others still get theirs. Caption: "Stops the digest email for you only. Other admins still get it. Only admins receive the digest, so members have nothing to mute."
 - **A-FOLLOWUPS** Technician follow-ups: **Team → Follow-ups** card, **Send follow-up messages** switch, **Also email** switch, "Currently due" list with **Send now**, **Copy**, **Open in mail**. Admin.
 - **A-DONOVAN-ADMIN** **Donovan** header button (admin): Answer quality — misses (questions Donovan couldn't answer, replay, copy for review), learning (proposals, keep as test), scorecard (**Run scorecard**), **Search by meaning → Prepare older documents**.
 - **A-FINANCIALS** Financials strip/card on the Dashboard: totals Donovan counted from invoices, states what it could not count; admin can start the backfill. Money on a document is corrected in the review panel (A-MONEY-FIX).
@@ -154,7 +158,7 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 ## Actions: exports, data, support access
 
 - **A-EXPORT-JSON** Full data export: **Team → Settings → Your data → Download data export (JSON)**. Admin. Documents, extractions, customer/unit records, audit log.
-- **A-EXPORT-CSV** CSV exports: **Records → Documents → Export CSV**, **Records → Customers → Export CSV**, **Records → Grid → Export CSV (N rows)**. The first two are admin-only on the server; the Grid one downloads what is on screen.
+- **A-EXPORT-CSV** CSV exports: **Records → Documents → Export CSV**, **Records → Customers → Export CSV**, **Records → Grid → Export CSV (N rows)**. The first two are admin-only (disabled with "Ask an admin" for members); the Grid one downloads what is on screen.
 - **A-EXPORT-WARRANTY** Warranty export = the claim packet PDF (A-CLAIM-PACKET); expiring-warranty list is the Dashboard table and Alerts cards.
 - **A-DELETE-ALL-DOCS** **Records → Documents**, "Empty this shop's documents": type DELETE, **Empty documents**. Permanent. Admin.
 - **A-DELETE-SHOP** **Team → Settings → Delete this shop**: **Delete shop data…**, type the shop name, **Permanently delete**. Cancels the subscription first; if that fails nothing is deleted. Admin. Export first.
@@ -165,9 +169,10 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 ## Actions: phone app
 
 - **A-M-INSTALL** Install: iPhone/iPad Safari → `deepwelltechnology.com/m` → **Share** → **Add to Home Screen** → **Add**. Android Chrome → **Install** / menu **Install app** or **Add to Home screen**. In-app browsers (social, email, messaging) cannot install: open in Safari/Chrome. QR code and **Copy link** in the install guide; a small banner in the Ask tab prompts too. A phone opening the desktop app sees "On a phone? DeepWell Mobile is built for it." (**Open**, dismissible).
-- **A-M-TABS** Tabs Ask / Scan / Docs; last tab remembered. Header: shop name, Help button, Field/Office view, profile button.
-- **A-M-LIMITS** Not on the phone: Dashboard, Inbox review queue, Team/invites, Billing, exports, settings, notifications bell, shop switcher, delete. Use the desktop app.
+- **A-M-TABS** Tabs Ask / Scan / Docs; last tab remembered. Header: shop name, Help button, Field/Office view, round profile button (opens the Account sheet).
+- **A-M-LIMITS** Not on the phone: Dashboard, Inbox review queue, Team/invites, Billing, exports, settings, notifications bell, delete. Use the desktop app. (Sign out and Switch shop ARE on the phone, in the Account sheet.)
 - **A-M-OFFLINE** Offline behavior: app shell opens from cache with weak/no signal; Ask needs a connection; scans queue on the phone and upload later (A-SCAN-OFFLINE).
+- **A-M-ACCOUNT** Phone Account sheet: header round profile button (initial, aria-label "Account and shops") opens a sheet titled **Account**: name and email, **Current shop**, **Switch shop** list (only when the person belongs to more than one shop; note "Scans waiting to upload stay with the shop they were taken in"), and **Sign out**. Switching halts the old shop's uploads, clears shop-scoped state, activates the new shop and reloads. Queued scans are not sent to the new shop: they stay under their own shop and upload when it is active again (server refuses them with a 409 otherwise). Signing out with unsent scans shows "N scans have not been sent yet. Signing out deletes them from this phone." with **Stay signed in** / **Sign out and delete**; with none it signs out at once and wipes the phone's offline queue.
 - **A-M-GATES** No shop: "Join your shop first ... Open DeepWell". No plan: "Choose a plan to continue ... See plans".
 
 ## Errors and limits reference (strings the UI shows)
@@ -181,17 +186,15 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 - "Daily AI budget reached — resumes tomorrow" (429).
 - "Donovan is seeing unusually high usage on your account..." (429) — safety ceiling, contact support.
 - "Enter a valid email address"; "Create your shop first to invite people."; "Invites are unavailable right now. Try again in a moment."; "Could not check your team size. Try again in a moment."; "Could not send that invite. Try again in a moment."
-- "Still processing — check Records in a few minutes" — shown next to an upload that was accepted but not finished (the status lives in Inbox).
+- "Still processing — check Inbox in a few minutes" (with a **See Needs you** button) — shown next to an upload that was accepted but not finished.
 
 ## Half-built or confusing (product feedback, not for customers)
 
-1. Admin-only actions are visible to members: **Export CSV** and **Empty this shop's documents** (Records → Documents), **Export CSV** (Customers), **Delete document**, Billing buttons, outreach send. A member clicks and gets the 403 text above.
-2. Role change, remove user and invitation management live in the provider's embedded panel under Team; DeepWell's own invite form hides the provider's invite button. Labels there are not in our code.
-3. `FREE_PREVIEW_DOCUMENTS` is 3 in `billingClient.ts` but 0 in `plan.js` (hard gate, 2026-09-21): the "Free preview used up" banner text is stale.
-4. Dashboard **Add install date** only opens the unit page, which has no field to edit an install date.
-5. Inbox **Classify received** button classifies by filename in the browser only (kept mostly for demo data).
-6. The upload note "Still processing — check Records in a few minutes" points at Records; processing status is in Inbox.
-7. Records opens on **Customers**, not Documents, so "where are my documents" surprises people.
-8. The daily email digest is a shop-wide switch inside an admin-only card; a member cannot mute it for themselves.
-9. The phone app has no shop switcher and no sign-out label of its own (provider profile button).
-10. The Help chat (desktop) and Donovan's Ask box were two separate places for questions; round 29 routes clear how-to questions typed into Ask to Help answers.
+Fixed in Round 30 (kept here so the articles are not re-broken): members now see admin buttons disabled with "Ask an admin" (A-MEMBER-GATE) and Empty documents / Delete document hidden; the Dashboard "Add install date" now opens a unit page with a real Install date field (A-INSTALL-DATE); Classify received now runs server classification (A-CLASSIFY); the upload note now says "check Inbox" with a **See Needs you** button; Records opens on Documents for new users and remembers the last tab; the daily digest has a per-admin **Mute my daily digest** (A-DIGEST-MUTE); the phone has an Account sheet with Switch shop and a labelled Sign out (A-M-ACCOUNT); the stale "Free preview used up" banner is gone.
+
+Still open:
+
+1. Role change, remove user and invitation management live in the provider's embedded panel under Team (Members / Invitations tabs); DeepWell's own invite form hides the provider's invite button. Labels inside that panel are not in our code.
+2. The shop-wide digest switch and the per-admin mute live in an admin-only card; a member has no digest setting (members do not receive it).
+3. Outreach send and a few other admin actions may still return the 403 text instead of being disabled; the articles say "admin only" for those.
+4. The Help chat (desktop) and Donovan's Ask box are two separate places for questions; round 29 routes clear how-to questions typed into Ask to Help answers.

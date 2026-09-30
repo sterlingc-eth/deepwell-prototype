@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { LIMITS, SUPPORT_EMAIL, SURFACES } from './policy.js';
 import { sanitizeInput } from './guard.js';
 import { redactSecrets, hashForLog } from '../privacy/redact.js';
+import { scrub as scrubDiagnostic } from './clientError.js';
 
 const EMAIL_RE = /^[^\s@<>()",;:\\]+@[^\s@<>()",;:\\]+\.[^\s@<>()",;:\\]{2,}$/;
 const SECRET_PHRASE_RE = /\b(password|passcode|passwd|pin|secret|api[ _-]?key|token)\b(\s*(?:is|was|:|=)\s*)\S+/gi;
@@ -35,6 +36,9 @@ export function validateHandoff(body) {
   const surface = SURFACES.includes(b.surface) ? b.surface : 'public';
   const name = oneLine(typeof b.name === 'string' ? b.name : '').slice(0, LIMITS.handoffNameChars);
   const page = oneLine(typeof b.page === 'string' ? b.page : '').slice(0, 120);
+  // "Report a problem" attaches a short diagnostics block (screen, device, recent scrubbed errors). Multi-line, capped.
+  const diagnostics = scrubDiagnostic(String(typeof b.diagnostics === 'string' ? b.diagnostics : '').replace(/[^\S\n]+/g, ' ').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{2,}/g, '\n').trim()).slice(0, 1500);
+  const kind = b.kind === 'problem' ? 'problem' : 'help';
   const transcript = (Array.isArray(b.transcript) ? b.transcript : [])
     .filter((t) => t && (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string' && t.text.trim())
     .slice(-LIMITS.handoffTranscriptTurns)
@@ -48,6 +52,8 @@ export function validateHandoff(body) {
       transcript,
       surface,
       page: scrub(page),
+      diagnostics,
+      kind,
       honeypot: typeof b.website === 'string' && b.website.trim() !== '',
     },
   };
@@ -65,7 +71,7 @@ export function ticketRef(now = new Date()) {
  */
 export function buildHandoffEmail(v, meta) {
   const subjectBase = oneLine(v.message).slice(0, 70);
-  const subject = `[DeepWell Help ${meta.ref}] ${subjectBase}`;
+  const subject = `[DeepWell ${v.kind === 'problem' ? 'Problem' : 'Help'} ${meta.ref}] ${subjectBase}`;
   const acct = meta.account
     ? `Plan: ${meta.account.plan ?? 'none'} | Billing state: ${meta.account.state ?? 'unknown'} | Role: ${meta.account.role ?? 'unknown'} | Tenant (hash): ${meta.account.tenantHash ?? 'n/a'}`
     : 'Signed out (website visitor)';
@@ -78,6 +84,7 @@ export function buildHandoffEmail(v, meta) {
     'Message:',
     v.message,
   ];
+  if (v.diagnostics) lines.push('', 'Diagnostics (attached automatically, scrubbed):', ...v.diagnostics.split('\n'));
   if (v.transcript.length) {
     lines.push('', `Recent chat (last ${v.transcript.length} turns, redacted):`);
     for (const t of v.transcript) lines.push(`${t.role === 'user' ? 'Visitor' : 'Assistant'}: ${t.text.replace(/\n+/g, ' ')}`);

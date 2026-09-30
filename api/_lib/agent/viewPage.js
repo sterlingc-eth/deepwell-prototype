@@ -18,7 +18,7 @@
  *
  * The bytes never leave this process except inside the model request; no text or bytes are logged.
  */
-import { getObject } from "../r2.js";
+import { getObject, keyBelongsToTenant } from "../r2.js";
 import { sniffMagicBytes } from "../readDocument.js";
 
 export const MAX_VIEWS = 2;
@@ -58,7 +58,7 @@ export function countPdfPages(bytes) {
  * @param {{withTenant: Function, ctxArg: object, ledger: import("./tools.js").EvidenceLedger,
  *   fetchObject?: (key: string) => Promise<Buffer>}} deps  fetchObject is injectable for tests.
  */
-export function createPageViewer({ withTenant, ctxArg, ledger, fetchObject = getObject, deadlineAt = Infinity }) {
+export function createPageViewer({ withTenant, ctxArg, ledger, fetchObject, deadlineAt = Infinity }) {
   let views = 0;
   const fail = (message) => ({ ok: false, content: `ERROR: ${message}`, rowCount: 0, inputSummary: "view" });
 
@@ -77,9 +77,12 @@ export function createPageViewer({ withTenant, ctxArg, ledger, fetchObject = get
     if (!doc.storage_key) return fail("this document has no stored original; use the transcript text");
     if (doc.page_count && pageNo > doc.page_count) return fail(`this document has only ${doc.page_count} page(s)`);
 
+    // R30 H1: with the real R2 fetcher (no test double injected), only ever fetch a key under the row's own tenant.
+    if (!fetchObject && !keyBelongsToTenant(doc.storage_key, doc.tenant_id)) return fail("this document's stored original is not available; use the transcript text");
+
     let bytes;
     try {
-      bytes = await fetchObject(doc.storage_key);
+      bytes = await (fetchObject ?? getObject)(doc.storage_key);
     } catch {
       return fail("could not fetch the original file; use the transcript text");
     }

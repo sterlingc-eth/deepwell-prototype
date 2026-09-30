@@ -1,4 +1,6 @@
 import { Component, type ReactNode } from 'react';
+import { recordRenderError } from '../services/errorReporter';
+import { SUPPORT_EMAIL } from '../services/supportClient';
 
 /**
  * Startup performance (handoffs/STARTUP_PERF_R13.md), reviewer NO-GO
@@ -35,7 +37,11 @@ export class ScreenLoadBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: unknown): void {
-    if (this.state.kind !== 'chunk') return;
+    // A genuine screen bug (not a stale-deploy chunk 404, which the reload below handles) is reported once, scrubbed.
+    if (this.state.kind !== 'chunk') {
+      recordRenderError(error);
+      return;
+    }
     // Auto-reload ONCE per tab — sessionStorage-guarded so a deploy that is
     // somehow STILL broken after a reload shows the card instead of
     // reload-looping the tab forever.
@@ -85,6 +91,13 @@ export class ScreenLoadBoundary extends Component<Props, State> {
                 Reload
               </button>
             </div>
+            <p className="text-caption text-ink-3">
+              Still stuck? Email{' '}
+              <a className="underline font-medium text-accent-ink" href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('DeepWell problem report')}`}>
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </p>
           </div>
         </div>
       );

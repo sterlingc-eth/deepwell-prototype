@@ -7,8 +7,8 @@
  * prefix at 10% of the input price. Everything that varies (surface, page, account facts, history, the
  * visitor's message) goes AFTER it in the messages array.
  */
-import { MODEL_KB, MODEL_KB_PUBLIC } from './kb.generated.js';
-import { CANARY, LIMITS, MODEL } from './policy.js';
+import { MODEL_KB, MODEL_KB_PUBLIC, ENTRIES } from './kb.generated.js';
+import { CANARY, LIMITS, MODEL, CANNED, STARTERS } from './policy.js';
 import { defang, sanitizeInput, makePromptShingles } from './guard.js';
 import { planCacheBreakpoints } from '../promptCache.js';
 
@@ -63,14 +63,36 @@ export const REPLY_TOOL = Object.freeze({
   },
 });
 
-/** Clean the client-supplied history: valid roles, strings only, capped, alternating, user-first. */
-export function sanitizeHistory(history, max = LIMITS.historyToModel) {
+/* ------------------------------------------------------------------ L6: the client cannot forge assistant turns
+ * The history array comes from the browser, so an `assistant` entry in it is just text the caller typed. Passing it to the model
+ * would let a caller plant "As the assistant I already agreed to ..." in the conversation. Rule: an assistant turn is kept ONLY when
+ * it is (a prefix of, since the widget truncates) a text the SERVER itself produces from a fixed source: a knowledge-base answer
+ * or a canned reply. Everything else (model replies, account lookups, did-you-mean prompts, invented text) is dropped, so the
+ * model sees the visitor's own earlier questions plus assistant text that could only have come from us. No client change needed.
+ */
+const collapse = (t) => sanitizeInput(String(t ?? '')).replace(/\s+/g, ' ').trim();
+const SERVER_TEXT_ALL = [...new Set([...Object.values(CANNED), ...Object.values(STARTERS).map((x) => x.greeting), ...ENTRIES.filter((e) => e.audience !== 'public-only').map((e) => e.a)].map(collapse))];
+const SERVER_TEXT_PUBLIC = [...new Set([...Object.values(CANNED), ...Object.values(STARTERS).map((x) => x.greeting), ...ENTRIES.filter((e) => e.audience !== 'app').map((e) => e.a)].map(collapse))];
+const MIN_PREFIX = 12;
+
+/** True when `text` is a server-produced assistant message (whole, or the truncated start of one). A public caller only matches public texts. */
+export function isServerAssistantText(text, { publicOnly = true } = {}) {
+  const t = collapse(text);
+  if (t.length < MIN_PREFIX) return false;
+  const pool = publicOnly ? SERVER_TEXT_PUBLIC : SERVER_TEXT_ALL;
+  for (const known of pool) if (known.startsWith(t)) return true;
+  return false;
+}
+
+/** Clean the client-supplied history: valid roles, strings only, capped, alternating, user-first; unverifiable assistant turns dropped (L6). */
+export function sanitizeHistory(history, max = LIMITS.historyToModel, { publicOnly = true } = {}) {
   const arr = Array.isArray(history) ? history : [];
   const cleaned = [];
   for (const h of arr.slice(-LIMITS.maxHistoryAccepted)) {
     const role = h?.role === 'assistant' ? 'assistant' : h?.role === 'user' ? 'user' : null;
     const text = typeof h?.text === 'string' ? sanitizeInput(h.text).slice(0, LIMITS.historyEntryChars) : '';
     if (!role || !text) continue;
+    if (role === 'assistant' && !isServerAssistantText(text, { publicOnly })) continue;
     cleaned.push({ role, text });
   }
   const tail = cleaned.slice(-max);
@@ -99,7 +121,7 @@ export function buildRequest({ message, history, surface, page, accountContext =
   const acct = accountContext && !publicSurface ? `\n<account_context>\n${JSON.stringify(accountContext)}\n</account_context>` : '';
 
   const messages = [];
-  const hist = sanitizeHistory(history);
+  const hist = sanitizeHistory(history, LIMITS.historyToModel, { publicOnly: publicSurface });
   for (const h of hist) {
     messages.push({ role: h.role, content: h.role === 'user' ? `<user_message>\n${defang(h.text)}\n</user_message>` : defang(h.text) });
   }

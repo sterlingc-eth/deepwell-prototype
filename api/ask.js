@@ -1,4 +1,5 @@
 import { armResponseDeadline } from "./_lib/util/deadline.js";
+import { resolveToday } from "./_lib/util/localDate.js";
 import crypto from "node:crypto";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff, providerFailureMessage } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
@@ -44,6 +45,7 @@ import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "
 import { hashForLog } from "./_lib/privacy/redact.js";
 import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
 import { attachSentenceCitationsSync } from "./_lib/citations/sentences.js";
+import { annotateSuperseded, getSupersessionMap } from "./_lib/supersession.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
 import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZeroCitations, searchedLibraryBasis } from "./_lib/citations/enrich.js";
 // Round 16 D1 #7 (cold start): routes/analytics.js imports @anthropic-ai/sdk
@@ -74,7 +76,7 @@ import { getTenantVocab, correctTenantNameTypos } from "./_lib/vocab/tenantVocab
 // for why every call site here is fire-and-forget and tolerant of the table
 // not existing yet.
 import { insertAskMiss, recordAskMiss, MISS_OUTCOMES } from "./_lib/missStore.js";
-import { getStreetVocab, correctStreetTypos } from "./_lib/streetVocab.js";
+import { getStreetVocab, peekStreetVocab, correctStreetTypos } from "./_lib/streetVocab.js";
 // Day 1 training-plan normalization layer (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
 // aliased because this file already has its own `normalizeQuestion` (the
 // retrieval-cache one, below) — the analytics pre-classifier gate needs the
@@ -689,6 +691,32 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, ques
   });
 }
 
+/**
+ * R31 (speed): tenant vocabulary with a short "recently verified" window on top of getTenantVocab's own
+ * data-version cache. getTenantVocab re-runs its data-version probe (a count + max(updated_at) over entities)
+ * on every call, and this call site wrapped that probe in a full withTenant transaction (connect + BEGIN +
+ * SET LOCAL + probe + COMMIT) for EVERY question, even though the vocabulary it guards only widens typo
+ * correction. Within DONOVAN_VOCAB_FRESH_MS (default 15 s; 0 disables) of a successful verify the cached
+ * vocabulary is returned with no database work; after that the normal version-keyed check runs again, so a
+ * customer/unit added by an upload is picked up within one window. Keyed per tenant; bounded.
+ */
+const VOCAB_FRESH_MS = (() => { const n = Number(process.env.DONOVAN_VOCAB_FRESH_MS); return Number.isFinite(n) && n >= 0 ? n : 15_000; })();
+const VOCAB_FRESH_MAX = 500;
+const vocabFresh = new Map(); // tenantKey -> { vocab, at }
+async function getTenantVocabFresh(ctxArg, tenantKey, pack) {
+  const now = Date.now();
+  const hit = VOCAB_FRESH_MS > 0 ? vocabFresh.get(tenantKey) : null;
+  if (hit && now - hit.at < VOCAB_FRESH_MS) return hit.vocab;
+  const vocab = await withTenant(ctxArg, (db) => getTenantVocab(db, tenantKey, pack));
+  if (VOCAB_FRESH_MS > 0 && vocab) {
+    if (vocabFresh.size >= VOCAB_FRESH_MAX) vocabFresh.delete(vocabFresh.keys().next().value);
+    vocabFresh.set(tenantKey, { vocab, at: Date.now() });
+  }
+  return vocab;
+}
+/** Test-only: forget every "recently verified" tenant vocabulary. */
+export function _resetTenantVocabFresh() { vocabFresh.clear(); }
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return handleCors(res, req).status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -726,6 +754,8 @@ export default async function handler(req, res) {
   // Round 29: set when the question looked like an app how-to that the strict help route did not answer; a no-answer
   // result then carries `helpHint` so the UI can point to the DeepWell Help chat instead of a bare "not in your records".
   let helpHint = false;
+  // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
+  let supersededMap = null;
   const send = (status, body) => {
     if (helpHint && body?.data && typeof body.data === "object" && body.data.kind === "no-answer" && !body.data.help) body.data.helpHint = true;
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
@@ -734,6 +764,7 @@ export default async function handler(req, res) {
       if (body.data.claimCheck == null) {
         try { checkAnswerClaimsSync(body.data, { today: claimsToday ?? new Date().toISOString().slice(0, 10) }); } catch (err) { console.error("checkAnswerClaimsSync failed, sending answer without it:", err?.message); }
       }
+      if (supersededMap) { try { annotateSuperseded(body.data, supersededMap); } catch (err) { console.error("annotateSuperseded failed, sending answer without it:", err?.message); } }
       try { finalizeCitations(body.data); } catch (err) { console.error("finalizeCitations failed, sending answer without it:", err?.message); }
       // R13H1: sentence-level citations (api/_lib/citations/sentences.js) — additive `data.sentences`,
       // independent of the claimCheck guard above so an answer that already carried its own claimCheck
@@ -864,10 +895,12 @@ export default async function handler(req, res) {
     // throws — a probe failure degrades to no tenant vocab at all, same behavior as before this existed.
     let tenantVocab = null;
     try {
-      tenantVocab = await timer.time("tenantvocab", () => withTenant(ctxArg, (db) => getTenantVocab(db, auth.tenantId, pack)));
+      tenantVocab = await timer.time("tenantvocab", () => getTenantVocabFresh(ctxArg, auth.tenantId, pack));
     } catch (err) {
       console.error("Tenant vocab lookup failed, using generic vocabulary only:", err?.message);
     }
+    // R31 3b: which cited documents have since been replaced (memoized 15 s per tenant; never throws).
+    supersededMap = await timer.time("superseded", () => getSupersessionMap({ withTenant, ctxArg, tenantKey: auth.tenantId }));
     if (!meta && tenantVocab) {
       try {
         const { corrected, corrections } = correctTenantNameTypos(question, tenantVocab);
@@ -906,7 +939,8 @@ export default async function handler(req, res) {
     // downstream call site.
     if (!meta && looksLikeSingleRecordReference(question)) {
       try {
-        const streetVocab = await timer.time("streetvocab", () =>
+        // R31: a warm in-process vocabulary answers without opening a transaction at all.
+        const streetVocab = peekStreetVocab(auth.tenantId) ?? await timer.time("streetvocab", () =>
           withTenant(ctxArg, (db) => getStreetVocab(db, auth.tenantId))
         );
         const { corrected, corrections } = correctStreetTypos(question, streetVocab);
@@ -940,6 +974,7 @@ export default async function handler(req, res) {
     // point production always reached it, never earlier (verify-cold-start.mjs is unaffected).
     const preRouter = await classifyAll(question, { meta, overlay, pack, tenantVocab, loadAnalyticsRouteModule, loadAgentModule });
     const { normalizedForAnalytics, gated } = preRouter;
+    if (preRouter.effectiveQuestion) question = preRouter.effectiveQuestion; // R31: conversational-frame-stripped text when it made a deterministic stage claim
     const relationsIntent = gated.relations;
     const detIntent = gated.deterministic;
     const decomposeIntent = gated.decompose;
@@ -957,7 +992,11 @@ export default async function handler(req, res) {
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
     // computed twice (inconsistently) before the cache needed it up front.
-    const todayResolved = today ?? new Date().toISOString().slice(0, 10);
+    // R30 M9: `today` is client input that reaches cache keys, date math and the prompt. Arbitrary strings used to
+    // pass straight through (random values also bypassed the answer cache = spend). Only a real, plausible
+    // YYYY-MM-DD is accepted (the same helper the warranty routes use); anything else falls back to the server's
+    // view of the shop's local date (R30 M10: TENANT_DEFAULT_TZ / America/Phoenix, not UTC).
+    const todayResolved = resolveToday(today);
     claimsToday = todayResolved;
     // Cache key (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): normalized so
     // near-identical phrasings ("What's the warranty?" / "whats the warranty")

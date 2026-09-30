@@ -87,6 +87,7 @@ import { audienceFilterSql } from '../audience/sql.js';
 import { schemaLinkedVocabLines } from '../vocab/tenantVocab.js';
 // TEAM C (citations everywhere): records/basis come from the SAME rows the number was computed from.
 import { withAnalyticsCitations } from '../citations/analytics.js';
+import { canonicalBrandLabel } from '../analytics/brandCanon.js';
 // g133/g138 (oldest/newest install): its own citation build, not withAnalyticsCitations'
 // (that helper's sortBy wording is customers-ranking-specific — see citations/analytics.js's
 // own analyticsBasis) — attachCitations/unitRecord are the same generic, pure primitives
@@ -1135,15 +1136,20 @@ async function queryCustomersByServiceTypeCondition(db, plan) {
            c.data->>'email' AS email, c.data->>'phone' AS phone
       FROM entities c
      WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
-       AND EXISTS (
-             SELECT 1 FROM document_entity_links l
+       AND c.id IN (
+             -- R31 (speed): a set-based semi-join, same rows as the per-customer correlated EXISTS it replaces
+             -- (a customer qualifies when a matching-service_type document is linked to the customer itself OR to
+             -- one of that customer's units) — the correlated form re-probed links x extractions once per customer.
+             SELECT l.entity_id FROM document_entity_links l
              JOIN extractions x ON x.document_id = l.document_id AND x.${TENANT_SQL}
             WHERE l.${TENANT_SQL} AND x.field_key = 'service_type' AND x.value = $1
-              AND (l.entity_id = c.id OR l.entity_id IN (
-                    SELECT e.id FROM entities e
-                     WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL
-                       AND e.customer_id = c.id AND e.${TENANT_SQL}
-                  ))
+              ${dateWindowSql}
+             UNION
+             SELECT e.customer_id FROM entities e
+             JOIN document_entity_links l ON l.entity_id = e.id AND l.${TENANT_SQL}
+             JOIN extractions x ON x.document_id = l.document_id AND x.${TENANT_SQL}
+            WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
+              AND x.field_key = 'service_type' AND x.value = $1
               ${dateWindowSql}
            )`;
 
@@ -1254,6 +1260,7 @@ function keyOf(groupBy) {
     // `month` (YYYY-MM) string, see detPlan.js's detectDistinctYearsCount.
     if (groupBy === 'year') return row.month ? String(row.month).slice(0, 4) : UNKNOWN_BUCKET;
     const v = row[groupBy];
+    if (groupBy === 'brand' && v != null && v !== '') return canonicalBrandLabel(v); // R31: one manufacturer printed several ways is ONE brand group
     return v == null || v === '' ? UNKNOWN_BUCKET : String(v);
   };
 }

@@ -119,15 +119,45 @@ export async function getFunctions() {
  * never read from a request body, so the worker cannot be pointed at a tenant
  * the uploader could not already reach.
  */
-export async function enqueueDocument({ documentId, tenantKey, tenantName, userId, autoExtract = true }) {
+export async function enqueueDocument({ documentId, tenantKey, tenantName, userId, autoExtract = true, requeueNonce = null }) {
   const { client } = await load();
   await client.send({
     name: EVENTS.uploaded,
     // One run per document: a double-click, a retry, or a duplicated event
     // collapses into the same run instead of transcribing the file twice.
-    id: `read-${documentId}`,
-    data: { documentId, tenantKey, tenantName, userId, autoExtract },
+    // R30 M7: Inngest remembers an event id for 24h, so a document whose earlier run died (billing-gated, failed,
+    // abandoned) and that the user then explicitly re-sends was silently dropped while the route answered 202.
+    // An explicit re-queue therefore carries a nonce (see shouldRequeue); automatic duplicates keep the fixed id.
+    id: eventIdFor("read", documentId, requeueNonce),
+    data: { documentId, tenantKey, tenantName, userId, autoExtract, ...(requeueNonce ? { nonce: requeueNonce } : {}) },
   });
+}
+
+/** Pure: the Inngest event id. Same (kind, document) -> same id (dedupe) unless a nonce says "this is a re-queue". */
+export function eventIdFor(kind, documentId, nonce = null) {
+  return nonce ? `${kind}-${documentId}-${nonce}` : `${kind}-${documentId}`;
+}
+
+/** How long a document may sit unread before a fresh request for it is treated as a re-queue, not a duplicate. */
+export const REQUEUE_STALE_MS = 10 * 60 * 1000;
+
+/**
+ * Pure (R30 M7): is this read request an explicit re-queue of a document whose earlier run is dead, as opposed to
+ * an automatic duplicate of a run still in progress (double click, browser retry, duplicate delivery)?
+ *   - the caller said so (`requeue`/`force`), or
+ *   - the document recorded a failure (extract_error), or
+ *   - it has no pages and was created more than REQUEUE_STALE_MS ago (its first run cannot still be going).
+ * Anything else keeps the fixed id, so the dedupe that protects bulk imports from double-paying stays.
+ * @param {{extract_error?: string|null, page_count?: number|null, created_at?: string|Date|null}|null} doc
+ * @param {{explicit?: boolean, now?: number}} [opts]
+ */
+export function shouldRequeue(doc, { explicit = false, now = Date.now() } = {}) {
+  if (explicit) return true;
+  if (!doc) return false;
+  if (doc.extract_error) return true;
+  if (Number(doc.page_count) > 0) return false;
+  const created = doc.created_at ? new Date(doc.created_at).getTime() : NaN;
+  return Number.isFinite(created) && now - created > REQUEUE_STALE_MS;
 }
 
 /* ------------------------------------------------------------- the workers */
@@ -165,7 +195,7 @@ export function fatal(error) {
   if (error?.name === "IngestError" && status >= 400 && status < 500 && status !== 429) return true;
   if (error?.name === "ModelBudgetExceededError") return true;
   if (error?.code === "23503") return true;
-  if (error?.name === "R2Error" && (status === 404 || status === 403 || status === 400)) return true;
+  if (error?.name === "R2Error" && (status === 404 || status === 403 || status === 400 || status === 413)) return true;
   return false;
 }
 
@@ -304,7 +334,7 @@ function buildFunctions(inngest, NonRetriableError) {
       triggers: [{ event: EVENTS.uploaded }],
     },
     async ({ event, step, attempt, maxAttempts }) => {
-      const { documentId, tenantKey, tenantName, userId, autoExtract } = event.data ?? {};
+      const { documentId, tenantKey, tenantName, userId, autoExtract, nonce } = event.data ?? {};
       if (!documentId || !tenantKey) throw new NonRetriableError("documentId and tenantKey are required");
       const ctx = { tenantKey, tenantName: tenantName ?? tenantKey };
 
@@ -365,7 +395,7 @@ function buildFunctions(inngest, NonRetriableError) {
       if (autoExtract) {
         await step.sendEvent("queue-extraction", {
           name: EVENTS.read,
-          id: `extract-${documentId}`,
+          id: eventIdFor("extract", documentId, nonce ?? null),
           data: { documentId, tenantKey, tenantName, userId },
         });
       }

@@ -1,5 +1,5 @@
 import { withTenant } from "./_lib/recordsStore.js";
-import { presign, objectKey } from "./_lib/r2.js";
+import { presign, objectKey, keyBelongsToTenant } from "./_lib/r2.js";
 import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { denyAuth } from "./_lib/auth.js";
@@ -42,12 +42,14 @@ async function checkUploadGateInner(auth) {
   // a real per-request round trip.
   const billingRowPromise = getCachedBillingRow(ctx);
   return withTenant(ctx, async (db) => {
-    const [billingRow, documentsStored, pagesThisMonth] = await Promise.all([
+    const [billingRow, documentsStored, pagesThisMonth, pendingPages] = await Promise.all([
       billingRowPromise,
       db.countDocuments(),
       db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString()),
+      // R30 M6: pages of documents already accepted but not read yet (fails safe to 0 if the probe errors).
+      typeof db.estimatePendingPages === "function" ? db.estimatePendingPages().catch(() => 0) : 0,
     ]);
-    return gateUpload(billingRow, { documentsStored, pagesThisMonth });
+    return gateUpload(billingRow, { documentsStored, pagesThisMonth, pendingPages });
   });
 }
 
@@ -165,8 +167,9 @@ function validateUploadBody(body) {
   if (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/.test(sha256)) {
     throw new UploadValidationError("sha256 must be a 64-character hex digest");
   }
-  if (sizeBytes != null && (!Number.isFinite(sizeBytes) || sizeBytes <= 0)) {
-    throw new UploadValidationError("sizeBytes must be a positive number");
+  // R30 M5: an integer, because it is signed into the upload URL as the exact Content-Length R2 will accept.
+  if (sizeBytes != null && (!Number.isInteger(sizeBytes) || sizeBytes <= 0)) {
+    throw new UploadValidationError("sizeBytes must be a positive whole number of bytes");
   }
   if (sizeBytes != null && sizeBytes > MAX_BYTES) {
     throw new UploadValidationError("File is larger than 100 MB", 413);
@@ -241,7 +244,9 @@ async function createUploadUrlTx(db, validated, auth) {
   let uploadUrl = null;
   if (!alreadyUploaded) {
     try {
-      uploadUrl = presign("PUT", key, 900);
+      // R30 M5: when the client declared a size, sign it (Content-Length) so R2 rejects a PUT of any other size -
+      // otherwise the "100 MB / 24 MB" limits above were only ever checked against what the client SAID.
+      uploadUrl = presign("PUT", key, 900, {}, new Date(), { contentLength: sizeBytes });
     } catch (err) {
       throw new StorageUnavailableError(err);
     }
@@ -365,6 +370,10 @@ export async function getOriginalUrl(auth, documentId) {
       if (!doc || !doc.storage_key) {
         throw new DocumentGetError("Document not found", 404);
       }
+      // R30 H1: never presign a key outside this tenant's own prefix.
+      if (!keyBelongsToTenant(doc.storage_key, db.tenantId)) {
+        throw new DocumentGetError("Document not found", 404);
+      }
       const filename = doc.original_filename || "document";
       let url;
       try {
@@ -412,10 +421,21 @@ export default async function handler(req, res) {
     let auth;
     try {
       auth = await timer.time("auth", () => requireAuthOrKey(req));
-      assertScope(auth, "ingest");
+      // R30 L3: downloading an original is a READ. An ingest-only (write-only) key could presign a GET and pull
+      // documents out; now `mode: 'get'` needs the 'read' scope and everything else the 'ingest' scope.
+      assertScope(auth, mode === "get" ? "read" : "ingest");
     } catch (err) {
       statusSent = err?.status ?? 401;
       return denyAuth(res, err);
+    }
+
+    // R30: a queued phone scan names the shop it was captured in. If the signed-in shop has changed since (org
+    // switch, another user on the same phone, a retry timer that outlived a switch), refuse instead of filing
+    // the scan into whichever shop the token belongs to now. Callers that send no header are unaffected.
+    const expectedTenant = req.headers?.["x-dw-expected-tenant"];
+    if (typeof expectedTenant === "string" && expectedTenant && !auth.viaKey && expectedTenant !== (auth.orgId ?? auth.userId)) {
+      statusSent = 409;
+      return handleCors(res, req).status(409).json({ error: "This scan was captured in a different shop. Switch back to that shop to send it.", code: "tenant-mismatch" });
     }
 
     // A 50-file batch presign is 50 units of ingest, not one request.

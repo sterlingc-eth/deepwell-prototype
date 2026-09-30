@@ -81,6 +81,12 @@ interface GraphActions {
 
   /** Review: correct an extracted value (or add a missing one). If the doc is linked/verified the entity field updates too. */
   correctField: (docId: DocumentId, fieldName: string, value: string, by: string, target?: FieldTarget) => void;
+  /**
+   * Unit page: enter an install date by hand. Waits for the server (which audits it and re-derives the
+   * warranty) and only then updates the entity here, so the Dashboard never shows a date that was not saved.
+   * Rejects with the server's plain-language message on failure.
+   */
+  setUnitInstallDate: (entityId: EntityId, ymd: string, by: string, byUserId?: string | null) => Promise<void>;
   /** Review: classify a received doc. */
   classifyDoc: (docId: DocumentId, typeId: string) => void;
   /** Review: attach a doc to an entity (clears the unlinked issue). */
@@ -272,6 +278,21 @@ export const useGraph = create<GraphStore>((set, get) => ({
         set((s) => ({ docs: { ...s.docs, [docId]: before }, entities: beforeEntities, lastError: describeError(err) }));
       });
     }
+  },
+
+  setUnitInstallDate: async (entityId, ymd, by, byUserId) => {
+    const res = DEMO_MODE
+      ? { warranty: null as { expires: string | null } | null }
+      : await reviewClient.setUnitInstallDate(entityId, ymd, by);
+    const enteredAt = new Date().toISOString();
+    set((s) => {
+      const e = s.entities[entityId];
+      if (!e) return s;
+      const fields: Record<string, FieldValue> = { ...e.fields, installDate: new Date(ymd), installDateEnteredBy: by, installDateEnteredAt: enteredAt };
+      if (byUserId) fields.installDateEnteredById = byUserId;
+      if (res.warranty && res.warranty.expires) fields.warrantyExpiry = new Date(res.warranty.expires);
+      return { entities: { ...s.entities, [entityId]: { ...e, fields } } };
+    });
   },
 
   classifyDoc: (docId, typeId) => {

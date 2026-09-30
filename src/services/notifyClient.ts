@@ -33,6 +33,8 @@ export interface NotificationsResponse {
   unreadCount: number;
   /** Current tenant setting — "Email me warranty digests" on the Team screen. */
   emailDigest: boolean;
+  /** This person's own "Mute my daily digest" choice (independent of the shop-wide switch). Older servers omit it. */
+  digestMuted?: boolean;
 }
 
 async function handle<T>(res: Response): Promise<T> {
@@ -73,6 +75,10 @@ export function markNotificationsRead(ids: string[]): Promise<{ updated: number 
 
 export function markAllNotificationsRead(): Promise<{ updated: number }> {
   return post({ all: true });
+}
+
+export function setDigestMutedPreference(digestMuted: boolean): Promise<{ digestMuted: boolean }> {
+  return post({ settings: { digestMuted } });
 }
 
 export function setEmailDigestPreference(emailDigest: boolean): Promise<{ settings: Record<string, unknown> }> {

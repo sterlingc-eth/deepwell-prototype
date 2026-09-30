@@ -35,6 +35,35 @@ function eff(col, cast) {
   return `(CASE WHEN f.corrections ? '${col}' THEN NULLIF(f.corrections->>'${col}', '') ELSE f.${col}::text END)::${cast}`;
 }
 
+/**
+ * R31 (speed): "the one customer each document is attributed to" as ONE hash-join pass (DISTINCT ON), replacing a
+ * per-document correlated LATERAL probe of doc_links that dominated every money/agent query on a real-sized tenant.
+ * Same tie-break the LATERAL used: an extraction link ('extraction') before a direct link ('link') — alphabetical —
+ * then the lowest customer id. UNION ALL (not doc_links' de-duplicating UNION): DISTINCT ON already collapses
+ * duplicates, so the extra sort/aggregate is skipped. `onlyFinancialDocs` restricts the pass to documents that have a
+ * document_financials row (the `financials` view never looks any other document up).
+ * (No SQL comments in the emitted text: callers may collapse whitespace.)
+ */
+export function docCustomerCte(name, { onlyFinancialDocs = false } = {}) {
+  const scope = (col) => (onlyFinancialDocs ? ` AND ${col} IN (SELECT ff.document_id FROM document_financials ff WHERE ${t("ff")})` : "");
+  return `${name} AS (
+  SELECT DISTINCT ON (s.document_id) s.document_id, s.customer_id, c.name AS customer_name
+    FROM (
+      SELECT l.document_id, CASE e.entity_type WHEN 'customer' THEN e.id WHEN 'equipment' THEN e.customer_id END AS customer_id, 'link'::text AS via
+        FROM document_entity_links l
+        JOIN entities e ON e.id = l.entity_id AND e.merged_into IS NULL AND ${t("e")}
+       WHERE ${t("l")}${scope("l.document_id")}
+      UNION ALL
+      SELECT x.document_id, CASE e.entity_type WHEN 'customer' THEN e.id WHEN 'equipment' THEN e.customer_id END AS customer_id, 'extraction'::text AS via
+        FROM extractions x
+        JOIN entities e ON e.id = x.entity_id AND e.merged_into IS NULL AND ${t("e")}
+       WHERE x.entity_id IS NOT NULL AND ${t("x")}${scope("x.document_id")}
+    ) s
+    JOIN customers c ON c.customer_id = s.customer_id
+   ORDER BY s.document_id, s.via, s.customer_id
+)`;
+}
+
 export function financeViewsSql({ hasFinancials = true } = {}) {
   if (!hasFinancials) {
     return `
@@ -57,6 +86,7 @@ invoice_lines AS (
   }
   const flagged = `(f.flags && ARRAY['total_mismatch','lines_mismatch','line_math','balance_mismatch','status_conflict','amount_not_on_page','due_before_invoice','non_usd']::text[])`;
   return `
+${docCustomerCte("fin_doc_customer", { onlyFinancialDocs: true })},
 financials AS (
   SELECT f.document_id, d.original_filename AS filename, d.stage, f.doc_kind, f.direction, f.currency,
          f.invoice_number, f.po_number,
@@ -79,12 +109,7 @@ financials AS (
          f.created_at
     FROM document_financials f
     JOIN documents d ON d.id = f.document_id AND ${t("d")}
-    LEFT JOIN LATERAL (
-      SELECT l.customer_id, c.name AS customer_name
-        FROM doc_links l JOIN customers c ON c.customer_id = l.customer_id
-       WHERE l.document_id = f.document_id
-       ORDER BY l.via, l.customer_id LIMIT 1
-    ) dc ON true
+    LEFT JOIN fin_doc_customer dc ON dc.document_id = f.document_id
    WHERE ${t("f")}
 ),
 invoice_lines AS (

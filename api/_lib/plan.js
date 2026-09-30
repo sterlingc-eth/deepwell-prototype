@@ -125,6 +125,12 @@ export const FREE_PREVIEW_DOCUMENTS = 0;
  * to read-only (ask allowed, uploads blocked). */
 export const PAST_DUE_GRACE_DAYS = 7;
 
+/** R30 M4: hours a trial keeps working AFTER trial_ends_at while the database still says 'trialing'. The
+ * trial->paid conversion (charge + webhook) can lag by hours; without this a paying customer saw "Choose a plan"
+ * (and could start a second checkout) the instant the clock passed trial_ends_at. Stripe's own status wins the
+ * moment a webhook / reconcile lands; this only bounds how long a missing webhook can keep a dead trial alive. */
+export const TRIAL_END_GRACE_HOURS = 48;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function toDate(v) {
@@ -144,8 +150,9 @@ export function planStateFor(tenantRow, now = new Date()) {
     const trialEnd = toDate(tenantRow?.trial_ends_at);
     // A trial Stripe itself hasn't rolled forward yet but whose end date has
     // passed is treated as expired here rather than waiting on the webhook —
-    // gating must never depend on webhook delivery timing.
-    if (trialEnd && now.getTime() > trialEnd.getTime()) return 'none';
+    // gating must never depend on webhook delivery timing. R30 M4: ...but only after a 48h grace, so the normal
+    // lag of the trial->paid conversion never shows a paying customer the paywall.
+    if (trialEnd && now.getTime() > trialEnd.getTime() + TRIAL_END_GRACE_HOURS * 60 * 60 * 1000) return 'none';
     return 'trialing';
   }
   if (status === 'active') return 'active';
@@ -154,12 +161,25 @@ export function planStateFor(tenantRow, now = new Date()) {
   return 'none';
 }
 
+/**
+ * When a past_due tenant's grace clock started, or null if unknown. R30 M3: persisted by the billing webhook at the
+ * moment the tenant ENTERS past_due (tenants.limits->'_billing'.pastDueSince, unix seconds; api/_lib/billing.js
+ * decideBillingEvent). Counting from current_period_end (the old rule) is wrong for a failed RENEWAL: Stripe has
+ * already rolled current_period_end to the NEW period by then, so "7 days" became roughly 37.
+ * @param {object} tenantRow
+ * @returns {Date|null}
+ */
+export function pastDueSinceFor(tenantRow) {
+  const secs = Number(tenantRow?.limits?._billing?.pastDueSince);
+  return Number.isFinite(secs) && secs > 0 ? new Date(secs * 1000) : null;
+}
+
 /** True once a `past_due` tenant is past the grace window (read-only territory). */
 export function isPastGrace(tenantRow, now = new Date()) {
   if (planStateFor(tenantRow, now) !== 'past_due') return false;
-  // current_period_end is the date the failed invoice was due; grace counts
-  // from there, not from whenever the webhook happened to arrive.
-  const ref = toDate(tenantRow?.current_period_end) ?? toDate(tenantRow?.trial_ends_at) ?? now;
+  // Preferred: the moment the tenant went past_due. Legacy rows (past_due before this was recorded) fall back to
+  // the old reference — current_period_end / trial_ends_at — until their next dunning event records the real one.
+  const ref = pastDueSinceFor(tenantRow) ?? toDate(tenantRow?.current_period_end) ?? toDate(tenantRow?.trial_ends_at) ?? now;
   return now.getTime() - ref.getTime() > PAST_DUE_GRACE_DAYS * DAY_MS;
 }
 
@@ -195,7 +215,9 @@ export function requireActiveBilling(tenantRow, now = new Date()) {
 /**
  * Gate for POST /api/upload-url (new ingestion).
  * @param {object} tenantRow
- * @param {{documentsStored: number, pagesThisMonth: number}} usage
+ * @param {{documentsStored: number, pagesThisMonth: number, pendingPages?: number}} usage
+ *   `pendingPages` (R30 M6): estimated pages of documents uploaded but not yet read. document_pages rows only exist
+ *   after the read step, so pipelining uploads faster than the reader used to slip past the monthly cap.
  * @param {Date} [now]
  * @returns {{allowed: true}|{allowed: false, status: 402, error: string, url: string}}
  */
@@ -218,8 +240,13 @@ export function gateUpload(tenantRow, usage, now = new Date()) {
   // trialing, active, or past_due-within-grace: check the monthly page cap.
   const plan = tenantRow?.plan;
   const cap = PLAN_LIMITS[plan]?.pagesPerMonth ?? null;
-  if (cap != null && (Number(usage?.pagesThisMonth) || 0) >= cap) {
-    return { allowed: false, status: 402, error: `Monthly page limit reached (${cap}) — upgrade your plan for more.`, url: billingUrl };
+  const pagesRead = Number(usage?.pagesThisMonth) || 0;
+  const pending = Math.max(0, Math.trunc(Number(usage?.pendingPages) || 0));
+  if (cap != null && pagesRead + pending >= cap) {
+    const error = pagesRead >= cap
+      ? `Monthly page limit reached (${cap}) — upgrade your plan for more.`
+      : `Monthly page limit reached (${cap}): ${pagesRead} pages are read and about ${pending} more are still being processed. Wait for them to finish, or upgrade your plan for more.`;
+    return { allowed: false, status: 402, error, url: billingUrl };
   }
   return { allowed: true };
 }
@@ -274,7 +301,7 @@ registerTenantCache(billingRowCache);
 
 async function fetchBillingRow(ctx) {
   const t = await getTenantContext(ctx.tenantKey, ctx.tenantName ?? ctx.tenantKey);
-  return { plan: t.plan, billing_status: t.billingStatus, trial_ends_at: t.trialEndsAt, current_period_end: t.currentPeriodEnd };
+  return { plan: t.plan, billing_status: t.billingStatus, trial_ends_at: t.trialEndsAt, current_period_end: t.currentPeriodEnd, limits: t.limits ?? {} };
 }
 
 /**

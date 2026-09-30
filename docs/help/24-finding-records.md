@@ -6,12 +6,12 @@ surface: desktop
 keywords: records, search, find, filter, sort, group, customers, documents, grid, graph, equipment, saved views, spreadsheet
 updated: 2026-09-29
 ---
-Records opens on **Customers**, not Documents. Search, filters and views all live inside its tabs.
+Records opens on **Documents** the first time you use it, then remembers the last tab you used. Search, filters and views all live inside its tabs.
 
 ### Where are my documents and customers?
 ~ where are my documents, where are my customers, where are my records, records screen, records tab, where did my documents go, where do i see uploaded files, list of documents, find my files, browse documents, customers tab, documents tab, where did search go, search screen, old search
 !covers:A-RECORDS-TABS
-Open **Records**. The tabs are **Customers** (it opens here first), **Documents**, **Grid** and **Graph**. Your uploaded files are under **Documents**. The old separate Search screen is gone: use the search boxes in Customers and Documents, or press Ctrl+K (Cmd+K on a Mac).
+Open **Records**. The tabs are **Documents** (where a new user lands first), **Customers**, **Grid** and **Graph**. Records reopens on the tab you used last. Your uploaded files are under **Documents**. The old separate Search screen is gone: use the search boxes in Customers and Documents, or press Ctrl+K (Cmd+K on a Mac).
 
 ### How do I search my documents?
 ~ search documents, search my documents, find a document, search by serial, search filename, search by address, search by technician, search by brand, search contents, find a work order, find an invoice, find a file, look for a document, document search, table or cards
@@ -59,6 +59,11 @@ Click a customer row. Click a value (Name, Address, Phone, Email) to edit and sa
 **Records → Graph** (and the **Graph** toggle on a customer or record) draws customers, properties, equipment and documents and how they connect. Click a node to open it. It's for exploring; for a specific answer use the Ask screen.
 
 ### Where is a unit's page?
-~ unit page, equipment page, equipment record, open a unit, open a serial, unit details, unit history, service visits for a unit, documents for a unit, serial number page, install date on a unit, where do i edit install date, add install date, edit install date, change install date
+~ unit page, equipment page, equipment record, open a unit, open a serial, unit details, unit history, service visits for a unit, documents for a unit, serial number page
 !covers:A-EQUIPMENT-PAGE
-Click any serial (in an answer, the Dashboard, a customer's Equipment tab or the Ctrl+K search) to open the unit page: its fields with their sources, related service visits and "Documents linked to this record". There is no field to type an install date on that page; DeepWell takes it from your documents, so upload the install or startup paperwork.
+Click any serial (in an answer, the Dashboard, a customer's Equipment tab or the Ctrl+K search) to open the unit page: its fields with their sources, related service visits and "Documents linked to this record". The page also has an **Install date** box (see the next answer).
+
+### How do I add or change a unit's install date?
+~ install date, add install date, edit install date, change install date, enter install date, set install date, type install date, install date on a unit, where do i edit install date, unit has no install date, no warranty on file needs install date, install date missing, fix install date, wrong install date, put in the install date, save install date, warranty from install date, installed date
+!covers:A-INSTALL-DATE
+Open the unit's page (click its serial, or press **Add install date** / **Change install date** in the Dashboard's warranty lists, which opens the page with the date box ready). In the **Install date** box press **Add install date** (or **Change install date**), pick the date and press **Save**. Anyone signed in to your shop who can correct records can do this, members included. The date must be after 1950 and no more than about three months ahead. The page then shows "entered by" your name and the date it was typed; a date that came from a scanned document shows the document as its source. If DeepWell has a verified rule for that brand, the warranty is worked out from the new date right away; a printed expiry already on a document is kept, and a brand with no verified rule keeps the date but gets no computed expiry.

@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole, seatStatus, type SeatStatus } from '../services/teamClient';
 import { billingClient, BillingApiError, type SeatsView } from '../services/billingClient';
-import { fetchNotifications, setEmailDigestPreference } from '../services/notifyClient';
+import { fetchNotifications, setDigestMutedPreference, setEmailDigestPreference } from '../services/notifyClient';
 import { deleteShopData, downloadTenantExportJson } from '../services/exportClient';
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
@@ -73,13 +73,22 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [emailDigest, setEmailDigestState] = useState<boolean | null>(null);
   const [savingDigest, setSavingDigest] = useState(false);
+  const [digestMuted, setDigestMutedState] = useState<boolean | null>(null);
+  const [savingMute, setSavingMute] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchNotifications()
-      .then((res) => setEmailDigestState(res.emailDigest))
-      .catch(() => setEmailDigestState(true)); // fail open to the default rather than showing a stuck loading state
+      .then((res) => {
+        setEmailDigestState(res.emailDigest);
+        setDigestMutedState(res.digestMuted ?? false);
+      })
+      .catch(() => {
+        // fail open to the defaults rather than showing a stuck loading state
+        setEmailDigestState(true);
+        setDigestMutedState(false);
+      });
   }, []);
 
   const toggleDigest = () => {
@@ -90,6 +99,16 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
     setEmailDigestPreference(next)
       .catch(() => setEmailDigestState(!next)) // revert on failure
       .finally(() => setSavingDigest(false));
+  };
+
+  const toggleMute = () => {
+    if (digestMuted === null || savingMute) return;
+    const next = !digestMuted;
+    setDigestMutedState(next);
+    setSavingMute(true);
+    setDigestMutedPreference(next)
+      .catch(() => setDigestMutedState(!next)) // revert on failure
+      .finally(() => setSavingMute(false));
   };
 
   const runExport = async () => {
@@ -118,7 +137,7 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
               <Bell className="w-4 h-4" aria-hidden="true" /> Notifications
             </h3>
             <label className="flex items-center justify-between gap-3 py-1">
-              <span className="text-body text-ink-2">Email me warranty digests</span>
+              <span className="text-body text-ink-2">Send the shop&apos;s daily warranty digest (every admin)</span>
               <button
                 type="button"
                 role="switch"
@@ -140,8 +159,36 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
               </button>
             </label>
             <p className="text-caption text-ink-3">
-              One email a day, only when a warranty needs attention — expired, expiring soon, or a registration
-              window closing.
+              One email a day to the shop&apos;s admins, only when a warranty needs attention — expired, expiring soon,
+              or a registration window closing. This switch is for the whole shop.
+            </p>
+            <label className="flex items-center justify-between gap-3 py-1 min-h-[44px]">
+              <span className="text-body text-ink-2">Mute my daily digest</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={digestMuted ?? false}
+                aria-label="Mute my daily digest"
+                data-testid="mute-my-digest"
+                disabled={digestMuted === null || savingMute}
+                onClick={toggleMute}
+                className={[
+                  'relative inline-flex items-center h-6 w-11 rounded-full transition-colors duration-quick shrink-0',
+                  digestMuted ? 'bg-forest-700' : 'bg-line',
+                  digestMuted === null ? 'opacity-50' : '',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'inline-block h-4 w-4 transform rounded-full bg-stone-0 transition-transform duration-quick',
+                    digestMuted ? 'translate-x-6' : 'translate-x-1',
+                  ].join(' ')}
+                />
+              </button>
+            </label>
+            <p className="text-caption text-ink-3">
+              Stops the digest email for you only. Other admins still get it. Only admins receive the digest, so
+              members have nothing to mute.
             </p>
           </div>
 
@@ -557,18 +604,23 @@ export function TeamScreen() {
         {admin ? (
           <>
             <p className="text-caption text-ink-3">
-              Invites are sent by email and handled by our sign-up — anyone who accepts lands in this shop with the role
-              you pick. Your plan includes {seats.cap == null ? '11 or more' : `up to ${seats.cap}`} logins. The owner
-              account doesn&apos;t count, but extra admins and pending invites do.
+              Invites are sent by email: anyone who accepts lands in this shop with the role you pick. To change a role,
+              remove someone or cancel an invitation, use the <strong className="text-ink-2">Members</strong> and{' '}
+              <strong className="text-ink-2">Invitations</strong> tabs of the panel below the form. Your plan includes{' '}
+              {seats.cap == null ? '11 or more' : `up to ${seats.cap}`} logins (the owner doesn&apos;t count; extra admins
+              and pending invites do).
             </p>
             <InviteForm seats={seats} onInvited={() => { refreshSeats(); void organization?.reload(); }} onUpgrade={() => setCurrentScreen('billing')} />
-            <div className="dw-card p-1 sm:p-3 overflow-hidden">
+            <div className="dw-card p-1 sm:p-3 overflow-hidden" data-testid="team-clerk-panel">
               <OrganizationProfile appearance={clerkAppearance} />
             </div>
           </>
         ) : (
           <div className="dw-card p-4">
-            <p className="text-body text-ink-2 mb-3">Members of {organization?.name ?? 'this shop'}:</p>
+            <p className="text-body text-ink-2 mb-1">Members of {organization?.name ?? 'this shop'}:</p>
+            <p className="text-caption text-ink-3 mb-3" data-testid="team-member-help">
+              Only a shop admin can invite people, change roles or remove someone. Ask an admin.
+            </p>
             <ul className="divide-y divide-line">
               {(memberships?.data ?? []).map((m) => (
                 <li key={m.id} className="py-2 flex items-center justify-between gap-2">

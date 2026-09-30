@@ -204,7 +204,7 @@ const TurnView = memo(function TurnView({
   onAsk,
 }: {
   turn: Turn
-  onOpenDoc: (id: string) => void
+  onOpenDoc: (id: string, page?: number, quote?: string) => void
   onOpenCustomer: (ref: string) => void
   onRetry: (q: string) => void
   onAsk: (q: string) => void
@@ -254,7 +254,7 @@ export function AskTab({
   onOpenScan,
   prefill = null,
 }: {
-  onOpenDoc: (id: string) => void
+  onOpenDoc: (id: string, page?: number, quote?: string) => void
   onOpenCustomer: (ref: string) => void
   /** orgId ?? userId from MobileApp (a prop, like ScanTab's, so this tab renders without a ClerkProvider in tests). */
   tenantKey?: string | null

@@ -545,8 +545,23 @@ const IDENTIFIER_RE = /\b[A-Za-z0-9][A-Za-z0-9-]{7,}\b/g;
 
 const NAME_HINT_RE = new RegExp(`\\b(?:for|at|on)\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'&.-]+(?:\\s+[A-Z][A-Za-z'&.-]+){0,3})(?:'s)?\\b`);
 const POSSESSIVE_NAME_RE = new RegExp(`\\b(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Z][A-Za-z'-]+)?)'s\\b`);
-const THE_NAME_NOUN_RE =
-  /\bthe\s+([A-Z][A-Za-z'-]+(?:\s+[A-Za-z'-]+){0,2})\s+(?:unit|account|job|customer|install(?:ation)?|condenser|furnace|job site)\b/i;
+// R31 (Team A, P1 roadmap "THE_NAME_NOUN_RE /i root fix"): the trailing /i lets the leading `[A-Z]` match ANY letter,
+// which is deliberate for a dispatcher's lowercase "the mercer unit" but also read "the OLDEST unit" / "the LAST job" /
+// "the main unit" as a proper-noun customer name (the R24 equipment_age exclusion above was a per-intent patch of the
+// same defect). The case-insensitivity is now explicit and BOUNDED: the first word may not be a superlative, ordinal,
+// determiner, position/size/type adjective (NON_NAME_LEAD) — words that can precede these nouns but are never the
+// start of a customer name. Every other lowercase name still matches exactly as before (full-corpus diff in
+// scripts/verify-r31-lookups.mjs: extractSubject over every exam/blind/dialogue question text).
+const NON_NAME_LEAD =
+  "oldest|newest|older|newer|last|latest|recent|first|next|previous|prior|other|same|whole|entire|main|new|old|only|biggest|largest|smallest|bigger|larger|smaller|current|existing|original|second|third|fourth|fifth|single|each|every|all|any|this|that|these|those|our|my|your|their|his|her|its|a|an|ac|hvac|air|outdoor|indoor|rooftop|roof|package|split|central|gas|electric|heating|cooling|upstairs|downstairs|front|back|rear|big|small|large|customer|customers|first-floor|second-floor";
+const THE_NAME_NOUN_RE = new RegExp(
+  `\\bthe\\s+(?!(?:${NON_NAME_LEAD})\\b)([A-Za-z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2})\\s+(?:unit|account|job|customer|install(?:ation)?|condenser|furnace|job site)\\b`,
+  "i"
+);
+/** R31: the THE_NAME_NOUN_RE capture for `question` (or null) — exported so scripts/verify-r31-lookups.mjs can diff it against the legacy pattern over the whole corpus. */
+export function theNameNounCapture(question) {
+  return THE_NAME_NOUN_RE.exec(String(question ?? ''))?.[1] ?? null;
+}
 // "does Henderson have/need/take" — a name with no leading preposition at all.
 // R21 (L2, h041/h043 — "is Amy Isaacson still under warranty" wrongly resolving to NO customer):
 // the trailing `{0,2}` name-continuation words are never required to be capitalized (unlike

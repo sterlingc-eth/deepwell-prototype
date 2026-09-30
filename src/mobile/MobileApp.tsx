@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { SignIn, UserButton, useAuth, useOrganization, useUser } from '@clerk/clerk-react'
+import { SignIn, useAuth, useOrganization, useUser } from '@clerk/clerk-react'
 import { FileText, Loader2, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { setAuthTokenProvider } from '../services/authToken'
 import { billingClient, type BillingStatus } from '../services/billingClient'
@@ -15,6 +15,9 @@ import { CustomerSheet } from './CustomerSheet'
 import { useKeyboardOpen } from './useKeyboardOpen'
 import { InstallGuide } from './InstallGuide'
 import { Sheet } from './Sheet'
+import { AccountMenu } from './AccountMenu'
+import { offlineQueue } from './offline/uploadQueue'
+import { reconcileDeviceOwner } from './offline/deviceIsolation'
 import { SupportLauncherButton, SupportLoading } from '../components/support/SupportWidget'
 import { useLauncherPulse } from '../components/support/useLauncherPulse'
 import { SupportLogo } from '../components/support/SupportLogo'
@@ -63,7 +66,7 @@ function FullScreenMessage({ title, body, action }: { title: string; body: strin
       )}
       {/* A tech stopped here by the plan gate (or a shop with no plan) had no way to sign out or switch to a
           shop that IS subscribed — the app header with the account menu never renders. */}
-      <UserButton afterSignOutUrl="/m/" />
+      <AccountMenu />
     </div>
   )
 }
@@ -77,6 +80,21 @@ export function MobileApp() {
     setAuthTokenProvider(() => getToken())
     return () => setAuthTokenProvider(null)
   }, [getToken])
+
+  // A different person on this phone than last time: their queued scans are deleted BEFORE anything can drain
+  // (ScanTab gets no tenant key until this settles, so nothing wires up early).
+  const [deviceChecked, setDeviceChecked] = useState<string | null>(null)
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !userId) return
+    let live = true
+    void reconcileDeviceOwner(userId, () => offlineQueue.purgeAll())
+      .catch(() => false)
+      .then(() => live && setDeviceChecked(userId))
+    return () => {
+      live = false
+    }
+  }, [isLoaded, isSignedIn, userId])
+  const queueTenantKey = deviceChecked && deviceChecked === userId ? (orgId ?? userId ?? null) : null
 
   const fieldMode = useAppStore((s) => s.fieldMode)
   const setFieldMode = useAppStore((s) => s.setFieldMode)
@@ -93,8 +111,8 @@ export function MobileApp() {
       /* best-effort only */
     }
   }
-  const [sheet, setSheet] = useState<{ kind: 'doc'; id: string } | { kind: 'customer'; ref: string } | null>(null)
-  const openDoc = useCallback((id: string) => setSheet({ kind: 'doc', id }), [])
+  const [sheet, setSheet] = useState<{ kind: 'doc'; id: string; page?: number; quote?: string } | { kind: 'customer'; ref: string } | null>(null)
+  const openDoc = useCallback((id: string, page?: number, quote?: string) => setSheet({ kind: 'doc', id, page, quote }), [])
   const openCustomer = useCallback((ref: string) => setSheet({ kind: 'customer', ref }), [])
   const closeSheet = useCallback(() => setSheet(null), [])
   const keyboardOpen = useKeyboardOpen()
@@ -215,8 +233,9 @@ export function MobileApp() {
         <div className="max-w-2xl mx-auto min-h-14 short:min-h-11 px-4 flex items-center justify-between gap-3">
           <Wordmark size="sm" />
           <div className="flex items-center gap-2 min-w-0">
+            {/* Phones (<480px) have no room for the shop name (it rendered as "Sunris…"); the Account sheet (avatar) always names the shop. */}
             {organization?.name && (
-              <span className="hidden min-[360px]:inline short:hidden text-caption text-ink-3 truncate max-w-[30vw] md:max-w-xs">{organization.name}</span>
+              <span className="hidden min-[480px]:inline short:hidden text-caption text-ink-3 truncate max-w-[30vw] md:max-w-xs">{organization.name}</span>
             )}
             <SupportLauncherButton buttonRef={helpBtnRef} size={44} pulsing={helpPulse} onClick={() => setHelpOpen(true)} className="shrink-0" />
             {/* Round 17 audit fix #1: reachable, 1-tap, persisted (same
@@ -233,7 +252,7 @@ export function MobileApp() {
             >
               {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
             </button>
-            <UserButton afterSignOutUrl="/m/" />
+            <AccountMenu />
           </div>
         </div>
       </header>
@@ -257,7 +276,7 @@ export function MobileApp() {
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
           <ScanTab
-            tenantKey={orgId ?? userId ?? null}
+            tenantKey={queueTenantKey}
             onUploaded={() => void sync.refresh()}
             onOpenDocs={() => setTab('docs')}
             onOpenDoc={openDoc}
@@ -279,7 +298,7 @@ export function MobileApp() {
                 type="button"
                 onClick={() => setTab(id)}
                 aria-current={active ? 'page' : undefined}
-                className={`min-h-16 short:min-h-11 flex flex-col short:flex-row items-center justify-center gap-1 short:gap-2 text-caption font-medium ${active ? 'text-accent' : 'text-ink-3'}`}
+                className={`min-h-16 short:min-h-11 flex flex-col short:flex-row items-center justify-center gap-1 short:gap-2 text-caption font-medium ${active ? 'text-accent-ink' : 'text-ink-3'}`}
               >
                 <Icon className="w-6 h-6 short:w-5 short:h-5" aria-hidden="true" />
                 {label}
@@ -309,7 +328,7 @@ export function MobileApp() {
       )}
 
       {sheet?.kind === 'doc' && (
-        <DocSheet key={sheet.id} documentId={sheet.id} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onOpenCustomer={openCustomer} onClose={closeSheet} />
+        <DocSheet key={sheet.id} documentId={sheet.id} page={sheet.page} quote={sheet.quote} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onOpenCustomer={openCustomer} onClose={closeSheet} />
       )}
       {sheet?.kind === 'customer' && <CustomerSheet key={sheet.ref} customerRef={sheet.ref} onOpenDoc={openDoc} onClose={closeSheet} />}
     </div>

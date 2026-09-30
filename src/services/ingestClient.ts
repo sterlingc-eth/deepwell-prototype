@@ -120,10 +120,10 @@ export class IngestHttpError extends Error {
   }
 }
 
-export async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+export async function postJson<T>(url: string, body: unknown, signal?: AbortSignal, extraHeaders?: Record<string, string>): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders, ...(await authHeader()) },
     body: JSON.stringify(body),
     signal,
   });
@@ -174,13 +174,17 @@ export interface PresignResultItem {
 const inFlightPresign = new Map<string, Promise<PresignResultItem>>();
 
 /** Presign one file. Thin wrapper so single-file and bulk-fallback paths share it. */
-export async function requestUploadUrl(body: PresignRequestItem, signal?: AbortSignal): Promise<PresignResultItem> {
-  const existing = inFlightPresign.get(body.sha256);
+export async function requestUploadUrl(body: PresignRequestItem, signal?: AbortSignal, expectedTenant?: string): Promise<PresignResultItem> {
+  // Keyed by shop too: the same bytes presigned for two shops must never share one in-flight request.
+  const key = `${expectedTenant ?? ''}:${body.sha256}`;
+  const existing = inFlightPresign.get(key);
   if (existing) return existing;
-  const request = postJson<PresignResultItem>('/api/upload-url', body, signal).finally(() => {
-    inFlightPresign.delete(body.sha256);
+  // `expectedTenant` (offline queue) = the shop the file was captured in; the server refuses with 409 when the
+  // signed-in shop is no longer that one (api/upload-url.js).
+  const request = postJson<PresignResultItem>('/api/upload-url', body, signal, expectedTenant ? { 'X-DW-Expected-Tenant': expectedTenant } : undefined).finally(() => {
+    inFlightPresign.delete(key);
   });
-  inFlightPresign.set(body.sha256, request);
+  inFlightPresign.set(key, request);
   return request;
 }
 
@@ -390,7 +394,9 @@ function isFinished(row: DocumentStatusRow, result: IngestResult): boolean {
 }
 
 /** Shown for documents still processing when the poll gives up — a status, not a failure. Rendered in a neutral pill, never the warn pill an actual error gets. */
-export const STILL_PROCESSING_MESSAGE = 'Still processing — check Records in a few minutes';
+export const STILL_PROCESSING_MESSAGE = 'Still processing — check Inbox in a few minutes';
+/** Label of the button that sits next to STILL_PROCESSING_MESSAGE and opens Inbox → Needs you (where anything that still needs a person lands). */
+export const STILL_PROCESSING_LINK_LABEL = 'See Needs you';
 
 /**
  * Terminal condition for the App-level "Processing N of M…" tracker (see

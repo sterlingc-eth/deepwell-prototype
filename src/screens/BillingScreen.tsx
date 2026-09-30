@@ -1,8 +1,10 @@
+import { usageMeter, longDate, type UsageMeter } from '../core/usageMeter';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { ApiAccessCard } from '../components/ApiAccessCard';
 import { useAppStore } from '../store/appStore';
+import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
 import {
   billingClient,
   BillingApiError,
@@ -30,6 +32,15 @@ function formatCents(cents: number): string {
 function formatCap(n: number | null | undefined): string {
   return n == null ? 'Unlimited' : n.toLocaleString('en-US');
 }
+function UsageBar({ meter, label }: { meter: UsageMeter | null; label: string }) {
+  if (!meter) return null;
+  const fill = meter.tone === 'bad' ? 'bg-bad' : meter.tone === 'warn' ? 'bg-warn' : 'bg-ok';
+  return (
+    <div role="meter" aria-label={`${label} used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={meter.pct} className="mt-1 h-1.5 rounded-full bg-surface-2 border border-line overflow-hidden">
+      <div className={`h-full ${fill}`} style={{ width: `${meter.pct}%` }} />
+    </div>
+  );
+}
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -55,6 +66,10 @@ const STATUS_PILL: Record<BillingStatus['status'], string> = {
 type Busy = null | 'trial' | 'portal' | 'rescue' | `checkout:${BillingPlanId}`;
 
 export function BillingScreen() {
+  // Checkout, the billing portal, Records Rescue and API keys are admin-only on the server (api/billing.js, keys.js);
+  // a member can read the plan and usage but sees those buttons disabled with "Ask an admin".
+  const canAdmin = useCanAdmin();
+  const adminTitle = canAdmin ? undefined : ASK_ADMIN_TITLE;
   const status = useAppStore((s) => s.billingStatus);
   const setBillingStatus = useAppStore((s) => s.setBillingStatus);
   const pendingPlan = useAppStore((s) => s.pendingPlan);
@@ -106,6 +121,8 @@ export function BillingScreen() {
   const highlightedPlan = pendingPlan?.plan;
   const trialEligible = status?.status === 'none';
   const trialDaysLeft = daysUntil(status?.trialEndsAt ?? null);
+  const docsMeter = status?.plan ? usageMeter(status.usage.documentsStored, status.limits.documentsStored) : null;
+  const pagesMeter = status?.plan ? usageMeter(status.usage.pagesThisMonth, status.limits.pagesPerMonth) : null;
 
   const rescueQuantity = resolveRecordsRescueQuantity(rescuePages);
   const rescueTotalCents = recordsRescueTotalCents(rescuePages);
@@ -131,6 +148,12 @@ export function BillingScreen() {
             {gated ? (trialEligible ? 'Start your 30-day Solo trial, or choose a plan below, to unlock DeepWell.' : 'Choose a plan below to unlock DeepWell again.') : 'Your DeepWell plan, trial, and usage.'}
           </p>
         </header>
+
+        {!canAdmin && (
+          <p role="note" data-testid="billing-member-note" className="dw-card px-4 py-3 text-body text-ink-2">
+            Only a shop admin can start a plan, change it or manage billing. Ask an admin{gated ? ' to pick a plan so your shop can use DeepWell' : ''}.
+          </p>
+        )}
 
         {confirming && (
           <div role="status" className="dw-card p-5 flex items-center gap-2">
@@ -161,7 +184,8 @@ export function BillingScreen() {
             <button
               type="button"
               className="dw-btn-primary"
-              disabled={busy !== null}
+              disabled={busy !== null || !canAdmin}
+              title={adminTitle}
               onClick={() => void runCheckout('trial', () => billingClient.checkout('solo', interval))}
             >
               {busy === 'trial' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
@@ -188,7 +212,7 @@ export function BillingScreen() {
               {status?.status === 'trialing' && trialDaysLeft != null && (
                 <> — trial ends in {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'}.</>
               )}
-              {status?.cancelAtPeriodEnd && status.currentPeriodEnd && <> Ends {new Date(status.currentPeriodEnd).toLocaleDateString()}.</>}
+              {status?.cancelAtPeriodEnd && status.currentPeriodEnd && <> — cancels {longDate(status.currentPeriodEnd)}; you keep access until then.</>}
             </p>
 
             {status?.plan && (
@@ -202,15 +226,24 @@ export function BillingScreen() {
                     <dt className="text-caption text-ink-3">Documents stored</dt>
                     <dd>
                       {status.usage.documentsStored.toLocaleString()} / {formatCap(status.limits.documentsStored)}
+                      <UsageBar meter={docsMeter} label="Documents stored" />
                     </dd>
                   </div>
                   <div>
                     <dt className="text-caption text-ink-3">Pages this month</dt>
                     <dd>
                       {status.usage.pagesThisMonth.toLocaleString()} / {formatCap(status.limits.pagesPerMonth)}
+                      <UsageBar meter={pagesMeter} label="Pages this month" />
                     </dd>
                   </div>
                 </dl>
+                {pagesMeter?.near && (
+                  <p role="status" data-testid="usage-nudge" className={['text-body rounded-lg border px-3 py-2', pagesMeter.over ? 'border-bad/40 bg-bad-bg text-bad-ink' : 'border-warn/40 bg-warn-bg text-warn-ink'].join(' ')}>
+                    {pagesMeter.over
+                      ? "You have reached this plan's page limit, so new uploads are paused. Choose a bigger plan below to keep going."
+                      : `You have used ${pagesMeter.pct}% of this plan's pages. A bigger plan below keeps uploads flowing.`}
+                  </p>
+                )}
 
                 <p className="text-caption text-ink-3">Donovan: unlimited on every plan. The owner account doesn&apos;t count toward logins.</p>
               </>
@@ -221,14 +254,15 @@ export function BillingScreen() {
                 <button
                   type="button"
                   className="dw-btn-primary"
-                  disabled={busy !== null}
+                  disabled={busy !== null || !canAdmin}
+                  title={adminTitle}
                   onClick={() => void runCheckout('trial', () => billingClient.checkout('solo', interval))}
                 >
                   {busy === 'trial' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
                   Start 30-day free trial
                 </button>
               )}
-              <button type="button" className="dw-btn-secondary" disabled={busy !== null} onClick={() => void runCheckout('portal', () => billingClient.portal())}>
+              <button type="button" className="dw-btn-secondary" disabled={busy !== null || !canAdmin} title={adminTitle} onClick={() => void runCheckout('portal', () => billingClient.portal())}>
                 {busy === 'portal' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
                 Manage billing
               </button>
@@ -283,7 +317,8 @@ export function BillingScreen() {
                   <button
                     type="button"
                     className={isCurrent ? 'dw-btn-secondary' : 'dw-btn-primary'}
-                    disabled={busy !== null || isCurrent}
+                    disabled={busy !== null || isCurrent || !canAdmin}
+                    title={adminTitle}
                     onClick={() => void runCheckout(`checkout:${planId}`, () => billingClient.checkout(planId, interval))}
                   >
                     {busy === `checkout:${planId}` && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
@@ -329,7 +364,8 @@ export function BillingScreen() {
           <button
             type="button"
             className="dw-btn-primary"
-            disabled={busy !== null}
+            disabled={busy !== null || !canAdmin}
+            title={adminTitle}
             onClick={() => void runCheckout('rescue', () => billingClient.checkout('records_rescue', 'month', rescueQuantity))}
           >
             {busy === 'rescue' && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}

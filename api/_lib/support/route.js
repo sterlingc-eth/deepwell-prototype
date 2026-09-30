@@ -4,7 +4,9 @@
  *
  *   GET  /api/support?starter=1&surface=public|app|mobile   -> {greeting, suggestions}   static, $0, no auth
  *   POST /api/support {message, history?, surface, page?, turn?} -> {reply, sources, mode, redirectTo?, handoff?, suggestions?}
- *   POST /api/support {action:'handoff', email, name?, message, transcript?, surface} -> {ok:true}
+ *   POST /api/support {action:'handoff', email, name?, message, transcript?, surface, kind?:'problem', diagnostics?} -> {ok:true}
+ *   POST /api/support {action:'client-error', surface:'app'|'mobile', kind, message, where?, page?, device?, build?} -> {ok:true}
+ *     (browser crash report from src/services/errorReporter.ts: signed-in only, capped per user/day, logged as one line, not stored)
  *
  * Auth: surface "public" needs none (the website widget). Surface "app"/"mobile" needs a Clerk session via
  * requireAuth (401 otherwise). The tenant is only ever what the session says — nothing in the body is trusted.
@@ -21,6 +23,8 @@ import { respond, starter } from './engine.js';
 import { createLimiter } from './limits.js';
 import { callSupportModel, supportModelEnabled, supportModelId } from './client.js';
 import { validateHandoff, deliverHandoff } from './handoff.js';
+import { validateClientError, clientErrorLogLine } from './clientError.js';
+import { captureMessage } from '../telemetry.js';
 import * as tools from './tools.js';
 
 export const config = { api: { bodyParser: { sizeLimit: '24kb' } } };
@@ -76,6 +80,20 @@ export default async function handler(req, res) {
   if (gate.denied) return undefined;
   const auth = gate.auth;
   const lim = getLimiter();
+
+  /* ------------------------------------------------------------ browser error report */
+  if (body.action === 'client-error') {
+    if (!auth) return bad(res, 400, 'Not available for this surface.');
+    const v = validateClientError({ ...body, surface });
+    if (!v.ok) return bad(res, 400, v.error);
+    const rl = await lim.checkClientError({ auth });
+    if (!rl.ok) return res.status(200).json({ ok: true, dropped: true }); // over the daily cap: quietly ignored, the browser must not retry
+    try {
+      console.log(clientErrorLogLine(v.value, hashForLog(auth.tenantId)));
+      void captureMessage(`client-error: ${v.value.message}`, { surface: v.value.surface, kind: v.value.kind, page: v.value.page, where: v.value.where, tenant_h: hashForLog(auth.tenantId) });
+    } catch { /* logging must never fail the request */ }
+    return res.status(200).json({ ok: true });
+  }
 
   /* ------------------------------------------------------------ hand-off */
   if (body.action === 'handoff') {

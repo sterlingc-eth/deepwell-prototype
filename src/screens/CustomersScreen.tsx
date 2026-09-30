@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Download, GitMerge, Loader2, Plus, Search, Users2, X } from 'lucide-react';
-import { useAuth } from '@clerk/clerk-react';
 import { formatYmd } from '../core/answer';
-import { isAdminRole } from '../services/teamClient';
+import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
+import { AskAdminNote } from '../components/AskAdminNote';
 import { DuplicateCustomersCard } from '../components/DuplicateCustomersCard';
 import { customerClient, CustomerAddressConflictError, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSummary } from '../services/customerClient';
 import {
@@ -26,6 +26,7 @@ import {
   type LastActivityFilter,
 } from '../core/customerFilters';
 import { defaultKeepId, pairKey, reduceDuplicates, visibleDuplicates } from '../core/duplicates';
+import { CUSTOMER_AUTOLOAD_MAX, CUSTOMER_PAGE_SIZE, customerCountLabel, mergeCustomerPages, mergeDuplicatePairs } from '../core/customerPaging';
 import { downloadExportCsv } from '../services/exportClient';
 import { IntegrityPanel } from '../components/IntegrityPanel';
 import { Tooltip } from '../components/Tooltip';
@@ -69,8 +70,7 @@ export function CustomersScreen() {
   const openCustomer = useAppStore((s) => s.openCustomer);
   const filters = useAppStore((s) => s.customerFilters);
   const setFilters = useAppStore((s) => s.setCustomerFilters);
-  const { orgRole } = useAuth();
-  const isAdmin = isAdminRole(orgRole ?? null);
+  const isAdmin = useCanAdmin();
 
   // Search, the four filter dropdowns, and sort are three independent pieces
   // of state on purpose (owner requirement: "changing a filter must never
@@ -85,23 +85,61 @@ export function CustomersScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Every dropdown, the search box, and sort all operate client-side over
-  // this one fetched page (see core/customerFilters.ts's file comment) — the
+  // the rows fetched (see core/customerFilters.ts's file comment) — the
   // full semantics (phone/email in search, a padded "C-3" match, surname
   // sort, per-tier alert breakdown) need real app logic no ILIKE query can
-  // do, and this screen already caps at 200 rows either way. So there is
-  // exactly one network fetch, on mount and after anything that changes the
-  // underlying data (create/merge) — never on a keystroke or a filter change.
-  const load = useCallback(() => {
+  // do. R31 QA: it used to fetch ONE page of 200 and stop, so in a shop with
+  // more customers the rest could not be found by any search or filter. It now
+  // shows the first page at once, then pages the rest in behind it (limit +
+  // cursor, up to CUSTOMER_AUTOLOAD_MAX), tells the truth about how many exist,
+  // and — only if some are still not loaded — also asks the server to search
+  // its whole customer list while the person types. Never on a filter change.
+  const [total, setTotal] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const loadToken = useRef(0);
+  const load = useCallback(async () => {
+    const token = ++loadToken.current;
+    const stale = () => token !== loadToken.current;
     setLoading(true);
     setError(null);
-    return customerClient
-      .listFull({ sort: 'recent', limit: 200 })
-      .then((data) => {
-        setRows(data.customers);
-        setDuplicates(data.duplicates ?? []);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load customers.'))
-      .finally(() => setLoading(false));
+    setMoreError(null);
+    setLoadingMore(false);
+    try {
+      const first = await customerClient.listPage({ sort: 'recent', limit: CUSTOMER_PAGE_SIZE });
+      if (stale()) return;
+      setRows(first.customers);
+      setDuplicates(first.duplicates ?? []);
+      setTotal(first.total ?? first.customers.length);
+      setLoading(false);
+      let cursor = first.nextCursor;
+      let acc = first.customers;
+      let dups = first.duplicates ?? [];
+      if (cursor) setLoadingMore(true);
+      while (cursor && acc.length < CUSTOMER_AUTOLOAD_MAX) {
+        let page;
+        try {
+          page = await customerClient.listPage({ sort: 'recent', limit: CUSTOMER_PAGE_SIZE, cursor });
+        } catch (e) {
+          if (stale()) return;
+          setMoreError(e instanceof Error ? `couldn't load the rest (${e.message})` : "couldn't load the rest");
+          break;
+        }
+        if (stale()) return;
+        acc = mergeCustomerPages(acc, page.customers);
+        dups = mergeDuplicatePairs(dups, page.duplicates ?? []);
+        setRows(acc);
+        setDuplicates(dups);
+        cursor = page.nextCursor;
+      }
+    } catch (e) {
+      if (!stale()) setError(e instanceof Error ? e.message : 'Could not load customers.');
+    } finally {
+      if (!stale()) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -240,7 +278,27 @@ export function CustomersScreen() {
   // control's own choices shouldn't shrink or reorder just because a sibling
   // filter (or the box itself) is mid-edit.
   const cities = useMemo(() => cityOptions(rows), [rows]);
-  const searched = useMemo(() => rows.filter((r) => matchesSearch(r, query)), [rows, query]);
+  // Some customers are not loaded (still paging in, or past the auto-load cap): search the server's whole list too.
+  const incomplete = total != null && rows.length < total;
+  const [serverResult, setServerResult] = useState<{ q: string; rows: CustomerSummary[] }>({ q: '', rows: [] });
+  const serverQuery = query.trim();
+  useEffect(() => {
+    if (!incomplete || serverQuery.length < 2) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      customerClient
+        .listPage({ q: serverQuery, sort: 'recent', limit: 100 })
+        .then((p) => { if (live) setServerResult({ q: serverQuery, rows: p.customers }); })
+        .catch(() => { if (live) setServerResult({ q: serverQuery, rows: [] }); });
+    }, 350);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [incomplete, serverQuery]);
+  // Only results for what is typed NOW count (derived, so no reset-in-effect and no stale flash).
+  const corpus = useMemo(
+    () => (incomplete && serverResult.q === serverQuery && serverResult.rows.length ? mergeCustomerPages(rows, serverResult.rows) : rows),
+    [incomplete, serverResult, serverQuery, rows]
+  );
+  const searched = useMemo(() => corpus.filter((r) => matchesSearch(r, query)), [corpus, query]);
   const filtered = useMemo(() => searched.filter((r) => matchesCustomerFilters(r, filters)), [searched, filters]);
   const shown = useMemo(() => sortCustomers(filtered, sortBy, sortDir), [filtered, sortBy, sortDir]);
 
@@ -281,9 +339,19 @@ export function CustomersScreen() {
             autoComplete="off"
           />
         </div>
-        <button type="button" className="dw-btn-secondary shrink-0" disabled={exporting || rows.length === 0} onClick={() => void runExport()}>
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Export CSV
-        </button>
+        <span className="inline-flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            className="dw-btn-secondary shrink-0"
+            disabled={!isAdmin || exporting || rows.length === 0}
+            title={isAdmin ? undefined : ASK_ADMIN_TITLE}
+            aria-describedby={isAdmin ? undefined : 'customers-export-admin-note'}
+            onClick={() => void runExport()}
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Export CSV
+          </button>
+          {!isAdmin && <AskAdminNote id="customers-export-admin-note" />}
+        </span>
         <button type="button" className="dw-btn-primary shrink-0" onClick={() => setCreating((v) => !v)}>
           <Plus className="w-4 h-4" aria-hidden="true" /> New customer
         </button>
@@ -532,7 +600,7 @@ export function CustomersScreen() {
             {!loading && shown.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-ink-3">
-                  <p>{anyActive ? 'No customers match these filters.' : 'No customers yet. They appear automatically as documents come in, or add one above.'}</p>
+                  <p>{loadingMore && anyActive ? 'Nothing yet — still loading the rest of your customers…' : anyActive ? 'No customers match these filters.' : 'No customers yet. They appear automatically as documents come in, or add one above.'}</p>
                   {anyActive && (
                     <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1 mt-2" onClick={clearAll}>
                       Clear all
@@ -551,11 +619,8 @@ export function CustomersScreen() {
           </tbody>
         </table>
       </div>
-      <p className="text-caption text-ink-3">
-        {anyActive
-          ? `${shown.length} of ${rows.length} customer${rows.length === 1 ? '' : 's'} · ${activeCount} filter${activeCount === 1 ? '' : 's'}`
-          : `${rows.length} customer${rows.length === 1 ? '' : 's'}`}
-        {rows.length === 200 ? ' (first 200)' : ''}
+      <p className="text-caption text-ink-3" data-testid="customers-count" role="status">
+        {customerCountLabel({ shown: shown.length, loaded: corpus.length, total, activeCount, loadingMore, moreError })}
       </p>
     </div>
   );

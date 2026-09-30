@@ -37,7 +37,7 @@ import * as hvacDocTypes from '../src/domains/hvac/documentTypes';
 import type { Doc, Entity } from '../src/core/types';
 import { STAGE_LABEL } from '../src/components/StagePill';
 import { PIPELINE_STAGES } from '../src/core/types';
-import { NAV } from '../src/components/AppShell';
+import { NAV } from '../src/components/nav';
 import { isAdminRole, seatStatus } from '../src/services/teamClient';
 import { unreadBadgeLabel, parseNotificationLink } from '../src/services/notifyClient';
 import { sentThisMonth, type OutreachMessage } from '../src/services/outreachClient';
@@ -775,9 +775,11 @@ function listFilesRecursive(dir: string): string[] {
     null,
   );
   eq(
-    'billingBannerFor: never-subscribed at the free-preview cap → the trial nudge',
+    // R30: the server hard-gates a never-subscribed shop (status 'none' -> 402 / plan screen), so there is no
+    // "free preview" allowance to run out of. The old client-side "cap" banner (3 documents) was stale copy.
+    'billingBannerFor: never-subscribed, whatever the document count → no banner (no client-side free-preview cap)',
     billingBannerFor(status({ status: 'none', usage: { documentsStored: 3, pagesThisMonth: 0 } }), NOW),
-    { kind: 'cap', message: 'Free preview used up. Start your 30-day trial to keep going.' },
+    null,
   );
   eq('billingBannerFor: canceled shows no banner (upload/ask already hard-block with their own 402)', billingBannerFor(status({ status: 'canceled' }), NOW), null);
 

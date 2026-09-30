@@ -16,7 +16,7 @@ import {
   detectHandoffTrigger, detectRecordsStrong, detectRecordsWeak, detectCompetitorComparison, detectTradeHowTo,
   detectOffTopic, hasDeepwellLexicon, detectAccountIntent, validateModelReply, cleanLinksAndMarkup, defang, capWords,
 } from './guard.js';
-import { matchFaq, suggestionsFor, contactEntry, articleById, PUBLIC_ARTICLES } from './faq.js';
+import { matchFaq, suggestionsFor, contactEntry, articleById, PUBLIC_ARTICLES, NEAR } from './faq.js';
 import { buildRequest, sanitizeHistory, RULES_SHINGLES } from './prompt.js';
 import { estimateTokens } from '../promptCache.js';
 import { SYSTEM_TEXT } from './prompt.js';
@@ -48,12 +48,26 @@ export function starter(surface) {
 }
 
 /** Did the previous assistant turn already fail to help? (two misses in a row -> offer a person) */
-function lastAssistantWasMiss(history) {
-  const last = [...sanitizeHistory(history, 6)].reverse().find((h) => h.role === 'assistant');
+function lastAssistantWasMiss(history, publicOnly = true) {
+  const last = [...sanitizeHistory(history, 6, { publicOnly })].reverse().find((h) => h.role === 'assistant');
   return Boolean(last && (last.text.startsWith("I'm not sure about that one") || last.text.startsWith('I can only help with questions about DeepWell')));
 }
 
 function handoff(reason) { return { handoff: { offered: true, reason } }; }
+
+/** "Did you mean: A / B?" from the matcher's two candidates; null when there are not two usable ones. Chips carry the full question (they may exceed the 70-char follow-up cap). */
+function didYouMeanReply(candidates, signedIn) {
+  const qs = [];
+  const ids = [];
+  for (const c of candidates ?? []) {
+    const e = c?.entry;
+    if (!e || typeof e.q !== 'string' || e.q.length > 110 || qs.includes(e.q)) continue;
+    if (!signedIn && e.audience === 'app') continue; // audience guard, belt and braces: the public index never holds app entries
+    qs.push(e.q); ids.push(e.id);
+  }
+  if (qs.length !== 2) return null;
+  return { ids, body: { ...reply('faq', `Did you mean: ${qs[0]} / ${qs[1]}`), suggestions: qs } };
+}
 
 /* ------------------------------------------------------------------ account replies ($0, signed-in only) */
 
@@ -196,12 +210,20 @@ export async function respond(input, deps = {}) {
 
   // 11. trade how-to and plainly off-topic
   const near = faq.top.filter((t) => t.score >= 1.6).slice(0, 2).map((t) => t.entry.q);
-  const missAgain = lastAssistantWasMiss(input.history);
+  const missAgain = lastAssistantWasMiss(input.history, !signedIn);
   if (detectTradeHowTo(message)) return done(withSuggestions(reply('guard', CANNED.hvacHowTo, missAgain ? handoff('repeat-miss') : {}), ['How does DeepWell work?']), 'guard', { reason: 'trade-howto' });
   const lexicon = hasDeepwellLexicon(message);
-  if (detectOffTopic(message) || !lexicon) {
+  // R30: the FAQ is stricter now, so an in-scope question it merely could not settle must not be mistaken for off-topic just because
+  // it carries no DeepWell vocabulary ("how do I stop the warranty emails"). If a KB entry matched on specific words, it is on topic.
+  const faqRecognizedTopic = faq.top.some((t) => t.score >= NEAR && t.specific >= 0.5);
+  if (detectOffTopic(message) || (!lexicon && !faqRecognizedTopic)) {
     return done(withSuggestions(reply('guard', CANNED.offTopic, missAgain ? handoff('repeat-miss') : {}), starter(surface).suggestions.slice(0, 3)), 'guard', { reason: 'off-topic' });
   }
+
+  // 11b. R30 PRECISION: two entries both look plausible and neither clearly wins. A wrong answer is worse than a question, so offer
+  // both as chips ($0, no model, no guess). Each chip is the entry's own question, which always answers on the next turn.
+  const dym = didYouMeanReply(faq.didYouMean, signedIn);
+  if (dym) return done(dym.body, 'faq', { faqId: 'did-you-mean', reason: `dym:${dym.ids.join('|')}` });
 
   // 12. on-topic but the FAQ could not answer: the optional model
   const model = deps.model;

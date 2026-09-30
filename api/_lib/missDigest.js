@@ -116,7 +116,14 @@ export function parseOwnerAlertEmails(raw) {
 export function isPlatformOperator(auth) {
   if (!auth) return false;
   const founderTenantKey = process.env.DEEPWELL_FOUNDER_TENANT_ID;
-  if (founderTenantKey && auth.tenantId === founderTenantKey) return true;
+  // R30 L1: belonging to the founder tenant is not enough on its own - ANY member of the founder shop (a
+  // technician, an intern, an invited contractor) used to be a platform operator with cross-tenant miss digests,
+  // learning, scorecards and expenses. Inside a shop the person must be its ADMIN; a solo founder tenant
+  // (no org, so no role) is its own owner. The DEEPWELL_OPERATOR_USER_IDS allowlist below is unchanged and always works.
+  if (founderTenantKey && auth.tenantId === founderTenantKey && !auth.viaKey) {
+    const inShop = Boolean(auth.orgId);
+    if (!inShop || auth.orgRole === "admin") return true;
+  }
   const operatorIds = parseCsvEnv(process.env.DEEPWELL_OPERATOR_USER_IDS);
   return Boolean(auth.userId) && operatorIds.includes(auth.userId);
 }

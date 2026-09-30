@@ -103,7 +103,7 @@ export function WarrantyExportScreen() {
             <h2 id="units-heading" className="dw-label">Units in this packet · {units.length}</h2>
             <div className="flex flex-wrap gap-2 items-center">
               <label htmlFor="unit-picker" className="sr-only">Add a unit</label>
-              <select id="unit-picker" className="dw-input !min-h-[40px] !py-1.5 w-auto" value={picker} onChange={(e) => setPicker(e.target.value)}>
+              <select id="unit-picker" className="dw-input !min-h-[40px] !py-1.5 w-auto max-w-full min-w-0" value={picker} onChange={(e) => setPicker(e.target.value)}>
                 <option value="">Add a unit…</option>
                 {allUnits.filter((u) => !selectedIds.includes(u.id)).map((u) => (
                   <option key={u.id} value={u.id}>{str(u, 'serial')} · {str(u, 'manufacturer')} {str(u, 'model')} · {str(property(u), 'address')}</option>

@@ -2,7 +2,8 @@ import { armResponseDeadline } from "./_lib/util/deadline.js";
 import { denyAuth } from "./_lib/auth.js";
 import { handleCors, handleError } from "./_lib/claude.js";
 import { ingestDocument, recordIngestFailure, isTransientError, isValidDocumentId } from "./_lib/readDocument.js";
-import { isQueueEnabled, enqueueDocument } from "./_lib/queue.js";
+import { isQueueEnabled, enqueueDocument, shouldRequeue } from "./_lib/queue.js";
+import { withTenant } from "./_lib/recordsStore.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
 import { assertActiveBilling } from "./_lib/plan.js";
@@ -96,12 +97,22 @@ export default async function handler(req, res) {
   // ---- queued ------------------------------------------------------------
   if (isQueueEnabled() && !sync) {
     try {
+      // R30 M7: a nonce on the Inngest event id ONLY for an explicit re-queue of a dead run (see shouldRequeue);
+      // an automatic duplicate keeps the fixed id and is deduped. The row lookup is best effort.
+      let requeueNonce = null;
+      try {
+        const row = await withTenant(ctx, (db) => db.getDocument(documentId));
+        if (shouldRequeue(row, { explicit: req.body?.requeue === true || force === true })) requeueNonce = Date.now().toString(36);
+      } catch (lookupErr) {
+        console.error("read-document: requeue check failed (using the deduped id):", lookupErr?.message);
+      }
       await enqueueDocument({
         documentId,
         tenantKey: auth.tenantId,
         tenantName: auth.orgId ?? auth.tenantId,
         userId: auth.userId,
         autoExtract: extract !== false,
+        requeueNonce,
       });
       // `extract` tells the browser whether a second stage is coming. Without
       // it the poller would call the document finished the moment the read

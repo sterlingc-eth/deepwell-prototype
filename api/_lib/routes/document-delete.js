@@ -38,7 +38,7 @@
  */
 import { serializeClient, assertTenantUuid } from '../util/pgClient.js';
 import { getPool } from '../recordsStore.js';
-import { deleteObject } from '../r2.js';
+import { deleteObject, keyBelongsToTenant } from '../r2.js';
 import { hasShop, requireRole, AuthError } from '../auth.js';
 import { ReviewError, isUuid } from '../reviewStore.js';
 
@@ -104,7 +104,8 @@ export async function deleteDocuments(ctx, { documentIds } = {}, auth) {
       `SELECT id, storage_key FROM documents WHERE id = ANY($1::uuid[]) AND ${TENANT}`,
       [ids]
     );
-    storageKeys = found.rows.filter((r) => r.storage_key).map((r) => r.storage_key);
+    // R30 H1: only ever delete objects under this tenant's own prefix (a row's key was client-writable once).
+    storageKeys = found.rows.filter((r) => r.storage_key && keyBelongsToTenant(r.storage_key, tenantId)).map((r) => r.storage_key);
     const foundIds = found.rows.map((r) => r.id);
 
     const del = await client.query(

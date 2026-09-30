@@ -435,7 +435,7 @@ export function AskScreen() {
         )}
       </div>
 
-      {preview && <DocumentPreview documentId={preview.documentId} location={preview.location} onClose={() => setPreview(null)} />}
+      {preview && <DocumentPreview documentId={preview.documentId} location={preview.location} excerpt={preview.excerpt} onClose={() => setPreview(null)} />}
       {capture && (
         <SerialCapture
           onClose={() => setCapture(false)}

@@ -164,6 +164,17 @@ interface CustomersResponse {
   customers: CustomerSummary[];
   duplicates?: CustomerDuplicatePair[];
   possibleDuplicates?: CustomerPossibleDuplicatePair[];
+  /** Paging mode only (`limit`/`cursor` sent): matching customers in the whole shop, and the opaque cursor for the
+   *  next page (null on the last page). GET /api/v1/customers?limit=&cursor=&q= */
+  total?: number | null;
+  nextCursor?: string | null;
+}
+
+/** One page of GET /api/v1/customers in paging mode. */
+export interface CustomersPage extends CustomersResponse {
+  customers: CustomerSummary[];
+  total: number | null;
+  nextCursor: string | null;
 }
 
 export interface CustomerEquipment {
@@ -305,7 +316,13 @@ function buildQuery(params: Record<string, string | number | undefined | null>):
 function normalizeCustomersResponse(data: CustomersResponse | CustomerSummary[]): CustomersResponse {
   return Array.isArray(data)
     ? { customers: data, duplicates: [], possibleDuplicates: [] }
-    : { customers: data.customers, duplicates: data.duplicates ?? [], possibleDuplicates: data.possibleDuplicates ?? [] };
+    : {
+        customers: data.customers,
+        duplicates: data.duplicates ?? [],
+        possibleDuplicates: data.possibleDuplicates ?? [],
+        ...(data.total !== undefined ? { total: data.total } : {}),
+        ...(data.nextCursor !== undefined ? { nextCursor: data.nextCursor } : {}),
+      };
 }
 
 export const customerClient = {
@@ -319,6 +336,18 @@ export const customerClient = {
     return getJson<CustomersResponse | CustomerSummary[]>(`${CUSTOMERS_URL}${buildQuery({ q: opts.q, sort: opts.sort, limit: opts.limit })}`).then(
       normalizeCustomersResponse
     );
+  },
+
+  /** One page of the shop's customers (R31 QA). The Customers tab used to read only the first 200 and search/filter
+   *  that slice, so customer #201+ simply could not be found. `cursor` is the previous page's `nextCursor` (opaque,
+   *  pinned to the sort and `q` it was issued for). Always sends `limit`, which is what switches the API into
+   *  paging mode (and adds `total` / `nextCursor` to the response). */
+  listPage(opts: { q?: string; sort?: CustomerSort; limit?: number; cursor?: string | null } = {}): Promise<CustomersPage> {
+    return getJson<CustomersResponse | CustomerSummary[]>(
+      `${CUSTOMERS_URL}${buildQuery({ q: opts.q, sort: opts.sort, limit: opts.limit ?? 200, cursor: opts.cursor })}`
+    )
+      .then(normalizeCustomersResponse)
+      .then((r) => ({ ...r, total: r.total ?? null, nextCursor: r.nextCursor ?? null }));
   },
 
   /** Looks up by either a customer's uuid (`id`) or its display number

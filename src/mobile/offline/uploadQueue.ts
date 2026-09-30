@@ -44,10 +44,11 @@ export interface UploadOutcome {
  * see api/upload-url.js) is IDENTICAL whether this is the first try or the
  * fifth: the same hash always resolves to the same document, never a new one.
  */
-export async function attemptUploadOnce(file: File, sha256: string, signal?: AbortSignal): Promise<UploadOutcome> {
+export async function attemptUploadOnce(file: File, sha256: string, signal?: AbortSignal, expectedTenant?: string): Promise<UploadOutcome> {
   const { documentId, uploadUrl, alreadyUploaded } = await requestUploadUrl(
     { filename: file.name, sha256, contentType: file.type || undefined, sizeBytes: file.size },
-    signal
+    signal,
+    expectedTenant
   )
   if (alreadyUploaded) return { documentId, duplicate: true }
   if (uploadUrl) await putFile(uploadUrl, file, signal)
@@ -61,7 +62,11 @@ export async function attemptUploadOnce(file: File, sha256: string, signal?: Abo
 export function classifyUploadError(err: unknown): QueueErrorClass {
   if (err instanceof IngestHttpError) {
     if (err.status === 413) return 'too-large'
-    if (err.status === 401 || err.status === 403) return 'permanent' // caller special-cases 401/403 as an auth pause; see drain()
+    // R30 L4: 402 = "choose a plan" / monthly page cap. That resolves itself (the shop subscribes, the month rolls
+    // over), so the scan must be retried later, not thrown away as permanent. drain() spaces these retries out.
+    if (err.status === 402) return 'transient'
+    if (err.status === 401) return 'permanent' // caller special-cases 401 as an auth pause; see drain()
+    if (err.status === 403) return 'permanent' // R30 L4: forbidden for THIS scan (role/plan/scope) - not "signed out"
     if (err.status === 429 || err.status >= 500) return 'transient'
     return 'permanent' // 400/402/404/etc — retrying the same bytes changes nothing
   }
@@ -70,8 +75,22 @@ export function classifyUploadError(err: unknown): QueueErrorClass {
   return 'transient'
 }
 
+/** The server (api/upload-url.js) refuses a scan whose capture shop is no longer the signed-in shop. */
+function isTenantMismatch(err: unknown): boolean {
+  return err instanceof IngestHttpError && err.status === 409 && (err.body as { code?: string } | null)?.code === 'tenant-mismatch'
+}
+
+/** Only a 401 means "signed out". R30 L4: a 403 (wrong role/plan/scope for one request) used to pause the WHOLE queue
+ *  behind a misleading "Signed out - sign in again" banner; it now fails just that scan with the server's message. */
 function isAuthError(err: unknown): boolean {
-  return err instanceof IngestHttpError && (err.status === 401 || err.status === 403)
+  return err instanceof IngestHttpError && err.status === 401
+}
+
+/** R30 L4: a billing 402 will not clear in seconds - wait at least this long between tries. */
+export const BILLING_RETRY_MIN_MS = 10 * 60_000
+export function retryDelayMs(err: unknown, attempts: number): number {
+  const base = backoffDelayMs(attempts)
+  return err instanceof IngestHttpError && err.status === 402 ? Math.max(base, BILLING_RETRY_MIN_MS) : base
 }
 
 function errorMessage(err: unknown): string {
@@ -121,9 +140,52 @@ export class OfflineUploadQueue {
    *  open — the auth block itself is never persisted). */
   private authBlocked = new Set<string>()
   private backoffTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  /** The shop this phone is signed into RIGHT NOW. `undefined` = never told (tests, unguarded); `null` = nobody is
+   *  signed in, so nothing may upload. A drain only ever runs for the active tenant; see setActiveTenant. */
+  private activeTenant: string | null | undefined = undefined
+  private inflight = new Map<string, AbortController>()
 
   constructor(store: QueueStore) {
     this.store = store
+  }
+
+  /**
+   * Tell the queue which shop is signed in (null = nobody). Anything still running or scheduled for a DIFFERENT
+   * shop is stopped at once: its backoff timer is cancelled and its in-flight upload aborted, and those scans stay
+   * queued (untouched) for when that shop is active again. Without this, a retry timer or a running drain kept using
+   * the CURRENT session token after an org switch and would have filed shop A's scans into shop B.
+   */
+  setActiveTenant(tenantKey: string | null): void {
+    this.activeTenant = tenantKey
+    for (const [key, t] of this.backoffTimers) {
+      if (key !== tenantKey) {
+        clearTimeout(t)
+        this.backoffTimers.delete(key)
+      }
+    }
+    for (const [key, ac] of this.inflight) {
+      if (key !== tenantKey) ac.abort()
+    }
+  }
+
+  private allowed(tenantKey: string): boolean {
+    return this.activeTenant === undefined || this.activeTenant === tenantKey
+  }
+
+  /** Scans waiting on this phone across every shop. */
+  countAll(): Promise<number> {
+    return this.store.countAll()
+  }
+
+  /** Delete every queued scan for every shop and stop all work. For sign-out and "a different person is on this phone". */
+  async purgeAll(): Promise<void> {
+    this.activeTenant = null
+    for (const t of this.backoffTimers.values()) clearTimeout(t)
+    this.backoffTimers.clear()
+    for (const ac of this.inflight.values()) ac.abort()
+    this.authBlocked.clear()
+    await this.store.clearAll()
+    for (const key of this.listeners.keys()) await this.notify(key)
   }
 
   subscribe(tenantKey: string, fn: (items: QueuedUpload[]) => void): () => void {
@@ -203,9 +265,14 @@ export class OfflineUploadQueue {
    */
   async drain(tenantKey: string, opts: DrainOptions = {}): Promise<void> {
     if (this.draining.has(tenantKey)) return
+    if (!this.allowed(tenantKey)) return
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return
     if (this.authBlocked.has(tenantKey)) return
     this.draining.add(tenantKey)
+    const ac = new AbortController()
+    this.inflight.set(tenantKey, ac)
+    const onOuterAbort = () => ac.abort()
+    opts.signal?.addEventListener('abort', onOuterAbort)
     const timer = this.backoffTimers.get(tenantKey)
     if (timer) {
       clearTimeout(timer)
@@ -216,6 +283,7 @@ export class OfflineUploadQueue {
       let soonest = Number.POSITIVE_INFINITY
       for (const item of items) {
         if (opts.signal?.aborted) break
+        if (!this.allowed(tenantKey)) break // signed-in shop changed mid-drain: leave the rest untouched
         if (this.authBlocked.has(tenantKey)) break
         if (item.status === 'error' && item.errorClass && item.errorClass !== 'transient') continue // permanent/too-large: only the tech deleting it changes anything
         const now = Date.now()
@@ -228,10 +296,16 @@ export class OfflineUploadQueue {
         await this.notify(tenantKey)
         try {
           const file = new File([item.blob], item.filename, { type: item.contentType })
-          const outcome = await attemptUploadOnce(file, item.sha256, opts.signal)
+          const outcome = await attemptUploadOnce(file, item.sha256, ac.signal, tenantKey)
           await this.store.remove(item.id)
           opts.onUploaded?.(item, outcome)
         } catch (err) {
+          if (!this.allowed(tenantKey) || isTenantMismatch(err)) {
+            // Not a failure of the scan: the signed-in shop is not the one it was captured in. Put it back as it was.
+            await this.store.update(item.id, { status: 'queued' })
+            await this.notify(tenantKey)
+            break
+          }
           const attempts = item.attempts + 1
           let patch: Partial<QueuedUpload>
           if (isAuthError(err)) {
@@ -241,7 +315,7 @@ export class OfflineUploadQueue {
             const cls = classifyUploadError(err)
             patch = { status: 'error', attempts, error: errorMessage(err), errorClass: cls }
             if (cls === 'transient') {
-              patch.nextAttemptAt = Date.now() + backoffDelayMs(attempts)
+              patch.nextAttemptAt = Date.now() + retryDelayMs(err, attempts)
               soonest = Math.min(soonest, patch.nextAttemptAt)
             }
           }
@@ -250,12 +324,14 @@ export class OfflineUploadQueue {
         }
         await this.notify(tenantKey)
       }
-      if (Number.isFinite(soonest) && !this.authBlocked.has(tenantKey)) {
+      if (Number.isFinite(soonest) && !this.authBlocked.has(tenantKey) && this.allowed(tenantKey)) {
         const delay = Math.max(0, soonest - Date.now())
         const t = setTimeout(() => void this.drain(tenantKey, opts), delay)
         this.backoffTimers.set(tenantKey, t)
       }
     } finally {
+      opts.signal?.removeEventListener('abort', onOuterAbort)
+      this.inflight.delete(tenantKey)
       this.draining.delete(tenantKey)
     }
   }

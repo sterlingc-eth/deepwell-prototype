@@ -9,6 +9,7 @@
  * "many rows" shapes (list, timeline), then comparison, then single-fact, then explain, then prose.
  */
 import type { Answer, AnswerRecord, Fact } from './types';
+import { roleChips, type Role } from './role';
 import { recordGroups } from './citations';
 
 export type AnswerLayoutKind =
@@ -244,12 +245,12 @@ const LAYOUT_FOLLOWUPS: Record<AnswerLayoutKind, string[]> = {
 /** Up to `max` quick-reply chips for the answer just shown, never repeating the question asked and
  *  never repeating a fact label already on screen as a chip (a "Warranty status?" chip is pointless
  *  directly under a fact already labelled "Warranty status"). */
-export function followupChips(answer: Answer, question: string, max = 3): string[] {
+export function followupChips(answer: Answer, question: string, max = 3, role: Role | null = null): string[] {
   const kind = answerLayout(answer);
   const asked = question.trim().toLowerCase();
   const shownLabels = new Set((answer.facts ?? []).map((f) => f.label.trim().toLowerCase()));
   const out: string[] = [];
-  for (const chip of LAYOUT_FOLLOWUPS[kind]) {
+  for (const chip of roleChips(kind, role, LAYOUT_FOLLOWUPS[kind], 6)) {
     const norm = chip.replace(/\?$/, '').trim().toLowerCase();
     if (norm === asked || shownLabels.has(norm)) continue;
     out.push(chip);
@@ -277,4 +278,82 @@ export function shareText(question: string, answer: Answer, resolveDocName?: (do
     for (const id of docIds) lines.push(`- ${resolveDocName?.(id) ?? id}`);
   }
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------------------------------
+// R31 Loop 3: superseded-document notes (server: api/_lib/supersession.js) and the "why / confidence"
+// explanation. Both read defensively off fields the server attaches but core/types.ts's Answer does not
+// declare, and both are pure so scripts/verify-r31-capabilities.mjs can pin them without a DOM.
+// ---------------------------------------------------------------------------------------------------
+
+export interface SupersededNote {
+  documentId: string;
+  /** ISO day (YYYY-MM-DD) the newer copy was added */
+  replacedOn: string;
+  replacedById: string;
+  replacedByName?: string | null;
+  newerAlsoCited?: boolean;
+}
+
+export function supersededOf(answer: unknown): SupersededNote[] {
+  const s = (answer as { supersession?: unknown } | null)?.supersession;
+  if (!Array.isArray(s)) return [];
+  return s.filter(
+    (x): x is SupersededNote => !!x && typeof x === 'object' && typeof (x as SupersededNote).documentId === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String((x as SupersededNote).replacedOn)) && typeof (x as SupersededNote).replacedById === 'string'
+  );
+}
+
+/** "Sep 3, 2026" from an ISO day, timezone-proof (parsed as a calendar day, not an instant). */
+export function replacedOnLabel(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[Number(m[2]) - 1] ?? m[2]} ${Number(m[3])}, ${m[1]}`;
+}
+
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+export interface WhyThisAnswer {
+  level: ConfidenceLevel;
+  levelLabel: string;
+  lines: string[];
+}
+
+/**
+ * The plain-English "why should I trust this" for a real answer: a confidence band plus only what the answer
+ * itself carries (interpretation, basis, verified counts, claim check, replaced sources). Nothing is invented; a
+ * line appears only when its source field is present. Returns null for a no-answer (nothing to justify).
+ */
+export function whyThisAnswer(answer: Answer): WhyThisAnswer | null {
+  if (!answer || answer.kind !== 'answer') return null;
+  const c = typeof answer.confidence === 'number' && Number.isFinite(answer.confidence) ? answer.confidence : 0;
+  const cc = claimCheckOf(answer);
+  const unsupported = cc ? Math.max(0, cc.checked - cc.supported) : 0;
+  let level: ConfidenceLevel = c >= 0.85 ? 'high' : c >= 0.6 ? 'medium' : 'low';
+  // A claim the page did not back up always caps the band at "medium".
+  if (unsupported > 0 && level === 'high') level = 'medium';
+  const superseded = supersededOf(answer).length > 0;
+  if (superseded && level === 'high') level = 'medium';
+  const lines: string[] = [];
+  if (answer.interpretation) lines.push(`How I read your question: ${answer.interpretation}`);
+  if (answer.basis) lines.push(answer.basis);
+  const docs = new Set((answer.sources ?? []).map((s) => s.documentId)).size;
+  if (docs > 0) {
+    const v = answer.verifiedCount ?? 0;
+    const u = answer.unverifiedCount ?? 0;
+    lines.push(`Read from ${docs} document${docs === 1 ? '' : 's'}${v + u > 0 ? ` (${v} verified, ${u} not yet verified)` : ''}.`);
+  }
+  if (cc && cc.checked > 0) {
+    lines.push(
+      unsupported === 0
+        ? `Every checked statement (${cc.checked}) matched a document.`
+        : `${cc.supported} of ${cc.checked} checked statements matched a document; the rest are marked.`
+    );
+  }
+  for (const n of supersededOf(answer)) lines.push(`One source was replaced on ${replacedOnLabel(n.replacedOn)}; the newer copy is one tap away.`);
+  return {
+    level,
+    levelLabel: level === 'high' ? 'High confidence' : level === 'medium' ? 'Medium confidence' : 'Low confidence - worth a second look',
+    lines,
+  };
 }

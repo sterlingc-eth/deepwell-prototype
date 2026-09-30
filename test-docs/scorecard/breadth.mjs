@@ -263,7 +263,7 @@ export function breadthQuestions(k) {
     ["thermostat", "thermostat", "thermostat"],
     ["motor", "(blower|fan|condenser) motor", "motor"],
     ["drain", "(drain line|condensate|clog)", "drain problem"],
-    ["ice", "(frozen|freez|iced|ice )", "freeze-up"],
+    ["ice", "(frozen|freez|iced|\\yice\\y)", "freeze-up"], // R31: "ice " (bare) matched "Serv-ice Address:" on nearly every document; anchored as a whole word
   ];
   CONCEPTS.forEach(([, kw, label], i) => {
     contentCount(["tech", "office", "owner"][i % 3], `How many jobs mention a ${label}?`, kw);
@@ -288,8 +288,9 @@ export function breadthQuestions(k) {
   }
 
   /* ================================================================ SEMANTIC (paraphrases of one symptom) */
+  // R31: the noise pattern's bare "loud" matched "icloud.com" in every customer email (8 phantom customers); anchored at a word start.
   const SYMPTOMS = [
-    ["(noise|noisy|loud|rattl|vibrat|humming|buzz|squeal|grind)", ["Which customers complained the unit is loud?", "Who called about a rattling or humming outdoor unit?", "How many jobs were for a noise complaint?"]],
+    ["(\\ynoise|noisy|\\yloud|rattl|vibrat|humming|buzz|squeal|grind)", ["Which customers complained the unit is loud?", "Who called about a rattling or humming outdoor unit?", "How many jobs were for a noise complaint?"]],
     ["(not cooling|no cool|warm air|won'?t cool|blowing warm|not cold|isn'?t cooling|insufficient cool)", ["Which customers said their AC wasn't keeping up?", "Who had a no-cooling call?", "How many calls were for warm air coming out of the vents?"]],
     ["(leak|drip|water damage|puddle)", ["Which customers had water dripping from the unit?", "Who called about a leak?", "How many jobs mention a water leak?"]],
     ["(won'?t start|not starting|no power|tripp|breaker|not turning on|won'?t turn on)", ["Which customers had a unit that would not turn on?", "Who had a tripped breaker on the AC?", "How many calls were for a system that won't start?"]],

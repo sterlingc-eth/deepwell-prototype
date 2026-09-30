@@ -1,0 +1,1579 @@
+{
+ "version": "r31-blind-1",
+ "category": "blind-r31-technician2",
+ "source": "scripts/gen-blind-r31.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r31-technician2-001",
+   "text": "quick one - how many jobs on file for Danny Ochoa",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-002",
+   "text": "yo what is Wyatt Coburn's call count asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-003",
+   "text": "ok so how many jobs on file for Ray Sutton real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-004",
+   "text": "quick one - Marisol Vega jobs total again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-005",
+   "text": "real quick: total number of visits Kevin Pratt has made when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-006",
+   "text": "quick q - how many jobs on file for Denise Ford for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-007",
+   "text": "customer is on the line, total number of visits Danny Ochoa has made thanks",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-008",
+   "text": "so uh, total number of visits Wyatt Coburn has made right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-009",
+   "text": "ok um, what is Ray Sutton's call count right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-010",
+   "text": "one sec, how many jobs on file for Marisol Vega again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-011",
+   "text": "im in the truck, Kevin Pratt jobs total when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-012",
+   "text": "real quick: Denise Ford jobs total again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-013",
+   "text": "umm Danny Ochoa - jobs completed so far",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-014",
+   "text": "how many jobs is Wyatt Coburn at real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-015",
+   "text": "gimme a sec, how many jobs on file for Ray Sutton please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-016",
+   "text": "quick one - how many jobs is Marisol Vega at thanks",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-017",
+   "text": "sorry, one more - tally of jobs for Kevin Pratt thanks",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-018",
+   "text": "hang on... what is Denise Ford's call count if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-019",
+   "text": "can you look up Danny Ochoa - jobs completed so far real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-020",
+   "text": "alright, give me Wyatt Coburn's number of service calls",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-021",
+   "text": "ok um, total number of visits Ray Sutton has made",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-022",
+   "text": "ok um, Marisol Vega - jobs completed so far",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-023",
+   "text": "gimme a sec, what is Kevin Pratt's call count asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-024",
+   "text": "give me Denise Ford's number of service calls",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-025",
+   "text": "alright, how many jobs on file for Danny Ochoa asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-026",
+   "text": "hold up, give me Wyatt Coburn's number of service calls real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-027",
+   "text": "sorry, one more - how many jobs is Ray Sutton at",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-028",
+   "text": "what is Marisol Vega's call count for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-029",
+   "text": "hmm, total number of visits Kevin Pratt has made if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-030",
+   "text": "sorry, one more - what is Denise Ford's call count if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-031",
+   "text": "Danny Ochoa - jobs completed so far when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-032",
+   "text": "alright, how many jobs is Wyatt Coburn at",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-033",
+   "text": "quick q - Denise Ford visits in Chandler only right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Chandler,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-034",
+   "text": "sorry, one more - Ray Sutton's job count in Maricopa for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Maricopa,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-035",
+   "text": "alright, Denise Ford's job count in Scottsdale please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Scottsdale,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-036",
+   "text": "Ray Sutton visits in Gilbert only asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Gilbert,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-037",
+   "text": "ok so how many of Denise Ford's jobs were in Oro Valley please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Oro Valley,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-038",
+   "text": "yo Tucson service calls handled by Ray Sutton",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Tucson,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-039",
+   "text": "hang on... Denise Ford visits in Las Vegas only when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Las Vegas,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-040",
+   "text": "how many of Ray Sutton's jobs were in Phoenix when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Phoenix,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-041",
+   "text": "Denise Ford's job count in Casa Grande",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Casa Grande,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-042",
+   "text": "Ray Sutton visits in Marana only asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Marana,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-043",
+   "text": "ok so what is the number of jobs for Denise Ford in San Tan Valley please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, San Tan Valley,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-044",
+   "text": "hold up, what is the number of jobs for Ray Sutton in Florence please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Florence,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-045",
+   "text": "Denise Ford visits in Mesa only when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Mesa,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-046",
+   "text": "yo jobs Ray Sutton did in Tempe",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Tempe,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-047",
+   "text": "ok so Denise Ford's job count in Glendale",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Glendale,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-048",
+   "text": "hang on... jobs Ray Sutton did in Peoria for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Peoria,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-049",
+   "text": "Denise Ford's job count in Albuquerque for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Albuquerque,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-050",
+   "text": "ok so how many of Ray Sutton's jobs were in Los Angeles",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Los Angeles,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-051",
+   "text": "alright, how many of Denise Ford's jobs were in Queen Creek for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Queen Creek,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-052",
+   "text": "quick one - what is the number of jobs for Ray Sutton in Chandler",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Chandler,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-053",
+   "text": "alright, jobs Denise Ford did in Maricopa",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Maricopa,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-054",
+   "text": "gimme a sec, Scottsdale service calls handled by Ray Sutton",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Scottsdale,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-055",
+   "text": "alright, jobs Denise Ford did in Gilbert please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Gilbert,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-056",
+   "text": "so uh, how many of Ray Sutton's jobs were in Oro Valley asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Oro Valley,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-057",
+   "text": "could you tell me jobs Denise Ford did in Tucson asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Tucson,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-058",
+   "text": "yo Ray Sutton's job count in Las Vegas if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Las Vegas,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-059",
+   "text": "hold up, what is the number of jobs for Denise Ford in Phoenix real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Phoenix,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-060",
+   "text": "hmm, Ray Sutton visits in Casa Grande only asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Casa Grande,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-061",
+   "text": "Denise Ford visits in Marana only again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Marana,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-062",
+   "text": "hey, how many of Ray Sutton's jobs were in San Tan Valley thanks",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, San Tan Valley,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-063",
+   "text": "customer is on the line, Florence service calls handled by Denise Ford if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Florence,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-064",
+   "text": "Ray Sutton visits in Mesa only for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Mesa,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-065",
+   "text": "sorry, one more - Denise Ford visits in Tempe only please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Tempe,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-066",
+   "text": "yo what is the number of jobs for Ray Sutton in Glendale",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Glendale,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-067",
+   "text": "can you look up how many of Denise Ford's jobs were in Peoria if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Denise Ford' AND c.data->>'service_address' ILIKE '%, Peoria,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-068",
+   "text": "so uh, jobs Ray Sutton did in Albuquerque for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions t JOIN documents d ON d.id=t.document_id JOIN document_entity_links l ON l.document_id=d.id\nJOIN entities c ON c.id=l.entity_id AND c.entity_type='customer'\nWHERE t.field_key='technician' AND t.value='Ray Sutton' AND c.data->>'service_address' ILIKE '%, Albuquerque,%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-069",
+   "text": "Kevin Pratt done any preventive maintenance visits thanks",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-070",
+   "text": "hang on... Denise Ford done any repair visits",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Denise Ford') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-071",
+   "text": "customer is on the line, did Danny Ochoa ever log repair work",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-072",
+   "text": "alright, does Wyatt Coburn have a preventive maintenance call on record when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Wyatt Coburn') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-073",
+   "text": "sorry, one more - has Ray Sutton handled any repair jobs",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-074",
+   "text": "so uh, did Marisol Vega ever log repair work if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Marisol Vega') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-075",
+   "text": "has Kevin Pratt handled any preventive maintenance jobs please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-076",
+   "text": "hold up, Denise Ford done any repair visits again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Denise Ford') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-077",
+   "text": "ok so does Danny Ochoa have a repair call on record real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-078",
+   "text": "could you tell me did Wyatt Coburn ever log preventive maintenance work",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Wyatt Coburn') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-079",
+   "text": "ok so Ray Sutton done any repair visits right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-080",
+   "text": "ok um, did Marisol Vega ever log repair work thanks",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Marisol Vega') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-081",
+   "text": "ok so has Kevin Pratt handled any preventive maintenance jobs for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-082",
+   "text": "customer is on the line, has Denise Ford handled any repair jobs again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Denise Ford') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-083",
+   "text": "so uh, Danny Ochoa done any repair visits if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-084",
+   "text": "did Wyatt Coburn ever log preventive maintenance work",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value='Wyatt Coburn') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-085",
+   "text": "ok um, does Ray Sutton have a repair call on record please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-086",
+   "text": "so uh, has Marisol Vega handled any repair jobs asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_ever",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value='Marisol Vega') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-087",
+   "text": "quick q - does Marisol Vega have fewer jobs than Danny Ochoa when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-088",
+   "text": "hold up, is Denise Ford ahead of Ray Sutton in job count again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-089",
+   "text": "could you tell me does Wyatt Coburn have fewer jobs than Kevin Pratt",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-090",
+   "text": "yo is Marisol Vega ahead of Danny Ochoa in job count real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-091",
+   "text": "alright, does Denise Ford have fewer jobs than Ray Sutton real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-092",
+   "text": "one sec, does Wyatt Coburn have a higher job count than Kevin Pratt right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-093",
+   "text": "alright, does Marisol Vega have fewer jobs than Danny Ochoa",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-094",
+   "text": "can you look up is Denise Ford ahead of Ray Sutton in job count right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-095",
+   "text": "customer is on the line, does Wyatt Coburn have fewer jobs than Kevin Pratt asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-096",
+   "text": "gimme a sec, does Marisol Vega have a higher job count than Danny Ochoa please",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-097",
+   "text": "could you tell me has Ray Sutton done less work than Denise Ford again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-098",
+   "text": "ok um, is Wyatt Coburn ahead of Kevin Pratt in job count right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-099",
+   "text": "hang on... has Marisol Vega logged fewer calls than Danny Ochoa right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-100",
+   "text": "sorry, one more - has Denise Ford done less work than Ray Sutton",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-101",
+   "text": "could you tell me does Kevin Pratt have a higher job count than Wyatt Coburn right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-102",
+   "text": "hmm, does Danny Ochoa have fewer jobs than Marisol Vega when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-103",
+   "text": "quick q - has Ray Sutton done less work than Denise Ford again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-104",
+   "text": "could you tell me has Wyatt Coburn done less work than Kevin Pratt real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-105",
+   "text": "so uh, has Marisol Vega logged fewer calls than Danny Ochoa",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-106",
+   "text": "could you tell me has Denise Ford done less work than Ray Sutton",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-107",
+   "text": "alright, Danny Ochoa and Kevin Pratt, how many jobs combined when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-108",
+   "text": "Denise Ford plus Marisol Vega together, how many calls real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-109",
+   "text": "hmm, Kevin Pratt and Ray Sutton, how many jobs combined if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-110",
+   "text": "Marisol Vega plus Wyatt Coburn together, how many calls",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-111",
+   "text": "ok um, Ray Sutton plus Danny Ochoa together, how many calls",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-112",
+   "text": "alright, Wyatt Coburn and Denise Ford, how many jobs combined again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-113",
+   "text": "Danny Ochoa and Kevin Pratt, how many jobs combined",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-114",
+   "text": "customer is on the line, Denise Ford plus Marisol Vega together, how many calls",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-115",
+   "text": "quick one - Kevin Pratt and Ray Sutton, how many jobs combined right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-116",
+   "text": "one sec, Marisol Vega and Wyatt Coburn, how many jobs combined",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-117",
+   "text": "quick q - total of Ray Sutton's and Danny Ochoa's jobs when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-118",
+   "text": "total of Wyatt Coburn's and Denise Ford's jobs",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-119",
+   "text": "customer is on the line, Danny Ochoa and Kevin Pratt, how many jobs combined right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-120",
+   "text": "yo Denise Ford plus Marisol Vega together, how many calls right now",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_sum",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') + (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-121",
+   "text": "so uh, are all technicians above 30+ jobs",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 30) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-122",
+   "text": "im in the truck, are all technicians above 52+ jobs",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 52) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-123",
+   "text": "has every tech logged at least 55 calls",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 55) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-124",
+   "text": "can you look up does every technician have 56 or more jobs again",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 56) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-125",
+   "text": "im in the truck, does every technician have 59 or more jobs real quick",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 59) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-126",
+   "text": "are all technicians above 20+ jobs when you get a sec",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 20) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-127",
+   "text": "does every technician have 54 or more jobs for me",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 54) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-128",
+   "text": "alright, does every technician have 58 or more jobs asap",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_threshold",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT NOT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 58) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-129",
+   "text": "does anyone have fewer than 50 jobs",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_anybelow",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 50) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-130",
+   "text": "quick one - is any technician under 56 jobs",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_anybelow",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 56) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-technician2-131",
+   "text": "so uh, is any technician under 58 jobs if you have it",
+   "category": "blind-r31-technician2",
+   "shape": "blind2_tech_anybelow",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT value FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) < 58) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  }
+ ]
+}

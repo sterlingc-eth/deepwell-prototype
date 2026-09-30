@@ -19,6 +19,8 @@ import {
   type CustomerTimelineEntry,
 } from '../services/customerClient';
 import { useAppStore } from '../store/appStore';
+import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
+import { AskAdminNote } from '../components/AskAdminNote';
 
 /** customerClient's CustomerDocument/CustomerReminder don't declare `displayName` yet — round 12
  *  hook for whoever owns api/_lib/routes/customers.js + src/services/customerClient.ts: map
@@ -178,6 +180,7 @@ const TABS: { id: Tab; label: string }[] = [
  * BrowseScreen's Documents tab filters).
  */
 export function CustomerProfileScreen() {
+  const canAdmin = useCanAdmin(); // merging customers is admin-only on the server
   const ref = useAppStore((s) => s.customerRef);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const prefillQuestion = useAppStore((s) => s.prefillQuestion);
@@ -466,7 +469,8 @@ export function CustomerProfileScreen() {
                     <span className="block text-caption text-ink-3">{dup.serviceAddress ?? '—'} · {dup.reason}</span>
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
-                    <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={mergeBusy === dup.id || keepSeparateBusy === dup.id} onClick={() => void runMerge(dup.id)}>
+                    {!canAdmin && <AskAdminNote />}
+                    <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={!canAdmin || mergeBusy === dup.id || keepSeparateBusy === dup.id} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void runMerge(dup.id)}>
                       {mergeBusy === dup.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />}
                       Merge into this customer
                     </button>

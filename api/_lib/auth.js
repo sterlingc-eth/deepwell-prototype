@@ -45,18 +45,19 @@
  * the fallback there.
  * ---------------------------------------------------------------------------
  */
-import { verifyToken } from "@clerk/backend";
+// R31 (cold start): @clerk/backend is ~100 ms of module load and only a request that actually carries a session
+// token needs it (API-key, cron, scorecard and health calls never do) — resolved once, on first use.
+let clerkVerifyPromise = null;
+const verifyToken = (token, opts) => {
+  clerkVerifyPromise ??= import("@clerk/backend").then((m) => m.verifyToken, (err) => { clerkVerifyPromise = null; throw err; });
+  return clerkVerifyPromise.then((fn) => fn(token, opts));
+};
 import { upsertMember } from "./members.js";
 import { TTLCache, logStage } from "./perf.js";
+import { APP_ORIGINS } from "./util/origins.js";
 
 /** Origins whose tokens this API will accept. */
-const AUTHORIZED_PARTIES = [
-  "https://deepwellinc.vercel.app",
-  "https://deepwelltechnology.com",
-  "https://www.deepwelltechnology.com",
-  "http://localhost:5173",
-  "http://localhost:4173",
-];
+const AUTHORIZED_PARTIES = [...APP_ORIGINS];
 
 export class AuthError extends Error {
   constructor(message, status = 401) {

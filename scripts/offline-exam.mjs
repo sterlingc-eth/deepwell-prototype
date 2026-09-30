@@ -29,6 +29,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+// R31 (Team A): pin the process/PGlite session timezone. The engine's shop-local date math defaults to
+// America/Phoenix (api/_lib/util/localDate.js), but the exam ORACLES run `d.created_at::date` inside PGlite,
+// which inherits the process TZ. Under TZ=UTC (the default of every scheduled/CI container) time-0002-canonical
+// measured oracle 106 vs engine 114 (documents dated 00:00-07:00 UTC fall on the previous Phoenix day) — the
+// "R26 +1 wrong regression". Not an engine regression: a harness environment dependence. Set before any
+// PGlite instance is created; an explicit TZ from the caller is still honored via DONOVAN_EXAM_TZ.
+process.env.TZ = process.env.DONOVAN_EXAM_TZ || "America/Phoenix";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, "..");
 

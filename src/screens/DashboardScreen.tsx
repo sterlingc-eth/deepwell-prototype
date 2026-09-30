@@ -146,6 +146,7 @@ export function DashboardScreen() {
   const graph = useGraph();
   const askQuestion = useAppStore((s) => s.askQuestion);
   const openEntity = useAppStore((s) => s.openEntity);
+  const openEntityField = useAppStore((s) => s.openEntityField);
   const openCustomer = useAppStore((s) => s.openCustomer);
   const openOutreach = useAppStore((s) => s.openOutreach);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
@@ -615,7 +616,8 @@ export function DashboardScreen() {
                       <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-body text-ink-3">
                         <span className="font-mono text-data">{str(e, 'serial')}</span>
                         <span className="min-w-0 flex-1">{[str(e, 'manufacturer'), str(e, 'model')].filter(Boolean).join(' ') || 'Unknown unit'}</span>
-                        <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-0.5" onClick={() => openEntity(e.id)}>Add install date</button>
+                        {dateOf(e, 'installDate') && <span className="text-caption text-ink-3">Installed {formatYmd(dateOf(e, 'installDate'))} · no warranty term on file</span>}
+                        <button type="button" className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[32px] !py-0.5" onClick={() => openEntityField(e.id, 'installDate')}>{dateOf(e, 'installDate') ? 'Change install date' : 'Add install date'}</button>
                       </li>
                     ))}
                   </ul>

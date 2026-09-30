@@ -13,6 +13,7 @@ import {
   type SupportStarter,
   type SupportSurface,
 } from '../../services/supportClient';
+import { buildDiagnostics } from '../../services/errorReporter';
 import { SupportLogo } from './SupportLogo';
 import { SupportText } from './SupportText';
 import './support.css';
@@ -117,6 +118,7 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
   const [error, setError] = useState<SupportError | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  const [handoffKind, setHandoffKind] = useState<'help' | 'problem'>('help');
 
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -398,11 +400,17 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
             surface={surface}
             defaultEmail={userEmail}
             defaultName={userName}
-            defaultMessage={lastUserText}
-            transcript={transcriptFor}
-            onCancel={() => setHandoffOpen(false)}
+            kind={handoffKind}
+            page={page}
+            defaultMessage={handoffKind === 'problem' ? '' : lastUserText}
+            transcript={handoffKind === 'problem' ? () => [] : transcriptFor}
+            onCancel={() => {
+              setHandoffOpen(false);
+              taRef.current?.focus({ preventScroll: true }); // the form's own button is about to unmount: keep the keyboard user's place
+            }}
             onSent={() => {
               setHandoffOpen(false);
+              taRef.current?.focus({ preventScroll: true });
               setChat((c) => ({ ...c, handoffSent: true }));
             }}
           />
@@ -462,9 +470,14 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
             New chat
           </button>
           {!handoffSent && !handoffOpen && (
-            <button type="button" onClick={() => setHandoffOpen(true)} className="min-h-11 px-2 underline underline-offset-2">
-              Talk to a person
-            </button>
+            <span className="flex items-center gap-1">
+              <button type="button" onClick={() => { setHandoffKind('problem'); setHandoffOpen(true); }} className="min-h-11 px-2 underline underline-offset-2">
+                Report a problem
+              </button>
+              <button type="button" onClick={() => { setHandoffKind('help'); setHandoffOpen(true); }} className="min-h-11 px-2 underline underline-offset-2">
+                Talk to a person
+              </button>
+            </span>
           )}
         </div>
       </div>
@@ -507,9 +520,13 @@ function HandoffForm({
   defaultName,
   defaultMessage,
   transcript,
+  kind,
+  page,
   onCancel,
   onSent,
 }: {
+  kind: 'help' | 'problem';
+  page?: string;
   surface: SupportSurface;
   defaultEmail: string;
   defaultName: string;
@@ -518,6 +535,7 @@ function HandoffForm({
   onCancel: () => void;
   onSent: () => void;
 }) {
+  const problem = kind === 'problem';
   const [email, setEmail] = useState(defaultEmail);
   const [name, setName] = useState(defaultName);
   const [message, setMessage] = useState(defaultMessage.slice(0, MAX_MESSAGE_CHARS));
@@ -538,21 +556,21 @@ function HandoffForm({
     e.preventDefault();
     if (busy) return;
     if (!EMAIL_RE.test(email.trim())) return setErr('Enter the email we should reply to.');
-    if (!message.trim()) return setErr('Tell us what you need help with.');
+    if (!message.trim()) return setErr(problem ? 'Tell us what went wrong.' : 'Tell us what you need help with.');
     setErr(null);
     setBusy(true);
-    const r = await sendSupportHandoff({ email, name: name.trim() || undefined, message, transcript: transcript(), surface });
+    const r = await sendSupportHandoff({ email, name: name.trim() || undefined, message, transcript: transcript(), surface, ...(problem ? { kind: 'problem' as const, diagnostics: buildDiagnostics(surface, page), page } : {}) });
     setBusy(false);
     if (r.ok) return onSent();
     setFailed(true);
     setErr(r.error.kind === 'rate_limited' || r.error.kind === 'invalid' ? r.error.message : "We couldn't send that just now.");
   };
 
-  const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('DeepWell Help request')}&body=${encodeURIComponent(message)}`;
+  const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(problem ? 'DeepWell problem report' : 'DeepWell Help request')}&body=${encodeURIComponent(message)}`;
   const field = 'w-full rounded-lg border border-line-2 bg-bg text-ink px-3 py-2 min-h-11 text-body-lg sm:text-body';
   return (
-    <form ref={ref} onSubmit={submit} className="mt-3 ml-9 rounded-xl border border-line-2 bg-surface p-3 grid gap-2.5" aria-label="Send this conversation to a person" noValidate>
-      <p className="m-0 text-body font-semibold">Send this to a person</p>
+    <form ref={ref} onSubmit={submit} className="mt-3 ml-9 rounded-xl border border-line-2 bg-surface p-3 grid gap-2.5" aria-label={problem ? 'Report a problem' : 'Send this conversation to a person'} noValidate>
+      <p className="m-0 text-body font-semibold">{problem ? 'Report a problem' : 'Send this to a person'}</p>
       <label className="grid gap-1 text-caption text-ink-2">
         Your email
         <input type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} required />
@@ -562,9 +580,10 @@ function HandoffForm({
         <input type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className={field} maxLength={80} />
       </label>
       <label className="grid gap-1 text-caption text-ink-2">
-        What do you need help with?
+        {problem ? 'What went wrong?' : 'What do you need help with?'}
         <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_CHARS))} rows={3} maxLength={MAX_MESSAGE_CHARS} className={`${field} resize-none`} required />
       </label>
+      {problem && <p className="m-0 text-caption text-ink-3">We attach the screen you are on, your device type and any recent error. Never your customers or documents.</p>}
       {err && (
         <p role="alert" className="m-0 text-body text-bad">
           {err}{' '}

@@ -251,6 +251,18 @@ it's used for and what it can see:
 | **Sentry** | Error monitoring, scrubbed as described above (`api/_lib/telemetry.js`) | Error type, stack trace, route, a hashed tenant id — never PII or content |
 | **Resend** | Transactional email (warranty digests, notifications) (`api/_lib/email.js`) | Recipient address and message content for the emails DeepWell sends on your behalf |
 
+## R30 audit hardening (2026-09-29)
+- **Storage keys are server-derived.** `api/records.ts` `createDocument` no longer accepts a client `storage_key` / `stage` / `uploaded_by`; the store also refuses any key not under `<tenantId>/`. Every place a stored key reaches R2 (read-document, agent view-page, get-original, document delete, tenant delete) re-checks the tenant prefix (`keyBelongsToTenant` in `api/_lib/r2.js`). That path now applies the same billing gate and `ingest` rate limit as `/api/upload-url`.
+- **`/api/records` action allowlist.** Reads and `createDocument` are open to any member. Writes to facets/extractions/entities/proposals/documents, `logAction`, `getAuditLog`, `incrementSchemaVersion` need the shop `admin` role (solo users, who have no org, are their own admin). Unknown actions get 400. Client-written audit rows are prefixed `client.` so they cannot be mistaken for server ones. The app UI calls none of the admin actions.
+- **Uploads:** the presigned PUT signs `content-length` when the client declares `sizeBytes` (integer), so R2 rejects any other size; `getObject` refuses anything over 25 MiB (header check plus streaming cap). Partner API-key uploads that omit `sizeBytes` are protected only by the read cap.
+- **Original-download URLs** (`upload-url` mode `get`) need the API key's `read` scope; upload modes need `ingest`.
+- **Platform operator** (`isPlatformOperator`): a member of the founder shop is no longer an operator; the founder shop's `admin` (or a solo founder tenant) is, as is anyone in `DEEPWELL_OPERATOR_USER_IDS`. API keys never are.
+- **Logs:** Postgres errors are logged as code/table/constraint/short message only (no `detail`, which can contain row values).
+- **Invites** are serialized per org so two simultaneous invites cannot both pass the seat check.
+- **Tests never touch real services.** `.env.local` is not loaded by `scripts/verify-*`, `npm run verify:*` or on Vercel (`api/_lib/util/envGuard.js`); set `DEEPWELL_LOAD_ENV_LOCAL=1` to opt a live test back in.
+- Operational knobs: `TENANT_DEFAULT_TZ` (default `America/Phoenix`), `NOTIFY_SWEEP_MAX_TENANTS` (default 200; the sweep is bounded by its time budget, 3 tenants in parallel).
+- Known and accepted: CSP still allows inline scripts; support-widget history turns are client-supplied (low risk); the support IP-hash salt lives in `api/_lib/support/limits.js` (owned elsewhere) and should be set via the `SUPPORT_HASH_SALT` env var.
+
 ## What is NOT yet done
 
 Being direct about the gap is part of the honest answer:

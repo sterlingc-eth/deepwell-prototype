@@ -24,9 +24,9 @@ Yes. With no signal the scan is saved on the phone ("No signal — saved on your
 When a plan or page-limit block stops a phone upload, the row shows the message and a **See plans** button. The owner or an admin fixes it in **Billing** on the desktop app. The scan is not lost.
 
 ### Do the phone tabs stay when I switch?
-~ phone tabs, switch tabs, tabs on phone, ask tab scan tab docs tab, bottom tabs, lose my question, thread stays, does it remember, last tab, tab remembered, header buttons phone, profile button phone
+~ phone tabs, switch tabs, tabs on phone, ask tab scan tab docs tab, bottom tabs, lose my question, thread stays, does it remember, last tab, tab remembered, header buttons phone
 !covers:A-M-TABS
-Yes. The tab you were on is remembered and an Ask thread stays while you switch to Scan or Docs. The header shows the shop name, **Help**, the Field/Office view button and your profile button (sign out is there).
+Yes. The tab you were on is remembered and an Ask thread stays while you switch to Scan or Docs. The header shows the shop name, **Help**, the Field/Office view button and the round profile button (your initial), which opens the **Account** sheet.
 
 ### Why does my phone say "Join your shop first" or "Choose a plan to continue"?
 ~ join your shop first, choose a plan to continue, phone gate, phone says join your shop, phone says choose a plan, open deepwell, phone no shop, phone paywall, blocked on phone, cant use the phone app, phone wont open my shop
@@ -42,3 +42,8 @@ Open the **Docs** tab. Search "Customer, address, serial…", or tap **Filters**
 ~ ask donovan on phone, phone ask, ask tab, ask from my phone, mobile ask, ask in the field, ask donovan anything phone, starter questions, phone starters, ask on the truck, look up a serial on my phone
 !covers:A-M-ASK
 Open the **Ask** tab, type in "Ask Donovan…" or tap a starter, and send. Answers show sources you can tap. It needs a connection; on a weak signal a slow answer says "That took too long — probably a weak signal. Try again." Questions typed into the Help chat can be passed to Ask.
+
+### Where do I sign out or switch shops on the phone?
+~ phone account, account sheet, profile button phone, avatar phone, round button top right, phone sign out, sign out of phone app, switch shop on phone, switch shops phone, change shop on my phone, phone shop switcher, sign out with unsent scans, sign out deletes my scans, stay signed in, sign out and delete, scans waiting sign out, which shop am i in on my phone, current shop phone
+!covers:A-M-ACCOUNT
+Tap the round profile button (your initial) at the top right of the phone app. The **Account** sheet shows your name and email, the **Current shop**, and **Sign out**. If you belong to more than one shop it also lists them under **Switch shop**; tapping one reloads the app on that shop. If scans are still waiting to upload, signing out warns you first: "N scans have not been sent yet. Signing out deletes them from this phone." Choose **Stay signed in** to keep them, or **Sign out and delete**. Scans waiting to upload stay with the shop they were taken in, so switching shops never sends them to the wrong one; they upload when that shop is active again.

@@ -49,8 +49,13 @@ function config() {
  * @param {string} key      object key, e.g. "tenant-uuid/2026/invoice.pdf"
  * @param {number} expiresIn seconds, max 604800
  * @param {Record<string,string>} extraQuery
+ * @param {Date} [now]
+ * @param {{contentLength?: number|null}} [opts]  R30 M5: for a PUT, sign the exact Content-Length the client
+ *   declared, so R2 refuses any body of a different size (an unsigned presigned PUT accepts up to 5 GB whatever
+ *   the client said it would send). The browser's fetch() sets Content-Length itself from the Blob/File, so a
+ *   client that sends what it declared needs no change.
  */
-export function presign(method, key, expiresIn = 900, extraQuery = {}, now = new Date()) {
+export function presign(method, key, expiresIn = 900, extraQuery = {}, now = new Date(), opts = {}) {
   const { accessKeyId, secretAccessKey, bucket, host } = config();
 
   const amzDate = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -59,12 +64,16 @@ export function presign(method, key, expiresIn = 900, extraQuery = {}, now = new
 
   const canonicalUri = '/' + uriEncode(bucket, false) + '/' + uriEncode(key, false);
 
+  const signLength = method === 'PUT' && Number.isInteger(opts?.contentLength) && opts.contentLength > 0;
+  const signedHeaders = signLength ? 'content-length;host' : 'host';
+  const canonicalHeaders = signLength ? `content-length:${opts.contentLength}\nhost:${host}\n` : `host:${host}\n`;
+
   const query = {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': `${accessKeyId}/${scope}`,
     'X-Amz-Date': amzDate,
     'X-Amz-Expires': String(Math.min(expiresIn, 604800)),
-    'X-Amz-SignedHeaders': 'host',
+    'X-Amz-SignedHeaders': signedHeaders,
     ...extraQuery,
   };
   const canonicalQuery = Object.keys(query).sort()
@@ -72,7 +81,7 @@ export function presign(method, key, expiresIn = 900, extraQuery = {}, now = new
 
   const canonicalRequest = [
     method, canonicalUri, canonicalQuery,
-    `host:${host}\n`, 'host', 'UNSIGNED-PAYLOAD',
+    canonicalHeaders, signedHeaders, 'UNSIGNED-PAYLOAD',
   ].join('\n');
 
   const stringToSign = [
@@ -110,8 +119,45 @@ export class R2Error extends Error {
   }
 }
 
-/** Fetch an object's bytes. Used by extraction, which runs server-side. */
-export async function getObject(key) {
+/**
+ * The most bytes any reader will pull out of R2 into memory (R30 M5). The upload limits are 24 MB for a PDF or
+ * photo and 20 MB for text; 25 MiB leaves a little slack. An object bigger than this can only have been PUT past
+ * the declared size (or before size signing existed), and reading it whole would be an out-of-memory / cost hole.
+ */
+export const MAX_OBJECT_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Object keys must sit under the caller's own tenant prefix `<tenantId>/`. Postgres RLS scopes the documents ROW,
+ * but the storage_key it holds was, until R30, writable by the client (api/records.ts createDocument), and
+ * getObject/presign/deleteObject take a bare key — so a foreign key was a cross-tenant read/delete. Pure.
+ * @param {unknown} key
+ * @param {unknown} tenantId  the tenant's internal uuid (db.tenantId / documents.tenant_id)
+ * @returns {boolean}
+ */
+export function keyBelongsToTenant(key, tenantId) {
+  if (typeof key !== 'string' || typeof tenantId !== 'string' || !tenantId) return false;
+  if (!key.startsWith(`${tenantId}/`) || key.length <= tenantId.length + 1) return false;
+  const rest = key.slice(tenantId.length + 1);
+  // No traversal / empty segments / control characters / backslashes.
+  if (rest.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')) return false;
+  return !/[\\\u0000-\u001f\u007f]/.test(rest);
+}
+
+/** Throws R2Error(403) unless the key is under `tenantId`'s prefix. Call before any getObject/presign/deleteObject on a key that came from a row. */
+export function assertKeyInTenant(key, tenantId) {
+  if (!keyBelongsToTenant(key, tenantId)) {
+    throw new R2Error('storage key is not in this tenant', 403);
+  }
+  return key;
+}
+
+/**
+ * Fetch an object's bytes. Used by extraction, which runs server-side.
+ * @param {string} key
+ * @param {{maxBytes?: number}} [opts]  hard cap on the body (default MAX_OBJECT_BYTES). Checked against the
+ *   Content-Length header first and again while streaming, so a body with no/lying length header is still cut off.
+ */
+export async function getObject(key, { maxBytes = MAX_OBJECT_BYTES } = {}) {
   const url = presign('GET', key, 120);
   // A hang here burns the whole function budget and is then hard-killed by the
   // platform, which means no catch block runs and the document is left looking
@@ -128,7 +174,30 @@ export async function getObject(key) {
     await r.body?.cancel().catch(() => {});
     throw new R2Error(`R2 GET ${key} failed: ${r.status}`, r.status);
   }
-  return Buffer.from(await r.arrayBuffer());
+  const declared = Number(r.headers?.get?.('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await r.body?.cancel().catch(() => {});
+    throw new R2Error(`R2 object is ${declared} bytes, over the ${maxBytes}-byte read limit`, 413);
+  }
+  if (!r.body || typeof r.body.getReader !== 'function') {
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > maxBytes) throw new R2Error(`R2 object is over the ${maxBytes}-byte read limit`, 413);
+    return buf;
+  }
+  const reader = r.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new R2Error(`R2 object is over the ${maxBytes}-byte read limit`, 413);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks.map((c) => Buffer.from(c.buffer, c.byteOffset, c.byteLength)), total);
 }
 
 /**

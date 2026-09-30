@@ -57,6 +57,13 @@ export function extractStreetTokens(addresses) {
  * transaction, the same convention every other tenant-scoped read in this
  * codebase already follows.
  */
+/** R31 (speed): the cached vocabulary if it is still fresh, else null — synchronous, no DB. Lets a caller skip
+ *  opening a whole withTenant transaction (BEGIN + SET LOCAL + COMMIT) just to hit an in-process cache. */
+export function peekStreetVocab(tenantKey) {
+  const cached = cacheByTenant.get(tenantKey);
+  return cached && cached.expiresAt > Date.now() ? cached.vocab : null;
+}
+
 export async function getStreetVocab(db, tenantKey) {
   const now = Date.now();
   const cached = cacheByTenant.get(tenantKey);

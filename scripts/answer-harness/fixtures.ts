@@ -205,6 +205,8 @@ export const CITATION_FIXTURE = {
   closest: [],
   interpretation: 'Warranty status for the unit at 2847 N 24th St',
   basis: 'Warranty expiry taken from the registration on file.',
+  // R31 3b: the invoice cited by sentence 2 was replaced by a newer upload (server: api/_lib/supersession.js).
+  supersession: [{ documentId: 'inv1', replacedOn: '2026-09-03', replacedById: 'inv2', replacedByName: 'Invoice 1042 (revised)', newerAlsoCited: false }],
   // Model-written (agent) policy — only an agent-written answer shows the subtle "not found" mark.
   claimCheck: { policy: 'agent', checked: 3, supported: 2, unsupported: [{ kind: 'name', claim: 'Jordan Alvarez', origin: 'text', reason: 'source-mismatch' }], rate: 0.33 },
   sentences: [

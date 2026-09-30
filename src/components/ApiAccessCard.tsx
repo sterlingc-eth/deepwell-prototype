@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, Loader2 } from 'lucide-react';
 import { keysClient, type ApiKeyRow } from '../services/keysClient';
 import { hasApiAccess, type BillingPlanId } from '../services/billingClient';
+import { useCanAdmin } from '../hooks/useCanAdmin';
+import { AskAdminNote } from './AskAdminNote';
 
 /**
  * API access (Round 26): Fleet-only. Every other plan sees an upgrade prompt; Fleet gets a small key manager
@@ -9,13 +11,18 @@ import { hasApiAccess, type BillingPlanId } from '../services/billingClient';
  */
 export function ApiAccessCard({ plan, onUpgrade }: { plan: BillingPlanId | null; onUpgrade: () => void }) {
   const allowed = hasApiAccess(plan);
+  const canAdmin = useCanAdmin();
   return (
     <section className="dw-card p-5 space-y-3" aria-labelledby="api-access-heading">
       <h2 id="api-access-heading" className="text-h3 flex items-center gap-2">
         <KeyRound className="w-4 h-4" aria-hidden="true" />
         API access
       </h2>
-      {allowed ? (
+      {allowed && !canAdmin ? (
+        <p className="text-ink-2">
+          API keys are managed by a shop admin. <AskAdminNote />
+        </p>
+      ) : allowed ? (
         <KeyManager />
       ) : (
         <>

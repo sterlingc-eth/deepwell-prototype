@@ -50,6 +50,12 @@ export interface SupportHandoffRequest {
   message: string;
   transcript?: SupportHistoryItem[];
   surface: SupportSurface;
+  /** 'problem' = sent from "Report a problem": subject tagged Problem, diagnostics attached. */
+  kind?: 'help' | 'problem';
+  /** Scrubbed screen/device/recent-errors block from errorReporter.buildDiagnostics(). */
+  diagnostics?: string;
+  /** Screen name the person was on. */
+  page?: string;
 }
 
 export type SupportErrorKind = 'offline' | 'rate_limited' | 'invalid' | 'auth' | 'server';

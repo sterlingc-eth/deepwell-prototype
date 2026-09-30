@@ -34,6 +34,7 @@ import { packForTenant } from './industry/index.js';
 import { attachCitations } from './citations/records.js';
 import { customerRecord } from './citations/records.js';
 import { escapeRegex as reEscape } from './util/escape.js';
+import { getCorpusStamp } from './askCache.js';
 
 // Doc types too generic/ambiguous to safely pattern-match in free text (never asked about this way in
 // this corpus, and "other"/"internal" are common enough words to false-positive on unrelated questions).
@@ -256,12 +257,28 @@ async function fetchDocLinkage(db) {
   return rows;
 }
 
-/** Builds the bounded customer universe every condition is checked against. Exported (Round 11,
- *  decompose/entitySets.js) so the query-decomposition engine can reuse the SAME per-customer
- *  equipment/docType/serviceDate/technician/email snapshot for its own simple (single-condition)
- *  sub-queries instead of re-deriving it — one shared read, never a second competing definition of
- *  "does this customer satisfy X" for the conditions the two engines both understand. */
-export async function fetchUniverse(db, today) {
+/**
+ * R31 (speed): the three raw reads behind fetchUniverse, memoized per tenant for as long as the tenant's corpus stamp
+ * (askCache.js — documents/extractions/links/entities/financials counts + newest timestamps, the same definition the
+ * answer cache trusts) is unchanged. Only the RAW rows are kept (never the derived universe, which depends on `today`
+ * and is rebuilt below on every call), a stamp probe is one cheap aggregate query versus the ~30 ms link/extraction
+ * scan it replaces, a stub db with no `tenantId` (unit tests) and any stamp failure simply skip the memo, and the memo
+ * holds at most UNIVERSE_MEMO_MAX tenants.
+ */
+const UNIVERSE_MEMO_MAX = 8;
+const universeMemo = new Map(); // tenantId -> { stamp, customers, equipment, linkRows }
+export function _resetUniverseMemo() { universeMemo.clear(); }
+
+async function fetchUniverseRows(db) {
+  const tenantId = db?.tenantId ?? null;
+  const stamp = tenantId ? await getCorpusStamp(db) : null;
+  if (stamp) {
+    const hit = universeMemo.get(tenantId);
+    if (hit && hit.stamp === stamp) {
+      universeMemo.delete(tenantId); universeMemo.set(tenantId, hit); // LRU touch
+      return hit;
+    }
+  }
   const [{ rows: customers }, { rows: equipment }, linkRows] = await Promise.all([
     db.raw(`SELECT id, data->>'customer_name' AS customer_name, data->>'service_address' AS service_address, data->>'email' AS email
               FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} LIMIT 20000`),
@@ -269,6 +286,22 @@ export async function fetchUniverse(db, today) {
               FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND customer_id IS NOT NULL AND ${TENANT_SQL} LIMIT 20000`),
     fetchDocLinkage(db),
   ]);
+  const rowsObj = { stamp, customers, equipment, linkRows };
+  if (stamp) {
+    universeMemo.delete(tenantId);
+    universeMemo.set(tenantId, rowsObj);
+    while (universeMemo.size > UNIVERSE_MEMO_MAX) universeMemo.delete(universeMemo.keys().next().value);
+  }
+  return rowsObj;
+}
+
+/** Builds the bounded customer universe every condition is checked against. Exported (Round 11,
+ *  decompose/entitySets.js) so the query-decomposition engine can reuse the SAME per-customer
+ *  equipment/docType/serviceDate/technician/email snapshot for its own simple (single-condition)
+ *  sub-queries instead of re-deriving it — one shared read, never a second competing definition of
+ *  "does this customer satisfy X" for the conditions the two engines both understand. */
+export async function fetchUniverse(db, today) {
+  const { customers, equipment, linkRows } = await fetchUniverseRows(db);
 
   const eqByCust = new Map();
   for (const e of equipment) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react'
 import { useGraph } from '../core/entityGraph'
 import { getOriginalUrl, type OriginalUrl } from '../services/documentClient'
@@ -14,6 +14,7 @@ import {
 import { IntakeQueueCard } from '../components/intake/IntakeQueueCard'
 import { customerAddress, customerName, customerOf, fieldValue, formatDate, typeLabel } from './docUtils'
 import { Sheet } from './Sheet'
+import { findPassage, passageHighlightOn, passageNeedle, withPdfPage } from '../core/passage'
 import { documentName, hasFriendlyName, originalFilename } from '../core/documentName'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -154,11 +155,16 @@ function DocIntakeCard({ documentId }: { documentId: string }) {
 /** A document's key facts plus its original, one tap away. (Keyed by id in MobileApp, so state starts fresh.) */
 export function DocSheet({
   documentId,
+  page,
+  quote,
   graphLoading,
   onOpenCustomer,
   onClose,
 }: {
   documentId: string
+  /** Cited page / words from the answer's citation (R31 3a). Optional: opened from Docs there is none. */
+  page?: number
+  quote?: string
   graphLoading: boolean
   onOpenCustomer: (ref: string) => void
   onClose: () => void
@@ -182,6 +188,16 @@ export function DocSheet({
   }, [documentId])
 
   const cust = doc ? customerOf(doc, entities) : null
+  const citedQuote = passageHighlightOn() ? passageNeedle(quote) : ''
+  const citedRef = useRef<HTMLDivElement>(null)
+  const isCitedField = (v: string) => {
+    const t = v.trim()
+    return citedQuote.length >= 3 && t.length >= 3 && !!findPassage(citedQuote, t)
+  }
+  // Bring the cited row into view once the fields render (inside the sheet's own scroller: no layout shift).
+  useEffect(() => {
+    if (citedQuote && doc) citedRef.current?.scrollIntoView?.({ block: 'center' })
+  }, [citedQuote, doc])
   const fields = (doc?.extracted ?? []).filter((f) => fieldValue(f) && f.name !== 'raw_text')
   const missing = (doc?.issues ?? []).flatMap((i) => (i.kind === 'missing-field' ? [requirementLabel(i.field)] : []))
   const isImage = !!original?.contentType?.startsWith('image/')
@@ -191,6 +207,17 @@ export function DocSheet({
     <Sheet eyebrow={doc ? typeLabel(doc.typeId) : undefined} title={title} onClose={onClose}>
       {doc && hasFriendlyName(doc) && (
         <p className="m-0 -mt-2 text-caption text-ink-3 truncate">{originalFilename(doc)}</p>
+      )}
+      {citedQuote && (
+        <blockquote
+          data-testid="doc-cited-passage"
+          className="m-0 rounded-xl border-l-4 border-accent bg-surface-2 px-3 py-2 text-body text-ink"
+        >
+          <span className="block text-caption text-ink-3 font-semibold uppercase tracking-wide">
+            Cited{page ? ` on page ${page}` : ''}
+          </span>
+          <mark className="bg-brass-200 dark:bg-forest-600 text-ink rounded-sm px-0.5">{citedQuote}</mark>
+        </blockquote>
       )}
       {UUID_RE.test(documentId) && <DocIntakeCard documentId={documentId} />}
       {(cust || missing.length > 0) && (
@@ -232,7 +259,7 @@ export function DocSheet({
 
       {original ? (
         <a
-          href={original.url}
+          href={withPdfPage(original.url, page)}
           target="_blank"
           rel="noopener noreferrer"
           className="min-h-touch rounded-xl bg-accent text-forest-950 font-semibold flex items-center justify-center gap-2"
@@ -261,15 +288,23 @@ export function DocSheet({
 
       {fields.length > 0 && (
         <dl className="m-0 divide-y divide-line/60">
-          {fields.map((f, i) => (
-            <div key={`${f.name}-${i}`} className="flex justify-between gap-4 py-2.5">
+          {fields.map((f, i) => {
+            const cited = isCitedField(fieldValue(f))
+            return (
+            <div
+              key={`${f.name}-${i}`}
+              ref={cited && !fields.slice(0, i).some((g) => isCitedField(fieldValue(g))) ? citedRef : undefined}
+              data-passage={cited ? 'true' : undefined}
+              className={['flex justify-between gap-4 py-2.5', cited ? 'bg-brass-100 dark:bg-forest-700 -mx-2 px-2 rounded-sm' : ''].join(' ')}
+            >
               <dt className="text-caption text-ink-3 shrink-0 max-w-[45%]">
                 {fieldLabel(f.name)}
                 {f.unitIndex && f.unitIndex > 1 ? ` (unit ${f.unitIndex})` : ''}
               </dt>
               <dd className="m-0 text-body text-ink text-right break-words min-w-0">{fieldValue(f)}</dd>
             </div>
-          ))}
+            )
+          })}
         </dl>
       )}
 

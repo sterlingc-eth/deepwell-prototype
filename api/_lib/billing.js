@@ -400,6 +400,90 @@ export const WEBHOOK_EVENTS = Object.freeze([
   'invoice.payment_failed',
 ]);
 
+// ---------------------------------------------------------------------------
+// R30 M1/M3: event ordering + past-due clock. Stripe does not deliver webhooks in order and retries for days, so
+// "apply every event as it arrives" lets a late invoice.payment_failed resurrect a canceled tenant, a $0 trial
+// invoice flip a trialing tenant to active, or an OLD subscription's deletion cancel a tenant that has since
+// subscribed again. The small bit of state this needs lives in tenants.limits->'_billing' (the jsonb billing_apply()
+// already writes on every event) so NO new column / migration is required:
+//   { eventAt: unix seconds of the newest state-changing event applied,
+//     subId:   the subscription the tenant currently follows,
+//     pastDueSince: unix seconds when the tenant entered past_due (the grace clock, plan.js isPastGrace) }
+// Nothing here throws; a tenant with no `_billing` yet (every tenant before this deploy) behaves exactly as before
+// for its first event, which then starts the record.
+// ---------------------------------------------------------------------------
+
+export const BILLING_META_KEY = '_billing';
+const LIVE_STATUSES = new Set(['active', 'trialing', 'past_due']);
+const ORDERED_TYPES = new Set([
+  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted',
+  'invoice.paid', 'invoice.payment_failed',
+]);
+
+/** Pure: the ordering-relevant facts of a Stripe event. */
+export function eventOrderingMeta(event) {
+  const obj = event?.data?.object ?? {};
+  const created = Number.isFinite(Number(event?.created)) && Number(event.created) > 0 ? Number(event.created) : null;
+  let subscriptionId = null;
+  if (event?.type?.startsWith('customer.subscription.')) subscriptionId = typeof obj.id === 'string' ? obj.id : null;
+  else if (event?.type?.startsWith('invoice.')) subscriptionId = typeof obj.subscription === 'string' ? obj.subscription : (obj.subscription?.id ?? null);
+  else if (event?.type === 'checkout.session.completed') subscriptionId = typeof obj.subscription === 'string' ? obj.subscription : null;
+  return { type: event?.type ?? null, created, subscriptionId, amountPaid: Number.isFinite(Number(obj.amount_paid)) ? Number(obj.amount_paid) : null };
+}
+
+/**
+ * Pure decision: should this event's patch be applied, given what the tenant row already says, and what should be
+ * written alongside it (the `_billing` record)?
+ * @param {{event: object, patch: object, row: {billing_status?: string|null, stripe_subscription_id?: string|null, limits?: object|null}|null, nowSeconds?: number}} args
+ * @returns {{apply: false, reason: string}|{apply: true, patch: object}}
+ */
+export function decideBillingEvent({ event, patch, row, nowSeconds = Math.floor(Date.now() / 1000) }) {
+  const meta = eventOrderingMeta(event);
+  const rowLimits = row?.limits && typeof row.limits === 'object' ? row.limits : {};
+  const prev = rowLimits[BILLING_META_KEY] && typeof rowLimits[BILLING_META_KEY] === 'object' ? rowLimits[BILLING_META_KEY] : {};
+  // checkout.session.completed only records customer/subscription ids and carries no state transition: not ordered.
+  if (!ORDERED_TYPES.has(event?.type)) return { apply: true, patch };
+
+  const status = row?.billing_status ?? null;
+  const currentSub = row?.stripe_subscription_id ?? null;
+  const sid = meta.subscriptionId;
+
+  // 1. Older than something already applied -> stale.
+  if (meta.created != null && Number.isFinite(prev.eventAt) && meta.created < prev.eventAt) return { apply: false, reason: 'stale' };
+
+  // 2. Events about a subscription that is not the tenant's current one.
+  if (sid && currentSub && sid !== currentSub) {
+    const isSubEvent = event.type.startsWith('customer.subscription.');
+    const becomesLive = LIVE_STATUSES.has(patch?.billing_status);
+    const adopt = isSubEvent && event.type !== 'customer.subscription.deleted' && becomesLive &&
+      (event.type === 'customer.subscription.created' || !LIVE_STATUSES.has(status));
+    if (!adopt) return { apply: false, reason: 'other-subscription' };
+  }
+
+  // 3. Invoice events never change a canceled tenant (a new subscription arrives as subscription.created), and
+  //    the $0 invoice Stripe issues when a trial starts is not a payment.
+  if (event.type.startsWith('invoice.')) {
+    if (status === 'canceled') return { apply: false, reason: 'canceled-tenant' };
+    if (event.type === 'invoice.paid' && meta.amountPaid === 0 && status === 'trialing') return { apply: false, reason: 'zero-invoice-during-trial' };
+  }
+
+  // Apply, and write the record.
+  const newStatus = patch?.billing_status ?? status;
+  let pastDueSince = Number.isFinite(prev.pastDueSince) ? prev.pastDueSince : null;
+  if (newStatus === 'past_due') {
+    if (status !== 'past_due' || pastDueSince == null) pastDueSince = meta.created ?? nowSeconds;
+  } else {
+    pastDueSince = null;
+  }
+  const eventAt = meta.created != null ? Math.max(meta.created, Number.isFinite(prev.eventAt) ? prev.eventAt : 0) : (Number.isFinite(prev.eventAt) ? prev.eventAt : null);
+  const subId = patch?.stripe_subscription_id ?? currentSub ?? sid ?? null;
+  const { [BILLING_META_KEY]: _dropped, ...baseLimits } = (patch?.limits && typeof patch.limits === 'object') ? patch.limits : rowLimits;
+  return {
+    apply: true,
+    patch: { ...patch, limits: { ...baseLimits, [BILLING_META_KEY]: { eventAt, subId, pastDueSince } } },
+  };
+}
+
 /**
  * Record the event in the idempotency ledger AND apply its patch in ONE
  * transaction. Why one transaction: recording first and applying second (two
@@ -414,7 +498,7 @@ export const WEBHOOK_EVENTS = Object.freeze([
  * present-key-wins merge patch, so a replayed event only re-writes the same
  * values. A paying customer's subscription state must never fail to apply
  * because a dedupe ledger is unavailable.
- * @returns {Promise<"applied"|"duplicate">}
+ * @returns {Promise<"applied"|"duplicate"|"ignored">}
  */
 export async function recordAndApplyEvent(pool, event, tenantId, patch) {
   const client = await pool.connect();
@@ -440,7 +524,30 @@ export async function recordAndApplyEvent(pool, event, tenantId, patch) {
       await client.query("ROLLBACK");
       return "duplicate";
     }
-    await client.query("SELECT billing_apply($1, $2::jsonb)", [tenantId, JSON.stringify(patch)]);
+    // R30 M1: ordering / staleness. Serialised per tenant (same advisory-lock key checkout uses), read through the
+    // tenant's own RLS scope. Any failure here (older schema, blip) falls back to the previous "apply as-is".
+    let toApply = patch;
+    try {
+      await client.query("SAVEPOINT billing_order");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`billing:${tenantId}`]);
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+      const { rows: trows } = await client.query(
+        "SELECT billing_status, stripe_subscription_id, limits FROM tenants WHERE id = $1",
+        [tenantId]
+      );
+      const decision = decideBillingEvent({ event, patch, row: trows[0] ?? null });
+      await client.query("RELEASE SAVEPOINT billing_order");
+      if (!decision.apply) {
+        console.log(`billing webhook: ignoring ${event.type} ${event.id} (${decision.reason})`);
+        await client.query("COMMIT"); // keep the ledger row: this event was seen and deliberately not applied
+        return "ignored";
+      }
+      toApply = decision.patch;
+    } catch (orderErr) {
+      await client.query("ROLLBACK TO SAVEPOINT billing_order").catch(() => {});
+      console.error("billing webhook: ordering guard unavailable, applying without it:", orderErr?.message);
+    }
+    await client.query("SELECT billing_apply($1, $2::jsonb)", [tenantId, JSON.stringify(toApply)]);
     await client.query("COMMIT");
     return "applied";
   } catch (err) {
@@ -582,9 +689,12 @@ export function pickSubscription(subs) {
  * Stripe customer (created when checkout starts) but the database still says nothing useful: state 'none',
  * or no subscription id recorded. That is exactly "paid, but the webhook never arrived".
  */
-export function needsBillingReconcile(row) {
+export function needsBillingReconcile(row, now = new Date()) {
   if (!row?.stripe_customer_id) return false;
   const status = row.billing_status ?? 'none';
+  // R30 M4: a trial whose end date has passed but that the database still calls 'trialing' means the conversion
+  // (or cancellation) webhook has not landed. Ask Stripe rather than leaving a paying customer in limbo.
+  if (status === 'trialing' && row.trial_ends_at && new Date(row.trial_ends_at).getTime() < now.getTime()) return true;
   return status === 'none' || status === 'incomplete' || (!row.stripe_subscription_id && status !== 'canceled');
 }
 
@@ -633,7 +743,17 @@ export async function reconcileTenantBilling(pool, stripe, { tenantId, row, now 
       (row?.current_period_end ? new Date(row.current_period_end).toISOString() : null) === (p.current_period_end ?? null);
     if (same) return { applied: false, reason: 'already-current' };
 
-    await pool.query('SELECT billing_apply($1, $2::jsonb)', [tenantId, JSON.stringify(p)]);
+    // R30 M1/M3: Stripe's answer right now is at least as fresh as any event created before now, so record that
+    // (keeps a late, older webhook from undoing it) and start the past-due clock if this is the transition.
+    const nowSeconds = Math.floor(now / 1000);
+    const prevMeta = row?.limits?.[BILLING_META_KEY] ?? {};
+    const pastDueSince = p.billing_status === 'past_due'
+      ? (row?.billing_status === 'past_due' && Number.isFinite(prevMeta.pastDueSince) ? prevMeta.pastDueSince : nowSeconds)
+      : null;
+    const baseLimits = p.limits ?? (row?.limits && typeof row.limits === 'object' ? row.limits : {});
+    const { [BILLING_META_KEY]: _old, ...cleanLimits } = baseLimits;
+    const toApply = { ...p, limits: { ...cleanLimits, [BILLING_META_KEY]: { eventAt: nowSeconds, subId: p.stripe_subscription_id ?? null, pastDueSince } } };
+    await pool.query('SELECT billing_apply($1, $2::jsonb)', [tenantId, JSON.stringify(toApply)]);
     return { applied: true, status: p.billing_status, plan: p.plan ?? row?.plan ?? null };
   } catch (err) {
     console.error('billing reconcile failed (non-fatal):', err?.message);

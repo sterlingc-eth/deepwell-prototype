@@ -357,7 +357,7 @@ for (const id of ["i096", "i097", "i098"]) {
 // kept in sync with it rather than duplicated at length. Any wrong id NOT in this list is a brand-new
 // wrong answer this guard introduced and must be investigated, not silently added here.
 const KNOWN_WRONG_IDS = new Set([
-  "breadth-content-019", "breadth-semantic-001", "breadth-semantic-002", "breadth-semantic-003",
+  // R31: the four exam-oracle-regex ids left this list when the oracle was fixed at its source (ADJUDICATION.md "R31").
   "h115", "h140",
   "i063", "i065", "i066", "i067", "i069", "i070", "i072", // F2 (dispatch_history compound) — not this round's
   "i188", // F2 (two-field-at-address) — not this round's

@@ -1,0 +1,2253 @@
+{
+ "version": "r31-blind-1",
+ "category": "blind-r31-fresh",
+ "source": "scripts/gen-blind-r31.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r31-fresh-001",
+   "text": "could you tell me Thomas Osborn - best callback number?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Thomas Osborn%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Thomas Osborn%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-002",
+   "text": "hey, Deborah Ortega - best callback number? again",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Deborah Ortega%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Deborah Ortega%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-003",
+   "text": "hmm, need to ring Kevin Zimmerman, what number real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kevin Zimmerman%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Kevin Zimmerman%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-004",
+   "text": "ok um, Melissa Quintana - best callback number?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Melissa Quintana%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Melissa Quintana%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-005",
+   "text": "quick one - what phone is listed under Kathleen Keller again",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kathleen Keller%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Kathleen Keller%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-006",
+   "text": "which number do I dial for Karen Bracken for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Karen Bracken%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Karen Bracken%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-007",
+   "text": "im in the truck, need to ring Donna Ulloa, what number asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donna Ulloa%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Donna Ulloa%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-008",
+   "text": "could you tell me Michael Redwine - best callback number? again",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Michael Redwine%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Michael Redwine%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-009",
+   "text": "quick one - Barbara Delgado: phone on the account?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Barbara Delgado%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Barbara Delgado%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-010",
+   "text": "sorry, one more - what phone is listed under Maria Gallardo please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Maria Gallardo%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Maria Gallardo%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-011",
+   "text": "alright, which number do I dial for Steven Fitzgerald for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Steven Fitzgerald%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Steven Fitzgerald%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-012",
+   "text": "could you tell me which number do I dial for Daniel Lombardi asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Daniel Lombardi%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Daniel Lombardi%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-013",
+   "text": "im in the truck, need to ring Laura Lombardi, what number asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Laura Lombardi%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Laura Lombardi%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-014",
+   "text": "Robert Salazar's mobile please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Robert Salazar%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Robert Salazar%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-015",
+   "text": "could you tell me Daniel Keller's mobile please asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Daniel Keller%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Daniel Keller%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-016",
+   "text": "real quick: which number do I dial for David Sandoval",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%David Sandoval%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%David Sandoval%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-017",
+   "text": "could you tell me need to ring Maria Holbrook, what number again",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Maria Holbrook%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Maria Holbrook%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-018",
+   "text": "so uh, Stephanie Osborn: phone on the account? asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Stephanie Osborn%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Stephanie Osborn%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-019",
+   "text": "quick q - need to ring William Quintana, what number if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%William Quintana%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%William Quintana%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-020",
+   "text": "could you tell me what phone is listed under Paul Kowalski if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Paul Kowalski%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Paul Kowalski%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-021",
+   "text": "gimme a sec, need to ring Donald Sorenson, what number when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donald Sorenson%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Donald Sorenson%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-022",
+   "text": "hold up, Jason Zamora: phone on the account? right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Jason Zamora%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Jason Zamora%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-023",
+   "text": "hold up, need to ring Richard Pruitt, what number",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Richard Pruitt%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Richard Pruitt%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-024",
+   "text": "could you tell me George Garrison - best callback number? please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%George Garrison%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%George Garrison%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-025",
+   "text": "so uh, Timothy Vance - best callback number? when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Timothy Vance%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Timothy Vance%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-026",
+   "text": "Matthew Winslow - best callback number? real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Matthew Winslow%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Matthew Winslow%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-027",
+   "text": "quick q - Cynthia Kowalski - best callback number?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Cynthia Kowalski%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Cynthia Kowalski%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-028",
+   "text": "hang on... which number do I dial for Steven Ellison please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Steven Ellison%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Steven Ellison%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-029",
+   "text": "sorry, one more - Gary Wyckoff's mobile please please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Gary Wyckoff%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Gary Wyckoff%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-030",
+   "text": "quick q - which number do I dial for Laura Nakamura please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Laura Nakamura%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Laura Nakamura%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-031",
+   "text": "real quick: Joseph Ortega - email on the account?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Joseph Ortega%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Joseph Ortega%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-032",
+   "text": "quick q - Ronald Dominguez's e-mail if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ronald Dominguez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Ronald Dominguez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-033",
+   "text": "ok um, where do I email Barbara Ellison thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Barbara Ellison%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Barbara Ellison%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-034",
+   "text": "one sec, which email is listed for Kevin Abernathy real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kevin Abernathy%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Kevin Abernathy%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-035",
+   "text": "yo Karen Abernathy's e-mail if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Karen Abernathy%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Karen Abernathy%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-036",
+   "text": "umm Patricia Esparza's e-mail please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Patricia Esparza%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Patricia Esparza%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-037",
+   "text": "umm Thomas Nakamura - email on the account? if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Thomas Nakamura%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Thomas Nakamura%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-038",
+   "text": "one sec, where do I email Ronald Fenwick when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ronald Fenwick%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Ronald Fenwick%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-039",
+   "text": "hold up, Robert Thornton - email on the account?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Robert Thornton%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Robert Thornton%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-040",
+   "text": "hang on... where do I email Melissa Pruitt asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Melissa Pruitt%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Melissa Pruitt%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-041",
+   "text": "hold up, Amanda Quinley - email on the account? thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Amanda Quinley%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Amanda Quinley%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-042",
+   "text": "sorry, one more - Patricia Fenwick's e-mail real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Patricia Fenwick%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Patricia Fenwick%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-043",
+   "text": "quick one - Steven Hutchins's e-mail",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Steven Hutchins%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Steven Hutchins%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-044",
+   "text": "hmm, which email is listed for Emily Villegas",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Emily Villegas%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Emily Villegas%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-045",
+   "text": "im in the truck, which email is listed for Jessica Chavez real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Jessica Chavez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Jessica Chavez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-046",
+   "text": "quick q - where do I email Ashley Whitfield when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ashley Whitfield%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Ashley Whitfield%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-047",
+   "text": "hmm, which address is Angela Hutchins at",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Angela Hutchins%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Angela Hutchins%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-048",
+   "text": "ok so where's the Mark Ibarra place asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Mark Ibarra%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Mark Ibarra%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-049",
+   "text": "one sec, Ronald Bracken - street address? thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ronald Bracken%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Ronald Bracken%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-050",
+   "text": "umm where does George Hutchins live",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%George Hutchins%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%George Hutchins%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-051",
+   "text": "quick one - which address is Anthony Alvarez at thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Anthony Alvarez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Anthony Alvarez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-052",
+   "text": "where does Kenneth Gallardo live",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kenneth Gallardo%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Kenneth Gallardo%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-053",
+   "text": "hmm, Amy Isaacson - street address? asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Amy Isaacson%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Amy Isaacson%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-054",
+   "text": "yo job site address for Timothy Ulloa right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Timothy Ulloa%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Timothy Ulloa%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-055",
+   "text": "can you look up which address is Linda Garrison at again",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Linda Garrison%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Linda Garrison%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-056",
+   "text": "umm which address is Jessica Bennett at thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Jessica Bennett%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Jessica Bennett%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-057",
+   "text": "gimme a sec, which address is Ashley Vance at right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ashley Vance%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Ashley Vance%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-058",
+   "text": "so uh, where does James Underhill live right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%James Underhill%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%James Underhill%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-059",
+   "text": "one sec, job site address for Charles Montoya real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Charles Montoya%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Charles Montoya%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-060",
+   "text": "hold up, job site address for Carol Rios right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Carol Rios%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Carol Rios%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-061",
+   "text": "alright, Mark Jennings - street address?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Mark Jennings%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Mark Jennings%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-062",
+   "text": "hmm, Stephanie Nakamura - street address?",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Stephanie Nakamura%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Stephanie Nakamura%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-063",
+   "text": "so uh, where does Charles Whitford live for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Charles Whitford%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Charles Whitford%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-064",
+   "text": "ok so where does Brian Chavez live real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Brian Chavez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Brian Chavez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-065",
+   "text": "hmm, where's the William Rios place for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%William Rios%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%William Rios%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-066",
+   "text": "hold up, which address is Amy Larkin at",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Amy Larkin%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Amy Larkin%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-067",
+   "text": "yo where's the Kathleen Jennings place",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kathleen Jennings%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Kathleen Jennings%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-068",
+   "text": "hold up, where's the Betty Zimmerman place",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Betty Zimmerman%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Betty Zimmerman%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-069",
+   "text": "hmm, where does Thomas Mercer live asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Thomas Mercer%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Thomas Mercer%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-070",
+   "text": "customer is on the line, where does Linda Fitzgerald live right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Linda Fitzgerald%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Linda Fitzgerald%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-071",
+   "text": "customer is on the line, how busy has Denise Ford been, in jobs for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-072",
+   "text": "so uh, how busy has Danny Ochoa been, in jobs",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-073",
+   "text": "ok um, count Wyatt Coburn's visits if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-074",
+   "text": "so uh, Ray Sutton - how many jobs so far",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-075",
+   "text": "im in the truck, number of calls handled by Marisol Vega",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-076",
+   "text": "can you look up number of calls handled by Kevin Pratt thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-077",
+   "text": "real quick: Denise Ford - how many jobs so far asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-078",
+   "text": "quick q - how busy has Danny Ochoa been, in jobs if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-079",
+   "text": "count Wyatt Coburn's visits thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-080",
+   "text": "real quick: how busy has Ray Sutton been, in jobs if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-081",
+   "text": "hang on... Marisol Vega - how many jobs so far",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-082",
+   "text": "count Kevin Pratt's visits please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-083",
+   "text": "so uh, number of calls handled by Denise Ford",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-084",
+   "text": "im in the truck, number of calls handled by Danny Ochoa right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-085",
+   "text": "yo does Denise Ford trail Danny Ochoa in jobs",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-086",
+   "text": "hold up, does Kevin Pratt trail Denise Ford in jobs",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Denise Ford') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-087",
+   "text": "sorry, one more - is Kevin Pratt ahead of Marisol Vega",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Kevin Pratt') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-088",
+   "text": "could you tell me does Ray Sutton trail Marisol Vega in jobs please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Marisol Vega') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-089",
+   "text": "one sec, is Ray Sutton ahead of Wyatt Coburn thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Ray Sutton') > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-090",
+   "text": "quick one - does Danny Ochoa trail Wyatt Coburn in jobs right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_tech_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Danny Ochoa') < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r31-fresh-091",
+   "text": "hold up, unit brand at 842 S Ellsworth Rd",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "842 S Ellsworth Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-092",
+   "text": "can you look up unit brand at 3765 E Broadway Rd please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3765 E Broadway Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-093",
+   "text": "hold up, anything known about 731 W Camelback Rd",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "731 W Camelback Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-094",
+   "text": "unit brand at 2803 W Guadalupe Rd right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "2803 W Guadalupe Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-095",
+   "text": "sorry, one more - tonnage at 1471 N Power Rd? if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1471 N Power Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-096",
+   "text": "can you look up who's the owner at 3506 E Main St thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3506 E Main St%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-097",
+   "text": "hey, who's the owner at 3617 E University Dr real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3617 E University Dr%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-098",
+   "text": "ok um, unit brand at 1323 E Chandler Blvd right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1323 E Chandler Blvd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-099",
+   "text": "gimme a sec, anything known about 3025 E Chandler Blvd asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3025 E Chandler Blvd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-100",
+   "text": "so uh, anything known about 2692 W Southern Ave for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "2692 W Southern Ave%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-101",
+   "text": "quick q - anything known about 3302 S Alma School Rd real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3302 S Alma School Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-102",
+   "text": "could you tell me tonnage at 583 W Thomas Rd? asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "583 W Thomas Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-103",
+   "text": "ok so anything known about 953 E Main St",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "953 E Main St%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-104",
+   "text": "hold up, unit brand at 3247 S Higley Rd for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3247 S Higley Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-105",
+   "text": "unit brand at 3136 W Thomas Rd",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3136 W Thomas Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-106",
+   "text": "hey, anything known about 1101 W Guadalupe Rd asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_fake_address",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1101 W Guadalupe Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-107",
+   "text": "gimme a sec, pull the paperwork dated January 2028 when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-108",
+   "text": "could you tell me total jobs completed during 2029 for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-109",
+   "text": "can you look up pull the paperwork dated November 2030 asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-110",
+   "text": "one sec, total jobs completed during 2031",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-111",
+   "text": "quick one - total jobs completed during 2032",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-112",
+   "text": "quick one - total jobs completed during 2033",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-113",
+   "text": "gimme a sec, total jobs completed during 2028 please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-114",
+   "text": "gimme a sec, did anything get invoiced in December 2029 asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-115",
+   "text": "total jobs completed during 2030 real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-116",
+   "text": "umm pull the paperwork dated October 2031",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_future",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-117",
+   "text": "im in the truck, whats the meaning of the word ubiquitous right now",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-118",
+   "text": "alright, how do I center a div in css",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-119",
+   "text": "can you look up whats a good gift for my wife asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-120",
+   "text": "can you look up convert 50 fahrenheit to celsius thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-121",
+   "text": "customer is on the line, who sang bohemian rhapsody",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-122",
+   "text": "alright, how many teaspoons in a tablespoon",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-123",
+   "text": "hang on... what is the tallest tree species when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-124",
+   "text": "could you tell me any good movies on tonight",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_offtopic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-125",
+   "text": "alright, which of our guys is closest to Mesa right now when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_live",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-126",
+   "text": "real quick: who can cover the 3pm slot",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_live",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-127",
+   "text": "quick one - anyone able to take a walk-in today asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_live",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-128",
+   "text": "ok um, who's covering nights this week if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_live",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-fresh-129",
+   "text": "ok so show me everything on Joseph Ortegaa if you have it",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Joseph Ortegaa%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-130",
+   "text": "hmm, email for Kaen Abernathy asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kaen Abernathy%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-131",
+   "text": "can you look up Betty Wnslow - what's the address real quick",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Betty Wnslow%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-132",
+   "text": "ok so Caro Salazar - what's the address when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Caro Salazar%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-133",
+   "text": "hmm, show me everything on Emly Villegas thanks",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Emly Villegas%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-134",
+   "text": "sorry, one more - Stephanie Osbornn - what's the address for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Stephanie Osbornn%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-135",
+   "text": "hey, Jaon Yarborough - what's the address for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Jaon Yarborough%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-136",
+   "text": "ok um, Edward Dominguezz - what's the address for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Edward Dominguezz%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-137",
+   "text": "email for Ronald Fnwick please",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ronald Fnwick%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-138",
+   "text": "hmm, show me everything on Rebecc Montoya when you get a sec",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Rebecc Montoya%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-139",
+   "text": "yo email for Angela Ibarraa asap",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Angela Ibarraa%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-fresh-140",
+   "text": "can you look up Rober Salazar - what's the address for me",
+   "category": "blind-r31-fresh",
+   "shape": "fresh_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Rober Salazar%"
+    ]
+   }
+  }
+ ]
+}

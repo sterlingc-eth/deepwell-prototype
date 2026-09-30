@@ -130,13 +130,16 @@ try {
     let clicks = 0;
     const click = async (locator) => { await locator.click(); clicks++; };
 
+    // R30: Records now opens on Documents for a new user (and on whichever tab they used last after that),
+    // so the very first visit costs one extra click to reach Customers; the next visit is back to 2.
     await click(page.getByRole('button', { name: 'Records' }));
+    await click(page.getByRole('tab', { name: 'Customers' }));
     await page.waitForSelector('table');
     await click(page.getByText('Harbor Point Apartments'));
 
     await page.waitForSelector('[role="tablist"]');
     const equipmentTab = page.getByRole('tab', { name: 'Equipment' });
-    check('task 4: reached a customer profile in <= 2 clicks', clicks <= 2, `clicks: ${clicks}`);
+    check('task 4: reached a customer profile in <= 3 clicks on a first visit (Records opens on Documents)', clicks <= 3, `clicks: ${clicks}`);
     check('task 4: Equipment tab is selected by default (was Documents)', await equipmentTab.getAttribute('aria-selected') === 'true');
     check('task 4: Equipment tab content is visible with no extra click', (await page.getByText('SN-LEN-345678').count()) > 0);
 
@@ -194,6 +197,7 @@ try {
   {
     const page = await newPage({ width: 1440, height: 900 });
     await go(page, 'browse');
+    await page.getByRole('tab', { name: 'Customers' }).click(); // R30: Records opens on Documents now
     await page.waitForSelector('table');
     const trigger = page.locator('span[tabindex="0"]').first();
     check('Tooltip trigger (customer alerts badge) is present', (await trigger.count()) > 0);

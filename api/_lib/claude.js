@@ -4,11 +4,15 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createHash } from "crypto";
 import { captureException } from "./telemetry.js";
+import { shouldLoadEnvLocal } from "./util/envGuard.js";
+import { APP_ORIGINS } from "./util/origins.js";
 
 // --- Load .env.local manually (no dotenv dependency needed) ---
 // vercel dev does not reliably inject .env.local into serverless functions,
 // so we read the file ourselves. Only fills in vars that aren't already set.
 function loadEnvLocal() {
+  // R30: never inside a verify script / on Vercel — see util/envGuard.js.
+  if (!shouldLoadEnvLocal()) return null;
   const here = dirname(fileURLToPath(import.meta.url)); // .../api/_lib
   const candidates = [
     resolve(process.cwd(), ".env.local"),
@@ -361,13 +365,7 @@ export async function withBackoff(fn, options = {}) {
   throw lastError;
 }
 
-const ALLOWED_ORIGINS = [
-  "https://deepwellinc.vercel.app",
-  "https://deepwelltechnology.com",
-  "https://www.deepwelltechnology.com",
-  "http://localhost:5173",
-  "http://localhost:4173",
-];
+const ALLOWED_ORIGINS = APP_ORIGINS;
 
 export function handleCors(res, req) {
   // An allowlist, not "*". With credentials in play, "*" would let any site on
@@ -378,7 +376,7 @@ export function handleCors(res, req) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-DW-Expected-Tenant");
   return res;
 }
 
@@ -416,11 +414,34 @@ export function sendPrivateCacheableJson(res, req, body, maxAgeSeconds = 15) {
   return res.status(200).send(json);
 }
 
+/**
+ * A Postgres driver error carries `detail` ("Key (email)=(a@b.com) already exists."), `where`, `hint`, and other
+ * fields that can hold the row's actual values. Logging the whole object put customer data in the logs (R30 L6).
+ * Keep only what is needed to diagnose: the SQLSTATE code, the message (truncated), and the table/constraint.
+ * Anything that is not a pg error is returned untouched.
+ * @param {any} err
+ */
+export function scrubErrorForLog(err) {
+  if (!err || typeof err !== "object") return err;
+  const looksPg =
+    typeof err.code === "string" && /^[0-9A-Z]{5}$/.test(err.code) &&
+    ("severity" in err || "detail" in err || "routine" in err || "schema" in err || "table" in err || "constraint" in err);
+  if (!looksPg) return err;
+  return {
+    name: err.name,
+    code: err.code,
+    message: String(err.message ?? "").slice(0, 300),
+    table: err.table,
+    constraint: err.constraint,
+    routine: err.routine,
+  };
+}
+
 export function handleError(res, error, req, extra = {}) {
   // Log the detail; return none of it. `error.message` here can carry the
   // Anthropic SDK's internals, our own config hints, or a stack fragment —
   // all of it useful to an attacker and useless to a user.
-  console.error("API Error:", error);
+  console.error("API Error:", scrubErrorForLog(error));
 
   // Fire-and-forget: telemetry must never delay or fail the response it is
   // reporting on. `extra` lets a caller that already has it (ask.js,

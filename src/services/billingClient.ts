@@ -154,7 +154,7 @@ export function daysUntil(iso: string | null | undefined, now: Date = new Date()
 }
 
 export interface BillingBanner {
-  kind: 'trialing' | 'past_due' | 'cap';
+  kind: 'trialing' | 'past_due';
   message: string;
 }
 
@@ -168,16 +168,16 @@ export function resetsOnShortLabel(iso: string | null | undefined): string | nul
   return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-/** Never-subscribed tenants may ingest/ask about this many documents before
- *  a trial or subscription is required — mirrors api/_lib/plan.js's
- *  FREE_PREVIEW_DOCUMENTS. */
-export const FREE_PREVIEW_DOCUMENTS = 3;
-
 /**
  * What AppShell's global banner should say, if anything, for a given billing
- * status: trial countdown, a past-due warning, or a free-preview-exhausted
- * nudge — each linking to Billing. Pure function of the status the caller
- * already fetched, so it's directly unit-testable (scripts/verify-ui.ts).
+ * status: a trial countdown or a past-due warning, each linking to Billing. Pure
+ * function of the status the caller already fetched, so it's directly
+ * unit-testable (scripts/verify-ui.ts).
+ *
+ * R30: there is no free preview any more (api/_lib/plan.js FREE_PREVIEW_DOCUMENTS = 0, hard gate 2026-09-21). A
+ * never-subscribed ('none') shop is routed to Billing by App.tsx and sees that screen's own "Pick a plan to open
+ * your account" headline, so this banner has nothing to add and used to carry a stale "Free preview used up" line
+ * copied from a client-side constant (3) that disagreed with the server (0). The constant and that path are gone.
  */
 export function billingBannerFor(status: BillingStatus | null, now: Date = new Date()): BillingBanner | null {
   if (!status) return null;
@@ -193,9 +193,6 @@ export function billingBannerFor(status: BillingStatus | null, now: Date = new D
   }
   if (status.status === 'past_due') {
     return { kind: 'past_due', message: 'Your last payment failed. Update billing to keep uploading.' };
-  }
-  if (status.status === 'none' && status.usage.documentsStored >= FREE_PREVIEW_DOCUMENTS) {
-    return { kind: 'cap', message: 'Free preview used up. Start your 30-day trial to keep going.' };
   }
   return null;
 }

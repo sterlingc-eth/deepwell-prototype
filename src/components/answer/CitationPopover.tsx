@@ -22,7 +22,7 @@ function clientFallbackQuote(previewText: string | undefined): string | undefine
 export interface CitationPopoverProps {
   citation: SentenceCitation;
   onClose: () => void;
-  onOpenDocument: (documentId: string, page?: number) => void;
+  onOpenDocument: (documentId: string, page?: number, quote?: string) => void;
   /** Resolves the element to return focus to when this closes (the marker button that opened it) —
    *  a getter, not the element itself: reading a ref's `.current` is only safe outside of render. */
   returnFocusTo?: () => HTMLElement | null;
@@ -130,7 +130,7 @@ export function CitationPopover({ citation, onClose, onOpenDocument, returnFocus
           data-tap-target="true"
           className="dw-btn-secondary mt-3 w-full min-h-touch justify-center"
           onClick={() => {
-            onOpenDocument(citation.documentId, citation.page);
+            onOpenDocument(citation.documentId, citation.page, citation.quote);
             onClose();
           }}
         >

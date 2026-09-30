@@ -241,7 +241,20 @@ function correctNamePhrase(phrase, glossary) {
     changed = true;
     return w[0] === w[0].toUpperCase() ? fix[0].toUpperCase() + fix.slice(1) : fix;
   });
-  return changed ? fixedWords.join(' ') : null;
+  if (!changed) return null;
+  // R31 (Team A): a multi-word name corrected word by word must land on words of ONE real name on file. Otherwise
+  // "Kevinn Zimmerman" (a customer) became "Kevin Zimmerman" because "Kevin" is a technician's first name and
+  // "Zimmerman" was left alone — a person who exists nowhere, silently substituted into the question text (and the
+  // downstream customer lookup then resolved it as if it were typed exactly). Single words keep the old behavior.
+  const nameWords = fixedWords.filter((w) => /^[A-Z]/.test(w)).map((w) => w.toLowerCase().replace(/'s$/, '')).filter((w) => !VOCAB.has(w) && !/^(?:did|does|do|is|was|has|had|are|were|have|how|what|who|when|where|which)$/.test(w));
+  if (nameWords.length > 1) {
+    const one = glossary.phrases.some((p) => {
+      const toks = p.toLowerCase().split(/\s+/);
+      return nameWords.every((w) => toks.includes(w));
+    });
+    if (!one) return null;
+  }
+  return fixedWords.join(' ');
 }
 
 /**

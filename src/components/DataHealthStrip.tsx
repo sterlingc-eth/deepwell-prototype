@@ -7,6 +7,8 @@ import { PIPELINE_STAGES } from '../core/types';
 import { useAppStore } from '../store/appStore';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
 import { downloadExportCsv } from '../services/exportClient';
+import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
+import { AskAdminNote } from './AskAdminNote';
 
 /** Safety cap on reclassify rounds: `reclassify` caps its own model calls per
  *  request, so a stubborn batch (no page text, model keeps saying 'other')
@@ -24,6 +26,7 @@ const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 export function DataHealthStrip() {
   const graph = useGraph();
   const openInboxNeedsPerson = useAppStore((s) => s.openInboxNeedsPerson);
+  const canAdmin = useCanAdmin();
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   const reclassifyDocs = useGraph((s) => s.reclassifyDocs);
   const aiVerifyDoc = useGraph((s) => s.aiVerifyDoc);
@@ -127,9 +130,19 @@ export function DataHealthStrip() {
             </button>
           )}
           {!DEMO_MODE && total > 0 && (
-            <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1.5" disabled={exporting} onClick={() => void runExport()}>
-              {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Export CSV
-            </button>
+            <span className="inline-flex items-center gap-2">
+              <button
+                type="button"
+                className="dw-btn-secondary !min-h-[36px] !py-1.5"
+                disabled={!canAdmin || exporting}
+                title={canAdmin ? undefined : ASK_ADMIN_TITLE}
+                aria-describedby={canAdmin ? undefined : 'health-export-admin-note'}
+                onClick={() => void runExport()}
+              >
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Export CSV
+              </button>
+              {!canAdmin && <AskAdminNote id="health-export-admin-note" />}
+            </span>
           )}
           {bulkProgress && <span className="text-caption text-ink-3">{bulkProgress}</span>}
         </div>

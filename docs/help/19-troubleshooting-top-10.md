@@ -30,7 +30,7 @@ Open the cited source and check it. The document may still be processing, or a f
 ### I can't see the Dashboard or Team screen
 ~ cant see team, no team screen, cant see billing, no dashboard, missing screen, cant find team, permission denied, requires admin, admin role, not authorized, forbidden, access denied, why cant i
 !covers:A-TEAM-MEMBER
-Some screens and actions are for admins. Team is hidden from members, and if a member reaches it they see a read-only list of members. Billing, invites, exports and deletions need an admin, and a member who tries gets "This action requires the 'admin' role in your shop." Ask your shop's admin. On a phone the app only has Ask, Scan and Docs, so use the desktop app for the rest.
+Some screens and actions are for admins. Team is hidden from members, and if a member reaches it they see a read-only list of members. Billing, invites, exports and deletions need an admin. A member sees those buttons disabled with "Ask an admin" beside them (Export CSV, customer merge, Billing actions, API keys), and Empty documents and Delete document are hidden. Ask your shop's admin. On a phone the app only has Ask, Scan and Docs, so use the desktop app for the rest.
 
 ### I get "API access is included on the Fleet plan"
 ~ api access error, api access is included on the fleet plan, cant create api key, api key error, create api key, api keys not working, 403 api, api forbidden

@@ -154,7 +154,8 @@ const examExport = exportA ?? committed;
 // the check is "actual wrong ids subset of this list", not "equal to".
 const KNOWN_WRONG_IDS = new Set([
   // R15: lookups-0010-*, hvac-tech-0007, lookups-0084 (install_date) and breadth-content-028 fixed; shrink-only list.
-  "breadth-content-019", // deliberately not chased - see file header
+  // R31: breadth-content-019 and breadth-semantic-001/002/003 REMOVED — the exam oracle's unanchored regexes were fixed at
+  // their source (test-docs/scorecard/breadth.mjs: "ice " -> \yice\y, "loud" -> \yloud); see ADJUDICATION.md "R31".
   // R23 (D1): re-verified breadth-content-019 and, this round, breadth-semantic-001/002/003 directly
   // against scripts/golden/golden-export.json's own document_pages.text (not just the exam's stated
   // expected count) — both are the SAME class of bug, in the EXAM'S oracle regex, not this codebase:
@@ -174,7 +175,6 @@ const KNOWN_WRONG_IDS = new Set([
   // having complained of a loud unit; every invoice/service-address line would count as a freeze-up)
   // far worse than 4 wrong ids, so left as a documented, deliberate non-fix, same as R18's original
   // breadth-content-019 call — never chased by loosening the word-boundary guard.
-  "breadth-semantic-001", "breadth-semantic-002", "breadth-semantic-003",
 
   // R16 part 2 (F1): the 23 g-ids below (the owner-decision address policy not yet answering
   // manufacturer/tonnage/refrigerant/warranty by address; 3 install-date-by-address reading the
@@ -850,8 +850,11 @@ if (examExport) {
     // R24: distinct-count/list + head-to-head metrics (analytics) and six new no-model families
     // (fastPath/docLookup: possessive-name fix, invoice/PO totals, agreement cost, equipment age,
     // "is there X on file", brand yes/no). Measured 1457/1426, wrong 16 -> 12 → floor RAISED to 1450/1420.
-    check(`no-model coverage floor: correct ≥ 1420 (got ${overall.correct})`, overall.correct >= 1420, JSON.stringify(overall));
-    check(`no-model coverage floor: answeredWithoutModel ≥ 1450 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1450, JSON.stringify(overall));
+    // R31 (Team A): conversational frame + entity-first slot filling + technician job counts + future-year / off-topic /
+    // near-miss honesty + the breadth-content-019/semantic oracle-regex fix. Measured 1524/1496 (incl. live-status declines), wrong 12 -> 8 (zero new wrong
+    // ids, zero lost-correct) → floor RAISED to 1515/1488 (a little below measured, same margin convention as above).
+    check(`no-model coverage floor: correct ≥ 1488 (got ${overall.correct})`, overall.correct >= 1488, JSON.stringify(overall));
+    check(`no-model coverage floor: answeredWithoutModel ≥ 1515 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1515, JSON.stringify(overall));
     check(`no-model coverage floor: correct ≥ 1165 (got ${overall.correct})`, overall.correct >= 1165, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 

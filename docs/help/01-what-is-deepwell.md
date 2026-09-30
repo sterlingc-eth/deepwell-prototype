@@ -16,7 +16,7 @@ DeepWell finds the answer in your own records. Your work orders, warranty sheets
 ~ who is it for, who uses deepwell, target customer, what kind of business, contractors, hvac shops, small shop, who should use, is it for me, what industries, which trades, do you support hvac
 DeepWell is built for HVAC contractors today, from an owner-operator to a multi-crew shop. Office staff and dispatch use it to answer callers, technicians use it in the field on a phone, and owners use it to see expiring warranties and maintenance agreements.
 
-### Do you support electrical, plumbing or property management?
+### Do you support electrical, plumbing or property management?, electrical contractors, just hvac, only hvac
 ~ electrical, plumbing, property management, other trades, other industries, other verticals, waitlist, do you do electrical, do you work with plumbers, do you support electricians, landscaping, roofing, do you support plumbers, support plumbers, plumbers, electricians, do you support electricians, do you work with plumbers, work with electricians
 HVAC is the only industry DeepWell runs today. Electrical, plumbing and property management pages exist on the site and are marked as coming. There are no dates. You can join the waitlist from those pages or email hello@deepwelltechnology.com.
 

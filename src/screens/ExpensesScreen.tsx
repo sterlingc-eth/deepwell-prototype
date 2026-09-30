@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { localYmd } from '../core/localDate';
 import { Camera, ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Paperclip, Pencil, Plus, Receipt, Sparkles, Trash2, Upload, X } from 'lucide-react';
 import {
   EXPENSE_CATEGORIES,
@@ -64,7 +65,7 @@ function unsupportedReason(file: File): string | null {
 }
 
 function newDraft(): ExpenseFieldsInput {
-  return { occurredOn: new Date().toISOString().slice(0, 10), vendor: '', amount: '', category: 'Other', note: '' };
+  return { occurredOn: localYmd(), vendor: '', amount: '', category: 'Other', note: '' };
 }
 
 function monthLabel(ym: string): string {

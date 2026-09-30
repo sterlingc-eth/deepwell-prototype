@@ -15,7 +15,7 @@ Every document moves through five stages. When DeepWell is unsure about somethin
 
 ### My document is stuck or still processing. What should I do?
 ~ stuck, still processing, not processing, never finished, stuck at received, taking too long, upload stuck, hasnt finished, stuck on read, pending, waiting, spinning, nothing happened, document not showing
-Give it a few minutes; large files and batches take longer. Check **Inbox** after a refresh. If a document has sat at **Uploaded** for more than about 15 minutes, email support@deepwelltechnology.com with the file name and the time you uploaded it. Files that were accepted but not finished show "Still processing"; the status lives in Inbox.
+Give it a few minutes; large files and batches take longer. Check **Inbox** after a refresh. If a document has sat at **Uploaded** for more than about 15 minutes, email support@deepwelltechnology.com with the file name and the time you uploaded it. Files that were accepted but not finished show "Still processing — check Inbox in a few minutes" with a **See Needs you** button that opens **Inbox → Needs you**, where anything that needs a person lands.
 !handoff:stuck-document
 
 ### Why was my document flagged?

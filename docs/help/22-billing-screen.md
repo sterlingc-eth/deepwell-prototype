@@ -6,7 +6,7 @@ surface: desktop
 keywords: billing, trial, plan, usage, status, paywall, records rescue, api keys, stripe, portal, checkout, subscription
 updated: 2026-09-29
 ---
-Billing is in the header (icon and "Billing"). Every member can open it; only admins can change anything.
+Billing is in the header (icon and "Billing"). Every member can open it and read the plan and usage; only admins can change anything. A member sees the Billing buttons disabled, with "Ask an admin" beside them and a note that only a shop admin can start a plan, change it or manage billing.
 
 ### How do I start my free trial?
 ~ start trial, start my free trial, start the 30 day trial, how do i start the trial, begin trial, activate trial, free trial button, try deepwell free, how do i try it, sign up for the trial, start free trial, start my 30 day trial, how do i start my 30 day trial, 30 day trial
@@ -21,7 +21,7 @@ A shop with no plan (never subscribed, or canceled) can only open **Billing** an
 ### What is Manage billing?
 ~ manage billing, what is manage billing, billing portal, stripe portal, open the portal, where is manage billing, manage subscription, billing settings, subscription settings, stripe
 !covers:A-PORTAL
-**Billing → Manage billing** (in the Current plan card, shown once a plan exists) opens Stripe's billing portal. There an admin updates the card, views invoices and receipts, and cancels. Members don't get the button.
+**Billing → Manage billing** (in the Current plan card, shown once a plan exists) opens Stripe's billing portal. There an admin updates the card, views invoices and receipts, and cancels. A member sees it disabled with "Ask an admin".
 
 ### Where can I see my usage against my plan?
 ~ usage, my usage, how much have i used, pages used, pages this month, documents stored, logins used, usage meter, plan usage, how many pages left, pages left, remaining pages, am i near my limit, check my allowance, allowance
@@ -46,7 +46,7 @@ An admin opens **Billing → Records Rescue**, enters the number of **Pages** (a
 ### How do I create an API key?
 ~ create api key, make an api key, api key, api keys, generate a key, new api key, api access, revoke api key, delete api key, where are api keys, dw_live, connect my own system, integration key, copy my key, lost my api key
 !covers:A-APIKEYS
-On the **Fleet** plan an admin opens **Billing → API access**, types a **Key name** and presses **Create key**. The key (starts dw_live_) is shown once, so copy it right away: "Copy your new key now — it will not be shown again". Keys can read, ingest and ask. **Revoke** on a row turns one off.
+On the **Fleet** plan an admin opens **Billing → API access**, types a **Key name** and presses **Create key**. The key (starts dw_live_) is shown once, so copy it right away: "Copy your new key now — it will not be shown again". Keys can read, ingest and ask. **Revoke** on a row turns one off. A member on a Fleet shop sees "API keys are managed by a shop admin. Ask an admin." instead of the key form.
 
 ### Where is API access? I don't see it.
 ~ i dont see api access, api access missing, no api section, see fleet, upgrade for api, why cant i use api keys, api not available on my plan, api locked

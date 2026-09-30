@@ -4,6 +4,7 @@ import { handleCors, handleError, sendPrivateCacheableJson } from "../claude.js"
 import { getPool, getTenantContext } from "../recordsStore.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { startTimer } from "../timing.js";
+import { mutedDigestUserIds } from "../util/digestMute.js";
 import { logStage } from "../perf.js";
 
 /**
@@ -12,6 +13,7 @@ import { logStage } from "../perf.js";
  *   { markRead: string[] }         -> { updated: n }
  *   { all: true }                  -> { updated: n }
  *   { settings: { emailDigest } }  -> { settings: {...} }   (admin only, shop tenants)
+ *   { settings: { digestMuted } }  -> { settings, digestMuted }   (the caller's OWN mute; any signed-in member)
  *
  * Shapes documented in handoffs/NOTIFICATIONS.md. `notifications` isn't in
  * recordsStore.js's curated store (owned by another engineer, no method for
@@ -55,7 +57,7 @@ async function withTenantTx(ctx, fn) {
  * into one round trip via three CTEs, rather than three separate awaits each
  * paying their own network latency to Neon.
  */
-async function listNotifications(client, tenantId) {
+async function listNotifications(client, tenantId, userId) {
   const { rows } = await client.query(
     `WITH items AS (
        SELECT id, kind, title, body, link, created_at, read_at
@@ -77,6 +79,7 @@ async function listNotifications(client, tenantId) {
   );
   const row = rows[0] ?? {};
   const emailDigest = (row.settings ?? {}).emailDigest !== false;
+  const digestMuted = !!userId && mutedDigestUserIds(row.settings).includes(userId);
   return {
     items: (row.items ?? []).map((r) => ({
       id: r.id,
@@ -89,6 +92,8 @@ async function listNotifications(client, tenantId) {
     })),
     unreadCount: Number(row.unread_count ?? 0),
     emailDigest,
+    /** This caller's own "Mute my daily digest" choice (independent of the shop-wide switch). */
+    digestMuted,
   };
 }
 
@@ -122,7 +127,7 @@ export default async function handler(req, res) {
     const ctx = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
 
     if (req.method === "GET") {
-      const out = await timer.time("handler", () => withTenantTx(ctx, (client, tenantId) => listNotifications(client, tenantId)));
+      const out = await timer.time("handler", () => withTenantTx(ctx, (client, tenantId) => listNotifications(client, tenantId, auth.userId)));
       statusSent = 200;
       handleCors(res, req);
       // Startup performance (handoffs/STARTUP_PERF_R13.md): NotificationsPanel
@@ -132,6 +137,35 @@ export default async function handler(req, res) {
     }
 
     const body = req.body ?? {};
+
+    // Per-person mute: any signed-in member may change THEIR OWN entry (never anyone else's). Only admins
+    // are digest recipients, so for a member it is a no-op switch the UI does not show.
+    if (body.settings && typeof body.settings === "object" && "digestMuted" in body.settings) {
+      const muted = body.settings.digestMuted;
+      if (typeof muted !== "boolean" || !auth.userId) {
+        statusSent = 400;
+        return handleCors(res, req).status(400).json({ error: "settings.digestMuted must be a boolean" });
+      }
+      const settings = await timer.time("handler", () =>
+        withTenantTx(ctx, async (client, tenantId) => {
+          const { rows } = await client.query(
+            `UPDATE tenants SET settings = jsonb_set(
+                 COALESCE(settings, '{}'::jsonb), '{digestMuted}',
+                 (SELECT COALESCE(jsonb_agg(DISTINCT v), '[]'::jsonb) FROM (
+                    SELECT v FROM jsonb_array_elements_text(COALESCE(settings->'digestMuted', '[]'::jsonb)) v WHERE v <> $2
+                    UNION ALL SELECT $2 WHERE $3::boolean
+                  ) x(v))
+               )
+               WHERE id = $1
+             RETURNING settings`,
+            [tenantId, auth.userId, muted]
+          );
+          return rows[0]?.settings ?? {};
+        })
+      );
+      statusSent = 200;
+      return handleCors(res, req).status(200).json({ settings, digestMuted: mutedDigestUserIds(settings).includes(auth.userId) });
+    }
 
     if (body.settings && typeof body.settings === "object") {
       if (hasShop(auth)) requireRole(auth, "admin");

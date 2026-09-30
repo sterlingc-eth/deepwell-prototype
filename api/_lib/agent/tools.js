@@ -23,7 +23,7 @@ import { extractionsHaveUnitIndex } from "../recordsStore.js";
 import { createPageViewer, VIEW_PAGE_TOOL_DEF, VIEW_TOOL_NAME } from "./viewPage.js";
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): the `financials` / `invoice_lines` views live in
 // financeViews.js; the table probe + catalogue block live in financials/store.js. Hooked in below with small hunks.
-import { financeViewsSql, FINANCE_VIEW_DOCS } from "./financeViews.js";
+import { financeViewsSql, FINANCE_VIEW_DOCS, docCustomerCte } from "./financeViews.js";
 import { escapeLikePattern } from "../util/escape.js";
 import { financialsTableExists, financialsCatalogue } from "../financials/store.js";
 // TEAM C (citations everywhere): capture the customer / unit / document each run_query row IS, and what search_documents searched.
@@ -116,6 +116,7 @@ doc_links AS NOT MATERIALIZED (
     JOIN entities e ON e.id = x.entity_id AND e.merged_into IS NULL AND ${t("e")}
    WHERE x.entity_id IS NOT NULL AND ${t("x")}
 ),
+${docCustomerCte("doc_customer")},
 documents_v AS (
   SELECT d.id, d.id AS document_id, d.original_filename AS filename, d.document_type, d.stage, d.created_at,
          (SELECT CASE WHEN s.v ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN left(s.v, 10) END
@@ -129,12 +130,7 @@ documents_v AS (
            ORDER BY tx.created_at DESC LIMIT 1) AS technician,
          dc.customer_id, dc.customer_name
     FROM documents d
-    LEFT JOIN LATERAL (
-      SELECT l.customer_id, c.name AS customer_name
-        FROM doc_links l JOIN customers c ON c.customer_id = l.customer_id
-       WHERE l.document_id = d.id
-       ORDER BY l.via, l.customer_id LIMIT 1
-    ) dc ON true
+    LEFT JOIN doc_customer dc ON dc.document_id = d.id
    WHERE ${t("d")}
 ),
 facts AS (

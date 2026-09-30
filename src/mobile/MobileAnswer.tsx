@@ -1,3 +1,5 @@
+import { AnswerTrust } from '../components/answer/AnswerTrust'
+import { applyRole, currentRole } from '../core/role'
 import { memo, useId, useMemo, useState } from 'react'
 import { ThumbsDown, ThumbsUp } from 'lucide-react'
 import type { Answer, Fact } from '../core/types'
@@ -144,19 +146,22 @@ function Feedback({ question }: { question: string }) {
  */
 export const MobileAnswer = memo(function MobileAnswer({
   question,
-  answer,
+  answer: answerIn,
   onOpenDoc,
   onOpenCustomer,
   onAsk,
 }: {
   question: string
   answer: Answer
-  onOpenDoc: (id: string) => void
+  onOpenDoc: (id: string, page?: number, quote?: string) => void
   onOpenCustomer: (ref: string) => void
   /** Send a follow-up chip as the next question — omitted, the chip row just doesn't render. */
   onAsk?: (question: string) => void
 }) {
   const docs = useGraph((s) => s.docs)
+  // R31 3c: role-aware ordering (the phone defaults to 'tech'); a no-op when no fact label matches.
+  const role = useMemo(() => currentRole(true), [])
+  const answer = useMemo(() => applyRole(answerIn, role), [answerIn, role])
   const [panel, setPanel] = useState<Panel>(null)
   const [group, setGroup] = useState<string | null>(null)
   const [recordLimit, setRecordLimit] = useState(RECORDS_PAGE)
@@ -175,7 +180,7 @@ export const MobileAnswer = memo(function MobileAnswer({
     () => (sentenceData ? numberCitations(sentenceData) : { numbered: [], order: [] }),
     [sentenceData]
   )
-  const openCitationDoc = (documentId: string) => onOpenDoc(documentId)
+  const openCitationDoc = (documentId: string, page?: number, quote?: string) => onOpenDoc(documentId, page, quote)
   const textLower = answer.text.toLowerCase()
   // Lead with the first fact only when it adds something the sentence doesn't already say — moot
   // once a hero is already showing the facts, so this stays empty for those layouts.
@@ -183,7 +188,7 @@ export const MobileAnswer = memo(function MobileAnswer({
   const restFacts = hasHero ? [] : keyFact ? answer.facts.slice(1) : answer.facts
 
   const claimNote = claimCheckNote(answer)
-  const chips = onAsk ? followupChips(answer, question) : []
+  const chips = onAsk ? followupChips(answer, question, 3, role) : []
   const resolveDocName = (id: string) => { const d = docs[id]; return d ? documentName(d) : undefined }
 
   const records = useMemo(() => answer.records ?? [], [answer.records])
@@ -230,13 +235,14 @@ export const MobileAnswer = memo(function MobileAnswer({
         </>
       )}
       {answer.basis && <p className="m-0 text-caption text-ink-3">{answer.basis}</p>}
+      <AnswerTrust answer={answer} onOpenDocument={(id) => onOpenDoc(id)} />
       {claimNote && <p className="m-0 text-caption text-ink-3">{claimNote}</p>}
       {citationOrder.length > 0 && <CitationSourceStrip order={citationOrder} onOpenDocument={openCitationDoc} />}
 
-      {layout === 'money' && <MoneyHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
-      {layout === 'status' && <StatusHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
-      {layout === 'single-fact' && answer.facts[0] && <SingleFactHero fact={answer.facts[0]} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
-      {layout === 'timeline' && <TimelineList facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId)} />}
+      {layout === 'money' && <MoneyHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId, ref.location.page, ref.excerpt)} />}
+      {layout === 'status' && <StatusHero facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId, ref.location.page, ref.excerpt)} />}
+      {layout === 'single-fact' && answer.facts[0] && <SingleFactHero fact={answer.facts[0]} onOpenSource={(ref) => onOpenDoc(ref.documentId, ref.location.page, ref.excerpt)} />}
+      {layout === 'timeline' && <TimelineList facts={answer.facts} onOpenSource={(ref) => onOpenDoc(ref.documentId, ref.location.page, ref.excerpt)} />}
 
       {keyFact && (
         <dl className="m-0">

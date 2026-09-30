@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { AlertTriangle, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
-import { isAdminRole } from '../services/teamClient';
+import { useCanAdmin } from '../hooks/useCanAdmin';
 import { ALL_INTEGRITY_FIXES, reviewClient, isIntegrityFixDebounced, type IntegrityFixApplied, type IntegrityScanResult } from '../services/reviewClient';
 
 // All ten `counts` keys — `total` below sums every one of them, so any key
@@ -32,8 +31,7 @@ const SUMMARY_ROWS: { key: keyof IntegrityScanResult['counts']; label: string }[
  * again, same as deleteDocuments).
  */
 export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
-  const { orgRole } = useAuth();
-  const isAdmin = isAdminRole(orgRole ?? null);
+  const isAdmin = useCanAdmin();
 
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<IntegrityScanResult | null>(null);

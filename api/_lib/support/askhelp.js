@@ -178,6 +178,8 @@ export async function answerHowTo(question) {
   if (!r?.hit || !best || best.entry !== r.hit.entry) return null;
   const entry = r.hit.entry;
   if (!(entry.audience === 'app' || (Array.isArray(entry.covers) && entry.covers.length))) return null;
+  // Round 30: the Ask box takes only the matcher's firm outcomes (never a 'narrow' win) and needs the entry's own words to explain the question.
+  if (!r.hit.exact && (r.hit.tier === 'narrow' || r.hit.explained < STRICT_EXPLAINED)) return null;
   if (best.score < STRICT_SCORE || best.coverage < STRICT_COVERAGE) return null;
   const rival = r.top.find((x) => x.entry.article !== entry.article);
   if (rival && best.score - rival.score < STRICT_MARGIN) return null;

@@ -1172,14 +1172,17 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
   }
 
   const NEGATIVES = [
-    'who is at 1234 Main St',
-    'serial for 123 W Ray Rd',
     'how many customers have a phone',
-    "what's the address for 1234 Main St, Mesa",
     'does the customer have a warranty',
   ];
   for (const q of NEGATIVES) {
     check(`contact-lookup: never hijacks "${q}"`, parseContactLookupQuestion(q) === null);
+  }
+  // R31 (Team A, loop 2): a bare street address + ONE field concept is now answered deterministically by the
+  // entity-first slot filler (lookups/slotFill.js) — a real customer's value, or an honest "Nothing on file" —
+  // instead of a paid model call. These were "never hijacks" negatives before; they are now positives.
+  for (const q of ['who is at 1234 Main St', 'serial for 123 W Ray Rd', "what's the address for 1234 Main St, Mesa"]) {
+    check(`contact-lookup: address slot-fill claims "${q}"`, parseContactLookupQuestion(q)?.field === 'slotFill');
   }
 
   check('contact-lookup: surname fuzzy match (typo)', fuzzyNameMatches('Thomas Mercer', nameTokens('thomas mercer')));
@@ -1645,13 +1648,15 @@ for (const q of ['we got any invoices on file', 'how many invoices do we have'])
     'list customers missing a phone number',
     'which customers have no email so i know who to call instead of emailing',
     'how many customers do we have an email on file for in mesa',
-    "what's the serial number of the unit at 248 w huard rd",
     'how many customers do we have',
     'list customers in mesa',
   ];
   for (const q of CONTACT_V2_NEGATIVES) {
     check(`contact-lookup v2: never hijacks "${q}"`, parseContactLookupQuestion(q) === null);
   }
+  // R31 loop 2: the unit-at-an-address serial shape is now slot-filled (see the note in the v1 block above).
+  check('contact-lookup v2: address slot-fill claims the serial-of-the-unit-at-address shape',
+    parseContactLookupQuestion("what's the serial number of the unit at 248 w huard rd")?.field === 'slotFill');
 
   const lastVisitRow = { id: 'c9', customer_number: 'C-00009', customer_name: 'Pat Ellison', phone: '555-0100' };
   const lastVisitAnswer = buildContactAnswer('lastVisit', lastVisitRow);

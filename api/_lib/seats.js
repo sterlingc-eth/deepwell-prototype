@@ -39,6 +39,7 @@
  * scripts/verify-plan-tiers-r26.mjs runs with no network.
  */
 import { loginCapForPlan } from './plan.js';
+import { getPool } from './recordsStore.js';
 
 export const OWNER_NOT_COUNTED = 'owner not counted';
 
@@ -274,7 +275,56 @@ export const SEAT_LIMIT_MESSAGE = (plan, cap) =>
  * Returns { ok: true, invitation, seats } or { ok: false, status, error, seats?, url? }.
  * @param {{orgId: string, plan: string|null, email: string, role?: 'admin'|'member', inviterUserId?: string, clerk?: any, redirectUrl?: string}} args
  */
-export async function guardedInvite({ orgId, plan, email, role = 'member', inviterUserId, clerk, redirectUrl }) {
+export async function guardedInvite(args) {
+  // R30 L6: the count (getSeatState) and the create (createOrganizationInvitation) below are two calls, so two
+  // admins inviting at the same moment both saw "under cap" and both created an invite. Serialise per org: an
+  // in-process queue (same warm instance) plus a Postgres advisory lock held across the pair (other instances).
+  // The lock is best effort - if there is no database, or it errors, the in-process queue and Clerk's own
+  // maxAllowedMemberships (the backstop) still apply.
+  return withOrgInviteLock(args?.orgId, () => guardedInviteUnlocked(args));
+}
+
+const inviteChains = new Map();
+async function withOrgInviteLock(orgId, fn) {
+  const key = String(orgId ?? '');
+  const prev = inviteChains.get(key) ?? Promise.resolve();
+  let release;
+  const mine = new Promise((r) => { release = r; });
+  const tail = prev.then(() => mine);
+  inviteChains.set(key, tail);
+  await prev;
+  let lockClient = null;
+  try {
+    try {
+      const pool = getPool();
+      const connecting = pool.connect();
+      let timer;
+      try {
+        lockClient = await Promise.race([
+          connecting,
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('invite lock: connect timed out')), 2000); timer.unref?.(); }),
+        ]);
+      } catch (e) {
+        connecting.then((c) => c.release()).catch(() => {}); // a late connection must not leak
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+      await lockClient.query('BEGIN');
+      await lockClient.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`invite:${key}`]);
+    } catch {
+      if (lockClient) { await lockClient.query('ROLLBACK').catch(() => {}); lockClient.release(); }
+      lockClient = null;
+    }
+    return await fn();
+  } finally {
+    if (lockClient) { await lockClient.query('COMMIT').catch(() => {}); lockClient.release(); }
+    release();
+    if (inviteChains.get(key) === tail) inviteChains.delete(key);
+  }
+}
+
+async function guardedInviteUnlocked({ orgId, plan, email, role = 'member', inviterUserId, clerk, redirectUrl }) {
   const cap = loginCapForPlan(plan);
   if (cap === undefined) return { ok: false, status: 402, error: 'Choose a plan to get started', url: '/app/?screen=billing' };
   const addr = String(email ?? '').trim();

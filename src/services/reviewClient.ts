@@ -653,6 +653,20 @@ export const reviewClient = {
     });
   },
 
+  /**
+   * Enter (or change) a unit's install date by hand. The server stores it on the unit with an "entered by"
+   * record, writes the audit log, and re-derives the warranty; `warranty.expires` is the new end date, or null
+   * when the brand has no verified warranty rule (the date is still saved).
+   */
+  setUnitInstallDate(entityId: string, installDate: string, by: string) {
+    return postJson<{
+      entity: ReviewEntity;
+      installDate: string;
+      previous: string | null;
+      warranty: { expires: string | null; brandVerified?: boolean; brandLabel?: string | null } | null;
+    }>({ action: 'setUnitInstallDate', entityId, installDate, by });
+  },
+
   classifyDocument(documentId: string, documentType: string) {
     return postJson<{ document: ReviewDocument }>({
       action: 'classifyDocument',

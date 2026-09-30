@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, AlertTriangle, Download, Loader2 } from 'lucide-react';
 import type { SourceLocation } from '../core/types';
+import { findPassage, passageHighlightOn, splitByPassage, withPdfPage } from '../core/passage';
 import { useGraph } from '../core/entityGraph';
 import { customerForDocument } from '../core/customer';
 import { useAppStore } from '../store/appStore';
@@ -18,6 +19,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 interface DocumentPreviewProps {
   documentId: string;
   location?: SourceLocation;
+  /** The cited words (SourceRef.excerpt / the citation quote). Highlighted and scrolled to when found. */
+  excerpt?: string;
   onClose: () => void;
 }
 
@@ -26,7 +29,7 @@ interface DocumentPreviewProps {
  * cited field highlighted, plus where it sits in the pipeline. Escape closes;
  * focus returns to where it came from.
  */
-export function DocumentPreview({ documentId, location, onClose }: DocumentPreviewProps) {
+export function DocumentPreview({ documentId, location, excerpt, onClose }: DocumentPreviewProps) {
   const doc = useGraph((s) => s.docs[documentId]);
   const batch = useGraph((s) => (doc ? s.batches[doc.batchId] : undefined));
   const schema = useGraph((s) => s.schema);
@@ -40,6 +43,8 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
   const entities = useGraph((s) => s.entities);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const needle = passageHighlightOn() ? excerpt : undefined;
 
   const [original, setOriginal] = useState<OriginalUrl | null>(null);
   const [textBody, setTextBody] = useState<string | null>(null);
@@ -94,10 +99,22 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
     };
   }, [onClose]);
 
+  // Scroll the first marked passage to the middle of the viewer once the text is on screen. Scrolling an
+  // overflow container never shifts layout (CLS stays 0); the <mark> is inline, so nothing reflows.
+  const previewText = doc?.preview;
+  useEffect(() => {
+    if (!needle) return;
+    const el = bodyRef.current?.querySelector('[data-passage]');
+    if (el && typeof (el as HTMLElement).scrollIntoView === 'function') (el as HTMLElement).scrollIntoView({ block: 'center' });
+  }, [needle, textBody, loadState, previewText]);
+
   if (!doc) return null;
   const typeLabel = schema.documentTypes.find((t) => t.id === doc.typeId)?.label ?? 'Unclassified';
   const lines = doc.preview.split('\n');
   const highlightField = location?.field?.toLowerCase();
+  const passageSpan = needle ? findPassage(doc.preview, needle) : null;
+  const markCls = 'bg-brass-200 dark:bg-forest-600 text-ink rounded-sm px-0.5';
+  let lineOffset = 0;
 
   const bodyCustomerRaw = doc.linkedFromBodyName ? entities[doc.linkedFromBodyName]?.fields?.customer_name : undefined;
   const bodyCustomerName = typeof bodyCustomerRaw === 'string' ? bodyCustomerRaw : '';
@@ -132,7 +149,7 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
           </button>
         </header>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-4">
+        <div ref={bodyRef} className="overflow-y-auto px-5 py-4 space-y-4">
           {doc.issues.length > 0 && (
             <ul className="space-y-1">
               {doc.issues.map((i, idx) => (
@@ -170,7 +187,7 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
               {loadState === 'ready' && original && (() => {
                 const ct = original.contentType ?? '';
                 if (ct === 'application/pdf') {
-                  return <iframe src={original.url} title={original.filename} className="w-full min-h-[70vh] block" />;
+                  return <iframe src={withPdfPage(original.url, location?.page)} title={original.filename} className="w-full min-h-[70vh] block" />;
                 }
                 if (ct.startsWith('image/')) {
                   return <img src={original.url} alt={original.filename} className="w-full h-auto block" />;
@@ -178,7 +195,11 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
                 if (ct === 'text/plain') {
                   return (
                     <pre className="p-4 font-mono text-data sm:text-[14px] sm:leading-6 whitespace-pre-wrap max-h-[70vh] overflow-y-auto">
-                      {textBody ?? ''}
+                      {needle && textBody
+                        ? splitByPassage(textBody, needle).map((seg, k) =>
+                            seg.hit ? <mark key={k} data-passage="true" className={markCls}>{seg.text}</mark> : <span key={k}>{seg.text}</span>
+                          )
+                        : (textBody ?? '')}
                     </pre>
                   );
                 }
@@ -199,9 +220,23 @@ export function DocumentPreview({ documentId, location, onClose }: DocumentPrevi
             {lines.map((line, i) => {
               const key = line.split(':')[0]?.trim().toLowerCase();
               const hit = !!highlightField && !!key && line.includes(':') && (key === highlightField || highlightField.startsWith(key));
+              const start = lineOffset;
+              lineOffset += line.length + 1;
+              // The cited words, when they fall on this line (a span crossing lines marks each line's part).
+              const a = passageSpan ? Math.max(passageSpan.start, start) : 0;
+              const b = passageSpan ? Math.min(passageSpan.end, start + line.length) : 0;
+              const marked = !!passageSpan && b > a;
               return (
-                <div key={i} className={hit ? 'bg-brass-100 dark:bg-forest-700 -mx-2 px-2 rounded-sm text-ink' : ''}>
-                  {line || ' '}
+                <div key={i} className={hit && !marked ? 'bg-brass-100 dark:bg-forest-700 -mx-2 px-2 rounded-sm text-ink' : ''}>
+                  {marked ? (
+                    <>
+                      {line.slice(0, a - start)}
+                      <mark data-passage="true" className={markCls}>{line.slice(a - start, b - start)}</mark>
+                      {line.slice(b - start)}
+                    </>
+                  ) : (
+                    line || ' '
+                  )}
                 </div>
               );
             })}

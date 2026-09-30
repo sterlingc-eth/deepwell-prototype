@@ -20,7 +20,7 @@ Yes, one at a time. Press **Open original** on a document (or **Download <file n
 ### Can I export to CSV for dispatch or accounting?
 ~ csv, csv export, export to excel, spreadsheet, export to csv, export for accounting, export for dispatch, download csv, excel, report export, export list, csv of my records, csv of my data, csv file, get a csv, records as csv, export records, export csv button, where is export csv, export customers, export documents, export grid, download spreadsheet
 !covers:A-EXPORT-CSV
-Yes. **Records → Documents → Export CSV** and **Records → Customers → Export CSV** (admin only), and **Records → Grid → Export CSV (N rows)**, which downloads the rows on screen and lets you pick columns first. For anything larger, such as a bulk API pull, Fleet has API access.
+Yes. **Records → Documents → Export CSV** and **Records → Customers → Export CSV** (both admin only: a member sees the button greyed out with "Ask an admin" beside it), and **Records → Grid → Export CSV (N rows)**, which downloads the rows on screen and lets you pick columns first. For anything larger, such as a bulk API pull, Fleet has API access.
 
 ### What is the warranty export?
 ~ warranty export, warranty report, expiring warranties, expiring units report, warranty list, upcoming warranty expirations, warranty dashboard, expiring soon, export warranties, warranties report

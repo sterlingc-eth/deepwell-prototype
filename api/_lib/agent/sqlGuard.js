@@ -60,6 +60,9 @@ export const REAL_TABLES = Object.freeze([
   // content, but the Donovan agent's generic SQL tool still has no legitimate reason to ever read
   // them directly (api/_lib/privacy/supportAccess.js's own typed functions are the only sanctioned path).
   "support_access_grants", "staff_access_log",
+  // M3-config/61-support-assistant.sql (R28): the support assistant's rate-limit windows. No app-role grants, so
+  // this is defence in depth only (R30 L5: verify-agent's "every CREATE TABLE is in REAL_TABLES" check failed).
+  "support_public_windows",
 ]);
 
 const DENY_TOKENS = new Set([
@@ -86,6 +89,7 @@ const DENY_TOKENS = new Set([
   "list_notification_eligible_tenants", "list_outreach_enabled_tenants", "mark_outreach_swept",
   "mark_tenant_digest_sent", "mark_tenant_notified", "record_warranty_notification",
   "expenses_delete", "expenses_insert", "expenses_list", "expenses_totals", "expenses_update",
+  "support_public_bump", // M3-config/61 (R30 L5)
 ]);
 const DENY_PREFIXES = ["pg_", "lo_", "dblink", "information_schema", "txid_", "xpath", "query_to_xml", "table_to_xml", "cursor_to_xml"];
 

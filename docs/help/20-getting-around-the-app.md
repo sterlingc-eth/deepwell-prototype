@@ -41,7 +41,7 @@ In the Dashboard's warranty table each unit has **Copy link**; anyone signed in 
 ### Why does my screen look different from the phone app?
 ~ phone vs desktop, desktop vs phone, difference between phone and desktop, what is missing on the phone, what can i do on the phone, phone app limits, cant do on phone, lite app, mobile limits, why is the phone app missing, no dashboard on phone, what can the phone app not do, what cant the phone app do, phone app not do
 !covers:A-M-LIMITS
-The phone app is for the field: **Ask**, **Scan** and **Docs**. Dashboard, the Inbox review queue, Team, Billing, exports and settings are desktop only.
+The phone app is for the field: **Ask**, **Scan** and **Docs**. Dashboard, the Inbox review queue, Team, Billing, exports and settings are desktop only. Sign out and switching shops are on the phone too, under the round profile button at the top right.
 
 ### Can DeepWell schedule jobs, take payments, text customers or change my logo?
 ~ schedule jobs, scheduling, dispatch, schedule a technician, take a payment, credit card payment from a customer, pay my tech, payroll, text a customer, sms, gps, track trucks, print a label, shipping label, change the logo, change my company name, branding, white label, logo on invoices, company name on the login page, recurring maintenance agreements, integrate with servicetitan, connect to quickbooks, is there a setting for, pay my techs, pay my tech through the app, pay through the app, pay my guys, pay employees, run payroll, timesheets, time clock, track hours, clock in

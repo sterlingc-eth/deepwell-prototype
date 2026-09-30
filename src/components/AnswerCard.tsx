@@ -1,3 +1,5 @@
+import { AnswerTrust } from './answer/AnswerTrust';
+import { applyRole, currentRole } from '../core/role';
 import { useMemo, useState } from 'react';
 import { ShieldCheck, ShieldQuestion } from 'lucide-react';
 import type { Answer, AnswerRecord, SourceRef } from '../core/types';
@@ -42,8 +44,11 @@ export interface AnswerCardProps {
  *
  * Embeddable: it depends only on the Answer object and three callbacks.
  */
-export function AnswerCard({ answer, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity, onOpenRecord, onAsk }: AnswerCardProps) {
+export function AnswerCard({ answer: answerIn, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity, onOpenRecord, onAsk }: AnswerCardProps) {
   const docs = useGraph((s) => s.docs);
+  // R31 3c: role-aware ordering of the facts (a tech's unit facts first / the office's money first); a no-op with no role.
+  const role = useMemo(() => currentRole(false), []);
+  const answer = useMemo(() => applyRole(answerIn, role), [answerIn, role]);
   // Round 12: which of the small set of layouts this answer's own shape (facts/records/basis) calls
   // for — see src/core/answerLayout.ts. Desktop and mobile both derive it the same way.
   const layout = useMemo(() => answerLayout(answer), [answer]);
@@ -107,7 +112,8 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
     () => (sentenceData ? numberCitations(sentenceData) : { numbered: [], order: [] }),
     [sentenceData]
   );
-  const openCitationDoc = (documentId: string, page?: number) => onOpenSource({ documentId, location: page != null ? { page } : {} });
+  const openCitationDoc = (documentId: string, page?: number, quote?: string) =>
+    onOpenSource({ documentId, location: page != null ? { page } : {}, ...(quote ? { excerpt: quote } : {}) });
   // The verified/unverified control is about DOCUMENT staging (a citation contract concept) — it has
   // nothing to say, and nothing to change, for a record-grounded answer (an analytics/agent count with
   // no document sources at all: "0 verified records" next to "Based on 13 customers" read as a flat
@@ -115,7 +121,7 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
   // answer that cites real documents.
   const showVerifiedControl = isEmpty || answer.sources.length > 0;
   const claimNote = claimCheckNote(answer);
-  const chips = onAsk ? followupChips(answer, question) : [];
+  const chips = onAsk ? followupChips(answer, question, 3, role) : [];
   const resolveDocName = (id: string) => { const d = docs[id]; return d ? documentName(d) : undefined; };
 
   return (
@@ -179,6 +185,7 @@ export function AnswerCard({ answer, question, includeUnverified, onToggleUnveri
             {claimNote}
           </p>
         )}
+        <AnswerTrust answer={answer} onOpenDocument={(documentId) => openCitationDoc(documentId)} />
         {/* R13H1: compact numbered strip tying [1][2] markers above to real document names — the
             "visible sources" trust signal, one glance under the sentences that cite them. */}
         {citationOrder.length > 0 && (

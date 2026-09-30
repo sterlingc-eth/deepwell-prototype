@@ -3,7 +3,7 @@ import { handleCors, handleError } from "../claude.js";
 import { deleteTenantData, recordTenantDeletion } from "../opsStore.js";
 import { withTenant, getPool, bustTenantCache } from "../recordsStore.js";
 import { getStripe, cancelTenantSubscriptions } from "../billing.js";
-import { deleteObject } from "../r2.js";
+import { deleteObject, keyBelongsToTenant } from "../r2.js";
 import { captureException } from "../telemetry.js";
 
 /**
@@ -128,7 +128,9 @@ export default async function handler(req, res) {
     bustTenantCache(tenantId);
 
     const failedObjects = [];
-    for (const key of storageKeys) {
+    // R30 H1: never delete an object outside this tenant's own prefix, whatever a row says.
+    const ownKeys = storageKeys.filter((k) => keyBelongsToTenant(k, tenantId));
+    for (const key of ownKeys) {
       try {
         await deleteObject(key);
       } catch (err) {
@@ -146,7 +148,7 @@ export default async function handler(req, res) {
     // happened even if this receipt fails to write.
     await recordTenantDeletion(ctx, {
       documents: documentsDeleted,
-      objects: storageKeys.length,
+      objects: ownKeys.length,
       failedObjects,
     }).catch((err) => console.error("Failed to write tenant_deletions row:", err?.message));
 
@@ -159,7 +161,7 @@ export default async function handler(req, res) {
         clerk_user_id: auth.userId,
         changes: {
           documents: documentsDeleted,
-          objects: storageKeys.length,
+          objects: ownKeys.length,
           objectsFailed: failedObjects.length,
           stripeSubscriptionsCanceled: canceledIds,
           stripeSkipped: billing.skipped,
@@ -170,7 +172,7 @@ export default async function handler(req, res) {
     return handleCors(res, req).status(200).json({
       deleted: true,
       documents: documentsDeleted,
-      objectsRemoved: storageKeys.length - failedObjects.length,
+      objectsRemoved: ownKeys.length - failedObjects.length,
       objectsFailed: failedObjects.length,
       billing,
     });

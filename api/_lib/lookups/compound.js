@@ -101,7 +101,19 @@ const NAME_SRC = "[A-Za-z][A-Za-z.-]*(?:\\s+[A-Za-z.-]+){0,2}";
 // with the shape itself; anchored at the END ($) so a real analytics/retrieval
 // question that merely happens to share a few words never matches.
 const MODEL_SERIAL_ADDR_RE = new RegExp(`model\\s+and\\s+serial\\s+on\\s+the\\s+unit\\s+at\\s+(${ADDR_SRC})\\s*\\??$`, "i");
-const NAME_PHONE_ADDR_RE = new RegExp(`customers?\\s+name\\s+and\\s+phone\\s+for\\s+(${ADDR_SRC})\\s*\\??$`, "i");
+// R31 (Team A, loop 1): the "name + phone at an address" ask, generalized from the single literal "customers name
+// and phone for <addr>" to the paraphrase families dispatchers actually type — all resolve to the SAME answer
+// (runNamePhone, exactly one customer at the address, else defer):
+//   "name and phone for X" / "customer name plus number for X" / "the customer's name and phone number at X"
+//   "who's at X and what's their phone" / "who lives at X, and their number"
+const PHONE_WORD = "(?:phone(?:\\s+number)?|number|contact\\s+number)";
+const ADDR_LAZY = "\\d[a-zA-Z0-9',.-]*(?:\\s+[a-zA-Z0-9',.-]+)*?";
+const NAME_PHONE_ADDR_RES = [
+  new RegExp(`\\b(?:the\\s+)?(?:customer'?s?\\s+|contact\\s+)?name\\s+(?:and|plus|&|\\+)\\s+(?:the\\s+)?${PHONE_WORD}(?:\\s+(?:number|on\\s+file))*\\s+(?:for|at|on)\\s+(${ADDR_SRC})\\s*\\??$`, "i"),
+  new RegExp(`\\bwho'?s?\\s+(?:at|on|living\\s+at|the\\s+(?:customer|owner)\\s+(?:at|on|for))\\s+(${ADDR_LAZY})\\s*,?\\s+and\\s+(?:what'?s?\\s+)?(?:their|his|her|the)\\s+${PHONE_WORD}\\s*\\??$`, "i"),
+  new RegExp(`\\bwho\\s+(?:lives|stays|lived|is)\\s+(?:at|on)\\s+(${ADDR_LAZY})\\s*,?\\s+and\\s+(?:their|his|her|the)\\s+${PHONE_WORD}\\s*\\??$`, "i"),
+];
+const NAME_PHONE_ADDR_RE = NAME_PHONE_ADDR_RES[0];
 // normalizeQuestion (nlNormalize.js) expands the abbreviation "tech" to
 // "technician" before this ever sees the text — "tech(?:nician)?" matches
 // either.
@@ -127,8 +139,10 @@ export function parseCompoundQuestion(question) {
   let m = q.match(MODEL_SERIAL_ADDR_RE);
   if (m) return { kind: "modelSerial", address: m[1].trim() };
 
-  m = q.match(NAME_PHONE_ADDR_RE);
-  if (m) return { kind: "namePhone", address: m[1].trim() };
+  for (const re of NAME_PHONE_ADDR_RES) {
+    m = q.match(re);
+    if (m) return { kind: "namePhone", address: m[1].trim() };
+  }
 
   m = q.match(WARRANTY_TECH_NAME_RE);
   if (m) {
@@ -195,8 +209,20 @@ async function runNamePhone(db, address) {
   const row = await resolveSingleAddress(db, address);
   if (!row) return null;
   const name = row.customer_name || row.customer_number;
-  if (!name || !row.phone) return null; // both halves need a real value — see runModelSerial's own doc comment
+  if (!name) return null; // a nameless row has nothing to say — see runModelSerial's own doc comment
   const addrLabel = row.service_address || titleCase(address);
+  // R31: a named customer with NO phone on file is answered honestly ("no phone on file") rather than deferred to the
+  // model — the phone half is genuinely absent, and the model cannot invent one; deferring only cost a model call.
+  if (!row.phone) {
+    return attachCitations(
+      {
+        kind: "answer", text: `${name} — no phone on file.`,
+        facts: [{ label: "Customer", value: name, entityId: row.id, sources: [] }],
+        sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
+      },
+      { records: [customerRecord(row)], total: 1, basis: `Read the customer name and phone number on file at ${addrLabel}; no phone number is recorded.` }
+    );
+  }
   return attachCitations(
     {
       kind: "answer", text: `${name} — phone ${row.phone}.`,

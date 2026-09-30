@@ -51,7 +51,7 @@ Open **Inbox → Needs you → Duplicates**, open the copy and press **Merge int
 ### How do I merge duplicate customers?
 ~ merge customers, duplicate customers, duplicate customer, same customer twice, merge two customers, combine customers, two records for one customer, customer listed twice, merge into, not the same, keep separate, merge all, undo a merge, dedupe customers, clean up customers, customer twice, merge button not working, merge button greyed out, tech cant merge, only admins can merge, why is the merge button not working, merge button not working for my tech
 !covers:A-DUP-CUSTOMER
-Admins can merge. In **Records → Customers**, a banner lists likely pairs: **Merge into <name>** (tick which one to keep), **Not the same**, or **Merge all**. Admins also get a whole-shop **Duplicate customers** scan there, with Undo after a merge. The same suggestions appear in Inbox → Needs you. A different name at the same address is never merged automatically.
+Admins can merge; a member sees the merge buttons disabled with "Ask an admin" beside them, and the whole-shop scan is hidden. In **Records → Customers**, a banner lists likely pairs: **Merge into <name>** (tick which one to keep), **Not the same**, or **Merge all**. Admins also get a whole-shop **Duplicate customers** scan there, with Undo after a merge. The same suggestions appear in Inbox → Needs you. A different name at the same address is never merged automatically.
 
 ### What does Verify with AI do?
 ~ verify with ai, ai verify, ai verified, let ai check, verified by ai, ai check, auto verify, what is ai verified, automatic verification, use ai to verify
@@ -66,7 +66,7 @@ Press **Open original** in the document's review panel, or click a citation or a
 ### How do I delete a document?
 ~ delete a document, delete document, remove a document, delete a file, delete a record, remove an upload, delete an upload, wrong file uploaded, delete this doc, get rid of a document, undo an upload, uploaded the wrong file, erase a document, delete one document, uploaded the wrong file how do i remove it, remove a file i uploaded, remove the wrong file
 !covers:A-DELETE-DOC
-An admin opens the document (**Inbox → Needs you**, then the document) and presses **Delete document**, then **Confirm delete**. It can't be undone. Members get "This action requires the 'admin' role in your shop."
+An admin opens the document (**Inbox → Needs you**, then the document) and presses **Delete document**, then **Confirm delete**. It can't be undone. Members don't see the **Delete document** button at all; ask an admin.
 
 ### How do I correct an invoice amount or total?
 ~ correct an amount, fix an invoice total, wrong total, wrong amount, fix the balance due, wrong tax, money to check, invoice amount wrong, correct the total, fix money, wrong subtotal, balance due wrong, edit invoice, money on this document, amount paid wrong, fix the price, invoice total is wrong, the invoice total is wrong how do i fix it, total is wrong, the total is wrong

@@ -1,4 +1,5 @@
 import { handleCors, handleError } from "./_lib/claude.js";
+import { tenantToday } from "./_lib/util/localDate.js";
 import { denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
 import { describeWarranty, addDays, ruleCoverage, isPlausibleToday, alertTier, upsell, daysBetween } from "./_lib/warrantyRules.js";
@@ -69,7 +70,8 @@ export async function getWarrantyAttention(auth, params) {
   if (params.today != null && !isPlausibleToday(params.today)) {
     throw new WarrantyAttentionError("today must be a real YYYY-MM-DD date between 2000 and 2100");
   }
-  const today = params.today ?? new Date().toISOString().slice(0, 10);
+  // R30 M10: with no caller-supplied date, the shop's local date (TENANT_DEFAULT_TZ / America/Phoenix), not UTC.
+  const today = params.today ?? tenantToday(null);
 
   const registerWithin = clampDays(params.registerWithinDays, 30, 365);
   const registerLookback = clampDays(params.registerLookbackDays, 60, 3650);

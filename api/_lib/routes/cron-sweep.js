@@ -50,9 +50,11 @@ import { runKnowledgeReportSweepStep } from "../search/mapReduce.js";
  * the EXACT deferral message (see listBudgetDeferredDocuments), so a document
  * that failed for a real, permanent reason is never retried here.
  */
+// R30 L6: informational only. This module is not a Vercel function entry point (api/account.js is, and it sets
+// maxDuration 300 for every ?action=, this one included), so the value here was never applied; kept in step with it.
 export const config = {
   api: { bodyParser: { sizeLimit: "64kb" } },
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 const STUCK_MINUTES = 60;

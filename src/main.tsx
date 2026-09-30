@@ -4,6 +4,8 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import './index.css'
 import App from './App.tsx'
 import { bootstrapHvac } from './domains/hvac'
+import { installErrorReporter } from './services/errorReporter'
+import { useAppStore } from './store/appStore'
 
 // Demo fixture is opt-in, not the default: a signed-in user with real
 // Postgres data must never see it mixed with theirs. `usePostgresSync` (see
@@ -53,6 +55,9 @@ const localization = {
     },
   },
 }
+
+// Crash visibility: scrubbed, capped browser error reports (see src/services/errorReporter.ts).
+installErrorReporter('app', () => useAppStore.getState().currentScreen)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

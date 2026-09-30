@@ -103,7 +103,7 @@ async function main() {
     // Settings expands and both moved pieces are inside it
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.waitForTimeout(150);
-    check('Team Settings: notifications toggle reachable', (await page.getByText('Email me warranty digests').count()) > 0);
+    check('Team Settings: notifications toggle reachable', (await page.getByText('Mute my daily digest').first().count()) > 0);
     check('Team Settings: data export reachable', (await page.getByText('Download data export (JSON)').count()) > 0);
 
     // ---- Donovan: reachable by admin from the account row ----

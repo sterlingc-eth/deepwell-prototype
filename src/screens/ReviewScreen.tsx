@@ -21,6 +21,8 @@ import { WorkFilterControl } from '../components/WorkFilterControl';
 import { FinancialStrip } from '../components/FinancialStrip';
 import { financialsClient } from '../services/financialsClient';
 import { FILTERS, FILTER_IDS, type Filter } from './reviewFilters';
+import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
+import { AskAdminNote } from '../components/AskAdminNote';
 
 const CURRENT_USER = 'You';
 
@@ -373,6 +375,8 @@ export interface ReviewBodyProps {
  */
 export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps) {
   const graph = useGraph();
+  // Merging customers is admin-only on the server (api/review.js mergeCustomers); a member sees it disabled.
+  const canAdmin = useCanAdmin();
   const { correctField, classifyDoc, linkDoc, approveDoc, resolveConflict, mergeDuplicate, clearLastError, aiVerifyDoc, removeDoc } = useGraph();
   const lastError = useGraph((s) => s.lastError);
   const selectedDocumentId = useAppStore((s) => s.selectedDocumentId);
@@ -637,9 +641,12 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
                   <li key={key} className="border border-line rounded-lg p-3 space-y-2">
                     <p className="text-body text-ink">{keep?.name ?? 'Unnamed'} <span className="text-ink-3">and</span> {drop?.name ?? 'Unnamed'}</p>
                     <p className="text-caption text-ink-3">{p.reason} · {Math.round(p.score * 100)}% match{p.tier === 'suggest' ? ' — needs your review' : ''}</p>
-                    <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={customerDupBusyKey === key} onClick={() => void mergeCustomerDup(p.keepId, p.dropId, key)}>
-                      {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge into {keep?.name ?? 'kept record'}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={!canAdmin || customerDupBusyKey === key} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void mergeCustomerDup(p.keepId, p.dropId, key)}>
+                        {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge into {keep?.name ?? 'kept record'}
+                      </button>
+                      {!canAdmin && <AskAdminNote />}
+                    </div>
                   </li>
                 );
               })}
@@ -652,9 +659,10 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
                     <p className="text-body text-ink">{keep?.name ?? 'Unnamed'} <span className="text-ink-3">and</span> {drop?.name ?? 'Unnamed'}</p>
                     <p className="text-caption text-ink-3">{keep?.serviceAddress ?? drop?.serviceAddress ?? '—'} · {p.reason}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={customerDupBusyKey === key} onClick={() => void mergeCustomerDup(p.keepId, p.dropId, key)}>
+                      <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" disabled={!canAdmin || customerDupBusyKey === key} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void mergeCustomerDup(p.keepId, p.dropId, key)}>
                         {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />} Merge
                       </button>
+                      {!canAdmin && <AskAdminNote className="self-center" />}
                       <button type="button" className="dw-btn-tertiary !min-h-[32px] !py-1" disabled={customerDupBusyKey === key} onClick={() => void keepCustomerDupSeparate(p.aId, p.bId, key)}>
                         {customerDupBusyKey === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : 'Keep separate'}
                       </button>
@@ -819,6 +827,8 @@ interface DocPanelProps {
 
 function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, onApprove, onResolve, onMerge, onAsk, onAiVerify, onDelete }: DocPanelProps) {
   const graph = useGraph();
+  // Deleting is admin-only on the server (document-delete.js) and destructive: a member never sees the button.
+  const canAdmin = useCanAdmin();
   const type = graph.schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   // Required fields may be `a|b` alternatives (either satisfies) — see the
@@ -963,11 +973,11 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               <Sparkles className="w-4 h-4" aria-hidden="true" /> {aiBusy ? 'Checking…' : 'Verify with AI'}
             </button>
           )}
-          {confirmingDelete ? (
+          {!canAdmin ? null : confirmingDelete ? (
             <span className="flex items-center gap-2">
               <span className="text-body text-ink-2">Delete this document? This can't be undone.</span>
               <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => setConfirmingDelete(false)} disabled={deleting}>Cancel</button>
-              <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5 !bg-bad hover:!bg-bad" onClick={() => void runDelete()} disabled={deleting}>{deleting ? 'Deleting…' : 'Confirm delete'}</button>
+              <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5 !bg-bad hover:!bg-bad !text-stone-0" onClick={() => void runDelete()} disabled={deleting}>{deleting ? 'Deleting…' : 'Confirm delete'}</button>
             </span>
           ) : (
             <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5 text-bad-ink" onClick={() => setConfirmingDelete(true)}>

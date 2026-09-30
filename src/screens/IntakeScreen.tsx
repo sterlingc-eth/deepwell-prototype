@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { localYmd } from '../core/localDate';
 import { Plus, Upload, AlertTriangle, ChevronRight, X, FolderArchive, FileUp } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { docCountsByStage, useGraph } from '../core/entityGraph';
@@ -6,7 +7,7 @@ import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSourc
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
 import { documentName, hasFriendlyName } from '../core/documentName';
-import { ingestFiles, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
+import { ingestFiles, STILL_PROCESSING_LINK_LABEL, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
 import {
   startBulkImport,
   walkZip,
@@ -22,6 +23,7 @@ const SOURCE_LABEL: Record<IntakeSource, string> = { cabinet: 'Filing cabinet', 
 const CURRENT_USER = 'You';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const UPLOAD_LABEL: Record<IngestProgress['status'], string> = {
   hashing: 'Checking…',
@@ -127,10 +129,12 @@ export function IntakeBody() {
   const createBatch = useGraph((s) => s.createBatch);
   const receiveDocs = useGraph((s) => s.receiveDocs);
   const classifyDoc = useGraph((s) => s.classifyDoc);
+  const reclassifyDocs = useGraph((s) => s.reclassifyDocs);
   const reconcileIntakeDoc = useGraph((s) => s.reconcileIntakeDoc);
   const removeDoc = useGraph((s) => s.removeDoc);
   const openDocument = useAppStore((s) => s.openDocument);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  const openInboxNeedsPerson = useAppStore((s) => s.openInboxNeedsPerson);
 
   const batches = useMemo(() => Object.values(graph.batches).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()), [graph.batches]);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -151,7 +155,7 @@ export function IntakeBody() {
   const [name, setName] = useState('');
   const [source, setSource] = useState<IntakeSource>('cabinet');
   const [from, setFrom] = useState('2026-01-01');
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(localYmd());
   const nameRef = useRef<HTMLInputElement>(null);
 
   const submitBatch = (e: FormEvent) => {
@@ -406,10 +410,42 @@ export function IntakeBody() {
     setDragOver(true);
   };
 
-  const processReceived = () => {
-    if (!selected) return;
-    for (const d of batchDocs(selected)) {
-      if (d.stage === 'received' && !d.issues.some((i) => i.kind === 'duplicate')) classifyDoc(d.id, classifyByFilename(d.filename));
+  // Real accounts: ask the server to classify (its facts + filename + model path, the same one Records'
+  // "Classify shop records" uses). It never overwrites a type a person chose, and it says how many it
+  // could not place, which we report instead of guessing from the filename in the browser.
+  // Demo mode has no server, so it keeps the filename guess (labelled as such on the button).
+  const [classifying, setClassifying] = useState(false);
+  const [classifyNote, setClassifyNote] = useState<string | null>(null);
+  const processReceived = async () => {
+    if (!selected || classifying) return;
+    const targets = batchDocs(selected).filter((d) => d.stage === 'received' && !d.issues.some((i) => i.kind === 'duplicate'));
+    if (DEMO_MODE) {
+      for (const d of targets) classifyDoc(d.id, classifyByFilename(d.filename));
+      return;
+    }
+    const ids = targets.map((d) => d.id).filter((id) => UUID_RE.test(id));
+    if (!ids.length) {
+      setClassifyNote('These files are still uploading. Try again in a moment.');
+      return;
+    }
+    setClassifying(true);
+    setClassifyNote(null);
+    try {
+      const { changed, remaining } = await reclassifyDocs(ids);
+      if (useGraph.getState().lastError) {
+        setClassifyNote('Could not classify right now. Try again.');
+      } else {
+        const left = ids.length - changed;
+        setClassifyNote(
+          changed === 0
+            ? 'Nothing could be classified automatically. Open each file under Needs you to set its type.'
+            : left > 0 || remaining > 0
+              ? `Classified ${changed} of ${ids.length}. The rest need a person: open them under Needs you.`
+              : `Classified ${changed} of ${ids.length}.`
+        );
+      }
+    } finally {
+      setClassifying(false);
     }
   };
 
@@ -684,9 +720,14 @@ export function IntakeBody() {
                       </button>
                     )}
                     {batchDocs(selected).some((d) => d.stage === 'received' && !d.issues.length) && (
-                      <button type="button" className="dw-btn-primary !min-h-[40px] !py-1.5" onClick={processReceived}>
-                        Classify received
+                      <button type="button" className="dw-btn-primary !min-h-[44px] sm:!min-h-[40px] !py-1.5" onClick={() => void processReceived()} disabled={classifying}>
+                        {classifying ? 'Classifying…' : DEMO_MODE ? 'Guess type from file name' : 'Classify received'}
                       </button>
+                    )}
+                    {classifyNote && (
+                      <p role="status" className="text-caption text-ink-2 basis-full">
+                        {classifyNote}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -706,7 +747,10 @@ export function IntakeBody() {
                           ) : u.status === 'pending' ? (
                             // Not a failure — extraction is still running server-side past the
                             // 15-minute poll window. Neutral pill, not the warn pill errors get.
-                            <span className="dw-pill-muted shrink-0">{UPLOAD_LABEL.pending}</span>
+                            <span className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                              <span className="dw-pill-muted">{UPLOAD_LABEL.pending}</span>
+                              <button type="button" className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[32px] !py-0.5" onClick={() => openInboxNeedsPerson()}>{STILL_PROCESSING_LINK_LABEL}</button>
+                            </span>
                           ) : (u.status === 'done' || u.status === 'queued') && liveDoc ? (
                             <span className="shrink-0"><StagePill stage={liveDoc.stage} ai={liveDoc.verifiedBy === 'ai'} compact /></span>
                           ) : (

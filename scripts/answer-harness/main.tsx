@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { useGraph } from '../../src/core/entityGraph';
 import { useAppStore } from '../../src/store/appStore';
 import { DOCS, SCHEMA } from './fixtures';
-import { DesktopFixtures, MobileFixtures } from './Fixtures';
+import { DesktopFixtures, MobileFixtures, PreviewFixture, DocSheetFixture } from './Fixtures';
 import '../../src/index.css';
 
 declare global {
@@ -20,7 +20,12 @@ window.__dwOpens = [];
 useGraph.getState().seed(SCHEMA, [], Object.values(DOCS), [], []);
 
 const params = new URLSearchParams(window.location.search);
-const view = params.get('view') === 'mobile' ? 'mobile' : 'desktop';
+const viewParam = params.get('view');
+const view = viewParam === 'mobile' ? 'mobile' : 'desktop';
 
 const root = document.getElementById('root');
-if (root) createRoot(root).render(view === 'mobile' ? <MobileFixtures /> : <DesktopFixtures />);
+if (root) {
+  // R31 3a: the source viewers on their own (passage highlight), same seeded graph.
+  const page = viewParam === 'preview' ? <PreviewFixture /> : viewParam === 'docsheet' ? <DocSheetFixture /> : view === 'mobile' ? <MobileFixtures /> : <DesktopFixtures />;
+  createRoot(root).render(page);
+}

@@ -40,6 +40,7 @@ export const RATE = Object.freeze({
   appPerDay: 200,
   handoffPublicPerDay: 3,   // per IP
   handoffAppPerDay: 5,      // per user
+  clientErrorPerDay: 30,    // browser error reports per user (SUPPORT_CLIENT_ERROR_PER_DAY)
 });
 
 /** $ caps for the MODEL path only. Env-overridable (names in `env`). 0 disables the model for that scope. */

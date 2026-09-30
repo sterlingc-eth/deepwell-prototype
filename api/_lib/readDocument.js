@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { withTenant } from "./recordsStore.js";
-import { getObject } from "./r2.js";
+import { getObject, keyBelongsToTenant } from "./r2.js";
 import { getApiKey, MODEL_TIMEOUT_MS, providerFailureMessage } from "./claude.js";
 import { captureException } from "./telemetry.js";
 import { recordModelCall } from "./usage.js";
@@ -438,7 +438,19 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
 
   if (!doc.storage_key) throw new IngestError("Document has no stored file", 409);
 
-  const bytes = await getObject(doc.storage_key);
+  // R30 H1: a key that is not under THIS tenant's prefix is never fetched, whatever put it on the row.
+  if (!keyBelongsToTenant(doc.storage_key, doc.tenant_id)) {
+    throw new IngestError("Document has an invalid storage location", 409);
+  }
+
+  let bytes;
+  try {
+    bytes = await getObject(doc.storage_key);
+  } catch (err) {
+    // R30 M5: an object over the read cap (PUT past its declared size) is the document's fault, not a blip.
+    if (err?.name === "R2Error" && err.status === 413) throw new IngestError("File is too large to read", 413);
+    throw err;
+  }
   // Magic bytes beat a declared content type, which is only ever a browser's
   // guess. Trusting a wrong guess — `doc.content_type || sniff(...)` used to
   // fall back to sniffing ONLY when nothing was declared — is how a photo the

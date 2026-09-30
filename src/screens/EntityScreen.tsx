@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, MessageSquareText, Network } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { FactGrid } from '../components/FactGrid';
+import { InstallDateField } from '../components/InstallDateField';
 import { SourceList } from '../components/SourceList';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { KnowledgeGraph } from '../components/KnowledgeGraph';
@@ -51,6 +52,8 @@ export function EntityScreen() {
     const out: Fact[] = [];
     for (const f of typeSpec.fields) {
       if (f.kind === 'ref') continue; // refs render as related records below
+      // A unit's install date has its own editable field above (InstallDateField): view, add, change, source.
+      if (entity.type === 'equipment' && f.key === 'installDate') continue;
       const raw = entity.fields[f.key];
       if (raw === null || raw === undefined || raw === '') continue;
       const sources = sourcesFor(graph, entity.id, f.key, true);
@@ -76,8 +79,9 @@ export function EntityScreen() {
   }
 
   const label = entityLabel(entity, typeSpec.labelField);
+  const installDateSources = entity.type === 'equipment' ? sourcesFor(graph, entity.id, 'installDate', true) : [];
   const docOrder = new Map<string, number>();
-  const allRefs = facts.flatMap((f) => f.sources);
+  const allRefs = [...facts.flatMap((f) => f.sources), ...installDateSources];
   for (const s of allRefs) if (!docOrder.has(s.documentId)) docOrder.set(s.documentId, docOrder.size + 1);
   const citation = (ref: SourceRef) => docOrder.get(ref.documentId) ?? 0;
 
@@ -142,6 +146,10 @@ export function EntityScreen() {
           <section aria-label="Knowledge graph" className="dw-card p-4">
             <KnowledgeGraph seedNodeId={graphNodeId} heading={`${label} knowledge graph`} />
           </section>
+        )}
+
+        {entity.type === 'equipment' && (
+          <InstallDateField entity={entity} sources={installDateSources} citation={citation} onOpenSource={setPreview} />
         )}
 
         <FactGrid facts={facts} citation={citation} onOpenSource={setPreview} sourceLabel={(r) => { const d = graph.docs[r.documentId]; return d ? documentName(d) : undefined; }} />

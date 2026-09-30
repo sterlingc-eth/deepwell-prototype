@@ -101,7 +101,9 @@ import {
   DOCUMENT_TYPE_IDS,
 } from './documentTypes.js';
 import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
-import { normalizeReminderTrigger } from './extractFields.js';
+import { normalizeReminderTrigger, normalizeDate } from './extractFields.js';
+import { deriveWarranty } from './warrantyRules.js';
+import { packForTenant } from './industry/index.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -278,6 +280,103 @@ export async function correctField(ctx, { documentId, fieldKey, value, by }, act
     });
 
     return { document: documentRow, extraction };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Unit install date (R30, product feedback: the Dashboard's "Add install date" opened a page with no
+// field to add one to).
+//
+// A unit's install date normally arrives from a scanned document (entities.data.installation_date is
+// filled once by findOrCreateEquipment). This is the HUMAN path: a person types the date on the unit's
+// own page. It is a correction in every sense the review store already uses — attributed ("entered by"),
+// audited (audit_log 'review.unit_install_date_entered', with the previous value), and it replaces a
+// scanned value only on purpose (the previous value is kept in the audit row and on the entry itself).
+// The warranty is then re-derived exactly as extractDocument.js does (deriveWarranty + the tenant's
+// industry pack), keeping a PRINTED expiry a document already gave, so entering a date can never erase
+// or invent one: a brand with no verified rule still gets a stored install date and no computed expiry.
+// entities.updated_at is bumped, which is what api/_lib/askCache.js's corpus_stamp reads.
+// No migration: provenance lives in entities.data (`installation_date_entered`).
+// ---------------------------------------------------------------------------
+
+const INSTALL_DATE_MIN = '1950-01-01';
+const INSTALL_DATE_FUTURE_MONTHS = 3; // same window extractFields.js gives a scanned installation_date
+
+/**
+ * Pure: validate what a person typed into the install-date box. Only a real calendar day in ISO
+ * YYYY-MM-DD form is accepted (the browser's date input always sends that); not before 1950, and not more
+ * than three months ahead of `today` (a scheduled install is real, next year's is a typo).
+ * @returns {{ok: true, ymd: string} | {ok: false, error: string}}
+ */
+export function validateInstallDateInput(raw, today = new Date().toISOString().slice(0, 10)) {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { ok: false, error: 'Enter the install date as a full date (year, month and day).' };
+  const parsed = normalizeDate(s);
+  if (!parsed || parsed !== s) return { ok: false, error: 'That is not a real calendar date.' };
+  if (s < INSTALL_DATE_MIN) return { ok: false, error: 'That install date is too far back. Check the year.' };
+  const limit = new Date(`${today}T00:00:00Z`);
+  limit.setUTCMonth(limit.getUTCMonth() + INSTALL_DATE_FUTURE_MONTHS);
+  if (s > limit.toISOString().slice(0, 10)) return { ok: false, error: 'That install date is in the future. Check the year.' };
+  return { ok: true, ymd: s };
+}
+
+/**
+ * Pure: the entities.data patch for a typed install date — the flat date, its "entered by" provenance,
+ * and the re-derived warranty. Exported so scripts/verify-r30-app-fixes.mjs can check the rules with no
+ * database (printed expiry kept, unverified brand keeps no computed expiry, provenance shape).
+ */
+export function installDatePatch(data, ymd, { by, byUserId = null, now = new Date(), pack = null } = {}) {
+  const current = data && typeof data === 'object' ? data : {};
+  const previous = typeof current.installation_date === 'string' && current.installation_date ? current.installation_date : null;
+  const known = { ...current, installation_date: ymd };
+  // A printed expiry is what a document said; it must survive a human adding the install date.
+  const w = current.warranty;
+  if (w && typeof w === 'object' && w.expiresBasis === 'printed' && w.expires) known.warranty_expires = w.expires;
+  const warranty = deriveWarranty(known, null, pack);
+  return {
+    previous,
+    warranty,
+    patch: {
+      installation_date: ymd,
+      installation_date_entered: { by: String(by).slice(0, 120), byUserId: byUserId ?? null, at: now.toISOString(), previous },
+      warranty,
+    },
+  };
+}
+
+export async function setUnitInstallDate(ctx, { entityId, installDate, by }, actorClerkId) {
+  assertUuid('entityId', entityId);
+  assertNonEmptyString('by', by);
+  const checked = validateInstallDateInput(installDate);
+  if (!checked.ok) throw new ReviewError(checked.error, 400);
+
+  return withTenant(ctx, async (client, tenantId) => {
+    const row = (await client.query(
+      `SELECT id, entity_type, merged_into, data FROM entities WHERE id = $1 AND ${TENANT} FOR UPDATE`,
+      [entityId]
+    )).rows[0];
+    if (!row) throw new ReviewError('Unit not found', 404);
+    if (row.entity_type !== 'equipment') throw new ReviewError('An install date can only be set on a unit (equipment) record.', 400);
+    if (row.merged_into) throw new ReviewError('That unit was merged into another record. Open the surviving record.', 409);
+
+    const pack = await packForTenant(client);
+    const { previous, warranty, patch } = installDatePatch(row.data, checked.ymd, { by, byUserId: actorClerkId ?? null, pack });
+
+    const updated = (await client.query(
+      `UPDATE entities SET data = COALESCE(data, '{}'::jsonb) || $2::jsonb, updated_at = NOW()
+        WHERE id = $1 AND ${TENANT} RETURNING id, entity_type, data, customer_id`,
+      [entityId, JSON.stringify(patch)]
+    )).rows[0];
+
+    await logAction(client, tenantId, {
+      clerkUserId: actorClerkId,
+      action: 'review.unit_install_date_entered',
+      resourceType: 'entity',
+      resourceId: entityId,
+      changes: { installDate: checked.ymd, previous, by, warrantyExpires: warranty?.expires ?? null },
+    });
+
+    return { entity: updated, installDate: checked.ymd, previous, warranty };
   });
 }
 

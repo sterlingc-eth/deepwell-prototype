@@ -1,4 +1,5 @@
 import type { Answer, AnswerProvider, Fact } from '../core/types';
+import { localYmd } from '../core/localDate';
 import { authHeader } from './authToken';
 import { messageFromResponse } from './httpError';
 import type { GraphSnapshot } from '../core/entityGraph';
@@ -114,7 +115,7 @@ export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           question,
-          today: (opts?.now ?? new Date()).toISOString().slice(0, 10),
+          today: localYmd(opts?.now ?? new Date()),
           ...(wantStream ? { stream: true } : {}),
           // TEAM T2: only sent when the thread actually has a prior turn — see
           // api/_lib/conversation.js. Omitted entirely for a first/"New question" ask.

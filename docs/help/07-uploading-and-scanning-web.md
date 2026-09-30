@@ -33,7 +33,12 @@ PDFs and photos must be under 24 MB, text and CSV files under 20 MB, and 100 MB 
 ### How long until an upload is searchable?
 ~ how long, how long does it take, processing time, how fast, searchable, ready to search, wait time, when will it be ready, turnaround, how quickly, upload speed, how soon, progress, status pill, processing n of m, uploaded sorted read matched checked, where do i see progress, watch progress, is it done, checking uploading reading queued, how do i know when my upload is finished, upload finished, is my upload done, when is my upload done, upload complete, finished uploading, how do i know its done
 !covers:A-UPLOAD-STATUS
-Usually within minutes. Each file shows Checking, Uploading, Reading or Queued while it goes in, then a stage pill: **Uploaded → Sorted → Read → Matched → Checked** (or **AI verified**). The header shows "Processing N of M…", or "Still working on N — check Inbox" after ten minutes. Watch it in **Inbox**; the bell tells you about later changes. Big batches take longer.
+Usually within minutes. Each file shows Checking, Uploading, Reading or Queued while it goes in, then a stage pill: **Uploaded → Sorted → Read → Matched → Checked** (or **AI verified**). The header shows "Processing N of M…", or "Still working on N — check Inbox" after ten minutes. Watch it in **Inbox**; the bell tells you about later changes. A file that is accepted but not finished shows "Still processing — check Inbox in a few minutes" with a **See Needs you** button. Big batches take longer.
+
+### What does the Classify received button do?
+~ classify received, classify button, what does classify received do, classify my files, classify uploads, guess type, sort my uploads, set document types, files stuck at uploaded, classified n of m, nothing could be classified, classify batch, type my documents, sort the batch
+!covers:A-CLASSIFY
+On **Inbox → Add files**, a batch with files still at **Uploaded** shows **Classify received**. Press it and DeepWell works out what kind of document each file is, the same way it does for the rest of your records. It never overwrites a type a person chose. It then reports "Classified N of M." If some could not be placed it says the rest need a person: open them under **Inbox → Needs you** and pick the document type. If a file is still uploading, wait a moment and press it again.
 
 ### Can DeepWell read handwriting and bad scans?
 ~ handwriting, handwritten, bad scan, blurry, poor quality, low quality, carbon copy, faded, cursive, scanned copy, crooked, photo quality, can it read my writing, read handwriting on old carbon copies

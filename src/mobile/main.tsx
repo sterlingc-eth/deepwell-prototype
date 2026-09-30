@@ -5,6 +5,7 @@ import '../index.css'
 import './mobile.css'
 import { MobileApp } from './MobileApp'
 import { registerServiceWorker } from './pwa'
+import { installErrorReporter } from '../services/errorReporter'
 
 // DeepWell Mobile (/m/): the lite field app for techs and managers — Ask,
 // Scan, Docs. Same Clerk session, same API, same tenant scoping as /app; it
@@ -27,6 +28,7 @@ const localization = {
 }
 
 registerServiceWorker()
+installErrorReporter('mobile', () => `tab:${new URLSearchParams(window.location.search).get('tab') ?? 'ask'}`)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

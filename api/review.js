@@ -165,6 +165,7 @@ export const config = {
 
 const ACTIONS = new Set([
   'correctField',
+  'setUnitInstallDate',
   'classifyDocument',
   'linkDocument',
   'unlinkDocument',
@@ -275,6 +276,9 @@ export default async (req, res) => {
     switch (action) {
       case 'correctField':
         result = await reviewStore.correctField(ctx, payload, auth.userId);
+        break;
+      case 'setUnitInstallDate':
+        result = await reviewStore.setUnitInstallDate(ctx, payload, auth.userId);
         break;
       case 'classifyDocument':
         result = await reviewStore.classifyDocument(ctx, payload, auth.userId);

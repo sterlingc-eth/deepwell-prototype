@@ -284,6 +284,13 @@ function toEntity(row: ApiEntity): Entity {
     }
     const warranty = data.warranty as { expires?: unknown } | undefined;
     fields.warrantyExpiry = toDateOrNull(warranty?.expires);
+    // R30: who typed the install date by hand (api/_lib/reviewStore.js setUnitInstallDate) — absent when it came from a document.
+    const entered = data.installation_date_entered as { by?: unknown; byUserId?: unknown; at?: unknown } | undefined;
+    if (entered && typeof entered === 'object' && typeof entered.by === 'string') {
+      fields.installDateEnteredBy = entered.by;
+      if (typeof entered.byUserId === 'string') fields.installDateEnteredById = entered.byUserId;
+      if (typeof entered.at === 'string') fields.installDateEnteredAt = entered.at;
+    }
     // entities.customer_id is a real column (setEquipmentCustomer), not a
     // data key — surface it so screens can walk unit → customer.
     if (row.customer_id) fields.customerId = String(row.customer_id);

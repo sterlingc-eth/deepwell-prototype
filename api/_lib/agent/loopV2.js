@@ -38,13 +38,13 @@ import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
 import { assertModelBudget } from "../rateLimit.js";
-import { planCacheBreakpoints } from "../promptCache.js";
+import { planCacheBreakpoints, withRollingBreakpoint, isRollingCacheEnabled, estimateTokens } from "../promptCache.js";
 import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usage.js";
 import { ALL_TOOL_DEFS_V2, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./tools.js";
 import { shapeAgentAnswer } from "./shape.js";
 import { citeAgentData } from "../citations/agent.js";
 import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
-import { escalationModel, sonnetAllowed, recordSonnetSpend, isEscalationEnabled } from "./escalation.js";
+import { escalationModel, sonnetAllowed, recordSonnetSpend, isEscalationEnabled, classifyQuestionDifficulty, needsEscalation, MIN_ESCALATION_MS } from "./escalation.js";
 import { VIEW_PAGE_DOCS } from "./viewPage.js";
 import { packForTenant } from "../industry/index.js";
 import { runToolsBounded } from "./loop.js";
@@ -276,14 +276,14 @@ function stepLabel(toolName, input) {
  *   outputTokens/costUsd/steps/modelCallsMs/queries/dropped/models/escalation?) so ask.js's existing
  *   bookkeeping (cache upsert, agentDebugTrace, submitRecipe) works completely unchanged.
  */
-export async function runResearchAgent({ withTenant, ctxArg, question, today, overlay, hint, callModel = defaultCallModel, deadlineAt, limits = {}, onEvent, env = process.env }) {
+async function runResearchAgentOnce({ withTenant, ctxArg, question, today, overlay, hint, callModel = defaultCallModel, deadlineAt, limits = {}, onEvent, env = process.env, model: runModel = RESEARCH_MODEL }) {
   await assertModelBudget(ctxArg);
 
   const emit = (type, message) => { if (typeof onEvent === "function") { try { onEvent({ type, message }); } catch { /* streaming is best-effort */ } } };
 
   const gate = await researchAllowed(withTenant, ctxArg, env);
   if (!gate.allowed) {
-    return { handled: false, data: null, reason: `budget:${gate.why}`, model: RESEARCH_MODEL, modelCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUsd: 0, steps: [], modelCallsMs: [], queries: [], dropped: null, models: [RESEARCH_MODEL] };
+    return { handled: false, data: null, reason: `budget:${gate.why}`, model: runModel, modelCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUsd: 0, steps: [], modelCallsMs: [], queries: [], dropped: null, models: [runModel] };
   }
 
   const maxTurns = Math.max(1, Math.min(MAX_TURNS_V2, limits.maxTurns ?? MAX_TURNS_V2));
@@ -313,8 +313,11 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       tools: ALL_TOOL_DEFS_V2.map((block, i) => ({ block, breakpoint: i === ALL_TOOL_DEFS_V2.length - 1 })),
       system: [{ block: { type: "text", text: buildResearchSystemPrompt(pack) }, breakpoint: true }],
     },
-    RESEARCH_MODEL
+    runModel
   );
+
+  const prefixTokens = estimateTokens(tools) + estimateTokens(system);
+  const prefixBreakpoints = [...tools, ...system].filter((b) => b?.cache_control).length;
 
   const examples = formatWorkedExamples(selectWorkedExamples(overlay?.recipes, question, 3));
   const note = typeof hint === "string" && hint.trim()
@@ -373,11 +376,15 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       const modelStarted = Date.now();
       const resp = await callModel(
         {
-          model: RESEARCH_MODEL,
+          model: runModel,
           max_tokens: forceAnswer ? forcedAnswerTokenBudget(steps, toolbox.ledger) : MAX_OUTPUT_TOKENS_V2,
           temperature: 0, system, tools,
           tool_choice: forceAnswer ? { type: "tool", name: ANSWER_TOOL_NAME } : { type: "auto" },
-          messages,
+          // R31: rolling breakpoint on the run's own history (see promptCache.js's withRollingBreakpoint) — later
+          // turns read earlier tool results from the cache instead of re-paying full input price for them.
+          messages: isRollingCacheEnabled(env)
+            ? withRollingBreakpoint(messages, { model: runModel, prefixTokens, breakpointsUsed: prefixBreakpoints, final: forceAnswer })
+            : messages,
         },
         { deadlineAt: deadline }
       );
@@ -388,8 +395,8 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
       totals.outputTokens += u.outputTokens;
       totals.cacheReadInputTokens += u.cacheReadInputTokens;
       totals.cacheCreationInputTokens += u.cacheCreationInputTokens;
-      costUsd += estimateModelCostUsd(RESEARCH_MODEL, u);
-      records.push(recordModelCall(ctxArg, { ...u, model: RESEARCH_MODEL }));
+      costUsd += estimateModelCostUsd(runModel, u);
+      records.push(recordModelCall(ctxArg, { ...u, model: runModel }));
 
       const content = Array.isArray(resp?.content) ? resp.content : [];
       const uses = content.filter((b) => b?.type === "tool_use");
@@ -523,7 +530,7 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
 
   console.log(
     JSON.stringify({
-      route: "ask", research_agent: true, model: RESEARCH_MODEL, reason, handled,
+      route: "ask", research_agent: true, model: runModel, reason, handled,
       model_calls: totals.modelCalls, input_tokens: totals.inputTokens, output_tokens: totals.outputTokens,
       // ROUND 20 (J4), task 2 ("report estimated $/question by route"): cost_usd was already computed
       // (recordSonnetSpend just above already spends it) but never made it into this log line — added
@@ -546,8 +553,8 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     data: handled ? shaped.data : null,
     reason,
     providerUnavailable,
-    model: RESEARCH_MODEL,
-    models: [RESEARCH_MODEL],
+    model: runModel,
+    models: [runModel],
     ...totals,
     costUsd,
     steps,
@@ -562,4 +569,73 @@ export async function runResearchAgent({ withTenant, ctxArg, question, today, ov
     memoHits: toolbox.memoHits,
     ...(error ? { error } : {}),
   };
+}
+
+/* ------------------------------------------------------------------ R31: cheap-model tier (Haiku first)
+ *
+ * DONOVAN_CHEAP_TIER=1 (default OFF — it changes which model answers, and that must be A/B'd against the live exam before
+ * it is switched on: scripts/model-ab.mjs). A question that carries NO difficulty signal at all (escalation.js's
+ * classifyQuestionDifficulty scores 0) and is not an enumeration / repair-history / unit-ranking / reasoning shape
+ * (isAgentFirstQuestion) — in practice a single-record lookup phrased in a way the deterministic layer did not parse —
+ * is tried on Haiku first, with a tighter turn/tool budget. Everything after that is the SAME safety net a Sonnet run
+ * already has: shape.js grounding, the fact-level verify step and the claim check all run inside the Haiku run. The
+ * Haiku result is accepted only if it answered AND nothing was dropped at any of those three stages; any other outcome
+ * (no answer, cannot_answer, dropped facts/claims, two rejected SQL statements) re-runs the WHOLE question on Sonnet
+ * with the remaining deadline, and the two runs' tokens/cost are added together so spend stays honest. Provider
+ * outages, a spent budget or an exhausted deadline are returned as they are (a second model would not help).
+ * Wrong answers cannot rise from this tier by construction: a Haiku answer only ever leaves this function after passing
+ * the exact same grounding gates Sonnet's does.
+ */
+export const CHEAP_MODEL = process.env.DONOVAN_CHEAP_MODEL || "claude-haiku-4-5";
+export const isCheapTierEnabled = (env = process.env) => env?.DONOVAN_CHEAP_TIER === "1";
+export const CHEAP_TIER_LIMITS = Object.freeze({ maxTurns: 3, maxToolCalls: 6 });
+
+/** Pure: is this question simple enough to try on the cheap model first? */
+export function isCheapTierCandidate(question) {
+  const q = String(question ?? "").trim();
+  if (!q || q.length > 160) return false;
+  if (classifyQuestionDifficulty(q).points > 0) return false;
+  if (isEnumerationQuestion(q) || isAgentFirstQuestion(q)) return false;
+  return true;
+}
+
+/** Pure: why a finished cheap-model run must be re-run on the full model, or null when it can stand. */
+export function cheapRunNeedsFullModel(run) {
+  if (!run) return "no-run";
+  if (run.providerUnavailable || String(run.reason ?? "").startsWith("budget:") || run.reason === "deadline" || run.reason === "error") return null;
+  const why = needsEscalation(run);
+  if (why) return why;
+  if (!run.handled) return "not-handled";
+  if ((run.dropped?.verify ?? 0) > 0 || (run.dropped?.claims ?? 0) > 0) return "verification-dropped";
+  return null;
+}
+
+const SUMMED = ["modelCalls", "inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"];
+function mergeTieredRuns(cheap, full, why) {
+  const merged = { ...full };
+  for (const k of SUMMED) merged[k] = (cheap[k] ?? 0) + (full[k] ?? 0);
+  merged.costUsd = Math.round(((cheap.costUsd ?? 0) + (full.costUsd ?? 0)) * 1_000_000) / 1_000_000;
+  merged.steps = [...(cheap.steps ?? []), ...(full.steps ?? [])];
+  merged.modelCallsMs = [...(cheap.modelCallsMs ?? []), ...(full.modelCallsMs ?? [])];
+  merged.queries = [...(cheap.queries ?? []), ...(full.queries ?? [])];
+  merged.models = [cheap.model, full.model];
+  merged.escalation = { from: cheap.model, to: full.model, why };
+  return merged;
+}
+
+/**
+ * The research agent entry point ask.js calls. Identical to running the Sonnet agent unless DONOVAN_CHEAP_TIER=1 and the
+ * question qualifies (see above) — same parameters, same result shape (plus `escalation` when the tier escalated).
+ */
+export async function runResearchAgent(params) {
+  const env = params?.env ?? process.env;
+  if (!isCheapTierEnabled(env) || params?.model || !isCheapTierCandidate(params?.question)) return runResearchAgentOnce(params);
+
+  const deadline = params.deadlineAt ?? Date.now() + DEFAULT_DEADLINE_MS_V2;
+  const cheap = await runResearchAgentOnce({ ...params, model: CHEAP_MODEL, deadlineAt: deadline, limits: { ...CHEAP_TIER_LIMITS, ...(params.limits ?? {}) } });
+  const why = cheapRunNeedsFullModel(cheap);
+  if (!why) return cheap;
+  if (deadline - Date.now() < MIN_ESCALATION_MS) return cheap; // no time for a second run: the cheap result stands as-is
+  const full = await runResearchAgentOnce({ ...params, model: RESEARCH_MODEL, deadlineAt: deadline });
+  return mergeTieredRuns(cheap, full, why);
 }

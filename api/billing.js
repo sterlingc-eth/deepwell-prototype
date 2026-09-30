@@ -52,8 +52,32 @@ async function getTenantBillingRow(store) {
   return rows[0] ?? null;
 }
 
+/** R30 L6: a malformed body is the caller's mistake (400), not a 500. */
+async function readJsonBody(req) {
+  try {
+    const parsed = JSON.parse((await readRawBody(req)).toString("utf8") || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * R30 M2: a tenant that already has a live subscription must not start a SECOND one (double billing; and with the
+ * old webhook, cancelling the old one cancelled the tenant). Pure. Records Rescue is a one-off payment and is
+ * always allowed.
+ * @param {string} plan
+ * @param {object|null} tenantRow
+ */
+export function checkoutBlockedByLiveSubscription(plan, tenantRow) {
+  if (plan === "records_rescue") return false;
+  const state = planStateFor(tenantRow ?? {});
+  return state === "active" || state === "trialing" || state === "past_due";
+}
+
 async function handleCheckout(req, res, auth) {
-  const body = JSON.parse((await readRawBody(req)).toString("utf8") || "{}");
+  const body = await readJsonBody(req);
+  if (body === null) return res.status(400).json({ error: "Invalid request body" });
   const plan = typeof body.plan === "string" ? body.plan : null;
   const interval = body.interval === "year" ? "year" : "month";
   const quantity = body.quantity;
@@ -78,6 +102,18 @@ async function handleCheckout(req, res, auth) {
     // that write instead of racing to create a second customer.
     await store.raw("SELECT pg_advisory_xact_lock(hashtext($1))", [`billing:${store.tenantId}`]);
     const tenantRow = await getTenantBillingRow(store);
+    if (checkoutBlockedByLiveSubscription(plan, tenantRow) && tenantRow?.stripe_customer_id) {
+      // Send them to the billing portal (change plan / update card there) instead of creating another subscription.
+      try {
+        const portal = await createPortalSession(stripe, { customerId: tenantRow.stripe_customer_id, returnUrl: SUCCESS_URL });
+        return { portalUrl: portal.url };
+      } catch (err) {
+        console.error("billing checkout: portal redirect failed:", err?.message);
+        const e = new Error("You already have an active subscription. Use Manage billing to change your plan.");
+        e.status = 409;
+        throw e;
+      }
+    }
     const customerId = await findOrCreateCustomer(stripe, {
       tenantRow,
       tenantId: store.tenantId,
@@ -100,6 +136,13 @@ async function handleCheckout(req, res, auth) {
     return session.url;
   });
 
+  if (result && typeof result === "object" && result.portalUrl) {
+    return handleCors(res, req).status(200).json({
+      url: result.portalUrl,
+      portal: true,
+      notice: "You already have an active subscription, so we opened Manage billing where you can change your plan.",
+    });
+  }
   return handleCors(res, req).status(200).json({ url: result });
 }
 
@@ -296,6 +339,10 @@ async function handleWebhook(req, res) {
     const outcome = await recordAndApplyEvent(pool, event, tenantId, mapped.patch);
     if (outcome === "duplicate") {
       return res.status(200).json({ received: true, handled: false, reason: "duplicate" });
+    }
+    // R30 M1: recorded in the ledger but deliberately not applied (older than what we have, another subscription, ...).
+    if (outcome === "ignored") {
+      return res.status(200).json({ received: true, handled: false, reason: "ignored" });
     }
     // Reviewer NO-GO (2026-09-22): billing_apply() just changed this tenant's
     // plan/billing_status, but api/_lib/plan.js's and recordsStore.js's

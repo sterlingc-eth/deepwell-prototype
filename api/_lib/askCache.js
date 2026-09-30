@@ -122,6 +122,24 @@ export function _resetTableExistsForTests() {
 }
 
 /**
+ * R31 (speed): the tenant's current corpus stamp on its own (one cheap aggregate query, no cache-row join), for
+ * in-process memos of tenant-wide snapshots (compose.js's customer universe) that must be dropped whenever ANY
+ * answer-relevant write lands — the exact same definition of "the corpus changed" the answer cache trusts. Returns null
+ * when the stamp cannot be computed (callers then simply do not memoize). No prompt version mixed in: it describes the
+ * data, not a prompt.
+ */
+export async function getCorpusStamp(db) {
+  if (!ASK_CACHE_ENABLED) return null;
+  try {
+    const hasFinancials = await financialsTableExists(db);
+    const { rows } = await db.raw(stampOnlySql(hasFinancials), []);
+    return rows[0]?.corpus_stamp ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * One round trip in steady state: fetches the tenant's current corpus_stamp
  * and, if present and matching (tenant, question_hash, today), the cached
  * row alongside it. `db` is a recordsStore.js store (has `.raw`), called

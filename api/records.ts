@@ -16,8 +16,11 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth, denyAuth } from './_lib/auth.js';
+import { requireAuth, denyAuth, hasShop, requireRole } from './_lib/auth.js';
 import { withTenant } from './_lib/recordsStore.js';
+import { handleCors, scrubErrorForLog } from './_lib/claude.js';
+import { limit } from './_lib/rateLimit.js';
+import { checkUploadGate } from './upload-url.js';
 import { clientLimits, planStateFor } from './_lib/plan.js';
 import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
 
@@ -28,6 +31,44 @@ export const config = {
 const BOOTSTRAP_RECORDS_LIMIT = 20;
 const BOOTSTRAP_NOTIFICATIONS_LIMIT = 10;
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * R30 L2: which actions any signed-in member may call, and which need the shop admin.
+ *
+ * The app's screens only ever READ through this endpoint (browseDocuments, listDocuments, listEntities,
+ * listExtractionsByDocument(s), getDocument, bootstrap - see src/services/recordsStoreClient.ts callers), so
+ * every read stays open to every member. Everything that writes (or reads the audit trail) used to be open to
+ * any member too, which let a technician forge audit_log rows, rewrite extractions/entities, and so on: those
+ * now need the admin role in a shop (a solo tenant has no org role and is its own owner, same rule as
+ * billing/keys/delete - `hasShop(auth) ? requireRole(auth, 'admin')`).
+ * createDocument is the one member-level write (it is what an upload does); it is billing-gated and
+ * rate-limited exactly like /api/upload-url, and never accepts a client storage_key (see the case below).
+ */
+export const RECORDS_READ_ACTIONS: ReadonlySet<string> = new Set([
+  'getDocument', 'listDocuments', 'browseDocuments',
+  'getFacet', 'listFacetsByDocument',
+  'getExtraction', 'listExtractionsByDocument', 'listExtractionsByDocuments', 'listExtractionsByEntity',
+  'getEntity', 'listEntities',
+  'getProposal', 'listProposals',
+  'getSchemaVersion', 'bootstrap',
+]);
+export const RECORDS_MEMBER_WRITE_ACTIONS: ReadonlySet<string> = new Set(['createDocument']);
+export const RECORDS_ADMIN_ACTIONS: ReadonlySet<string> = new Set([
+  'updateDocument',
+  'createFacet', 'updateFacet',
+  'createExtraction', 'updateExtraction',
+  'createEntity', 'updateEntity',
+  'createProposal', 'updateProposal',
+  'logAction', 'getAuditLog',
+  'incrementSchemaVersion',
+]);
+
+/** Pure: is this action allowed for this caller? Returns 'ok' | 'forbidden' | 'unknown'. */
+export function recordsActionAccess(action: string, auth: { orgId?: string | null; orgRole?: string | null }): 'ok' | 'forbidden' | 'unknown' {
+  if (RECORDS_READ_ACTIONS.has(action) || RECORDS_MEMBER_WRITE_ACTIONS.has(action)) return 'ok';
+  if (RECORDS_ADMIN_ACTIONS.has(action)) return !auth?.orgId || auth.orgRole === 'admin' ? 'ok' : 'forbidden';
+  return 'unknown';
+}
+
 const TENANT_PRED = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
 /**
@@ -111,6 +152,14 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     return denyAuth(res, err);
   }
 
+  return processRecords(req, res, auth);
+};
+
+/**
+ * Everything after authentication. Split out (R30) so scripts/verify-r30-audit-fixes.mjs can drive the real
+ * dispatcher - role allowlist, createDocument hardening, gates - with a fabricated `auth` and no Clerk token.
+ */
+export async function processRecords(req: VercelRequest, res: VercelResponse, auth: any) {
   const { action, ...rest } = (req.body ?? {}) as Record<string, any>;
   if (!action) {
     return res.status(400).json({ error: 'action required' });
@@ -124,6 +173,36 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     delete payload[k];
   }
   payload.clerk_user_id = auth.userId;
+
+  const access = recordsActionAccess(String(action), auth);
+  if (access === 'unknown') {
+    return res.status(400).json({ error: `Unknown action: ${action}` });
+  }
+  if (access === 'forbidden') {
+    return handleCors(res, req).status(403).json({ error: "This action requires the 'admin' role in your shop." });
+  }
+
+  if (action === 'createDocument') {
+    // R30 H1: the object key, the uploader and the stage are the SERVER's to set. A client-supplied storage_key
+    // was inserted (and overwritten on conflict) unvalidated, so a member could point their own document at
+    // another tenant's R2 object and then presign / read / delete it. upload-url.js derives the key from the
+    // tenant + hash; nothing else may supply one.
+    delete payload.storage_key;
+    delete payload.stage;
+    payload.uploaded_by = auth.userId;
+    // R30: this path used to skip the billing gate and the ingest rate limit that /api/upload-url applies, so a
+    // member could create documents without either. Same gate, same bucket.
+    const gate = await checkUploadGate(auth);
+    if (!gate.allowed) {
+      return handleCors(res, req).status(gate.status ?? 402).json({ error: gate.error, url: gate.url });
+    }
+    if (!(await limit(req, res, auth, 'ingest'))) return; // 429 already written
+  }
+  if (action === 'logAction') {
+    // Client-originated audit rows are namespaced so they can never be mistaken for a server-written one.
+    const a = typeof payload.action === 'string' ? payload.action.slice(0, 80) : 'unspecified';
+    payload.action = a.startsWith('client.') ? a : `client.${a}`;
+  }
 
   try {
     const result = await withTenant(
@@ -201,7 +280,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
   } catch (err) {
     // Log the detail, return none of it — raw messages leak schema and
     // connection internals to anonymous callers.
-    console.error('API error:', err);
+    console.error('API error:', scrubErrorForLog(err));
     return res.status(500).json({ error: 'Internal server error' });
   }
-};
+}

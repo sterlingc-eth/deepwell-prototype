@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { Download, FolderOpen, Grid3x3, Loader2, Network, Trash2, Users } from 'lucide-react';
 import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
@@ -10,6 +11,25 @@ import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
 import { RecordsBrowser } from '../components/records/RecordsBrowser';
 import { GridView } from '../components/grid/GridView';
+import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
+import { AskAdminNote } from '../components/AskAdminNote';
+
+export type RecordsTab = 'documents' | 'customers' | 'grid' | 'graph';
+const RECORDS_TABS: RecordsTab[] = ['documents', 'customers', 'grid', 'graph'];
+const recordsTabKey = (userId: string | null | undefined) => `dw.records.tab.${userId ?? 'anon'}`;
+/** Last-used Records tab for this user; 'documents' when nothing valid is stored or storage is blocked. */
+export function readRecordsTab(userId: string | null | undefined): RecordsTab {
+  try {
+    const v = window.localStorage.getItem(recordsTabKey(userId));
+    if (v && (RECORDS_TABS as string[]).includes(v)) return v as RecordsTab;
+  } catch { /* storage blocked: fall through to the default */ }
+  return 'documents';
+}
+export function writeRecordsTab(userId: string | null | undefined, tab: RecordsTab): void {
+  try {
+    window.localStorage.setItem(recordsTabKey(userId), tab);
+  } catch { /* storage blocked: the choice just is not remembered */ }
+}
 
 /**
  * Documents tab: the records browser (round 12 contract — server-side
@@ -28,6 +48,7 @@ function DocumentsTab() {
   const docs = useGraph((s) => s.docs);
   const removeDoc = useGraph((s) => s.removeDoc);
   const openDocument = useAppStore((s) => s.openDocument);
+  const canAdmin = useCanAdmin();
 
   // Round 13 (H3): a Records Browse row can name a document past
   // usePostgresSync's 500-doc sync cap (see appStore.ts's openDocument /
@@ -80,15 +101,24 @@ function DocumentsTab() {
       {error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{error}</p>}
       {exportErr && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportErr}</p>}
 
-      <div className="flex justify-end">
-        <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1" disabled={exporting} onClick={() => void runExport()}>
+      <div className="flex justify-end items-center gap-2">
+        {!canAdmin && <AskAdminNote id="docs-export-admin-note" />}
+        <button
+          type="button"
+          className="dw-btn-secondary !min-h-[36px] !py-1"
+          disabled={!canAdmin || exporting}
+          title={canAdmin ? undefined : ASK_ADMIN_TITLE}
+          aria-describedby={canAdmin ? undefined : 'docs-export-admin-note'}
+          onClick={() => void runExport()}
+        >
           {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Download className="w-3.5 h-3.5" aria-hidden="true" />} Export CSV
         </button>
       </div>
 
       <RecordsBrowser onOpenDocument={onOpenDocument} />
 
-      {totalCount > 0 && (
+      {/* Destructive and admin-only (api/_lib/routes/document-delete.js): a member never sees it at all. */}
+      {canAdmin && totalCount > 0 && (
         <div className="dw-card p-4 space-y-2 border-bad/30">
           <p className="font-medium text-bad-ink flex items-center gap-2"><Trash2 className="w-4 h-4" aria-hidden="true" /> Empty this shop's documents</p>
           <p className="text-body text-ink-2">
@@ -107,7 +137,7 @@ function DocumentsTab() {
             />
             <button
               type="button"
-              className="dw-btn-primary !bg-bad hover:!bg-bad"
+              className="dw-btn-primary !bg-bad hover:!bg-bad !text-stone-0"
               disabled={emptyText !== 'DELETE' || emptying}
               onClick={() => void runEmpty()}
             >
@@ -139,8 +169,13 @@ function DocumentsTab() {
  * customers, from anywhere, not only from here.
  */
 export function BrowseScreen() {
-  // Customers first (owner, 2026-09-20): the shop's people are the entry point; documents hang off them.
-  const [mainTab, setMainTab] = useState<'documents' | 'customers' | 'grid' | 'graph'>('customers');
+  // Documents by default for a new user; after that, the tab THIS person last used (per user, per browser).
+  const { userId } = useAuth();
+  const [mainTab, setMainTabState] = useState<RecordsTab>(() => readRecordsTab(userId));
+  const setMainTab = (t: RecordsTab) => {
+    setMainTabState(t);
+    writeRecordsTab(userId, t);
+  };
 
   return (
     <AppShell>
@@ -162,7 +197,7 @@ export function BrowseScreen() {
               role="tab"
               aria-selected={mainTab === t.id}
               onClick={() => setMainTab(t.id)}
-              className={['dw-btn !min-h-[40px] !py-1.5 !px-3', mainTab === t.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
+              className={['dw-btn !min-h-[44px] sm:!min-h-[40px] !py-1.5 !px-3', mainTab === t.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
             >
               <t.Icon className="w-4 h-4" aria-hidden="true" /> {t.label}
             </button>

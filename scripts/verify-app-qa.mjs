@@ -199,6 +199,8 @@ try {
   {
     const page = await open({ backend: { docs: 12, customers: 6, longNames: true } });
     await go(page, 'browse');
+    await page.getByRole('tab', { name: 'Customers' }).click(); // R30: Records opens on Documents now
+    await page.waitForTimeout(500);
     const numCell = page.locator('tbody tr').first().locator('td').first();
     const text = await numCell.innerText();
     // Text lines actually drawn (distinct client-rect tops of the cell's text), not the stretched cell height.
@@ -230,7 +232,7 @@ try {
   }
   {
     const page = await open({ mobile: true, vp: { width: 390, height: 844 }, backend: { billing: 'none' }, url: '?tab=ask' });
-    check('mobile plan gate: account menu (sign out / switch shop) is reachable', (await page.getByRole('button', { name: 'User menu' }).count()) === 1 && /Choose a plan to continue/.test(await page.locator('body').innerText()));
+    check('mobile plan gate: account menu (sign out / switch shop) is reachable', (await page.getByTestId('account-button').count()) === 1 && /Choose a plan to continue/.test(await page.locator('body').innerText()));
     await page.context().close();
   }
   {

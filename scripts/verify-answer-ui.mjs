@@ -338,6 +338,30 @@ try {
           check(`${label}: closing returns focus to the marker that opened it`, focusReturnedToMarker);
         }
 
+        // R31 3b/3d: the replaced-source note and the collapsed "Why this answer?" disclosure.
+        {
+          const note = citSection.locator('[data-testid="answer-superseded"]');
+          check(`${label}: superseded note says "replaced on <date>"`, (await note.count()) === 1 && /replaced on Sep 3, 2026/.test((await note.textContent()) ?? ''), `count=${await note.count()}`);
+          const newerBtn = note.getByRole('button', { name: /newer copy/ });
+          const nb = await newerBtn.boundingBox();
+          check(`${label}: "Open newer copy" is >=44px`, Boolean(nb && nb.height >= 44 && nb.width >= 44), JSON.stringify(nb));
+          await newerBtn.click();
+          const opens2 = await page.evaluate(() => window.__dwOpens ?? []);
+          check(`${label}: "Open newer copy" opens the replacing document`, opens2.some((o) => /^(source|doc):inv2$/.test(o)), opens2.join(', '));
+          const why = citSection.locator('[data-testid="answer-why-toggle"]');
+          const wb = await why.boundingBox();
+          check(`${label}: "Why this answer?" toggle is >=44px tall`, Boolean(wb && wb.height >= 44), JSON.stringify(wb));
+          check(`${label}: the why panel starts collapsed`, (await citSection.locator('[data-testid="answer-why"]').count()) === 0 && (await why.getAttribute('aria-expanded')) === 'false');
+          const before = await citSection.boundingBox();
+          await why.click();
+          const lis = await citSection.locator('[data-testid="answer-why"] li').count();
+          check(`${label}: the why panel opens with the confidence reasons`, lis >= 3 && (await why.getAttribute('aria-expanded')) === 'true', `li=${lis}`);
+          check(`${label}: confidence is capped below "High" when a claim or source is flagged`, /Medium confidence/.test((await why.textContent()) ?? ''), (await why.textContent()) ?? '');
+          await why.click();
+          const after = await citSection.boundingBox();
+          check(`${label}: collapsing the why panel restores the layout (no residual shift)`, Boolean(before && after && Math.abs(before.height - after.height) < 1));
+        }
+
         const citOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
         check(`${label}: citations fixture causes no horizontal overflow`, !citOverflow);
 
@@ -362,6 +386,32 @@ try {
   await runViewport('mobile', { width: 390, height: 1400 }, false, 'mobile-office');
   await runViewport('mobile', { width: 390, height: 1400 }, true, 'mobile-field');
   await runViewport('mobile', { width: 1280, height: 1400 }, false, 'mobile-wide');
+
+  // R31 3a — passage highlight in the source viewers (desktop DocumentPreview, phone DocSheet).
+  for (const [view, viewport, label] of [['preview', { width: 1280, height: 900 }, 'desktop'], ['preview', { width: 390, height: 800 }, 'phone'], ['docsheet', { width: 390, height: 800 }, 'phone']]) {
+    const page = await browser.newPage({ viewport, reducedMotion: 'reduce' });
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message));
+    await page.goto(url(view), { waitUntil: 'networkidle' });
+    await page.waitForTimeout(300);
+    const name = `${view}/${label}`;
+    if (view === 'preview') {
+      const marks = page.locator('mark[data-passage]');
+      const n = await marks.count();
+      const txt = (await marks.allTextContents()).join(' | ');
+      check(`highlight ${name}: the cited quote is marked (across two extracted lines)`, n === 2 && /total: 620\.00/.test(txt) && /balance_due: 420\.00/.test(txt), `marks=${n} "${txt}"`);
+      const inView = await marks.first().evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; });
+      check(`highlight ${name}: the marked passage is on screen`, inView);
+      check(`highlight ${name}: the cited page is named in the header`, (await page.getByText(/cited at/i).count()) > 0);
+    } else {
+      const cited = page.locator('[data-testid="doc-cited-passage"]');
+      check(`highlight ${name}: the cited passage card shows the quote and page`, (await cited.count()) === 1 && /page 2/.test((await cited.textContent()) ?? '') && (await cited.locator('mark').textContent()) === 'total: 620.00', (await cited.textContent()) ?? '');
+    }
+    check(`highlight ${name}: no horizontal overflow`, !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)));
+    check(`highlight ${name}: no page errors`, errs.length === 0, errs.join(' | '));
+    await page.screenshot({ path: `${SHOT_DIR}/highlight-${view}-${label}.png` });
+    await page.close();
+  }
 
   await browser.close();
 } finally {

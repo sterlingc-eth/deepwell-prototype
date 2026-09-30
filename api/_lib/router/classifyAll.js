@@ -48,6 +48,8 @@ import { isFinancialQuestion } from "../financials/classify.js";
 import { isUnitRankingQuestion, isReasoningQuestion } from "../agent/intents.js";
 import { isInstallDateExtremeQuestion } from "../analytics/detPlan.js";
 import { normalizeQuestion as normalizeQuestionForAnalytics } from "../nlNormalize.js";
+import { stripConversationalFrame } from "./frame.js";
+import { isFutureRecordQuestion } from "./futureDate.js";
 import { performance } from "node:perf_hooks";
 
 const now = () => performance.now();
@@ -60,6 +62,8 @@ const round = (ms) => Math.round(ms * 1000) / 1000; // 3 decimal places — thes
  * because — per the audit above — the two are NOT the same order in production today, and collapsing
  * them would silently change which classifier wins on an overlap.
  */
+const FUTURE_OVERRIDES = new Set(["fastPath", "docLookup", "contentCount", "money", "analytics"]);
+
 export const TRIAL_ORDER = [
   "meta",
   "relations",
@@ -230,7 +234,7 @@ async function defaultLoadAgentModule() {
  *                                      DONOVAN_AGENT-gated exclusions.
  * @param {object} [ctx.env]            process.env override, for tests (isFastPathEnabled/isAnalyticsEnabled).
  */
-export async function classifyAll(question, ctx = {}) {
+async function classifyAllOnce(question, ctx = {}) {
   const {
     meta = null,
     overlay,
@@ -260,7 +264,7 @@ export async function classifyAll(question, ctx = {}) {
     deterministic: timed("deterministic", () => classifyDeterministic(question, { overlay })),
     decompose: timed("decompose", () => classifyDecompose(question, { pack })),
     fastPath: timed("fastPath", () => classifyFastPath(question)),
-    contactLookup: timed("contactLookup", () => parseContactLookupQuestion(question, { overlay })),
+    contactLookup: timed("contactLookup", () => parseContactLookupQuestion(question, { overlay, tenantVocab: ctx.tenantVocab })),
     docLookup: timed("docLookup", () => parseDocLookupQuestion(question, { overlay })),
     contentCount: timed("contentCount", () => parseContentCountQuestion(question, pack)),
     money: timed("money", () => isMoneyQuestion(normalizedForAnalytics) || isFinancialQuestion(normalizedForAnalytics)),
@@ -321,7 +325,40 @@ export async function classifyAll(question, ctx = {}) {
     }
   }
 
+  // R31 loop 4: a question about a record "filed/issued/logged in <future year>" — no classifier (or a fastPath that
+  // then fails) claims it, yet routes/analytics.js already answers it with the deterministic future-date decline
+  // (mentionsFutureYear -> futureDateAnswer). Route it there instead of a paid model call. Never overrides a
+  // customer-name / relations / deterministic / decompose claim (see futureDate.js for the conservative shape test).
+  if (!meta && (!winner || FUTURE_OVERRIDES.has(winner.name)) && isFutureRecordQuestion(question, { tenantVocab })) {
+    const analyticsRouteModule = await loadAnalyticsRouteModule();
+    if (analyticsRouteModule.isAnalyticsEnabled(env)) {
+      for (const stage of PRECEDENCE_TABLE) if (stage.name !== "meta") gated[stage.name] = BOOLEAN_STAGES.has(stage.name) ? false : null;
+      gated.analytics = true;
+      winner = { name: "analytics", intent: true, futureDate: true };
+    }
+  }
+
   timingsMs.total = round(now() - startedAt); // includes the two lazy imports above, on their first call only
 
   return { normalizedForAnalytics, raw, claimed, gated, winner, timingsMs };
+}
+
+/**
+ * R31 (Team A): classifyAll = one pass on the question as typed, plus (only when the text carries spoken
+ * filler, router/frame.js) one pass on the frame-stripped text; the stripped pass is adopted when a
+ * deterministic stage claims it. The adopted
+ * text is returned as `effectiveQuestion` so ask.js hands the SAME text to the run* function that
+ * re-parses it (runContactLookup/runDocLookup/runFastPath take the question string, not the intent).
+ */
+export async function classifyAll(question, ctx = {}) {
+  const first = await classifyAllOnce(question, ctx);
+  const stripped = stripConversationalFrame(question);
+  if (!stripped) return { ...first, effectiveQuestion: question };
+  const second = await classifyAllOnce(stripped, ctx);
+  const secondName = second.winner?.name ?? null;
+  // The frame words carry no information by construction, so the stripped pass is the better read whenever
+  // it is claimed by a deterministic stage. (The raw text can be "claimed" too — e.g. fastPath's own
+  // subject extraction latches onto the filler — and then fail at run time and fall through to the model.)
+  if (secondName && secondName !== "analytics") return { ...second, effectiveQuestion: stripped, frameStripped: true };
+  return { ...first, effectiveQuestion: question };
 }

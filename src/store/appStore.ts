@@ -212,6 +212,11 @@ interface AppState {
   openDocument: (id: string) => void;
   selectedEntityId: string | null;
   openEntity: (id: string) => void;
+  /** Open a unit and put the cursor in one of its editable fields (the Dashboard's "Add install date"). EntityScreen
+   *  consumes and clears `entityFocusField` once the field has focus. */
+  entityFocusField: 'installDate' | null;
+  openEntityField: (id: string, field: 'installDate') => void;
+  clearEntityFocusField: () => void;
   // The customer-profile screen's ref — whatever the caller had in hand (a
   // uuid or a 'C-00012' display number); CustomerProfileScreen itself
   // resolves which one it is (customerClient.getByRef) rather than the store
@@ -383,7 +388,10 @@ export const useAppStore = create<AppState>((set) => ({
     void ensureDocLoaded(id);
   },
   selectedEntityId: null,
-  openEntity: (id) => set({ selectedEntityId: id, currentScreen: 'entity' }),
+  openEntity: (id) => set({ selectedEntityId: id, currentScreen: 'entity', entityFocusField: null }),
+  entityFocusField: null,
+  openEntityField: (id, field) => set({ selectedEntityId: id, currentScreen: 'entity', entityFocusField: field }),
+  clearEntityFocusField: () => set({ entityFocusField: null }),
   customerRef: null,
   openCustomer: (ref) => set({ customerRef: ref, currentScreen: 'customer' }),
 

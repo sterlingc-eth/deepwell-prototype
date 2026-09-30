@@ -1,9 +1,9 @@
-import { lazy, Suspense, useState, type ComponentType, type ReactNode } from 'react';
-import { AlertTriangle, CreditCard, Database, Inbox, LayoutDashboard, Sparkles, Sun, Moon, LogOut, Globe, Users, Smartphone, X } from 'lucide-react';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { AlertTriangle, CreditCard, Inbox, Sparkles, Sun, Moon, LogOut, Globe, Users, Smartphone, X } from 'lucide-react';
 import { AskMark } from './AskMark';
 import { OrganizationSwitcher, useAuth, useClerk } from '@clerk/clerk-react';
 import { Wordmark } from './Wordmark';
-import { useAppStore, selectIngestProgress, type Screen } from '../store/appStore';
+import { useAppStore, selectIngestProgress } from '../store/appStore';
 import { billingBannerFor } from '../services/billingClient';
 import { isAdminRole } from '../services/teamClient';
 import { NotificationsPanel } from './NotificationsPanel';
@@ -11,6 +11,7 @@ import { useGraph } from '../core/entityGraph';
 import { needsPersonCount } from '../screens/ReviewScreen';
 import { CommandPalette } from './command/CommandPalette';
 import { SupportWidget } from './support/SupportWidget';
+import { NAV } from './nav';
 
 // Lazy — same reasoning as App.tsx's WarrantyExportScreen/OutreachScreen:
 // this is an admin-only destination most sessions never open, and it pulls
@@ -18,28 +19,6 @@ import { SupportWidget } from './support/SupportWidget';
 // must not sit in AppShell's own bundle — AppShell wraps every screen,
 // including AskScreen, the one screen that stays eager for startup speed.
 const DonovanScreen = lazy(() => import('../screens/DonovanScreen').then((m) => ({ default: m.DonovanScreen })));
-
-interface NavItem {
-  screen: Screen;
-  label: string;
-  icon: ComponentType<{ className?: string; active?: boolean }>;
-  /** Screens that should light up this nav item */
-  matches: Screen[];
-}
-
-// Exactly four primary destinations — Ask, Dashboard, Inbox, Records. Browse
-// merged into Records (as its Documents/Customers/Grid/Graph tabs — round 17
-// folded the old standalone Search tab into ⌘K and the Documents/Customers
-// tabs' own search boxes instead, see BrowseScreen.tsx); the old standalone
-// Records screen's health metrics moved into Dashboard's "Data health"
-// strip; 'review' and 'records' are retired ids kept as aliases (see
-// store/appStore.ts) so they still light up the right item here.
-export const NAV: NavItem[] = [
-  { screen: 'ask', label: 'Ask', icon: AskMark, matches: ['ask', 'entity'] },
-  { screen: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, matches: ['dashboard', 'warranty-export', 'records'] },
-  { screen: 'ingest', label: 'Inbox', icon: Inbox, matches: ['ingest', 'review'] },
-  { screen: 'browse', label: 'Records', icon: Database, matches: ['browse', 'customer'] },
-];
 
 interface AppShellProps {
   children: ReactNode;
@@ -99,7 +78,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
       </a>
 
       <header className="relative sm:sticky sm:top-0 z-40 bg-forest-700 text-stone-0 border-b border-forest-800">
-        <div className="max-w-content mx-auto px-3 lg:px-6 min-h-14 sm:min-h-16 flex flex-wrap xl:flex-nowrap items-center gap-x-0.5 lg:gap-x-4 gap-y-0">
+        <div className="max-w-content 2xl:max-w-[1480px] mx-auto px-3 lg:px-6 min-h-14 sm:min-h-16 flex flex-wrap xl:flex-nowrap items-center gap-x-0.5 lg:gap-x-4 gap-y-0">
           <button
             type="button"
             onClick={() => setCurrentScreen('ask')}
@@ -184,6 +163,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               otherwise. */}
           <button
             aria-label="Billing"
+            title="Billing"
             type="button"
             onClick={() => setCurrentScreen('billing')}
             aria-current={currentScreen === 'billing' ? 'page' : undefined}
@@ -193,7 +173,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             ].join(' ')}
           >
             <CreditCard className="w-5 h-5" aria-hidden="true" />
-            <span className="hidden lg:inline text-body">Billing</span>
+            <span className="hidden 2xl:inline text-body whitespace-nowrap">Billing</span>
           </button>
 
           {/* Team (invite/manage members) — admin-only in the UI. A member
@@ -203,13 +183,14 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           {isAdmin && (
             <button
               aria-label="Team"
+              title="Team"
               type="button"
               onClick={() => setCurrentScreen('team')}
               aria-current={currentScreen === 'team' ? 'page' : undefined}
               className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
             >
               <Users className="w-5 h-5" aria-hidden="true" />
-              <span className="hidden lg:inline text-body">Team</span>
+              <span className="hidden 2xl:inline text-body whitespace-nowrap">Team</span>
             </button>
           )}
 
@@ -222,12 +203,13 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           {isAdmin && !billingGateActive && (
             <button
               aria-label="Donovan"
+              title="Donovan"
               type="button"
               onClick={() => setDonovanOpen(true)}
               className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
             >
               <Sparkles className="w-5 h-5" aria-hidden="true" />
-              <span className="hidden lg:inline text-body">Donovan</span>
+              <span className="hidden 2xl:inline text-body whitespace-nowrap">Donovan</span>
             </button>
           )}
 
@@ -241,7 +223,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
             {fieldMode ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
-            <span className="hidden lg:inline text-body">{fieldMode ? 'Field view' : 'Office view'}</span>
+            <span className="hidden 2xl:inline text-body whitespace-nowrap">{fieldMode ? 'Field view' : 'Office view'}</span>
           </button>
 
           {/* A tech who works two shops switches their active org here — the
@@ -255,8 +237,9 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             afterSelectOrganizationUrl="/app/"
             appearance={{
               elements: {
-                organizationSwitcherTrigger: 'text-forest-100 hover:text-stone-0 rounded-md px-2 min-h-touch focus-visible:outline-brass-300',
-                organizationPreviewMainIdentifier: 'text-forest-100',
+                organizationSwitcherTrigger: 'text-forest-100 hover:text-stone-0 rounded-md px-2 min-h-touch focus-visible:outline-brass-300 whitespace-nowrap',
+                // A long shop name must never wrap the trigger onto 3 lines and stretch the header.
+                organizationPreviewMainIdentifier: 'text-forest-100 truncate max-w-[9rem] 2xl:max-w-[14rem]',
                 organizationSwitcherTriggerIcon: 'text-forest-100',
               },
             }}
@@ -266,10 +249,11 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             type="button"
             onClick={() => { void signOut({ redirectUrl: '/app/' }); }}
             aria-label="Sign out"
+            title="Sign out"
             className="inline-flex items-center gap-2 min-h-touch min-w-touch justify-center px-2 rounded-md text-forest-100 hover:text-stone-0 hover:bg-forest-800 transition-colors duration-quick focus-visible:outline-brass-300"
           >
             <LogOut className="w-5 h-5" aria-hidden="true" />
-            <span className="hidden lg:inline text-body">Sign out</span>
+            <span className="hidden 2xl:inline text-body whitespace-nowrap">Sign out</span>
           </button>
         </div>
       </header>
@@ -290,7 +274,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           onClick={() => setCurrentScreen('billing')}
           className={[
             'w-full text-left px-4 sm:px-6 py-2 flex items-center gap-2 text-body transition-colors duration-quick',
-            banner.kind === 'past_due' || banner.kind === 'cap'
+            banner.kind === 'past_due'
               ? 'bg-warn-bg text-warn-ink hover:brightness-95'
               : 'bg-info-bg text-info-ink hover:brightness-95',
           ].join(' ')}
@@ -316,7 +300,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
       </main>
 
       <footer className="border-t border-line">
-        <div className="max-w-content mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-caption text-ink-3">
+        <div className="max-w-content mx-auto px-4 sm:px-6 pt-4 pb-20 lg:pb-4 flex flex-wrap items-center justify-between gap-2 text-caption text-ink-3">
           <span>DeepWell Technology · Knowledge Builds Business.</span>
           <span className="flex items-center gap-4">
             <span>Every answer shows its source.</span>

@@ -12,7 +12,7 @@ export function CitationMarkers({
   onOpenDocument,
 }: {
   citations: (SentenceCitation & { n: number })[];
-  onOpenDocument: (documentId: string, page?: number) => void;
+  onOpenDocument: (documentId: string, page?: number, quote?: string) => void;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const triggerRefs = useRef<Array<HTMLButtonElement | null>>([]);

@@ -50,6 +50,10 @@ import { fetchFileData, attachFileSummary, fetchNotes, buildNotesAnswer } from "
 import { citeNotes } from "./citations/history.js"; // TEAM C
 // TEAM E (2026-09-24): full-name (not just surname) typo tolerance — see tokenFuzzyMatches below.
 import { damerauLevenshteinDistance } from "./integrity.js";
+// R31 (Team A): entity-first slot filling — the parser's last resort, see lookups/slotFill.js.
+import { stripConversationalFrame } from "./router/frame.js";
+import { parseSlotFill, runSlotFill } from "./lookups/slotFill.js";
+import { parseTechnician, runTechnician, loadTechnicianVocab } from "./lookups/technician.js";
 
 /* ============================================================ shape detection */
 
@@ -115,7 +119,7 @@ const FIELD_ORDER = ["phone", "email", "address", "serial", "lastVisit"];
 // analytics.js's own TRAILING_NAME_RE already documents for excluding "of"
 // from its own, near-identical trailing-name shape.
 const CONNECTOR_NAME_RE =
-  /\b(?:on file for|for)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,2})\s*\??\s*$/i;
+  /\b(?:on file for|for)\s+([a-zA-Z][a-zA-Z'.-]*(?:\s+[a-zA-Z][a-zA-Z'.-]*){0,4})\s*\??\s*$/i; // R31: {0,2} -> {0,4} — a 4-word business name ("Sunrise Valley Elementary School") never matched
 // R21 (L2, needs-model cluster h018/h027: "phone number for the alvarez account", "address for
 // the rios account"): CONNECTOR_NAME_RE's own trailing capture, anchored to end-of-string, has no
 // way to know an "account"/"job" noun (with an optional leading "the") sits AFTER the name rather
@@ -177,7 +181,7 @@ const LEADING_FILLER_RE = /^(?:what'?s|whats|what\s+is)\s+/i;
 // phone"), so the engine backtracks and grows the name to "Amy Isaacson",
 // exactly as before.
 const POSSESSIVE_NAME_FIELD_RE = new RegExp(
-  `^([A-Za-z][A-Za-z.-]*(?:\\s+[A-Za-z][A-Za-z.-]*){0,2}?)'s\\s+(${FIELD_WORDS_ALT})\\s*\\??\\s*$`,
+  `^([A-Za-z][A-Za-z.-]*(?:\\s+[A-Za-z][A-Za-z.-]*){0,4}?)'s\\s+(${FIELD_WORDS_ALT})\\s*\\??\\s*$`, // R31: lazy {0,2} -> {0,4}
   "i"
 );
 const BARE_NAME_FIELD_RE = new RegExp(
@@ -206,7 +210,7 @@ const BARE_NAME_FIELD_RE = new RegExp(
 // way: "for serial M100017" must never be misread as a name "serial
 // M100017" — see the serial/lastVisit fields' own doc comment above FIELD_RE.
 const NAME_STOPWORD_RE =
-  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have|in|on|at|of|for|with|without|serial|number|visit)$/i;
+  /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|does|do|did|is|are|list|show|has|have|in|on|at|of|for|with|without|serial|number|visit|give|gimme|get|tell|find|check|lookup|need|want|wait|ok|okay|so|hey|um|uh)$/i; // R31: + leading request/chatter verbs (a wider name capture otherwise swallowed "give me <name>")
 
 function firstWordIsStopword(namePhrase) {
   return NAME_STOPWORD_RE.test(namePhrase.split(/\s+/)[0]);
@@ -245,7 +249,7 @@ const AGGREGATE_WORD_RE = new RegExp(
 // wrong unit (live defect). Such questions are aggregate/superlative asks for the analytics + agent path.
 const RANKING_WORD_RE = /\b(?:newest|oldest|latest|earliest|newer|older|biggest|largest|smallest|most recent)\b/i;
 
-function isRealNamePhrase(namePhrase) {
+export function isRealNamePhrase(namePhrase) {
   return !firstWordIsStopword(namePhrase) && !AGGREGATE_WORD_RE.test(namePhrase) && !RANKING_WORD_RE.test(namePhrase);
 }
 
@@ -658,6 +662,54 @@ const OUT_OF_DOMAIN_PATTERNS = [
   /\bsing\s+me\s+a\s+song\b/i,
   /\bwhos?\s+your\s+favorite\s+customer\b/i,
   /\bset\s+a\s+timer\b/i,
+  // R31 (Team A, loop 4): more of the same closed, unambiguous general-knowledge / personal-assistant families
+  // (each phrase family names something no HVAC record could hold; hasAnchor/STREET_ADDRESS_RE above still veto).
+  /\b(?:capital|population|currency|flag|anthem)\s+of\s+(?!(?:the\s+)?(?:customer|unit|job|account)\b)[a-z]/i,
+  /\bwho\s+is\s+the\s+(?:current\s+)?(?:president|prime\s+minister|pope|king|queen|mayor|governor)\b/i,
+  /\bhow\s+(?:tall|high|far|old|deep|big|long)\s+is\s+(?:mount|mt\.?|everest|the\s+(?:moon|sun|earth|eiffel|empire|statue|grand\s+canyon|great\s+wall|nile|amazon))/i,
+  /\bhow\s+far\s+is\s+(?:the\s+)?(?:moon|sun|mars)\b/i,
+  /\btranslate\b[^.?]*\b(?:to|into|in)\s+(?:spanish|french|german|italian|chinese|japanese|portuguese|russian|korean)\b/i,
+  /\brecipe\s+for\b|\bhow\s+(?:do\s+i|to)\s+(?:cook|bake|grill|roast)\b|\bwhat\s+should\s+i\s+(?:have|eat|make|cook)\s+for\s+(?:lunch|dinner|breakfast)\b/i,
+  /\b(?:book|reserve)\s+(?:me\s+)?(?:a\s+|an\s+)?(?:flight|hotel|table|ticket|uber|cab|taxi)\b/i,
+  /\border\s+me\s+(?:a\s+|an\s+|some\s+)?(?:coffee|pizza|lunch|dinner|food|uber|burger|tacos?|sandwich)\b/i,
+  /\bbest\s+(?:pizza|restaurants?|coffee|tacos?|burgers?|sushi|bars?)\b/i,
+  /\b(?:play|put\s+on)\s+(?:me\s+)?(?:some\s+)?(?:music|a\s+song|jazz|rock|country|podcasts?)\b/i,
+  /\bwhat\s+time\s+is\s+it\s+in\s+[a-z]/i,
+  /\bremind\s+me\s+to\s+(?:call|text|email|pick\s+up)\s+(?:my\s+)?(?:mom|dad|mother|father|wife|husband|kids?|son|daughter|girlfriend|boyfriend)\b/i,
+  /\bmeaning\s+of\s+life\b|\bfun\s+fact\b|\btell\s+me\s+about\s+the\s+(?:roman|greek|british|ottoman|mongol)\s+empire\b/i,
+  /\bwrite\s+(?:me\s+)?(?:a\s+|an\s+)?(?:haiku|poem|story|song|limerick|essay|sonnet)\b/i,
+  /\bwho\s+is\s+[a-z]+\s+[a-z]+\s+dating\b/i,
+  /\b(?:bitcoin|ethereum|dogecoin|stock\s+price|nasdaq|dow\s+jones)\b/i,
+  /\bhow\s+do\s+i\s+lose\s+(?:\w+\s+)?(?:pounds|weight)\b|\bhow\s+many\s+(?:ounces|cups|tablespoons|teaspoons|grams|kilograms)\s+in\s+a\b/i,
+  /\bwhats?\s+(?:the\s+)?score\s+of\s+the\s+[a-z]+\s+game\b|\bwho\s+(?:won|is\s+winning)\s+the\s+(?:super\s+bowl|world\s+cup|election)\b/i,
+  /\bwhat\s+movies\s+are\s+(?:out|playing|showing)\b/i,
+  /\bis\s+it\s+(?:going\s+to|gonna)\s+(?:rain|snow|storm)\b|\bwhat(?:'s|s)\s+the\s+forecast\b/i,
+  /\bwhats?\s+(?:your\s+favorite\s+(?:color|food|movie|song|band)|\d+\s*(?:%|percent)\s+of\s+\d+)/i,
+  /\bwhat\s+is\s+\d+\s*(?:%|percent)\s+of\s+\d+\b/i,
+  /\bwho\s+(?:invented|wrote|painted|discovered|composed|directed|founded|sang|starred)\b/i,
+  /\bwhat\s+(?:year|day)\s+did\s+(?:the|world\s+war|\w+\s+(?:sink|land|die|win|become))\b/i,
+  /\bhow\s+many\s+(?:calories|carbs|carbohydrates|miles|kilometers|feet|inches|yards|meters|ounces|cups|gallons|liters|quarts|pints|pounds|grams|kilos|hours|minutes|seconds|weeks)\s+(?:are\s+)?(?:in|per)\s+(?:a|an|one|the)\s+(?:apple|banana|pizza|marathon|mile|kilometer|foot|yard|meter|gallon|liter|quart|pint|pound|kilo|hour|minute|day|week|year)\b/i,
+  /\bhow\s+many\s+(?:calories|carbs)\s+in\b|\bhow\s+many\s+people\s+(?:live|are)\s+in\s+(?:china|india|texas|california|new\s+york|the\s+world|the\s+us)\b/i,
+  /\bspeed\s+of\s+(?:light|sound)\b|\b(?:boiling|freezing|melting)\s+point\s+of\b/i,
+  /\b(?:largest|biggest|tallest|smallest|longest|highest|richest|oldest)\s+(?:planet|mountain|river|ocean|animal)\b/i,
+  /\bwhat\s+language\s+(?:do|does|is)\s+(?:they\s+)?(?:speak|spoken)\b/i,
+  /\bhow\s+(?:long|old)\s+do\s+(?:cats|dogs|elephants|horses|turtles|humans|people)\s+(?:live|get)\b/i,
+  /\btell\s+me\s+a\s+(?:bedtime\s+)?(?:story|riddle|fact)\b/i,
+  /\brecommend\s+(?:a|an|some)\s+(?:good\s+)?(?:podcasts?|books?|movies?|shows?|restaurants?|songs?|games?|phones?|laptops?)\b/i,
+  /\b(?:good|best|cute)\s+names?\s+for\s+(?:a|my)\s+(?:dog|cat|baby|puppy|kitten|boat|band)\b/i,
+  /\bhow\s+(?:do|can|to)\s+(?:i\s+)?(?:tie\s+a\s+tie|change\s+a\s+tire|get\s+[a-z ]+\s+out\s+of\s+(?:carpet|clothes|a\s+shirt)|make\s+(?:pancakes|bread|coffee|pasta|chili|cookies)|lose\s+weight|get\s+a\s+girlfriend|learn\s+(?:spanish|guitar|piano))\b/i,
+  /\bwhen\s+is\s+(?:thanksgiving|christmas|easter|halloween|valentine'?s\s+day|mother'?s\s+day|father'?s\s+day|new\s+year'?s)\b/i,
+  /\bexchange\s+rate\b|\bwhats?\s+the\s+tip\s+on\s+a\b/i,
+  /\bhow\s+(?:deep|wide|far)\s+is\s+the\s+(?:ocean|pacific|atlantic|grand\s+canyon|sun)\b/i,
+  /\bhelp\s+me\s+write\s+(?:a|an)\s+(?:cover\s+letter|resume|essay|poem|speech|toast|breakup)\b/i,
+  /\bgive\s+me\s+a\s+(?:workout|diet|meal|exercise|study)\s+plan\b/i,
+  /\bexplain\s+(?:photosynthesis|gravity|evolution|relativity|inflation|blockchain|quantum\s+\w+)\b/i,
+  /\bmeaning\s+of\s+the\s+word\b|\bhow\s+do\s+(?:i|you)\s+(?:spell|pronounce)\b|\bsynonym\s+for\b/i,
+  /\bhow\s+(?:do|can|to)\s+(?:i\s+)?(?:center|style|code|write|fix|debug)\b[^?]*\b(?:css|html|javascript|python|typescript|react|sql\s+query|excel\s+formula)\b/i,
+  /\b(?:gift|present)\s+(?:idea\s+)?for\s+my\s+(?:wife|husband|mom|mother|dad|father|girlfriend|boyfriend|son|daughter|boss|friend)\b/i,
+  /\bconvert\s+\d+(?:\.\d+)?\s*(?:degrees?\s+)?(?:fahrenheit|celsius|kelvin|miles?|km|kilometers?|pounds?|kg|kilograms?|inches|cm|feet|meters?|gallons?|liters?)\s+(?:to|into|in)\b/i,
+  /\bany\s+good\s+(?:movies?|shows?|restaurants?|songs?|books?|games?|bars?)\b/i,
+  /\b(?:largest|biggest|tallest|smallest|longest|fastest|heaviest)\s+(?:tree|trees|species|bird|fish|insect|dinosaur|mammal|lake|desert|island|bridge)\b/i,
 ];
 
 /** Pure: is this a fast, honest "not a business record" decline, never a
@@ -669,6 +721,40 @@ function isOutOfDomainQuestion(q) {
   if (!q) return false;
   if (hasAnchor(q) || STREET_ADDRESS_RE.test(q)) return false;
   return OUT_OF_DOMAIN_PATTERNS.some((re) => re.test(q));
+}
+
+/**
+ * R31 (Team A, loop 5): LIVE dispatch / availability / schedule status — "who's out on a call right now", "is anybody
+ * free this afternoon", "what's the truck status for this afternoon", "who's next up in the queue", "is a tech already on
+ * the way to that address". The records here are what was DONE (documents, invoices, units); real-time crew position,
+ * availability and the day's schedule live in the shop's FSM (out of Donovan's lane by product definition), so there is
+ * nothing to look up and nothing to cite — the honest answer is the same deterministic decline the other out-of-domain
+ * families give, without a paid model call. Closed vocabulary: a live/present-tense cue AND a crew/dispatch cue, and NO
+ * record cue (past tense, documents, history, "on file", a street address). "anything scheduled for the Ibarra account"
+ * (scheduled work ON FILE for a customer) and "what did the dispatch note say" (a document) never match.
+ */
+const LIVE_STATUS_PATTERNS = [
+  /\bwho(?:'s|s|\s+is|\s+do\s+we\s+have|\s+have\s+we\s+got)?\s+(?:out|going\s+out|on\s+the\s+(?:road|way)|on\s+(?:a\s+)?calls?|working|on\s+call|available|free|next\s+up|up\s+next|rolling)\b/i,
+  /\b(?:is|are)\s+(?:anybody|anyone|any\s+techs?|any\s+technicians?|a\s+tech|a\s+technician|someone|somebody)\s+(?:already\s+)?(?:free|available|around|out|on\s+call|on\s+the\s+way|able\s+to\s+roll|free\s+to\s+roll)\b/i,
+  /\b(?:anybody|anyone)\s+(?:free|available|around)\b/i,
+  /\b(?:whats?|what\s+is|what's)\s+(?:on|the)\s+(?:the\s+)?(?:schedule|calendar|truck\s+status|board)\b/i,
+  /\btruck\s+status\b/i,
+  /\b(?:in|on)\s+the\s+queue\b/i,
+  /\b(?:notice|announcement|message|memo)s?\s+(?:that\s+)?(?:went|go|goes|was\s+sent|were\s+sent)\s+out\s+to\s+the\s+crew\b/i,
+];
+const LIVE_CUE_RE = /\b(?:today|tomorrow|tonight|now|right\s+now|currently|this\s+(?:second|minute|morning|afternoon|evening|week)|next\s+up|up\s+next|already|on\s+the\s+way|queue|status|going\s+out|free|available|out\s+on)\b/i;
+const LIVE_VETO_RE = /\b(?:did|was|were|last|yesterday|ago|history|historic|note|notes|invoice|invoices|permit|permits|warranty|document|documents|record|records|on\s+file|completed|finished|paid|serviced|installed|customers|account)\b/i;
+const LIVE_CREW_RE = /\b(?:who|whos|who's|anyone|anybody|any\s+(?:techs?|technicians?|trucks?|guys)|(?:the\s+)?(?:techs?|technicians?|trucks?|crews?|guys|team|drivers?)|which\s+(?:techs?|technicians?|trucks?))\b/i;
+const LIVE_ACT_RE = /\b(?:out|on\s+the\s+road|on\s+the\s+way|on\s+(?:a\s+)?calls?|on\s+(?:a\s+)?jobs?|on\s+call|free|available|around|working|rolling|dispatched|en\s+route|busy|next\s+up|up\s+next|in\s+the\s+queue|closest|nearest|cover|covering|able\s+to\s+take|walk[- ]?ins?|slot)\b/i;
+const LIVE_TIME_RE = /\b(?:today'?s?|tomorrow'?s?|tonight|now|right\s+now|at\s+the\s+moment|currently|this\s+(?:second|minute|morning|afternoon|evening|weekend|week)|next\s+week|nights?|\d{1,2}\s*(?:am|pm)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+const LIVE_SCHED_RE = /\b(?:schedule|calendar|board|routes?|roster|lineup)\b/i;
+const LIVE_ASK_RE = /\b(?:whats?|what's|what\s+is|show|see|pull\s+up|give\s+me|whos?|who's|open)\b/i;
+function isLiveStatusQuestion(q) {
+  if (!q || q.length > 140) return false;
+  if (STREET_ADDRESS_RE.test(q) || LIVE_VETO_RE.test(q)) return false;
+  if (LIVE_STATUS_PATTERNS.some((re) => re.test(q)) && LIVE_CUE_RE.test(q)) return true;
+  if (LIVE_CREW_RE.test(q) && LIVE_ACT_RE.test(q) && LIVE_TIME_RE.test(q)) return true;
+  return LIVE_SCHED_RE.test(q) && LIVE_TIME_RE.test(q) && LIVE_ASK_RE.test(q);
 }
 
 const OUT_OF_DOMAIN_EXAMPLES = [
@@ -813,7 +899,7 @@ function titleCase(s) {
  * (runContactLookup) then defers to whatever would have handled the
  * question anyway.
  */
-export function parseContactLookupQuestion(question, opts = {}) {
+function parseContactLookupQuestionCore(question, opts = {}) {
   const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
   if (!raw) return null;
@@ -828,7 +914,10 @@ export function parseContactLookupQuestion(question, opts = {}) {
   // see its own doc comment), while trying it LAST could let a coincidental
   // partial match on an already-claimed real question override a good
   // answer. In practice the two never overlap.
-  if (isOutOfDomainQuestion(q)) return { field: "outOfDomain", namePhrase: null };
+  // R31: also tested on the question as typed (frame-stripped) — the vocabulary corrector above can rewrite a plain word
+  // ("play" -> "plan", "mount" -> "count") into a different one and hide an off-topic phrase from the closed patterns.
+  if (isOutOfDomainQuestion(q) || isOutOfDomainQuestion(stripConversationalFrame(raw) ?? raw)) return { field: "outOfDomain", namePhrase: null };
+  if (isLiveStatusQuestion(q) || isLiveStatusQuestion(stripConversationalFrame(raw) ?? raw)) return { field: "outOfDomain", namePhrase: null };
 
   // Shape 0b (R16 F3): existence — "do we have any records for <address>" /
   // "we ever work on a house on <street>" / "is there a customer named
@@ -1156,6 +1245,41 @@ export function parseContactLookupQuestion(question, opts = {}) {
   return null;
 }
 
+/**
+ * R31: normalizeQuestion's fuzzy corrector "fixes" any token within edit distance 1 of a domain-vocabulary word — and the vocabulary
+ * includes AZ/US city names, so the first name "William" became the city "Williams" and "William Quintana phone" answered
+ * `I don't have a customer named "williams quintana"` (a live defect for every William/Marion/Chandler/...). A NAME the user
+ * typed is never a vocabulary typo, so put back the token exactly as typed when the normalized name token differs from it by
+ * a single edit. (A genuinely typo'd name still reaches the fuzzy resolver + "Did you mean" path, unchanged, in its typed form.)
+ */
+function restoreTypedNameTokens(parsed, rawQuestion) {
+  if (!parsed?.namePhrase || parsed.isStreet || /\d/.test(parsed.namePhrase)) return parsed;
+  const typed = new Set(String(rawQuestion ?? "").toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/'s\b/g, "").split(/[^a-z'.-]+/).filter((w) => w.length >= 3));
+  if (!typed.size) return parsed;
+  let changed = false;
+  const words = parsed.namePhrase.split(/\s+/).map((w) => {
+    if (typed.has(w)) return w;
+    for (const t of typed) {
+      if (t !== w && Math.abs(t.length - w.length) <= 1 && damerauLevenshteinDistance(t, w) === 1) { changed = true; return t; }
+    }
+    return w;
+  });
+  return changed ? { ...parsed, namePhrase: words.join(" ") } : parsed;
+}
+
+/** R31: the classic regex shapes first (unchanged), then entity-first slot filling as the last resort. */
+export function parseContactLookupQuestion(question, opts = {}) {
+  // R31 loop 3: technician job counts first — the entity (a known technician's full name) is a far stronger signal
+  // than the core shapes' "number of ... for NAME" = phone-number reading. Needs the tenant's technician names.
+  try {
+    const tech = parseTechnician(question, opts.tenantVocab);
+    if (tech) return { field: "technician", ...tech };
+  } catch (err) { console.error("technician parse failed, deferring:", err?.message); }
+  const core = parseContactLookupQuestionCore(question, opts);
+  if (core) return restoreTypedNameTokens(core, question);
+  try { return parseSlotFill(question); } catch (err) { console.error("slotFill parse failed, deferring:", err?.message); return null; }
+}
+
 /** Which canonical field a small matched fragment ("phone number", "ph#",
  *  "email", "address", "service address") represents — reuses FIELD_RE
  *  itself so this can never disagree with the shape-1 field detection
@@ -1433,7 +1557,7 @@ const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 // scope as the outer query, most-recent unit wins (ORDER BY ... DESC LIMIT
 // 1), the same idiom analytics.js's buildAnalyticsSQL already uses for its
 // own document/service-visit correlated lookups.
-const CUSTOMER_ROW_COLUMNS =
+export const CUSTOMER_ROW_COLUMNS =
   "id, customer_number, data->>'customer_name' AS customer_name, " +
   "data->>'service_address' AS service_address, data->>'phone' AS phone, data->>'email' AS email, " +
   "(SELECT eq.data->>'serial_number' FROM entities eq " +
@@ -1754,11 +1878,19 @@ export async function resolveAddressCandidates(db, addressPhrase) {
 export async function runContactLookup(db, question, opts = {}) {
   const overlay = opts?.overlay;
   const today = opts?.today ?? null;
-  const parsed = parseContactLookupQuestion(question, { overlay });
+  let tenantVocab = opts?.tenantVocab;
+  if (!tenantVocab && /\b(?:jobs?|visits?|calls?|techs?|technicians?|busier|work(?:ed)?)\b/i.test(question)) {
+    // The caller did not thread the tenant vocabulary through: read the technician names once (only for questions
+    // that could be about them; the classifier stage, which HAS the vocabulary, already decided to claim this).
+    try { tenantVocab = await loadTechnicianVocab(db); } catch (err) { console.error("technician vocab load failed:", err?.message); }
+  }
+  const parsed = parseContactLookupQuestion(question, { overlay, tenantVocab });
   if (!parsed) return null;
+  if (parsed.field === "technician") return runTechnician(db, parsed);
 
   // R16 F3: out-of-domain decline — no DB resolution at all, the question
   // itself is the whole answer.
+  if (parsed.field === "slotFill") return runSlotFill(db, parsed, { today, question });
   if (parsed.field === "outOfDomain") return buildOutOfDomainAnswer();
   if (parsed.field === "untrackedField") return buildUntrackedFieldAnswer();
 
@@ -2233,7 +2365,7 @@ async function buildNamedUnitAmbiguousAnswer(db, field, namePhrase, candidates, 
  *  the one place runContactLookup needs `db` beyond the name/street
  *  resolution it already does. `opts.namePhrase`/`opts.today` are only used
  *  by the named-unit-attribute branch below. */
-async function buildResolvedAnswer(db, field, row, opts = {}) {
+export async function buildResolvedAnswer(db, field, row, opts = {}) {
   // TEAM C: the citation trail (customer row, plus the units / visit documents the answer read).
   const trail = { units: [], visits: [], kind: "customer" };
   const answer = await buildResolvedAnswerCore(db, field, row, opts, trail);

@@ -21,6 +21,7 @@
  */
 import { serializeClient, assertTenantUuid, isNonBlankId, explicitPgSsl } from './util/pgClient.js';
 import pg from 'pg';
+import { keyBelongsToTenant } from './r2.js';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress, houseNumberOf,
@@ -1424,6 +1425,13 @@ function makeStore(db, tenantId) {
     // see that probe's own comment. Left NULL/never overwritten on a repeat
     // upload of the same bytes (COALESCE keeps whoever uploaded it first).
     createDocument: async (d) => {
+      // R30 H1 (defence in depth; api/records.ts also strips it): a storage_key is only ever `<tenantId>/...`.
+      // The INSERT below would otherwise store a foreign key AND overwrite the existing one on conflict.
+      if (d.storage_key != null && !keyBelongsToTenant(d.storage_key, tenantId)) {
+        const err = new Error('storage_key is not in this tenant');
+        err.status = 400;
+        throw err;
+      }
       if (await documentsHaveUploadedBy(db)) {
         return one(
           `INSERT INTO documents (tenant_id, batch_id, original_filename, document_type,
@@ -1645,6 +1653,26 @@ function makeStore(db, tenantId) {
            JOIN documents d ON d.id = dp.document_id
           WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND dp.created_at >= $1`,
         [sinceIso]
+      );
+      return r?.n ?? 0;
+    },
+    // R30 M6: estimated pages of documents that have been accepted (row exists) but not read yet, so the
+    // monthly page cap counts work that is queued or in flight and not only pages already written. Recent
+    // (24h, after which the cron sweep has re-attempted or given up), stage 'received', no error, no pages.
+    // Per-document estimate, deliberately not below 1: photos 1; PDFs ~200 KB/page (max 200); text 6,000
+    // chars/page (readDocument PAGE_CHARS). An estimate for gating only - nothing is billed from it.
+    estimatePendingPages: async () => {
+      const r = await one(
+        `SELECT COALESCE(SUM(CASE
+                  WHEN d.content_type ILIKE 'image/%' THEN 1
+                  WHEN d.content_type ILIKE 'application/pdf' THEN GREATEST(1, LEAST(200, CEIL(COALESCE(d.file_size_bytes, 0) / 204800.0)))
+                  ELSE GREATEST(1, LEAST(200, CEIL(COALESCE(d.file_size_bytes, 0) / 6000.0)))
+                END), 0)::int AS n
+           FROM documents d
+          WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')}
+            AND d.stage = 'received' AND d.extract_error IS NULL
+            AND d.created_at >= NOW() - INTERVAL '24 hours'
+            AND NOT EXISTS (SELECT 1 FROM document_pages dp WHERE dp.document_id = d.id)`
       );
       return r?.n ?? 0;
     },

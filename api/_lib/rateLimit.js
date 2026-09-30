@@ -97,6 +97,18 @@ export function exceedsPerMinute(unitsAfterIncrement, perMinute) {
   return Number(unitsAfterIncrement) > Number(perMinute);
 }
 
+/** Pure (R30 H2): the rate_limit_windows bucket name for a bucket's DAILY counter. Distinct from the per-minute
+ *  bucket (`ingest`) and from every other special bucket (`ask_month`, `support_*`). */
+export function dailyBucketKey(bucket) {
+  return `day:${String(bucket)}`;
+}
+
+/** Pure (R30 H2): the UTC midnight that starts `now`'s day, as an ISO string (the daily window_start). */
+export function utcDayStartIso(now = Date.now()) {
+  const d = new Date(now);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
+}
+
 /** Parse one RATE_LIMIT_<BUCKET>_PER_(MINUTE|DAY) env var: a positive finite
  *  number, or undefined for anything else (unset, blank, zero, negative,
  *  non-numeric) — so a bad env value falls back to the hardcoded default
@@ -321,20 +333,29 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
   }
 
   // ---- 2. daily hard cap: Postgres, exact, shared across every instance --
+  // R30 H2: the daily count is PER BUCKET. It used to read usage_counters.requests, which has no bucket dimension
+  // (every ask, read, poll and upload adds to it), and compare that shared total to THIS bucket's perDay - so
+  // ~60 unrelated requests in a UTC day locked checkout/portal/invite out (billing perDay 60), and ingest's 2000
+  // was spent by asks. Now: rate_limit_windows (same table + atomic upsert function as the burst limiter, no schema
+  // change) keyed by bucket `day:<bucket>` with window_start = the UTC midnight. increment_rate_limit_window()
+  // deletes that bucket's OLDER windows, so old days clean themselves up, and the new keys start at zero on
+  // deploy - yesterday's shared counter can never block anyone. usage_counters.requests is still incremented, for
+  // usage reporting only (getUsage), and is never compared to a limit.
   if (tenantUuid) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date(now).toISOString().slice(0, 10);
     let requestsToday = null;
-    try {
-      const { rows } = await getAuxPool().query(
-        "SELECT * FROM increment_usage_counters($1, $2::date, $3, 0, 0, 0)",
-        [tenantUuid, today, units]
-      );
-      requestsToday = rows[0]?.requests ?? null;
-    } catch (err) {
-      logOnce("usage_counters", err);
-    }
+    const [bucketRes, reportRes] = await Promise.allSettled([
+      getAuxPool().query(
+        "SELECT increment_rate_limit_window($1, $2, $3::timestamptz, $4) AS units",
+        [tenantUuid, dailyBucketKey(bucket), utcDayStartIso(now), units]
+      ),
+      getAuxPool().query("SELECT * FROM increment_usage_counters($1, $2::date, $3, 0, 0, 0)", [tenantUuid, today, units]),
+    ]);
+    if (bucketRes.status === "fulfilled") requestsToday = bucketRes.value.rows[0]?.units ?? null;
+    else logOnce("rate_limit_windows", bucketRes.reason);
+    if (reportRes.status === "rejected") logOnce("usage_counters", reportRes.reason);
 
-    if (requestsToday != null && requestsToday > limits.perDay) {
+    if (requestsToday != null && Number(requestsToday) > limits.perDay) {
       // Donovan's daily ceiling is the hidden safety net, never a plan limit: polite, no "upgrade".
       send429(
         res,

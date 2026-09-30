@@ -184,6 +184,46 @@ export function planCacheBreakpoints({ tools = [], system = [], messageBlocks = 
   return out;
 }
 
+/** DONOVAN_ROLLING_CACHE=0 disables the rolling multi-turn breakpoint (withRollingBreakpoint). Default ON. */
+export const isRollingCacheEnabled = (env = process.env) => env?.DONOVAN_ROLLING_CACHE !== "0";
+
+/**
+ * R31 (model cost): a rolling cache breakpoint for a MULTI-TURN tool-use run (agent/loopV2.js).
+ *
+ * planCacheBreakpoints() caches the stable prefix (tools + system) — but every later turn of one run re-sends the
+ * whole growing history (each turn's assistant tool_use + the tool results, up to several thousand tokens apiece) at
+ * FULL input price. Marking the LAST block of the LAST message with a breakpoint makes the next turn's request read
+ * that history back from the cache at 0.1x instead of paying 1x again (the write costs 1.25x once, on only the tokens
+ * added since the previous breakpoint).
+ *
+ * Pure, and never mutates `messages` (the run keeps appending to its own array; older breakpoints must not
+ * accumulate toward Anthropic's 4-per-request cap): returns the same array when nothing applies, else a shallow copy
+ * whose last message/block are new objects carrying `cache_control`. Applies only when
+ *   - there is already at least one tool round (>= 3 messages: question, assistant tool_use, user tool_result) —
+ *     the first request is the question alone, whose variable text must never be a breakpoint,
+ *   - the last message is a user turn whose last block is a tool_result/text block (Anthropic accepts
+ *     cache_control on both),
+ *   - the request is NOT a forced final answer (`final: true`) — nothing follows it, so the write would be wasted,
+ *   - the cumulative estimated prefix (`prefixTokens` = tools + system already sent, plus every message) reaches
+ *     the model's caching minimum, and
+ *   - `breakpointsUsed` (tools/system breakpoints the caller already attached) leaves room under the cap of 4.
+ *
+ * @param {object[]} messages
+ * @param {{model: string, prefixTokens?: number, breakpointsUsed?: number, final?: boolean, ttl?: '1h'}} opts
+ * @returns {object[]}
+ */
+export function withRollingBreakpoint(messages, { model, prefixTokens = 0, breakpointsUsed = 0, final = false, ttl } = {}) {
+  if (final || !Array.isArray(messages) || messages.length < 3) return messages;
+  if (breakpointsUsed >= MAX_CACHE_BREAKPOINTS) return messages;
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user" || !Array.isArray(last.content) || !last.content.length) return messages;
+  const block = last.content[last.content.length - 1];
+  if (!block || typeof block !== "object" || (block.type !== "tool_result" && block.type !== "text")) return messages;
+  if (prefixTokens + estimateTokens(messages) < minTokensFor(model)) return messages;
+  const marked = { ...block, cache_control: ttl === "1h" ? CACHE_CONTROL_1H : CACHE_CONTROL };
+  return [...messages.slice(0, -1), { ...last, content: [...last.content.slice(0, -1), marked] }];
+}
+
 /**
  * Pure: shape the one structured log line each Anthropic call site emits
  * (via `console.log(JSON.stringify(...))`) so Vercel logs show cache hit

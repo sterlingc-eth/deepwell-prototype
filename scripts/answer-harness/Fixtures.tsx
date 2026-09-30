@@ -2,6 +2,8 @@
 // react-refresh rule wants a component's own file to only export components.
 import { AnswerCard } from '../../src/components/AnswerCard';
 import { MobileAnswer } from '../../src/mobile/MobileAnswer';
+import { DocumentPreview } from '../../src/components/DocumentPreview';
+import { DocSheet } from '../../src/mobile/DocSheet';
 import type { Answer } from '../../src/core/types';
 import { CITATION_FIXTURE, FIXTURES, LAYOUT_ORDER, noteOpen } from './fixtures';
 
@@ -67,6 +69,24 @@ export function MobileFixtures() {
           onAsk={(q) => noteOpen(`ask:${q}`)}
         />
       </section>
+    </div>
+  );
+}
+
+/** R31 3a: the desktop source viewer opened from a citation that carries a quote spanning two extracted lines. */
+export function PreviewFixture() {
+  return (
+    <div data-testid="preview-root">
+      <DocumentPreview documentId="inv1" location={{ page: 1 }} excerpt="total: 620.00 balance_due: 420.00" onClose={() => noteOpen('preview:close')} />
+    </div>
+  );
+}
+
+/** R31 3a: the phone document sheet opened from a citation quote. */
+export function DocSheetFixture() {
+  return (
+    <div data-testid="docsheet-root">
+      <DocSheet documentId="inv1" page={2} quote="… total: 620.00 …" graphLoading={false} onOpenCustomer={() => {}} onClose={() => noteOpen('docsheet:close')} />
     </div>
   );
 }

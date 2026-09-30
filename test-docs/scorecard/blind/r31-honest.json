@@ -1,0 +1,1399 @@
+{
+ "version": "r31-blind-1",
+ "category": "blind-r31-honest",
+ "source": "scripts/gen-blind-r31.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r31-honest-001",
+   "text": "so uh, was there an invoice issued in January 2028 real quick",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-002",
+   "text": "any paperwork dated June 2, 2029 thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-003",
+   "text": "one sec, how many jobs did we finish in 2030 for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-004",
+   "text": "so uh, any paperwork dated April 4, 2031",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-005",
+   "text": "hmm, any paperwork dated September 5, 2032 thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-006",
+   "text": "do we have an install completed for February 2033 asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-007",
+   "text": "what work did we do in July 2028 thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-008",
+   "text": "hmm, do we have a quote sent for December 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-009",
+   "text": "sorry, one more - was there a purchase order placed in May 2030 again",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-010",
+   "text": "could you tell me anything on file from October 2031",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-011",
+   "text": "alright, any paperwork dated March 11, 2032 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-012",
+   "text": "quick q - anything on file from August 2033",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-013",
+   "text": "can you look up what work did we do in January 2028 for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-014",
+   "text": "alright, was there a service call logged in June 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-015",
+   "text": "quick q - any paperwork dated November 15, 2030 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-016",
+   "text": "quick q - what work did we do in April 2031 again",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-017",
+   "text": "quick q - what work did we do in September 2032 right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-018",
+   "text": "real quick: any paperwork dated February 18, 2033 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-019",
+   "text": "was there a purchase order placed in July 2028 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-020",
+   "text": "quick q - anything on file from December 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-021",
+   "text": "im in the truck, any paperwork dated May 21, 2030",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-022",
+   "text": "customer is on the line, how many jobs did we finish in 2031",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-023",
+   "text": "sorry, one more - any paperwork dated March 23, 2032 please",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-024",
+   "text": "can you look up was there a service call logged in August 2033",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-025",
+   "text": "hold up, do we have a work order dated for January 2028 please",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-026",
+   "text": "what work did we do in June 2029 asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-027",
+   "text": "what work did we do in November 2030 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-028",
+   "text": "hey, was there a quote sent in April 2031",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-029",
+   "text": "hold up, what work did we do in September 2032",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-030",
+   "text": "one sec, was there a startup sheet filed in February 2033 please",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-031",
+   "text": "umm what work did we do in July 2028 again",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-032",
+   "text": "alright, anything on file from December 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-033",
+   "text": "real quick: anything on file from May 2030 again",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-034",
+   "text": "hold up, what work did we do in October 2031 right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-035",
+   "text": "gimme a sec, was there a work order dated in March 2032",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-036",
+   "text": "can you look up do we have an install completed for August 2033 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-037",
+   "text": "real quick: do we have a maintenance visit done for January 2028 please",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-038",
+   "text": "im in the truck, any paperwork dated June 11, 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-039",
+   "text": "anything on file from November 2030 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-040",
+   "text": "ok so any paperwork dated April 13, 2031 again",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-041",
+   "text": "im in the truck, how many jobs did we finish in 2032",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-042",
+   "text": "ok so any paperwork dated February 15, 2033 again",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-043",
+   "text": "quick q - anything on file from July 2028",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-044",
+   "text": "hang on... any paperwork dated December 17, 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-045",
+   "text": "yo what work did we do in May 2030",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-046",
+   "text": "alright, how many jobs did we finish in 2031 when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-047",
+   "text": "hmm, any paperwork dated March 20, 2032",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-048",
+   "text": "real quick: was there a quote sent in August 2033 asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-049",
+   "text": "do we have a purchase order placed for January 2028 please",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-050",
+   "text": "umm do we have a startup sheet filed for June 2029",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-051",
+   "text": "quick one - do we have an invoice issued for November 2030 asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-052",
+   "text": "hmm, do we have a permit filed for April 2031",
+   "category": "blind-r31-honest",
+   "shape": "blind_future_date",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE value ~ '^\\d{4}-\\d{2}-\\d{2}$' AND value::date > '2027-01-01'::date) + (SELECT count(*) FROM document_financials WHERE invoice_date > '2027-01-01'::date)) AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-053",
+   "text": "umm whats the weather going to be like tomorrow",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-054",
+   "text": "can you look up who won the world series last year please",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-055",
+   "text": "ok um, tell me a joke for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-056",
+   "text": "write me a poem about air filters when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-057",
+   "text": "hey, whats the capital of France",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-058",
+   "text": "how tall is mount everest",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-059",
+   "text": "hang on... can you book me a flight to denver again",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-060",
+   "text": "whats a good recipe for chili right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-061",
+   "text": "alright, who is the president when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-062",
+   "text": "gimme a sec, translate good morning to spanish please",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-063",
+   "text": "gimme a sec, what time is it in tokyo asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-064",
+   "text": "yo how do i reset my email password",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-065",
+   "text": "whats the best pizza in mesa asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-066",
+   "text": "customer is on the line, play some music",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-067",
+   "text": "hang on... how many ounces in a pound for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-068",
+   "text": "hey, remind me to call my mom asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-069",
+   "text": "sorry, one more - what is the meaning of life",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-070",
+   "text": "one sec, tell me about the roman empire please",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-071",
+   "text": "alright, whats bitcoin trading at",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-072",
+   "text": "can you look up who is taylor swift dating for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-073",
+   "text": "so uh, what should i have for lunch thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-074",
+   "text": "ok so can you order me a coffee thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-075",
+   "text": "gimme a sec, how do i lose ten pounds if you have it",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-076",
+   "text": "sing me a song",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-077",
+   "text": "real quick: whats the score of the suns game right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-078",
+   "text": "hold up, what movies are out this weekend thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-079",
+   "text": "hold up, is it going to rain today",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-080",
+   "text": "hmm, how far is the moon right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-081",
+   "text": "can you look up what is 15 percent of 240 thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-082",
+   "text": "gimme a sec, give me a fun fact about dolphins",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-083",
+   "text": "so uh, write a haiku about summer please",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-084",
+   "text": "umm whats your favorite color asap",
+   "category": "blind-r31-honest",
+   "shape": "blind_off_topic",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r31-honest-085",
+   "text": "one sec, pull up the file for Nanc Alvarez for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Nanc Alvarez%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-086",
+   "text": "could you tell me serial number for Caarol Rios's unit again",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Caarol Rios%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-087",
+   "text": "could you tell me whats the address for George Garison when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%George Garison%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-088",
+   "text": "quick one - is Barbar Ellison still under warranty",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Barbar Ellison%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-089",
+   "text": "hang on... whats the address for Betty Zimmermans again",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Betty Zimmermans%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-090",
+   "text": "hold up, pull up the file for Kenneth Fenwicks when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kenneth Fenwicks%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-091",
+   "text": "hold up, serial number for Lnda Fitzgerald's unit",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Lnda Fitzgerald%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-092",
+   "text": "hang on... whats the phone number for Rnald Calloway please",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Rnald Calloway%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-093",
+   "text": "hmm, whats the phone number for Maark Ibarra",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Maark Ibarra%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-094",
+   "text": "so uh, whats the phone number for Rnald Dominguez right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Rnald Dominguez%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-095",
+   "text": "one sec, pull up the file for Amy Isacson thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Amy Isacson%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-096",
+   "text": "quick one - whats the address for Thoma Mercer right now",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Thoma Mercer%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-097",
+   "text": "whats the address for George Hutchinss",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%George Hutchinss%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-098",
+   "text": "can you look up whats the phone number for Ronal Bracken",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ronal Bracken%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-099",
+   "text": "alright, whats the phone number for Lura Mercer if you have it",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Lura Mercer%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-100",
+   "text": "real quick: whats the address for Cynthi Larkin",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Cynthi Larkin%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-101",
+   "text": "ok um, whats the phone number for Rober Thornton for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Rober Thornton%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-102",
+   "text": "hmm, whats the phone number for Nanc Zamora if you have it",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Nanc Zamora%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-103",
+   "text": "can you look up Deeborah Prentiss email thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Deeborah Prentiss%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-104",
+   "text": "one sec, serial number for Suusan Dominguez's unit",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Suusan Dominguez%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-105",
+   "text": "pull up the file for Jaason Yarborough",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Jaason Yarborough%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-106",
+   "text": "ok um, serial number for Dvid Quinley's unit thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Dvid Quinley%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-107",
+   "text": "hey, is Paul Kowalskis still under warranty for me",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Paul Kowalskis%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-108",
+   "text": "hmm, Emily Whitfields email if you have it",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Emily Whitfields%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-109",
+   "text": "so uh, whats the address for Donna Vace",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donna Vace%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-110",
+   "text": "quick one - is Donal Isaacson still under warranty if you have it",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donal Isaacson%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-111",
+   "text": "could you tell me pull up the file for Angela Ibarras again",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Angela Ibarras%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-112",
+   "text": "im in the truck, pull up the file for Dniel Keller",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Dniel Keller%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-113",
+   "text": "quick q - whats the phone number for Sndra Yarborough",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Sndra Yarborough%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-114",
+   "text": "alright, whats the address for Ssan Calloway when you get a sec",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Ssan Calloway%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-115",
+   "text": "umm whats the phone number for Steve Ellison",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Steve Ellison%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-116",
+   "text": "can you look up pull up the file for Wiilliam Quintana thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Wiilliam Quintana%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-117",
+   "text": "gimme a sec, whats the address for Kevi Zimmerman",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Kevi Zimmerman%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-118",
+   "text": "so uh, pull up the file for Michae Redwine thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Michae Redwine%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-119",
+   "text": "hmm, pull up the file for Jaason Zamora thanks",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Jaason Zamora%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r31-honest-120",
+   "text": "hold up, is Rebecca Nowood still under warranty if you have it",
+   "category": "blind-r31-honest",
+   "shape": "blind_near_miss_name",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Rebecca Nowood%"
+    ]
+   }
+  }
+ ]
+}

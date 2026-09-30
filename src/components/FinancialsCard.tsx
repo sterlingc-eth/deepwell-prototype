@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { Loader2, Receipt } from 'lucide-react';
-import { isAdminRole } from '../services/teamClient';
+import { useCanAdmin } from '../hooks/useCanAdmin';
 import { financialsClient, formatMoney, type BackfillStatus, type FinancialsSummary } from '../services/financialsClient';
 
 /**
@@ -11,8 +10,7 @@ import { financialsClient, formatMoney, type BackfillStatus, type FinancialsSumm
  * financials migration is applied. Admins can also start the (bounded, resumable) backfill.
  */
 export function FinancialsCard() {
-  const { orgId, orgRole } = useAuth();
-  const allowed = !orgId || isAdminRole(orgRole ?? null);
+  const allowed = useCanAdmin();
   const [s, setS] = useState<FinancialsSummary | null>(null);
   const [status, setStatus] = useState<BackfillStatus | null>(null);
   const [busy, setBusy] = useState(false);

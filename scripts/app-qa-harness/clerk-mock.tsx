@@ -9,7 +9,18 @@ interface QaAuth {
   orgRole?: string | null;
   orgName?: string;
   userId?: string;
+  /** Shops the person belongs to (mobile account sheet). Default: just the current one. */
+  shops?: { id: string; name: string }[];
 }
+interface QaCalls { setActive: unknown[]; signOut: unknown[] }
+// Persisted in sessionStorage so a check can still read them after the page reloads itself (shop switch).
+const calls = (): QaCalls => {
+  let c: QaCalls = { setActive: [], signOut: [] };
+  try { c = JSON.parse(sessionStorage.getItem('__QA_CALLS') ?? '') as QaCalls; } catch { /* first call */ }
+  return new Proxy(c, {
+    get(t, k) { const arr = (t as any)[k] as unknown[]; return { push: (v: unknown) => { arr.push(v); sessionStorage.setItem('__QA_CALLS', JSON.stringify(t)); } }; },
+  }) as unknown as QaCalls;
+};
 const st = (): QaAuth => ((window as unknown as { __QA_AUTH?: QaAuth }).__QA_AUTH ?? {});
 
 export function useAuth() {
@@ -36,10 +47,20 @@ export function useOrganization(_o?: any) {
     },
   } as any;
 }
-export function useClerk() { return { signOut: async () => {} } as any; }
-export function useUser() { return { isLoaded: true, isSignedIn: true, user: { id: 'user_qa', firstName: 'Pat' } } as any; }
+export function useClerk() { return { signOut: async (o?: unknown) => { calls().signOut.push(o ?? null); } } as any; }
+export function useOrganizationList(_o?: any) {
+  const a = st();
+  const shops = a.shops ?? [{ id: a.orgId ?? 'org_qa', name: a.orgName ?? 'Sunrise HVAC' }];
+  return {
+    isLoaded: true,
+    setActive: async (o: unknown) => { calls().setActive.push(o); (window as unknown as { __QA_AUTH?: QaAuth }).__QA_AUTH = { ...a, orgId: (o as { organization: string }).organization }; },
+    userMemberships: { data: shops.map((x) => ({ id: `mem_${x.id}`, organization: x })), revalidate: async () => {} },
+  } as any;
+}
+export function useUser() { return { isLoaded: true, isSignedIn: true, user: { id: st().userId ?? 'user_qa', firstName: 'Pat', fullName: 'Pat Owner', primaryEmailAddress: { emailAddress: 'pat@sunrisehvac.com' } } } as any; }
 export function OrganizationSwitcher(_p: any) {
-  return <button type="button" className="text-forest-100 px-2" title="Org switcher (mock)">{st().orgName ?? 'Sunrise HVAC'} ▾</button>;
+  // Mirrors the real trigger's styling in AppShell.tsx (nowrap + truncated identifier), so a long shop name is exercised honestly.
+  return <button type="button" className="text-forest-100 px-2 min-h-touch whitespace-nowrap inline-flex items-center gap-1" title="Org switcher (mock)"><span className="truncate max-w-[9rem] 2xl:max-w-[14rem]">{st().orgName ?? 'Sunrise HVAC'}</span> ▾</button>;
 }
 export function CreateOrganization(_p: any) { return <div data-testid="clerk-create-org">CreateOrganization (mock)</div>; }
 export function OrganizationList(_p: any) { return <div data-testid="clerk-org-list">OrganizationList (mock)</div>; }

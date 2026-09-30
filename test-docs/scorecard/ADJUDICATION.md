@@ -119,3 +119,59 @@ never attempts a model call to fall back on). `live-misses-2026-09-21-0018-*` (7
 that no real address matches at all; still correctly "not on file" either way) and `live-misses-2026-09-21-0019-canonical`
 (serial number — not one of the six `ADDRESS_ENTITY_FIELD_INTENTS`, unaffected by this policy) were identified by the same
 oracle-SQL-shape search and deliberately left alone.
+
+## R31 (Donovan Team A) — oracle fixes and OWNER-DECISION conflicts
+
+### Oracle fixes applied (verdict ORACLE, defect proven against the golden export)
+
+1. `breadth-content-019` (and its sibling set question `breadth-content-020`), `breadth-semantic-001/002/003`. The two generator
+   patterns in `test-docs/scorecard/breadth.mjs` were unanchored substrings:
+   - `(frozen|freez|iced|ice )` — the bare `ice ` matched "Serv-**ice** Address:" on nearly every document, so the oracle expected 317 freeze-up jobs;
+   - `(noise|noisy|loud|...)` — the bare `loud` matched "i**cloud**.com" in every customer's email, so the oracle expected 8 customers with a noise complaint.
+   Fixed at the source (`breadth.mjs`): `ice ` -> `\yice\y`, `loud` -> `\yloud`, `noise` -> `\ynoise` (Postgres word boundary). Applied by an
+   exact-string replacement of those two patterns in `exam.json` (no other question changed: verified id-for-id) and the generator version
+   hash re-stamped so `node scripts/gen-scorecard.mjs --check` passes. NOTE: `exam.json` carries hand-applied post-generation edits
+   (keyFacts, address-policy oracles), so do NOT regenerate it wholesale; re-run `gen-scorecard.mjs` only to `--check`.
+   Corrected expected values (measured on the golden export): freeze-up count 0 (the question's `requires` probe is now 0, so the exam
+   SKIPS it — the fixture genuinely has no freeze-up text); noise customers `[]`, noise jobs `0`. Donovan already answered "No documents
+   on file mention noise" (correct). Effect: wrong 12 -> 8, skipped 50 -> 51, correct +3. The ids are removed from
+   `KNOWN_WRONG_IDS` in `verify-golden.mjs` / `verify-precision-guard.mjs`.
+2. `generalization/dialogues-2.json` e033-e040 (turn 1). The oracle SQL selected the customer name from EQUIPMENT rows, so the graded
+   "who is the customer at <address>" turn expected the wrong entity. Now selects `c.data->>'customer_name'` from customer entities with a
+   single-customer guard. (Found because Donovan's slot-filled, correct answer was flagged "fabricated".)
+
+### OWNER DECISION — options, nothing chosen here
+
+**h115 / k141 "which technician has the fewest visits / jobs logged".** Oracle = fewest `technician` extractions, ties broken by name
+(`Denise Ford`, 55); Donovan answers `Ray Sutton` (50 dated service visits). The corpus has TWO defensible units and they disagree:
+Denise Ford 55 and Ray Sutton 55 tie on tagged records, but Ray has only 50 that carry a service date. Options:
+  A. "Visit" = a service record naming the technician (oracle reading). Donovan's analytics count would switch to technician
+     extractions; ties must be reported as ties ("Denise Ford and Ray Sutton tie at 55") — the oracle's alphabetical tiebreak then also changes.
+  B. "Visit" = a service record with a service date (current Donovan). Change the oracle to that definition (Ray Sutton, 50).
+  C. Answer both, state the definition ("by dated visits: Ray Sutton 50; by tagged jobs: tie Denise Ford / Ray Sutton 55") — passes any oracle that
+     accepts either via `alts`. Recommended: C now, decide A vs B when the owner settles the vocabulary ("job" vs "visit").
+
+**j141 / j142 / j143 "units over 15 / over 10 / under 5 years old".** Oracle = exact date age (`installation_date <= today - N years`):
+20 / 59 / 35. Donovan filters by calendar-year difference: 17 / 53 / 42 (a unit installed 2011-12-30 is "15 years" on 2026-09-25 by year
+math but 14.7 by date). Options:
+  A. Exact-date age everywhere (matches the oracle and "how old is the unit" which already uses whole years by date). Change the
+     `installYear` age filters in `analytics.js`/`detPlan.js` to date arithmetic. Recommended: it is the natural reading and the only
+     one that agrees with the per-unit "how old" answer.
+  B. Keep calendar-year age and change the three oracles (and say "by install year" in the answer).
+  C. Both figures in the answer ("20 units are over 15 years old by install date; 17 by install year").
+
+**Typo policy: lookups-0101-typo, lookups-0106-typo, live-misses-2026-09-21-0002-typo.** Oracle expects the fuzzy-resolved value
+(e.g. the phone for "maaria gallardo"); Donovan answers `I don't have a customer named "maaria gallardo". Did you mean Maria Gallardo?` (R21 P0
+policy: a one-edit near-miss is never auto-resolved, because "Amanda Quinly" -> a different real customer's PII). Options:
+  A. Keep the policy; change these three oracles to `honest-zero`/"asks Did-you-mean" (recommended: a phone number is PII).
+  B. Auto-resolve ONLY with a second signal (the customer's own address or serial in the same question — already implemented as
+     `corroboratesCandidate`), else Did-you-mean. This is today's behavior; the three questions carry no second signal.
+  C. Auto-resolve when exactly one customer is within edit distance 1 AND the field is non-PII (address of a business). Not recommended.
+R31 extends the same policy to shapes that had no near-miss handling ("pull up the file for Nanc Alvarez", "who is Kevinn Zimmerman").
+
+### R26 "+1 wrong" root cause
+`scripts/offline-exam.mjs` never pinned a time zone. The oracle SQL casts `created_at::date` in the PGlite SESSION time zone, which
+follows the host `TZ`. Under `TZ=UTC` (a scheduled / CI environment) one rolling-window date bucket moved a day and one question flipped
+correct -> wrong; under `America/Phoenix` (every developer run and the R24/R25/R27 numbers) it does not. Fixed by pinning
+`process.env.TZ = process.env.DONOVAN_EXAM_TZ || "America/Phoenix"` at the top of `offline-exam.mjs`. The canonical invocation
+(`TZ=America/Phoenix EXAM_TODAY=2026-09-25 node scripts/offline-exam.mjs scripts/golden/golden-export.json out.json out.md`) is unchanged.

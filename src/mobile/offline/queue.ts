@@ -75,6 +75,10 @@ export interface QueueStore {
   get(id: string): Promise<QueuedUpload | undefined>
   update(id: string, patch: Partial<QueuedUpload>): Promise<void>
   remove(id: string): Promise<void>
+  /** How many items are queued across every tenant (for the sign-out warning). */
+  countAll(): Promise<number>
+  /** Delete EVERY item for EVERY tenant (sign-out / another person on this phone). */
+  clearAll(): Promise<void>
 }
 
 const DB_NAME = 'dw-offline-queue'
@@ -175,6 +179,23 @@ export function createIndexedDbStore(dbName = DB_NAME): QueueStore {
         tx.onerror = () => reject(tx.error)
       })
     },
+    async countAll() {
+      const db = await open()
+      return new Promise<number>((resolve, reject) => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).count()
+        req.onsuccess = () => resolve(req.result)
+        req.onerror = () => reject(req.error)
+      })
+    },
+    async clearAll() {
+      const db = await open()
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite')
+        tx.objectStore(STORE).clear()
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      })
+    },
   }
 }
 
@@ -206,6 +227,12 @@ export function createMemoryStore(): QueueStore {
     },
     async remove(id) {
       rows.delete(id)
+    },
+    async countAll() {
+      return rows.size
+    },
+    async clearAll() {
+      rows.clear()
     },
   }
 }

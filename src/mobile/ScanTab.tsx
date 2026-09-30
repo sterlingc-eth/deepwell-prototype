@@ -145,6 +145,8 @@ export function ScanTab({
   // Re-wires if the signed-in org changes so a queue never drains into the
   // wrong tenant.
   useEffect(() => {
+    // Nobody signed in / no shop yet: nothing may upload. Otherwise only THIS shop's queue may (R30 isolation).
+    offlineQueue.setActiveTenant(tenantKey)
     if (!tenantKey) return
     const unsubscribe = offlineQueue.subscribe(tenantKey, setQueueItems)
     const unwire = wireAutoDrain(offlineQueue, tenantKey, {
@@ -157,6 +159,7 @@ export function ScanTab({
     return () => {
       unsubscribe()
       unwire()
+      offlineQueue.setActiveTenant(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantKey])
@@ -247,7 +250,7 @@ export function ScanTab({
           const controller = new AbortController()
           const timer = setTimeout(() => controller.abort(), LIVE_ATTEMPT_TIMEOUT_MS)
           try {
-            const outcome = await attemptUploadOnce(file, sha256, controller.signal)
+            const outcome = await attemptUploadOnce(file, sha256, controller.signal, tenantKey ?? undefined)
             clearTimeout(timer)
             if (outcome.duplicate) {
               report(file.name, 'done')
@@ -396,7 +399,7 @@ export function ScanTab({
                 <button
                   type="button"
                   onClick={() => tenantKey && offlineQueue.retryAuthNow(tenantKey)}
-                  className="min-h-8 px-2 rounded-lg bg-accent/20 text-accent text-caption font-semibold inline-flex items-center gap-1"
+                  className="min-h-8 px-2 rounded-lg bg-accent/20 text-accent-ink text-caption font-semibold inline-flex items-center gap-1"
                 >
                   <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
                   Sign in again
@@ -450,7 +453,7 @@ export function ScanTab({
               <button
                 type="button"
                 onClick={() => filesRef.current?.click()}
-                className="w-full min-h-touch mt-2 rounded-xl text-accent font-semibold flex items-center justify-center gap-2"
+                className="w-full min-h-touch mt-2 rounded-xl text-accent-ink font-semibold flex items-center justify-center gap-2"
               >
                 <FileUp className="w-5 h-5" aria-hidden="true" />
                 Choose photos or PDFs
@@ -551,7 +554,7 @@ export function ScanTab({
                               <button
                                 type="button"
                                 onClick={() => (r.documentId && onOpenDoc ? onOpenDoc(r.documentId) : onOpenDocs())}
-                                className="block text-caption text-accent font-semibold underline mt-0.5 text-left"
+                                className="block text-caption text-accent-ink font-semibold underline mt-0.5 text-left"
                               >
                                 {status}
                               </button>
@@ -565,7 +568,7 @@ export function ScanTab({
                   })}
               </ul>
               {billingUrl && (
-                <a href={billingUrl} className="text-body font-semibold underline text-accent">
+                <a href={billingUrl} className="text-body font-semibold underline text-accent-ink">
                   See plans
                 </a>
               )}

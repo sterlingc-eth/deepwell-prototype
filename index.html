@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="AI answers from your records — work orders, warranties and photos, searchable in seconds.">
+<meta name="description" content="DeepWell reads your shop's work orders, invoices, warranty sheets and nameplate photos, so your whole team can ask a question and get the answer with the original page attached.">
 <meta property="og:title" content="DeepWell Technology — Knowledge Builds Business.">
-<meta property="og:description" content="One question answered right. For example, a $300 callback avoided. Your records, answerable in seconds.">
+<meta property="og:description" content="One question answered right. For example, a $300 callback avoided. Your shop's paperwork, answerable in seconds.">
 <meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -13,15 +13,15 @@
 <meta property="og:url" content="https://deepwelltechnology.com/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="DeepWell Technology — AI answers from your records">
-<meta name="twitter:description" content="AI answers from your records — work orders, warranties and photos, searchable in seconds.">
+<meta name="twitter:title" content="DeepWell Technology — Answers from your shop's paperwork">
+<meta name="twitter:description" content="DeepWell reads your shop's work orders, invoices, warranty sheets and nameplate photos, so your team can ask a question and get the answer with its source page.">
 <meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
 <link rel="canonical" href="https://deepwelltechnology.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0B1613">
-<title>DeepWell Technology — AI answers from your records</title>
+<title>DeepWell Technology — Answers from your shop's paperwork</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -545,7 +545,6 @@ footer{padding-block:12px}
 }
 
 /* problem lead-in flows straight into how-it-works */
-#platform{padding-bottom:clamp(14px,1.6vw,20px)}
 #how-it-works{padding-top:clamp(16px,1.8vw,22px)}
 .ledger > div{padding:12px 16px;gap:4px}
 .ledger h3{font-size:1.2rem}
@@ -676,18 +675,51 @@ footer{padding-block:12px}
 #team .founder p{font-size:.9rem;line-height:1.5}
 @media (max-width:900px){#team .founders{grid-template-columns:1fr}}
 @media (max-width:640px){#team .founder{grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}#team .founder h3{font-size:1.1rem}#team .founder p{font-size:.86rem;line-height:1.45}}
-#platform{padding-block:clamp(12px,1.4vw,18px)}
-#platform .sec-head{align-items:center;margin-bottom:8px}
-#platform .sec-head .eyebrow{margin-bottom:2px}
-#platform h2{font-size:clamp(1.15rem,1.7vw,1.4rem);line-height:1.2}
-#platform .lede{font-size:.92rem;line-height:1.45;margin:0}
-#platform .ledger > div{padding:8px 14px;gap:2px}
-#platform .ledger h3{font-size:1.02rem}
-#platform .ledger p{font-size:.84rem;line-height:1.4}
-#platform .ledger .where{font-size:.66rem}
-@media (max-width:860px){#platform .ledger > div{padding:7px 12px}#platform .ledger h3{font-size:1rem}#platform .ledger p{font-size:.84rem;margin-top:1px}}
 .cta-card .cta-who{font-size:.9rem;margin-top:10px}
 .cta-card .cta-who a{color:#fff;text-decoration:underline;text-underline-offset:2px}
+
+/* r30: plain-English clarity pass — hero steps, "what it does" block, FAQ */
+.hero-steps{list-style:none;margin:2px 0 0;padding:8px 0 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px 22px;counter-reset:none}
+.hero-steps li{display:flex;align-items:center;gap:8px;font-size:.92rem;line-height:1.3;color:var(--text)}
+.hero-steps b{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--brass);color:var(--brass-text);font:500 .74rem/1 "IBM Plex Mono",monospace}
+@media (min-width:1000px){.hero-steps li+li::before{content:"\2192";color:var(--brass-text);font-size:1.15rem;line-height:1;margin-right:12px;margin-left:-2px}.hero-steps{gap:6px 4px;flex-wrap:nowrap}.hero-steps li{white-space:nowrap}}
+@media (max-width:560px){.hero-steps{flex-direction:column;gap:5px}.hero-steps li{font-size:.9rem}}
+section{padding-block:clamp(12px,1.3vw,18px)}
+#team,#what,#faq{padding-block:clamp(12px,1.3vw,18px)}
+#what .sec-head{align-items:center;margin-bottom:10px}
+#what .sec-head .eyebrow{margin-bottom:4px}
+#what h2{font-size:clamp(1.35rem,2.2vw,1.75rem)}
+#what .lede{font-size:.98rem;margin:0}
+.what-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.what-steps li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;padding:10px 14px 12px;background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--brass)}
+.what-steps h3{font-size:1.12rem}
+.what-steps p{color:var(--muted);font-size:.9rem;line-height:1.45;margin-top:3px;grid-column:2}
+.what-more{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.what-ask,.what-not{padding:10px 14px 12px;border:1px solid var(--line);background:var(--surface)}
+.what-not{border-left:4px solid var(--brass)}
+.what-ask h3,.what-not h3{font-size:1.05rem;margin-bottom:4px}
+.what-ask ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 18px}
+.what-ask li{position:relative;padding-left:14px;font-size:.86rem;line-height:1.35;color:var(--text)}
+.what-ask li::before{content:"";position:absolute;left:0;top:.5em;width:6px;height:6px;border-radius:50%;background:var(--brass)}
+.what-not p{color:var(--muted);font-size:.9rem;line-height:1.45;margin:0}
+@media (max-width:860px){.what-steps{grid-template-columns:1fr;gap:8px}.what-more{grid-template-columns:1fr;gap:8px}}
+@media (max-width:560px){.what-ask ul{grid-template-columns:1fr}}
+@media (max-width:560px){.what-steps li{padding:8px 12px 10px}.what-steps p,.what-not p{font-size:.86rem}.what-ask li{font-size:.84rem}}
+#faq .sec-head{align-items:center;margin-bottom:10px}
+#faq .sec-head .eyebrow{margin-bottom:4px}
+#faq h2{font-size:clamp(1.35rem,2.2vw,1.75rem)}
+#faq .lede{font-size:.95rem;margin:0}
+#faq .lede a{color:var(--text);text-decoration:underline;text-underline-offset:2px}
+.faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;align-items:start}
+.faq-grid details{border:1px solid var(--line);background:var(--surface)}
+.faq-grid summary{list-style:none;cursor:pointer;position:relative;min-height:40px;box-sizing:border-box;display:flex;align-items:center;padding:8px 40px 8px 14px;font-weight:600;font-size:.95rem;line-height:1.3}
+.faq-grid summary::-webkit-details-marker{display:none}
+.faq-grid summary::after{content:"";position:absolute;right:16px;top:50%;width:7px;height:7px;margin-top:-6px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .2s}
+.faq-grid details[open] summary::after{margin-top:-2px;transform:rotate(-135deg)}
+.faq-grid summary:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
+.faq-grid details p{margin:0;padding:0 14px 12px;color:var(--muted);font-size:.9rem;line-height:1.5}
+@media (max-width:860px){.faq-grid{grid-template-columns:1fr;gap:6px}.faq-grid summary{min-height:44px}}
+@media (prefers-reduced-motion:reduce){.faq-grid summary::after{transition:none}}
 </style>
 <link rel="stylesheet" href="/support/widget.css">
 </head>
@@ -734,7 +766,7 @@ footer{padding-block:12px}
     </a>
     <div class="navlinks" id="navLinks">
       <a href="#how-it-works">How it works</a>
-      <a href="#demo">What it feels like</a>
+      <a href="#demo">Try it</a>
       <!-- Industries nav dropdown (Workstream C, 2026-09-21) — see the
            labeled CSS block above and the standalone script near the end
            of </body>. Keyboard: Enter/Space/↓ opens and focuses the first
@@ -769,7 +801,7 @@ footer{padding-block:12px}
   <div class="wrap">
     <div class="hero-copy dw-observe">
       <div class="hero-eyebrow-row">
-      <div class="eyebrow">Records that answer back.</div>
+      <div class="eyebrow">For HVAC shop owners and office managers</div>
       <svg class="hero-micro" viewBox="0 0 118 36" aria-hidden="true" focusable="false">
         <g class="hm-doc-g">
           <rect class="hm-doc-page" x="2" y="4" width="20" height="28" rx="2"/>
@@ -790,17 +822,17 @@ footer{padding-block:12px}
       </svg>
       </div>
       <h1 class="mm-headline">One question answered right. <em>For example, a $300 callback avoided.</em></h1>
-      <p class="lede">DeepWell finds the answer in your own work orders, warranty sheets, invoices and nameplate photos — so your techs stop calling the office. We set it up for you; day one is already useful.</p>
+      <p class="lede">DeepWell turns your shop's paperwork — work orders, invoices, warranty sheets, nameplate photos — into answers your whole team can look up in seconds, each with the original page attached.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="#plans">See pricing</a>
-        <a class="btn btn-ghost" href="#demo">See what it feels like</a>
-        <p class="hero-trial">30-day free trial on Solo, card required, cancel anytime.</p>
+        <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+        <a class="btn btn-ghost" href="#what">See how it works</a>
+        <p class="hero-trial">30-day free trial on Solo. Card required, cancel anytime.</p>
       </div>
-      <div class="hero-facts" aria-label="What to expect">
-        <div class="fact"><b>Seconds</b><span>Question to answer</span></div>
-        <div class="fact"><b>Minutes</b><span>Upload to searchable</span></div>
-        <div class="fact"><b>Every answer</b><span>Shows its source</span></div>
-      </div>
+      <ol class="hero-steps" aria-label="How it works in 3 steps">
+        <li><b>1</b><span>Send it your paperwork</span></li>
+        <li><b>2</b><span>It reads and organizes everything</span></li>
+        <li><b>3</b><span>Ask, and get the answer with the source</span></li>
+      </ol>
     </div>
     <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
     </div>
@@ -839,31 +871,46 @@ footer{padding-block:12px}
   </div>
 </section>
 
-<section id="platform">
-  <span class="anchor" id="problem"></span>
+<section id="what">
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
       <div>
-        <div class="eyebrow">The problem</div>
-        <h2>The knowledge exists. It's just in the wrong place.</h2>
+        <div class="eyebrow">What DeepWell does</div>
+        <h2>Your paperwork, turned into answers.</h2>
       </div>
-      <p class="lede">A mid-sized shop closes 3,000 jobs a year, and every one leaves a trail split across a filing cabinet, an inbox, and a tech's phone.</p>
+      <p class="lede">Your paperwork is split across a filing cabinet, an inbox and your techs' phones. DeepWell reads it all, so anyone on your team can just ask.</p>
     </div>
-    <div class="ledger">
-      <div>
-        <div class="where">In the office</div>
-        <h3>The filing cabinet</h3>
-        <p>Complete, but unsearchable. The serial number is on page two of a carbon copy.</p>
+    <ol class="what-steps">
+      <li class="dw-observe dw-once">
+        <span class="hiw-n">01</span>
+        <h3>Send it your paperwork</h3>
+        <p>Upload files on the web or scan pages with the phone app: work orders, invoices, warranty sheets, nameplate photos. Handwriting and rough scans are fine.</p>
+      </li>
+      <li class="dw-observe dw-once">
+        <span class="hiw-n">02</span>
+        <h3>It reads and organizes everything</h3>
+        <p>It reads every page, pulls out the customer, address, equipment model and serial, install and warranty dates and who did the work, and files it under the right customer and unit. The original page is kept.</p>
+      </li>
+      <li class="dw-observe dw-once">
+        <span class="hiw-n">03</span>
+        <h3>Ask, and get the answer with the source</h3>
+        <p>Anyone on your team asks Donovan, DeepWell's assistant, in plain English and gets the answer with the original page attached. If it isn't in your records, it says so instead of guessing.</p>
+      </li>
+    </ol>
+    <div class="what-more">
+      <div class="what-ask">
+        <h3>What you can ask</h3>
+        <ul>
+          <li>Is the furnace at 3247 Elm still under warranty?</li>
+          <li>What did Marcus do at the Henderson job last fall?</li>
+          <li>What is serial 4N2119-08772, and where is it?</li>
+          <li>Which Carrier units we installed expire in the next 90 days?</li>
+          <li>When was the Smith system installed, and who did the work?</li>
+        </ul>
       </div>
-      <div>
-        <div class="where">In the inbox</div>
-        <h3>The PDF nobody renamed</h3>
-        <p>Buried in &ldquo;Re: Re: Fwd: Tuesday,&rdquo; findable only by whoever received it.</p>
-      </div>
-      <div>
-        <div class="where">In the truck</div>
-        <h3>The photo on a phone</h3>
-        <p>A nameplate photo from a tech who has since moved on. Never uploaded anywhere.</p>
+      <div class="what-not">
+        <h3>What it's not</h3>
+        <p>DeepWell is not a scheduling, dispatch or invoicing tool. Keep using the one you have; DeepWell works alongside it and is where the paperwork behind those jobs becomes answers.</p>
       </div>
     </div>
   </div>
@@ -1034,24 +1081,24 @@ footer{padding-block:12px}
     <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">How it works</div>
-        <h2>Every record goes two places at once.</h2>
+        <h2>Watch one invoice become an answer.</h2>
       </div>
-      <p class="lede">One hosted system that ingests everything, links what belongs together, and answers anything you ask. It runs under your company's name and we keep it running.</p>
+      <p class="lede">Here is a single page going from a scan to a sourced answer. The same three steps run on every page you send.</p>
     </div>
 
     <div class="hiw" id="hiw">
-      <p class="hiw-sr">Animated diagram of the DeepWell data flow, which loops. A person taps Scan on an invoice. The page is read, then written to the vault under a key scoped to the account, while the facts about it are written to the index and linked to the customer and the equipment. Later someone asks Donovan when the Smith warranty expires, and Donovan answers, March 14, 2027, with the invoice and page number attached as the source.</p>
+      <p class="hiw-sr">Animated diagram that loops. A person taps Scan on an invoice. DeepWell reads the page, keeps the original page unchanged, pulls out the facts, and files them under the right customer and equipment. Later someone asks Donovan when the Smith warranty expires, and Donovan answers, March 14, 2027, with the invoice and page number attached as the source.</p>
 
       <div class="hiw-stage" aria-hidden="true">
         <div class="hiw-world">
           <div class="hiw-grid"></div>
-          <div class="hiw-cap" data-n="cap0">01 · CAPTURE</div>
-          <div class="hiw-cap" data-n="cap1">02 · LINK</div>
+          <div class="hiw-cap" data-n="cap0">01 · SEND</div>
+          <div class="hiw-cap" data-n="cap1">02 · READ &amp; FILE</div>
           <div class="hiw-cap" data-n="cap2">03 · ASK</div>
 
           <div class="hiw-btn" data-n="btn">
             <i class="hiw-btn-on" data-n="btnOn"></i>
-            <span class="hiw-lab hiw-lab1" data-n="lab1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>Scan a record</span>
+            <span class="hiw-lab hiw-lab1" data-n="lab1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg>Scan a page</span>
             <span class="hiw-lab hiw-lab2" data-n="lab2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Scanned</span>
           </div>
           <div class="hiw-tag" data-n="tag"><svg viewBox="0 0 14 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2 1h6.5L12 4.5V15H2z"/><path d="M4.5 9h5M4.5 12h3" stroke-linecap="round"/></svg>Invoice_1042.pdf</div>
@@ -1060,9 +1107,9 @@ footer{padding-block:12px}
           <div class="hiw-fill" data-n="fill"></div>
           <div class="hiw-slab" data-n="slab">READING · INVOICE_1042.PDF</div>
 
-          <div class="hiw-card" data-n="c0"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg></span><span class="hiw-ct"><b>The vault</b><span>Page stored, unchanged</span></span><span class="hiw-now">now</span></div>
-          <div class="hiw-card" data-n="c1"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="hiw-ct"><b>The index</b><span>6 facts recorded</span></span><span class="hiw-now">now</span></div>
-          <div class="hiw-card" data-n="c2"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="hiw-ct"><b>Linked</b><span>Smith residence · Trane XR16</span></span><span class="hiw-now">now</span></div>
+          <div class="hiw-card" data-n="c0"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></svg></span><span class="hiw-ct"><b>Original page</b><span>Kept as scanned</span></span><span class="hiw-now">now</span></div>
+          <div class="hiw-card" data-n="c1"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="hiw-ct"><b>Facts found</b><span>6 facts pulled out</span></span><span class="hiw-now">now</span></div>
+          <div class="hiw-card" data-n="c2"><span class="hiw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1613" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="hiw-ct"><b>Filed under</b><span>Smith residence · Trane XR16</span></span><span class="hiw-now">now</span></div>
 
           <div class="hiw-ans" data-n="ans">
             <div class="hiw-ah"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.4"/><circle cx="8" cy="8" r="2.6" fill="currentColor" stroke="none"/></svg>Donovan<i>now</i></div>
@@ -1094,24 +1141,24 @@ footer{padding-block:12px}
       <ol class="hiw-steps">
         <li>
           <span class="hiw-n">01</span>
-          <h3>A record arrives</h3>
-          <p>Paper, PDF, spreadsheet, photo or email: scan the cabinet, forward the inbox, drop the shared drive, or snap a nameplate in the field. Nothing has to be renamed or filed first.</p>
-          <div class="hiw-feat" role="list"><span role="listitem">Drag-and-drop upload</span><span role="listitem">Email intake &amp; folder sync <span class="pill-soon">Coming soon</span></span><span role="listitem">Reads handwriting, carbon copies and low-quality scans</span><span role="listitem">Searchable within minutes of upload</span></div>
+          <h3>Send it your paperwork</h3>
+          <p>Scan with the phone or upload on the web.</p>
+          <div class="hiw-feat" role="list"><span role="listitem">Drag-and-drop upload</span><span role="listitem">Phone scans upload when the signal returns</span><span role="listitem">Email &amp; folder upload <span class="pill-soon">Coming soon</span></span></div>
         </li>
         <li>
           <span class="hiw-n">02</span>
-          <h3>It goes two places at once</h3>
-          <p>The page is stored under a key scoped to your account. What it <i>says</i> (serials, addresses, dates, names, amounts) is recorded separately and linked equipment &harr; site &harr; customer &harr; people &harr; money. One serial number pulls up seven years of history from a dozen files.</p>
-          <div class="hiw-feat" role="list"><span role="listitem">Uncertain reads are flagged for a quick human check</span><span role="listitem">Your corrections make the system sharper</span></div>
+          <h3>It reads and organizes everything</h3>
+          <p>Facts are pulled out and filed by customer and unit.</p>
+          <div class="hiw-feat" role="list"><span role="listitem">Unsure reads are flagged for a quick check</span><span role="listitem">Your corrections are used in later answers</span></div>
         </li>
         <li>
           <span class="hiw-n">03</span>
-          <h3>Later, someone asks</h3>
-          <p>Answers, not search results: type a question the way you'd ask a coworker, at the desk, on the phone or in the truck. Donovan answers from the record, and the key leads back to the original page, attached as its source.</p>
-          <div class="hiw-feat" role="list"><span role="listitem">Warranty &amp; maintenance dashboards: what's expiring, due, slipping</span><span role="listitem">CSV export for dispatch &amp; accounting</span></div>
+          <h3>Ask, and get the answer with the source</h3>
+          <p>Ask in plain English. The answer links to the page.</p>
+          <div class="hiw-feat" role="list"><span role="listitem">Warranty alerts &amp; a daily email digest</span><span role="listitem">CSV export for dispatch &amp; accounting</span></div>
         </li>
       </ol>
-      <p class="hiw-types">Works on invoices &middot; warranty cards &middot; nameplate photos &middot; startup sheets &middot; permits &middot; dispatch notes &middot; work orders &middot; service tickets</p>
+      
     </div>
 
   </div>
@@ -1530,10 +1577,10 @@ footer{padding-block:12px}
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
       <div>
-        <div class="eyebrow">What it feels like</div>
-        <h2>Ask Donovan.</h2>
+        <div class="eyebrow">Try it</div>
+        <h2>Ask Donovan a question.</h2>
       </div>
-      <p class="lede">Every answer shows its source. Ask an address, a serial, a name, or a date, the way you'd ask a coworker who never forgets.</p>
+      <p class="lede">Ask about an address, a serial, a name or a date, the way you'd ask a coworker who never forgets. Every answer shows its source.</p>
     </div>
     <div class="demo-wrap">
     <form class="ask" id="ask" role="search">
@@ -1562,17 +1609,17 @@ footer{padding-block:12px}
       <div class="person dw-observe dw-once">
         <div class="role">Office manager · dispatch</div>
         <blockquote>"The customer's on hold. I need the install date and who was out there last."</blockquote>
-        <p>Answer the call without putting it down. Equipment, warranty status and last three visits on one screen, with the signed work order behind it.</p>
+        <p>Answer the call without putting it down: equipment, warranty status and the last three visits on one screen.</p>
       </div>
       <div class="person dw-observe dw-once">
         <div class="role">Field technician · on site</div>
         <blockquote>"I'm in the attic on my phone. What's this unit's history?"</blockquote>
-        <p>Type the serial off the nameplate — or photograph it — and read the last tech's notes before you touch anything. Big type, high contrast, works in sun.</p>
+        <p>Type the serial off the nameplate, or photograph it, and read the last tech's notes before you touch anything.</p>
       </div>
       <div class="person dw-observe dw-once">
         <div class="role">Owner · operations</div>
         <blockquote>"How much warranty money did we leave on the table last year?"</blockquote>
-        <p>See expiring coverage across every unit installed, and where maintenance agreements are due — plus, <span class="pill-soon">Coming soon</span>, which techs generate callbacks.</p>
+        <p>See expiring coverage across every unit, and where maintenance agreements are due. Which techs generate callbacks: <span class="pill-soon">Coming soon</span>.</p>
       </div>
     </div>
     </div>
@@ -1586,7 +1633,7 @@ footer{padding-block:12px}
         <div class="eyebrow">Pricing</div>
         <h2>Pick your plan by team size.</h2>
       </div>
-      <p class="lede">Plans differ by logins, storage, monthly document-scan volume and support. 30-day free trial on Solo &mdash; card required, you won't be charged until the trial ends.</p>
+      <p class="lede">Plans differ by logins, storage, monthly page volume and support. Solo has a 30-day free trial; you aren't charged until it ends.</p>
     </div>
     <div class="plans-every" aria-label="Included with every plan">
       <span class="pe-label">Every plan includes</span>
@@ -1625,7 +1672,7 @@ footer{padding-block:12px}
           </ul>
         </div>
         <p class="math">One prevented callback covers 3&ndash;6 months.</p>
-        <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Get started</a>
+        <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Start free trial</a>
       </div>
       <div class="plan featured dw-observe dw-once">
         <div class="plan-top"><div class="tier">Shop</div><span class="badge-pop">Most popular</span></div>
@@ -1652,7 +1699,7 @@ footer{padding-block:12px}
             <li>Email intake <span class="pill-soon">Coming soon</span></li>
           </ul></div>
         <p class="math">Three techs preventing one callback a month each: $3,600&ndash;7,200 saved. You pay $199.</p>
-        <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Get started</a>
+        <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Choose Shop</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Crew</div></div>
@@ -1682,7 +1729,7 @@ footer{padding-block:12px}
             <li>Branch scoping <span class="pill-soon">Coming soon</span></li>
           </ul></div>
         <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
-        <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Get started</a>
+        <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Choose Crew</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Fleet</div></div>
@@ -1715,24 +1762,65 @@ footer{padding-block:12px}
         <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
-    <p class="plans-note"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price. The owner account doesn't count toward logins. Donovan is unlimited, subject to a fair-use safety limit ordinary use never reaches. Dashed <span class="pill-soon">Coming soon</span> tags mark features still being built.</p>
+    <p class="plans-note"><b>Annual prepay:</b> one month free on every tier. The owner account doesn't count toward logins. Donovan is unlimited, with a fair-use safety limit ordinary use never reaches. <span class="pill-soon">Coming soon</span> marks features still being built.</p>
     <div class="plans-extra">
       <div class="onboard">
         <div class="eyebrow">Included with every plan</div>
         <h3>White-glove setup by the DeepWell Technology team</h3>
-        <p>Our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon.</p>
+        <p>Our team takes stock of your records, loads your first big batch, checks the answers against the questions your office actually asks, and trains your crew in an afternoon.</p>
       </div>
       <div class="rescue">
         <div>
           <div class="eyebrow">Records Rescue</div>
           <h3>See it on your own records, free.</h3>
-          <p>Send one sample folder or box of old invoices, tickets, or warranties and we'll digitize it free, so you can see the result before committing to the rest.</p>
+          <p>Send one folder or box of old invoices, tickets or warranties. We digitize it free, so you can see the result first.</p>
         </div>
         <div class="rescue-cta">
-          <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box — free demo</a>
+          <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
           <p>Full service: <strong>$0.12/page</strong> · $500 min — or <a href="/app/?screen=billing">buy it under Billing</a></p>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head dw-observe dw-once">
+      <div>
+        <h2>Questions shop owners ask</h2>
+      </div>
+      <p class="lede">What owners ask before trusting software with their paperwork. More in our <a href="/security.html">security</a>, <a href="/privacy.html">privacy</a> and <a href="/terms.html">terms</a> pages.</p>
+    </div>
+    <div class="faq-grid">
+      <details>
+        <summary>Do I have to scan everything myself?</summary>
+        <p>No. Setup by our team is included with every plan: we take stock of your records, load the first batch and check the answers against the questions your office asks. For boxes of old paper, our Records Rescue service does the scanning ($0.12/page, $500 minimum), and you can send one sample box free first. After that, your team only scans new paperwork.</p>
+      </details>
+      <details>
+        <summary>What if it reads something wrong?</summary>
+        <p>Every answer shows the page it came from, so you can check it yourself. When DeepWell isn't sure about a read, it flags that document for a quick human check, and your corrections are used in later answers. It is AI, so it can still be wrong. That is why the source page is always attached.</p>
+      </details>
+      <details>
+        <summary>Does my data train AI? Who can see it?</summary>
+        <p>Your records are stored under your company's own account and are never mixed with another shop's. To read pages and answer questions, DeepWell sends them to its AI providers, and under those providers' API terms that content is not used to train their models. DeepWell staff can only look at your account if your admin grants time-limited support access.</p>
+      </details>
+      <details>
+        <summary>What happens if I cancel?</summary>
+        <p>You can cancel any time. A monthly plan ends at the end of the current billing period (no prorated refunds for partial months), and you can cancel the free trial before you are charged. Your admin can export or delete your shop's data from Team &rarr; Settings whenever they like.</p>
+      </details>
+      <details>
+        <summary>Does it replace my field-service software?</summary>
+        <p>No. DeepWell does not schedule jobs, dispatch trucks, take payments or send invoices, so keep the software you use now. There are no built-in integrations yet, but you can export CSV for dispatch and accounting.</p>
+      </details>
+      <details>
+        <summary>Does it work on my techs' phones?</summary>
+        <p>Yes. The phone app installs from the browser on iPhone, iPad and Android, with no app store and no extra charge. Techs can ask questions, scan paperwork and look up documents. A scan taken with no signal is saved on the phone and uploads when it is back online; asking a question needs a connection.</p>
+      </details>
+      <details>
+        <summary>I'm not an HVAC shop. Will it work for me?</summary>
+        <p>HVAC is the only trade DeepWell is built for and running today. Electrical, plumbing and property management pages are up and marked coming soon, with no dates. You can join the waitlist from those pages.</p>
+      </details>
     </div>
   </div>
 </section>
@@ -1742,9 +1830,9 @@ footer{padding-block:12px}
     <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">The cost of missing this</div>
-        <h2>What a missed follow-up costs a shop like yours, per year</h2>
+        <h2>What a missed follow-up costs</h2>
       </div>
-      <p class="lede">Move the sliders to your own numbers and watch the total change live. Every figure below is an adjustable starting example, not a claim about your shop.</p>
+      <p class="lede">Move the sliders to your own numbers. Every figure is an adjustable starting example, not a claim about your shop.</p>
     </div>
 
     <div class="cost-calc dw-observe dw-once" id="cost-calc">
@@ -1844,7 +1932,7 @@ footer{padding-block:12px}
     <div class="cost-foot">
     <div class="cost-card dw-observe dw-once">
       <div class="where">A claim denied because nobody registered it</div>
-      <p>Most manufacturers cut the parts warranty in half if a unit isn't registered within 60–90 days of install — Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane drop from 10 yr registered to 5 yr unregistered <span class="mono" style="font-size:.74rem;color:var(--faint)">(based on published manufacturer registration windows)</span>. Miss it, and a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
+      <p>Many manufacturers cut the parts warranty in half if a unit isn't registered within 60–90 days of install (Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane: 10 yr registered, 5 yr not <span class="mono" style="font-size:.74rem;color:var(--faint)">(published registration windows)</span>). Then a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
     </div>
 
     <p class="cost-note">Your numbers will differ. DeepWell watches every expiry — bell alert plus daily digest — then drafts the customer's extended-warranty email for an admin to approve and send, or run fully automatic. Both ship today.</p>
@@ -1866,15 +1954,15 @@ footer{padding-block:12px}
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 6l14 6v10c0 8-6 13-14 16C14 35 8 30 8 22V12z"/><path d="M16 22l4 4 8-8"/></svg>
-        <div><h4>Your records stay yours.</h4><p>Data is stored under your company's own account, never pooled with another contractor's, never used to build anything for anyone else. It stays your data, and you can ask us for a full copy at any time.</p></div>
+        <div><h4>Your records stay yours.</h4><p>Your data is stored under your company's own account, never pooled with another contractor's and never used to build anything for anyone else. You can export or delete it at any time.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15"/><path d="M22 12v10l7 4"/></svg>
-        <div><h4>Built for the job, not the demo.</h4><p>Readable in an attic on a cracked phone. Built for the field: fast on a weak connection. Nothing that flashes or slows a tech down. Office gets the full desk view.</p></div>
+        <div><h4>Built for the job, not the demo.</h4><p>Readable in an attic on a cracked phone, and fast on a weak connection. Nothing that flashes or slows a tech down.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
-        <div><h4>Measured before you rely on it.</h4><p>During setup we score your account against the questions your team actually asks and show you the result. If it isn't good enough on your own set, we keep working before go-live.</p></div>
+        <div><h4>Measured before you rely on it.</h4><p>During setup we test your account on the questions your team actually asks and show you the result. If it falls short, we keep working before go-live.</p></div>
       </div>
     </div>
     </div>
@@ -1883,11 +1971,11 @@ footer{padding-block:12px}
       <div>
         <div class="eyebrow">Talk to us</div>
         <h3>Start with one box of records.</h3>
-        <p>Send us a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you'll ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
+        <p>Send a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
         <p class="cta-who">Talk to Sterling or Hilton: <a href="mailto:hello@deepwelltechnology.com?subject=Records%20audit">hello@deepwelltechnology.com</a></p>
       </div>
       <div class="cta-side">
-        <a class="btn btn-primary" href="mailto:hello@deepwelltechnology.com?subject=Records%20audit">hello@deepwelltechnology.com</a>
+        <a class="btn btn-primary" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
         <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge Builds Business." width="900" height="750" loading="lazy" decoding="async"></div>
       </div>
     </div>
@@ -2026,6 +2114,10 @@ const DEMO=[
   }));
   /* user typing takes over from any running animation */
   input.addEventListener('input',cancelRun);
+  /* Focusing the field mid-animation also takes over, and selects what the demo had typed so far: the visitor's
+     first keystroke then REPLACES it. (Only 'input' used to cancel, so a click + type appended the visitor's
+     text to the demo's half-typed question: "What did Marc" + "carrier expire 90".) */
+  input.addEventListener('focus',()=>{if(activeIdx>=0){cancelRun();input.select();}});
   const KEYS=[["elm","3247","furnace","warranty","under"],["marcus","henderson","ridgeview","fall","did"],["4n2119","08772","serial","what is it","where"],["carrier","expire","90","next","which"]];
   function match(q){
     q=q.toLowerCase();let best=0,bi=-1;
