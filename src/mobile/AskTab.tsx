@@ -250,6 +250,7 @@ export function AskTab({
   tenantKey = null,
   emptyShop = false,
   onOpenScan,
+  prefill = null,
 }: {
   onOpenDoc: (id: string) => void
   onOpenCustomer: (ref: string) => void
@@ -259,6 +260,8 @@ export function AskTab({
   emptyShop?: boolean
   /** Jumps to the Scan tab — the only way a phone adds its first document. */
   onOpenScan?: () => void
+  /** Fills the composer (does not send). `n` makes the same text re-apply; set by DeepWell Help's "Ask Donovan" button. */
+  prefill?: { text: string; n: number } | null
 }) {
   const [turns, setTurns] = useState<Turn[]>([])
   // Counter, not a boolean: a "Try again" can start while another ask is still in flight.
@@ -267,6 +270,11 @@ export function AskTab({
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<ComposerHandle>(null)
   const nextId = useRef(1)
+  const prefillN = prefill?.n
+  useEffect(() => {
+    if (prefill && prefill.text) composerRef.current?.fill(prefill.text)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillN])
 
   // Round 18 P2: per-tenant, per-role sample-prompt cache (src/core/suggestions.ts's useSamplePrompts) —
   // never another tenant's, even on a same-tab org switch.

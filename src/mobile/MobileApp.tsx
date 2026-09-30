@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { SignIn, UserButton, useAuth, useOrganization } from '@clerk/clerk-react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { SignIn, UserButton, useAuth, useOrganization, useUser } from '@clerk/clerk-react'
 import { FileText, Loader2, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { setAuthTokenProvider } from '../services/authToken'
 import { billingClient, type BillingStatus } from '../services/billingClient'
@@ -14,6 +14,13 @@ import { DocSheet } from './DocSheet'
 import { CustomerSheet } from './CustomerSheet'
 import { useKeyboardOpen } from './useKeyboardOpen'
 import { InstallGuide } from './InstallGuide'
+import { Sheet } from './Sheet'
+import { SupportLauncherButton, SupportLoading } from '../components/support/SupportWidget'
+import { useLauncherPulse } from '../components/support/useLauncherPulse'
+import { SupportLogo } from '../components/support/SupportLogo'
+
+// Loaded on first open of the Help sheet, so the phone's startup bundle doesn't carry the chat.
+const SupportAssistant = lazy(() => import('../components/support/SupportAssistant').then((m) => ({ default: m.SupportAssistant })))
 
 export type MobileTab = 'ask' | 'scan' | 'docs'
 const TABS: { id: MobileTab; label: string; Icon: typeof MessageCircle }[] = [
@@ -64,6 +71,7 @@ function FullScreenMessage({ title, body, action }: { title: string; body: strin
 export function MobileApp() {
   const { isLoaded, isSignedIn, getToken, orgId, userId } = useAuth()
   const { organization } = useOrganization()
+  const { user } = useUser()
 
   useEffect(() => {
     setAuthTokenProvider(() => getToken())
@@ -90,6 +98,12 @@ export function MobileApp() {
   const openCustomer = useCallback((ref: string) => setSheet({ kind: 'customer', ref }), [])
   const closeSheet = useCallback(() => setSheet(null), [])
   const keyboardOpen = useKeyboardOpen()
+  // DeepWell Help: a header button (never a 4th tab, never over the tab bar or Scan) opening the chat in a Sheet.
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [askPrefill, setAskPrefill] = useState<{ text: string; n: number } | null>(null)
+  const helpBtnRef = useRef<HTMLButtonElement>(null)
+  const helpPulse = useLauncherPulse(helpOpen, 8_000)
+  const closeHelp = useCallback(() => setHelpOpen(false), [])
 
   const ready = isLoaded && !!isSignedIn && !!orgId
   // The full records graph (Docs list, source filenames, suggestions) is the
@@ -198,6 +212,7 @@ export function MobileApp() {
             {organization?.name && (
               <span className="hidden min-[360px]:inline short:hidden text-caption text-ink-3 truncate max-w-[30vw] md:max-w-xs">{organization.name}</span>
             )}
+            <SupportLauncherButton buttonRef={helpBtnRef} size={44} pulsing={helpPulse} onClick={() => setHelpOpen(true)} className="shrink-0" />
             {/* Round 17 audit fix #1: reachable, 1-tap, persisted (same
                 setFieldMode/localStorage the desktop toggle uses) — the only
                 thing missing before was a button that calls it from here. */}
@@ -232,7 +247,7 @@ export function MobileApp() {
         {/* All three stay mounted so an upload keeps going and the Ask
             thread survives while the tech flips between tabs. */}
         <div className={tab === 'ask' ? 'h-full' : 'hidden'}>
-          <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} tenantKey={orgId ?? userId ?? null} emptyShop={sync.status === 'ready' && sync.isEmpty} onOpenScan={() => setTab('scan')} />
+          <AskTab prefill={askPrefill} onOpenDoc={openDoc} onOpenCustomer={openCustomer} tenantKey={orgId ?? userId ?? null} emptyShop={sync.status === 'ready' && sync.isEmpty} onOpenScan={() => setTab('scan')} />
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
           <ScanTab
@@ -267,6 +282,25 @@ export function MobileApp() {
           })}
         </div>
       </nav>
+
+      {helpOpen && (
+        <Sheet fill title="DeepWell Help" icon={<SupportLogo plate size={32} />} onClose={closeHelp}>
+          <Suspense fallback={<SupportLoading />}>
+          <SupportAssistant
+            surface="mobile"
+            page={`mobile:${tab}`}
+            variant="embedded"
+            userEmail={user?.primaryEmailAddress?.emailAddress ?? ''}
+            userName={user?.fullName ?? ''}
+            onAskDonovan={(q) => {
+              setHelpOpen(false)
+              setTab('ask')
+              setAskPrefill((p) => ({ text: q, n: (p?.n ?? 0) + 1 }))
+            }}
+          />
+          </Suspense>
+        </Sheet>
+      )}
 
       {sheet?.kind === 'doc' && (
         <DocSheet key={sheet.id} documentId={sheet.id} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onOpenCustomer={openCustomer} onClose={closeSheet} />

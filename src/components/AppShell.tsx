@@ -10,6 +10,7 @@ import { NotificationsPanel } from './NotificationsPanel';
 import { useGraph } from '../core/entityGraph';
 import { needsPersonCount } from '../screens/ReviewScreen';
 import { CommandPalette } from './command/CommandPalette';
+import { SupportWidget } from './support/SupportWidget';
 
 // Lazy — same reasoning as App.tsx's WarrantyExportScreen/OutreachScreen:
 // this is an admin-only destination most sessions never open, and it pulls
@@ -54,8 +55,9 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const ingestProgress = useAppStore(selectIngestProgress);
   const billingStatus = useAppStore((s) => s.billingStatus);
   const banner = billingBannerFor(billingStatus);
-  const { signOut } = useClerk();
+  const { signOut, user } = useClerk();
   const { orgRole } = useAuth();
+  const prefillQuestion = useAppStore((s) => s.prefillQuestion);
   const isAdmin = isAdminRole(orgRole ?? null);
   const [donovanOpen, setDonovanOpen] = useState(false);
 
@@ -329,6 +331,13 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
       </footer>
 
       {!billingGateActive && <CommandPalette isAdmin={isAdmin} onOpenDonovan={() => setDonovanOpen(true)} />}
+
+      <SupportWidget
+        page={currentScreen}
+        userEmail={user?.primaryEmailAddress?.emailAddress ?? ''}
+        userName={user?.fullName ?? ''}
+        onAskDonovan={prefillQuestion}
+      />
 
       {donovanOpen && (
         <Suspense fallback={<div className="fixed inset-0 z-40 bg-bg" aria-busy="true" />}>

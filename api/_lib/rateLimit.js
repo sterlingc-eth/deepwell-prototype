@@ -64,6 +64,9 @@ export const DEFAULT_LIMITS = Object.freeze({
   // "Upgrade"/"Manage billing" a few times while comparing plans, nowhere near what a real workflow
   // needs in a day.
   billing: { perMinute: 6,   perDay: 60 },
+  // Round 28: the Support Assistant's OWN bucket (api/_lib/support/limits.js), per signed-in user. It never
+  // touches `ask`, so chatting with support cannot spend Donovan's allowance. Env: RATE_LIMIT_SUPPORT_PER_MINUTE/DAY.
+  support: { perMinute: 8,   perDay: 200 },
 });
 
 /** Fixed window size for the burst limiter. Exported so callers/tests can

@@ -51,6 +51,10 @@ import audience from "./_lib/audience/route.js";
  *                                                      document's audience, one-tap override — any
  *                                                      member — round 18, owner ask (a))
  *
+ *   GET/POST support          -> ?action=support    (DeepWell Support Assistant, round 28: website widget (no auth,
+ *                                                      surface=public) and in-app help (Clerk); lazy-imported so the
+ *                                                      Anthropic SDK stays out of the cold-start graph)
+ *
  * Each underlying handler does its own auth. Body limit and duration are the
  * maximum any member needs.
  *
@@ -61,7 +65,7 @@ import audience from "./_lib/audience/route.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)) };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

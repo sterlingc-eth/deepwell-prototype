@@ -198,14 +198,13 @@ a{color:inherit}
 header,section,footer{position:relative;z-index:1}
 
 /* Founders: compact horizontal leadership cards, 3:4 headshots */
-.founders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
-.founder{display:grid;grid-template-columns:clamp(150px,17vw,220px) minmax(0,1fr);gap:clamp(18px,2.2vw,28px);align-items:start;padding:clamp(16px,1.8vw,22px);border:1px solid var(--line);background:var(--surface)}
+.founders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.founder{display:grid;grid-template-columns:clamp(96px,9vw,130px) minmax(0,1fr);gap:16px;align-items:start;padding:10px;border:1px solid var(--line);background:var(--surface)}
 .founder-img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;object-position:50% 25%;border:1px solid var(--line);background:var(--surface-2)}
 .founder h3{font-family:"Newsreader",serif;font-size:1.3rem;font-weight:500;margin:0 0 2px}
-.founder .role{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-text);margin-bottom:12px}
-.founder p{margin:0;color:var(--muted);font-size:.95rem}
-@media (max-width:980px){.founders{grid-template-columns:1fr}.founder{grid-template-columns:200px minmax(0,1fr)}}
-@media (max-width:560px){.founder{grid-template-columns:1fr;gap:16px}.founder-img{width:min(220px,62%)}.founder p{font-size:1rem}}
+.founder .role{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-text);margin-bottom:8px}
+.founder p{margin:0;color:var(--muted);font-size:.92rem;line-height:1.5}
+@media (max-width:640px){.founders{grid-template-columns:1fr}.founder{grid-template-columns:96px minmax(0,1fr);gap:12px;padding:10px}.founder h3{font-size:1.15rem}.founder .role{margin-bottom:6px}.founder p{font-size:.9rem;line-height:1.45}}
 
 /* sections */
 section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
@@ -213,19 +212,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .sec-head .eyebrow{margin-bottom:16px}
 @media (max-width:860px){.sec-head{grid-template-columns:1fr}}
 
-/* problem */
-.prob-art{width:150px;margin:0 auto 24px 0}
-.prob-art-svg{display:block;width:100%;height:auto}
-.prob-art-svg .pa-page{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.4}
-.prob-art-svg .pa-ink{fill:var(--faint);opacity:.65}
-.prob-art-svg .pa-row{fill:none;stroke:var(--line-strong);stroke-width:1.4}
-.prob-art-svg .pa-glass{fill:none;stroke:var(--brass);stroke-width:1.6}
-.prob-stack,.prob-list{opacity:1}
-.prob-list{opacity:0}
-.dw-observe.in-view .prob-stack{animation:prob-cross-a 4s ease-in-out infinite}
-.dw-observe.in-view .prob-list{animation:prob-cross-b 4s ease-in-out infinite}
-@keyframes prob-cross-a{0%,42%{opacity:1}55%,100%{opacity:0}}
-@keyframes prob-cross-b{0%,42%{opacity:0}55%,92%{opacity:1}100%{opacity:0}}
+/* problem lead-in */
 .ledger{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);background:var(--surface)}
 .ledger > div{padding:18px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .ledger > div:last-child{border-right:0}
@@ -234,27 +221,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .ledger p{color:var(--muted);font-size:.95rem}
 @media (max-width:860px){.ledger{grid-template-columns:1fr}.ledger > div{border-right:0;border-bottom:1px solid var(--line)}.ledger > div:last-child{border-bottom:0}}
 
-/* process */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
-#platform{padding-block:clamp(26px,3.8vw,50px)}
-#who{padding-block:clamp(26px,3.8vw,50px)}
-.step{padding:10px 24px 10px 0;display:flex;flex-direction:column;gap:8px;position:relative}
-.step + .step{padding-left:24px;border-left:1px solid var(--line)}
-.step .step-ic{width:30px;height:30px;stroke:var(--well);fill:none;stroke-width:1.6;opacity:0;transform:translateY(10px);transition:opacity .6s ease,transform .6s ease}
-:root[data-theme="dark"] .step .step-ic{stroke:#9DC4B2}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .step .step-ic{stroke:#9DC4B2}}
-.step.in-view .step-ic{opacity:1;transform:translateY(0)}
-.step .num{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--brass-text);letter-spacing:.14em}
-.step .when{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--faint)}
-.step ul{margin:0;padding-left:18px;color:var(--muted);font-size:.95rem;display:flex;flex-direction:column;gap:6px}
-@media (max-width:860px){.steps{grid-template-columns:1fr}.step + .step{padding-left:0;border-left:0;border-top:1px solid var(--line)}}
-
-/* onboard */
-.onboard{margin-top:clamp(14px,2vw,22px);border:1px solid var(--line-strong);background:var(--surface);padding:14px 22px;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:24px;align-items:center;border-left:4px solid var(--brass)}
-.onboard .eyebrow{margin-bottom:10px}
-.plans-note{margin-top:14px;font-size:13px;line-height:1.5;color:var(--muted);text-align:center}
-.onboard p{color:var(--muted)}
-@media (max-width:860px){.onboard{grid-template-columns:1fr}}
+.plans-note{margin-top:10px;font-size:13px;line-height:1.5;color:var(--muted);text-align:center}
 /* plans */
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .plan{border:1px solid var(--line);background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:10px}
@@ -277,8 +244,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .plan ul.spec li::before{content:none}
 .plan ul.spec li span{color:var(--muted)}
 .plan ul.spec li b{font-weight:600;text-align:right}
-.annual{margin:12px 0 0;font-size:.92rem;color:var(--muted)}
-.annual b{color:var(--text)}
+.plans-note b{color:var(--text)}
 .plan .math{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--brass-text);border-top:1px solid var(--line);padding-top:8px;margin:0}
 .plan-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
 .badge-pop{padding:3px 10px;border-radius:999px;border:1px solid var(--brass-text);color:var(--brass-text);font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
@@ -292,11 +258,8 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .plan .math{min-height:5.2em}
 .trial-badge{white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
 .pill-soon{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;border:1px dashed var(--line-strong);color:var(--faint);background:transparent;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
-.rescue{margin-top:14px;border:1px solid var(--line);background:var(--surface);padding:16px 22px;display:flex;gap:24px;align-items:center;justify-content:space-between}
-.rescue h3{font-size:1.3rem;margin:6px 0}
-.rescue p{color:var(--muted);font-size:.92rem;margin:0}
 @media (max-width:1100px){.plans-4{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:860px){.plans,.plans-4{grid-template-columns:1fr}.rescue{flex-direction:column;align-items:flex-start}}
+@media (max-width:860px){.plans,.plans-4{grid-template-columns:1fr}}
 /* cost-of-missing-this: interactive calculator + tightened registration note */
 #cost{padding-block:clamp(24px,3vw,40px)}
 #cost .sec-head{margin-bottom:8px}
@@ -398,34 +361,6 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .person p{color:var(--muted);font-size:.95rem}
 @media (max-width:860px){.people{grid-template-columns:1fr}}
 
-/* principles — a compact band, not a full section; sits flush against the footer */
-#principles{padding-block:clamp(18px,2.5vw,26px) clamp(10px,1.5vw,16px);border-bottom:1px solid var(--line)}
-#principles + footer{border-top:0;padding-top:8px}
-#principles .sec-head{margin-bottom:clamp(10px,1.5vw,16px)}
-.principles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 24px}
-.principle{display:grid;grid-template-columns:28px 1fr;gap:10px}
-.principle svg{width:28px;height:28px;stroke:var(--well);fill:none;stroke-width:1.5}
-:root[data-theme="dark"] .principle svg{stroke:#9DC4B2}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .principle svg{stroke:#9DC4B2}}
-.principle h3{font-size:1.05rem}
-.principle p{color:var(--muted);font-size:.88rem;margin-top:4px}
-@media (max-width:980px){.principles{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:520px){.principles{grid-template-columns:1fr}}
-
-/* closing */
-.close{background:var(--well);color:#fff;border-top:0}
-.close .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:48px;align-items:center}
-.close h2{color:#fff}
-.close p{color:rgba(255,255,255,.78)}
-.close .btn-primary{background:var(--brass);color:#1B1408}
-.close .btn-primary:hover{background:#D8AE6E}
-.close .btn-ghost{border-color:rgba(255,255,255,.4);color:#fff}
-.close .btn-ghost:hover{background:rgba(255,255,255,.08)}
-.logo-card{background:#F4F7F4;padding:18px;display:grid;place-items:center}
-/* The artwork ships on a white ground; multiply drops it into the cream. */
-.logo-card img{max-width:210px;width:100%;height:auto;display:block;mix-blend-mode:multiply}
-@media (max-width:860px){.close .wrap{grid-template-columns:1fr}.logo-card{max-width:340px}}
-
 footer{padding-block:18px;font-size:.84rem;color:var(--faint)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
@@ -484,15 +419,15 @@ footer a{color:var(--muted);text-decoration:none}
    --mm-x/--mm-y (set by JS on pointer-fine devices) default to center,
    so touch/keyboard/reduced-motion still get a plain centered highlight
    on hover/focus, just without the pointer-follow motion. */
-.step,.person,.plan{position:relative;overflow:hidden}
-.step::before,.person::before,.plan::before{
+.person,.plan{position:relative;overflow:hidden}
+.person::before,.plan::before{
   content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
   background:radial-gradient(220px circle at var(--mm-x,50%) var(--mm-y,50%),color-mix(in srgb,var(--brass) 16%,transparent),transparent 70%);
   transition:opacity .3s ease;
 }
-.step:hover::before,.person:hover::before,.plan:hover::before,
-.step:focus-within::before,.person:focus-within::before,.plan:focus-within::before{opacity:1}
-.step.in-view:hover,.person.in-view:hover,.plan.in-view:hover{transform:translateY(-2px)}
+.person:hover::before,.plan:hover::before,
+.person:focus-within::before,.plan:focus-within::before{opacity:1}
+.person.in-view:hover,.plan.in-view:hover{transform:translateY(-2px)}
 
 /* 4) magnetic primary buttons (translate toward pointer, JS sets the
    --mm-tx/--mm-ty vars, ≤6px) + press scale (pure CSS, no JS needed);
@@ -510,19 +445,6 @@ footer a{color:var(--muted);text-decoration:none}
    the value climbs; JS also locks min-width for the duration (no shift). */
 .hero-facts .fact b,.cost-total b{font-variant-numeric:tabular-nums}
 
-/* 6) document-type marquee, under "Ingest everything". Pure CSS scroll;
-   paused by default and only runs once revealed + resumes/pauses with
-   scroll position via the existing .dw-observe/.in-view mechanism. */
-.mm-marquee{margin:18px 0 4px;overflow:hidden;padding:10px 0;
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  -webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);
-  mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);}
-.mm-marquee-track{display:flex;width:max-content;animation:none}
-.dw-observe.in-view .mm-marquee-track{animation:mm-marquee-scroll 34s linear infinite}
-.mm-marquee-track span{font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.05em;
-  color:var(--faint);white-space:nowrap;padding:0 22px;border-right:1px solid var(--line)}
-@keyframes mm-marquee-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-
 /* 7) cursor glow — dark theme only, confined to the hero copy column so
    it never sits over the Donovan well/canvas. JS-created element. */
 .mm-glow{position:absolute;width:280px;height:280px;left:0;top:0;border-radius:50%;
@@ -537,18 +459,6 @@ footer a{color:var(--muted);text-decoration:none}
   opacity:0;transform:translateX(0);
   transition:transform .35s cubic-bezier(.16,1,.3,1),width .35s cubic-bezier(.16,1,.3,1),opacity .3s ease}
 .mm-nav-ind.mm-show{opacity:1}
-
-/* 9) "Included with every plan" — ticks draw on (stroke-dashoffset) once
-   revealed, same trigger as the reveal system above. */
-.mm-ticks{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
-.mm-ticks li{display:flex;align-items:center;gap:8px;font-size:.86rem;color:var(--muted)}
-.mm-ticks svg{width:15px;height:15px;flex:none;stroke:var(--brass-text);fill:none;stroke-width:2.4;
-  stroke-linecap:round;stroke-linejoin:round}
-.mm-ticks path{stroke-dasharray:20;stroke-dashoffset:20;transition:stroke-dashoffset .5s cubic-bezier(.16,1,.3,1)}
-.mm-ticks.in-view path{stroke-dashoffset:0}
-.mm-ticks li:nth-child(2) path{transition-delay:.1s}
-.mm-ticks li:nth-child(3) path{transition-delay:.2s}
-.mm-ticks li:nth-child(4) path{transition-delay:.3s}
 
 /* ------------------------------------------------------------------ */
 /* Industries nav dropdown (Workstream C, 2026-09-21). Lives inside      */
@@ -595,111 +505,167 @@ footer a{color:var(--muted);text-decoration:none}
 /* JS-off fallback for engineer B's reveal-on-scroll additions above (and
    the pre-existing .cost-card, which uses the same JS-only mechanism):
    without JS these would otherwise stay invisible forever. */
-.sec-head,.person,.founder,.plan,.principle,.cost-card,.cost-calc,.mm-ticks{opacity:1!important;transform:none!important}
-.mm-ticks path{stroke-dashoffset:0!important}
+.sec-head,.person,.founder,.plan,.principle,.cost-card,.cost-calc{opacity:1!important;transform:none!important}
 </style></noscript>
 <style id="dw-tighten">
-/* ==== Vertical rhythm tightening (density pass) ==== */
-section{padding-block:clamp(24px,2.8vw,38px)}
-#platform,#who,#cost{padding-block:clamp(22px,2.6vw,34px)}
-h1{font-size:clamp(2rem,3.5vw,2.85rem)}
+/* ==== Density pass: fewer, tighter sections (r28) ==== */
+section{padding-block:clamp(16px,1.7vw,24px)}
+h1{font-size:clamp(1.8rem,3.5vw,2.85rem)}
 h2{font-size:clamp(1.6rem,2.7vw,2.1rem)}
 h3{font-size:1.25rem}
-.sec-head{grid-template-columns:minmax(0,1.05fr) minmax(0,1.15fr);gap:10px 32px;margin-bottom:clamp(12px,1.5vw,16px)}
+.sec-head{grid-template-columns:minmax(0,1.05fr) minmax(0,1.15fr);gap:8px 32px;margin-bottom:clamp(8px,1vw,12px)}
 .sec-head .eyebrow{margin-bottom:8px}
 .lede{font-size:1.05rem;line-height:1.5}
+@media (max-width:860px){.sec-head{grid-template-columns:1fr}}
+.anchor{display:block;height:0;overflow:hidden}
+section,.anchor,#who,#contact,#principles{scroll-margin-top:60px}
 
 /* hero */
-.hero .wrap{padding-block:clamp(20px,2.6vw,32px);gap:32px}
+.hero .wrap{padding-block:clamp(18px,2.2vw,28px);gap:32px}
 @media (min-width:861px){.hero .wrap{grid-template-columns:1.4fr .6fr}}
-.hero-copy{gap:14px}
-.hero-facts{gap:24px;padding-top:8px}
+.hero-copy{gap:12px}
+.hero .cta-row{align-items:center;gap:10px 16px}
+.hero .cta-row .hero-trial{flex:1 1 220px;min-width:0}
+.hero-facts{gap:24px;padding-top:6px}
+.fact b{font-size:1.25rem}
+footer{padding-block:12px}
 .well{max-width:300px}
-@media (max-width:860px){
-  .hero .wrap{gap:14px}
-  .well{max-width:170px}
-  .hero-copy{gap:12px}
-}
-
+@media (max-width:860px){.hero .wrap{gap:10px}.well{max-width:120px}.hero-copy{gap:10px}.sec-head{gap:6px}}
 @media (max-width:560px){.hero-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.fact b{font-size:1.1rem}.fact span{font-size:.62rem;letter-spacing:.02em}}
 
-@media (min-width:640px) and (max-width:980px){.founders{grid-template-columns:repeat(2,minmax(0,1fr))}.founder{grid-template-columns:120px minmax(0,1fr);gap:14px;padding:12px}.founder p{font-size:.9rem}}
-
-/* problem: art beside the heading, ledger as a tight 3-up */
-#problem .wrap{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:32px;align-items:start}
-#problem .sec-head{grid-column:1;grid-row:1}
-#problem .prob-art{grid-column:2;grid-row:1;width:112px;margin:0;align-self:center}
-#problem .ledger{grid-column:1/-1;grid-row:2;margin-top:14px}
-.ledger > div{padding:14px 16px;gap:6px}
-.ledger p{font-size:.92rem;line-height:1.5}
-@media (max-width:860px){
-  #problem .wrap{grid-template-columns:minmax(0,1fr);position:relative}
-  #problem .prob-art{position:absolute;right:clamp(16px,4vw,40px);top:0;width:64px;grid-column:1}
-  .ledger > div{padding:12px 14px;gap:4px}
+@media (max-width:560px){
+  .lede{font-size:1rem;line-height:1.45}
+  .hero .btn{padding:10px 14px}
+  .q{padding:6px 12px;font-size:.82rem}
+  .hiw-feat > span{font-size:.72rem;padding:1px 8px}
+  .plans-every{font-size:.82rem;gap:0 12px}
+  .onboard,.rescue{padding:10px 14px}
+  .onboard p,.rescue p{font-size:.86rem}
+  .person p,.principle p{font-size:.86rem}
 }
 
-/* founders */
-#team .sec-head{margin-bottom:12px}
-@media (min-width:981px){.founder{grid-template-columns:clamp(130px,14vw,190px) minmax(0,1fr)}}
-.founders{gap:16px}
-.founder{padding:14px}
-@media (max-width:560px){.founder{gap:12px}.founder-img{width:min(180px,52%)}}
+/* problem lead-in flows straight into how-it-works */
+#platform{padding-bottom:clamp(14px,1.6vw,20px)}
+#how-it-works{padding-top:clamp(16px,1.8vw,22px)}
+.ledger > div{padding:12px 16px;gap:4px}
+.ledger h3{font-size:1.2rem}
+.ledger p{font-size:.9rem;line-height:1.45}
+@media (max-width:860px){.ledger > div{display:block;padding:10px 14px}.ledger h3{font-size:1.1rem;display:inline}.ledger .where{display:inline}.ledger .where::after{content:" \00b7  "}.ledger p{margin-top:3px}}
 
-/* platform / steps */
-.step{padding-block:4px;gap:6px}
-.mm-marquee{margin:10px 0 6px;padding:8px 0}
-/* demo */
+/* how it works: the three captions also carry the platform detail */
+.hiw-steps{margin-top:10px}
+.hiw-feat{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.hiw-feat > span{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid var(--line);border-radius:999px;font-size:.76rem;line-height:1.4;color:var(--muted)}
+.hiw-feat .pill-soon{padding:0 6px;font-size:.56rem}
+.hiw-types{margin:10px 0 0;font-family:"IBM Plex Mono",monospace;font-size:.74rem;line-height:1.6;letter-spacing:.03em;color:var(--faint)}
+
+/* demo + who it's for */
 .demo-wrap{gap:12px}
 .demo{min-height:0}
 .demo-side{padding:12px;gap:6px}
-.q{padding:9px 12px}
+.q{padding:9px 12px;min-height:44px;box-sizing:border-box;display:flex;align-items:center}
 .demo-main{padding:12px 14px;gap:8px}
-.kv > div{padding:7px 10px}
+.answer{font-size:1.3rem;line-height:1.3}
+.kv{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.kv > div{padding:6px 10px}
+.sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px}
 .src{padding:5px 10px}
-
-/* who */
-.person{padding:12px 14px;gap:6px}
-.person blockquote{font-size:1.2rem}
+.who{margin-top:clamp(12px,1.4vw,16px)}
+.who-head,.pb-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 20px;margin-bottom:10px}
+.who-head h3,.pb-head h3{font-size:1.25rem}
+.who-head p,.pb-head p{color:var(--muted);font-size:.95rem;max-width:72ch}
+.people{gap:14px}
+.person{padding:12px 14px;gap:5px}
+.person blockquote{font-size:1.1rem}
+.person p{font-size:.9rem;line-height:1.5}
+@media (max-width:860px){.people{gap:10px}.person{padding:10px 12px}.person blockquote{font-size:1.02rem}.kv{grid-template-columns:repeat(2,minmax(0,1fr))}.sources{grid-template-columns:1fr}.answer{font-size:1.2rem}}
 
 /* plans */
+.plans-every{gap:2px 16px;margin:0 0 12px;padding:8px 14px;font-size:.88rem}
 .plans-4{gap:14px}
 .plan{padding:14px;gap:8px}
 .plan ul{gap:4px;padding-top:8px}
-.onboard{margin-top:12px;padding:12px 20px;gap:10px 24px}
-.onboard .eyebrow{margin-bottom:6px}
-.onboard .mm-ticks{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;gap:4px 22px;margin:0}
-.annual{margin:8px 0 0}
-.rescue{margin-top:10px;padding:12px 20px}
-.rescue h3{margin:4px 0}
-@media (max-width:860px){.rescue{gap:12px}}
-
+.plan .grp{padding-top:6px}
+.plan .grp:not(.plus) h4{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.plan .grp:not(.plus)+.grp:not(.plus){border-top:0;padding-top:0;margin-top:-4px}
+.plan .math{min-height:0}
+.plan-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 12px}
+.plan-top{min-height:26px}
+.badge-pop,.trial-badge{line-height:1.5}
+.plan ul.spec li{line-height:1.35}
 @media (min-width:1101px){#plans .sec-head{grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr)}}
+.plans-extra{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px;margin-top:10px}
+.onboard,.rescue{border:1px solid var(--line);background:var(--surface);padding:12px 18px;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.rescue{flex-direction:row;align-items:center;justify-content:space-between;gap:14px 24px}
+.rescue-cta{flex-direction:column;align-items:flex-start;flex:none;max-width:250px}
+.onboard{border-color:var(--line-strong);border-left:4px solid var(--brass)}
+.onboard h3,.rescue h3{font-size:1.15rem;margin:2px 0}
+.onboard p,.rescue p{color:var(--muted);font-size:.9rem;margin:0}
+.rescue-cta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
+.rescue-cta p{font-size:.82rem}
+.rescue-cta a:not(.btn){color:var(--text);text-decoration:underline}
+@media (max-width:860px){.plans-extra{grid-template-columns:1fr;gap:10px}.plans-note{text-align:left}.rescue{flex-direction:column;align-items:flex-start}.rescue-cta{max-width:none;flex-direction:row}}
 
-/* cost calculator: three cards across, summary as a side rail */
+/* cost calculator: three across, summary as a bar; accordions on phones */
 #cost .sec-head{margin-bottom:10px}
-.cost-calc{gap:14px;margin-top:0}
-.cost-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:stretch}
+.cost-calc{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:0}
+.cost-lines{display:contents}
 .cost-lines > .cost-line:first-child{grid-row:1 / span 2}
-.cost-summary{position:sticky;top:84px}
-.cost-line-total{margin-top:auto}
-.cost-line{padding:12px 14px;gap:8px}
-.cost-summary{padding:16px 18px;gap:10px}
-.cost-card{margin-top:12px;max-width:none;padding:12px 16px}
-.cost-note{margin-top:8px;max-width:none}
-@media (max-width:1100px){
-  .cost-calc{grid-template-columns:1fr}
-  .sec-head{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}
-  .cost-lines{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .cost-summary{position:static}
+.cost-line{padding:0;gap:0}
+.cost-line > summary{list-style:none;display:flex;flex-direction:column;gap:2px;padding:12px 14px 6px}
+.cost-line > summary::-webkit-details-marker{display:none}
+.cost-line .sub{display:block;margin:0}
+.cost-line .cost-line-total{display:block;border:0;padding:6px 0 0;margin:0}
+.cost-body{display:flex;flex-direction:column;gap:6px;padding:4px 14px 10px}
+.cost-field{gap:3px}
+.cost-summary{position:static;grid-column:2 / -1;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"t c" "r c";align-items:center;gap:6px 24px;padding:10px 16px}
+.cost-summary > div{grid-area:t}
+.cost-compare{grid-area:c;border-top:0;padding-top:0}
+.cost-reset{grid-area:r}
+.cost-foot{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start;margin-top:12px}
+.cost-card{margin-top:0;max-width:none;padding:12px 16px}
+.cost-note{margin-top:0;max-width:none}
+@media (max-width:900px){
+  .cost-calc{grid-template-columns:1fr;gap:8px}
+  .cost-lines{display:grid;grid-template-columns:1fr;gap:8px}
+  .cost-lines > .cost-line:first-child{grid-row:auto}
+  .cost-summary{grid-column:auto;grid-template-areas:none}
+  .cost-summary > div,.cost-compare,.cost-reset{grid-area:auto}
+  .brand{min-height:44px}
+  .cost-row input[type=number]{min-height:44px;width:5em}
+  .cost-row input[type=range]{height:32px}
+  .cost-row input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10px}
+  .cost-row input[type=range]::-moz-range-thumb{width:24px;height:24px}
+  .cost-reset{min-height:44px;padding-inline:14px}
+  .cost-line > summary{cursor:pointer;position:relative;min-height:44px;padding-right:40px}
+  .cost-line > summary::after{content:"";position:absolute;right:16px;top:16px;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg)}
+  .cost-line[open] > summary::after{top:20px;transform:rotate(-135deg)}
+  .cost-summary{grid-template-columns:1fr}
+  .cost-foot{grid-template-columns:1fr;gap:10px}
 }
-@media (max-width:860px){.sec-head{grid-template-columns:1fr}}
-@media (max-width:760px){.cost-lines{grid-template-columns:1fr;gap:10px}.cost-lines > .cost-line:first-child{grid-row:auto}}
 
-/* principles + close */
-.principles{gap:10px 24px}
-.close .wrap{gap:32px}
-.logo-card{padding:12px}
+/* founders + rules we don't bend + contact: one closing section */
+#principles{margin-top:clamp(12px,1.4vw,16px);padding-top:clamp(10px,1.2vw,14px);border-top:1px solid var(--line)}
+.principles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 28px}
+.principle{display:grid;grid-template-columns:24px 1fr;gap:10px}
+.principle svg{width:24px;height:24px;stroke:var(--well);fill:none;stroke-width:1.5}
+:root[data-theme="dark"] .principle svg{stroke:#9DC4B2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .principle svg{stroke:#9DC4B2}}
+.principle h4{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line-height:1.25;margin:0}
+.principle p{color:var(--muted);font-size:.88rem;line-height:1.45;margin-top:2px}
+@media (max-width:700px){.principles{grid-template-columns:1fr;gap:8px}.principle{grid-template-columns:1fr}.principle svg{display:none}.principle h4,.principle p{display:inline;margin:0}.principle h4{font-size:1rem}.principle h4::after{content:" "}}
+.cta-card{margin-top:clamp(12px,1.4vw,16px);background:var(--well);color:#fff;padding:clamp(14px,1.8vw,20px);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 32px;align-items:center}
+.cta-card .eyebrow{color:rgba(255,255,255,.7);margin-bottom:6px}
+.cta-card h3{color:#fff;font-size:clamp(1.4rem,2.4vw,1.8rem)}
+.cta-card p{color:rgba(255,255,255,.8);margin:6px 0 0;max-width:62ch}
+.cta-side{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.cta-card .btn-primary{background:var(--brass);color:#1B1408}
+.cta-card .btn-primary:hover{background:#D8AE6E}
+.logo-card{background:#F4F7F4;padding:8px;display:grid;place-items:center}
+.logo-card img{width:96px;max-width:100%;height:auto;display:block;mix-blend-mode:multiply}
+@media (max-width:700px){.cta-card{grid-template-columns:1fr}.logo-card{display:none}.cta-card p{font-size:.95rem}}
 </style>
+<link rel="stylesheet" href="/support/widget.css">
 </head>
 <body>
 
@@ -743,10 +709,8 @@ h3{font-size:1.25rem}
       <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
     </a>
     <div class="navlinks" id="navLinks">
-      <a href="#problem">The problem</a>
-      <a href="#platform">Platform</a>
+      <a href="#how-it-works">How it works</a>
       <a href="#demo">What it feels like</a>
-      <a href="#who">Who it's for</a>
       <!-- Industries nav dropdown (Workstream C, 2026-09-21) — see the
            labeled CSS block above and the standalone script near the end
            of </body>. Keyboard: Enter/Space/↓ opens and focuses the first
@@ -766,6 +730,7 @@ h3{font-size:1.25rem}
         </div>
       </div>
       <a href="#plans">Pricing</a>
+      <a href="#team">Founders</a>
     </div>
     <div class="navcta">
       <a class="btn btn-ghost" href="/app/">Log in</a>
@@ -805,8 +770,8 @@ h3{font-size:1.25rem}
       <div class="cta-row">
         <a class="btn btn-primary" href="#plans">See pricing</a>
         <a class="btn btn-ghost" href="#demo">See what it feels like</a>
+        <p class="hero-trial">30-day free trial on Solo, card required, cancel anytime.</p>
       </div>
-      <p class="hero-trial">30-day free trial on Solo, card required, cancel anytime.</p>
       <div class="hero-facts" aria-label="What to expect">
         <div class="fact"><b>Seconds</b><span>Question to answer</span></div>
         <div class="fact"><b>Minutes</b><span>Upload to searchable</span></div>
@@ -818,32 +783,15 @@ h3{font-size:1.25rem}
   </div>
 </header>
 
-<section id="problem">
+<section id="platform">
+  <span class="anchor" id="problem"></span>
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
       <div>
         <div class="eyebrow">The problem</div>
         <h2>The knowledge exists. It's just in the wrong place.</h2>
       </div>
-      <p class="lede">A mid-sized shop closes 3,000 jobs a year. Each one leaves a trail — but the trail is split across a filing cabinet, a dispatcher's inbox, a shared drive, and a tech's phone.</p>
-    </div>
-    <div class="prob-art dw-observe" aria-hidden="true">
-      <svg class="prob-art-svg" viewBox="0 0 150 78">
-        <g class="prob-stack">
-          <rect class="pa-page" x="34" y="20" width="60" height="46" rx="2" transform="rotate(-4 64 43)"/>
-          <rect class="pa-page" x="30" y="14" width="60" height="46" rx="2" transform="rotate(3 60 37)"/>
-          <rect class="pa-page" x="32" y="10" width="60" height="46" rx="2"/>
-          <rect class="pa-ink" x="40" y="20" width="34" height="2"/>
-          <rect class="pa-ink" x="40" y="27" width="40" height="2"/>
-          <rect class="pa-ink" x="40" y="34" width="22" height="2"/>
-        </g>
-        <g class="prob-list">
-          <rect class="pa-page" x="30" y="10" width="70" height="50" rx="2"/>
-          <path class="pa-row" d="M38 22h54M38 32h54M38 42h32"/>
-          <circle class="pa-glass" cx="112" cy="52" r="8"/>
-          <path class="pa-glass" d="M118 58l7 7"/>
-        </g>
-      </svg>
+      <p class="lede">A mid-sized shop closes 3,000 jobs a year. Each one leaves a trail, but the trail is split across a filing cabinet, a dispatcher's inbox, a shared drive, and a tech's phone.</p>
     </div>
     <div class="ledger">
       <div>
@@ -854,99 +802,12 @@ h3{font-size:1.25rem}
       <div>
         <div class="where">In the inbox</div>
         <h3>The PDF nobody renamed</h3>
-        <p>Distributor invoices, startup sheets, equipment submittals — every one attached to an email titled "Re: Re: Fwd: Tuesday." Findable only by the person who received it.</p>
+        <p>Distributor invoices, startup sheets, equipment submittals, each attached to an email titled "Re: Re: Fwd: Tuesday." Findable only by the person who received it.</p>
       </div>
       <div>
         <div class="where">In the truck</div>
         <h3>The photo on a phone</h3>
         <p>The clearest record of what was installed is a nameplate photo taken by a tech who has since moved to another company. It was never uploaded anywhere.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="team">
-  <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">The Founders</div>
-        <h2>Two brothers, and a phone that gets answered.</h2>
-      </div>
-      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
-    </div>
-
-    <div class="founders">
-      <div class="founder dw-observe dw-once">
-        <img class="founder-img" src="/founders/sterling.jpg" srcset="/founders/sterling-480.webp 480w, /founders/sterling-720.webp 720w, /founders/sterling-1086.webp 1086w" sizes="(max-width:560px) 62vw, 300px" alt="Sterling Chapman, co-founder of DeepWell" width="720" height="960" loading="lazy" decoding="async">
-        <div>
-          <h3>Sterling Chapman</h3>
-          <div class="role">Co-founder</div>
-          <p>Prior Army service, and the engineer behind DeepWell — systems integration, APIs, databases and network support. He's the person you'll work with from your first sample box through go-live.</p>
-        </div>
-      </div>
-
-      <div class="founder dw-observe dw-once">
-        <img class="founder-img" src="/founders/hilton.jpg" srcset="/founders/hilton-480.webp 480w, /founders/hilton-720.webp 720w, /founders/hilton-1086.webp 1086w" sizes="(max-width:560px) 62vw, 300px" alt="Hilton Chapman, co-founder of DeepWell" width="720" height="960" loading="lazy" decoding="async">
-        <div>
-          <h3>Hilton Chapman</h3>
-          <div class="role">Co-founder</div>
-          <p>Retired Air Force veteran and the voice of DeepWell. Leads customer relationships and marketing, and sets the vision for where the platform goes next.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="platform">
-  <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">The platform</div>
-        <h2>Ingest everything. Link what belongs together. Ask anything.</h2>
-      </div>
-      <p class="lede">DeepWell is one hosted system that does three things to your records, continuously — from the first box of paper to this morning's job sheet. It runs under your company's name and we keep it running.</p>
-    </div>
-    <div class="mm-marquee dw-observe" aria-hidden="true">
-      <div class="mm-marquee-track">
-        <span>Invoices</span><span>Warranty cards</span><span>Nameplate photos</span><span>Startup sheets</span><span>Permits</span><span>Dispatch notes</span><span>Work orders</span><span>Service tickets</span>
-        <span>Invoices</span><span>Warranty cards</span><span>Nameplate photos</span><span>Startup sheets</span><span>Permits</span><span>Dispatch notes</span><span>Work orders</span><span>Service tickets</span>
-      </div>
-    </div>
-    <div class="steps">
-      <div class="step dw-observe dw-once">
-        <svg class="step-ic" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 16h7l3 5h4l3-5h7"/><path d="M6 16V8a2 2 0 012-2h16a2 2 0 012 2v8"/></svg>
-        <div class="num">INGEST</div>
-        <h3>Everything goes in as-is</h3>
-        <div class="when">Paper · PDF · spreadsheets · photos · email</div>
-        <p>Scan the cabinet, forward the inbox, drop the shared drive, upload from a phone in the field. Handwriting, carbon copies and nameplate photos included. Nothing has to be renamed or filed first.</p>
-        <ul>
-          <li>Drag-and-drop upload</li>
-          <li>Email intake &amp; folder sync <span class="pill-soon">Coming soon</span></li>
-          <li>Reads handwritten and low-quality scans</li>
-          <li>Searchable within minutes of upload</li>
-        </ul>
-      </div>
-      <div class="step dw-observe dw-once">
-        <svg class="step-ic" viewBox="0 0 32 32" aria-hidden="true"><path d="M13 19l6-6"/><rect x="3" y="14" width="12" height="12" rx="5" transform="rotate(-45 9 20)"/><rect x="17" y="6" width="12" height="12" rx="5" transform="rotate(-45 23 12)"/></svg>
-        <div class="num">LINK</div>
-        <h3>Facts get connected</h3>
-        <div class="when">Equipment ↔ site ↔ customer ↔ people ↔ money</div>
-        <p>Each document is read for the facts that matter — serials, addresses, dates, names, amounts — and stitched to every other record about the same thing. One serial number pulls up seven years of history from a dozen files.</p>
-        <ul>
-          <li>Uncertain reads are flagged for a quick human check</li>
-          <li>Your corrections make the system sharper</li>
-        </ul>
-      </div>
-      <div class="step dw-observe dw-once">
-        <svg class="step-ic" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 8h24v14H14l-6 6v-6H4z"/><path d="M12 15h8M12 19h5"/></svg>
-        <div class="num">ASK</div>
-        <h3>Answers, not search results</h3>
-        <div class="when">Desk · phone · truck</div>
-        <p>Type a question the way you'd ask a coworker. Get the answer, with the source attached. Dashboards surface what's expiring, what's due, and what's slipping.</p>
-        <ul>
-          <li>Warranty &amp; maintenance dashboards</li>
-          <li>CSV export for dispatch &amp; accounting</li>
-        </ul>
       </div>
     </div>
   </div>
@@ -1119,7 +980,7 @@ h3{font-size:1.25rem}
         <div class="eyebrow">How it works</div>
         <h2>Every record goes two places at once.</h2>
       </div>
-      <p class="lede">One upload, two destinations.</p>
+      <p class="lede">One hosted system that ingests everything, links what belongs together, and answers anything you ask. It runs under your company's name and we keep it running.</p>
     </div>
 
     <div class="hiw" id="hiw">
@@ -1178,19 +1039,23 @@ h3{font-size:1.25rem}
         <li>
           <span class="hiw-n">01</span>
           <h3>A record arrives</h3>
-          <p>Scan it, snap a nameplate, or drop the file in. Any format, from anywhere.</p>
+          <p>Paper, PDF, spreadsheet, photo or email: scan the cabinet, forward the inbox, drop the shared drive, or snap a nameplate in the field. Nothing has to be renamed or filed first.</p>
+          <div class="hiw-feat" role="list"><span role="listitem">Drag-and-drop upload</span><span role="listitem">Email intake &amp; folder sync <span class="pill-soon">Coming soon</span></span><span role="listitem">Reads handwriting, carbon copies and low-quality scans</span><span role="listitem">Searchable within minutes of upload</span></div>
         </li>
         <li>
           <span class="hiw-n">02</span>
           <h3>It goes two places at once</h3>
-          <p>The page is stored under a key scoped to your account. What it <i>says</i> is recorded separately, and linked to the customer and the equipment.</p>
+          <p>The page is stored under a key scoped to your account. What it <i>says</i> (serials, addresses, dates, names, amounts) is recorded separately and linked equipment &harr; site &harr; customer &harr; people &harr; money. One serial number pulls up seven years of history from a dozen files.</p>
+          <div class="hiw-feat" role="list"><span role="listitem">Uncertain reads are flagged for a quick human check</span><span role="listitem">Your corrections make the system sharper</span></div>
         </li>
         <li>
           <span class="hiw-n">03</span>
           <h3>Later, someone asks</h3>
-          <p>Donovan answers from the record, and the key leads back to the original page, attached to the answer as its source.</p>
+          <p>Answers, not search results: type a question the way you'd ask a coworker, at the desk, on the phone or in the truck. Donovan answers from the record, and the key leads back to the original page, attached as its source.</p>
+          <div class="hiw-feat" role="list"><span role="listitem">Warranty &amp; maintenance dashboards: what's expiring, due, slipping</span><span role="listitem">CSV export for dispatch &amp; accounting</span></div>
         </li>
       </ol>
+      <p class="hiw-types">Works on invoices &middot; warranty cards &middot; nameplate photos &middot; startup sheets &middot; permits &middot; dispatch notes &middot; work orders &middot; service tickets</p>
     </div>
 
   </div>
@@ -1207,7 +1072,7 @@ h3{font-size:1.25rem}
   var hiw=root.querySelector('.hiw'),stage=root.querySelector('.hiw-stage'),world=root.querySelector('.hiw-world');
   if(!hiw||!stage||!world) return;
 
-  var T=12,STATIC_T=10.4,Q='smith warranty',R=20;
+  var T=12,SPEED=12/18,STATIC_T=10.4,Q='smith warranty',R=20;
   var mq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
 
   /* ---------- easing + keyframes ---------- */
@@ -1555,7 +1420,7 @@ h3{font-size:1.25rem}
     return function(now){
       if(my!==token) return;
       var dt=Math.min((now-last)/1000,.08);last=now;
-      tLoop+=dt;
+      tLoop+=dt*SPEED; /* 12s timeline played over 18s */
       if(tLoop>=T){tLoop-=T;loops++;stage.setAttribute('data-loops',String(loops))}
       render(tLoop);
       rid=requestAnimationFrame(frame(my));
@@ -1612,7 +1477,7 @@ h3{font-size:1.25rem}
         <div class="eyebrow">What it feels like</div>
         <h2>Ask Donovan.</h2>
       </div>
-      <p class="lede">Every answer shows its source. Ask an address, a serial, a name, or a date — the way you'd ask a coworker who never forgets. Try a few of the questions a dispatcher asks on a normal Tuesday.</p>
+      <p class="lede">Every answer shows its source. Ask an address, a serial, a name, or a date, the way you'd ask a coworker who never forgets.</p>
     </div>
     <div class="demo-wrap">
     <form class="ask" id="ask" role="search">
@@ -1632,18 +1497,11 @@ h3{font-size:1.25rem}
       </div>
     </div>
     </div>
-  </div>
-</section>
-
-<section id="who">
-  <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">Who it's for</div>
-        <h2>One system. Three people who use it differently.</h2>
+    <div class="who" id="who">
+      <div class="who-head">
+        <h3>One system. Three views.</h3>
+        <p>The same records, seen from the desk, the truck, and the owner's office. Everybody gets the view that matches their day.</p>
       </div>
-      <p class="lede">The same records, seen from the desk, the truck, and the owner's office. Nobody gets a dumbed-down version; everybody gets the view that matches their day.</p>
-    </div>
     <div class="people">
       <div class="person dw-observe dw-once">
         <div class="role">Office manager · dispatch</div>
@@ -1661,6 +1519,7 @@ h3{font-size:1.25rem}
         <p>See expiring coverage across every unit installed, and where maintenance agreements are due — plus, <span class="pill-soon">Coming soon</span>, which techs generate callbacks.</p>
       </div>
     </div>
+    </div>
   </div>
 </section>
 
@@ -1671,7 +1530,7 @@ h3{font-size:1.25rem}
         <div class="eyebrow">Pricing</div>
         <h2>Pick your plan by team size.</h2>
       </div>
-      <p class="lede">Every plan includes unlimited Donovan &mdash; answers from your own records, always with sources &mdash; a monthly document-scan allowance, white-glove setup and self-serve export of your data. Plans differ by logins, storage, scan volume and support. 30-day free trial on Solo &mdash; card required, you won't be charged until the trial ends.</p>
+      <p class="lede">Plans differ by logins, storage, monthly document-scan volume and support. 30-day free trial on Solo &mdash; card required, you won't be charged until the trial ends.</p>
     </div>
     <div class="plans-every" aria-label="Included with every plan">
       <span class="pe-label">Every plan includes</span>
@@ -1683,8 +1542,8 @@ h3{font-size:1.25rem}
     <div class="plans plans-4">
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Solo</div><span class="trial-badge">30-day free trial</span></div>
-        <h3>$99<span class="per">/mo</span></h3>
-        <p class="for">Owner-operator</p>
+        <div class="plan-price"><h3>$99<span class="per">/mo</span></h3><p class="for">Owner-operator</p></div>
+
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
             <li><span>Logins</span><b>up to 2</b></li>
@@ -1711,8 +1570,8 @@ h3{font-size:1.25rem}
       </div>
       <div class="plan featured dw-observe dw-once">
         <div class="plan-top"><div class="tier">Shop</div><span class="badge-pop">Most popular</span></div>
-        <h3>$199<span class="per">/mo</span></h3>
-        <p class="for">Small shop</p>
+        <div class="plan-price"><h3>$199<span class="per">/mo</span></h3><p class="for">Small shop</p></div>
+
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
             <li><span>Logins</span><b>up to 5</b></li>
@@ -1738,8 +1597,8 @@ h3{font-size:1.25rem}
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Crew</div></div>
-        <h3>$399<span class="per">/mo</span></h3>
-        <p class="for">Growing crew</p>
+        <div class="plan-price"><h3>$399<span class="per">/mo</span></h3><p class="for">Growing crew</p></div>
+
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
             <li><span>Logins</span><b>up to 10</b></li>
@@ -1768,8 +1627,8 @@ h3{font-size:1.25rem}
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Fleet</div></div>
-        <h3>$899<span class="per">+/mo</span></h3>
-        <p class="for">Multi-crew teams</p>
+        <div class="plan-price"><h3>$899<span class="per">+/mo</span></h3><p class="for">Multi-crew teams</p></div>
+
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
             <li><span>Logins</span><b>11+</b></li>
@@ -1797,30 +1656,23 @@ h3{font-size:1.25rem}
         <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
-    <p class="plans-note">The owner account doesn't count toward logins. Donovan is unlimited, subject to a fair-use safety limit ordinary use never reaches. Dashed <span class="pill-soon">Coming soon</span> tags mark features still being built.</p>
-    <div class="onboard">
-      <div>
+    <p class="plans-note"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price. The owner account doesn't count toward logins. Donovan is unlimited, subject to a fair-use safety limit ordinary use never reaches. Dashed <span class="pill-soon">Coming soon</span> tags mark features still being built.</p>
+    <div class="plans-extra">
+      <div class="onboard">
         <div class="eyebrow">Included with every plan</div>
         <h3>White-glove setup by the DeepWell Technology team</h3>
+        <p>Our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon.</p>
       </div>
-      <p>Our team inventories your records, runs the first bulk ingest, checks the links against the questions your office actually asks, and trains your crew in an afternoon.</p>
-      <ul class="mm-ticks">
-        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Inventories your records</li>
-        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Runs the first bulk ingest</li>
-        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Checks links against real questions</li>
-        <li><svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9"/></svg>Trains your crew in an afternoon</li>
-      </ul>
-    </div>
-    <p class="annual"><b>Save with annual prepay:</b> all tiers get one month free when you pay annually. Lock in your price.</p>
-    <div class="rescue">
-      <div>
-        <div class="eyebrow">Records Rescue</div>
-        <h3>Start with one box.</h3>
-        <p>Send one sample folder or box of old invoices, tickets, or warranties — we'll digitize it free so you can see the result before committing to the rest.</p>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;flex:none">
-        <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box — free demo</a>
-        <p style="margin:0;font-size:.82rem;color:var(--muted)">Full service: <strong>$0.12/page</strong> · $500 min — or <a href="/app/?screen=billing" style="color:var(--text);text-decoration:underline">buy it under Billing</a></p>
+      <div class="rescue">
+        <div>
+          <div class="eyebrow">Records Rescue</div>
+          <h3>See it on your own records, free.</h3>
+          <p>Send one sample folder or box of old invoices, tickets, or warranties and we'll digitize it free, so you can see the result before committing to the rest.</p>
+        </div>
+        <div class="rescue-cta">
+          <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box — free demo</a>
+          <p>Full service: <strong>$0.12/page</strong> · $500 min — or <a href="/app/?screen=billing">buy it under Billing</a></p>
+        </div>
       </div>
     </div>
   </div>
@@ -1833,26 +1685,24 @@ h3{font-size:1.25rem}
         <div class="eyebrow">The cost of missing this</div>
         <h2>What a missed follow-up costs a shop like yours, per year</h2>
       </div>
-      <p class="lede">Move the sliders to your own numbers — install volume, callback rate, hours lost hunting for paperwork — and watch the total change live. Every figure below is an adjustable starting example, not a claim about your shop.</p>
+      <p class="lede">Move the sliders to your own numbers and watch the total change live. Every figure below is an adjustable starting example, not a claim about your shop.</p>
     </div>
 
     <div class="cost-calc dw-observe dw-once" id="cost-calc">
       <div class="cost-lines">
 
-        <div class="cost-line">
-          <div>
-            <h3>Missed warranty &amp; service-agreement follow-ups</h3>
-            <p class="sub">Units that hit end-of-warranty with nobody reaching out to sell the next step.</p>
-          </div>
+        <details class="cost-line" open>
+          <summary><h3>Missed warranty &amp; service-agreement follow-ups</h3><span class="sub">Units that hit end-of-warranty with nobody reaching out to sell the next step.</span><span class="cost-line-total">≈ <b id="cc-out-warranty">$1,500</b>/yr left unclaimed</span></summary>
+          <div class="cost-body">
           <div class="cost-field">
-            <div class="fl"><label for="cc-units">Units installed / yr</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-units">Units installed / yr</label></div>
             <div class="cost-row">
               <input type="range" id="cc-units" min="10" max="1500" step="10" value="300">
               <input type="number" id="cc-units-n" min="0" max="20000" step="1" value="300" aria-label="Units installed per year, exact number">
             </div>
           </div>
           <div class="cost-field">
-            <div class="fl"><label for="cc-share">Share reaching end-of-parts-warranty this yr</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-share">Share reaching end-of-parts-warranty this yr</label></div>
             <div class="cost-row">
               <input type="range" id="cc-share" min="0" max="100" step="1" value="10">
               <input type="number" id="cc-share-n" min="0" max="100" step="1" value="10" aria-label="Share reaching end of parts warranty this year, percent">
@@ -1860,7 +1710,7 @@ h3{font-size:1.25rem}
             </div>
           </div>
           <div class="cost-field">
-            <div class="fl"><label for="cc-ticket">Typical extended-warranty / service ticket</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-ticket">Typical extended-warranty / service ticket</label></div>
             <div class="cost-row">
               <span class="unit">$</span>
               <input type="range" id="cc-ticket" min="0" max="1500" step="10" value="250">
@@ -1868,61 +1718,57 @@ h3{font-size:1.25rem}
             </div>
           </div>
           <div class="cost-field">
-            <div class="fl"><label for="cc-close">Close rate, offered at the right moment</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-close">Close rate, offered at the right moment</label></div>
             <div class="cost-row">
               <input type="range" id="cc-close" min="0" max="100" step="1" value="20">
               <input type="number" id="cc-close-n" min="0" max="100" step="1" value="20" aria-label="Close rate, percent">
               <span class="unit">%</span>
             </div>
           </div>
-          <p class="cost-line-total">≈ <b id="cc-out-warranty">$1,500</b>/yr left unclaimed</p>
-        </div>
-
-        <div class="cost-line">
-          <div>
-            <h3>Callbacks avoided</h3>
-            <p class="sub">A callback headed off by the right answer before the truck rolls twice.</p>
           </div>
+        </details>
+
+        <details class="cost-line" open>
+          <summary><h3>Callbacks avoided</h3><span class="sub">A callback headed off by the right answer before the truck rolls twice.</span><span class="cost-line-total">≈ <b id="cc-out-callbacks">$16,200</b>/yr in avoidable callbacks</span></summary>
+          <div class="cost-body">
           <div class="cost-field">
-            <div class="fl"><label for="cc-cb-count">Callbacks / month</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-cb-count">Callbacks / month</label></div>
             <div class="cost-row">
               <input type="range" id="cc-cb-count" min="0" max="30" step="1" value="3">
               <input type="number" id="cc-cb-count-n" min="0" max="500" step="1" value="3" aria-label="Callbacks per month">
             </div>
           </div>
           <div class="cost-field">
-            <div class="fl"><label for="cc-cb-cost">Cost per callback</label><i>illustrative · site uses $300–600</i></div>
+            <div class="fl"><label for="cc-cb-cost">Cost per callback</label><i>site uses $300–600</i></div>
             <div class="cost-row">
               <span class="unit">$</span>
               <input type="range" id="cc-cb-cost" min="100" max="1000" step="10" value="450">
               <input type="number" id="cc-cb-cost-n" min="0" max="20000" step="10" value="450" aria-label="Cost per callback, dollars">
             </div>
           </div>
-          <p class="cost-line-total">≈ <b id="cc-out-callbacks">$16,200</b>/yr in avoidable callbacks</p>
-        </div>
-
-        <div class="cost-line">
-          <div>
-            <h3>Time spent hunting for paperwork</h3>
-            <p class="sub">Techs and office staff paging through boxes and drives instead of asking Donovan.</p>
           </div>
+        </details>
+
+        <details class="cost-line" open>
+          <summary><h3>Time spent hunting for paperwork</h3><span class="sub">Techs and office staff paging through boxes and drives instead of asking Donovan.</span><span class="cost-line-total">≈ <b id="cc-out-time">$9,100</b>/yr spent looking for documents</span></summary>
+          <div class="cost-body">
           <div class="cost-field">
-            <div class="fl"><label for="cc-hours">Hours / week hunting for records</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-hours">Hours / week hunting for records</label></div>
             <div class="cost-row">
               <input type="range" id="cc-hours" min="0" max="40" step="1" value="5">
               <input type="number" id="cc-hours-n" min="0" max="200" step="1" value="5" aria-label="Hours per week hunting for records">
             </div>
           </div>
           <div class="cost-field">
-            <div class="fl"><label for="cc-rate">Loaded hourly rate</label><i>illustrative</i></div>
+            <div class="fl"><label for="cc-rate">Loaded hourly rate</label></div>
             <div class="cost-row">
               <span class="unit">$</span>
               <input type="range" id="cc-rate" min="10" max="150" step="1" value="35">
               <input type="number" id="cc-rate-n" min="0" max="1000" step="1" value="35" aria-label="Loaded hourly rate, dollars">
             </div>
           </div>
-          <p class="cost-line-total">≈ <b id="cc-out-time">$9,100</b>/yr spent looking for documents</p>
-        </div>
+          </div>
+        </details>
 
       </div>
 
@@ -1936,56 +1782,83 @@ h3{font-size:1.25rem}
       </div>
     </div>
 
+    <div class="cost-foot">
     <div class="cost-card dw-observe dw-once">
       <div class="where">A claim denied because nobody registered it</div>
       <p>Most manufacturers cut the parts warranty in half if a unit isn't registered within 60–90 days of install — Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane drop from 10 yr registered to 5 yr unregistered <span class="mono" style="font-size:.74rem;color:var(--faint)">(based on published manufacturer registration windows)</span>. Miss it, and a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
     </div>
 
     <p class="cost-note">Your numbers will differ. DeepWell watches every expiry — bell alert plus daily digest — then drafts the customer's extended-warranty email for an admin to approve and send, or run fully automatic. Both ship today.</p>
+    </div>
   </div>
 </section>
 
-<section id="principles">
+<section id="team">
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
       <div>
-        <div class="eyebrow">How we build</div>
-        <h2>Rules we don't bend.</h2>
+        <div class="eyebrow">The Founders</div>
+        <h2>Two brothers, and a phone that gets answered.</h2>
       </div>
-      <p class="lede">These are commitments in every DeepWell Technology agreement, not a values page. If a feature can't meet them, it doesn't ship.</p>
+      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
     </div>
+
+    <div class="founders">
+      <div class="founder dw-observe dw-once">
+        <img class="founder-img" src="/founders/sterling.jpg" srcset="/founders/sterling-480.webp 480w, /founders/sterling-720.webp 720w, /founders/sterling-1086.webp 1086w" sizes="(max-width:640px) 96px, 130px" alt="Sterling Chapman, co-founder of DeepWell" width="720" height="960" loading="lazy" decoding="async">
+        <div>
+          <h3>Sterling Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Prior Army service, and the engineer behind DeepWell — systems integration, APIs, databases and network support. He's the person you'll work with from your first sample box through go-live.</p>
+        </div>
+      </div>
+
+      <div class="founder dw-observe dw-once">
+        <img class="founder-img" src="/founders/hilton.jpg" srcset="/founders/hilton-480.webp 480w, /founders/hilton-720.webp 720w, /founders/hilton-1086.webp 1086w" sizes="(max-width:640px) 96px, 130px" alt="Hilton Chapman, co-founder of DeepWell" width="720" height="960" loading="lazy" decoding="async">
+        <div>
+          <h3>Hilton Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Retired Air Force veteran and the voice of DeepWell. Leads customer relationships and marketing, and sets the vision for where the platform goes next.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="principles">
+      <div class="pb-head">
+        <h3>Rules we don't bend.</h3>
+        <p>These are commitments in every DeepWell Technology agreement, not a values page. If a feature can't meet them, it doesn't ship.</p>
+      </div>
     <div class="principles">
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><rect x="8" y="6" width="28" height="32" rx="2"/><path d="M14 16h16M14 22h16M14 28h9"/></svg>
-        <div><h3>Every answer shows its source.</h3><p>If the system isn't sure, it says so and shows you the document instead of guessing.</p></div>
+        <div><h4>Every answer shows its source.</h4><p>If the system isn't sure, it says so and shows you the document instead of guessing.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 6l14 6v10c0 8-6 13-14 16C14 35 8 30 8 22V12z"/><path d="M16 22l4 4 8-8"/></svg>
-        <div><h3>Your records stay yours.</h3><p>Data is stored under your company's own account, never pooled with another contractor's, never used to build anything for anyone else. It stays your data, and you can ask us for a full copy at any time.</p></div>
+        <div><h4>Your records stay yours.</h4><p>Data is stored under your company's own account, never pooled with another contractor's, never used to build anything for anyone else. It stays your data, and you can ask us for a full copy at any time.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15"/><path d="M22 12v10l7 4"/></svg>
-        <div><h3>Built for the job, not the demo.</h3><p>Readable in an attic on a cracked phone. Built for the field: fast on a weak connection. Nothing that flashes or slows a tech down. Office gets the full desk view.</p></div>
+        <div><h4>Built for the job, not the demo.</h4><p>Readable in an attic on a cracked phone. Built for the field: fast on a weak connection. Nothing that flashes or slows a tech down. Office gets the full desk view.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
-        <div><h3>Measured before you rely on it.</h3><p>During setup we score your account against the questions your team actually asks and show you the result. If it isn't good enough on your own set, we keep working before go-live.</p></div>
+        <div><h4>Measured before you rely on it.</h4><p>During setup we score your account against the questions your team actually asks and show you the result. If it isn't good enough on your own set, we keep working before go-live.</p></div>
       </div>
     </div>
-  </div>
-</section>
+    </div>
 
-<section class="close" id="contact">
-  <div class="wrap">
-    <div style="display:flex;flex-direction:column;gap:24px">
-      <div class="eyebrow" style="color:rgba(255,255,255,.7)">Start here</div>
-      <h2>Start with one box of records.</h2>
-      <p class="lede" style="color:rgba(255,255,255,.8)">Send us a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you'll ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
-      <div class="cta-row">
+    <div class="cta-card" id="contact">
+      <div>
+        <div class="eyebrow">Talk to us</div>
+        <h3>Start with one box of records.</h3>
+        <p>Send us a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you'll ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
+      </div>
+      <div class="cta-side">
         <a class="btn btn-primary" href="mailto:hello@deepwelltechnology.com?subject=Records%20audit">hello@deepwelltechnology.com</a>
+        <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge Builds Business." width="900" height="750" loading="lazy" decoding="async"></div>
       </div>
     </div>
-    <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge Builds Business." width="900" height="750" loading="lazy" decoding="async"></div>
   </div>
 </section>
 
@@ -1994,7 +1867,7 @@ h3{font-size:1.25rem}
 <footer>
   <div class="wrap">
     <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
-    <div><a href="#problem">Problem</a><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#who">People</a><a href="#contact">Contact</a><a href="/industries/hvac.html">HVAC</a><a href="/get">Mobile app</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+    <div><a href="#how-it-works">How it works</a><a href="#plans">Plans</a><a href="#team">Founders</a><a href="#contact">Contact</a><a href="/industries/hvac.html">HVAC</a><a href="/get">Mobile app</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
   </div>
 </footer>
 
@@ -2419,6 +2292,14 @@ const DEMO=[
 })();
 </script>
 <script>
+/* Cost calculator: the three cards sit side by side on wide screens; on phones/tablets only the first stays open. */
+(function(){var b=document.getElementById('cost-calc');if(!b||!window.matchMedia)return;
+var mq=matchMedia('(max-width:900px)'),ds=[].slice.call(b.querySelectorAll('details.cost-line'));
+function sync(first){ds.forEach(function(d,i){if(!mq.matches)d.open=true;else if(first&&i)d.open=false;});}
+ds.forEach(function(d){d.firstElementChild.addEventListener('click',function(e){if(!mq.matches)e.preventDefault();});});
+sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(false);});})();
+</script>
+<script>
 /* Cost-of-missing-this calculator (2026-09-25) — a standalone script,
    deliberately separate from the numbered micro-animation IIFEs above and
    from the Industries-dropdown script. Vanilla JS, no dependencies, no
@@ -2525,5 +2406,6 @@ const DEMO=[
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
 
+<script defer src="/support/widget.js"></script>
 </body>
 </html>

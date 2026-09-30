@@ -74,7 +74,7 @@ function mockRes() {
 check('api/ holds exactly 13 entries (12 top-level files + _lib): no new serverless function', fs.readdirSync(rel('api')).length === 13, fs.readdirSync(rel('api')).join(','));
 
 const sqlFiles = fs.readdirSync(rel('M3-config')).filter((f) => /^\d\d.*\.sql$/.test(f) && !f.startsWith('99')).sort();
-check('migration 60 is the next numbered file after 59', sqlFiles.includes('60-list-all-tenant-keys.sql') && sqlFiles.filter((f) => f > '59z').length === 1, sqlFiles.slice(-3).join(','));
+check('migration 60 is the next numbered file after 59 (61 is the round-28 support-assistant table, checked in verify-support-assistant)', sqlFiles.includes('60-list-all-tenant-keys.sql') && sqlFiles.filter((f) => f > '59z' && f < '61').length === 1, sqlFiles.slice(-3).join(','));
 
 /** Every table that carries a tenant_id column, derived from the migration SQL itself (CREATE TABLE bodies and ALTER ... ADD COLUMN tenant_id). */
 function tenantTablesFromSql() {

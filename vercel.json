@@ -51,6 +51,10 @@
       "destination": "/api/v1?resource=customer-equipment"
     },
     {
+      "source": "/api/support",
+      "destination": "/api/account?action=support"
+    },
+    {
       "source": "/api/keys",
       "destination": "/api/account?action=keys"
     },

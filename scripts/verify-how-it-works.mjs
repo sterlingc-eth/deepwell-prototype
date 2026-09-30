@@ -94,7 +94,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
     new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__lt.push(Math.round(e.duration)))).observe({ entryTypes: ['longtask'] });
     document.getElementById('how-it-works').__hiw.resume();
   });
-  await page.waitForTimeout(13500);
+  await page.waitForTimeout(19500); // loop is 18s since SPEED=12/18
   const st = await page.evaluate(() => ({ loops: document.querySelector('#how-it-works .hiw-stage').dataset.loops, state: document.querySelector('#how-it-works .hiw-stage').dataset.state, lt: window.__lt }));
   ok(st.state === 'playing', 'playing when in view (' + st.state + ')');
   ok(+st.loops >= 1, `loop completed in real time (loops=${st.loops})`);

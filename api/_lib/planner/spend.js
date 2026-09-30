@@ -59,6 +59,12 @@ export const ROUTE_BUCKETS = Object.freeze({
   retrieval: { bucket: 'retrieval_usd_micro', envVar: 'DONOVAN_RETRIEVAL_DAILY_USD', defaultUsd: 5 },
   escalation: { bucket: SONNET_BUCKET, envVar: 'DONOVAN_SONNET_DAILY_USD', defaultUsd: 2 },
   research: { bucket: RESEARCH_BUCKET, envVar: 'DONOVAN_RESEARCH_DAILY_USD', defaultUsd: 10 },
+  // Round 28: the Support Assistant's per-tenant daily $ cap (its Haiku path only; the FAQ path costs $0).
+  // NOTE: support/limits.js reads/writes this bucket through escalation.js's sonnetSpentTodayUsd/
+  // recordSonnetSpend directly, NOT through assertDailySpend above — assertDailySpend goes through
+  // sonnetAllowed, which returns "disabled" whenever DONOVAN_ESCALATION=0, and turning Sonnet escalation off
+  // must never silently turn the support assistant's cap into "always denied".
+  support: { bucket: 'support_usd_micro', envVar: 'SUPPORT_DAILY_USD', defaultUsd: 0.5 },
 });
 
 /** This route's daily $ cap: its own env var if set (and a valid non-negative number), else its default. */

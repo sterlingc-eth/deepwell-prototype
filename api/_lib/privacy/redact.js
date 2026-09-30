@@ -48,6 +48,14 @@ export function redactText(input) {
     .replace(PHONE_RE, "[redacted-phone]");
 }
 
+/** Round 28 (support assistant): strip ONLY SSN-shaped and card-shaped runs. Unlike redactText this keeps
+ *  emails and phone numbers, which a support hand-off needs so staff can reply. Never throws; pure. */
+export function redactSecrets(input) {
+  return String(input ?? "")
+    .replace(SSN_RE, "[redacted-id]")
+    .replace(CARD_RE, "[redacted-card]");
+}
+
 /** A short, stable digest of `input`, for correlating log lines without logging the value itself.
  *  Truncated to 12 hex chars — plenty to eyeball-match two log lines, nowhere near enough entropy to
  *  be mistaken for a value someone would rely on for lookups. Pure, synchronous, no salt (this is a

@@ -15,7 +15,9 @@ export const EMAIL_FROM = "alert@deepwelltechnology.com";
 export const EMAIL_FROM_NAME = "DeepWell Technology";
 
 /**
- * @param {{to: string[], subject: string, text: string, html: string}} msg
+ * @param {{to: string[], subject: string, text: string, html: string, replyTo?: string}} msg
+ *   `replyTo` (Round 28, support hand-offs): optional Reply-To header so staff can answer the customer directly.
+ *   The sender stays EMAIL_FROM; a malformed or multi-line replyTo is dropped rather than sent.
  * @returns {Promise<{sent: boolean, channel: 'email'|'in-app', error?: string}>}
  */
 // A serverless function's own maxDuration is the real backstop, but a hung
@@ -25,7 +27,9 @@ export const EMAIL_FROM_NAME = "DeepWell Technology";
 // shared cron deadline callers like api/_lib/routes/outreach.js budget for.
 const SEND_TIMEOUT_MS = 10_000;
 
-export async function sendEmail({ to, subject, text, html }) {
+const REPLY_TO_RE = /^[^\s@<>()",;:\\]+@[^\s@<>()",;:\\]+\.[^\s@<>()",;:\\]{2,}$/;
+
+export async function sendEmail({ to, subject, text, html, replyTo }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || !to?.length) {
     console.log(`[email:log-only] to=${(to ?? []).map((t) => hashForLog(t) ?? "?").join(",")} ${describeForLog("subject", subject)}`);
@@ -45,6 +49,7 @@ export async function sendEmail({ to, subject, text, html }) {
         subject,
         text,
         html,
+        ...(typeof replyTo === "string" && replyTo.length <= 254 && REPLY_TO_RE.test(replyTo) ? { reply_to: replyTo } : {}),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
