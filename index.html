@@ -664,6 +664,30 @@ footer{padding-block:12px}
 .logo-card{background:#F4F7F4;padding:8px;display:grid;place-items:center}
 .logo-card img{width:96px;max-width:100%;height:auto;display:block;mix-blend-mode:multiply}
 @media (max-width:700px){.cta-card{grid-template-columns:1fr}.logo-card{display:none}.cta-card p{font-size:.95rem}}
+/* r29: founders right under the hero; problem shrunk to a strip */
+#team{padding-block:clamp(14px,1.6vw,22px)}
+#team .sec-head{align-items:center;margin-bottom:clamp(8px,1vw,12px)}
+#team .sec-head .eyebrow{margin-bottom:4px}
+#team h2{font-size:clamp(1.35rem,2.2vw,1.75rem)}
+#team .lede{font-size:1rem;margin:0}
+#team .founders{gap:12px}
+#team .founder{grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center;padding:10px}
+#team .founder h3{font-size:1.25rem}
+#team .founder p{font-size:.9rem;line-height:1.5}
+@media (max-width:900px){#team .founders{grid-template-columns:1fr}}
+@media (max-width:640px){#team .founder{grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}#team .founder h3{font-size:1.1rem}#team .founder p{font-size:.86rem;line-height:1.45}}
+#platform{padding-block:clamp(12px,1.4vw,18px)}
+#platform .sec-head{align-items:center;margin-bottom:8px}
+#platform .sec-head .eyebrow{margin-bottom:2px}
+#platform h2{font-size:clamp(1.15rem,1.7vw,1.4rem);line-height:1.2}
+#platform .lede{font-size:.92rem;line-height:1.45;margin:0}
+#platform .ledger > div{padding:8px 14px;gap:2px}
+#platform .ledger h3{font-size:1.02rem}
+#platform .ledger p{font-size:.84rem;line-height:1.4}
+#platform .ledger .where{font-size:.66rem}
+@media (max-width:860px){#platform .ledger > div{padding:7px 12px}#platform .ledger h3{font-size:1rem}#platform .ledger p{font-size:.84rem;margin-top:1px}}
+.cta-card .cta-who{font-size:.9rem;margin-top:10px}
+.cta-card .cta-who a{color:#fff;text-decoration:underline;text-underline-offset:2px}
 </style>
 <link rel="stylesheet" href="/support/widget.css">
 </head>
@@ -783,6 +807,38 @@ footer{padding-block:12px}
   </div>
 </header>
 
+<section id="team">
+  <div class="wrap">
+    <div class="sec-head dw-observe dw-once">
+      <div>
+        <div class="eyebrow">The Founders</div>
+        <h2>Two brothers, and a phone that gets answered.</h2>
+      </div>
+      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
+    </div>
+
+    <div class="founders">
+      <div class="founder dw-observe dw-once">
+        <img class="founder-img" src="/founders/sterling.jpg" srcset="/founders/sterling-480.webp 480w, /founders/sterling-720.webp 720w, /founders/sterling-1086.webp 1086w" sizes="(max-width:640px) 96px, 150px" alt="Sterling Chapman, co-founder of DeepWell" width="720" height="960" decoding="async" fetchpriority="auto">
+        <div>
+          <h3>Sterling Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Prior Army service, and the engineer behind DeepWell — systems integration, APIs, databases and network support. He's the person you'll work with from your first sample box through go-live.</p>
+        </div>
+      </div>
+
+      <div class="founder dw-observe dw-once">
+        <img class="founder-img" src="/founders/hilton.jpg" srcset="/founders/hilton-480.webp 480w, /founders/hilton-720.webp 720w, /founders/hilton-1086.webp 1086w" sizes="(max-width:640px) 96px, 150px" alt="Hilton Chapman, co-founder of DeepWell" width="720" height="960" decoding="async" fetchpriority="auto">
+        <div>
+          <h3>Hilton Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Retired Air Force veteran and the voice of DeepWell. Leads customer relationships and marketing, and sets the vision for where the platform goes next.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="platform">
   <span class="anchor" id="problem"></span>
   <div class="wrap">
@@ -791,23 +847,23 @@ footer{padding-block:12px}
         <div class="eyebrow">The problem</div>
         <h2>The knowledge exists. It's just in the wrong place.</h2>
       </div>
-      <p class="lede">A mid-sized shop closes 3,000 jobs a year. Each one leaves a trail, but the trail is split across a filing cabinet, a dispatcher's inbox, a shared drive, and a tech's phone.</p>
+      <p class="lede">A mid-sized shop closes 3,000 jobs a year, and every one leaves a trail split across a filing cabinet, an inbox, and a tech's phone.</p>
     </div>
     <div class="ledger">
       <div>
         <div class="where">In the office</div>
         <h3>The filing cabinet</h3>
-        <p>Signed work orders, manufacturer warranty registrations, permit copies. Complete, and unsearchable. The serial number you need is on page two of a carbon copy.</p>
+        <p>Complete, but unsearchable. The serial number is on page two of a carbon copy.</p>
       </div>
       <div>
         <div class="where">In the inbox</div>
         <h3>The PDF nobody renamed</h3>
-        <p>Distributor invoices, startup sheets, equipment submittals, each attached to an email titled "Re: Re: Fwd: Tuesday." Findable only by the person who received it.</p>
+        <p>Buried in &ldquo;Re: Re: Fwd: Tuesday,&rdquo; findable only by whoever received it.</p>
       </div>
       <div>
         <div class="where">In the truck</div>
         <h3>The photo on a phone</h3>
-        <p>The clearest record of what was installed is a nameplate photo taken by a tech who has since moved to another company. It was never uploaded anywhere.</p>
+        <p>A nameplate photo from a tech who has since moved on. Never uploaded anywhere.</p>
       </div>
     </div>
   </div>
@@ -1562,7 +1618,10 @@ footer{padding-block:12px}
           </ul></div>
         <div class="grp plus"><h4>Included</h4>
           <ul>
-            <li>Everything under &ldquo;Every plan includes&rdquo; above</li>
+            <li>Unlimited Donovan, with sources</li>
+            <li>White-glove setup by our team</li>
+            <li>Export your data anytime</li>
+            <li>Owner account doesn&rsquo;t count toward logins</li>
           </ul>
         </div>
         <p class="math">One prevented callback covers 3&ndash;6 months.</p>
@@ -1793,36 +1852,8 @@ footer{padding-block:12px}
   </div>
 </section>
 
-<section id="team">
+<section id="closing">
   <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">The Founders</div>
-        <h2>Two brothers, and a phone that gets answered.</h2>
-      </div>
-      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
-    </div>
-
-    <div class="founders">
-      <div class="founder dw-observe dw-once">
-        <img class="founder-img" src="/founders/sterling.jpg" srcset="/founders/sterling-480.webp 480w, /founders/sterling-720.webp 720w, /founders/sterling-1086.webp 1086w" sizes="(max-width:640px) 96px, 130px" alt="Sterling Chapman, co-founder of DeepWell" width="720" height="960" loading="lazy" decoding="async">
-        <div>
-          <h3>Sterling Chapman</h3>
-          <div class="role">Co-founder</div>
-          <p>Prior Army service, and the engineer behind DeepWell — systems integration, APIs, databases and network support. He's the person you'll work with from your first sample box through go-live.</p>
-        </div>
-      </div>
-
-      <div class="founder dw-observe dw-once">
-        <img class="founder-img" src="/founders/hilton.jpg" srcset="/founders/hilton-480.webp 480w, /founders/hilton-720.webp 720w, /founders/hilton-1086.webp 1086w" sizes="(max-width:640px) 96px, 130px" alt="Hilton Chapman, co-founder of DeepWell" width="720" height="960" loading="lazy" decoding="async">
-        <div>
-          <h3>Hilton Chapman</h3>
-          <div class="role">Co-founder</div>
-          <p>Retired Air Force veteran and the voice of DeepWell. Leads customer relationships and marketing, and sets the vision for where the platform goes next.</p>
-        </div>
-      </div>
-    </div>
-
     <div id="principles">
       <div class="pb-head">
         <h3>Rules we don't bend.</h3>
@@ -1853,6 +1884,7 @@ footer{padding-block:12px}
         <div class="eyebrow">Talk to us</div>
         <h3>Start with one box of records.</h3>
         <p>Send us a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you'll ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
+        <p class="cta-who">Talk to Sterling or Hilton: <a href="mailto:hello@deepwelltechnology.com?subject=Records%20audit">hello@deepwelltechnology.com</a></p>
       </div>
       <div class="cta-side">
         <a class="btn btn-primary" href="mailto:hello@deepwelltechnology.com?subject=Records%20audit">hello@deepwelltechnology.com</a>

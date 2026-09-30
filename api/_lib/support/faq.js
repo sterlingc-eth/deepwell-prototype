@@ -139,34 +139,57 @@ function scoreEntry(it, msg) {
   return { score, coverage };
 }
 
-/**
- * @param {string} text
- * @param {{surface?: string}} [opts]
- * @returns {{hit: null | {entry: object, article: object, score: number}, top: Array<{entry: object, score: number}>, confident: boolean}}
- */
-export function matchFaq(text) {
-  const msg = tokenize(text);
-  if (msg.content.size === 0) return { hit: null, top: [], confident: false };
-  const scored = index.map((it) => { const r = scoreEntry(it, msg); return { entry: it.e, score: r.score, coverage: r.coverage }; }).filter((x) => x.score > 0.4).sort((a, b) => b.score - a.score);
+function rank(msg, items) {
+  const scored = items.map((it) => { const r = scoreEntry(it, msg); return { entry: it.e, score: r.score, coverage: r.coverage }; }).filter((x) => x.score > 0.4).sort((a, b) => b.score - a.score);
   const top = scored.slice(0, 3);
   const best = top[0];
-  if (!best) return { hit: null, top, confident: false };
+  if (!best) return { top, best: null, confident: false };
   const second = top.find((x) => x.entry.article !== best.entry.article);
   const oov = [...msg.content].filter((t) => !VOCAB.has(t) && !/^\d+$/.test(t));
   const mostlyUnknown = oov.length >= 2 && oov.length / msg.content.size >= 0.25;
   const confident = !mostlyUnknown && best.coverage >= MIN_COVERAGE && best.score >= STRONG && (!second || best.score - second.score >= MARGIN || best.score >= second.score * 1.12);
-  return {
-    hit: confident ? { entry: best.entry, article: ARTICLE_BY_ID.get(best.entry.article), score: best.score } : null,
-    top,
-    confident,
-  };
+  return { top, best, confident };
+}
+
+// Entry audiences: 'public' = everyone, 'app' = signed in only, 'public-only' = a signed-out summary of an app entry
+// (signed-in users get the fuller app entry instead, so these are hidden from them).
+const PUBLIC_INDEX = index.filter((it) => it.e.audience === 'public' || it.e.audience === 'public-only');
+const APP_INDEX = index.filter((it) => it.e.audience !== 'public-only');
+/** Article ids that have at least one entry a signed-out visitor may receive (the only ones the public model may cite). */
+export const PUBLIC_ARTICLES = new Set(ENTRIES.filter((e) => e.audience !== 'app').map((e) => e.article));
+
+/**
+ * AUDIENCE ENFORCEMENT. `allowApp` is true only for a signed-in app/mobile caller. A public visitor is matched
+ * against `audience: public` entries only; if the question is confidently about an app-only topic they get
+ * `appOnly` (the entry, NEVER its answer text) so the engine can point them to the app / the team instead.
+ * @param {string} text
+ * @param {{allowApp?: boolean}} [opts]
+ * @returns {{hit: null | {entry: object, article: object, score: number}, top: Array<{entry: object, score: number}>, confident: boolean, appOnly: null | object}}
+ */
+export function matchFaq(text, opts = {}) {
+  const msg = tokenize(text);
+  if (msg.content.size === 0) return { hit: null, top: [], confident: false, appOnly: null };
+  const allowApp = opts.allowApp === true;
+  const first = rank(msg, allowApp ? APP_INDEX : PUBLIC_INDEX);
+  if (allowApp || first.confident) {
+    return {
+      hit: first.confident ? { entry: first.best.entry, article: ARTICLE_BY_ID.get(first.best.entry.article), score: first.best.score } : null,
+      top: first.top,
+      confident: first.confident,
+      appOnly: null,
+    };
+  }
+  // public visitor, no confident public answer: is this an app-only topic?
+  const all = rank(msg, APP_INDEX);
+  const appOnly = all.confident && all.best.entry.audience === 'app' ? all.best.entry : null;
+  return { hit: null, top: first.top, confident: false, appOnly };
 }
 
 /** Up to 3 short follow-up chips from the same article as `entry` (never the entry itself). */
-export function suggestionsFor(entry) {
+export function suggestionsFor(entry, { allowApp = true } = {}) {
   const out = [];
   for (const e of ENTRIES) {
-    if (e.article === entry.article && e.id !== entry.id && e.q.length <= 60) out.push(e.q);
+    if ((allowApp ? e.audience !== 'public-only' : e.audience !== 'app') && e.article === entry.article && e.id !== entry.id && e.q.length <= 60) out.push(e.q);
     if (out.length === 3) break;
   }
   return out;

@@ -93,7 +93,7 @@ reach an answer: they return `redirectTo:'ask'`.
 
 ## Known limits (be honest with customers)
 
-- FAQ hit-rate: 93.5% on the 92 answerable questions of the 136-question tuning fixture (86/92; the other 6 need the
+- FAQ hit-rate (signed in): 93.5% on the 92 answerable questions of the 136-question tuning fixture (86/92; the other 6 need the
   model), but the matcher was tuned on that set. A 45-question second set written afterward scored 56% on first contact
   before keyword fixes, so expect roughly 55-70% of real in-scope traffic to be answered at $0 and the rest to go to the
   model (if on) or the hand-off.
@@ -103,7 +103,77 @@ reach an answer: they return `redirectTo:'ask'`.
 
 ## Verify
 
-`node scripts/verify-support-assistant.mjs` (unit, 107 checks), `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node
+`node scripts/verify-support-assistant.mjs` (unit, 168 checks), `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node
 scripts/verify-support-widget.mjs` (browser, 108 checks; screenshots to `$SUPPORT_SHOTS_DIR`),
 `node scripts/build-support-kb.mjs --check`, `node scripts/build-support-widget.mjs --check`. `verify:support` is in
 `verify:all`.
+
+## Guardrails (every layer, in request order)
+
+Who sees what
+1. **Audience enforcement.** Each `docs/help` article has `audience: public|app`, carried onto every KB entry. A signed-out
+   visitor (surface `public`, or any caller without a verified session) is matched against public entries only. If the
+   question is confidently about an app-only topic (9 articles: logins, change/cancel/invoices, uploading, scan status,
+   exports, team/notifications, support access, data export/deletion, troubleshooting) they get a short pointer ("covered
+   inside the app once you are signed in"), the public overview article as the source, and a hand-off offer. The app-only
+   answer text is never returned. Signed-in app/mobile callers match everything.
+2. **Two model prefixes.** The model gets a public-only knowledge prefix (about 5.8k estimated tokens) for signed-out
+   visitors and the full one (about 8.9k) for signed-in users. Both are byte-stable and above Haiku's 4,096-token cache
+   minimum. The full KB never reaches a signed-out visitor, and the account summary is never added to a public request.
+3. **Tenant from auth only.** The tenant/user come from the verified Clerk session, never from the body. The account
+   tools (plan/usage/upload counts, read-only, counts only, no names or filenames) are called only when signed in.
+   Billing dates are shown to admins/solo only; a member is told to ask their admin.
+
+Before the model
+4. Request limits (per IP hash / per user), 600-char input cap, 12-turn cap, honeypot on hand-off.
+5. Sensitive-data screen (SSN/card shapes refused before anything else looks at them).
+6. Injection screens (ignore/override/reveal/persona/repeat-above patterns) -> refusal, never the model.
+7. Scope screen: small talk, identity, competitor comparisons, trade how-to, off-topic all answered with canned text.
+8. "Your own records" questions (addresses, serials, named-customer equipment/warranty) -> `redirectTo:'ask'`, never answered.
+9. The FAQ ($0) comes before the model; the model runs only if the FAQ misses, a dedicated key exists, and every spend cap
+   is readable and open (fail closed).
+
+The model call
+10. Dedicated `SUPPORT_ANTHROPIC_API_KEY` (never `CLAUDE_API_KEY`), kill switch `SUPPORT_ASSISTANT_MODEL=off`, temperature 0,
+    250/350 max tokens, no retries, 15 s timeout, per-turn worst-case cost cap, spend caps per tenant/day/month, platform
+    and public pool.
+11. Rules in the cached system block: only the audience's facts; never invent prices, dates, certifications or contacts;
+    never speculate about roadmap, costs, margins, staff or infrastructure; vendors only if in the published subprocessor
+    list; security details only as published; never mention other companies, customers or accounts; never write customer
+    names, addresses, serials, file names or record contents; only `@deepwelltechnology.com` addresses.
+12. Untrusted text is wrapped in `<user_message>` with angle brackets defanged; canary string; forced structured `reply` tool.
+
+After the model (any failure drops the WHOLE reply and falls back to a hand-off offer)
+13. Output validator: canary/prompt leak, prompt markup, competitor names, prices not derived from the price constants,
+    "coming soon"/roadmap promises, certification claims, **any email not @deepwelltechnology.com, street addresses,
+    serial-like tokens, file names, company-name shapes, and capitalized name pairs the KB does not contain**, foreign
+    links, HTML/markdown, SSN/card redaction, 1,200-char cap.
+14. Citation required: a reply must cite known articles; a public reply that cites an app-only article is dropped.
+
+After the answer
+15. Hand-off email: email validated, transcript capped (12 turns x 600 chars), SSN/card/password redacted, ticket ref, Reply-To
+    set, per-IP/user daily cap. Nothing is stored server-side; logs hold hashes and counts only.
+
+Entry-level audience (articles 06, 07, 15, 16). An entry can override its article with `!audience:public` (visible to
+everyone) or `!audience:public-only` (a signed-out summary; hidden from signed-in users, who get the fuller app entry),
+and every such entry must carry `!source:` naming the public page(s) that state it (index.html, terms.html, privacy.html,
+security.html, get/). `verify-support-assistant` checks that every number, price, email and menu path in these entries
+appears on the cited page. Click-by-click in-app steps stay `audience: app`. Current split: 79 public entries (5 inside app
+articles: refund policy, trial refund, card storage, delete a document, data after cancel) + 6 public-only summaries
+(cancel any time, file types/size, support access, activity log, delete all data, what is kept) + 43 app-only entries.
+The public site does not publish a file-format list or a size limit, so a signed-out visitor asking is told that and offered
+the team. The public model prefix is now about 6.7k estimated tokens, the signed-in one about 9.0k.
+
+## App how-to coverage + Ask routing (Round 29)
+
+**Goal:** every "how do I do X in the app" question is answered, both in the DeepWell Help chat and when typed into Donovan's Ask box, from the same signed-in KB, at $0.
+
+- **Inventory:** `docs/help/APP_INVENTORY.md` (not part of the KB build) lists 19 screens and 105 actions (`A-...` ids) read from `src/` and `src/mobile/`, with the exact labels, plus an errors reference and a "half-built or confusing" list. It is the source of truth for the articles.
+- **Articles:** new `20-getting-around-the-app` .. `27-team-and-data-how-to` (audience app) and corrected/extended `02, 06, 07, 08, 09, 10, 11, 12, 13, 15, 16, 19`. Stale facts fixed: stage names are Uploaded / Sorted / Read / Matched / Checked (not received/read/mapped/linked/verified), size limits (PDF/photo 24 MB, text/CSV 20 MB, 100 MB ceiling, 50 files per request), support access lives in Team -> Support access, phone scans queue offline. Entry 20#8 is the honest "DeepWell has no scheduling, payments, GPS, texting, branding" answer.
+- **Enforced coverage:** each app entry may carry `!covers:A-XXX`; `scripts/build-support-kb.mjs` fails the build when an inventory action is covered by no entry (or covers an unknown id, or a public-only entry claims one). KB is now 204 entries, about 14.6k model-KB tokens (cap for the Haiku turn guard is about 18.5k at `perTurnMaxUsd` 0.04, so no policy change).
+- **Ask box route:** `api/_lib/support/askhelp.js` (no new top-level api file). In `api/ask.js` right after question validation: `helpGate(question)` (regex only: how-to shape + app vocabulary + a records veto for serials/model numbers, addresses, dates/months, "who/what did", "how many jobs", proper nouns, other people's passwords) then `answerHowTo` (lazy `import('./faq.js')`, strict: score >= 4.2, coverage >= 0.6, margin >= 1.1 over any other article, >= 75% of the question's words explained by the entry's own question/keywords, entry must be an app how-to). Skipped for scorecard calls and API-key callers. Answer shape is a normal Ask answer (`kind:'answer'`, no facts) with `interpretation: "From DeepWell Help: <article>"` and a `help` block; claim/citation fields are pre-filled so `send()` leaves it alone. It does not count against the monthly allowance and costs $0.
+- **No-answer hint:** when the gate passed but the strict match did not answer and the normal pipeline ends in "no answer", the response carries `helpHint: true`; desktop AskScreen and mobile AskTab show "This looks like a how-to question... Open DeepWell Help". Both open the same Help chat through a `deepwell:open-help` window event (`SupportWidget`, `MobileApp`).
+- **Client:** `Answer.help` / `Answer.helpHint` in `src/core/types.ts`, kept by `normalizeAnswer`; `src/components/HelpAnswerCard.tsx` renders the help card (desktop and mobile) and the hint.
+- **Verify:** `npm run verify:support` now also runs `scripts/verify-support-app-coverage.mjs` (also `verify:support-app`): inventory-to-KB coverage, 164 tagged how-to questions (`scripts/fixtures/app-howto-questions.mjs`; typos and field-tech voice), out-of-scope how-tos, 28 records questions the gate must never capture, and every question in `test-docs/scorecard/**` (1,845 strings) through the gate and route (0 captured).
+- **Honest numbers:** 164/164 on the tuned set, 40/40 on the second set (used once to tune), and only about 57% (17/30) at the FAQ level on a third set written after tuning (`HOLDOUT2`), with 6 of 30 answered from a wrong-but-related entry and 7 falling through. The Ask route is the safe subset: 25 answers on the 70 held-out questions, 0 wrong. The FAQ scorer generalizes to paraphrases only as well as the keyword lists; add phrasing to the entry's `~` line when a real question misses (check `HOLDOUT2` numbers stay flat or better).
+- **Product feedback:** see "Half-built or confusing" at the bottom of `APP_INVENTORY.md`.

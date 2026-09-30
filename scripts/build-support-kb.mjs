@@ -15,6 +15,10 @@
  *   ~ alternate phrasings, synonyms, keywords (comma separated; used by the $0 FAQ matcher only)
  *   The answer text. May contain **bold**, blank-line paragraph breaks and {{tokens}}.
  *   !handoff:reason        (optional: offer a hand-off to a person with this answer)
+ *   !covers:A-INVITE,A-...  (optional, Round 29: the docs/help/APP_INVENTORY.md action ids this entry documents)
+ *
+ * docs/help/APP_INVENTORY.md (not an article: only NN-slug.md files are read) lists every screen and user action in the app.
+ * The build FAILS when an entry names an unknown action id, and when an inventory action is covered by no entry.
  *
  * PRICES ARE NEVER TYPED. Every dollar amount, login cap, page allowance and storage figure is a
  * {{token}} rendered from PLAN_CATALOG (billing.js), PLAN_LIMITS (plan.js) and RECORDS_RESCUE. The build
@@ -100,9 +104,17 @@ function render(text, file) {
 }
 
 const files = fs.readdirSync(HELP_DIR).filter((f) => /^\d\d-.*\.md$/.test(f)).sort();
+// Round 29: the app inventory (docs/help/APP_INVENTORY.md) is the list of actions the help must cover.
+const INVENTORY_ACTIONS = new Set();
+try {
+  const inv = fs.readFileSync(path.join(HELP_DIR, 'APP_INVENTORY.md'), 'utf8');
+  for (const m of inv.matchAll(/^- \*\*(A-[A-Z0-9-]+)\*\*/gm)) INVENTORY_ACTIONS.add(m[1]);
+} catch { fail('docs/help/APP_INVENTORY.md is missing'); }
+const coveredActions = new Set();
 const articles = [];
 const entries = [];
 const modelParts = [];
+const publicParts = [];
 const seenIds = new Set();
 
 for (const file of files) {
@@ -116,15 +128,22 @@ for (const file of files) {
   const artKw = meta.keywords.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   articles.push({ id: meta.id, title: meta.title, audience: meta.audience, surface: meta.surface, updated: meta.updated, keywords: artKw, intro });
   const modelLines = [`## ${meta.title} [article_id: ${meta.id}]`, intro];
+  const publicLines = [`## ${meta.title} [article_id: ${meta.id}]`, ...(meta.audience === 'public' ? [intro] : [])];
   let n = 0;
   for (const part of parts) {
     const lines = part.split('\n');
     const q = lines.shift().trim();
     let kw = [];
     let handoff = null;
+    let audience = meta.audience;
+    let pubSource = null;
+    let covers = [];
     const ans = [];
     for (const line of lines) {
       if (line.startsWith('~ ')) kw = kw.concat(line.slice(2).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+      else if (line.startsWith('!audience:')) audience = line.slice(10).trim();
+      else if (line.startsWith('!source:')) pubSource = line.slice(8).split(',').map((x) => x.trim()).filter(Boolean);
+      else if (line.startsWith('!covers:')) covers = line.slice(8).split(',').map((x) => x.trim()).filter(Boolean);
       else if (line.startsWith('!handoff:')) handoff = line.slice(9).trim() || 'requested';
       else ans.push(line);
     }
@@ -132,14 +151,23 @@ for (const file of files) {
     if (!q || !a) { fail(`${file}: entry "${q}" has no answer`); continue; }
     if (a.length > 900) fail(`${file}: answer for "${q}" is ${a.length} chars (max 900)`);
     n += 1;
-    entries.push({ id: `${meta.id}#${n}`, article: meta.id, q, a, kw, handoff });
-    modelLines.push(`Q: ${q}\nA: ${a}`);
+    if (!['public', 'app', 'public-only'].includes(audience)) fail(`${file}: entry "${q}" has audience "${audience}" (public|app|public-only)`);
+    // entry-level overrides: `public` = visible to everyone (needs !source: = the public page(s) that state it);
+    // `public-only` = a signed-out summary of an app entry, hidden from signed-in users (they get the app entry)
+    if (audience !== meta.audience && audience !== 'app' && !pubSource) fail(`${file}: entry "${q}" is public inside an app article but has no !source: (which public page states it?)`);
+    for (const c of covers) { if (!INVENTORY_ACTIONS.has(c)) fail(`${file}: entry "${q}" covers unknown inventory action ${c}`); else coveredActions.add(c); }
+    if (covers.length && audience === 'public-only') fail(`${file}: entry "${q}" has !covers but is public-only (hidden from signed-in users)`);
+    entries.push({ id: `${meta.id}#${n}`, article: meta.id, audience, q, a, kw, handoff, ...(covers.length ? { covers } : {}), ...(pubSource ? { pubSource } : {}) });
+    if (audience !== 'public-only') modelLines.push(`Q: ${q}\nA: ${a}`);
+    if (audience !== 'app') publicLines.push(`Q: ${q}\nA: ${a}`);
   }
   if (n === 0) fail(`${file}: no entries`);
   modelParts.push(modelLines.join('\n'));
+  if (publicLines.length > (meta.audience === 'public' ? 2 : 1)) publicParts.push(publicLines.join('\n'));
 }
 
 /* ---------------------------------------------------------------- parity + hygiene checks */
+for (const id of INVENTORY_ACTIONS) if (!coveredActions.has(id)) fail(`inventory action ${id} is covered by no KB entry (add a !covers:${id} line to an app entry)`);
 const allText = [...entries.map((e) => e.a), ...articles.map((a) => a.intro)].join('\n');
 for (const m of allText.matchAll(/\$(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/g)) {
   if (!allowedAmounts.has(m[1])) fail(`literal price "$${m[1]}" in the KB is not derived from PLAN_CATALOG / RECORDS_RESCUE`);
@@ -180,6 +208,8 @@ try {
 /* ---------------------------------------------------------------- emit */
 const modelKb = modelParts.join('\n\n');
 const modelKbTokens = estimateTokens(modelKb);
+const modelKbPublic = publicParts.join('\n\n');
+const modelKbPublicTokens = estimateTokens(modelKbPublic);
 const hash = crypto.createHash('sha256').update(JSON.stringify({ articles, entries, plans })).digest('hex').slice(0, 12);
 
 const out = `/* GENERATED by scripts/build-support-kb.mjs from docs/help/*.md — DO NOT EDIT BY HAND.
@@ -190,6 +220,8 @@ export const ARTICLES = ${JSON.stringify(articles, null, 1)};
 export const ENTRIES = ${JSON.stringify(entries, null, 1)};
 export const PRICES = ${JSON.stringify({ plans, rescue: { rate: rescueRate, min: rescueMin, minPages: RECORDS_RESCUE.minUnits }, allowedAmounts: [...allowedAmounts] }, null, 1)};
 export const MODEL_KB = ${JSON.stringify(modelKb)};
+// Public-website articles only (audience: public). The model prefix for signed-out visitors is built from THIS, never MODEL_KB.
+export const MODEL_KB_PUBLIC = ${JSON.stringify(modelKbPublic)};
 `;
 
 if (errors.length) {
@@ -208,5 +240,5 @@ if (CHECK) {
 } else {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, out);
-  console.log(`build-support-kb: wrote ${path.relative(ROOT, OUT)} — ${articles.length} articles, ${entries.length} entries, ~${modelKbTokens} model-KB tokens, ${parity.length} price parity checks passed`);
+  console.log(`build-support-kb: wrote ${path.relative(ROOT, OUT)} — ${articles.length} articles, ${entries.length} entries, ~${modelKbTokens} model-KB tokens (public-only ~${modelKbPublicTokens}), ${parity.length} price parity checks passed`);
 }

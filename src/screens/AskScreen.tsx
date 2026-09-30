@@ -4,6 +4,7 @@ import { ArrowRight, Camera, Clock, Loader2, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DonovanMark } from '../components/DonovanMark';
 import { AnswerCard } from '../components/AnswerCard';
+import { HelpAnswerCard, HelpHint } from '../components/HelpAnswerCard';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SerialCapture } from '../components/SerialCapture';
 import type { Answer, AnswerRecord, SourceRef } from '../core/types';
@@ -353,7 +354,7 @@ export function AskScreen() {
                 </button>
               </div>
             )}
-            <AnswerCard
+            {answer.help ? <HelpAnswerCard answer={answer} /> : <AnswerCard
               answer={answer}
               question={asked}
               includeUnverified={includeUnverified}
@@ -362,7 +363,8 @@ export function AskScreen() {
               onOpenEntity={openFactEntity}
               onOpenRecord={openRecord}
               onAsk={(q) => void submit(q)}
-            />
+            />}
+            {answer.helpHint && answer.kind === 'no-answer' && <HelpHint />}
             {(answer.kind === 'no-answer' || nearMiss.length > 0) && didYouMean.length > 0 && (
               <DidYouMeanChips chips={didYouMean} onPick={(q) => void submit(q)} />
             )}

@@ -280,6 +280,10 @@ export interface Answer {
   recordsKind?: 'basis' | 'searched';
   /** One short sentence: how the answer was computed. */
   basis?: string;
+  /** Round 29: set when the server answered a how-to question about the app from the DeepWell Help guide. */
+  help?: { article: string; title: string; entry: string };
+  /** Round 29: a no-answer to what looks like an app how-to question; the UI points to the Help chat. */
+  helpHint?: boolean;
 }
 
 /**

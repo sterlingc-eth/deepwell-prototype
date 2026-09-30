@@ -104,6 +104,12 @@ export function MobileApp() {
   const helpBtnRef = useRef<HTMLButtonElement>(null)
   const helpPulse = useLauncherPulse(helpOpen, 8_000)
   const closeHelp = useCallback(() => setHelpOpen(false), [])
+  // The Ask tab's "Open DeepWell Help" button (a how-to answer from the Help guide) opens this same sheet.
+  useEffect(() => {
+    const openFromAsk = () => setHelpOpen(true)
+    window.addEventListener('deepwell:open-help', openFromAsk)
+    return () => window.removeEventListener('deepwell:open-help', openFromAsk)
+  }, [])
 
   const ready = isLoaded && !!isSignedIn && !!orgId
   // The full records graph (Docs list, source filenames, suggestions) is the

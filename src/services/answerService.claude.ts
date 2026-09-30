@@ -185,6 +185,8 @@ function normalizeAnswer(a: Partial<Answer>, g: GraphSnapshot): Answer {
   };
   if (a.entityId && g.entities[a.entityId]) out.entityId = a.entityId;
   if (a.interpretation) out.interpretation = a.interpretation;
+  if (a.helpHint === true && !facts.length) out.helpHint = true;
+  if (a.help && typeof a.help.title === 'string' && typeof a.help.article === 'string') out.help = { article: a.help.article, title: a.help.title, entry: String(a.help.entry ?? '') };
   // Citation contract: the rows behind the answer + one sentence on how it was computed.
   const cite = normalizeCitations(a);
   if (cite.records) out.records = cite.records;

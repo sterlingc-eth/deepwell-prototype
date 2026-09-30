@@ -17,7 +17,7 @@ Donovan answers questions in plain language using your uploaded records: warrant
 Open **Ask** in the app, on desktop or in the phone app, and type the question the way you would ask a coworker, for example an address, a serial number, a name or a date. You get the answer with the source attached.
 
 ### What kinds of questions can Donovan answer?
-~ what can i ask, what can donovan answer, example questions, sample questions, what questions, questions to ask, what can i ask donovan, examples, warranty questions, service history, what can donovan do
+~ what can i ask, what can donovan answer, what questions, questions to ask, what can i ask donovan, warranty questions, service history, what can donovan do
 Warranty status, last service date, model and serial numbers, who worked on a job, and which units are expiring soon, for example. Try something like "Is the furnace at 3247 Elm still under warranty?" It answers from your own records only.
 
 ### Can Donovan be wrong?

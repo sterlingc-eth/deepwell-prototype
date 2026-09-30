@@ -255,6 +255,32 @@ export function cleanLinksAndMarkup(text) {
   return t.trim();
 }
 
+const STREET_RE = /\b\d{2,6}\s+(?:[NSEW]\.?\s+)?(?:[A-Za-z]+|\d+(?:st|nd|rd|th))(?:\s+[A-Za-z]+)?\s+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|cir|circle|pl|place|pkwy|parkway|hwy)\b/i;
+const SERIAL_RES = [/\b[A-Z]{0,3}\d[A-Z0-9]{2,}-\d{4,}[A-Z0-9-]*\b/, /\b(?:serial|s\/n|model)\s*(?:number|no\.?|#)?\s*[:#]?\s*[A-Z0-9]{2,}[- ]?\d{4,}[A-Z0-9-]*/i, /\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{9,}\b/];
+const FILENAME_RE = /\b[\w-]+\.(?:pdf|jpe?g|png|tiff?|heic|docx?|xlsx?|csv|zip|txt)\b/i;
+const COMPANY_RE = /\b[A-Z][\w&'.-]+(?: [A-Z][\w&'.-]+){0,3} (?:LLC|L\.L\.C\.|Inc\.?|Corp\.?|Co\.|Company|Heating|Cooling|Air|HVAC|Plumbing|Mechanical|Services|Contractors|Refrigeration|Electric|Enterprises|Properties)\b/;
+
+/** Capitalized words the KB itself uses. A capitalized PAIR of words that are not both in this set looks like a name. */
+export function capWords(text) {
+  return new Set([...String(text ?? '').matchAll(/\b[A-Z][a-z]{1,20}\b/g)].map((m) => m[0]));
+}
+
+/** Returns a short reason string when the text looks like it contains someone's data, else null. */
+export function detectDataLeak(text, knownCapWords = null) {
+  const t = String(text ?? '');
+  for (const m of t.matchAll(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g)) if (!/@deepwelltechnology\.com$/i.test(m[0])) return 'foreign-email';
+  if (STREET_RE.test(t)) return 'street-address';
+  if (SERIAL_RES.some((re) => re.test(t))) return 'serial-like';
+  if (FILENAME_RE.test(t.replace(/\b(?:deepwelltechnology)\.com\b/gi, ''))) return 'filename';
+  if (COMPANY_RE.test(t.replace(/\bDeepWell(?: Technology)?(?: (?:Inc|LLC)\.?)?/g, 'DeepWell'))) return 'company-name';
+  if (knownCapWords) {
+    for (const m of t.matchAll(/\b([A-Z][a-z]{1,20}) ([A-Z][a-z]{1,20})\b/g)) {
+      if (!knownCapWords.has(m[1]) || !knownCapWords.has(m[2])) return 'unknown-name';
+    }
+  }
+  return null;
+}
+
 /**
  * Validate + clean one model reply. Returns {ok:true, text} or {ok:false, reason}. A failed reply is NEVER
  * shown: the caller substitutes the canned fallback.
@@ -287,6 +313,11 @@ export function validateModelReply(raw, ctx = {}) {
     if (COMING_SOON_FEATURES.test(s) && /\b(?:includes?|has|offers?|supports?|provides?|comes with|available (?:now|today))\b/i.test(s) && !NEGATION.test(s) && !/coming soon|marked|listed|waitlist/i.test(s)) return { ok: false, reason: 'promise' };
     if (/\bsoc ?2|iso ?27001|hipaa|pci(?:-| )dss|fedramp\b/i.test(s) && !NEGATION.test(s)) return { ok: false, reason: 'certification' };
   }
+
+  // Leak screens: the bot never holds customer data, so any of these in a reply means it is echoing user input or
+  // inventing. Drop the WHOLE reply (the caller falls back to a hand-off); do not try to patch it.
+  const leak = detectDataLeak(text, ctx.knownCapWords);
+  if (leak) return { ok: false, reason: leak };
 
   text = cleanLinksAndMarkup(text);
   text = redactSecrets(text);

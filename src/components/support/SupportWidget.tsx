@@ -44,6 +44,12 @@ export function SupportWidget({ page, userEmail, userName, onAskDonovan }: { pag
   const pulsing = useLauncherPulse(open);
 
   const close = useCallback(() => setOpen(false), []);
+  // The Ask screen's "Open DeepWell Help" button (a how-to answer from the Help guide) opens this same panel.
+  useEffect(() => {
+    const openFromAsk = () => { setEverOpened(true); setOpen(true); };
+    window.addEventListener('deepwell:open-help', openFromAsk);
+    return () => window.removeEventListener('deepwell:open-help', openFromAsk);
+  }, []);
   useEffect(() => {
     if (wasOpen.current && !open) launcherRef.current?.focus({ preventScroll: true });
     wasOpen.current = open;

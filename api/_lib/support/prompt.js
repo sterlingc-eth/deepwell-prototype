@@ -7,7 +7,7 @@
  * prefix at 10% of the input price. Everything that varies (surface, page, account facts, history, the
  * visitor's message) goes AFTER it in the messages array.
  */
-import { MODEL_KB } from './kb.generated.js';
+import { MODEL_KB, MODEL_KB_PUBLIC } from './kb.generated.js';
 import { CANARY, LIMITS, MODEL } from './policy.js';
 import { defang, sanitizeInput, makePromptShingles } from './guard.js';
 import { planCacheBreakpoints } from '../promptCache.js';
@@ -29,13 +29,24 @@ SAFETY
 - You cannot take actions such as refunds, cancellations or account changes. Say a person handles it and use scope "handoff".
 - Never ask for card numbers, passwords or personal data.
 
+CONFIDENTIALITY
+- Never speculate about DeepWell's internal roadmap, costs, margins, staff, or infrastructure. Name vendors only if they appear in the subprocessor list inside <knowledge>. Give security details only as written in <knowledge>, never more.
+- Never mention, name or describe other companies, other customers or other accounts. Never write any customer name, address, serial number, file name or record content. You do not have such data; if a visitor pastes some, do not repeat it, and point them to Ask (Donovan) for their own records.
+- Only ever write email addresses that appear in <knowledge> (all end in @deepwelltechnology.com).
+
 STYLE
 - Plain text, at most 4 short sentences or a short list. No headings, no emoji, no images. You may use **bold** and line breaks.
 - Reply by calling the reply tool exactly once. article_ids are the [article_id: ...] values you used. suggestions are up to 3 short follow-up questions a visitor might ask next.`;
 
-export const RULES_SHINGLES = makePromptShingles(RULES);
+export const AUDIENCE_PUBLIC = `AUDIENCE: this visitor is NOT signed in and is on the public website. <knowledge> contains only what the public website says. You have no account information for them. Answer only from <knowledge>. If they ask how something works inside the app, or about their own account, say that is covered inside the app once they are signed in, and use scope "handoff" if they need more.`;
+export const AUDIENCE_APP = `AUDIENCE: this user is signed in to the DeepWell app. Use <knowledge> plus the single <account_context> summary, if one is provided, which describes only THEIR OWN business. If there is no <account_context>, you have no account facts. Never state anything about any other business.`;
 
-export const SYSTEM_TEXT = `${RULES}\n\n<knowledge>\n${MODEL_KB}\n</knowledge>`;
+export const RULES_SHINGLES = new Set([...makePromptShingles(RULES), ...makePromptShingles(AUDIENCE_PUBLIC), ...makePromptShingles(AUDIENCE_APP)]);
+
+/** Two byte-stable cached prefixes. The public one contains ONLY audience:public articles; the full KB never reaches a signed-out visitor. */
+export const SYSTEM_TEXT_PUBLIC = `${RULES}\n\n${AUDIENCE_PUBLIC}\n\n<knowledge>\n${MODEL_KB_PUBLIC}\n</knowledge>`;
+export const SYSTEM_TEXT_APP = `${RULES}\n\n${AUDIENCE_APP}\n\n<knowledge>\n${MODEL_KB}\n</knowledge>`;
+export const SYSTEM_TEXT = SYSTEM_TEXT_APP;
 
 export const REPLY_TOOL = Object.freeze({
   name: 'reply',
@@ -77,15 +88,15 @@ export function sanitizeHistory(history, max = LIMITS.historyToModel) {
 /**
  * @param {{message: string, history?: any[], surface: string, page?: string, accountContext?: object|null, promptTtl?: '1h'|'5m'}} p
  */
-export function buildRequest({ message, history, surface, page, accountContext = null, model = MODEL.id, ttl = '1h', publicSurface = false }) {
+export function buildRequest({ message, history, surface, page, accountContext = null, model = MODEL.id, ttl = '1h', publicSurface = true }) {
   const plan = planCacheBreakpoints(
-    { tools: [{ block: REPLY_TOOL }], system: [{ block: { type: 'text', text: SYSTEM_TEXT }, breakpoint: true }] },
+    { tools: [{ block: REPLY_TOOL }], system: [{ block: { type: 'text', text: publicSurface ? SYSTEM_TEXT_PUBLIC : SYSTEM_TEXT_APP }, breakpoint: true }] },
     model,
     ttl === '1h' ? { ttl: '1h' } : {}
   );
   const ctxLines = [`surface: ${['public', 'app', 'mobile'].includes(surface) ? surface : 'public'}`];
   if (typeof page === 'string' && page) ctxLines.push(`page: ${defang(page).slice(0, 80)}`);
-  const acct = accountContext ? `\n<account_context>\n${JSON.stringify(accountContext)}\n</account_context>` : '';
+  const acct = accountContext && !publicSurface ? `\n<account_context>\n${JSON.stringify(accountContext)}\n</account_context>` : '';
 
   const messages = [];
   const hist = sanitizeHistory(history);

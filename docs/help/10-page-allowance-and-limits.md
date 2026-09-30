@@ -18,6 +18,7 @@ Solo stores up to {{solo.docs}} documents, Shop {{shop.docs}}, Crew {{crew.docs}
 
 ### What happens when I reach my page limit?
 ~ reach my limit, hit the limit, monthly page limit reached, over the page limit, out of pages, exceeded allowance, limit reached, out of scans, ran out of pages, more pages, need more pages, upgrade for more pages, page cap
+!covers:A-UPLOAD-ERR
 New uploads pause with a message that the monthly page limit is reached. Existing records and Donovan keep working. Upgrade your plan for a larger allowance, or email support@deepwelltechnology.com. If you have a large backlog, Records Rescue can scan it separately.
 
 ### Do questions to Donovan count against my allowance?

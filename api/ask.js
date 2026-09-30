@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff, providerFailureMessage } from "./_lib/claude.js";
 import { denyAuth } from "./_lib/auth.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
+import { helpGate, answerHowTo } from "./_lib/support/askhelp.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";
 import { withTenant, normalizeMatchText } from "./_lib/recordsStore.js";
 import { mergeDocumentVia, formatVia } from "./_lib/routes/customers.js";
@@ -722,7 +723,11 @@ export default async function handler(req, res) {
   // R14 integration fix: `todayResolved` is declared inside the try block below, invisible to this closure —
   // every call threw a ReferenceError and the claim check was silently skipped on EVERY answer.
   let claimsToday = null;
+  // Round 29: set when the question looked like an app how-to that the strict help route did not answer; a no-answer
+  // result then carries `helpHint` so the UI can point to the DeepWell Help chat instead of a bare "not in your records".
+  let helpHint = false;
   const send = (status, body) => {
+    if (helpHint && body?.data && typeof body.data === "object" && body.data.kind === "no-answer" && !body.data.help) body.data.helpHint = true;
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
     // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
     if (body?.data && typeof body.data === "object") {
@@ -795,6 +800,24 @@ export default async function handler(req, res) {
     }
     if (question.length > MAX_QUESTION) {
       return res.status(400).json({ error: "Question is too long" });
+    }
+
+    // ---- Round 29: how-to questions about the app itself ("how do I invite a tech", "where is billing") -------
+    // Answered from the signed-in DeepWell Help KB at $0, labelled "From DeepWell Help: <article>". Two layers keep
+    // records questions out: a cheap regex gate (how-to shape + app vocabulary + no serial/address/person/date/
+    // "who did"/"how many jobs" signal) and, only when it passes, a strict FAQ match (lazy-imported). Anything else,
+    // including every scorecard question and every API-key call, continues to the normal pipeline untouched.
+    if (!scorecardCall && !auth.viaKey && helpGate(question)) {
+      helpHint = true;
+      try {
+        const help = await answerHowTo(question);
+        if (help) {
+          console.log(JSON.stringify({ route: "ask", help_route: true, help_entry: help.help.entry }));
+          return send(200, { success: true, data: help });
+        }
+      } catch (err) {
+        console.error("ask: help route failed, continuing with the normal pipeline:", err?.message);
+      }
     }
 
     // TEAM T2: fold a real follow-up into a self-contained question (see the

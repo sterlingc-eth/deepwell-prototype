@@ -14,12 +14,13 @@ Check that you're signing in with the email your invite went to, and use the pas
 !handoff:sign-in-help
 
 ### My invite email didn't arrive
-~ invite not arriving, invite email, did not get invite, invitation not received, didnt receive invite, tech didnt get invite, invite expired, resend invite, invite spam, invite link, invitation email
+~ my tech never got the invite email, tech never got the invite, never got the invite, invite never came, never received the invite, invite not arriving, invite email, did not get invite, invitation not received, didnt receive invite, tech didnt get invite, invite expired, resend invite, invite spam, invite link, invitation email
 Ask the person to check spam or junk. Confirm the address is right in **Team**, and re-send the invite if needed. Invites count toward your plan's login limit, and if you're at the limit the invite is blocked with a message that says so.
 
 ### An upload failed
-~ upload failed, upload error, cant upload, cannot upload, upload not working, upload wont work, file wont upload, upload stuck, failed to upload, upload fails, error uploading, upload problem
-Check the file type (PDF, JPG, PNG, WEBP, TIFF, TXT, CSV or ZIP) and size (100 MB or less). A billing message such as "Choose a plan to get started" or "Monthly page limit reached" means uploads are paused for that reason. See the billing and page-limit articles. Otherwise, email support@deepwelltechnology.com with the file name and time.
+~ upload failed, upload error, cant upload, cannot upload, upload not working, upload wont work, file wont upload, upload stuck, failed to upload, upload fails, error uploading, upload problem, file too large, monthly page limit reached, subscription required, daily ai budget, couldnt reach deepwell, waiting for the servers rate limit, upload error message, pdfs and photos have to be under, already on file
+!covers:A-UPLOAD-ERR
+Check the file type (PDF, JPG, PNG, WEBP, TIFF, TXT, CSV or ZIP) and size (PDFs and photos under 24 MB, text/CSV under 20 MB). "Choose a plan to get started", "Subscription required" or "Monthly page limit reached" mean uploads are paused for billing reasons (**See plans**). "Daily AI budget reached" resumes tomorrow. "Couldn't reach DeepWell" means check your connection and retry. "Already on file" means that exact file is already in. Otherwise email support@deepwelltechnology.com with the file name and time.
 
 ### Donovan gave a wrong or missing answer
 ~ wrong answer, donovan wrong, incorrect answer, answer is wrong, bad answer, not right, missing answer, thumbs down, report a wrong answer, donovan mistake, no answer
@@ -28,10 +29,12 @@ Open the cited source and check it. The document may still be processing, or a f
 
 ### I can't see the Dashboard or Team screen
 ~ cant see team, no team screen, cant see billing, no dashboard, missing screen, cant find team, permission denied, requires admin, admin role, not authorized, forbidden, access denied, why cant i
-Some screens and actions are for admins, including billing, invites and export. If you're a member, ask your shop's admin. On a phone, the lite app only has Ask, Scan and Docs, so use the desktop app for the rest.
+!covers:A-TEAM-MEMBER
+Some screens and actions are for admins. Team is hidden from members, and if a member reaches it they see a read-only list of members. Billing, invites, exports and deletions need an admin, and a member who tries gets "This action requires the 'admin' role in your shop." Ask your shop's admin. On a phone the app only has Ask, Scan and Docs, so use the desktop app for the rest.
 
 ### I get "API access is included on the Fleet plan"
 ~ api access error, api access is included on the fleet plan, cant create api key, api key error, create api key, api keys not working, 403 api, api forbidden
+!covers:A-APIKEYS-GATE
 API keys are a Fleet-only feature, so other plans can't create them. Upgrade to Fleet from Billing, or email hello@deepwelltechnology.com.
 
 ### The page looks broken or won't load

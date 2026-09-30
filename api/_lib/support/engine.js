@@ -9,14 +9,14 @@
  * The first nine steps and the FAQ are free. The model is reached only for an on-topic question the FAQ could
  * not answer, only when a dedicated key exists, the kill switch is off and every $ cap has room.
  */
-import { PRICES } from './kb.generated.js';
+import { PRICES, ENTRIES, ARTICLES, MODEL_KB, MODEL_KB_PUBLIC } from './kb.generated.js';
 import { LIMITS, CANNED, STARTERS, SOURCES_ACCOUNT, SUPPORT_EMAIL } from './policy.js';
 import {
   sanitizeInput, detectSensitive, detectInjection, detectSmalltalk, detectIdentity, detectHumanRequest,
   detectHandoffTrigger, detectRecordsStrong, detectRecordsWeak, detectCompetitorComparison, detectTradeHowTo,
-  detectOffTopic, hasDeepwellLexicon, detectAccountIntent, validateModelReply, cleanLinksAndMarkup, defang,
+  detectOffTopic, hasDeepwellLexicon, detectAccountIntent, validateModelReply, cleanLinksAndMarkup, defang, capWords,
 } from './guard.js';
-import { matchFaq, suggestionsFor, contactEntry, articleById } from './faq.js';
+import { matchFaq, suggestionsFor, contactEntry, articleById, PUBLIC_ARTICLES } from './faq.js';
 import { buildRequest, sanitizeHistory, RULES_SHINGLES } from './prompt.js';
 import { estimateTokens } from '../promptCache.js';
 import { SYSTEM_TEXT } from './prompt.js';
@@ -172,14 +172,21 @@ export async function respond(input, deps = {}) {
   if (recStrong) return done(reply('redirect', signedIn ? CANNED.recordsRedirectApp : CANNED.recordsRedirectPublic, { redirectTo: 'ask' }), 'redirect', { reason: `records:${recStrong}` });
 
   // 9. the free FAQ
-  const faq = matchFaq(message);
+  const faq = matchFaq(message, { allowApp: signedIn });
   const trig = detectHandoffTrigger(message);
   if (faq.hit) {
     const { entry, article } = faq.hit;
     let body = reply('faq', entry.a, { sources: [{ id: article.id, title: article.title }] });
     const reason = entry.handoff ?? trig;
     if (reason) body = { ...body, ...handoff(reason) };
-    return done(withSuggestions(body, suggestionsFor(entry)), 'faq', { faqId: entry.id, score: Math.round(faq.hit.score * 100) / 100 });
+    return done(withSuggestions(body, suggestionsFor(entry, { allowApp: signedIn })), 'faq', { faqId: entry.id, score: Math.round(faq.hit.score * 100) / 100 });
+  }
+
+  // an app-only topic asked by a signed-out visitor: never the app article, only a pointer + the public overview
+  if (faq.appOnly) {
+    const ov = articleById(APP_ONLY_OVERVIEW[faq.appOnly.article] ?? 'what-is-deepwell');
+    const chips = ENTRIES.filter((e) => e.article === ov.id && e.audience !== 'app').map((e) => e.q).filter((q) => q.length <= 60).slice(0, 3);
+    return done(withSuggestions(reply('faq', `That one is covered inside the DeepWell app once you are signed in. For the public overview, see "${ov.title}", or I can pass your question to the team.`, { ...handoff('app-only-topic'), sources: [{ id: ov.id, title: ov.title }] }), chips), 'faq', { faqId: 'app-only', reason: `app-only:${faq.appOnly.article}` });
   }
 
   if (needSignIn) return done(reply('faq', CANNED.signInForAccount, { sources: [] }), 'faq', { faqId: 'account-signin' });
@@ -208,7 +215,7 @@ export async function respond(input, deps = {}) {
         accountContext = toModelContext(p, u);
       } catch { accountContext = null; }
     }
-    const request = buildRequest({ message, history: input.history, surface, page: input.page, accountContext, model: model.id, publicSurface: pub });
+    const request = buildRequest({ message, history: input.history, surface, page: input.page, accountContext, model: model.id, publicSurface: !signedIn });
     const estimate = estimateTurnCostUsd(request);
     if (estimate > LIMITS.perTurnMaxUsd) {
       meta.reason = 'turn-cost-cap';
@@ -225,7 +232,7 @@ export async function respond(input, deps = {}) {
           meta.usage = res.usage;
           meta.latencyMs = res.latencyMs;
           try { await deps.budget.record({ surface, auth: input.auth ?? null, usd }); } catch { /* best effort */ }
-          const out = interpretModelOutput(res.input, { accountUsed: Boolean(accountContext), meta });
+          const out = interpretModelOutput(res.input, { accountUsed: Boolean(accountContext), meta, pub: !signedIn });
           if (out) return done(withSuggestions(out.body, out.suggestions), 'model', {});
         } else {
           meta.reason = `model-${res?.error ?? 'error'}`;
@@ -241,6 +248,22 @@ export async function respond(input, deps = {}) {
   return done(withSuggestions(body, near), 'fallback', {});
 }
 
+const CAP_WORDS_PUBLIC = capWords(`${MODEL_KB_PUBLIC}\n${Object.values(CANNED).join('\n')}\n${ARTICLES.filter((a) => PUBLIC_ARTICLES.has(a.id)).map((a) => a.title).join('\n')}`);
+const CAP_WORDS_FULL = capWords(`${MODEL_KB}\n${Object.values(CANNED).join('\n')}\n${ARTICLES.map((a) => a.title).join('\n')}`);
+
+/** Public overview article to point a signed-out visitor to, per app-only article (audience enforcement, faq.js). */
+const APP_ONLY_OVERVIEW = Object.freeze({
+  'signing-in-and-logins': 'plans-and-pricing',
+  'change-cancel-plan-invoices': 'trial-and-billing-dates',
+  'uploading-and-scanning-web': 'what-is-deepwell',
+  'scan-status-and-needs-info': 'what-is-deepwell',
+  'exports-and-warranty-export': 'what-is-deepwell',
+  'team-and-notifications': 'what-is-deepwell',
+  'support-access-grants': 'security-and-privacy',
+  'data-export-and-deletion': 'security-and-privacy',
+  troubleshooting: 'contacting-humans',
+});
+
 /** The small fixed-key context object handed to the model (never free text; no ids, names or filenames). */
 export function toModelContext(plan, uploads) {
   const o = {};
@@ -250,16 +273,16 @@ export function toModelContext(plan, uploads) {
 }
 
 /** Turn the model's structured reply into a response body, or null to use the canned fallback. */
-function interpretModelOutput(input, { accountUsed, meta }) {
+function interpretModelOutput(input, { accountUsed, meta, pub = true }) {
   if (!input || typeof input !== 'object') { meta.reason = 'model-no-output'; return null; }
   const scope = input.scope;
   if (scope === 'off_topic') return { body: reply('guard', CANNED.offTopic), suggestions: [] };
   if (scope === 'donovan') return { body: reply('redirect', CANNED.recordsRedirectApp, { redirectTo: 'ask' }), suggestions: [] };
   if (scope === 'handoff') { meta.reason = 'model-handoff'; return null; }
   if (scope !== 'in_scope') { meta.reason = 'model-bad-scope'; return null; }
-  const ids = (Array.isArray(input.article_ids) ? input.article_ids : []).map(String).filter((id) => articleById(id));
+  const ids = (Array.isArray(input.article_ids) ? input.article_ids : []).map(String).filter((id) => { const a = articleById(id); return a && (!pub || PUBLIC_ARTICLES.has(a.id)); });
   if (ids.length === 0 && !accountUsed) { meta.reason = 'model-no-citation'; return null; }
-  const v = validateModelReply(input.answer, { allowedAmounts: PRICES.allowedAmounts, promptShingles: RULES_SHINGLES });
+  const v = validateModelReply(input.answer, { allowedAmounts: PRICES.allowedAmounts, promptShingles: RULES_SHINGLES, knownCapWords: pub ? CAP_WORDS_PUBLIC : CAP_WORDS_FULL });
   if (!v.ok) { meta.reason = `validator:${v.reason}`; return null; }
   const sources = [...new Set(ids)].slice(0, 2).map((id) => ({ id, title: articleById(id).title }));
   if (accountUsed && sources.length === 0) sources.push(SOURCES_ACCOUNT);
