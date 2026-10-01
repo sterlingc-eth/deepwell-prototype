@@ -30,6 +30,7 @@ const eq = (name, got, want) =>
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.env.NEON_CONNECTION_STRING = 'postgres://harness:harness@localhost:5432/harness';
 process.env.CLAUDE_API_KEY = 'sk-test-not-real';
+process.env.DOSSIER_MODEL = '1'; // R32: model dossier summaries are opt-in; this script tests that path with a mocked model
 delete process.env.VOYAGE_API_KEY;
 delete process.env.DONOVAN_RERANK_MODEL;
 delete process.env.DONOVAN_SEMANTIC;

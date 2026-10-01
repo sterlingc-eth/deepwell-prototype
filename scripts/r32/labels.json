@@ -1,0 +1,723 @@
+{
+ "note": "truth from ANSWER_KEY.json + golden template parser; tools[] hand-labelled from the source documents; see build-labels.mjs",
+ "docs": [
+  {
+   "file": "corpus/001-invoice-c0.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Linda Fitzgerald",
+    "service_address": "100 E Main St, Phoenix, AZ 85001",
+    "customer_phone": "(480) 555-0110",
+    "customer_email": "linda.fitzgerald0@gmail.com",
+    "serial_number": "F100002",
+    "model": "4TTR4002L1000AA",
+    "manufacturer": "Trane",
+    "installation_date": "2009-01-01",
+    "service_date": "2009-01-01",
+    "technician": "Danny Ochoa",
+    "status": "Completed",
+    "labor_hours": "1.5",
+    "invoice_number": "INV-20000"
+   }
+  },
+  {
+   "file": "corpus/002-warranty-registration-c0.pdf",
+   "type": "warranty-registration",
+   "truth": {
+    "customer_name": "Linda Fitzgerald",
+    "service_address": "100 E Main St, Phoenix, AZ 85001",
+    "customer_email": "linda.fitzgerald0@gmail.com",
+    "serial_number": "F100002",
+    "model": "4TTR4002L1000AA",
+    "manufacturer": "Trane",
+    "installation_date": "2009-01-01",
+    "tonnage": "2 ton",
+    "refrigerant": "R-410A",
+    "warranty_registered_date": "2009-01-16",
+    "warranty_term": "5-10 year parts (per manufacturer terms)"
+   }
+  },
+  {
+   "file": "corpus/003-service-ticket-c0.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "Linda Fitzgerald",
+    "service_address": "100 E Main St, Phoenix, AZ 85001",
+    "customer_phone": "(480) 555-0110",
+    "service_date": "2010-05-16",
+    "technician": "Kevin Pratt",
+    "status": "Completed",
+    "service_type": "Preventive Maintenance"
+   }
+  },
+  {
+   "file": "corpus/004-work-order-c0.pdf",
+   "type": "work-order",
+   "truth": {
+    "customer_name": "Linda Fitzgerald",
+    "service_address": "100 E Main St, Phoenix, AZ 85001",
+    "customer_phone": "(480) 555-0110",
+    "service_date": "2010-08-24",
+    "technician": "Danny Ochoa",
+    "status": "Completed",
+    "invoice_number": "WO-40000"
+   }
+  },
+  {
+   "file": "corpus/005-startup-sheet-c0.pdf",
+   "type": "startup-sheet",
+   "truth": {
+    "customer_name": "Linda Fitzgerald",
+    "service_address": "100 E Main St, Phoenix, AZ 85001",
+    "serial_number": "F100002",
+    "model": "4TTR4002L1000AA",
+    "manufacturer": "Trane",
+    "installation_date": "2009-01-01",
+    "service_date": "2009-01-01",
+    "technician": "Danny Ochoa",
+    "tonnage": "2 ton",
+    "refrigerant": "R-410A"
+   }
+  },
+  {
+   "file": "corpus/006-invoice-c1.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Thomas Mercer",
+    "service_address": "137 W Southern Ave, Phoenix, AZ 85001",
+    "customer_phone": "480-555-0111",
+    "serial_number": "2C100003",
+    "model": "24ACC634A003",
+    "manufacturer": "Carrier",
+    "installation_date": "2016-06-10",
+    "service_date": "2016-06-10",
+    "technician": "Marisol Vega",
+    "status": "Completed",
+    "labor_hours": "1.5",
+    "invoice_number": "INV-20001"
+   }
+  },
+  {
+   "file": "corpus/007-proposal-quote-c1.pdf",
+   "type": "proposal-quote",
+   "truth": {
+    "customer_name": "Thomas Mercer",
+    "service_address": "137 W Southern Ave, Phoenix, AZ 85001"
+   }
+  },
+  {
+   "file": "corpus/008-service-ticket-c1.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "Thomas Mercer",
+    "service_address": "137 W Southern Ave, Phoenix, AZ 85001",
+    "customer_phone": "480-555-0111",
+    "service_date": "2017-11-05",
+    "technician": "Denise Ford",
+    "status": "Completed",
+    "service_type": "Repair"
+   }
+  },
+  {
+   "file": "corpus/009-permit-p1.pdf",
+   "type": "permit",
+   "truth": {
+    "customer_name": "Thomas Mercer",
+    "service_address": "137 W Southern Ave, Phoenix, AZ 85001",
+    "status": "Issued",
+    "permit_number": "BP-2026-10001"
+   }
+  },
+  {
+   "file": "corpus/010-dispatch-note-c1.txt",
+   "type": "dispatch-note",
+   "truth": {
+    "customer_name": "Thomas Mercer",
+    "service_address": "137 W Southern Ave, Phoenix, AZ 85001",
+    "technician": "Marisol Vega"
+   }
+  },
+  {
+   "file": "corpus/011-invoice-c2.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Donna Sorensen",
+    "service_address": "174 N College Ave, Phoenix, AZ 85001",
+    "customer_phone": "480.555.0112",
+    "customer_email": "donna.sorensen2@outlook.com",
+    "serial_number": "2G100004",
+    "model": "GSX163261FB",
+    "manufacturer": "Goodman",
+    "installation_date": "2023-11-19",
+    "service_date": "2023-11-19",
+    "technician": "Kevin Pratt",
+    "status": "Completed",
+    "labor_hours": "3.5",
+    "invoice_number": "INV-20002"
+   }
+  },
+  {
+   "file": "corpus/012-warranty-registration-c2.pdf",
+   "type": "warranty-registration",
+   "truth": {
+    "customer_name": "Donna Sorensen",
+    "service_address": "174 N College Ave, Phoenix, AZ 85001",
+    "customer_email": "donna.sorensen2@outlook.com",
+    "serial_number": "2G100004",
+    "model": "GSX163261FB",
+    "manufacturer": "Goodman",
+    "installation_date": "2023-11-19",
+    "tonnage": "3 ton",
+    "refrigerant": "R-410A",
+    "warranty_registered_date": "2023-12-06",
+    "warranty_term": "5-10 year parts (per manufacturer terms)"
+   }
+  },
+  {
+   "file": "corpus/013-service-ticket-c2.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "Donna Sorensen",
+    "service_address": "174 N College Ave, Phoenix, AZ 85001",
+    "customer_phone": "480.555.0112",
+    "service_date": "2025-04-28",
+    "technician": "Ray Sutton",
+    "status": "Completed",
+    "service_type": "Repair"
+   }
+  },
+  {
+   "file": "corpus/014-inspection-report-c2.pdf",
+   "type": "inspection-report",
+   "truth": {
+    "customer_name": "Donna Sorensen",
+    "service_address": "174 N College Ave, Phoenix, AZ 85001",
+    "service_date": "2026-05-09",
+    "technician": "Kevin Pratt"
+   }
+  },
+  {
+   "file": "corpus/015-equipment-record-c2.pdf",
+   "type": "equipment-record",
+   "truth": {
+    "customer_name": "Donna Sorensen",
+    "service_address": "174 N College Ave, Phoenix, AZ 85001",
+    "serial_number": "2G100004",
+    "model": "GSX163261FB",
+    "manufacturer": "Goodman",
+    "equipment_type": "condenser"
+   }
+  },
+  {
+   "file": "corpus/016-invoice-c3.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Ronald Bracken",
+    "service_address": "211 E University Dr, Phoenix, AZ 85001",
+    "customer_phone": "480-555-0113",
+    "serial_number": "LX100005",
+    "model": "ML14XC1-046-230",
+    "manufacturer": "Lennox",
+    "installation_date": "2012-04-28",
+    "service_date": "2012-04-28",
+    "technician": "Denise Ford",
+    "status": "Completed",
+    "labor_hours": "1.5",
+    "invoice_number": "INV-20003"
+   }
+  },
+  {
+   "file": "corpus/017-proposal-quote-c3.pdf",
+   "type": "proposal-quote",
+   "truth": {
+    "customer_name": "Ronald Bracken",
+    "service_address": "211 E University Dr, Phoenix, AZ 85001"
+   }
+  },
+  {
+   "file": "corpus/018-service-ticket-c3.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "Ronald Bracken",
+    "service_address": "211 E University Dr, Phoenix, AZ 85001",
+    "customer_phone": "480-555-0113",
+    "service_date": "2013-10-19",
+    "technician": "Wyatt Coburn",
+    "status": "Completed",
+    "service_type": "Preventive Maintenance"
+   }
+  },
+  {
+   "file": "corpus/019-correspondence-c3.pdf",
+   "type": "correspondence",
+   "truth": {
+    "customer_name": "Ronald Bracken",
+    "service_address": "211 E University Dr, Phoenix, AZ 85001",
+    "customer_phone": "480-555-0113"
+   }
+  },
+  {
+   "file": "corpus/020-maintenance-agreement-c3.pdf",
+   "type": "maintenance-agreement",
+   "truth": {
+    "customer_name": "Ronald Bracken",
+    "service_address": "211 E University Dr, Phoenix, AZ 85001",
+    "agreement_term": "01/01/2025 - 12/31/2026"
+   }
+  },
+  {
+   "file": "corpus/021-invoice-c4.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Amy Isaacson",
+    "service_address": "248 W Guadalupe Rd, Phoenix, AZ 85001",
+    "customer_phone": "(480) 555-0114",
+    "customer_email": "amy.isaacson4@aol.com",
+    "serial_number": "2R100006",
+    "model": "RA1456AJ1NA",
+    "manufacturer": "Rheem",
+    "installation_date": "2019-09-09",
+    "service_date": "2019-09-09",
+    "technician": "Ray Sutton",
+    "status": "Completed",
+    "labor_hours": "2.5",
+    "invoice_number": "INV-20004"
+   }
+  },
+  {
+   "file": "corpus/022-warranty-registration-c4.pdf",
+   "type": "warranty-registration",
+   "truth": {
+    "customer_name": "Amy Isaacson",
+    "service_address": "248 W Guadalupe Rd, Phoenix, AZ 85001",
+    "customer_email": "amy.isaacson4@aol.com",
+    "serial_number": "2R100006",
+    "model": "RA1456AJ1NA",
+    "manufacturer": "Rheem",
+    "installation_date": "2019-09-09",
+    "tonnage": "5 ton",
+    "refrigerant": "R-410A",
+    "warranty_registered_date": "2019-09-28",
+    "warranty_term": "5-10 year parts (per manufacturer terms)"
+   }
+  },
+  {
+   "file": "corpus/023-service-ticket-c4.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "Amy Isaacson",
+    "service_address": "248 W Guadalupe Rd, Phoenix, AZ 85001",
+    "customer_phone": "(480) 555-0114",
+    "service_date": "2021-03-14",
+    "technician": "Danny Ochoa",
+    "status": "Completed",
+    "service_type": "Repair"
+   }
+  },
+  {
+   "file": "corpus/024-purchase-order-c4.pdf",
+   "type": "purchase-order",
+   "truth": {
+    "customer_name": "Amy Isaacson",
+    "service_address": "248 W Guadalupe Rd, Phoenix, AZ 85001"
+   }
+  },
+  {
+   "file": "corpus/026-invoice-c5.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "David Prentiss",
+    "service_address": "285 E Elliot Rd, Phoenix, AZ 85001",
+    "serial_number": "Y100007",
+    "model": "YXV026BF31TAA",
+    "manufacturer": "York",
+    "installation_date": "2026-02-18",
+    "service_date": "2026-02-18",
+    "technician": "Wyatt Coburn",
+    "status": "Completed",
+    "labor_hours": "2.5",
+    "invoice_number": "INV-20005"
+   }
+  },
+  {
+   "file": "corpus/027-proposal-quote-c5.pdf",
+   "type": "proposal-quote",
+   "truth": {
+    "customer_name": "David Prentiss",
+    "service_address": "285 E Elliot Rd, Phoenix, AZ 85001"
+   }
+  },
+  {
+   "file": "corpus/028-service-ticket-c5.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "David Prentiss",
+    "service_address": "285 E Elliot Rd, Phoenix, AZ 85001",
+    "service_date": "2026-09-21",
+    "technician": "Marisol Vega",
+    "status": "Completed",
+    "service_type": "Repair"
+   }
+  },
+  {
+   "file": "corpus/029-startup-sheet-c5.pdf",
+   "type": "startup-sheet",
+   "truth": {
+    "customer_name": "David Prentiss",
+    "service_address": "285 E Elliot Rd, Phoenix, AZ 85001",
+    "serial_number": "Y100007",
+    "model": "YXV026BF31TAA",
+    "manufacturer": "York",
+    "installation_date": "2026-02-18",
+    "service_date": "2026-02-18",
+    "technician": "Wyatt Coburn",
+    "tonnage": "2 ton",
+    "refrigerant": "R-454B"
+   }
+  },
+  {
+   "file": "corpus/031-invoice-c6.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Sandra Wyckoff",
+    "service_address": "322 N Greenfield Rd, Phoenix, AZ 85001",
+    "customer_phone": "480.555.0116",
+    "customer_email": "sandra.wyckoff1@comcast.net",
+    "serial_number": "D100008",
+    "model": "DZ16SA0361",
+    "manufacturer": "Daikin",
+    "installation_date": "2015-07-27",
+    "service_date": "2015-07-27",
+    "technician": "Danny Ochoa",
+    "status": "Completed",
+    "labor_hours": "3.5",
+    "invoice_number": "INV-20006"
+   }
+  },
+  {
+   "file": "corpus/032-warranty-registration-c6.pdf",
+   "type": "warranty-registration",
+   "truth": {
+    "customer_name": "Sandra Wyckoff",
+    "service_address": "322 N Greenfield Rd, Phoenix, AZ 85001",
+    "customer_email": "sandra.wyckoff1@comcast.net",
+    "serial_number": "D100008",
+    "model": "DZ16SA0361",
+    "manufacturer": "Daikin",
+    "installation_date": "2015-07-27",
+    "tonnage": "3 ton",
+    "refrigerant": "R-410A",
+    "warranty_registered_date": "2015-08-17",
+    "warranty_term": "5-10 year parts (per manufacturer terms)"
+   }
+  },
+  {
+   "file": "corpus/033-service-ticket-c6.pdf",
+   "type": "service-ticket",
+   "truth": {
+    "customer_name": "Sandra Wyckoff",
+    "service_address": "322 N Greenfield Rd, Phoenix, AZ 85001",
+    "customer_phone": "480.555.0116",
+    "service_date": "2017-02-24",
+    "technician": "Kevin Pratt",
+    "status": "Completed",
+    "service_type": "Preventive Maintenance"
+   }
+  },
+  {
+   "file": "corpus/034-dispatch-note-c6.txt",
+   "type": "dispatch-note",
+   "truth": {
+    "customer_name": "Sandra Wyckoff",
+    "service_address": "322 N Greenfield Rd, Phoenix, AZ 85001",
+    "technician": "Danny Ochoa"
+   }
+  },
+  {
+   "file": "corpus/035-work-order-c6.pdf",
+   "type": "work-order",
+   "truth": {
+    "customer_name": "Sandra Wyckoff",
+    "service_address": "322 N Greenfield Rd, Phoenix, AZ 85001",
+    "customer_phone": "480.555.0116",
+    "service_date": "2017-03-24",
+    "technician": "Danny Ochoa",
+    "status": "Completed",
+    "invoice_number": "WO-40006"
+   }
+  },
+  {
+   "file": "corpus/036-invoice-c7.pdf",
+   "type": "invoice",
+   "truth": {
+    "customer_name": "Steven Ellison",
+    "service_address": "359 E Broadway Rd, Phoenix, AZ 85001",
+    "customer_phone": "480-555-0117",
+    "serial_number": "M100009",
+    "model": "MUZ-FS30NA",
+    "manufacturer": "Mitsubishi",
+    "installation_date": "2022-12-08",
+    "service_date": "2022-12-08",
+    "technician": "Marisol Vega",
+    "status": "Completed",
+    "labor_hours": "1.5",
+    "invoice_number": "INV-20007"
+   }
+  },
+  {
+   "file": "corpus/037-proposal-quote-c7.pdf",
+   "type": "proposal-quote",
+   "truth": {
+    "customer_name": "Steven Ellison",
+    "service_address": "359 E Broadway Rd, Phoenix, AZ 85001"
+   }
+  },
+  {
+   "file": "corpus/039-equipment-record-c7.pdf",
+   "type": "equipment-record",
+   "truth": {
+    "customer_name": "Steven Ellison",
+    "service_address": "359 E Broadway Rd, Phoenix, AZ 85001",
+    "serial_number": "M100009",
+    "model": "MUZ-FS30NA",
+    "manufacturer": "Mitsubishi",
+    "equipment_type": "condenser"
+   }
+  },
+  {
+   "file": "corpus/040-permit-p7.pdf",
+   "type": "permit",
+   "truth": {
+    "customer_name": "Steven Ellison",
+    "service_address": "359 E Broadway Rd, Phoenix, AZ 85001",
+    "status": "Issued",
+    "permit_number": "BP-2026-10007"
+   }
+  },
+  {
+   "file": "corpus/042-warranty-registration-c8.pdf",
+   "type": "warranty-registration",
+   "truth": {
+    "customer_name": "Laura Lombardi",
+    "service_address": "396 W Baseline Rd, Phoenix, AZ 85001",
+    "customer_email": "laura.lombardi3@yahoo.com",
+    "serial_number": "F100010",
+    "model": "4TTR4004L1000AA",
+    "manufacturer": "Trane",
+    "installation_date": "2011-05-17",
+    "tonnage": "4 ton",
+    "refrigerant": "R-410A",
+    "warranty_registered_date": "2011-06-09",
+    "warranty_term": "5-10 year parts (per manufacturer terms)"
+   }
+  },
+  {
+   "file": "corpus/044-maintenance-agreement-c8.pdf",
+   "type": "maintenance-agreement",
+   "truth": {
+    "customer_name": "Laura Lombardi",
+    "service_address": "396 W Baseline Rd, Phoenix, AZ 85001",
+    "agreement_term": "01/01/2025 - 12/31/2026"
+   }
+  },
+  {
+   "file": "corpus/045-inspection-report-c8.pdf",
+   "type": "inspection-report",
+   "truth": {
+    "customer_name": "Laura Lombardi",
+    "service_address": "396 W Baseline Rd, Phoenix, AZ 85001",
+    "service_date": "2013-11-10",
+    "technician": "Kevin Pratt"
+   }
+  },
+  {
+   "file": "corpus/050-correspondence-c9.pdf",
+   "type": "correspondence",
+   "truth": {
+    "customer_name": "Robert Salazar",
+    "service_address": "433 S Alma School Rd, Mesa, AZ 85201",
+    "customer_phone": "480-555-0119"
+   }
+  },
+  {
+   "file": "corpus/055-purchase-order-c10.pdf",
+   "type": "purchase-order",
+   "truth": {
+    "customer_name": "Karen Abernathy",
+    "service_address": "470 E Chandler Blvd, Mesa, AZ 85201"
+   }
+  },
+  {
+   "file": "corpus/059-work-order-c11.pdf",
+   "type": "work-order",
+   "truth": {
+    "customer_name": "Donald Sorenson",
+    "service_address": "507 N Dobson Rd, Mesa, AZ 85201",
+    "customer_phone": "480-555-0121",
+    "service_date": "2016-04-18",
+    "technician": "Wyatt Coburn",
+    "status": "Completed",
+    "invoice_number": "WO-40011"
+   }
+  },
+  {
+   "file": "corpus/060-startup-sheet-c11.pdf",
+   "type": "startup-sheet",
+   "truth": {
+    "customer_name": "Donald Sorenson",
+    "service_address": "507 N Dobson Rd, Mesa, AZ 85201",
+    "serial_number": "LX100013",
+    "model": "ML14XC1-036-230",
+    "manufacturer": "Lennox",
+    "installation_date": "2014-08-16",
+    "service_date": "2014-08-16",
+    "technician": "Wyatt Coburn",
+    "tonnage": "3 ton",
+    "refrigerant": "R-410A"
+   }
+  },
+  {
+   "file": "corpus/064-permit-p12.pdf",
+   "type": "permit",
+   "truth": {
+    "customer_name": "Deborah Ortega",
+    "service_address": "544 E Ray Rd, Mesa, AZ 85201",
+    "status": "Issued",
+    "permit_number": "BP-2026-10012"
+   }
+  },
+  {
+   "file": "corpus/069-inspection-report-c13.pdf",
+   "type": "inspection-report",
+   "truth": {
+    "customer_name": "Gary Villegas",
+    "service_address": "581 W Thomas Rd, Mesa, AZ 85201",
+    "service_date": "2012-12-05",
+    "technician": "Marisol Vega"
+   }
+  },
+  {
+   "file": "corpus/070-equipment-record-c13.pdf",
+   "type": "equipment-record",
+   "truth": {
+    "customer_name": "Gary Villegas",
+    "service_address": "581 W Thomas Rd, Mesa, AZ 85201",
+    "serial_number": "Y100015",
+    "model": "YXV046BF31TAA",
+    "manufacturer": "York",
+    "equipment_type": "condenser"
+   }
+  },
+  {
+   "file": "corpus/075-maintenance-agreement-c14.pdf",
+   "type": "maintenance-agreement",
+   "truth": {
+    "customer_name": "Barbara Delgado",
+    "service_address": "618 N Power Rd, Mesa, AZ 85201",
+    "agreement_term": "01/01/2025 - 12/31/2026"
+   }
+  },
+  {
+   "file": "corpus/090-work-order-c17.pdf",
+   "type": "work-order",
+   "truth": {
+    "customer_name": "Kevin Zimmerman",
+    "service_address": "729 W Camelback Rd, Gilbert, AZ 85234",
+    "customer_phone": "480-555-0127",
+    "service_date": "2021-10-23",
+    "technician": "Wyatt Coburn",
+    "status": "Completed",
+    "invoice_number": "WO-40017"
+   }
+  }
+ ],
+ "tools": [
+  {
+   "file": "tools/libreoffice-docx.pdf",
+   "type": "service-ticket",
+   "expect": "accept",
+   "truth": {
+    "shop_address": "2210 E Main St, Mesa, AZ 85213",
+    "customer_name": "Margaret Henderson",
+    "service_address": "3247 Elm St, Mesa, AZ 85201",
+    "customer_phone": "(480) 555-0148",
+    "manufacturer": "Carrier",
+    "model": "24ACC636A003",
+    "serial_number": "4N2119-08772",
+    "technician": "Marcus Bell",
+    "service_date": "2025-07-18",
+    "status": "Completed"
+   }
+  },
+  {
+   "file": "tools/qpdf-objstm.pdf",
+   "type": "service-ticket",
+   "expect": "accept",
+   "truth": {
+    "shop_address": "2210 E Main St, Mesa, AZ 85213",
+    "customer_name": "Margaret Henderson",
+    "service_address": "3247 Elm St, Mesa, AZ 85201",
+    "customer_phone": "(480) 555-0148",
+    "manufacturer": "Carrier",
+    "model": "24ACC636A003",
+    "serial_number": "4N2119-08772",
+    "technician": "Marcus Bell",
+    "service_date": "2025-07-18",
+    "status": "Completed"
+   }
+  },
+  {
+   "file": "tools/qpdf-qdf.pdf",
+   "type": "service-ticket",
+   "expect": "accept",
+   "truth": {
+    "shop_address": "2210 E Main St, Mesa, AZ 85213",
+    "customer_name": "Margaret Henderson",
+    "service_address": "3247 Elm St, Mesa, AZ 85201",
+    "customer_phone": "(480) 555-0148",
+    "manufacturer": "Carrier",
+    "model": "24ACC636A003",
+    "serial_number": "4N2119-08772",
+    "technician": "Marcus Bell",
+    "service_date": "2025-07-18",
+    "status": "Completed"
+   }
+  },
+  {
+   "file": "tools/reportlab.pdf",
+   "type": "invoice",
+   "expect": "accept",
+   "truth": {
+    "shop_address": "2210 E Main St, Mesa, AZ 85213",
+    "customer_name": "Margaret Henderson",
+    "service_address": "3247 Elm St, Mesa, AZ 85201",
+    "customer_phone": "(480) 555-0148",
+    "manufacturer": "Carrier",
+    "model": "24ACC636A003",
+    "serial_number": "4N2119-08772",
+    "technician": "Marcus Bell",
+    "cost": "485.00",
+    "invoice_number": "INV-30417",
+    "service_date": "2025-09-12"
+   }
+  },
+  {
+   "file": "tools/wkhtmltopdf-invoice.pdf",
+   "type": "invoice",
+   "expect": "reject-any",
+   "truth": {}
+  },
+  {
+   "file": "tools/scan-image-only.pdf",
+   "type": "service-ticket",
+   "expect": "read-refused:page-image",
+   "truth": {}
+  },
+  {
+   "file": "tools/ocr-overlay.pdf",
+   "type": "service-ticket",
+   "expect": "read-refused:invisible-text-ocr-layer",
+   "truth": {}
+  }
+ ]
+}

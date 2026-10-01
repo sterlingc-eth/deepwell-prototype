@@ -27,6 +27,7 @@ import * as reviewStore from './_lib/reviewStore.js';
 import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
 import { limit } from './_lib/rateLimit.js';
+import { recheckDocument, recheckTenantMissing } from './_lib/recheck.js';
 import { assertActiveBilling } from './_lib/plan.js';
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): owner/admin-only
 // read of the ask_misses table missStore.js writes from api/ask.js.
@@ -89,7 +90,7 @@ import {
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['recheckDocument', 'recheckMissing', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
 const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
@@ -176,6 +177,9 @@ const ACTIONS = new Set([
   'listCorrections',
   'deleteDocuments',
   'aiVerify',
+  // R33: $0 re-read of a stored document's own page text for a missing required field (api/_lib/recheck.js).
+  'recheckDocument',
+  'recheckMissing',
   'reclassify',
   'createCustomer',
   'updateCustomer',
@@ -310,6 +314,29 @@ export default async (req, res) => {
         break;
       case 'aiVerify':
         result = await reviewStore.aiVerifyDocument(ctx, payload, auth.userId);
+        break;
+      // R33: "Re-check this document" (Inbox missing-field banner). Fill-only from the page's own printed labels, no
+      // model call, so it is a member action like aiVerify (which runs the same re-check first).
+      case 'recheckDocument':
+        try {
+          result = await recheckDocument(ctx, payload.documentId, { actorClerkId: auth.userId, source: 'inbox' });
+        } catch (err) {
+          if (err?.status === 400) throw new reviewStore.ReviewError(err.message, 400);
+          throw err;
+        }
+        break;
+      // R33: "Re-check all missing fields" (Inbox bulk). Admin: it writes across many documents at once. Bounded
+      // (<=100 per call; the caller loops on `leftForNextRun`), idempotent, $0.
+      case 'recheckMissing':
+        requireAdmin(auth);
+        result = await recheckTenantMissing(ctx, {
+          limit: Math.min(100, Number(payload.limit) || 50),
+          documentIds: Array.isArray(payload.documentIds) ? payload.documentIds : null,
+          force: payload.force === true,
+          actorClerkId: auth.userId,
+          source: 'inbox-bulk',
+          deadlineAt: Date.now() + 240_000,
+        });
         break;
       case 'reclassify':
         result = await reviewStore.reclassifyDocuments(ctx, payload, auth.userId);

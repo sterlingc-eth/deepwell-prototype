@@ -19,6 +19,7 @@ import { TENANT_SQL, typeSql, normalizeTypeId, docTypeAliases, answerEnvelope } 
 // TEAM C: the records behind both counts (same rows), listed under the answer with their side as the group.
 import { attachCitations, customerRecord, unitRecord, documentRecord } from './citations/records.js';
 import { comparisonCitations } from './citations/history.js';
+import { parseNamedCompare, runNamedCompare } from './lookups/namedCompare.js'; // R32b
 
 const BRANDS = ['trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi'];
 const CITY_SET = new Set([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].map((c) => String(c).toLowerCase()));
@@ -61,7 +62,7 @@ const SHAPES = [
  */
 export function parseComparison(question) {
   const q = String(question ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!q || !/\b(?:more|fewer|less|greater|compare|comparison|vs\.?|versus)\b/.test(q) || !/\b(?:or|vs\.?|versus|and|to|with)\b/.test(q)) return null;
+  if (!q || !/\b(?:more|fewer|less|greater|compare|comparison|vs\.?|versus|bigger|larger|between|ahead|behind|busier)\b/.test(q) || !/\b(?:or|vs\.?|versus|and|to|with|than|of)\b/.test(q)) return null;
   for (const re of SHAPES) {
     const m = re.exec(q);
     if (!m) continue;
@@ -71,7 +72,7 @@ export function parseComparison(question) {
       return { kind: a.kind, a, b, direction: /\b(?:fewer|less)\b/.test(q) ? 'fewer' : 'more' };
     }
   }
-  return null;
+  return parseNamedCompare(q); // R32b: named customers / vendors / service types
 }
 
 /* ------------------------------------------------------------------ answer (pure) */
@@ -120,6 +121,7 @@ for (const t of DOCUMENT_TYPES) for (const alias of docTypeAliases(t.id)) CANON.
 const canonicalType = (raw) => CANON.get(normalizeTypeId(raw)) ?? normalizeTypeId(raw);
 
 export async function runComparison(db, intent) {
+  if (intent.kind === 'named' || intent.kind === 'vendor' || intent.kind === 'servicetype') return runNamedCompare(db, intent); // R32b
   if (intent.kind === 'doctype') {
     const { rows } = await db.raw(
       `SELECT ${typeSql('document_type')} AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} GROUP BY 1`, []);

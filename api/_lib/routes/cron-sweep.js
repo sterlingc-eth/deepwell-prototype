@@ -13,6 +13,7 @@ import { runScorecardSweepStep } from "./scorecard.js";
 import { runAutopilotSweepStep } from "../learning/autopilot.js";
 import { runDossierCatchup } from "../search/dossier.js";
 import { runKnowledgeReportSweepStep } from "../search/mapReduce.js";
+import { recheckTenantMissing } from "../recheck.js";
 
 /**
  * GET /api/cron-sweep
@@ -141,6 +142,14 @@ export default async function handler(req, res) {
     // many it did. An admin applies them from the Customers-tab panel.
     integrityNamesRelinkable: 0,
     integritySkippedTenants: 0,
+    // R33 (2026-09-30): $0 re-check of documents with a missing required field against their own stored page text
+    // (api/_lib/recheck.js) — repairs documents ingested before the far-future-date fix (Sonoran Comfort Air).
+    recheckScanned: 0,
+    recheckFilledDocuments: 0,
+    recheckFilledFields: 0,
+    recheckVerified: 0,
+    recheckLeftForNextRun: 0,
+    recheckSkippedTenants: 0,
     billingGatedTenants: 0,
     // TEAM T2 (2026-09-25): dossier catch-up (per tenant, below) + async full-report jobs (one per tenant, below).
     dossiersBuilt: 0,
@@ -299,6 +308,25 @@ export default async function handler(req, res) {
       summary.integritySkippedTenants += 1;
     }
 
+    // R33: missing-field re-check for THIS tenant — deterministic, no model, no billing gate needed ($0). Bounded per
+    // tenant (25 documents, newest first) and idempotent: a document a re-check of this version already looked at is
+    // not scanned again, so a backlog drains over successive nights instead of one tenant eating the deadline.
+    if (Date.now() < deadlineAt) {
+      try {
+        const rc = await recheckTenantMissing(ctx, { limit: 25, deadlineAt, source: "cron" });
+        summary.recheckScanned += rc.scanned;
+        summary.recheckFilledDocuments += rc.filled;
+        summary.recheckFilledFields += rc.fields;
+        summary.recheckVerified += rc.verified;
+        summary.recheckLeftForNextRun += rc.leftForNextRun;
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "recheck", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "recheck" });
+      }
+    } else {
+      summary.recheckSkippedTenants += 1;
+    }
+
     // TEAM T2 (2026-09-25): dossier catch-up for THIS tenant — small, bounded slice (a few seconds,
     // a few dozen entities) so one tenant's backlog never crowds out the rest of the sweep. Never throws.
     if (Date.now() < deadlineAt) {
@@ -429,6 +457,7 @@ export default async function handler(req, res) {
       `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
+      `recheck: ${summary.recheckScanned} document(s) re-checked, ${summary.recheckFilledFields} field(s) restored on ${summary.recheckFilledDocuments} document(s), ${summary.recheckVerified} verified, ${summary.recheckLeftForNextRun} left for next run; ` +
       `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +
       `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}; ` +
       `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}; ` +

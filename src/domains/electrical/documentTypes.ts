@@ -114,6 +114,8 @@ export interface Completeness {
   required: string[];
   present: string[];
   missing: string[];
+  /** R33: requirements met only by an unconfirmed far-future date. Optional so older payloads still type-check. */
+  unconfirmed?: string[];
   minConfidence: number;
   complete: boolean;
 }
@@ -137,11 +139,17 @@ export function completenessFor(typeId: string, fields: CompletenessField[]): Co
   const missing: string[] = [];
   const satisfiedConfidences: number[] = [];
 
+  // R33: an unconfirmed far-future date (service_date_unconfirmed) is printed and on file — never "missing" —
+  // but keeps `complete` false until a person confirms it. Mirrors api/_lib/documentTypes.js.
+  const unconfirmed: string[] = [];
   for (const requirement of required) {
-    const hit = requirement.split('|').map((k) => byKey.get(k)).find((x): x is { field_key: string; confidence: number } => !!x);
+    const alts = requirement.split('|');
+    const hit = alts.map((k) => byKey.get(k)).find((x): x is { field_key: string; confidence: number } => !!x);
     if (hit) {
       present.push(hit.field_key);
       satisfiedConfidences.push(hit.confidence);
+    } else if (alts.some((k) => byKey.has(`${k}_unconfirmed`))) {
+      unconfirmed.push(requirement);
     } else {
       missing.push(requirement);
     }
@@ -153,5 +161,5 @@ export function completenessFor(typeId: string, fields: CompletenessField[]): Co
       ? 0
       : 1;
 
-  return { type, required, present, missing, minConfidence, complete: missing.length === 0 };
+  return { type, required, present, missing, unconfirmed, minConfidence, complete: missing.length === 0 && unconfirmed.length === 0 };
 }

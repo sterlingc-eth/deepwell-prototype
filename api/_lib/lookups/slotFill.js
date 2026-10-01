@@ -27,6 +27,7 @@ import { KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "../analytics.js";
 import { attachCitations, customerRecord } from "../citations/records.js";
 import { stripConversationalFrame } from "../router/frame.js";
 import { LEX } from "./lexicon.js";
+import { withTypoNote } from "./typoResolve.js";
 import { TENANT_SQL } from "../scope.js";
 import {
   buildAmbiguousContactAnswer,
@@ -47,6 +48,7 @@ const NEVER = new Set(
     "work order orders invoice invoices warranty warranties registration startup sheet permit permits nameplate photo maintenance agreement contract contracts plan plans ticket tickets dispatch note notes proposal quote quotes estimate estimates inspection report reports purchase po record records correspondence " +
     "paid unpaid owe owes balance cost costs price bill billed revenue sales profit margin installed install installation installer age old expire expires expired expiring schedule scheduled visit visits technician technicians tech techs repair repairs " +
     // equipment components / other fields the deterministic layer answers elsewhere (or honestly declines): never a plain contact field
+    "document documents doc docs paperwork history number-of " +
     "thermostat filter filters condenser evaporator coil capacitor compressor blower motor duct ducts breaker pressure amperage voltage refrigerant seer btu rating size drier drain pan line lineset furnace heater heat pump ac hvac equipment unit units tons"
   ).split(/\s+/)
 );
@@ -111,6 +113,7 @@ export function parseSlotFill(question) {
   if (tokens.length < 2 || tokens.length > 22) return null;
   if (tokens.some((tk) => NEVER.has(tk) || /n't$/.test(tk) || /^(?:dont|doesnt|isnt|arent|hasnt|havent|didnt|wasnt|werent|wont|cant|cannot|none|nobody|nothing|nowhere)$/.test(tk))) return null;
   if ((text.match(/\?/g) ?? []).length > 1) return null;
+  if (/\b(?:number|count|total)\s+of\s+(?:our\s+|all\s+)?(?:documents?|docs?|files?|invoices?|jobs?|visits?|tickets?|work\s+orders?|purchase\s+orders?|pos|calls?|appointments?|records?|permits?|quotes?|estimates?|units?|systems?)\b/.test(lower)) return null; // "number of invoices for X" is a count, but "serial number of the unit at ..." is not // R32b: "number of X for <name>" is a count, not the phone-number concept
 
   const addrHits = [...lower.matchAll(ADDRESS_SCAN_RE)];
   if (addrHits.length > 1) return null; // two addresses = a comparison
@@ -247,7 +250,11 @@ function buildWhoAnswer(row, address, withPhone) {
   );
 }
 
-export async function runSlotFill(db, parsed, opts = {}) {
+export function runSlotFill(db, parsed, opts = {}) {
+  return withTypoNote(() => runSlotFillCore(db, parsed, opts));
+}
+
+async function runSlotFillCore(db, parsed, opts = {}) {
   const today = opts.today ?? null;
   const question = opts.question ?? parsed.text;
   if (parsed.kind === "name") {
@@ -259,8 +266,11 @@ export async function runSlotFill(db, parsed, opts = {}) {
       // here (a second signal - the customer's own address/serial in the same question - is the existing R21 rule in
       // resolveNamedCustomers, which only ever DECLINES with a name-only "Did you mean" that becomes a one-tap chip).
       if (parsed.block.length < 2 || parsed.block.length > 3) return null;
-      const { declined } = await resolveNamedCustomers(db, question, parsed.block.join(" "));
-      return declined ?? null;
+      const { candidates, declined } = await resolveNamedCustomers(db, question, parsed.block.join(" "));
+      if (declined) return declined;
+      // R32: an unambiguous typo'd name resolved (visible note attached by withTypoNote) — answer for that one customer.
+      if (candidates.length === 1) return buildResolvedAnswer(db, field, candidates[0], { namePhrase: candidates[0].customer_name, today, question });
+      return null;
     }
     if (rows.length > 1) return buildAmbiguousContactAnswer(rows[0].customer_name, rows);
     return buildResolvedAnswer(db, field, rows[0], { namePhrase: rows[0].customer_name, today, question });

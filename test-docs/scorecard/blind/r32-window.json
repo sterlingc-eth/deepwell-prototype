@@ -1,0 +1,1873 @@
+{
+ "version": "r32-blind-1",
+ "category": "blind-r32-window",
+ "source": "scripts/gen-blind-r32.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32-window-001",
+   "text": "count of service calls in the past month",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-002",
+   "text": "hang on... service visits over the past 30 days, how many",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-003",
+   "text": "number of jobs over the past 60 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-004",
+   "text": "hang on... number of visits over the past 60 days when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-005",
+   "text": "quick one - number of service calls in the last three months when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-006",
+   "text": "count of service visits over the past 90 days for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-007",
+   "text": "sorry, one more - service calls in the past week, how many when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-008",
+   "text": "alright, count of service visits over the last 7 days when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-009",
+   "text": "ok so number of jobs in the last half year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-010",
+   "text": "number of visits in the last 180 days please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-011",
+   "text": "ok um, number of service calls this month thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-012",
+   "text": "number of service visits this month please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-013",
+   "text": "ok so service calls last month, how many",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date - interval '1 month')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-014",
+   "text": "service visits last month, how many real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date - interval '1 month')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-015",
+   "text": "hmm, jobs so far this year, how many",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-016",
+   "text": "visits so far this year, how many",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-017",
+   "text": "so uh, how many service calls last year thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-018",
+   "text": "service visits last year, how many",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-019",
+   "text": "alright, how many repair visits in the past month for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-020",
+   "text": "ok so how many repair visits over the past 60 days when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-021",
+   "text": "how many repair calls in the last 90 days thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-022",
+   "text": "ok um, how many repair visits over the last 7 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-023",
+   "text": "how many repair jobs in the last half year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-024",
+   "text": "hmm, how many repair visits so far this month",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date) AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-025",
+   "text": "sorry, one more - how many preventive maintenance calls over the past 30 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-026",
+   "text": "how many PM visits in the last two months thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-027",
+   "text": "how many PM visits over the past 90 days real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-028",
+   "text": "hey, how many maintenance visits in the past week real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-029",
+   "text": "quick one - how many maintenance visits over the past six months for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-030",
+   "text": "how many maintenance visits so far this month when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_count_typed",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date) AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-031",
+   "text": "any service calls in the last 30 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-032",
+   "text": "hang on... has there been any work in the last 30 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-033",
+   "text": "hey, was there any activity over the past 30 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-034",
+   "text": "hang on... any service visits over the past 60 days please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-035",
+   "text": "did we do any jobs over the past 60 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-036",
+   "text": "sorry, one more - has there been any work in the last 60 days thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-037",
+   "text": "real quick: any jobs in the last 90 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-038",
+   "text": "so uh, did we do any visits in the last 90 days thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-039",
+   "text": "was there any activity in the last three months",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-040",
+   "text": "have we had any visits over the last 7 days real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-041",
+   "text": "hmm, any service calls over the last 7 days thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-042",
+   "text": "any service visits over the last 7 days real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-043",
+   "text": "real quick: has there been any work over the past six months",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-044",
+   "text": "hang on... was there any activity over the past six months",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-045",
+   "text": "so uh, did we do any service calls over the past six months real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-046",
+   "text": "so uh, any service visits this month",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date)) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-047",
+   "text": "alright, have we had any service calls this month when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date)) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-048",
+   "text": "did we do any service visits so far this month thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date)) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-049",
+   "text": "quick one - was there any activity last month when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date - interval '1 month')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-050",
+   "text": "so uh, any service visits last month thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date - interval '1 month')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-051",
+   "text": "has there been any work last month real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND date_trunc('month', x.value::date) = date_trunc('month', $1::date - interval '1 month')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-052",
+   "text": "quick one - any service visits this year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date)) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-053",
+   "text": "hang on... any jobs year to date when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date)) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-054",
+   "text": "hmm, has there been any work this year when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date)) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-055",
+   "text": "was there any activity last year for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-056",
+   "text": "was there any activity last year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-057",
+   "text": "hey, did we do any service calls last year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-058",
+   "text": "did we do any repair jobs over the past 30 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-059",
+   "text": "any repair jobs in the last 60 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-060",
+   "text": "have we had any repair calls in the last three months when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-061",
+   "text": "quick one - did we do any repair visits in the last week",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-062",
+   "text": "did we do any repair jobs in the last 180 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Repair')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-063",
+   "text": "hey, have we had any maintenance visits over the past 30 days please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '30 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-064",
+   "text": "sorry, one more - any PM visits in the last 60 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '60 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-065",
+   "text": "did we do any PM visits over the past 90 days when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-066",
+   "text": "real quick: did we do any PM visits in the last week",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '7 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-067",
+   "text": "sorry, one more - did we do any PM visits over the past six months when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_typed",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND EXISTS (SELECT 1 FROM extractions t WHERE t.document_id=x.document_id AND t.field_key='service_type' AND t.value='Preventive Maintenance')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-068",
+   "text": "have we been out to 3319 N Val Vista Dr over the past 90 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '3319 N Val Vista Dr%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-069",
+   "text": "any service calls at 285 E Elliot Rd over the past six months for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '285 E Elliot Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-070",
+   "text": "hey, any service calls at 2653 E Main St so far this year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '2653 E Main St%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-071",
+   "text": "real quick: any service calls at 1691 S Ellsworth Rd last year for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1 AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '1691 S Ellsworth Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-072",
+   "text": "so uh, have we been out to 2838 E Elliot Rd in the last 90 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '2838 E Elliot Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-073",
+   "text": "ok um, did we do any work at 2098 W Baseline Rd in the last 180 days",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '2098 W Baseline Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-074",
+   "text": "have we been out to 1062 E University Dr year to date thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '1062 E University Dr%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-075",
+   "text": "ok so have we been out to 803 E Pecos Rd last year real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1 AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '803 E Pecos Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-076",
+   "text": "hang on... did we do any work at 988 W Southern Ave in the last 90 days real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '988 W Southern Ave%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-077",
+   "text": "any service calls at 3393 S Ellsworth Rd in the last 180 days when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '3393 S Ellsworth Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-078",
+   "text": "ok um, did we do any work at 1210 E Broadway Rd this year thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '1210 E Broadway Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-079",
+   "text": "any service calls at 840 S Ellsworth Rd last year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1 AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '840 S Ellsworth Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-080",
+   "text": "have we been out to 2135 S Alma School Rd over the past 90 days real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '90 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '2135 S Alma School Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-081",
+   "text": "hmm, have we been out to 2986 S Alma School Rd over the past six months",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND x.value::date >= ($1::date - interval '180 days') AND x.value::date <= $1::date AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '2986 S Alma School Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-082",
+   "text": "real quick: have we been out to 3171 N Power Rd so far this year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '3171 N Power Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-083",
+   "text": "hang on... any service calls at 3356 E Pecos Rd last year",
+   "category": "blind-r32-window",
+   "shape": "blind_window_exists_addr",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions x WHERE x.field_key='service_date' AND x.value IS NOT NULL AND x.value ~ '^\\d{4}-\\d{2}-\\d{2}' AND extract(year from x.value::date) = extract(year from $1::date) - 1 AND x.document_id IN (SELECT l.document_id FROM document_entity_links l JOIN entities c ON c.id=l.entity_id WHERE c.entity_type='customer' AND c.data->>'service_address' ILIKE '3356 E Pecos Rd%')) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-084",
+   "text": "hang on... total PM visits we have logged",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-085",
+   "text": "sorry, one more - total repair calls we have logged when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-086",
+   "text": "so uh, number of preventive maintenance jobs on record",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-087",
+   "text": "ok so how many repair visits are on file when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-088",
+   "text": "ok so number of preventive maintenance jobs on record",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-089",
+   "text": "real quick: number of repair jobs on record please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-090",
+   "text": "hey, number of preventive maintenance jobs on record",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-091",
+   "text": "hey, number of repair jobs on record thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-092",
+   "text": "total PM visits we have logged please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-093",
+   "text": "quick one - number of repair jobs on record when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-094",
+   "text": "ok so how many PMs have we done overall real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-095",
+   "text": "ok so how many repair visits are on file",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-096",
+   "text": "ok so how many PMs have we done overall",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-097",
+   "text": "so uh, number of repair jobs on record",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-098",
+   "text": "how many maintenance visits are on file when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-099",
+   "text": "so uh, number of repair jobs on record",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_type' AND value='Repair'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-100",
+   "text": "so uh, do we do more repairs than preventive maintenance thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Repair') > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-101",
+   "text": "hey, are repair visits more common than PM visits",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Repair') > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-102",
+   "text": "do we have fewer PM visits than repair visits please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance') < (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Repair') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-103",
+   "text": "alright, is preventive maintenance a bigger share of our work than repair",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance') > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Repair') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-104",
+   "text": "have we logged more repair calls than maintenance calls when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Repair') > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-105",
+   "text": "real quick: is repair work bigger than maintenance work for us",
+   "category": "blind-r32-window",
+   "shape": "blind_window_type_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Repair') > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value='Preventive Maintenance') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-106",
+   "text": "how many service calls has Danny Ochoa been out on, total when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Danny Ochoa'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-107",
+   "text": "hang on... how many visits has Denise Ford been on altogether",
+   "category": "blind-r32-window",
+   "shape": "blind_window_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Denise Ford'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-108",
+   "text": "sorry, one more - total number of calls Kevin Pratt has gone out on real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Kevin Pratt'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-109",
+   "text": "how many times has Marisol Vega been dispatched in all",
+   "category": "blind-r32-window",
+   "shape": "blind_window_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Marisol Vega'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-110",
+   "text": "Ray Sutton - lifetime service calls real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Ray Sutton'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-111",
+   "text": "hey, how many service calls has Wyatt Coburn been out on, total",
+   "category": "blind-r32-window",
+   "shape": "blind_window_tech_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='technician' AND value='Wyatt Coburn'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-112",
+   "text": "how many units total does Copper Sky Dental have when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Copper Sky Dental%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-113",
+   "text": "sorry, one more - how many pieces of equipment are on file for Sonoran Grill Restaurant",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Sonoran Grill Restaurant%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-114",
+   "text": "unit count for Holy Trinity Church",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Holy Trinity Church%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-115",
+   "text": "how many systems does Cactus Rose Restaurant have on file real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Cactus Rose Restaurant%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-116",
+   "text": "so uh, how many units total does Sunrise Valley Elementary School have",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Sunrise Valley Elementary School%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-117",
+   "text": "hmm, how many pieces of equipment are on file for Grace Community Church",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Grace Community Church%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-118",
+   "text": "unit count for Canyon View Dental",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Canyon View Dental%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-119",
+   "text": "alright, how many systems does Mesquite Table Restaurant have on file when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Mesquite Table Restaurant%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-120",
+   "text": "hang on... how many units total does Linda Garrison have real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Linda Garrison%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-121",
+   "text": "sorry, one more - how many pieces of equipment are on file for Donald Isaacson",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Donald Isaacson%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-122",
+   "text": "unit count for Paul Jarvis",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Paul Jarvis%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-123",
+   "text": "hey, how many systems does Kevin Zimmerman have on file",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Kevin Zimmerman%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-124",
+   "text": "hmm, how many units total does Brian Chavez have please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Brian Chavez%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-125",
+   "text": "sorry, one more - how many pieces of equipment are on file for Thomas Nakamura real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Thomas Nakamura%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-126",
+   "text": "sorry, one more - unit count for Joseph Norwood please",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Joseph Norwood%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-127",
+   "text": "how many systems does Nancy Zamora have on file when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_units_customer",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE '%Nancy Zamora%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-128",
+   "text": "how many units are out of warranty right now",
+   "category": "blind-r32-window",
+   "shape": "blind_window_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-129",
+   "text": "hmm, count of units whose warranty has expired when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-130",
+   "text": "quick one - how many units are past their warranty when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-131",
+   "text": "number of units not currently covered by warranty when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND (data#>>'{warranty,expires}') IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-132",
+   "text": "real quick: which zip code do we have the most customers in thanks",
+   "category": "blind-r32-window",
+   "shape": "blind_window_top_zip",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT substring(data->>'service_address' from '(\\d{5})$') AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-133",
+   "text": "alright, what zip has the most customers for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_top_zip",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT substring(data->>'service_address' from '(\\d{5})$') AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-134",
+   "text": "top zip code by number of customers when you get a sec",
+   "category": "blind-r32-window",
+   "shape": "blind_window_top_zip",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT substring(data->>'service_address' from '(\\d{5})$') AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-135",
+   "text": "hmm, most common zip code among our customers real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_top_zip",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT substring(data->>'service_address' from '(\\d{5})$') AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-136",
+   "text": "was our invoiced revenue higher in 2021 than in 2025",
+   "category": "blind-r32-window",
+   "shape": "blind_window_year_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2021) > (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2025) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-137",
+   "text": "did we invoice more in 2019 than 2023 real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_year_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2019) > (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2023) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-138",
+   "text": "ok so is 2024 invoiced revenue bigger than 2022",
+   "category": "blind-r32-window",
+   "shape": "blind_window_year_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2024) > (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2022) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-139",
+   "text": "sorry, one more - was our invoiced revenue higher in 2018 than in 2020 for me",
+   "category": "blind-r32-window",
+   "shape": "blind_window_year_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2018) > (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2020) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-140",
+   "text": "did we invoice more in 2025 than 2024 real quick",
+   "category": "blind-r32-window",
+   "shape": "blind_window_year_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2025) > (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2024) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-window-141",
+   "text": "quick one - is 2011 invoiced revenue bigger than 2016",
+   "category": "blind-r32-window",
+   "shape": "blind_window_year_compare",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2011) > (SELECT coalesce(sum(total),0) FROM document_financials WHERE doc_kind='invoice' AND invoice_date IS NOT NULL AND extract(year from invoice_date)=2016) AS v",
+    "params": []
+   },
+   "citationRequired": true
+  }
+ ]
+}

@@ -15,6 +15,7 @@
  *
  *   node scripts/verify-autopilot.mjs
  */
+process.env.DONOVAN_AUTOPILOT_MODEL = process.env.DONOVAN_AUTOPILOT_MODEL ?? '1'; // R32: the nightly loop is opt-in; this script tests it enabled
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

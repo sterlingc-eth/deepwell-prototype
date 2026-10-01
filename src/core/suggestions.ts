@@ -80,6 +80,8 @@ export interface SamplePrompt {
 }
 export interface DidYouMeanChip {
   text: string;
+  /** R32: optional row heading (the "Not who you meant?" chip after an auto-resolved typo); default "Did you mean". */
+  heading?: string;
 }
 export type AskRole = 'tech' | 'office';
 
@@ -311,8 +313,24 @@ export function useSamplePrompts(role: AskRole, enabled = true, tenantKey: strin
  */
 const NEAR_MISS_RE = /^I don't have a customer named "([^"]+)"\.\s*Did you mean (.+)\?\s*$/;
 
+/**
+ * R32: an UNAMBIGUOUS typo'd customer name is now answered straight away, prefixed with
+ *   Showing results for Sandra Wyckoff (you typed "sanrda wyckoff").
+ * (api/_lib/lookups/typoResolve.js typoNoteText — keep the two in sync). The one-tap escape is a chip that re-asks the SAME
+ * question with the typed name in quotes — the server reads a quoted name as "exactly as typed" and gives the honest
+ * "I don't have a customer named ..." decline instead of resolving it again.
+ */
+const TYPO_NOTE_RE = /^Showing results for .+? \(you typed "([^"]+)"\)\./;
+
 export function nearMissRetryChips(question: string | null | undefined, answerText: string | null | undefined): DidYouMeanChip[] {
   if (!question || !answerText) return [];
+  const note = TYPO_NOTE_RE.exec(answerText.trim());
+  if (note) {
+    const typedName = note[1]!;
+    const idx = question.toLowerCase().indexOf(typedName.toLowerCase());
+    if (idx === -1 || question.slice(Math.max(0, idx - 1), idx) === '"') return [];
+    return [{ text: `${question.slice(0, idx)}"${question.slice(idx, idx + typedName.length)}"${question.slice(idx + typedName.length)}`, heading: 'Not who you meant?' }];
+  }
   const m = NEAR_MISS_RE.exec(answerText.trim());
   if (!m) return [];
   const typed = m[1]!;

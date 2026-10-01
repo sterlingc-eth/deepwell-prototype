@@ -49,6 +49,8 @@ import { isUnitRankingQuestion, isReasoningQuestion } from "../agent/intents.js"
 import { isInstallDateExtremeQuestion } from "../analytics/detPlan.js";
 import { normalizeQuestion as normalizeQuestionForAnalytics } from "../nlNormalize.js";
 import { stripConversationalFrame } from "./frame.js";
+import { rewriteQuestion } from "./rewrite.js";
+import { detectAmbiguousSurname, clarifyEnabled } from "../lookups/clarify.js";
 import { isFutureRecordQuestion } from "./futureDate.js";
 import { performance } from "node:perf_hooks";
 
@@ -351,8 +353,29 @@ async function classifyAllOnce(question, ctx = {}) {
  * re-parses it (runContactLookup/runDocLookup/runFastPath take the question string, not the intent).
  */
 export async function classifyAll(question, ctx = {}) {
+  const out = await classifyAllInner(question, ctx);
+  // R32: an analytics claim on a bare surname shared by 2+ customers ("whens the winslow warranty up" -> a customers-in-Winslow count) is a wrong
+  // reading of a customer reference; release it so the clarify path can ask "which one?".
+  if (out?.winner?.name === "analytics" && clarifyEnabled() && ctx?.tenantVocab && detectAmbiguousSurname(out.effectiveQuestion ?? question, ctx.tenantVocab)) {
+    return { ...out, winner: null, claimed: [], gated: { ...out.gated, analytics: null } };
+  }
+  return out;
+}
+
+async function classifyAllInner(question, ctx = {}) {
   const first = await classifyAllOnce(question, ctx);
   const stripped = stripConversationalFrame(question);
+  // R32: vocabulary/dictation rewrite (router/rewrite.js) of the stripped-or-raw text. Preferred over the plain pass whenever a
+  // deterministic stage claims it, because the rewrite only respells words the classifiers already know (mfr -> manufacturer, spoken
+  // digits -> digits, "train unit" -> "trane unit"); an unchanged question never reaches this branch.
+  if (process.env.DONOVAN_REWRITE !== "0") {
+    const rewritten = rewriteQuestion(stripped ?? question);
+    if (rewritten) {
+      const third = await classifyAllOnce(rewritten, ctx);
+      const thirdName = third.winner?.name ?? null;
+      if (thirdName) return { ...third, effectiveQuestion: rewritten, frameStripped: Boolean(stripped), rewritten: true };
+    }
+  }
   if (!stripped) return { ...first, effectiveQuestion: question };
   const second = await classifyAllOnce(stripped, ctx);
   const secondName = second.winner?.name ?? null;
@@ -360,5 +383,8 @@ export async function classifyAll(question, ctx = {}) {
   // it is claimed by a deterministic stage. (The raw text can be "claimed" too — e.g. fastPath's own
   // subject extraction latches onto the filler — and then fail at run time and fall through to the model.)
   if (secondName && secondName !== "analytics") return { ...second, effectiveQuestion: stripped, frameStripped: true };
+  // R32: the raw (filler-wrapped) text was claimed by nothing at all, so an analytics claim on the stripped text cannot be trading a
+  // better raw read for a worse one; adopt it (previously: "so uh, did we do any visits in the last 90 days" went to the model).
+  if (secondName === "analytics" && (!first.winner?.name || first.winner.name === "analytics")) return { ...second, effectiveQuestion: stripped, frameStripped: true };
   return { ...first, effectiveQuestion: question };
 }

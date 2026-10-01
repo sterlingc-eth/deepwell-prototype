@@ -60,6 +60,8 @@ import {
   CONDITION_RATIO,
   DOC_TYPE_FILTER_FIELDS,
   SERVICE_TYPE_FILTER_FIELDS,
+  SERVICE_TYPE_PHRASE_RE,
+  serviceTypeValueOf,
   validatePlan,
   deriveGeo,
   normalizeStateValue,
@@ -220,8 +222,16 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // one, and a stray model filter for the WRONG entity (customers/
     // equipment) would otherwise reject the whole plan downstream.
     const serviceVisitsOverride = resolveServiceVisitsOverride(question);
+    // R32: the override used to drop EVERY filter, silently turning "how many repair/PM visits in the last 90 days" into the
+    // untyped visit count. A service-type qualifier the question names is a real filter on a visit (hasServiceType) and is kept.
+    // Only for a plain count/existence question: a negated or "which/who" question ("which technicians have never logged a
+    // PM visit") is a different relation, and a count would answer it wrongly, so it is left to fail closed as before.
+    const visitTypeQ = String(question ?? '');
+    const visitTypePhrase = serviceVisitsOverride && serviceVisitsOverride.op === 'count'
+      && !/\b(?:never|without|no|not|none|haven'?t|hasn'?t|didn'?t|which|who|whose|each|every|per|by)\b/i.test(visitTypeQ)
+      ? visitTypeQ.match(SERVICE_TYPE_PHRASE_RE) : null;
     const base = serviceVisitsOverride
-      ? { ...(rawInput ?? {}), ...serviceVisitsOverride, filters: [] }
+      ? { ...(rawInput ?? {}), ...serviceVisitsOverride, filters: visitTypePhrase ? [{ field: 'hasServiceType', op: 'eq', value: serviceTypeValueOf(visitTypePhrase[1]) }] : [] }
       : rawInput;
     // Item 1 (2026-09-21 live miss) + round 5 item 2: a literal month name/
     // "this month"/"last month" phrase in the QUESTION overrides whatever
@@ -231,6 +241,12 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // see that function's own doc comment for why the model's date math is
     // not trusted by default, and when it is trusted anyway.
     let input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
+    // R32: a typed visit filter is only trustworthy on a plain count/existence question; a negated or "which/who/each" question
+    // is a different relation (which technicians NEVER logged a PM visit) that a positive typed count would answer wrongly.
+    if (input?.entity === 'serviceVisits' && input.filters?.some((f) => f.field === 'hasServiceType' || f.field === 'lacksServiceType')
+      && (input.op !== 'count' || /\b(?:never|without|no|not|none|haven'?t|hasn'?t|didn'?t|which|who|whose|each|every|per|by)\b/i.test(String(question ?? '')))) {
+      input = null;
+    }
     // Team A (2026-09-24): "older/newer than N years" is year arithmetic done in code, not by the model; and a documents
     // time window is decided by the wording - "added/uploaded/received/scanned/filed" -> upload date (created_at),
     // "serviced/visited/job/work done" -> service date. Both override whatever the model guessed.
@@ -649,7 +665,7 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
       // hasEmail/hasPhone (round 5 item 1) are genuinely checked for the
       // FIRST time in that second pass, now that email/phone are on the row.
       brand: unit.brand, model: unit.model, equipmentType: unit.equipmentType,
-      tonnage: unit.tonnage, refrigerant: unit.refrigerant, installYear: unit.installYear,
+      tonnage: unit.tonnage, refrigerant: unit.refrigerant, installYear: unit.installYear, installDate: unit.installDate,
       warrantyStatus: unit.warrantyStatus,
     });
   }
@@ -910,6 +926,29 @@ function formatWarrantyRegDateExtremeAnswer(plan, rows, extreme) {
  * already makes elsewhere in this file.
  */
 async function runCountComparison(db, cmp, { today } = {}) {
+  if (cmp.entity === 'serviceVisits') {
+    const sides = [];
+    for (const f of [cmp.leftFilter, cmp.rightFilter]) {
+      const d = await executeAnalyticsPlan(db, { entity: 'serviceVisits', op: 'count', filters: [f] }, { today });
+      const n = Number(d?.facts?.[0]?.value);
+      if (!Number.isFinite(n)) return null;
+      sides.push({ n, records: Array.isArray(d.records) ? d.records : [] });
+    }
+    const [l, r] = sides;
+    const yes = l.n > r.n; // detectServiceTypeComparison already swapped the sides for a "fewer" question
+    // report the counts in the order the question asked them
+    const [an, bn] = cmp.fewerAsked ? [r.n, l.n] : [l.n, r.n];
+    const text = `${yes ? 'Yes' : 'No'}, you have ${an} ${cmp.askedLeftLabel} and ${bn} ${cmp.askedRightLabel}.`;
+    const data = {
+      kind: 'answer', text,
+      facts: [{ label: cmp.askedLeftLabel, value: String(an), sources: [] }, { label: cmp.askedRightLabel, value: String(bn), sources: [] }],
+      sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    };
+    return attachCitations(data, {
+      records: [...l.records, ...r.records], total: l.n + r.n, kind: 'basis',
+      basis: `Counted service visits by their own service type: ${cmp.askedLeftLabel} (${an}) versus ${cmp.askedRightLabel} (${bn}).`,
+    });
+  }
   const { sql, params } = buildAnalyticsSQL({ entity: cmp.entity, op: 'list', filters: [] });
   const { rows: raw } = await db.raw(sql, params);
   const rows = cmp.entity === 'customers' ? raw.map((r) => shapeCustomerRow(r)) : raw.map((r) => shapeEquipmentRow(r, today));

@@ -27,7 +27,8 @@ import { parseTrends, runTrends } from './trends.js';
 import { parseRanking, runRanking } from './rankings.js';
 import { packForTenant } from './industry/index.js';
 import { resolveNamedCustomers } from './contactLookup.js';
-import { brandMatches } from './analytics.js';
+import { withTypoNote } from './lookups/typoResolve.js';
+import { brandMatches, resolveAnyTimeRange } from './analytics.js';
 import { fetchNotes, buildNotesAnswer } from './customerFile.js';
 // TEAM C: every answer below cites the rows it was computed from (records / recordsTotal / recordsKind / basis).
 import { attachCitations } from './citations/records.js';
@@ -39,7 +40,16 @@ import {
 } from './scope.js';
 import { correctTriggerWordTypos, normalizeQuestion } from './nlNormalize.js';
 import { parseCompoundQuestion } from './lookups/compound.js';
+import { parseAggregate, runAggregate } from './lookups/aggregates.js';
 
+// R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
+const WINDOW_VISIT_LEAD_RE = /^\s*(?:any\s+(?:service\s+(?:calls?|visits?)|visits?|calls?|work|jobs?|repairs?|maintenance)|(?:did|have)\s+we\s+(?:do\s+any|had\s+any|done\s+any|been\s+(?:out\s+)?(?:to|at)|gone\s+out\s+to|visited|serviced|worked\s+(?:on|at)|got\s+any)|has\s+anyone\s+been\s+out\s+to)\b/i;
+const WINDOW_ADDRESS_RE = /\b\d{2,6}\s+(?:[NSEW]\.?\s+)?[A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3}\s+(?:St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court|Pkwy|Parkway|Pl|Place|Cir|Circle|Ter|Trail|Trl|Hwy)\b\.?/i;
+const LAST_TYPE_PROXIES = [
+  [/\bwhat\s+(?:type|kind|sort)\s+of\s+(?:service|work|visit|call)\s+(?:was|were)\s+(?:the\s+)?(?:last|latest|most\s+recent)\s+(?:visit|call|service|job)\b/i, 'who was the last tech'],
+  [/\bwhat\s+(?:was|were)\s+(?:the\s+)?(?:last|latest|most\s+recent)\s+(?:visit|call|service|job)\b(?=[^?]*\bfor\s*\??$)/i, 'who was the last tech'],
+  [/\b(?:the\s+)?(?:last|latest|most\s+recent)\s+service\s+type\b/i, 'who was the last tech'],
+];
 const HISTORY_INTENTS = new Set(['last_service_date', 'last_service_tech', 'install_date', 'installer']);
 const NUM_WORDS = { two: 2, three: 3, four: 4, five: 5, six: 6, ten: 10 };
 
@@ -102,6 +112,10 @@ export function classifyDeterministic(question, opts = {}) {
   const q = fixRouterWordTypos(normalizeQuestion(String(question ?? ''), { overlay: opts?.overlay }).normalized);
   if (!q) return null;
 
+  // R32b (loop C): closed-shape shop-wide aggregates (warranty extremes / out-of-warranty counts / technicians who never did X / date extremes ...).
+  const agg = parseAggregate(String(question ?? '')) ?? parseAggregate(q); // raw first: the fuzzy normalizer can respell real words (older -> order, start -> star)
+  if (agg) return { route: 'aggregate', intent: agg };
+
   const cmp = parseComparison(q);
   if (cmp) return { route: 'comparison', intent: cmp };
 
@@ -128,6 +142,25 @@ export function classifyDeterministic(question, opts = {}) {
   // classifier has no DB for — so this is only a cheap candidate GATE; runDeterministic does the real
   // parse (with pack) and returns null (falls through, same as any other route) when it doesn't hold up.
   if (looksLikeComposeCandidate(q)) return { route: 'compose', question: q };
+
+  // R32 (loop 4): "what was the last visit at <addr> for" / "what type of service was the latest call at <addr>" / "last service type at <addr>"
+  // — the SERVICE TYPE (Repair / Preventive Maintenance / ...) of the most recent visit. Subject extraction reuses the fast path's own
+  // address/name reading on a "who was the last tech ..." proxy of the same question.
+  for (const [re, proxy] of LAST_TYPE_PROXIES) {
+    if (!re.test(q)) continue;
+    const f2 = classifyFastPath(q.replace(re, proxy).replace(/\s+for\s*$/i, ''));
+    if (f2?.intent === 'last_service_tech' && !f2.subject.customerNumber && !f2.subject.identifier && (f2.subject.address || f2.subject.name)) {
+      return { route: 'history', kind: 'last-type', address: f2.subject.address ?? null, name: f2.subject.address ? null : f2.subject.name, question: q };
+    }
+  }
+
+  if (WINDOW_VISIT_LEAD_RE.test(q)) {
+    const addr = WINDOW_ADDRESS_RE.exec(q);
+    if (addr && resolveAnyTimeRange(q, todayIso())) {
+      const f3 = classifyFastPath(`who was the last tech at ${addr[0]}`);
+      if (f3?.intent === 'last_service_tech' && f3.subject.address) return { route: 'history', kind: 'window-visits', address: f3.subject.address, name: null, question: q };
+    }
+  }
 
   const lastN = LAST_N_RE.exec(q);
   if (lastN) {
@@ -230,6 +263,40 @@ function explicitFutureYearNote(question, today) {
 const LAST_TECH_WHAT_RE =
   /\bwhat\s+(?:did\s+they\s+(?:do|work\s+on)|was\s+(?:done|the\s+(?:visit|job)(?:\s+for)?))\b/i;
 
+const pad = (v, end) => {
+  const m = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(String(v ?? ''));
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  if (d) return `${y}-${mo}-${d}`;
+  if (mo) return end ? `${y}-${mo}-${String(new Date(Date.UTC(Number(y), Number(mo), 0)).getUTCDate()).padStart(2, '0')}` : `${y}-${mo}-01`;
+  return end ? `${y}-12-31` : `${y}-01-01`;
+};
+
+/** "have we been out to <addr> in the last 90 days" — a yes/no over the visits linked to the address, inside the question's own window. */
+async function windowVisits(db, intent, ctx, today) {
+  const win = resolveAnyTimeRange(intent.question, today);
+  const from = pad(win?.from, false);
+  const to = pad(win?.to, true) ?? today;
+  if (!from) return null;
+  const ids = await scopeDocumentIds(db, ctx.scope);
+  const { past } = splitFuture(await fetchVisits(db, ids), today);
+  const label = win.label ? ` ${win.label}` : ' in that window';
+  const inWin = past.filter((v) => v.date >= from && v.date <= (to < today ? to : today));
+  if (inWin.length) {
+    const top = inWin[0];
+    const n = new Set(inWin.map((v) => v.documentId)).size;
+    return citeVisits(answerEnvelope({
+      text: `Yes, ${n} visit${n === 1 ? '' : 's'} at ${ctx.label}${label}; the most recent was ${humanDate(top.date)} (${describeVisit(top)}).`,
+      facts: [{ label: `Visits${label}`, value: String(n), sources: inWin.slice(0, 5).map((v) => ({ documentId: v.documentId, location: { field: 'service_date' } })) }],
+    }), inWin, [], { claimedCount: n, basis: `Counted the ${n} of ${distinctVisitDocs(past)} visits on file at ${ctx.label} dated ${from} to ${to < today ? to : today}, by service date.` });
+  }
+  const last = past[0];
+  return citeVisits(answerEnvelope({
+    text: `No, no visits at ${ctx.label}${label}.${last ? ` The last visit on file was ${humanDate(last.date)}.` : ' There are no visits on file there at all.'}`,
+    facts: last ? [visitFact(last, 'Last visit on file')] : [],
+  }), last ? [last] : [], [], { claimedCount: 0, basis: `Checked the ${distinctVisitDocs(past)} visits on file at ${ctx.label} for a service date from ${from} to ${to < today ? to : today}; none.` });
+}
+
 async function lastService(db, intent, ctx, today) {
   const ids = await scopeDocumentIds(db, ctx.scope);
   const { past, future } = splitFuture(await fetchVisits(db, ids), today);
@@ -238,6 +305,14 @@ async function lastService(db, intent, ctx, today) {
   }
   const top = past[0];
   const same = past.filter((v) => v.date === top.date);
+  if (intent.kind === 'last-type') {
+    const withType = same.find((v) => v.serviceType);
+    if (!withType) return null; // no service type on the most recent visit: never answer from an older one
+    return citeVisits(answerEnvelope({
+      text: `The last visit at ${ctx.label} was a ${withType.serviceType} visit, on ${humanDate(withType.date)}.${futureNote(future, today)}`,
+      facts: [{ label: 'Last visit type', value: `${withType.serviceType} · ${humanDate(withType.date)}`, sources: [{ documentId: withType.documentId, location: { field: 'service_type' } }] }],
+    }), [withType], future, { basis: `Took the service type from the most recent of ${distinctVisitDocs(past)} visits at ${ctx.label}, by service date.` });
+  }
   if (intent.kind === 'last-tech') {
     const withTech = past.find((v) => v.technician);
     if (!withTech) {
@@ -439,8 +514,13 @@ async function installer(db, intent, ctx, today) {
  * @param intent classifyDeterministic's result
  * @returns an /api/ask `data` object, or null (carry on down the chain)
  */
-export async function runDeterministic(db, intent, { today } = {}) {
+export function runDeterministic(db, intent, opts = {}) {
+  return withTypoNote(() => runDeterministicCore(db, intent, opts));
+}
+
+async function runDeterministicCore(db, intent, { today } = {}) {
   const t = todayIso(today);
+  if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);
   // Team G (industry packs): db is already inside this tenant's transaction, so packForTenant is a plain read
   // against it — no second transaction — and its own 10-minute cache makes repeat calls free.
@@ -460,8 +540,11 @@ export async function runDeterministic(db, intent, { today } = {}) {
   if (ctx?.declined) return ctx.declined;
   if (!ctx) return null;
   switch (intent.kind) {
+    case 'window-visits':
+      return windowVisits(db, intent, ctx, t);
     case 'last-service':
     case 'last-tech':
+    case 'last-type':
       return lastService(db, intent, ctx, t);
     case 'last-n-visits':
       return lastNVisits(db, intent, ctx, t);

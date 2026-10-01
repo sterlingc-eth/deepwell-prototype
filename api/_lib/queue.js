@@ -1,7 +1,7 @@
 import { ingestDocument, recordIngestFailure } from "./readDocument.js";
 import { extractDocumentFields } from "./extractDocument.js";
 // FINANCIALS layer (handoffs/FINANCIALS_2026-09-23.md): best-effort money extraction, its own step, never throws.
-import { extractFinancialsBestEffort } from "./financials/hook.js";
+import { extractFinancialsDeterministicFirst as extractFinancialsBestEffort } from "./modelAvoidance/financialsHook.js"; // R32: same contract as financials/hook.js, deterministic text first
 import { getDailyModelBudgetStatus } from "./rateLimit.js";
 import { assertActiveBilling } from "./plan.js";
 

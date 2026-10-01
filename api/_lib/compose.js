@@ -184,6 +184,17 @@ export function describeConditions(conditions) {
 
 /* ------------------------------------------------------------------ matching */
 
+/** ISO date `years` calendar years before `today` (YYYY-MM-DD, or a Date). Feb 29 clamps to Feb 28 in a non-leap target year (Postgres interval math). */
+export function ageCutoffIso(today, years) {
+  const t = String(today instanceof Date ? today.toISOString() : today ?? '').slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (!m) return '0000-00-00';
+  const y = Number(m[1]) - Number(years);
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const md = m[2] === '02' && m[3] === '29' && !leap ? '02-28' : `${m[2]}-${m[3]}`;
+  return `${String(y).padStart(4, '0')}-${md}`;
+}
+
 /** True when customer `c` (see runCompose's shape) satisfies one condition. Pure. */
 export function matchesCondition(c, cond, { today, thisYear }) {
   switch (cond.type) {
@@ -192,7 +203,13 @@ export function matchesCondition(c, cond, { today, thisYear }) {
       return c.equipment.some((e) => e.manufacturer && wanted.includes(String(e.manufacturer).toLowerCase()));
     }
     case 'ageOlder':
-      return c.equipment.some((e) => e.installYear != null && e.installYear < thisYear - cond.years);
+      // R32 (owner decision 2026-09-30): exact-date age — installed on or before today - N years. A year-only date (no day)
+      // falls back to the calendar-year reading, never a guessed day.
+      return c.equipment.some((e) => {
+        const d = String(e.installDate ?? '');
+        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10) <= ageCutoffIso(today, cond.years);
+        return e.installYear != null && e.installYear < thisYear - cond.years;
+      });
     case 'warrantyStatus':
       return c.equipment.some((e) => e.warrantyStatus === cond.status);
     case 'hasDocType':

@@ -51,6 +51,8 @@ import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
 import { estimateCostUsd, recordModelCall } from '../usage.js';
 import { documentIdsForEntities } from './knowledge.js';
 import { withTenantRaw } from './store.js';
+import { isDossierModelEnabled } from '../modelAvoidance/switches.js';
+import { deterministicDossierSentences } from '../modelAvoidance/dossierText.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -62,6 +64,9 @@ function hasApiKey() {
 }
 
 export const DOSSIER_MODEL = process.env.DONOVAN_DOSSIER_MODEL || 'claude-haiku-4-5';
+/** R32: the model summariser is OPT-IN (DOSSIER_MODEL=1 and a key). Default = deterministic, field-derived sentences ($0, no key needed). */
+const modelSummaries = () => isDossierModelEnabled() && hasApiKey();
+const DETERMINISTIC_LABEL = 'deterministic-text';
 /** entities.entity_type -> dossiers.entity_type. A "unit" IS an equipment entity; the dossier just
  *  speaks the domain word the rest of the product uses for it. */
 const DOSSIER_TYPE_OF = { customer: 'customer', equipment: 'unit' };
@@ -213,7 +218,8 @@ async function summarizeDocument(client, deadlineAt, doc) {
  * @returns {Promise<{status:'unchanged'|'built'|'no-schema'|'no-docs'|'error', added?:number, costUsd?:number}>}
  */
 export async function rebuildOneDossier(ctx, entityId, { maxNewDocs = HOOK_MAX_NEW_DOCS, deadlineMs = 20_000 } = {}) {
-  if (!hasApiKey()) return { status: 'no-key' };
+  const useModel = modelSummaries();
+  if (isDossierModelEnabled() && !useModel) return { status: 'no-key' };
   const started = Date.now();
   try {
     const found = await withTenantRaw(ctx, async (client, tenantId) => {
@@ -258,13 +264,13 @@ export async function rebuildOneDossier(ctx, entityId, { maxNewDocs = HOOK_MAX_N
     }
     if (found.noDocs) return { status: 'no-docs' };
 
-    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0, fetch: (...args) => globalThis.fetch(...args) });
+    const client = useModel ? new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0, fetch: (...args) => globalThis.fetch(...args) }) : null;
     const deadlineAt = started + deadlineMs;
     let costUsd = 0;
     const newSentences = [];
     for (const doc of found.pending) {
       if (Date.now() > deadlineAt - 2000) break;
-      const r = await summarizeDocument(client, deadlineAt, doc);
+      const r = useModel ? await summarizeDocument(client, deadlineAt, doc) : { sentences: deterministicDossierSentences(doc), costUsd: 0 };
       costUsd += r.costUsd;
       newSentences.push(...r.sentences);
     }
@@ -277,7 +283,7 @@ export async function rebuildOneDossier(ctx, entityId, { maxNewDocs = HOOK_MAX_N
        ON CONFLICT (tenant_id, entity_type, entity_id) DO UPDATE
          SET summary = EXCLUDED.summary, sentences = EXCLUDED.sentences, source_document_ids = EXCLUDED.source_document_ids,
              source_hash = EXCLUDED.source_hash, model = EXCLUDED.model, built_at = NOW(), updated_at = NOW()`,
-      [tenantId, found.entityType, entityId, summaryText, JSON.stringify(merged), JSON.stringify(found.coveredAfter), found.fullyCovered ? found.sig.hash : null, DOSSIER_MODEL]
+      [tenantId, found.entityType, entityId, summaryText, JSON.stringify(merged), JSON.stringify(found.coveredAfter), found.fullyCovered ? found.sig.hash : null, useModel ? DOSSIER_MODEL : DETERMINISTIC_LABEL]
     ));
     if (costUsd > 0) await recordModelCall(ctx, { model: DOSSIER_MODEL, inputTokens: 0, outputTokens: 0 }).catch(() => {}); // token detail already folded into costUsd above; this call attributes SOME spend to the tenant meter even when usage.input/output_tokens weren't threaded through
     console.log(JSON.stringify({ route: 'dossier', t: 'rebuilt', entityType: found.entityType, newDocs: found.pending.length, sentences: merged.length, costUsd: Math.round(costUsd * 10000) / 10000 }));
@@ -293,7 +299,7 @@ export async function rebuildOneDossier(ctx, entityId, { maxNewDocs = HOOK_MAX_N
  * is (now) linked to and rebuilds each one's dossier incrementally.
  */
 export async function updateDossierForDocument(ctx, documentId, { maxNewDocs = HOOK_MAX_NEW_DOCS } = {}) {
-  if (!hasApiKey()) return { status: 'off' };
+  if (isDossierModelEnabled() && !hasApiKey()) return { status: 'off' };
   try {
     const entityIds = await withTenantRaw(ctx, async (client) => {
       if (!(await dossierSchemaReady(client))) return null;
@@ -324,7 +330,7 @@ export async function updateDossierForDocument(ctx, documentId, { maxNewDocs = H
 export async function runDossierCatchup(ctx, { deadlineMs = 8000, maxEntities = 25 } = {}) {
   const started = Date.now();
   const out = { checked: 0, built: 0, unchanged: 0, errors: 0 };
-  if (!hasApiKey()) return { ...out, status: 'off' };
+  if (isDossierModelEnabled() && !hasApiKey()) return { ...out, status: 'off' };
   let candidates;
   try {
     candidates = await withTenantRaw(ctx, async (client) => {
@@ -367,7 +373,7 @@ export async function runDossierBackfillPage(ctx, { deadlineMs = 25_000, maxEnti
 
 /** Progress numbers for the Team-screen card. */
 export async function dossierStatus(ctx) {
-  if (!hasApiKey()) return { configured: false, ready: false, reason: 'not-configured' };
+  if (isDossierModelEnabled() && !hasApiKey()) return { configured: false, ready: false, reason: 'not-configured' };
   return withTenantRaw(ctx, async (client) => {
     if (!(await dossierSchemaReady(client))) return { configured: true, ready: false, reason: 'migration-pending' };
     const r = await client.query(

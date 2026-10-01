@@ -318,7 +318,7 @@ const exportData = JSON.parse(fs.readFileSync(path.join(ROOT, "scripts/golden/go
 // field-phrasing-3.json, the blind-3 set r19_blind3_clusters.json's F1/F6 clusters came from) is resolved
 // against the export's OWN tenantKey before the data is loaded into this run's fresh PGlite tenant.
 const exam = await loadFullExam(exportData.tenantKey ?? null);
-const today = new Date().toISOString().slice(0, 10);
+const today = process.env.EXAM_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.EXAM_TODAY) ? process.env.EXAM_TODAY : new Date().toISOString().slice(0, 10); // R32b: honor the same pinned date every other exam script uses (the oracle fixtures are dated against it)
 const { ctx } = await loadExportIntoNewTenant(lite, exportData, { tenantKey: "offline-precision-guard", tenantName: "Precision Guard Verify" });
 
 const { overall, perQuestion } = await runOfflineExam({ ctx, questions: exam.questions, today, modelCounter });
@@ -356,34 +356,10 @@ for (const id of ["i096", "i097", "i098"]) {
 // golden.mjs's own KNOWN_WRONG_IDS carries (that file documents each id's own history/root cause) —
 // kept in sync with it rather than duplicated at length. Any wrong id NOT in this list is a brand-new
 // wrong answer this guard introduced and must be investigated, not silently added here.
-const KNOWN_WRONG_IDS = new Set([
-  // R31: the four exam-oracle-regex ids left this list when the oracle was fixed at its source (ADJUDICATION.md "R31").
-  "h115", "h140",
-  "i063", "i065", "i066", "i067", "i069", "i070", "i072", // F2 (dispatch_history compound) — not this round's
-  "i188", // F2 (two-field-at-address) — not this round's
-  "i195", // F4 (multi-unit) — not this round's
-  "g104", "g105", "g149", "g151", "g153", "g155", "h138", "h163", "h167", "i194", // pre-existing, unrelated to this round
-  "j055", // pre-existing date-boundary sensitivity under the pinned harness date — unrelated to this round
-  "j176", "j178", "j180", // C7 adversarial near-miss fuzzy-name matching — M1's territory (contactLookup.js/scope.js), not touched
-  // R21 (review fix): this list's own comment above claims it's "the SAME 32-id set scripts/verify-
-  // golden.mjs's own KNOWN_WRONG_IDS carries", but these 3 were missing here — verify-golden.mjs's own
-  // P0 trade-off note (its KNOWN_WRONG_IDS, next to its j141-j143 entry) explains why: a bare
-  // first+last-name fuzzy match is structurally indistinguishable, at the shape level, from an
-  // adversarial near-miss onto a different real customer (M1's near-miss guard, contactLookup.js), so
-  // these 3 pre-existing "-typo" ids now decline instead of answering, same as j176/j178/j180 above.
-  "live-misses-2026-09-21-0002-typo", "lookups-0101-typo", "lookups-0106-typo",
-  "j141", "j142", "j143", // Cluster 3 single-threshold age shape: two incompatible frozen oracles for the
-  // same "older/over N years" phrasing (exam.json wants bare calendar-year, field-phrasing-4.json wants
-  // day-precise) — see api/_lib/analytics.js's resolveAgeFilter doc comment for the full writeup.
-  // R23 (D1, item 4): field-phrasing-5.json's own fresh blind measurement surfaced 5 pre-existing
-  // analytics gaps, none of them this round's own doing — see scripts/verify-golden.mjs's own
-  // KNOWN_WRONG_IDS comment next to these same 5 ids for the full writeup (a tied technician
-  // comparison, a "fewest jobs" ranking that counts a different thing than the plain per-tech total,
-  // and no generic "distinct value" metric for an arbitrary field).
-  // R24: k139 (tie-safe technician head-to-head), k143 (distinct count), k186/k187 (distinct list)
-  // fixed in analytics.js/detPlan.js — removed. k141 stays (same two-oracle conflict as h115).
-  "k141",
-]);
+// R32 (Team A): the known-wrong set is now EMPTY. Every id that used to live here is either fixed or was an oracle disagreement resolved by an
+// owner decision (see test-docs/scorecard/ADJUDICATION.md "R32"): h115/k141 (distinct dated visits), j141-j143 + 21 sibling age oracles (exact-date age),
+// the near-miss typo ids (auto-resolve with a visible note, typoResolvesTo). The wrong-count floor is therefore 0: any wrong answer fails.
+const KNOWN_WRONG_IDS = new Set([]);
 const wrongIds = perQuestion.filter((q) => q.status === "wrong").map((q) => q.id);
 const newWrong = wrongIds.filter((id) => !KNOWN_WRONG_IDS.has(id));
 check(
@@ -396,8 +372,8 @@ check(
   overall.wrong <= KNOWN_WRONG_IDS.size,
   JSON.stringify(overall)
 );
-check(`correct count has not regressed below this round's measured floor (got ${overall.correct}, floor 936)`, overall.correct >= 936, JSON.stringify(overall));
-check(`answered-without-model has not regressed below the pre-round floor's "genuinely correct" share (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 900, JSON.stringify(overall));
+check(`correct count has not regressed below this round's measured floor (got ${overall.correct}, floor 1552)`, overall.correct >= 1552, JSON.stringify(overall));
+check(`answered-without-model has not regressed below the pre-round floor's "genuinely correct" share (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1572, JSON.stringify(overall));
 
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

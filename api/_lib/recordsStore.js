@@ -590,6 +590,10 @@ function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceC
  * carries a CHECK constraint limited to registry/synonym/learned/human.
  */
 export const FIELD_EXTRACT_SEGMENT = 'field-extract';
+/** R33: facets written by a $0 re-check of a stored document (api/_lib/recheck.js) — the provenance marker for
+ * `method: 'recheck'` (facets.mapping_method is CHECK-constrained, segment_id is not). Swept by the same
+ * replace-on-re-extraction as FIELD_EXTRACT_SEGMENT, so a later full re-read converges instead of stacking. */
+export const FIELD_RECHECK_SEGMENT = 'field-recheck';
 
 /**
  * Collapse whitespace and refuse a value that is only punctuation or
@@ -2153,12 +2157,12 @@ function makeStore(db, tenantId) {
           WHERE document_id = $1 AND ${TENANT}
             AND source_facet_id IN (
                   SELECT id FROM facets
-                   WHERE document_id = $1 AND ${TENANT} AND segment_id = $2)`,
-        [documentId, FIELD_EXTRACT_SEGMENT]
+                   WHERE document_id = $1 AND ${TENANT} AND segment_id = ANY($2::text[]))`,
+        [documentId, [FIELD_EXTRACT_SEGMENT, FIELD_RECHECK_SEGMENT]]
       );
       const delFacets = await db.query(
-        `DELETE FROM facets WHERE document_id = $1 AND ${TENANT} AND segment_id = $2`,
-        [documentId, FIELD_EXTRACT_SEGMENT]
+        `DELETE FROM facets WHERE document_id = $1 AND ${TENANT} AND segment_id = ANY($2::text[])`,
+        [documentId, [FIELD_EXTRACT_SEGMENT, FIELD_RECHECK_SEGMENT]]
       );
 
       // Advance the pipeline stage so the browser can tell "read but not yet

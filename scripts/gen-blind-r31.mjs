@@ -35,6 +35,27 @@ const ADDR_MATCH = `SELECT count(*) AS n FROM entities WHERE entity_type='custom
 const zeroAddr = (id, cat, text, addr, shape = "blind_fake_address") => ({ id, text, category: cat, shape, cmp: "honest-zero", oracle: { sql: ADDR_MATCH, params: [`${addr}%`] } });
 const zeroConst = (id, cat, text, shape, sql = "SELECT 0 AS n") => ({ id, text, category: cat, shape, cmp: "honest-zero", oracle: { sql, params: [] } });
 
+
+/* R32 (owner decision 2026-09-30): an UNAMBIGUOUS typo'd full name now resolves, with a visible "Showing results for <name>" note.
+ * Independent re-statement of the policy for the oracle (no import from api/): exactly one customer within per-word
+ * Damerau-Levenshtein <= 2 (<= 1 when a word is under 6 letters), total <= 2, full name <= 2, and no OTHER customer name within 3.
+ * `typoTarget(t)` = that customer's name, or null (then the only correct answer is the honest "Did you mean" decline). */
+function dl(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 0; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) { d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1); } return d[a.length][b.length]; }
+function typoTarget(t) {
+  const tt = t.toLowerCase().split(/\s+/); if (tt.length < 2 || tt.length > 3) return null;
+  const hits = [];
+  for (const c of customers) {
+    const ct = c.customer_name.toLowerCase().split(/\s+/); if (ct.length !== tt.length) continue;
+    let total = 0, ok = true;
+    for (let i = 0; i < tt.length; i++) { if (tt[i] === ct[i]) continue; const lim = Math.min(tt[i].length, ct[i].length) < 6 ? 1 : 2; if (tt[i].length <= 2 || ct[i].length <= 2) { ok = false; break; } const d = dl(tt[i], ct[i]); if (d > lim) { ok = false; break; } total += d; }
+    if (ok && total >= 1 && total <= 2 && dl(t.toLowerCase(), c.customer_name.toLowerCase()) <= 2) hits.push(c.customer_name);
+  }
+  const uniqHits = [...new Set(hits)]; if (uniqHits.length !== 1) return null;
+  const tgt = uniqHits[0].toLowerCase();
+  if (customers.some((c) => c.customer_name.toLowerCase() !== tgt && dl(t.toLowerCase(), c.customer_name.toLowerCase()) <= 3)) return null;
+  return uniqHits[0];
+}
+
 const LEAD = ["", "", "", "so uh, ", "hey, ", "quick one - ", "ok so ", "hmm, ", "yo ", "hold up, ", "one sec, ", "umm ", "real quick: ", "alright, ", "gimme a sec, ", "can you look up ", "could you tell me ", "quick q - ", "ok um, ", "hang on... ", "sorry, one more - ", "customer is on the line, ", "im in the truck, "];
 const TAIL = ["", "", "", "", " again", " please", " thanks", " real quick", " for me", " asap", " right now", " if you have it", " when you get a sec"];
 const dress = (s, p) => { const l = p.pick(LEAD); let t = p.pick(TAIL); return (l + s + t).replace(/\s+/g, " ").trim(); };
@@ -121,7 +142,7 @@ function f4() {
   const typoOf = (nm) => { const [f, l] = nm.split(" "); const opts = [`${f.slice(0, -1)} ${l}`, `${f} ${l.slice(0, 2)}${l.slice(3)}`, `${f[0]}${f[1] === f[1] ? f[1] : ""}${f.slice(1)} ${l}`, `${f} ${l}s`, `${f.slice(0, 1)}${f.slice(2)} ${l}`]; return p.pick(opts); };
   const typoCores = [(x) => `whats the phone number for ${x}`, (x) => `pull up the file for ${x}`, (x) => `${x} email`, (x) => `whats the address for ${x}`, (x) => `is ${x} still under warranty`, (x) => `serial number for ${x}'s unit`];
   const nameSet = new Set(customers.map((c) => c.customer_name.toLowerCase()));
-  let made = 0; for (const c of p.shuffle(person)) { if (made >= 36) break; const t = typoOf(c.customer_name); if (nameSet.has(t.toLowerCase()) || t.toLowerCase() === c.customer_name.toLowerCase()) continue; const sameSur = customers.filter((x) => x.customer_name.split(" ")[1] === c.customer_name.split(" ")[1]).length; if (customers.some((x) => x.customer_name.toLowerCase().includes(t.toLowerCase()))) continue; made++; out.push({ id: ID("honest", ++n), text: dress(p.pick(typoCores)(t), p), category: cat, shape: "blind_near_miss_name", cmp: "honest-zero", oracle: { sql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`, params: [`%${t}%`] } }); }
+  let made = 0; for (const c of p.shuffle(person)) { if (made >= 36) break; const t = typoOf(c.customer_name); if (nameSet.has(t.toLowerCase()) || t.toLowerCase() === c.customer_name.toLowerCase()) continue; const sameSur = customers.filter((x) => x.customer_name.split(" ")[1] === c.customer_name.split(" ")[1]).length; if (customers.some((x) => x.customer_name.toLowerCase().includes(t.toLowerCase()))) continue; made++; out.push({ id: ID("honest", ++n), text: dress(p.pick(typoCores)(t), p), category: cat, shape: "blind_near_miss_name", cmp: "honest-zero", ...(typoTarget(t) ? { typoResolvesTo: typoTarget(t) } : {}), oracle: { sql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`, params: [`%${t}%`] } }); }
   return out;
 }
 
@@ -185,7 +206,7 @@ function f4b() {
   const typoOf = (nm) => { const [f, l] = nm.split(" "); const opts = [`${f} ${l.slice(0, -1)}`, `${f.slice(0, 2)}${f.slice(3)} ${l}`, `${f} ${l[0]}${l[0]}${l.slice(1)}`, `${f}${f.slice(-1)} ${l}`, `${f} ${l.slice(0, 1)}${l.slice(2)}`]; return p.pick(opts); };
   const typoCores = [(x) => `show the file on ${x}`, (x) => `what do we have on file for ${x}`, (x) => `serial number for ${x}'s furnace`, (x) => `who is ${x}`, (x) => `${x} - address?`, (x) => `pull up ${x}`, (x) => `brand of the unit for ${x}`, (x) => `${x}'s phone`];
   const nameSet = new Set(customers.map((c) => c.customer_name.toLowerCase()));
-  let made = 0; for (const c of p.shuffle(person)) { if (made >= 30) break; const t = typoOf(c.customer_name); if (nameSet.has(t.toLowerCase()) || t.toLowerCase() === c.customer_name.toLowerCase()) continue; if (customers.some((x) => x.customer_name.toLowerCase().includes(t.toLowerCase()))) continue; made++; out.push({ id: ID("honest2", ++n), text: dress(p.pick(typoCores)(t), p), category: cat, shape: "blind2_near_miss_name", cmp: "honest-zero", oracle: { sql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`, params: [`%${t}%`] } }); }
+  let made = 0; for (const c of p.shuffle(person)) { if (made >= 30) break; const t = typoOf(c.customer_name); if (nameSet.has(t.toLowerCase()) || t.toLowerCase() === c.customer_name.toLowerCase()) continue; if (customers.some((x) => x.customer_name.toLowerCase().includes(t.toLowerCase()))) continue; made++; out.push({ id: ID("honest2", ++n), text: dress(p.pick(typoCores)(t), p), category: cat, shape: "blind2_near_miss_name", cmp: "honest-zero", ...(typoTarget(t) ? { typoResolvesTo: typoTarget(t) } : {}), oracle: { sql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`, params: [`%${t}%`] } }); }
   return out;
 }
 
@@ -224,7 +245,7 @@ function f5() {
   // typo'd names (must Did-you-mean, never auto-resolve to a value)
   const nameSet = new Set(customers.map((c) => c.customer_name.toLowerCase()));
   const typoOf = (nm) => { const [f, l] = nm.split(" "); return p.pick([`${f} ${l.slice(0, 1)}${l.slice(2)}`, `${f.slice(0, 2)}${f.slice(3)} ${l}`, `${f} ${l}${l.slice(-1)}`, `${f.slice(0, -1)} ${l}`]); };
-  let made = 0; for (const c of p.shuffle(person)) { if (made >= 12) break; const t = typoOf(c.customer_name); if (nameSet.has(t.toLowerCase()) || customers.some((x) => x.customer_name.toLowerCase().includes(t.toLowerCase()))) continue; made++; out.push({ id: ID("fresh", ++n), text: dr(p.pick([(x) => `email for ${x}`, (x) => `${x} - what's the address`, (x) => `show me everything on ${x}`])(t)), category: cat, shape: "fresh_near_miss", cmp: "honest-zero", oracle: { sql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`, params: [`%${t}%`] } }); }
+  let made = 0; for (const c of p.shuffle(person)) { if (made >= 12) break; const t = typoOf(c.customer_name); if (nameSet.has(t.toLowerCase()) || customers.some((x) => x.customer_name.toLowerCase().includes(t.toLowerCase()))) continue; made++; out.push({ id: ID("fresh", ++n), text: dr(p.pick([(x) => `email for ${x}`, (x) => `${x} - what's the address`, (x) => `show me everything on ${x}`])(t)), category: cat, shape: "fresh_near_miss", cmp: "honest-zero", ...(typoTarget(t) ? { typoResolvesTo: typoTarget(t) } : {}), oracle: { sql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`, params: [`%${t}%`] } }); }
   return out;
 }
 

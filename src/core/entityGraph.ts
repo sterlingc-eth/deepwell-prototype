@@ -148,8 +148,12 @@ const stageIndex = (s: PipelineStage) => PIPELINE_STAGES.indexOf(s);
 export function splitAlternatives(requirement: string): string[] {
   return requirement.split('|');
 }
+/** R33: a requirement met only by an unconfirmed far-future date (`service_date_unconfirmed`, see
+ *  api/_lib/extractFields.js) is still MET — the date is printed and on file — so it never shows as
+ *  "Missing information". The Inbox shows a "check the year" chip for it instead (unconfirmedDateFields). */
+export const UNCONFIRMED_SUFFIX = '_unconfirmed';
 export function isRequirementMet(present: Set<string>, requirement: string): boolean {
-  return splitAlternatives(requirement).some((k) => present.has(k));
+  return splitAlternatives(requirement).some((k) => present.has(k) || present.has(`${k}${UNCONFIRMED_SUFFIX}`));
 }
 
 export function isAnswerable(doc: Doc, includeUnverified: boolean): boolean {

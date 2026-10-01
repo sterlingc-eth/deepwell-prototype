@@ -76,7 +76,7 @@ function labelModels(usage, debug) {
  */
 export async function gradeAnswer({ ctx, question, expected, data, alts, callModel, deadlineAt }) {
   if (question.cmp !== "rubric") {
-    const r = compareAnswer({ cmp: question.cmp, expected, question: question.text, citationRequired: question.citationRequired, alts, tolerance: question.tolerance, anyNumber: question.anyNumber }, data);
+    const r = compareAnswer({ cmp: question.cmp, expected, question: question.text, citationRequired: question.citationRequired, alts, tolerance: question.tolerance, anyNumber: question.anyNumber, typoResolvesTo: question.typoResolvesTo }, data);
     return { ...r, costUsd: 0 };
   }
   const view = answerView(data);

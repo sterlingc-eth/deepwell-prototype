@@ -60,6 +60,9 @@ export const FIELD_SPECS = [
   { key: 'invoice_number',   kind: 'text', desc: 'Invoice, ticket, or work-order number.', example: 'Printed "Invoice #INV-10493" -> value "INV-10493".' },
   { key: 'status',           kind: 'text', desc: 'Completed, Pending, In Progress.', example: 'A checkbox next to "Completed" is marked -> value "Completed".' },
   { key: 'notes',            kind: 'text', desc: 'A short observation the technician recorded that does not fit another field.', example: 'Handwritten "customer requested callback next week" -> value "customer requested callback next week".' },
+  // R33: a purchase order's required "vendor|customer_name" could never be met from "Vendor: Baker Distributing" —
+  // there was no field to put it in, so every PO with no customer line showed "missing" forever.
+  { key: 'vendor',           kind: 'text', desc: 'On a purchase order: the supplier/vendor the order is placed WITH (a parts house or distributor), exactly as printed. Never the HVAC company itself and never the customer.', example: 'Printed "Vendor: Baker Distributing" -> value "Baker Distributing".' },
   { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.', example: 'Printed "Permit No: BP-2024-08841" -> value "BP-2024-08841".' },
   // CUSTOMER REMINDERS (2026-09-22): an internal memo, dispatch note or piece
   // of correspondence sometimes carries a forward-looking instruction for
@@ -278,6 +281,7 @@ Rules:
 - Do not calculate. If the warranty term is "10 year" and the install date is 2024-03-04 but no expiry is printed, return warranty_term and installation_date and NOT warranty_expires.
 - If a field appears more than once with conflicting values, return each occurrence with its own page_no and let confidence reflect the conflict.
 - If only the month and year are printed for a date (e.g. "installed 06/2021" with no day), return it as YYYY-MM. Do not guess a day.
+- Return every printed date exactly as printed, even when it is in the future or looks like a typo (e.g. "Date of Service: 10/19/2028"). Never drop, shift or "fix" a printed year — the system flags implausible dates for a person to confirm. When a page prints several dates, service_date is the date the work was PERFORMED ("Date of Service", "Service Date", "DOS", "Date Performed", "Completed", "Visit Date"); never a "Next Service Due", "Printed on", "Due date" or follow-up date.
 - If this document covers more than one piece of equipment, tag equipment_id, serial_number, model, manufacturer, equipment_type, tonnage, refrigerant and installation_date with unit_index (1, 2, 3, ...) so each unit's facts stay together. Fields that apply to the whole document (customer_name, service_address, shop_address, shop_phone, shop_email, warranty_term, agreement_term, cost, ...) do not need unit_index.
 - customer_phone/customer_email are the CUSTOMER's own contact info, never the contractor's own letterhead phone/email. If the only phone or email on the page is the one printed in the company's own header/letterhead, with no separate line for the customer, record it as shop_phone/shop_email instead of customer_phone/customer_email.
 - document_type must be exactly one id from the list above. If none clearly fits, use "other".
@@ -298,15 +302,22 @@ const MONTHS = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
+// R33: only a real month word counts ("Oct", "Oct.", "October", "Sept") — the old
+// "first three letters" test let "Marine 5 2028" parse as a March date.
+const MONTH_WORD = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$/i;
+function monthOf(word) {
+  const w = String(word ?? '').replace(/\.$/, '');
+  return MONTH_WORD.test(w) ? MONTHS[w.slice(0, 3).toLowerCase()] : undefined;
+}
+/** Two-digit years: 00-69 -> 2000s, 70-99 -> 1900s (the POSIX strptime pivot). Pure, no clock. */
+function fullYear(y) {
+  const s = String(y).replace(/^'/, '');
+  if (s.length === 4) return +s;
+  if (s.length !== 2) return NaN;
+  const n = +s;
+  return n <= 69 ? 2000 + n : 1900 + n;
+}
 
-/**
- * Coerce a date to YYYY-MM-DD, or return null.
- *
- * Deliberately not `new Date(s)`: that parses "13/04/2024" as a valid date in
- * some runtimes, silently turns "Unit 3" into a date in others, and treats a
- * bare YYYY-MM-DD as UTC midnight, which prints as the previous day anywhere
- * west of Greenwich — including Mesa, where this is being built.
- */
 /**
  * Some fields record something that ALREADY HAPPENED. A unit cannot have been
  * installed next year, and a warranty cannot have been registered in 2030.
@@ -340,54 +351,119 @@ const EXTENDED_FUTURE_MONTHS = {
   installation_date: 3,
 };
 
+/**
+ * R33 (2026-09-30, live defect — Sonoran Comfort Air, "118-service-ticket-c23.pdf"): a service ticket printing
+ * "Date of Service: 10/19/2028" showed "Missing information — Service date" because a date BEYOND the window above was
+ * DROPPED, and the document then looked like it never stated one. A printed, clearly labelled date must never become
+ * "missing". Beyond the window the date is now KEPT, as printed, under a separate "unconfirmed" key
+ * (`service_date_unconfirmed`) and flagged ['future','far_future']:
+ *   - the Inbox shows it with a "Service date 10/19/2028 is in the future — check the year" chip and a one-click
+ *     Confirm (which writes the canonical `service_date` as a human correction), never as a missing field;
+ *   - every downstream consumer of the canonical key (warranty clock, maintenance-due, "last service" answers,
+ *     reminders, follow-ups, equipment facts) keeps ignoring it, by construction — they all read `field_key =
+ *     'service_date'` exactly, so an unconfirmed far-future date can never become a warranty deadline or a "last
+ *     serviced" answer until a person confirms it.
+ */
+export const UNCONFIRMED_SUFFIX = '_unconfirmed';
+export function unconfirmedKey(key) { return `${key}${UNCONFIRMED_SUFFIX}`; }
+export function isUnconfirmedKey(key) { return typeof key === 'string' && key.endsWith(UNCONFIRMED_SUFFIX); }
+export function baseKeyOf(key) { return isUnconfirmedKey(key) ? key.slice(0, -UNCONFIRMED_SUFFIX.length) : key; }
+/** Every canonical key that can be parked as unconfirmed (exported so tests/UI share one list). */
+export const UNCONFIRMABLE_DATE_FIELDS = [...BACKWARD_LOOKING_FIELDS];
+
 export function isFutureDate(ymd, today = new Date().toISOString().slice(0, 10)) {
   if (typeof ymd !== 'string' || typeof today !== 'string') return false;
   const limit = new Date(`${today}T00:00:00Z`);
+  if (Number.isNaN(limit.getTime())) return false;
   limit.setUTCDate(limit.getUTCDate() + FUTURE_GRACE_DAYS);
   return ymd > limit.toISOString().slice(0, 10);
 }
 
 /**
- * True when `ymd` is further out than `key`'s allowed future window — still
- * implausible even after EXTENDED_FUTURE_MONTHS, so the fact must be dropped
- * rather than kept-and-flagged. Fields with no extended window fall back to
- * the tight universal grace (same as isFutureDate).
+ * True when `ymd` is further out than `key`'s allowed future window. R33: such a date is no longer dropped — it is
+ * parked under the unconfirmed key (see UNCONFIRMED_SUFFIX). Fields with no extended window fall back to the tight
+ * universal grace (same as isFutureDate).
  */
-function isBeyondFutureWindow(key, ymd, today = new Date().toISOString().slice(0, 10)) {
+export function isBeyondFutureWindow(key, ymd, today = new Date().toISOString().slice(0, 10)) {
   const months = EXTENDED_FUTURE_MONTHS[key];
   if (!months) return isFutureDate(ymd, today);
   const limit = new Date(`${today}T00:00:00Z`);
+  if (Number.isNaN(limit.getTime())) return false;
   limit.setUTCMonth(limit.getUTCMonth() + months);
   return ymd > limit.toISOString().slice(0, 10);
 }
 
-export function normalizeDate(raw) {
-  const s = String(raw ?? '').trim();
+/**
+ * Pure. How a normalized date for `key` should be stored: `{status: 'ok'|'future'|'far_future', storeKey, flags}`.
+ * Only BACKWARD_LOOKING_FIELDS are ever flagged; a forward-looking date (warranty_expires) is always 'ok'.
+ */
+export function classifyDateForField(key, ymd, today) {
+  if (!BACKWARD_LOOKING_FIELDS.has(key) || !isFutureDate(ymd, today)) return { status: 'ok', storeKey: key, flags: null };
+  if (isBeyondFutureWindow(key, ymd, today)) return { status: 'far_future', storeKey: unconfirmedKey(key), flags: ['future', 'far_future'] };
+  return { status: 'future', storeKey: key, flags: ['future'] };
+}
+
+/**
+ * Coerce a date to YYYY-MM-DD (or YYYY-MM when only a month is printed), or return null.
+ *
+ * Deliberately not `new Date(s)`: that parses "13/04/2024" as a valid date in
+ * some runtimes, silently turns "Unit 3" into a date in others, and treats a
+ * bare YYYY-MM-DD as UTC midnight, which prints as the previous day anywhere
+ * west of Greenwich — including Mesa, where this is being built.
+ *
+ * R33: every common US paperwork spelling — ISO (with or without a time), M/D/YYYY, M/D/YY, M-D-YY, M.D.YYYY (with or
+ * without leading zeros), "Oct 19, 2028", "Oct. 19th 2028", "October 19 2028", "Thursday, October 19, 2028",
+ * "19 Oct 2028", "19-Oct-28", "Oct-19-2028", and a trailing time ("10/19/2028 2:30 PM"). Numeric dates are US
+ * month-first unless `opts.order` says the document is day-first ('dmy'); `opts.order === 'strict'` refuses a
+ * numeric date whose day and month could be swapped (both <= 12 and different) — used when the document itself
+ * shows BOTH orders, so there is no hint left to go on.
+ * @param {unknown} raw
+ * @param {{order?: 'mdy'|'dmy'|'strict'}} [opts]
+ */
+export function normalizeDate(raw, opts = {}) {
+  let s = String(raw ?? '').trim();
+  if (!s) return null;
+  const order = opts?.order === 'dmy' || opts?.order === 'strict' ? opts.order : 'mdy';
+
+  // Furniture around the date itself: a weekday in front, a time (or "@ 2:30pm") after, a trailing period/comma,
+  // ordinal suffixes ("19th").
+  s = s
+    .replace(/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day|sday|nesday|rsday|urday)?\.?,?\s+/i, '')
+    .replace(/[\s,]*(?:@|at)?\s*\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?\s?m\.?)?$/i, '')
+    .replace(/\s*\((?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?\)$/i, '')
+    .replace(/[.,;]+$/, '')
+    .replace(/\b(\d{1,2})(?:st|nd|rd|th)\b/gi, '$1')
+    .trim();
   if (!s) return null;
 
-  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/);
   if (m) return ymd(+m[1], +m[2], +m[3]);
 
-  // US order. HVAC paperwork in Arizona is month-first; 04/13/2024 confirms it.
-  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  // Numeric with the year last. The same separator both times ("10/19-2028" is not a date anyone printed).
+  m = s.match(/^(\d{1,2})([-/.])(\d{1,2})\2('?\d{2}|\d{4})$/);
   if (m) {
-    let [, a, b, y] = m;
-    let mo = +a, day = +b;
-    if (mo > 12 && day <= 12) { mo = +b; day = +a; } // unambiguously day-first
-    return ymd(+y, mo, day);
+    const a = +m[1], b = +m[3], y = fullYear(m[4]);
+    // A dotted short form ("1.5.25") is as often a version/part number as a date; only a 4-digit year is trusted there.
+    if (m[2] === '.' && String(m[4]).length !== 4) return null;
+    let mo, day;
+    if (a > 12 && b <= 12) { mo = b; day = a; }           // unambiguously day-first
+    else if (b > 12 && a <= 12) { mo = a; day = b; }      // unambiguously month-first
+    else if (a === b) { mo = a; day = b; }
+    else if (order === 'strict') return null;            // swappable and the document gives no usable hint
+    else if (order === 'dmy') { mo = b; day = a; }
+    else { mo = a; day = b; }                             // US default. HVAC paperwork in Arizona is month-first.
+    return ymd(y, mo, day);
   }
 
-  m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/);
-  if (m) {
-    const mo = MONTHS[m[1].slice(0, 3).toLowerCase()];
-    return mo ? ymd(+m[3], mo, +m[2]) : null;
-  }
-
-  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})$/);
-  if (m) {
-    const mo = MONTHS[m[2].slice(0, 3).toLowerCase()];
-    return mo ? ymd(+m[3], mo, +m[1]) : null;
-  }
+  // "Oct 19, 2028" / "October 19 2028" / "Oct. 19 '28"
+  m = s.match(/^([A-Za-z]{3,9}\.?)\s+(\d{1,2}),?\s+('?\d{2}|\d{4})$/);
+  if (m) { const mo = monthOf(m[1]); return mo ? ymd(fullYear(m[3]), mo, +m[2]) : null; }
+  // "Oct-19-2028"
+  m = s.match(/^([A-Za-z]{3,9}\.?)-(\d{1,2})-(\d{2}|\d{4})$/);
+  if (m) { const mo = monthOf(m[1]); return mo ? ymd(fullYear(m[3]), mo, +m[2]) : null; }
+  // "19 Oct 2028" / "19-Oct-28" / "19 October, 2028"
+  m = s.match(/^(\d{1,2})(?:\s+|-)([A-Za-z]{3,9}\.?)(?:,?\s+|-)('?\d{2}|\d{4})$/);
+  if (m) { const mo = monthOf(m[2]); return mo ? ymd(fullYear(m[3]), mo, +m[1]) : null; }
 
   // Month-precision only: no day was ever printed ("installed 06/2021"). Real
   // HVAC paperwork does this constantly for install dates on multi-year-old
@@ -401,9 +477,9 @@ export function normalizeDate(raw) {
   m = s.match(/^(\d{1,2})[-/](\d{4})$/);
   if (m) return ym(+m[2], +m[1]);
 
-  m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{4})$/);
+  m = s.match(/^([A-Za-z]{3,9}\.?),?\s+(\d{4})$/);
   if (m) {
-    const mo = MONTHS[m[1].slice(0, 3).toLowerCase()];
+    const mo = monthOf(m[1]);
     return mo ? ym(+m[2], mo) : null;
   }
 
@@ -532,25 +608,24 @@ export function normalizeFields(rawFields, { pageCount, today, pack = null } = {
     if (!value) { dropped.push({ key, reason: 'empty' }); continue; }
 
     let dateFlags;
+    let storeKey = key;
+    let unconfirmedOf = null;
     if (spec.kind === 'reminder_trigger') {
       const t = normalizeReminderTrigger(value);
       if (!t) { dropped.push({ key, reason: `unparseable reminder_trigger "${value}"` }); continue; }
       value = t;
     } else if (spec.kind === 'date') {
-      const d = normalizeDate(value);
+      const d = normalizeDate(value, { order: f?.date_order });
       if (!d) { dropped.push({ key, reason: `unparseable date "${value}"` }); continue; }
-      // A record of something that already happened cannot be dated far in
-      // the future. Dropped rather than clamped: we do not know what the real
-      // date was, and a guess here becomes a warranty deadline downstream.
-      // Within the field's own extended window, though, a future date is a
-      // real fact (scheduled work) — kept and flagged rather than discarded.
-      if (BACKWARD_LOOKING_FIELDS.has(key) && isFutureDate(d, today)) {
-        if (isBeyondFutureWindow(key, d, today)) {
-          dropped.push({ key, reason: `date is in the future ("${d}")` });
-          continue;
-        }
-        dateFlags = ['future'];
-      }
+      // A record of something that already happened cannot be dated far in the future — but a PRINTED date is never
+      // thrown away (R33). Within the field's own extended window a future date is a real fact (scheduled work):
+      // kept under its own key, flagged 'future'. Beyond it the date is kept AS PRINTED under the unconfirmed key
+      // (service_date_unconfirmed), flagged ['future','far_future'] — visible in the Inbox as "check the year",
+      // invisible to everything that reads the canonical key (warranty clock, last-service answers, reminders)
+      // until a person confirms it. See UNCONFIRMED_SUFFIX above.
+      const cls = classifyDateForField(key, d, today);
+      if (cls.flags) dateFlags = cls.flags;
+      if (cls.status === 'far_future') { storeKey = cls.storeKey; unconfirmedOf = key; }
       value = d;
     } else if (spec.kind === 'money' || spec.kind === 'number') {
       const n = normalizeNumber(value, { money: spec.kind === 'money' });
@@ -577,7 +652,7 @@ export function normalizeFields(rawFields, { pageCount, today, pack = null } = {
       : null;
 
     kept.push({
-      field_key: key,
+      field_key: storeKey,
       value,
       confidence,
       page_no: pageNo,
@@ -587,6 +662,10 @@ export function normalizeFields(rawFields, { pageCount, today, pack = null } = {
       // builds a plain {field_key,value,...} object to compare against a kept
       // fact (no `flags` key at all) still matches one with no future date.
       ...(dateFlags ? { flags: dateFlags } : {}),
+      ...(unconfirmedOf ? { unconfirmed_of: unconfirmedOf } : {}),
+      // R33: provenance for a value the deterministic label scan supplied (modelAvoidance/labelScan.js) rather than
+      // the extractor itself — 'label-fill' at ingest, 'recheck' when a stored document is re-checked.
+      ...(f?.method ? { method: String(f.method) } : {}),
     });
   }
 
@@ -634,7 +713,7 @@ function dedupe(fields, meta = { specs: FIELD_SPECS, unitScoped: UNIT_SCOPED_FIE
   }
 
   for (const f of best.values()) if (!REPEATABLE.has(f.field_key)) out.push(f);
-  return out.sort((a, b) => order.indexOf(a.field_key) - order.indexOf(b.field_key));
+  return out.sort((a, b) => order.indexOf(baseKeyOf(a.field_key)) - order.indexOf(baseKeyOf(b.field_key)));
 }
 
 /**

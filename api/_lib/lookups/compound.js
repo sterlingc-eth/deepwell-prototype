@@ -33,6 +33,7 @@
  * own doc comment at the dispatch point.
  */
 import { normalizeQuestion } from "../nlNormalize.js";
+import { withTypoNote } from "./typoResolve.js";
 import { attachCitations, customerRecord, unitRecord } from "../citations/records.js";
 import { formatDateHuman } from "../fastPath.js";
 import { TENANT_SQL } from "../scope.js";
@@ -366,7 +367,11 @@ async function runWarrantyLastVisit(db, address, today) {
  *  question (the caller then falls through exactly as if this file didn't
  *  exist — same "return null rather than guess" contract every other lookup
  *  in this codebase follows). */
-export async function runCompound(db, question, opts = {}) {
+export function runCompound(db, question, opts = {}) {
+  return withTypoNote(() => runCompoundCore(db, question, opts));
+}
+
+async function runCompoundCore(db, question, opts = {}) {
   const parsed = parseCompoundQuestion(question);
   if (!parsed) return null;
   const today = opts?.today ?? null;

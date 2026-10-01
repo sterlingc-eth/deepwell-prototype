@@ -1117,7 +1117,7 @@ const HANDLERS = {
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1)
-                        AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - $3::int))
+                        AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(e.data->>'installation_date', 1, 10)::date END) <= ($2::date - make_interval(years => $3::int)))
           AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
                             LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                            WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
@@ -1195,7 +1195,7 @@ const HANDLERS = {
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id
-                        AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - $2::int))
+                        AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(e.data->>'installation_date', 1, 10)::date END) <= ($1::date - make_interval(years => $2::int)))
           AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
                         LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]))`,
@@ -1234,7 +1234,7 @@ const HANDLERS = {
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id
-                        AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - $2::int))
+                        AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(e.data->>'installation_date', 1, 10)::date END) <= ($1::date - make_interval(years => $2::int)))
           AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
                             JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date' AND y.${TENANT_SQL}
                             LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}

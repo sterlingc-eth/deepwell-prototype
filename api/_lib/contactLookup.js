@@ -50,6 +50,7 @@ import { fetchFileData, attachFileSummary, fetchNotes, buildNotesAnswer } from "
 import { citeNotes } from "./citations/history.js"; // TEAM C
 // TEAM E (2026-09-24): full-name (not just surname) typo tolerance — see tokenFuzzyMatches below.
 import { damerauLevenshteinDistance } from "./integrity.js";
+import { typoAutoResolveEnabled, decideTypoResolution, isQuotedAsTyped, recordTypoResolution, withTypoNote } from "./lookups/typoResolve.js";
 // R31 (Team A): entity-first slot filling — the parser's last resort, see lookups/slotFill.js.
 import { stripConversationalFrame } from "./router/frame.js";
 import { parseSlotFill, runSlotFill } from "./lookups/slotFill.js";
@@ -948,6 +949,9 @@ function parseContactLookupQuestionCore(question, opts = {}) {
     }
   }
 
+  // R32b: "number of invoices for <name>" is a COUNT of records, never the phone-number reading of the word "number".
+  if (/\b(?:number|count|total)\s+of\s+(?:documents?|docs?|files?|invoices?|jobs?|visits?|tickets?|work\s+orders?|units?|systems?|permits?|quotes?|estimates?|purchase\s+orders?|pos|calls?|appointments?|records?)\b/.test(q)) return null;
+
   // Shape 1: "<field> ... for/of <name>" (the original, more specific shape
   // — tried first since a "for/of"-connector match is a stronger signal
   // than the bare name-before-field shapes below).
@@ -1675,7 +1679,7 @@ export async function resolveContactCandidatesDetailed(db, namePhrase) {
       tier = 'fuzzy';
     }
   }
-  return { rows, tier };
+  return { rows, tier, universe: tier === 'fuzzy' ? all : undefined };
 }
 
 export async function resolveContactCandidates(db, namePhrase) {
@@ -1764,9 +1768,16 @@ export function corroboratesCandidate(question, row) {
  * 'exact'/'contains'/'fuzzy-surname' tiers — this guard only ever narrows the 'fuzzy' tier).
  */
 export async function resolveNamedCustomers(db, question, namePhrase) {
-  const { rows, tier } = await resolveContactCandidatesDetailed(db, namePhrase);
+  const { rows, tier, universe } = await resolveContactCandidatesDetailed(db, namePhrase);
   if (tier !== "fuzzy" || !rows.length) return { candidates: rows, declined: null };
   if (rows.length === 1 && corroboratesCandidate(question, rows[0])) return { candidates: rows, declined: null };
+  // R32 (CEO decision 2026-09-30): an UNAMBIGUOUS typo'd full name resolves, with a visible note on the answer (see
+  // lookups/typoResolve.js for the whole policy and its negatives). Anything else keeps the "Did you mean" decline.
+  if (rows.length === 1 && typoAutoResolveEnabled() && !isQuotedAsTyped(question, namePhrase) && decideTypoResolution(namePhrase, rows[0], universe).ok) {
+    const at = String(question ?? "").toLowerCase().indexOf(String(namePhrase).toLowerCase());
+    recordTypoResolution(at >= 0 ? String(question).slice(at, at + String(namePhrase).length) : namePhrase, rows[0].customer_name);
+    return { candidates: rows, declined: null, typoResolved: true };
+  }
   return { candidates: [], declined: buildNearMissDeclineAnswer(namePhrase, rows) };
 }
 
@@ -1875,7 +1886,11 @@ export async function resolveAddressCandidates(db, addressPhrase) {
  * comment), and a namePhrase that matches no customer is reported as a miss,
  * not guessed at.
  */
-export async function runContactLookup(db, question, opts = {}) {
+export function runContactLookup(db, question, opts = {}) {
+  return withTypoNote(() => runContactLookupCore(db, question, opts));
+}
+
+async function runContactLookupCore(db, question, opts = {}) {
   const overlay = opts?.overlay;
   const today = opts?.today ?? null;
   let tenantVocab = opts?.tenantVocab;

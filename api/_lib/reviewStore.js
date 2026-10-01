@@ -100,8 +100,11 @@ import {
   DOCUMENT_TYPE_DEFINITIONS,
   DOCUMENT_TYPE_IDS,
 } from './documentTypes.js';
+import { classifyFromText } from './modelAvoidance/textExtract.js';
+import { isDeterministicClassifyEnabled } from './modelAvoidance/switches.js';
 import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
-import { normalizeReminderTrigger, normalizeDate } from './extractFields.js';
+import { normalizeReminderTrigger, normalizeDate, UNCONFIRMED_SUFFIX } from './extractFields.js';
+import { recheckDocumentTx } from './recheck.js';
 import { deriveWarranty } from './warrantyRules.js';
 import { packForTenant } from './industry/index.js';
 
@@ -267,6 +270,42 @@ export async function correctField(ctx, { documentId, fieldKey, value, by }, act
           [tenantId, documentId, fieldKey, value, by]
         )).rows[0];
 
+    // R33: a person writing the canonical date (the Inbox's "Confirm" on a "Service date 10/19/2028 is in the future —
+    // check the year" chip, or a corrected year) settles the parked far-future reading: its <key>_unconfirmed row
+    // goes, so the document stops asking. Only ever the SAME field's parked twin; nothing else is touched.
+    let unconfirmedCleared = 0;
+    if (!fieldKey.endsWith(UNCONFIRMED_SUFFIX)) {
+      unconfirmedCleared = (await client.query(
+        `DELETE FROM extractions WHERE document_id = $1 AND field_key = $2 AND ${TENANT}`,
+        [documentId, `${fieldKey}${UNCONFIRMED_SUFFIX}`]
+      )).rowCount;
+    }
+
+    // R33: confirming (or fixing the year of) a parked install date is the moment it may reach the warranty clock —
+    // the same fill-only rule ingest uses: only when the document's unit has NO install date yet, only for a date
+    // the unit-install-date rules accept (never the future), via the same patch the unit page writes.
+    let unitInstallFilled = null;
+    if (fieldKey === 'installation_date' && unconfirmedCleared) {
+      const checked = validateInstallDateInput(String(value).trim());
+      if (checked.ok) {
+        const unitRow = (await client.query(
+          `SELECT e.id, e.data FROM extractions x JOIN entities e ON e.id = x.entity_id AND e.${TENANT}
+            WHERE x.document_id = $1 AND x.${TENANT} AND e.entity_type = 'equipment' AND e.merged_into IS NULL
+            ORDER BY x.created_at LIMIT 1`,
+          [documentId]
+        )).rows[0];
+        if (unitRow && !(typeof unitRow.data?.installation_date === 'string' && unitRow.data.installation_date)) {
+          const pack = await packForTenant(client);
+          const { patch } = installDatePatch(unitRow.data, checked.ymd, { by, byUserId: actorClerkId ?? null, pack });
+          await client.query(
+            `UPDATE entities SET data = COALESCE(data, '{}'::jsonb) || $2::jsonb, updated_at = NOW() WHERE id = $1 AND ${TENANT}`,
+            [unitRow.id, JSON.stringify(patch)]
+          );
+          unitInstallFilled = unitRow.id;
+        }
+      }
+    }
+
     const unverified = await unverifyTx(client, documentId);
     const documentRow = unverified
       ?? (await client.query(`SELECT * FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
@@ -276,7 +315,7 @@ export async function correctField(ctx, { documentId, fieldKey, value, by }, act
       action: 'review.field_corrected',
       resourceType: 'document',
       resourceId: documentId,
-      changes: { fieldKey, value, by, unverified: !!unverified },
+      changes: { fieldKey, value, by, unverified: !!unverified, ...(unconfirmedCleared ? { unconfirmed_cleared: true } : {}), ...(unitInstallFilled ? { unit_install_date_filled: unitInstallFilled } : {}) },
     });
 
     return { document: documentRow, extraction };
@@ -745,6 +784,18 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     const doc = await db.getDocument(documentId);
     if (!doc) throw new ReviewError('Document not found', 404);
 
+    // R33: "Verify with AI" on a document showing "Missing information" first re-reads its own page for the missing
+    // field ($0, no model — recheck.js). The Sonoran Comfort Air ticket printed "Date of Service: 10/19/2028" and this
+    // button answered "Not confident enough yet"; now it finds the date, parks it as unconfirmed (far future) and
+    // says exactly that. Only runs when something required is missing, so a complete document is unaffected.
+    let recheck = null;
+    {
+      const pre = completenessFor(normalizeDocumentType(doc.document_type), toCompletenessFields(await db.listExtractionsByDocument(documentId)));
+      if (pre.missing.length && doc.stage !== 'verified') {
+        recheck = await recheckDocumentTx(db, documentId, { actorClerkId, source: 'ai-verify' });
+      }
+    }
+
     const rows = await db.listExtractionsByDocument(documentId); // SELECT * includes corrected_value
     const completenessFields = toCompletenessFields(rows);
 
@@ -796,7 +847,12 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     // Re-fetch rather than trusting the pre-repair `doc`: the link-repair
     // above (or verifyByAi) may have changed stage since it was read.
     const document = (await db.getDocument(documentId)) ?? doc;
-    return { document, completeness, verified };
+    // R33: say WHY it is not verified when the reason is an unconfirmed printed date, so the panel can show "Service
+    // date 10/19/2028 is in the future — check the year" instead of a generic "still needs a person".
+    const unconfirmedDates = rows
+      .filter((r) => typeof r.field_key === 'string' && r.field_key.endsWith(UNCONFIRMED_SUFFIX) && (r.corrected_value ?? r.value))
+      .map((r) => ({ fieldKey: r.field_key.slice(0, -UNCONFIRMED_SUFFIX.length), value: r.corrected_value ?? r.value }));
+    return { document, completeness, verified: verified || !!recheck?.aiVerified, unconfirmedDates, recheck: recheck ? { filled: recheck.filled, ambiguous: recheck.ambiguous ?? [] } : null };
   });
 }
 
@@ -971,6 +1027,14 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
         const facts = Object.fromEntries(completenessFields.map((f) => [f.field_key, f.value]));
         let resolved = doc.document_type ? normalizeDocumentType(doc.document_type, facts) : 'other';
         if (resolved === 'other') resolved = inferDocumentType(facts, doc.original_filename);
+
+        // R32 (Team M): a document whose own TITLE line names its type ("Service Ticket", "Purchase Order"...) is
+        // classified from the stored page text at $0 before any model call. CLASSIFY_DETERMINISTIC=0 turns this off.
+        if (resolved === 'other' && isDeterministicClassifyEnabled()) {
+          const pages = await db.listPages(id);
+          const hit = classifyFromText(pages.map((p) => ({ page_no: p.page_no, text: p.text ?? '' })));
+          if (hit && hit.type !== 'other' && hit.type !== 'internal' && DOCUMENT_TYPES.some((t) => t.id === hit.type)) resolved = hit.type;
+        }
 
         if (resolved === 'other') {
           const budget = modelCalls < MAX_RECLASSIFY_MODEL_CALLS && !budgetStatus.exceeded

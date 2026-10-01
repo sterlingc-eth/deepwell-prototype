@@ -436,47 +436,47 @@ eq(
 check(
   'resolveAgeFilter tolerates "yeears" (doubled vowel) the same as "years"',
   JSON.stringify(resolveAgeFilter('units older than 10 yeears', '2026-09-26')) ===
-    JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 })
+    JSON.stringify({ field: 'installDate', op: 'lte', value: '2016-09-26' })
 );
 check(
   'resolveAgeFilter tolerates "yeasr" (transposed letters)',
   JSON.stringify(resolveAgeFilter('units older than 10 yeasr old', '2026-09-26')) ===
-    JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 })
+    JSON.stringify({ field: 'installDate', op: 'lte', value: '2016-09-26' })
 );
 check(
   'resolveAgeFilter tolerates "order" (nlNormalize\'s own "older"->"order" typo-corrector collision)',
   JSON.stringify(resolveAgeFilter('units order than 10 years', '2026-09-26')) ===
-    JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 })
+    JSON.stringify({ field: 'installDate', op: 'lte', value: '2016-09-26' })
 );
 check(
   'resolveAgeFilter: "over N years old" means the same as "older than N years"',
   JSON.stringify(resolveAgeFilter('a unit over 10 years old', '2026-09-26')) ===
-    JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 })
+    JSON.stringify({ field: 'installDate', op: 'lte', value: '2016-09-26' })
 );
 check(
   'resolveAgeFilter direction bug fix: "younger than N years" means NEWER, not older',
   JSON.stringify(resolveAgeFilter('a unit younger than 5 years', '2026-09-26')) ===
-    JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 })
+    JSON.stringify({ field: 'installDate', op: 'gt', value: '2021-09-26' })
 );
 check(
-  'resolveAgeFilter (own paraphrase): "units over 15 years old" -> year-based installYear lt',
+  'resolveAgeFilter (own paraphrase): "units over 15 years old" -> exact-date installDate lte (R32)',
   JSON.stringify(resolveAgeFilter('how many units on our books are over 15 years old', '2026-09-25')) ===
-    JSON.stringify({ field: 'installYear', op: 'lt', value: 2011 })
+    JSON.stringify({ field: 'installDate', op: 'lte', value: '2011-09-25' })
 );
 check(
-  'resolveAgeFilter (own paraphrase): "units under 5 years old" -> year-based installYear gte',
+  'resolveAgeFilter (own paraphrase): "units under 5 years old" -> exact-date installDate gt (R32)',
   JSON.stringify(resolveAgeFilter('how many units on our books are under 5 years old', '2026-09-25')) ===
-    JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 })
+    JSON.stringify({ field: 'installDate', op: 'gt', value: '2021-09-25' })
 );
 check(
-  'resolveAgeFilter (own paraphrase): "replacement candidates over 15 years old" -> same year-based shape regardless of the "candidates" noun',
+  'resolveAgeFilter (own paraphrase): "replacement candidates over 15 years old" -> same exact-date shape regardless of the "candidates" noun',
   JSON.stringify(resolveAgeFilter('how many replacement candidates are over 15 years old', '2026-09-25')) ===
-    JSON.stringify({ field: 'installYear', op: 'lt', value: 2011 })
+    JSON.stringify({ field: 'installDate', op: 'lte', value: '2011-09-25' })
 );
 check(
-  'resolveAgeFilter negative: "newer than 5 years" (not "under") still resolves the same newer-direction gte shape',
+  'resolveAgeFilter negative: "newer than 5 years" (not "under") still resolves the same newer-direction gt shape',
   JSON.stringify(resolveAgeFilter('units newer than 5 years', '2026-09-25')) ===
-    JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 })
+    JSON.stringify({ field: 'installDate', op: 'gt', value: '2021-09-25' })
 );
 check(
   'resolveAgeFilter (Cluster 3, own paraphrase): "between 10 and 15 years old" -> two installDate filters',

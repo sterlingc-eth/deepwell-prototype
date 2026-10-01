@@ -119,6 +119,8 @@ export function parsePeriod(q, today) {
 /* -------------------------------------------------------------------- intents */
 
 const TIME_STOP = new Set([
+  // R32b: "how many invoices have we sent out last quarter / yr to date / in the last 6 weeks" must never read "out ..." as a customer
+  'versus', 'vs', 'compared', 'compare', 'against', 'than', 'quoted', 'invoiced', 'billed', 'charged', 'out', 'yr', 'yrs', 'weeks', 'years', 'quarters', 'lately', 'recently', 'over', 'since', 'during', 'ago', 'q1', 'q2', 'q3', 'q4', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'twelve',
   'for', 'at', 'about', 'did', 'do', 'does', 'have', 'has', 'had', 'is', 'are', 'was', 'what', 'how', 'who', 'which', 'whats', "what's", 'much', 'me', 'my',
   'last', 'this', 'next', 'month', 'year', 'week', 'quarter', 'ytd', 'all', 'time', 'so', 'far', 'today', 'yesterday', 'ever', 'total',
   'the', 'our', 'a', 'an', 'of', 'to', 'in', 'on', 'we', 'i', 'you', 'us', 'them', 'him', 'her', 'his', 'their', 'job', 'jobs', 'invoice',
@@ -164,7 +166,7 @@ const TIME_STOP = new Set([
 /** A candidate name phrase is usable only if it has at least one non-stop word. */
 function usablePhrase(p) {
   const words = String(p ?? '').toLowerCase().replace(/[^a-z0-9'.\s-]/g, ' ').split(/\s+/).filter(Boolean);
-  const kept = words.filter((w) => !TIME_STOP.has(w));
+  const kept = words.filter((w) => !TIME_STOP.has(w) && !/^\d+$/.test(w));
   if (!kept.length) return null;
   // Trim leading/trailing stop words ("the bracken job" -> "bracken").
   let a = 0; let b = words.length;
@@ -187,6 +189,11 @@ export function extractSubjectPhrase(question) {
     /\b(?:the\s+)?([a-z][\w'.-]*)\s+(?:job|install(?:ation)?|project|replacement)\b/i,
     // "for/to/from/of <name>" at the end or before a time word
     /\b(?:for|to|from|of|with)\s+(?:the\s+)?(.+?)(?=['’]s\b|\s+(?:last|latest|most|this|in|so|since|during|total|and|vs|versus|so far|over|under|job)\b|$)/i,
+    // R32b: "how many unpaid invoices does Rebecca Montoya have" / "how much has Rebecca Montoya been invoiced" - the name sits between an auxiliary
+    // and the verb ("we"/"you"/"they" are stop words, so a shop-wide "have we sent out" never becomes a subject).
+    /\b(?:does|did|do|has|have|had)\s+(?:the\s+)?(.+?)\s+(?:have|had|got|been\s+(?:invoiced|billed|charged|sent|quoted)|paid|owe|owed|pay)\b/i,
+    // "how many invoices have we sent Maria Gallardo" - the name FOLLOWS the verb
+    /\b(?:sent|send|billed|bill|charged|invoiced)\s+(?:to\s+)?(.+?)(?=\s+(?:for|in|on|last|this|since|during|so|and|vs|versus|so far|over|under)\b|$)/i,
   ];
   for (const re of tries) {
     const m = q.match(re);
@@ -246,10 +253,25 @@ const MORE_LESS_WORD_RE = /\bmore\b|\bless\b|\bhigher\b|\blower\b|\bgreater\b/i;
 const THAN_WORD_RE = /\bthan\b/i;
 const THIS_YEAR_ANY_RE = /\b(?:so\s+far\s+)?this\s+year\b/i;
 const LAST_YEAR_ANY_RE = /\b(?:all\s+of\s+)?last\s+year\b/i;
-function detectRevenueYearComparison(q) {
+const LESS_WORD_RE = /\bless\b|\blower\b|\bfewer\b|\bsmaller\b/i;
+const YEAR_TOKEN_RE = /\bthis\s+year\b|\blast\s+year\b|\b(?:19|20)\d{2}\b/gi;
+/** R32: a two-CALENDAR-YEAR revenue comparison, any two years ("higher in 2021 than in 2025", "did we invoice more in 2019 than 2023", "less this year
+ *  than last"). Returns {a, b, less} (compare year `a` against year `b`; `less` flips the direction), or null. The first-named year is the subject
+ *  of the comparison ("more in A than B" -> A > B). Exactly two distinct years must be named, else null (never guesses which two are meant). */
+function detectRevenueYearComparison(q, today) {
   if (!REVENUE_WORD_RE.test(q) || !MORE_LESS_WORD_RE.test(q) || !THAN_WORD_RE.test(q)) return null;
-  if (!THIS_YEAR_ANY_RE.test(q) || !LAST_YEAR_ANY_RE.test(q)) return null;
-  return true;
+  const Y = Number(String(today ?? new Date().toISOString()).slice(0, 4));
+  const toks = [...q.matchAll(YEAR_TOKEN_RE)].map((m) => (/this/i.test(m[0]) ? Y : /last/i.test(m[0]) ? Y - 1 : Number(m[0])));
+  const distinct = [...new Set(toks)];
+  if (toks.length < 2 || distinct.length !== 2) return null;
+  // the word ordering must be "<more/less> ... A ... than ... B": A is the first year token before "than"
+  const thanAt = q.search(THAN_WORD_RE);
+  const before = [...q.slice(0, thanAt).matchAll(YEAR_TOKEN_RE)].map((m) => (/this/i.test(m[0]) ? Y : /last/i.test(m[0]) ? Y - 1 : Number(m[0])));
+  const after = [...q.slice(thanAt).matchAll(YEAR_TOKEN_RE)].map((m) => (/this/i.test(m[0]) ? Y : /last/i.test(m[0]) ? Y - 1 : Number(m[0])));
+  const a = before.length ? before[0] : distinct[0];
+  const b = after.length ? after[0] : distinct.find((y) => y !== a);
+  if (a === b || !Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return { a, b, less: LESS_WORD_RE.test(q) && !/\bmore\b|\bhigher\b|\bgreater\b/i.test(q) };
 }
 /*
  * TEAM K (financial remainders, 2026-09-25, R5_FAILS.md): a handful of plain "how many
@@ -258,7 +280,7 @@ function detectRevenueYearComparison(q) {
  * (RE.totalInvoiced only fires on a money WORD - "how many invoices do we have on file" has
  * none). Each is deterministic and cited exactly like its siblings above.
  */
-const DOC_COUNT_RE = /\bhow many\s+(invoices?|quotes?|estimates?|proposals?|purchase orders?|pos)\b(?!.*\b(?:overdue|past due|paid|unpaid|open|outstanding|over\s*\$|under\s*\$|more than|less than|verify|unverified|missing|no total|without a total|no printed total)\b)/i;
+const DOC_COUNT_RE = /\b(?:how many|number of|count of)\s+(invoices?|quotes?|estimates?|proposals?|purchase orders?|pos)\b(?!.*\b(?:overdue|past due|paid|unpaid|open|outstanding|over\s*\$|under\s*\$|more than|less than|verify|unverified|missing|no total|without a total|no printed total)\b)/i;
 // R11 (breadth-data-quality-001, "How many invoices are missing a total?"): a data-quality
 // question about a MISSING field, not a count of documents - without this DOC_COUNT_RE would
 // otherwise catch it (it names "invoices" and "how many") and answer with the total document
@@ -372,7 +394,10 @@ export function parseMoneyIntent(question, { today }) {
   if (RE.aging.test(q)) return mk('ar_aging', { subject: null });
   if (RE.overdue.test(q)) return mk('overdue', { subject, dayThreshold: (q.match(OVERDUE_DAYS_RE) || [])[1] ? Number(q.match(OVERDUE_DAYS_RE)[1]) : null });
   if (RE.open.test(q) && !RE.last.test(q) && !RE.topCustomers.test(q)) return mk('open_invoices', { subject });
-  if (detectRevenueYearComparison(q)) return mk('revenue_year_comparison', { subject: null });
+  {
+    const yc = detectRevenueYearComparison(q, today);
+    if (yc) return mk('revenue_year_comparison', { subject: null, cmpYears: yc });
+  }
   if (RE.byMonth.test(q) && /\b(?:revenue|invoic|bill|sales|income|money)\w*/.test(q)) return mk('revenue_by_month', { subject: null });
   if (RE.topCustomers.test(q)) {
     // "top 3 customers by invoiced revenue" - an explicit count narrows the ranking to exactly
@@ -392,7 +417,7 @@ export function parseMoneyIntent(question, { today }) {
   if (QUOTES_TOTAL_RE.test(q)) return mk('quotes_total', { subject: null });
   if (CUSTOMERS_INVOICED_RE.test(q)) return mk('customers_invoiced_count', { subject: null });
   if (MISSING_TOTAL_RE.test(q)) return mk('missing_total_count', { subject: null, docKindWord: q.match(MISSING_TOTAL_RE)[1] });
-  if (DOC_COUNT_RE.test(q)) return mk('document_count', { subject: null, docKindWord: q.match(DOC_COUNT_RE)[1] });
+  if (DOC_COUNT_RE.test(q)) return mk('document_count', { subject, docKindWord: q.match(DOC_COUNT_RE)[1] }); // R32b: a named customer / vendor scopes the count
   if (RE.totalInvoiced.test(q)) return mk('total_invoiced');
   return null;
 }
@@ -758,23 +783,26 @@ async function revenueByMonth(db, intent, ctx) {
 async function revenueYearComparison(db, intent, ctx) {
   const today = ctx.today;
   const Y = Number(today.slice(0, 4));
+  const { a: A, b: B, less } = intent.cmpYears ?? { a: Y, b: Y - 1, less: false };
   const rows = await q(db,
-    `SELECT extract(year from f.doc_date)::int AS yr, COALESCE(sum(f.total), 0) AS amount, count(*)::int AS n
+    `SELECT extract(year from f.doc_date)::int AS yr, COALESCE(sum(f.total), 0) AS amount, count(*)::int AS n,
+            (array_agg(jsonb_build_object('id', f.document_id, 'no', f.invoice_number, 'cust', f.customer_name, 'total', f.total, 'page', f.total_page, 'date', f.doc_date) ORDER BY f.doc_date DESC))[1:30] AS docs
        FROM financials f WHERE ${REVENUE_WHERE} AND f.total IS NOT NULL AND extract(year from f.doc_date) IN ($2, $3)
-      GROUP BY 1`, [Y, Y - 1], ctx.hu);
-  const cur = rows.find((r) => r.yr === Y) ?? { amount: '0', n: 0 };
-  const prior = rows.find((r) => r.yr === Y - 1) ?? { amount: '0', n: 0 };
-  const curAmt = Number(cur.amount);
-  const priorAmt = Number(prior.amount);
-  const more = curAmt > priorAmt;
-  const text = `${more ? 'Yes' : 'No'} — ${Y} has ${fmt(String(curAmt))} across ${plural(cur.n, 'invoice')} so far, versus ${fmt(String(priorAmt))} across ${plural(prior.n, 'invoice')} in all of ${Y - 1}.`;
+      GROUP BY 1`, [A, B], ctx.hu);
+  const ra = rows.find((r) => r.yr === A) ?? { amount: '0', n: 0 };
+  const rb = rows.find((r) => r.yr === B) ?? { amount: '0', n: 0 };
+  const aAmt = Number(ra.amount);
+  const bAmt = Number(rb.amount);
+  const yes = less ? aAmt < bAmt : aAmt > bAmt;
+  const soFar = (y) => (y === Y ? ' so far' : '');
+  const text = `${yes ? 'Yes' : 'No'} — ${A} has ${fmt(String(aAmt))} across ${plural(ra.n, 'invoice')}${soFar(A)}, versus ${fmt(String(bAmt))} across ${plural(rb.n, 'invoice')}${B === Y ? ' so far' : ` in all of ${B}`}.`;
   const facts = [
-    { label: `Revenue (${Y})`, value: fmt(String(curAmt)), status: 'ok', sources: [] },
-    { label: `Revenue (${Y - 1})`, value: fmt(String(priorAmt)), status: 'ok', sources: [] },
+    { label: `Revenue (${A})`, value: fmt(String(aAmt)), status: 'ok', sources: [] },
+    { label: `Revenue (${B})`, value: fmt(String(bAmt)), status: 'ok', sources: [] },
   ];
   return baseAnswer(text, facts, {
-    interpretation: `revenue comparison, ${Y} vs ${Y - 1}`,
-    cite: { records: [], total: cur.n + prior.n, claimedCount: cur.n + prior.n, basis: `Summed printed invoice totals dated in ${Y} and separately in ${Y - 1} (customer invoices and credit memos, USD).` },
+    interpretation: `revenue comparison, ${A} vs ${B}`,
+    cite: { records: [ra, rb].flatMap((r, i) => (Array.isArray(r.docs) ? r.docs : []).map((d) => aggregatedDocRecord(d, { group: String(i === 0 ? A : B) }))), total: ra.n + rb.n, claimedCount: ra.n + rb.n, basis: `Summed printed invoice totals dated in ${A} and separately in ${B} (customer invoices and credit memos, USD); the invoices are listed by year.` },
   });
 }
 
@@ -976,10 +1004,29 @@ async function documentCount(db, intent, ctx) {
   const p = intent.period;
   const scope = kind === 'po' ? `f.doc_kind = 'po'` : kind === 'estimate' ? `f.doc_kind = 'estimate' AND f.direction = 'receivable'` : `f.doc_kind = 'invoice' AND f.direction = 'receivable'`;
   const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
-  const [a] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}`, [p?.from ?? null, p?.to ?? null], ctx.hu);
-  if (!a || a.n === 0) return baseAnswer(`No ${noun}s are on file${p ? ` in ${p.label}` : ''} yet.`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} on file${p ? ` dated ${p.label}` : ''}; found none.`) });
-  const docs = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null], ctx.hu);
-  const text = `We have ${plural(a.n, noun)} on file${p ? ` in ${p.label}` : ''}.`;
+  // R32b: "how many invoices for Rebecca Montoya" / "how many purchase orders from Baker Distributing" - a named customer (invoices, quotes) or vendor
+  // (purchase orders) scopes the count. An unresolvable name never falls back to the shop-wide figure (that was a confident wrong answer).
+  let who = null; let whoSql = ''; const whoParams = [];
+  if (intent.subject) {
+    if (kind === 'po') {
+      who = { label: intent.subject, vendor: true };
+      whoSql = ` AND f.vendor_name ILIKE '%' || $4::text || '%'`;
+      whoParams.push(String(intent.subject).replace(/[%_\\]/g, ' '));
+    } else {
+      const g = await subjectGate(db, intent);
+      if (g?.answer) return g.answer;
+      if (!g || g.unresolved) return null;
+      who = { label: g.name };
+      whoSql = ` AND f.customer_id = ANY($4::uuid[])`;
+      whoParams.push(g.ids);
+    }
+  }
+  const [a] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}${whoSql}`, [p?.from ?? null, p?.to ?? null, ...whoParams], ctx.hu);
+  const forWho = who ? (who.vendor ? ` from ${who.label}` : ` for ${who.label}`) : '';
+  if (!a || a.n === 0) return baseAnswer(`No ${noun}s are on file${forWho}${p ? ` in ${p.label}` : ''}${who ? '' : ' yet'}.`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} on file${forWho}${p ? ` dated ${p.label}` : ''}; found none.`) });
+  const docs = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}${whoSql} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null, ...whoParams], ctx.hu);
+  if (who?.vendor && docs[0]?.vendor_name) who.label = docs[0].vendor_name; // the vendor as printed, not as typed ("baker distributing" -> "Baker Distributing")
+  const text = who ? (who.vendor ? `We have ${plural(a.n, noun)} from ${who.label} on file${p ? ` in ${p.label}` : ''}.` : `${who.label} has ${plural(a.n, noun)} on file${p ? ` in ${p.label}` : ''}.`) : `We have ${plural(a.n, noun)} on file${p ? ` in ${p.label}` : ''}.`;
   return baseAnswer(text, [{ label: `${noun[0].toUpperCase()}${noun.slice(1)}s on file`, value: String(a.n), status: 'info', sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)) }, ...docs.slice(0, 8).map((d) => invoiceFact(d))], {
     sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: `${noun} count`,
     cite: { records: financeRecords(docs), total: a.n, claimedCount: a.n, basis: `Counted every ${noun} on file${p ? ` dated ${p.label}` : ''}.` },

@@ -1,0 +1,1437 @@
+{
+ "version": "r32b-blind-1",
+ "category": "blind-r32b-agg",
+ "source": "scripts/gen-blind-r32b.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32b-agg-001",
+   "text": "hey, whats the earliest warranty expiration we have on file when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL  ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-002",
+   "text": "quick one - latest warranty expiration on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL  ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-003",
+   "text": "real quick: when does the first warranty run out",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL  ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-004",
+   "text": "when does the last warranty run out thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL  ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-005",
+   "text": "hmm, earliest Carrier warranty expiry on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-006",
+   "text": "ok um, what's the furthest out york warranty end date",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-007",
+   "text": "hmm, which lennox warranty expires first, what date",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-008",
+   "text": "so uh, which carrier warranty expires last, what date real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-009",
+   "text": "ok so whats the earliest lennox warranty expiration we have on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-010",
+   "text": "latest York warranty expiration on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-011",
+   "text": "ok so when does the first Lennox warranty run out",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-012",
+   "text": "hey, when does the last goodman warranty run out please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-013",
+   "text": "so uh, earliest rheem warranty expiry on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-014",
+   "text": "alright, what's the furthest out Trane warranty end date",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-015",
+   "text": "ok um, which Lennox warranty expires first, what date thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-016",
+   "text": "alright, which Daikin warranty expires last, what date",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-017",
+   "text": "hey, whats the earliest goodman warranty expiration we have on file thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' ASC LIMIT 1",
+    "params": [
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-018",
+   "text": "hmm, latest Mitsubishi warranty expiration on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data#>>'{warranty,expires}' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND data->>'manufacturer' ILIKE $1 ORDER BY data#>>'{warranty,expires}' DESC LIMIT 1",
+    "params": [
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-019",
+   "text": "real quick: how many units are not currently under warranty real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-020",
+   "text": "real quick: how many units are still under warranty when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-021",
+   "text": "real quick: how many units are out of warranty for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-022",
+   "text": "hang on... how many units are in warranty right now for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-023",
+   "text": "hmm, how many units have an expired warranty please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-024",
+   "text": "quick one - number of systems still covered by warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-025",
+   "text": "hang on... number of systems no longer covered by warranty when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-026",
+   "text": "alright, how many units have active warranty coverage please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-027",
+   "text": "how many york units are not currently under warranty thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-028",
+   "text": "how many daikin units are still under warranty real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-029",
+   "text": "hang on... how many Mitsubishi units are out of warranty when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-030",
+   "text": "how many Rheem units are in warranty right now",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-031",
+   "text": "hang on... how many york units have an expired warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-032",
+   "text": "number of Trane systems still covered by warranty thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-033",
+   "text": "number of goodman systems no longer covered by warranty when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-034",
+   "text": "how many goodman units have active warranty coverage please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-035",
+   "text": "sorry, one more - how many mitsubishi units are not currently under warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-036",
+   "text": "ok so how many Trane units are still under warranty when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-037",
+   "text": "hey, how many lennox units are out of warranty please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-038",
+   "text": "how many Trane units are in warranty right now",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-039",
+   "text": "ok um, how many Carrier units have an expired warranty please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-040",
+   "text": "number of daikin systems still covered by warranty real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-041",
+   "text": "alright, number of Daikin systems no longer covered by warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-042",
+   "text": "ok so how many Mitsubishi units have active warranty coverage",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-043",
+   "text": "quick one - how many trane units are not currently under warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-044",
+   "text": "hey, how many Trane units are still under warranty please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-045",
+   "text": "hang on... how many mitsubishi units are out of warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-046",
+   "text": "ok um, how many carrier units are in warranty right now",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-047",
+   "text": "hang on... how many rheem units have an expired warranty for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-048",
+   "text": "hmm, number of Rheem systems still covered by warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-049",
+   "text": "number of mitsubishi systems no longer covered by warranty thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-050",
+   "text": "hmm, how many trane units have active warranty coverage",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-051",
+   "text": "how many daikin units are not currently under warranty real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-052",
+   "text": "how many Trane units are still under warranty",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-053",
+   "text": "hmm, how many goodman units are out of warranty real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-054",
+   "text": "how many Goodman units are in warranty right now",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-055",
+   "text": "real quick: how many Rheem units have an expired warranty real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-056",
+   "text": "real quick: number of york systems still covered by warranty please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-057",
+   "text": "ok um, number of Rheem systems no longer covered by warranty when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-058",
+   "text": "hmm, how many Mitsubishi units have active warranty coverage real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_warranty_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-059",
+   "text": "ok um, which technicians have never logged a preventive maintenance visit",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_pm",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-060",
+   "text": "hmm, which techs have never done a PM",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_pm",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-061",
+   "text": "alright, who on the crew has never worked a preventive maintenance call",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_pm",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-062",
+   "text": "list the technicians with zero preventive maintenance visits for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_pm",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-063",
+   "text": "hang on... which technicians have no PM visits on file for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_pm",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-064",
+   "text": "hmm, any techs who've never done preventive maintenance, which ones when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_pm",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-065",
+   "text": "quick one - which technicians have never logged a repair",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_repair",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-066",
+   "text": "hmm, which techs have never done a repair call",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_repair",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-067",
+   "text": "sorry, one more - who on the crew has never worked a repair when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_repair",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-068",
+   "text": "real quick: list the technicians with zero repair visits",
+   "category": "blind-r32b-agg",
+   "shape": "blind_tech_never_repair",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-069",
+   "text": "hmm, how many documents have no readable text extracted",
+   "category": "blind-r32b-agg",
+   "shape": "blind_no_text_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE NOT EXISTS (SELECT 1 FROM document_pages pg WHERE pg.document_id = d.id AND coalesce(pg.text,'') <> '')",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-070",
+   "text": "alright, how many documents came back with no extracted text for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_no_text_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE NOT EXISTS (SELECT 1 FROM document_pages pg WHERE pg.document_id = d.id AND coalesce(pg.text,'') <> '')",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-071",
+   "text": "hang on... count of documents with no text on any page",
+   "category": "blind-r32b-agg",
+   "shape": "blind_no_text_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE NOT EXISTS (SELECT 1 FROM document_pages pg WHERE pg.document_id = d.id AND coalesce(pg.text,'') <> '')",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-072",
+   "text": "alright, how many files have no text we could read when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_no_text_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE NOT EXISTS (SELECT 1 FROM document_pages pg WHERE pg.document_id = d.id AND coalesce(pg.text,'') <> '')",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-073",
+   "text": "so uh, has most of our service history happened before last year when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) > (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-074",
+   "text": "sorry, one more - is most of our service history older than last year",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) > (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-075",
+   "text": "hey, do most of our service visits predate last year",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) > (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-076",
+   "text": "did the majority of our visits happen before last year, rather than since for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) > (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-077",
+   "text": "so uh, is more than half of our service history from before last year",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) > (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-078",
+   "text": "hey, has most of our service history happened since the start of last year please",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)) > ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-079",
+   "text": "is most of our service history from last year or later",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)) > ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-080",
+   "text": "alright, do most of our service visits fall in the last two calendar years when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)) > ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-081",
+   "text": "alright, did the majority of our visits happen since last year rather than before",
+   "category": "blind-r32b-agg",
+   "shape": "blind_history_skew",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)) > ((SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL) - (SELECT count(*) FROM extractions WHERE field_key='service_date' AND value IS NOT NULL AND value::date >= make_date(extract(year from $1::date)::int - 1, 1, 1)))) AS v",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-082",
+   "text": "real quick: when was the first service visit on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='service_date' AND value IS NOT NULL ORDER BY value::date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-083",
+   "text": "ok so what's the earliest service date we have real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='service_date' AND value IS NOT NULL ORDER BY value::date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-084",
+   "text": "date of our oldest service visit",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='service_date' AND value IS NOT NULL ORDER BY value::date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-085",
+   "text": "sorry, one more - when was the most recent service visit on file thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='service_date' AND value IS NOT NULL ORDER BY value::date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-086",
+   "text": "real quick: what's the latest service date we have for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='service_date' AND value IS NOT NULL ORDER BY value::date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-087",
+   "text": "date of the newest service visit when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='service_date' AND value IS NOT NULL ORDER BY value::date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-088",
+   "text": "when was the oldest unit installed thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'installation_date' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' IS NOT NULL ORDER BY (data->>'installation_date')::date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-089",
+   "text": "sorry, one more - what's the earliest installation date on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'installation_date' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' IS NOT NULL ORDER BY (data->>'installation_date')::date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-090",
+   "text": "when was the newest unit installed",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'installation_date' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' IS NOT NULL ORDER BY (data->>'installation_date')::date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-091",
+   "text": "what's the most recent install date we have",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'installation_date' AS v FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' IS NOT NULL ORDER BY (data->>'installation_date')::date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-092",
+   "text": "ok um, date of our earliest invoice",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT invoice_date::text AS v FROM document_financials WHERE doc_kind='invoice' AND direction='receivable' AND invoice_date IS NOT NULL ORDER BY invoice_date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-093",
+   "text": "hang on... when is the oldest invoice we have dated",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT invoice_date::text AS v FROM document_financials WHERE doc_kind='invoice' AND direction='receivable' AND invoice_date IS NOT NULL ORDER BY invoice_date ASC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-094",
+   "text": "hey, date of our most recent invoice thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT invoice_date::text AS v FROM document_financials WHERE doc_kind='invoice' AND direction='receivable' AND invoice_date IS NOT NULL ORDER BY invoice_date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-095",
+   "text": "ok so when was the latest invoice issued for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_date_extreme",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT invoice_date::text AS v FROM document_financials WHERE doc_kind='invoice' AND direction='receivable' AND invoice_date IS NOT NULL ORDER BY invoice_date DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-096",
+   "text": "any invoices from last quarter that are still open",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-097",
+   "text": "real quick: are there open invoices from this month real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-098",
+   "text": "any unpaid invoices from last month for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-099",
+   "text": "hang on... any invoices from this year that are still open when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-100",
+   "text": "ok um, are there open invoices from last year when you get a sec",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-101",
+   "text": "any unpaid invoices from in the last 90 days real quick",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-102",
+   "text": "so uh, any invoices from from this quarter that are still open",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-103",
+   "text": "are there open invoices from last week for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_open_period",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials WHERE status IN ('unpaid','partial')) AS n",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-104",
+   "text": "sorry, one more - how many units do we have thanks",
+   "category": "blind-r32b-agg",
+   "shape": "blind_agg_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-agg-105",
+   "text": "how many technicians do we have on file for me",
+   "category": "blind-r32b-agg",
+   "shape": "blind_agg_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT value) AS n FROM extractions WHERE field_key='technician'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-agg-106",
+   "text": "quick one - how many service visits are on file",
+   "category": "blind-r32b-agg",
+   "shape": "blind_agg_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key='service_date' AND value IS NOT NULL",
+    "params": []
+   },
+   "citationRequired": true
+  }
+ ]
+}

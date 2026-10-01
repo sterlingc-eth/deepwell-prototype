@@ -933,6 +933,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Nancy Alvarez",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -946,6 +947,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Carol Rios",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -959,6 +961,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "George Garrison",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -972,6 +975,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Barbara Ellison",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -985,6 +989,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Betty Zimmerman",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -998,6 +1003,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Kenneth Fenwick",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1011,6 +1017,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Linda Fitzgerald",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1024,6 +1031,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Ronald Calloway",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1037,6 +1045,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Mark Ibarra",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1050,6 +1059,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Ronald Dominguez",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1063,6 +1073,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Amy Isaacson",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1076,6 +1087,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Thomas Mercer",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1089,6 +1101,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "George Hutchins",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1102,6 +1115,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Ronald Bracken",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1115,6 +1129,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Laura Mercer",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1128,6 +1143,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Cynthia Larkin",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1141,6 +1157,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Robert Thornton",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1154,6 +1171,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Nancy Zamora",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1167,6 +1185,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Deborah Prentiss",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1180,6 +1199,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Susan Dominguez",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1193,6 +1213,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Jason Yarborough",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1206,6 +1227,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "David Quinley",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1219,6 +1241,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Paul Kowalski",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1232,6 +1255,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Emily Whitfield",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1245,6 +1269,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Donna Vance",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1258,6 +1283,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Donald Isaacson",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1271,6 +1297,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Angela Ibarra",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1284,6 +1311,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Daniel Keller",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1297,6 +1325,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Sandra Yarborough",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1310,6 +1339,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Susan Calloway",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1323,6 +1353,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Steven Ellison",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1336,6 +1367,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "William Quintana",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1349,6 +1381,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Kevin Zimmerman",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1362,6 +1395,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Michael Redwine",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1375,6 +1409,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Jason Zamora",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [
@@ -1388,6 +1423,7 @@
    "category": "blind-r31-honest",
    "shape": "blind_near_miss_name",
    "cmp": "honest-zero",
+   "typoResolvesTo": "Rebecca Norwood",
    "oracle": {
     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
     "params": [

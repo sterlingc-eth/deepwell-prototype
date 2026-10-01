@@ -1,0 +1,1519 @@
+{
+ "version": "r32b-blind-1",
+ "category": "blind-r32b-compare",
+ "source": "scripts/gen-blind-r32b.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32b-compare-001",
+   "text": "how many documents do we have on file for Cactus Rose Restaurant please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Cactus Rose Restaurant"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-002",
+   "text": "quick one - how many docs does Nancy Alvarez have thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Nancy Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-003",
+   "text": "document count for Thomas Mercer for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Thomas Mercer"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-004",
+   "text": "ok um, how many files are there for Susan Dominguez for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Susan Dominguez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-005",
+   "text": "hey, how many jobs have we done for Amy Isaacson please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Amy Isaacson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-006",
+   "text": "alright, how many jobs for Cynthia Kowalski please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Cynthia Kowalski"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-007",
+   "text": "ok um, how many documents do we have on file for Linda Fitzgerald",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Linda Fitzgerald"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-008",
+   "text": "ok so how many docs does David Prentiss have",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "David Prentiss"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-009",
+   "text": "document count for Steven Ellison for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Steven Ellison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-010",
+   "text": "sorry, one more - how many files are there for Patricia Fenwick real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Patricia Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-011",
+   "text": "real quick: how many jobs have we done for Steven Fitzgerald please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Steven Fitzgerald"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-012",
+   "text": "hmm, how many jobs for Donald Isaacson",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Donald Isaacson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-013",
+   "text": "ok um, how many documents do we have on file for Ashley Whitfield",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Ashley Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-014",
+   "text": "how many docs does Cynthia Larkin have",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Cynthia Larkin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-015",
+   "text": "alright, document count for Ronald Dominguez please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Ronald Dominguez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-016",
+   "text": "so uh, how many files are there for Donna Sorensen when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Donna Sorensen"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-017",
+   "text": "ok um, how many jobs have we done for Kenneth Gallardo",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Kenneth Gallardo"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-018",
+   "text": "ok um, how many jobs for Copper Sky Dental real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Copper Sky Dental"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-019",
+   "text": "how many documents do we have on file for Jason Yarborough",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Jason Yarborough"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-020",
+   "text": "ok um, how many docs does Matthew Whitfield have please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Matthew Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-021",
+   "text": "alright, document count for Ashley Vance",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Ashley Vance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-022",
+   "text": "how many files are there for Amanda Quinley real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Amanda Quinley"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-023",
+   "text": "quick one - how many jobs have we done for Steven Hutchins when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Steven Hutchins"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-024",
+   "text": "alright, how many jobs for Paul Jarvis when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Paul Jarvis"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-025",
+   "text": "alright, how many documents do we have on file for Mark Ibarra for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Mark Ibarra"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-026",
+   "text": "ok um, how many docs does Carol Rios have real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Carol Rios"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-027",
+   "text": "document count for Maria Gallardo real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Maria Gallardo"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-028",
+   "text": "hang on... how many files are there for Mark Jennings when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Mark Jennings"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-029",
+   "text": "how many jobs have we done for Richard Osborn real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Richard Osborn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-030",
+   "text": "real quick: how many jobs for Anthony Alvarez",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_doc_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Anthony Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-031",
+   "text": "hang on... how many invoices for Jessica Chavez real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Jessica Chavez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-032",
+   "text": "hang on... how many invoices does Barbara Delgado have",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Barbara Delgado"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-033",
+   "text": "how many invoices have we sent Rebecca Montoya for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Rebecca Montoya"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-034",
+   "text": "number of invoices for William Quintana for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "William Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-035",
+   "text": "ok um, how many invoices for Robert Thornton",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Robert Thornton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-036",
+   "text": "how many invoices does Karen Bracken have please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Karen Bracken"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-037",
+   "text": "hang on... how many invoices have we sent Amy Jarvis for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Amy Jarvis"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-038",
+   "text": "ok um, number of invoices for Jessica Bennett",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Jessica Bennett"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-039",
+   "text": "ok so how many invoices for Charles Whitford please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Charles Whitford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-040",
+   "text": "ok so how many invoices does Linda Hutchins have when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Linda Hutchins"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-041",
+   "text": "ok um, how many invoices have we sent Edward Dominguez thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Edward Dominguez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-042",
+   "text": "ok so number of invoices for Charles Montoya thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Charles Montoya"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-043",
+   "text": "hey, how many invoices for Melissa Quintana",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Melissa Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-044",
+   "text": "quick one - how many invoices does Michelle Sandoval have real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Michelle Sandoval"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-045",
+   "text": "hmm, how many invoices have we sent Thomas Quintana real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Thomas Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-046",
+   "text": "hmm, number of invoices for Kevin Abernathy when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Kevin Abernathy"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-047",
+   "text": "hmm, how many invoices for Sunrise Valley Elementary School for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Sunrise Valley Elementary School"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-048",
+   "text": "how many invoices does Michelle Tovar have",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Michelle Tovar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-049",
+   "text": "how many invoices have we sent Kenneth Fenwick real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Kenneth Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-050",
+   "text": "quick one - number of invoices for Laura Nakamura",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Laura Nakamura"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-051",
+   "text": "how many invoices for Nancy Zamora",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Nancy Zamora"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-052",
+   "text": "ok um, how many invoices does Linda Garrison have thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Linda Garrison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-053",
+   "text": "how many invoices have we sent Timothy Vance for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Timothy Vance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-054",
+   "text": "hang on... number of invoices for Emily Whitfield real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM document_financials df JOIN document_entity_links l ON l.document_id=df.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND df.doc_kind='invoice' AND df.direction='receivable' AND c.data->>'customer_name' = $1) AS n",
+    "params": [
+     "Emily Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-055",
+   "text": "sorry, one more - how many purchase orders from baker distributing for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-056",
+   "text": "hang on... how many POs do we have with watsco supply",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-057",
+   "text": "hang on... number of purchase orders for baker distributing when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-058",
+   "text": "so uh, how many purchase orders have we placed with Watsco Supply",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-059",
+   "text": "ok um, how many POs from Baker Distributing real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-060",
+   "text": "purchase order count for watsco supply when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-061",
+   "text": "real quick: how many purchase orders from baker distributing",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-062",
+   "text": "hmm, how many POs do we have with Watsco Supply please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-063",
+   "text": "alright, number of purchase orders for baker distributing when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-064",
+   "text": "alright, how many purchase orders have we placed with Watsco Supply real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-065",
+   "text": "hey, how many POs from Baker Distributing",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-066",
+   "text": "hmm, purchase order count for Watsco Supply",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_po_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') AS n",
+    "params": [
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-067",
+   "text": "has Cactus Rose Restaurant had more documents on file than David Prentiss for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Cactus Rose Restaurant",
+     "David Prentiss"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-068",
+   "text": "ok so does Steven Fitzgerald have more documents than Copper Sky Dental real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Steven Fitzgerald",
+     "Copper Sky Dental"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-069",
+   "text": "hmm, has Steven Hutchins had more jobs than Anthony Alvarez when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Steven Hutchins",
+     "Anthony Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-070",
+   "text": "does Melissa Quintana have fewer documents on file than Laura Nakamura",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) < (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Melissa Quintana",
+     "Laura Nakamura"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-071",
+   "text": "sorry, one more - have we got more paperwork on Thomas Quintana than on Linda Garrison real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Thomas Quintana",
+     "Linda Garrison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-072",
+   "text": "quick one - has Sunrise Valley Elementary School had more documents on file than Emily Whitfield",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Sunrise Valley Elementary School",
+     "Emily Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-073",
+   "text": "alright, does Timothy Vance have more documents than David Sandoval thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Timothy Vance",
+     "David Sandoval"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-074",
+   "text": "ok so has Ronald Fenwick had more jobs than Joseph Norwood",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Ronald Fenwick",
+     "Joseph Norwood"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-075",
+   "text": "hmm, does Sonoran Grill Restaurant have fewer documents on file than Ronald Bracken",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) < (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Sonoran Grill Restaurant",
+     "Ronald Bracken"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-076",
+   "text": "so uh, have we got more paperwork on Gary Villegas than on Donna Winslow real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Gary Villegas",
+     "Donna Winslow"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-077",
+   "text": "sorry, one more - has Canyon View Dental had more documents on file than Donna Vance thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Canyon View Dental",
+     "Donna Vance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-078",
+   "text": "hang on... does Holy Trinity Church have more documents than Susan Calloway please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Holy Trinity Church",
+     "Susan Calloway"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-079",
+   "text": "hang on... has Michael Redwine had more jobs than Mesquite Table Restaurant",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Michael Redwine",
+     "Mesquite Table Restaurant"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-080",
+   "text": "hmm, does Amy Larkin have fewer documents on file than George Garrison",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) < (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Amy Larkin",
+     "George Garrison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-081",
+   "text": "real quick: have we got more paperwork on Patricia Esparza than on Sandra Alvarez real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Patricia Esparza",
+     "Sandra Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-082",
+   "text": "sorry, one more - has Angela Ibarra had more documents on file than Grace Community Church thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Angela Ibarra",
+     "Grace Community Church"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-083",
+   "text": "has Thomas Mercer had more documents on file than Patricia Fenwick for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Thomas Mercer",
+     "Patricia Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-084",
+   "text": "so uh, does Amy Isaacson have more documents than Donald Isaacson please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Amy Isaacson",
+     "Donald Isaacson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-085",
+   "text": "ok so has Linda Fitzgerald had more jobs than Cynthia Larkin",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Linda Fitzgerald",
+     "Cynthia Larkin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-086",
+   "text": "hey, has Steven Ellison had more documents on file than Donna Sorensen for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Steven Ellison",
+     "Donna Sorensen"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-087",
+   "text": "does Ashley Whitfield have more documents than Matthew Whitfield",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Ashley Whitfield",
+     "Matthew Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-088",
+   "text": "has Ronald Dominguez had more jobs than Amanda Quinley",
+   "category": "blind-r32b-compare",
+   "shape": "blind_cust_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $1) > (SELECT count(DISTINCT l.document_id) FROM document_entity_links l JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE c.merged_into IS NULL AND c.data->>'customer_name' = $2)) AS v",
+    "params": [
+     "Ronald Dominguez",
+     "Amanda Quinley"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-089",
+   "text": "hey, have we bought more from Baker Distributing or Watsco Supply",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order') THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Baker Distributing",
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-090",
+   "text": "hey, do we order more from Watsco Supply or Baker Distributing, by PO count real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order') THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Watsco Supply",
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-091",
+   "text": "alright, which vendor do we have more purchase orders with, Baker Distributing or Watsco Supply for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order') THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Baker Distributing",
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-092",
+   "text": "real quick: more POs with Watsco Supply than Baker Distributing?",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order')) AS v",
+    "params": [
+     "Watsco Supply",
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-093",
+   "text": "hey, have we bought more from Baker Distributing or Watsco Supply when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order') THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Baker Distributing",
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-094",
+   "text": "hang on... do we order more from Watsco Supply or Baker Distributing, by PO count",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order') THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Watsco Supply",
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-095",
+   "text": "sorry, one more - which vendor do we have more purchase orders with, Baker Distributing or Watsco Supply thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order') THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Baker Distributing",
+     "Watsco Supply"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-096",
+   "text": "more POs with Watsco Supply than Baker Distributing? thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_vendor_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$1 WHERE d.document_type='purchase-order') > (SELECT count(*) FROM documents d JOIN extractions v ON v.document_id=d.id AND v.field_key='vendor_name' AND v.value=$2 WHERE d.document_type='purchase-order')) AS v",
+    "params": [
+     "Watsco Supply",
+     "Baker Distributing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-097",
+   "text": "ok um, do we do more repair work or more preventive maintenance",
+   "category": "blind-r32b-compare",
+   "shape": "blind_servicetype_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Repair",
+     "Preventive Maintenance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-098",
+   "text": "real quick: are there more repair calls than preventive maintenance visits when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_servicetype_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$2)) AS v",
+    "params": [
+     "Repair",
+     "Preventive Maintenance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-099",
+   "text": "ok so which is bigger for us, repairs or PM, by volume thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_servicetype_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Repair",
+     "Preventive Maintenance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-100",
+   "text": "do we do more preventive maintenance than repairs real quick",
+   "category": "blind-r32b-compare",
+   "shape": "blind_servicetype_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$2)) AS v",
+    "params": [
+     "Preventive Maintenance",
+     "Repair"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-101",
+   "text": "hang on... have we done more PM visits than repair jobs thanks",
+   "category": "blind-r32b-compare",
+   "shape": "blind_servicetype_cmp",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$2)) AS v",
+    "params": [
+     "Preventive Maintenance",
+     "Repair"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-102",
+   "text": "hmm, are repairs or preventive maintenance more common for us for me",
+   "category": "blind-r32b-compare",
+   "shape": "blind_servicetype_cmp",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='service_type' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Repair",
+     "Preventive Maintenance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-103",
+   "text": "sorry, one more - how many invoices do we have",
+   "category": "blind-r32b-compare",
+   "shape": "blind_compare_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials WHERE doc_kind='invoice' AND direction='receivable'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-104",
+   "text": "so uh, how many purchase orders do we have",
+   "category": "blind-r32b-compare",
+   "shape": "blind_compare_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials WHERE doc_kind='po'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-105",
+   "text": "do we have more Rheem or Carrier units please",
+   "category": "blind-r32b-compare",
+   "shape": "blind_compare_control",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'rheem') > (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'carrier') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-compare-106",
+   "text": "alright, do we have more Mitsubishi or Lennox units when you get a sec",
+   "category": "blind-r32b-compare",
+   "shape": "blind_compare_control",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'mitsubishi') > (SELECT count(*) FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE 'lennox') AS v",
+    "params": []
+   },
+   "citationRequired": true
+  }
+ ]
+}

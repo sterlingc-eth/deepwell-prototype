@@ -180,7 +180,7 @@ if (exam.questions.length) {
   check("some questions were answered entirely without a model (fast path / financials / relations / analytics all work offline)", overall.answeredWithoutModel > 0, JSON.stringify(overall));
   check("some questions genuinely need a model (the mock + counter mechanism actually engages, not a silent no-op)", overall.needsModel > 0, JSON.stringify(overall));
   check("no oracle crashed against the reloaded schema (loader produced a schema-valid, self-consistent database)", overall.oracleError === 0, JSON.stringify(perQuestion.filter((r) => r.status === "oracle-error").slice(0, 5)));
-  check("overall counts add up to the total asked", overall.answeredWithoutModel + overall.needsModel + overall.skipped + overall.oracleError === overall.total, JSON.stringify(overall));
+  check("overall counts add up to the total asked", overall.answeredWithoutModel + overall.needsModel + (overall.clarified ?? 0) + overall.skipped + overall.oracleError === overall.total, JSON.stringify(overall));
   check("byCategory buckets sum to the overall total", Object.values(byCategory).reduce((a, b) => a + b.total, 0) === overall.total);
   check("no wrong answer is reported without an expected/got pair", perQuestion.filter((r) => r.status === "wrong").every((r) => "expected" in r && "got" in r));
 

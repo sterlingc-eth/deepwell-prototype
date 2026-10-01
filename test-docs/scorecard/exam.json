@@ -299,7 +299,7 @@
    "text": "How many of our customers are running units older than 15 years?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 15))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '15 years'))",
     "params": [
      "@today"
     ]
@@ -314,7 +314,7 @@
    "text": "how many of our customers are running units omder than 15 years",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 15))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '15 years'))",
     "params": [
      "@today"
     ]
@@ -329,7 +329,7 @@
    "text": "how many of our custs are running units older than 15 yrs",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 15))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '15 years'))",
     "params": [
      "@today"
     ]
@@ -344,7 +344,7 @@
    "text": "How many units are older than 10 years?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)",
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')",
     "params": [
      "@today"
     ]
@@ -358,7 +358,7 @@
    "text": "How many customers have a unit newer than 5 years old?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) >= (EXTRACT(YEAR FROM $1::date)::int - 5))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) > ($1::date - interval '5 years'))",
     "params": [
      "@today"
     ]
@@ -373,7 +373,7 @@
    "text": "How many units older than 10 years do we have?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)",
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')",
     "params": [
      "@today"
     ]
@@ -387,7 +387,7 @@
    "text": "how many units older than 10 yeears do we have",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)",
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')",
     "params": [
      "@today"
     ]
@@ -401,7 +401,7 @@
    "text": "how many units older than 10 yrs do we have",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)",
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')",
     "params": [
      "@today"
     ]
@@ -415,7 +415,7 @@
    "text": "How many of our customers are running units older than 20 years?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 20))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '20 years'))",
     "params": [
      "@today"
     ]
@@ -6293,7 +6293,7 @@
    "text": "How many customers in Casa Grande have units older than 10 years?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years'))",
     "params": [
      "Casa Grande",
      "@today"
@@ -6309,7 +6309,7 @@
    "text": "how many customers in casa grade have units older than 10 years",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years'))",
     "params": [
      "Casa Grande",
      "@today"
@@ -6325,7 +6325,7 @@
    "text": "how many custs in casa grande have units older than 10 yrs",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years'))",
     "params": [
      "Casa Grande",
      "@today"
@@ -6453,7 +6453,7 @@
    "text": "Which customers have an expired warranty AND a unit over 10 years old?",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')) ORDER BY 1",
     "params": [
      "@today",
      "expired"
@@ -6469,7 +6469,7 @@
    "text": "which customers have an expired warranty and a unit over 10 yeasr old",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')) ORDER BY 1",
     "params": [
      "@today",
      "expired"
@@ -6485,7 +6485,7 @@
    "text": "which custs have an expired warranty and a unit over 10 yrs old",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')) ORDER BY 1",
     "params": [
      "@today",
      "expired"
@@ -6517,7 +6517,7 @@
    "text": "How many customers in Mesa have units older than 10 years?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array((c.data->>'service_address'), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = lower($1) AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years'))",
     "params": [
      "Mesa",
      "@today"
@@ -10213,7 +10213,7 @@
    "text": "Which customers have a Trane unit older than 10 years and no maintenance agreement?",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10)) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years')) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
     "params": [
      "Trane",
      "@today",
@@ -10234,7 +10234,7 @@
    "text": "Which customers have a Carrier unit older than 10 years and no maintenance agreement?",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10)) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years')) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
     "params": [
      "Carrier",
      "@today",
@@ -10255,7 +10255,7 @@
    "text": "Which customers have a Lennox unit older than 10 years and no maintenance agreement?",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10)) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years')) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
     "params": [
      "Lennox",
      "@today",
@@ -10276,7 +10276,7 @@
    "text": "Which customers have a Goodman unit older than 10 years and no maintenance agreement?",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $2::date)::int - 10)) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1) AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($2::date - interval '10 years')) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]::text[])) ORDER BY 1",
     "params": [
      "Goodman",
      "@today",
@@ -10582,7 +10582,7 @@
    "text": "How many customers have a unit older than 15 years and a permit on file?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 15)) AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[]))",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '15 years')) AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[]))",
     "params": [
      "@today",
      [
@@ -10657,7 +10657,7 @@
    "text": "Which customers with units older than 10 years have never had a service visit on file?",
    "cmp": "set",
    "oracle": {
-    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date' LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[])) ORDER BY 1",
+    "sql": "SELECT c.data->>'customer_name' AS item FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')) AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date' LEFT JOIN entities le ON le.id = l.entity_id WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[])) ORDER BY 1",
     "params": [
      "@today",
      [
@@ -12110,7 +12110,7 @@
    "text": "Do we have any units older than 20 years?",
    "cmp": "yesno",
    "oracle": {
-    "sql": "SELECT EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 20)) AS v",
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '20 years')) AS v",
     "params": [
      "@today"
     ]
@@ -12872,7 +12872,7 @@
    "text": "How many units in Mesa are older than 10 years?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array(COALESCE(e.data->>'service_address', (SELECT c0.data->>'service_address' FROM entities c0 WHERE c0.id = e.customer_id)), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = 'mesa' AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}' THEN substr(e.data->>'installation_date', 1, 4)::int END) < (EXTRACT(YEAR FROM $1::date)::int - 10)",
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND lower((SELECT z.s FROM (SELECT btrim(regexp_replace(regexp_replace(t.seg, '(^|[[:space:],])[A-Za-z]{2}[[:space:]]*[0-9]{5}([[:space:]-]*[0-9]{4})?[[:space:]]*$', ''), '(^|[[:space:],])[A-Z]{2}[[:space:]]*$', '')) AS s, t.ord FROM unnest(string_to_array(COALESCE(e.data->>'service_address', (SELECT c0.data->>'service_address' FROM entities c0 WHERE c0.id = e.customer_id)), ',')) WITH ORDINALITY AS t(seg, ord) WHERE t.ord > 1) z WHERE z.s <> '' AND z.s !~ '[0-9]' AND z.s !~* '^(suite|ste|unit|apt|apartment|bldg|building|floor|fl|room|rm|lot|space|spc)([[:space:].]|$)' ORDER BY z.ord DESC LIMIT 1)) = 'mesa' AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN (e.data->>'installation_date')::date END) <= ($1::date - interval '10 years')",
     "params": [
      "@today"
     ]

@@ -1,0 +1,1435 @@
+{
+ "version": "r32-blind-1",
+ "category": "blind-r32-acct",
+ "source": "scripts/gen-blind-r32.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32-acct-001",
+   "text": "sorry, one more - serial on mercer's unit thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Mercer"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-002",
+   "text": "sorry, one more - what do we have on file for the fenwick account real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-003",
+   "text": "pull the file on prentiss",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Prentiss"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-004",
+   "text": "hey, anything scheduled for the montoya account real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Montoya"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-005",
+   "text": "ok so what brand is the osborn unit when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Osborn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-006",
+   "text": "who normally handles the ortega account please",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Ortega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-007",
+   "text": "ok um, whens the winslow warranty up when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Winslow"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-008",
+   "text": "quick one - whats the model on zamora's system",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Zamora"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-009",
+   "text": "ok so show me everything for bennett real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Bennett"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-010",
+   "text": "does ulloa have a maintenance agreement",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Ulloa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-011",
+   "text": "hey, serial on wyckoff's unit",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Wyckoff"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-012",
+   "text": "hmm, what do we have on file for the abernathy account",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Abernathy"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-013",
+   "text": "alright, pull the file on rios",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Rios"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-014",
+   "text": "so uh, anything scheduled for the quinley account",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Quinley"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-015",
+   "text": "hey, what brand is the sandoval unit real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Sandoval"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-016",
+   "text": "who normally handles the kowalski account for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Kowalski"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-017",
+   "text": "whens the alvarez warranty up thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-018",
+   "text": "whats the model on villegas's system for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Villegas"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-019",
+   "text": "show me everything for redwine",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Redwine"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-020",
+   "text": "hey, does jennings have a maintenance agreement",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Jennings"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-021",
+   "text": "serial on isaacson's unit please",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Isaacson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-022",
+   "text": "sorry, one more - what do we have on file for the larkin account please",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Larkin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-023",
+   "text": "pull the file on chavez when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Chavez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-024",
+   "text": "real quick: anything scheduled for the esparza account when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Esparza"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-025",
+   "text": "alright, what brand is the delgado unit",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Delgado"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-026",
+   "text": "who normally handles the pruitt account",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Pruitt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-027",
+   "text": "hang on... whens the zimmerman warranty up",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Zimmerman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-028",
+   "text": "ok so whats the model on norwood's system",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Norwood"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-029",
+   "text": "show me everything for gallardo thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Gallardo"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-030",
+   "text": "sorry, one more - does salazar have a maintenance agreement real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Salazar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-031",
+   "text": "hang on... serial on quintana's unit",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-032",
+   "text": "hmm, what do we have on file for the vance account",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Vance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-033",
+   "text": "quick one - pull the file on tovar",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Tovar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-034",
+   "text": "sorry, one more - anything scheduled for the jarvis account when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_ambiguous_surname",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ~* ('\\m' || $1 || '$')",
+    "params": [
+     "Jarvis"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-035",
+   "text": "who's been out to David Sandoval's place",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "David Sandoval"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-036",
+   "text": "which techs have been to Angela Ibarra real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Angela Ibarra"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-037",
+   "text": "who has serviced David Prentiss's equipment",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "David Prentiss"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-038",
+   "text": "list the technicians who visited Donald Isaacson",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Donald Isaacson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-039",
+   "text": "ok um, what techs have worked on Kenneth Fenwick's account please",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Kenneth Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-040",
+   "text": "who's been out to Edward Dominguez's place for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Edward Dominguez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-041",
+   "text": "which techs have been to Cynthia Kowalski",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Cynthia Kowalski"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-042",
+   "text": "alright, who has serviced Thomas Osborn's equipment please",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Thomas Osborn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-043",
+   "text": "sorry, one more - list the technicians who visited Ronald Fenwick when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Ronald Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-044",
+   "text": "real quick: what techs have worked on William Quintana's account",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "William Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-045",
+   "text": "who's been out to Sandra Yarborough's place",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Sandra Yarborough"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-046",
+   "text": "hang on... which techs have been to Anthony Alvarez",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Anthony Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-047",
+   "text": "hmm, who has serviced Steven Ellison's equipment when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Steven Ellison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-048",
+   "text": "list the technicians who visited Betty Winslow",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Betty Winslow"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-049",
+   "text": "real quick: what techs have worked on Amy Jarvis's account",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Amy Jarvis"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-050",
+   "text": "so uh, who's been out to George Hutchins's place real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "George Hutchins"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-051",
+   "text": "which techs have been to Barbara Ellison",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Barbara Ellison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-052",
+   "text": "hey, who has serviced Ashley Whitfield's equipment please",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Ashley Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-053",
+   "text": "so uh, list the technicians who visited Maria Holbrook real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Maria Holbrook"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-054",
+   "text": "what techs have worked on Thomas Quintana's account when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Thomas Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-055",
+   "text": "alright, who's been out to Patricia Fenwick's place for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Patricia Fenwick"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-056",
+   "text": "which techs have been to Stephanie Osborn",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Stephanie Osborn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-057",
+   "text": "quick one - who has serviced Donald Sorenson's equipment",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Donald Sorenson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-058",
+   "text": "sorry, one more - list the technicians who visited Robert Salazar please",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Robert Salazar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-059",
+   "text": "ok um, what techs have worked on Paul Jarvis's account for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Paul Jarvis"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-060",
+   "text": "hang on... who's been out to Cynthia Larkin's place",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Cynthia Larkin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-061",
+   "text": "ok so which techs have been to George Garrison for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "George Garrison"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-062",
+   "text": "who has serviced Melissa Quintana's equipment for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Melissa Quintana"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-063",
+   "text": "hang on... list the technicians who visited Anthony Bennett please",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Anthony Bennett"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-064",
+   "text": "quick one - what techs have worked on Brian Delgado's account for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Brian Delgado"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-065",
+   "text": "so uh, who's been out to Richard Osborn's place when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Richard Osborn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-066",
+   "text": "which techs have been to Kathleen Jennings please",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Kathleen Jennings"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-067",
+   "text": "ok so who has serviced Carol Salazar's equipment for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Carol Salazar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-068",
+   "text": "so uh, list the technicians who visited Donna Winslow thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_techs_at_customer",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT t.value AS item FROM extractions t JOIN document_entity_links l ON l.document_id=t.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' JOIN extractions y ON y.document_id=t.document_id AND y.field_key='service_date' WHERE t.field_key='technician' AND c.data->>'customer_name' = $1",
+    "params": [
+     "Donna Winslow"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-069",
+   "text": "who was the last tech at 2394 S Higley Rd real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2394 S Higley Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-070",
+   "text": "who went out to 3097 E Ray Rd most recently",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3097 E Ray Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-071",
+   "text": "so uh, last technician to visit 1691 S Ellsworth Rd for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1691 S Ellsworth Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-072",
+   "text": "so uh, who did the most recent visit at 2653 E Main St for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2653 E Main St%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-073",
+   "text": "alright, who was the last tech at 753 W Guadalupe Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "753 W Guadalupe Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-074",
+   "text": "quick one - who went out to 618 N Power Rd most recently please",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "618 N Power Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-075",
+   "text": "alright, last technician to visit 3504 E Main St",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3504 E Main St%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-076",
+   "text": "who did the most recent visit at 2542 S Ellsworth Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2542 S Ellsworth Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-077",
+   "text": "who was the last tech at 3911 N Dobson Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3911 N Dobson Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-078",
+   "text": "who went out to 859 E Chandler Blvd most recently real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "859 E Chandler Blvd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-079",
+   "text": "real quick: last technician to visit 3726 N Greenfield Rd when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3726 N Greenfield Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-080",
+   "text": "hey, who did the most recent visit at 322 N Greenfield Rd when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "322 N Greenfield Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-081",
+   "text": "sorry, one more - who was the last tech at 1247 W Baseline Rd thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1247 W Baseline Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-082",
+   "text": "hey, who went out to 2024 N Greenfield Rd most recently please",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2024 N Greenfield Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-083",
+   "text": "real quick: last technician to visit 988 W Southern Ave when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "988 W Southern Ave%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-084",
+   "text": "sorry, one more - who did the most recent visit at 581 W Thomas Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "581 W Thomas Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-085",
+   "text": "ok um, who was the last tech at 3134 W Thomas Rd please",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3134 W Thomas Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-086",
+   "text": "who went out to 3023 E Chandler Blvd most recently",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_tech_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='technician' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3023 E Chandler Blvd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-087",
+   "text": "what was the last visit at 692 S Higley Rd for for me",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "692 S Higley Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-088",
+   "text": "hey, what type of service was the latest call at 3430 W Ocotillo Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3430 W Ocotillo Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-089",
+   "text": "sorry, one more - last service type at 1580 W Camelback Rd thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1580 W Camelback Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-090",
+   "text": "what was the last visit at 618 N Power Rd for thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "618 N Power Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-091",
+   "text": "real quick: what type of service was the latest call at 1432 W Thomas Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1432 W Thomas Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-092",
+   "text": "so uh, last service type at 2061 E Broadway Rd please",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2061 E Broadway Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-093",
+   "text": "quick one - what was the last visit at 2542 S Ellsworth Rd for real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2542 S Ellsworth Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-094",
+   "text": "what type of service was the latest call at 3800 W Baseline Rd thanks",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3800 W Baseline Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-095",
+   "text": "last service type at 2246 E Ray Rd when you get a sec",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2246 E Ray Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-096",
+   "text": "quick one - what was the last visit at 1099 W Guadalupe Rd for",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1099 W Guadalupe Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-097",
+   "text": "what type of service was the latest call at 1469 N Power Rd real quick",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1469 N Power Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-098",
+   "text": "ok um, last service type at 1284 S Alma School Rd",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1284 S Alma School Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-099",
+   "text": "so uh, what was the last visit at 2912 E Broadway Rd for",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "2912 E Broadway Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-100",
+   "text": "alright, what type of service was the latest call at 1839 W Southern Ave",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1839 W Southern Ave%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-101",
+   "text": "real quick: last service type at 1876 N College Ave",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "1876 N College Ave%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-acct-102",
+   "text": "hmm, what was the last visit at 3763 E Broadway Rd for",
+   "category": "blind-r32-acct",
+   "shape": "blind_last_type_addr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions y JOIN extractions t ON t.document_id=y.document_id AND t.field_key='service_type' JOIN document_entity_links l ON l.document_id=y.document_id JOIN entities c ON c.id=l.entity_id AND c.entity_type='customer' WHERE y.field_key='service_date' AND c.data->>'service_address' ILIKE $1 ORDER BY y.value DESC LIMIT 1",
+    "params": [
+     "3763 E Broadway Rd%"
+    ]
+   },
+   "citationRequired": true
+  }
+ ]
+}

@@ -73,11 +73,22 @@ export interface Correction {
   corrected_at: string | null;
 }
 
+/** R33: one field a $0 re-check restored from the page (api/_lib/recheck.js). */
+export interface RecheckFilledField {
+  field_key: string;
+  value: string;
+  page_no: number | null;
+  method: 'recheck';
+  flags?: string[];
+}
+
 export interface ReviewCompleteness {
   type: string;
   required: string[];
   present: string[];
   missing: string[];
+  /** R33: requirements met only by an unconfirmed far-future date. */
+  unconfirmed?: string[];
   minConfidence: number;
   complete: boolean;
 }
@@ -733,9 +744,29 @@ export const reviewClient = {
    *  extractions and promotes to verified (verified_by 'ai') if complete and
    *  confident enough. No-op (verified:false) otherwise — never an error. */
   aiVerify(documentId: string) {
-    return postJson<{ document: ReviewDocument; completeness: ReviewCompleteness; verified: boolean }>({
+    return postJson<{ document: ReviewDocument; completeness: ReviewCompleteness; verified: boolean; unconfirmedDates?: { fieldKey: string; value: string }[]; recheck?: { filled: RecheckFilledField[] } | null }>({
       action: 'aiVerify',
       documentId,
+    });
+  },
+
+  /** R33: re-read this document's own stored page text for a missing required field ($0, no model; fill-only —
+   *  api/_lib/recheck.js). A far-future printed date comes back as `<key>_unconfirmed` with flags. */
+  recheckDocument(documentId: string) {
+    return postJson<{ documentId: string; status: string; filled: RecheckFilledField[]; ambiguous?: { key: string; values: string[] }[]; aiVerified: boolean }>({
+      action: 'recheckDocument',
+      documentId,
+    });
+  },
+
+  /** R33 (admin): "Re-check all missing fields" — a bounded batch (<=100) of this account's documents with a missing
+   *  required field, optionally restricted to `documentIds`. Loop while `leftForNextRun` > 0. */
+  recheckMissing(documentIds: string[] | null, limit = 50) {
+    return postJson<{ scanned: number; candidates: number; rechecked: number; filled: number; fields: number; verified: number; leftForNextRun: number; errors: number }>({
+      action: 'recheckMissing',
+      ...(documentIds ? { documentIds: documentIds.slice(0, 500) } : {}),
+      limit,
+      force: true,
     });
   },
 

@@ -2661,7 +2661,8 @@
           "%Amanda Quinly%"
         ]
       },
-      "note": "\"Amanda Quinly\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+      "note": "\"Amanda Quinly\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one",
+      "typoResolvesTo": "Amanda Quinley"
     },
     {
       "id": "j177",
@@ -2675,7 +2676,8 @@
           "%Kenith Fenwick%"
         ]
       },
-      "note": "\"Kenith Fenwick\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+      "note": "\"Kenith Fenwick\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one",
+      "typoResolvesTo": "Kenneth Fenwick"
     },
     {
       "id": "j178",
@@ -2689,7 +2691,8 @@
           "%Ashely Vance%"
         ]
       },
-      "note": "\"Ashely Vance\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+      "note": "\"Ashely Vance\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one",
+      "typoResolvesTo": "Ashley Vance"
     },
     {
       "id": "j179",
@@ -2703,7 +2706,8 @@
           "%Micheal Redwine%"
         ]
       },
-      "note": "\"Micheal Redwine\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+      "note": "\"Micheal Redwine\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one",
+      "typoResolvesTo": "Michael Redwine"
     },
     {
       "id": "j180",
@@ -2717,7 +2721,8 @@
           "%Nancey Zamora%"
         ]
       },
-      "note": "\"Nancey Zamora\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one"
+      "note": "\"Nancey Zamora\" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one",
+      "typoResolvesTo": "Nancy Zamora"
     },
     {
       "id": "j181",

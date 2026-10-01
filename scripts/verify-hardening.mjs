@@ -406,9 +406,14 @@ check('page_count is still writable', DOCUMENT_UPDATE_COLUMNS.includes('page_cou
   const today = '2026-09-17';
   const run = (key, value) => normalizeFields([{ key, value, confidence: 0.9 }], { pageCount: 1, today });
 
-  check('a future install date is dropped', run('installation_date', '2030-01-01').fields.length === 0);
-  check('a future registration date is dropped', run('warranty_registered_date', '2030-01-20').fields.length === 0);
-  check('a future service date is dropped', run('service_date', '2029-05-05').fields.length === 0);
+  // R33 (2026-09-30): "dropped" became "never a canonical fact": the printed value is parked under <key>_unconfirmed
+  // for a person to confirm (so the Inbox can show it instead of "missing"), and nothing that reads the canonical key
+  // — the warranty clock above all — ever sees it.
+  const canonical = (key, value) => run(key, value).fields.filter((f) => f.field_key === key).length;
+  check('a future install date never becomes a canonical installation_date', canonical('installation_date', '2030-01-01') === 0);
+  check('a future registration date never becomes a canonical warranty_registered_date', canonical('warranty_registered_date', '2030-01-20') === 0);
+  check('a far-future service date never becomes a canonical service_date', canonical('service_date', '2029-05-05') === 0);
+  check('...each is kept as printed under the unconfirmed key instead of dropped', run('installation_date', '2030-01-01').fields[0]?.field_key === 'installation_date_unconfirmed' && run('service_date', '2029-05-05').fields[0]?.value === '2029-05-05');
   check('a past install date is kept', run('installation_date', '2019-03-04').fields.length === 1);
   check('today is kept', run('installation_date', today).fields.length === 1);
   // A warranty EXPIRES in the future by definition — it must not be caught.

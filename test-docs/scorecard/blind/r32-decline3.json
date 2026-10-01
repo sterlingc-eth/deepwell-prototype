@@ -1,0 +1,1507 @@
+{
+ "version": "r32-blind-1",
+ "category": "blind-r32-decline3",
+ "source": "scripts/gen-blind-r32.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32-decline3-001",
+   "text": "is it going to be windy tomorrow",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-002",
+   "text": "ok so how hot is it in phoenix right now thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-003",
+   "text": "got a good dad joke",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-004",
+   "text": "what rhymes with orange",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-005",
+   "text": "who won the nba finals",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-006",
+   "text": "so uh, whats the best burger in town",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-007",
+   "text": "hey, where is the closest taco truck please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-008",
+   "text": "quick one - i need a ride to the airport thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-009",
+   "text": "turn the music up",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-010",
+   "text": "real quick: whats the wifi password here thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-011",
+   "text": "who is the governor of arizona when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-012",
+   "text": "quick one - how many legs does a spider have",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-013",
+   "text": "hey, whats the distance to the moon",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-014",
+   "text": "explain how airplanes fly",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-015",
+   "text": "alright, why do cats purr thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-016",
+   "text": "hey, whats the population of mesa",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-017",
+   "text": "hang on... what should i cook tonight real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-018",
+   "text": "is the mall open today",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-019",
+   "text": "real quick: what time does the bank close thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-020",
+   "text": "quick one - how do i get to the nearest hospital",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-021",
+   "text": "help me pick a birthday present for my dad thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-022",
+   "text": "quick one - what is a good workout for my back when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-023",
+   "text": "quick one - who is the fastest man alive",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-024",
+   "text": "alright, whats 18 times 22 when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-025",
+   "text": "read me the news real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-026",
+   "text": "so uh, tell me about yourself when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-027",
+   "text": "hang on... are you always this quiet",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-028",
+   "text": "whats your favorite food thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-029",
+   "text": "ok so can you cook",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-030",
+   "text": "real quick: do you have a girlfriend please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-031",
+   "text": "what happened in the game last night for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-032",
+   "text": "should i bet on the fight",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-033",
+   "text": "whats the latest iphone please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-034",
+   "text": "real quick: how do i unlock my phone",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-035",
+   "text": "how do i cancel my netflix please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-036",
+   "text": "hey, when is the next full moon",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-037",
+   "text": "alright, who was the first president",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-038",
+   "text": "how big is texas",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-039",
+   "text": "what rhymes with cat",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-040",
+   "text": "tell me a scary story when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-041",
+   "text": "ok um, any decent podcasts about history real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-042",
+   "text": "hang on... which is better, ford or chevy for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-043",
+   "text": "hang on... recommend a hiking trail",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-044",
+   "text": "alright, what is a good haircut for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-045",
+   "text": "how do i get a tan when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-046",
+   "text": "ok um, book me a table for four please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-047",
+   "text": "so uh, whats the best sushi place",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-048",
+   "text": "sorry, one more - translate thank you into italian thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-049",
+   "text": "ok so how do you spell necessary",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-050",
+   "text": "quick one - what does yolo mean thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_off_domain",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-051",
+   "text": "what kind of thermostat does Ronald Fenwick have",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-052",
+   "text": "what horsepower is the blower motor at 3356 E Pecos Rd thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-053",
+   "text": "alright, how many feet of line set at 2949 W Baseline Rd",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-054",
+   "text": "hey, what size breaker is on Joseph Ortega's condenser",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-055",
+   "text": "ok um, what is the wire gauge to the unit at 2394 S Higley Rd for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-056",
+   "text": "sorry, one more - what kind of capacitor is in Laura Lombardi's outdoor unit for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-057",
+   "text": "sorry, one more - what brand filter is in Jason Yarborough's furnace thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-058",
+   "text": "so uh, is there a humidifier on Richard Pruitt's system thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-059",
+   "text": "real quick: what is the static pressure reading on Steven Fitzgerald's unit",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-060",
+   "text": "ok um, what color is Laura Nakamura's condenser real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-061",
+   "text": "real quick: what kind of thermostat does Ronald Calloway have",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-062",
+   "text": "what horsepower is the blower motor at 729 W Camelback Rd",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-063",
+   "text": "hang on... how many feet of line set at 3763 E Broadway Rd please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-064",
+   "text": "ok so what size breaker is on Paul Kowalski's condenser for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-065",
+   "text": "real quick: what is the wire gauge to the unit at 2283 W Thomas Rd when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-066",
+   "text": "so uh, what kind of capacitor is in Melissa Pruitt's outdoor unit please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-067",
+   "text": "hang on... what brand filter is in Kathleen Keller's furnace real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-068",
+   "text": "alright, is there a humidifier on Michelle Sandoval's system",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-069",
+   "text": "alright, what is the static pressure reading on Michael Redwine's unit real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-070",
+   "text": "hey, what color is Edward Esparza's condenser",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-071",
+   "text": "what kind of thermostat does Thomas Mercer have thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-072",
+   "text": "ok so what horsepower is the blower motor at 1432 W Thomas Rd thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-073",
+   "text": "how many feet of line set at 3615 E University Dr for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-074",
+   "text": "what size breaker is on Amy Isaacson's condenser real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-075",
+   "text": "sorry, one more - what is the wire gauge to the unit at 3300 S Alma School Rd thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-076",
+   "text": "ok so what kind of capacitor is in James Tovar's outdoor unit",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-077",
+   "text": "ok um, what brand filter is in Thomas Osborn's furnace real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-078",
+   "text": "is there a humidifier on Carol Salazar's system",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-079",
+   "text": "what is the static pressure reading on Linda Garrison's unit",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-080",
+   "text": "hang on... what color is Rebecca Montoya's condenser when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_untracked",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-081",
+   "text": "real quick: and how about their address when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-082",
+   "text": "hmm, what did he say about it for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-083",
+   "text": "so uh, ok and the one before that",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-084",
+   "text": "whos the tech on that when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-085",
+   "text": "hang on... and how old is that one",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-086",
+   "text": "ok so is that one under warranty",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-087",
+   "text": "real quick: show me the invoice for it for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-088",
+   "text": "and the other customer real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-089",
+   "text": "quick one - what was the total on that",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-090",
+   "text": "quick one - so when did that happen please",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-091",
+   "text": "sorry, one more - and where is it real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-092",
+   "text": "real quick: and who else was there",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-093",
+   "text": "alright, how many were there when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-094",
+   "text": "hmm, give me their details",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-095",
+   "text": "hang on... which one was the last one",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-096",
+   "text": "real quick: and who did the work",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-097",
+   "text": "how much did they pay",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-098",
+   "text": "ok um, repeat that",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-099",
+   "text": "go back to the previous one for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-100",
+   "text": "quick one - the same for him thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32-decline3-101",
+   "text": "hmm, address for Maria Gallardo for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Maria Gallardo%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Maria Gallardo%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-102",
+   "text": "hmm, William Quintana phone",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%William Quintana%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%William Quintana%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-103",
+   "text": "hey, email for Susan Dominguez",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Susan Dominguez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Susan Dominguez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-104",
+   "text": "alright, where does Donald Isaacson live for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donald Isaacson%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Donald Isaacson%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-105",
+   "text": "so uh, address for Robert Salazar",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Robert Salazar%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Robert Salazar%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-106",
+   "text": "hmm, Michael Redwine phone thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Michael Redwine%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Michael Redwine%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-107",
+   "text": "real quick: email for Donna Sorensen when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donna Sorensen%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Donna Sorensen%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-108",
+   "text": "real quick: where does Robert Thornton live thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Robert Thornton%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Robert Thornton%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-109",
+   "text": "quick one - address for James Tovar thanks",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%James Tovar%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%James Tovar%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-110",
+   "text": "real quick: Thomas Nakamura phone",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Thomas Nakamura%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Thomas Nakamura%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-111",
+   "text": "hang on... email for Anthony Alvarez real quick",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Anthony Alvarez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Anthony Alvarez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-112",
+   "text": "where does Matthew Whitfield live for me",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Matthew Whitfield%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Matthew Whitfield%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-113",
+   "text": "ok um, address for Matthew Winslow",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Matthew Winslow%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Matthew Winslow%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-114",
+   "text": "Gary Wyckoff phone when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Gary Wyckoff%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Gary Wyckoff%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-115",
+   "text": "real quick: email for Patricia Esparza",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Patricia Esparza%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Patricia Esparza%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-116",
+   "text": "where does David Prentiss live",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%David Prentiss%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%David Prentiss%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-117",
+   "text": "address for William Rios when you get a sec",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%William Rios%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%William Rios%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-118",
+   "text": "Michelle Tovar phone",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Michelle Tovar%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Michelle Tovar%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-119",
+   "text": "so uh, email for Edward Dominguez",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Edward Dominguez%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Edward Dominguez%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-decline3-120",
+   "text": "so uh, where does Carol Salazar live",
+   "category": "blind-r32-decline3",
+   "shape": "blind3_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Carol Salazar%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "%Carol Salazar%"
+     ]
+    }
+   },
+   "citationRequired": true
+  }
+ ]
+}

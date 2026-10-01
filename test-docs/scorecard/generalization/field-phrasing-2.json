@@ -1752,7 +1752,7 @@
       "shape": "ranking",
       "cmp": "value",
       "oracle": {
-        "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' AND value IS NOT NULL GROUP BY value ORDER BY count(*) ASC LIMIT 1",
+        "sql": "SELECT v FROM (SELECT v, n, min(n) OVER () AS m FROM (SELECT t.value AS v, count(DISTINCT t.document_id) AS n FROM extractions t WHERE t.field_key='technician' AND t.value IS NOT NULL AND EXISTS (SELECT 1 FROM extractions s WHERE s.document_id=t.document_id AND s.field_key='service_date' AND s.value IS NOT NULL AND s.value<>'') GROUP BY t.value) y) z WHERE n = m",
         "params": []
       },
       "citationRequired": true

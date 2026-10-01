@@ -175,3 +175,79 @@ follows the host `TZ`. Under `TZ=UTC` (a scheduled / CI environment) one rolling
 correct -> wrong; under `America/Phoenix` (every developer run and the R24/R25/R27 numbers) it does not. Fixed by pinning
 `process.env.TZ = process.env.DONOVAN_EXAM_TZ || "America/Phoenix"` at the top of `offline-exam.mjs`. The canonical invocation
 (`TZ=America/Phoenix EXAM_TODAY=2026-09-25 node scripts/offline-exam.mjs scripts/golden/golden-export.json out.json out.md`) is unchanged.
+
+## R32 (Team A, deterministic coverage) — owner decisions applied, blind-oracle conflicts, one rejected rule
+
+### Owner decisions from the "OWNER DECISION" section above, decided by the owner on 2026-09-30 and applied in R32
+
+- **h115 / k141 "fewest visits / jobs logged" — a visit is a distinct dated visit.** Oracle rewritten to count DISTINCT documents that carry a
+  `service_date` per technician (Ray Sutton, 50), ties reported as ties. Donovan already counted this; nothing changed in the engine.
+- **j141–j143 (and 21 sibling oracles) "N years old" — exact-date age.** `resolveAgeFilter` filters on `installDate` (`<= today - N years`,
+  `> today - N years` for newer) instead of the calendar-year difference; a year-only / year-month install date is compared conservatively.
+  24 exam / field-phrasing oracles that had encoded the calendar-year reading were rewritten to the exact-date SQL (`exam.json`,
+  `field-phrasing-2/4/5.json`, generators updated). The "how old is the unit" per-unit answer already used whole years by date.
+- **Typo'd names auto-resolve when unambiguous, visibly.** `lookups/typoResolve.js` (policy documented at the top of the file): one candidate,
+  same word count, per-word Damerau distance <= 2 (<= 1 under 6 letters), words under 4 letters must match exactly, total <= 2, no other customer
+  within distance 3, the mistyped word is not a real word / given name / surname / brand / city / street word and is not another customer's word,
+  not typed in quotes. The answer starts `Showing results for X (you typed "y").` and the client shows a one-tap "Not who you meant?" chip that
+  re-asks with the name quoted ("as typed" restores the honest decline). Oracle field `typoResolvesTo` (compare.js) accepts either the resolved value
+  or the honest decline for j176–j180, k161–k165 and the R31 near-miss blind sets. Kill switch `DONOVAN_TYPO_AUTORESOLVE=0`. The three PII-worry
+  options above (A/B/C) are superseded: the visible note plus the one-tap escape is the safeguard, and every "could be a different real person"
+  shape (two similar customers, short names, real words, a typo equal to another customer's word, > 2 edits, quoted) is a negative test in
+  `scripts/verify-r32-coverage.mjs`.
+
+### Blind-oracle conflicts found while writing the R32 blind sets (the ENGINE's adjudicated reading won; the blind oracle was corrected)
+
+- **"tickets" / "work orders"** are DOCUMENT counts in this engine, never visit counts (frozen by exam ids); the window blind set does not assert them as visits.
+- **"still / under warranty" count** is the strict >365-day "active" bucket (frozen by `counts-warranty-0004`); the future-side count is not asserted.
+- **Install date at a multi-unit address** enumerates every unit; a single-date oracle is wrong there.
+- **Multi-customer address attribute questions** stay an honest "which one?" decline (R16 owner decision); the new bare-surname stage reuses that policy.
+- **Technician totals have two adjudicated readings that disagree**: "how many jobs has X done in total" = distinct documents with a service date
+  (`breadth-tech-performance-*`, 52 for Danny Ochoa); "how many jobs/calls has X done / been out on, total" = technician records (`field-phrasing-5` k133, 57).
+  The rewrite maps the "calls ... total" phrasings onto the record-count reading (k133's convention) and leaves the exact "in total" wording alone.
+  Owner decision needed if one number is wanted everywhere.
+- **Replacement-due (j136–j140)** oracle uses a 15-year heuristic with no product rule behind it: skipped deliberately, not fought.
+- **"jobs for customer X" (g102)** counts distinct linked documents, which is questionable as "jobs": left as is, no new rules on top of it.
+
+### Rejected rule (measured, do not re-add)
+
+**Rule G, "decline any question that names a record-shaped noun nobody stores"** produced 21 false declines on the 1704-question exam (a record question that
+merely contains a lexicon word, e.g. "condenser" or "filter" inside a real lookup). It is documented and removed in `router/earlyDecline.js`. The early-decline
+rules that remain each need an off-domain lexicon hit AND the absence of every record anchor (customer name, address, serial, brand, unit noun), with a customer-name veto.
+
+## R32b (Team A3, learning loops A-E) — oracle / convention conflicts found while writing the blind sets
+
+The engine's already-adjudicated reading won in every case; the blind oracle was corrected, never the exam oracle.
+
+- **"how many units are still under warranty" (shop-wide) vs a brand-scoped one.** The shop-wide figure keeps the owner's `counts-warranty-0004` reading
+  (status `active` = more than 365 days left, 33), while the brand-scoped exam ids (h050, g135, h091-h098) count end date AFTER today. New code
+  (`lookups/aggregates.js`) answers the unambiguous side only: units whose end date has PASSED (shop-wide or per brand, h132 reading, 79) and brand-scoped
+  "still under warranty" (end date after today, with the within-a-year share named). The shop-wide "still under warranty" is left on the existing route.
+  Owner decision needed if one number is wanted for the shop-wide question (33 vs 37).
+- **"soonest warranty expiry"** is a from-today reading ("next to expire"), not the earliest date on file (h054 = earliest overall, 2014-01-13). Only
+  earliest / first / oldest / latest / last / furthest-out are answered; "soonest" and "next" are left to the model.
+- **"do we do more repair work or more preventive maintenance"** (a "which one" question) vs i019's yes/no oracle ("Repair > PM" = yes): the answer names the winner
+  and both counts ("Repair has more visits: Repair 85, Preventive Maintenance 35"), which satisfies both oracles; the blind oracle uses "value" for the which-form.
+- **"visits" = a dated `service_date` record (317)** for shop-wide counts (j048 convention), not documents with a service type (120).
+- **Technician "jobs on file"** (pair comparisons, "who has the most/fewest jobs on file", per-technician typed counts) use the technician-record convention of
+  `r31-technician*` / k133 (every document naming the technician: Kevin Pratt 59). The existing "busiest technician this year" keeps the dated-visit convention
+  (`breadth-tech-performance-019`); the two disagree for shop-wide totals (see the R32 note above), so the answer text names what was counted.
+- **No readable text:** every document in the golden tenant has text on at least one page, so "how many documents have no readable text" is an honest 0 (the old answer
+  was "You have 500 documents").
+- **Open invoices in a period:** no invoice in the golden tenant carries a payment status, so "any invoices from last quarter that are still open" is an honest
+  "can't tell, none records a payment status" (kind no-answer); with real statuses on file the route yields to the money route.
+- **City names that are also brand/surname words:** "temperature in New York" is off-domain, never "customers with a York unit"; "Prescott" (a real city) is not an
+  unknown customer name (it is on the non-name word list), so "serial on the prescott unit" keeps going to the model.
+
+### R32b loop log (fresh blind set written BEFORE the rules; hold-out = a second set with different phrasings written after the rules were tuned)
+
+| loop | family | rule(s) | blind before -> after (no-model / q) | hold-out |
+|---|---|---|---|---|
+| A | unextracted unit attributes (SEER / filter size), unknown names, persona / app-settings / announcement declines | `pageAttribute.js`, `unknownName.js`, earlyDecline additions | 33 -> 141 / 144 (needs-model 100 -> 3, wrong 2 -> 0) | decl2: 116 -> 135 / 135 |
+| B | per-customer / per-vendor counts, named-pair comparisons (customers, vendors, service types) | `namedCompare.js`, financials subject scoping, contact/slotFill count guards | 36 -> 105 / 106 (needs-model 38 -> 1, clarified 32 -> 0, wrong 4 -> 0) | (compare variants inside the set) |
+| C | shop-wide aggregates (warranty extremes / out-of-warranty counts / tech-never sets / date extremes / history skew / open-in-period / no-text docs) | `aggregates.js` (closed vocabularies) | 55 -> 106 / 106 (needs-model 51 -> 0, wrong 13 -> 0) | agg2: 75 -> 81 / 81 |
+| D | technician pair comparisons, "who has the most/fewest jobs", typed per-technician counts | `namedCompare.js` tech shapes, `aggregates.js` tech-extreme / tech-typed-count | 70 -> 115 / 115 (needs-model 45 -> 0) | (pair orders and phrasings split inside the set) |
+| E | off-domain trivia / shopping / device / health / weather, dangling follow-ups with no conversation | earlyDecline lexicon + dangling shapes | 74 -> 103 / 103 (needs-model 21 -> 0, wrong 1 -> 0) | off2: 66 -> 68 / 68 |
+
+Every loop kept: exam wrong 0, no new wrong id vs the baseline run, `verify:golden` floors raised (correct >= 1570, answered >= 1590, needs-model <= 16), p95 unchanged (~55 ms).
+

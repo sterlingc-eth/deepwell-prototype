@@ -23,6 +23,7 @@ import { financialsClient } from '../services/financialsClient';
 import { FILTERS, FILTER_IDS, type Filter } from './reviewFilters';
 import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
 import { AskAdminNote } from '../components/AskAdminNote';
+import { baseFieldOf, futureDateNote, isUnconfirmedField, todayYmd, unconfirmedDates, visibleExtracted } from '../core/dateFlags';
 
 const CURRENT_USER = 'You';
 
@@ -561,6 +562,30 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     }
   };
 
+  // R33 (admin): "Re-check all missing fields" — every document in this view with a missing required field gets its
+  // own page text re-read for it ($0, no model; api/_lib/recheck.js), in bounded batches until none are left.
+  const missingQueueIds = useMemo(() => queue.filter((d) => d.issues.some((i) => i.kind === 'missing-field')).map((d) => d.id), [queue]);
+  const [recheckAllBusy, setRecheckAllBusy] = useState(false);
+  const [recheckAllMsg, setRecheckAllMsg] = useState<string | null>(null);
+  const runRecheckAll = async () => {
+    if (!missingQueueIds.length) return;
+    setRecheckAllBusy(true);
+    setRecheckAllMsg(null);
+    try {
+      let checked = 0, fixedDocs = 0, fields = 0;
+      for (let i = 0; i < missingQueueIds.length; i += 100) {
+        const r = await reviewClient.recheckMissing(missingQueueIds.slice(i, i + 100), 100);
+        checked += r.rechecked; fixedDocs += r.filled; fields += r.fields;
+      }
+      try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
+      setRecheckAllMsg(`Re-checked ${checked} document${checked === 1 ? '' : 's'}: restored ${fields} field${fields === 1 ? '' : 's'} on ${fixedDocs}. ${Math.max(0, checked - fixedDocs)} still need a person.`);
+    } catch (e) {
+      setRecheckAllMsg(e instanceof Error ? e.message : 'Could not re-check these documents.');
+    } finally {
+      setRecheckAllBusy(false);
+    }
+  };
+
   const doc = selectedDocumentId ? graph.docs[selectedDocumentId] : undefined;
   useEffect(() => {
     if (!doc && queue[0]) openDocument(queue[0].id);
@@ -703,6 +728,16 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           </div>
         )}
 
+        {(filter === 'gaps' || filter === 'attention') && missingQueueIds.length > 0 && !REVIEW_IS_DEMO_ONLY && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5" disabled={recheckAllBusy || !canAdmin} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void runRecheckAll()}>
+              {recheckAllBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} Re-check all missing fields
+            </button>
+            {!canAdmin && <AskAdminNote />}
+            {recheckAllMsg && <span className="text-caption text-ink-3">{recheckAllMsg}</span>}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start">
           <ul className="min-w-0 divide-y divide-line border border-line rounded-lg bg-surface" aria-label="Documents in queue">
             {queue.map((d) => {
@@ -782,26 +817,44 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
  *  DocPanel so grouping by unit (owner request 2026-09-20, item 4) doesn't
  *  duplicate this markup per group. */
 function FieldRows({ fields, onCorrect }: { fields: Doc['extracted']; onCorrect: (fieldName: string, value: string) => void }) {
+  const today = todayYmd();
   return (
     <ul className="divide-y divide-line border border-line rounded-lg">
       {fields.map((f) => {
         const value = f.correctedValue ?? f.value;
         const low = f.confidence < 0.85;
+        // R33: a printed date in the future is SHOWN with a "check the year" chip, never dropped. An unconfirmed
+        // far-future date (service_date_unconfirmed) is edited/confirmed as its canonical field (service_date).
+        const unconfirmed = isUnconfirmedField(f.name);
+        const target = baseFieldOf(f.name);
+        const futureNote = futureDateNote(f.name, value, today);
         return (
           <li key={f.name} className="px-3 py-2.5 grid sm:grid-cols-[minmax(120px,30%)_1fr] gap-x-4 gap-y-1 items-center">
             <div>
-              <p className="text-body text-ink-3">{fieldLabel(f.name)}</p>
+              <p className="text-body text-ink-3">{fieldLabel(target)}</p>
               <p className={`text-caption ${low ? 'text-warn-ink dark:text-brass-200' : 'text-ink-3'}`}>{Math.round(f.confidence * 100)}% confidence{f.correctedBy ? ` · corrected by ${f.correctedBy}` : ''}</p>
             </div>
-            <div className="flex gap-2">
-              <label className="sr-only" htmlFor={`field-${f.name}`}>{f.name}</label>
-              <input
-                id={`field-${f.name}`}
-                className={`dw-input !min-h-[44px] font-mono text-data ${low ? 'border-warn' : ''}`}
-                defaultValue={value}
-                onBlur={(e) => { if (e.target.value.trim() && e.target.value !== value) onCorrect(f.name, e.target.value.trim()); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-              />
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex gap-2">
+                <label className="sr-only" htmlFor={`field-${f.name}`}>{fieldLabel(target)}</label>
+                <input
+                  id={`field-${f.name}`}
+                  className={`dw-input !min-h-[44px] font-mono text-data ${low || futureNote ? 'border-warn' : ''}`}
+                  defaultValue={value}
+                  onBlur={(e) => { if (e.target.value.trim() && e.target.value !== value) onCorrect(target, e.target.value.trim()); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                />
+                {unconfirmed && (
+                  <button type="button" className="dw-btn-secondary !min-h-[44px] shrink-0" onClick={() => onCorrect(target, value)}>
+                    <Check className="w-4 h-4" aria-hidden="true" /> Confirm
+                  </button>
+                )}
+              </div>
+              {futureNote && (
+                <p className="dw-pill-warn inline-flex items-center gap-1 text-caption" data-testid="future-date-chip">
+                  <AlertTriangle className="w-3 h-3" aria-hidden="true" /> {futureNote}{unconfirmed ? ' (please confirm)' : ''}
+                </p>
+              )}
             </div>
           </li>
         );
@@ -865,7 +918,42 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
          * from the aiVerify call itself already surfaced any real failure */
       }
     }
-    setAiMsg(verified ? 'Verified by AI.' : 'Not confident enough yet — this still needs a person.');
+    // R33: say exactly what is holding the document back when it is a printed date in the future — never the
+    // generic "still needs a person" for a document whose only open item is "check the year".
+    const fresh = useGraph.getState().docs[doc.id] ?? doc;
+    const pending = unconfirmedDates(fresh);
+    setAiMsg(
+      verified
+        ? 'Verified by AI.'
+        : pending.length
+          ? `${pending.map((p) => p.note).join('; ')}. Confirm it (or fix the year) and this document can be verified.`
+          : 'Not confident enough yet — this still needs a person.'
+    );
+  };
+
+  // R33: "Re-check this document" — re-reads the document's own stored page text for the missing field ($0, no model).
+  const [recheckBusy, setRecheckBusy] = useState(false);
+  const [recheckMsg, setRecheckMsg] = useState<string | null>(null);
+  const runRecheck = async () => {
+    setRecheckBusy(true);
+    setRecheckMsg(null);
+    try {
+      const r = await reviewClient.recheckDocument(doc.id);
+      if (!REVIEW_IS_DEMO_ONLY) {
+        try { await loadGraphFromServer(); } catch { /* keep last-good data on screen */ }
+      }
+      setRecheckMsg(
+        r.filled.length
+          ? `Found on the page: ${r.filled.map((f) => `${fieldLabel(baseFieldOf(f.field_key))} ${f.value}${f.flags?.includes('far_future') ? ' (in the future — please confirm)' : ''}`).join('; ')}.`
+          : r.ambiguous?.length
+            ? `The page prints more than one ${r.ambiguous.map((a) => fieldLabel(a.key)).join(', ')} (${r.ambiguous.flatMap((a) => a.values).join(' / ')}) — pick the right one below.`
+            : 'Nothing labelled for the missing field on this document — fill it in below.'
+      );
+    } catch (e) {
+      setRecheckMsg(e instanceof Error ? e.message : 'Could not re-check this document.');
+    } finally {
+      setRecheckBusy(false);
+    }
   };
 
   const runDelete = async () => {
@@ -912,7 +1000,9 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const reminderCustomerField = doc.extracted.find((f) => f.name === 'reminder_customer_name');
   const reminderCustomerName = reminderCustomerField ? (reminderCustomerField.correctedValue ?? reminderCustomerField.value).trim() || null : null;
 
-  const grouped = useMemo(() => groupExtractionsByUnit(doc.extracted), [doc.extracted]);
+  // R33: an unconfirmed far-future twin is hidden once its canonical field has a value (confirmed or corrected).
+  const grouped = useMemo(() => groupExtractionsByUnit(visibleExtracted(doc.extracted)), [doc.extracted]);
+  const pendingDates = useMemo(() => unconfirmedDates(doc), [doc]);
   const currentCustomer = customerForDocument(doc, graph.entities);
   const customerStatusLine = currentCustomer
     ? `Customer: ${str(currentCustomer, 'customer_name') || str(currentCustomer, 'name') || 'Unnamed'}`
@@ -1020,9 +1110,32 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       {!duplicate && doc.typeId && (
         <section className="p-5 space-y-3">
           <h3 className="text-h4">Extracted fields</h3>
+          {pendingDates.length > 0 && (
+            <div className="rounded-lg border border-warn/40 bg-surface-2 p-3 space-y-2" role="status">
+              <p className="flex items-center gap-2 text-ink-2 font-medium"><AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Please confirm — this date was read from the page as printed.</p>
+              {pendingDates.map((p) => (
+                <div key={p.fieldKey} className="flex flex-wrap items-center gap-2">
+                  <span className="text-body text-ink-2">{p.note}.</span>
+                  <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => onCorrect(p.fieldKey, p.value)}>
+                    <Check className="w-4 h-4" aria-hidden="true" /> Confirm {p.value}
+                  </button>
+                  <span className="text-caption text-ink-3">or correct it in the field below.</span>
+                </div>
+              ))}
+            </div>
+          )}
           {missing.length > 0 && (
             <div className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 space-y-3">
               <p className="flex items-center gap-2 text-warn-ink dark:text-brass-200 font-medium"><AlertTriangle className="w-4 h-4" aria-hidden="true" /> Missing information — fill in the highlighted fields to continue.</p>
+              {!REVIEW_IS_DEMO_ONLY && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" disabled={recheckBusy} onClick={() => void runRecheck()}>
+                    {recheckBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} Re-check this document
+                  </button>
+                  <span className="text-caption text-ink-3">Reads the page again for the missing field. Free, no AI call.</span>
+                </div>
+              )}
+              {recheckMsg && <p className="text-caption text-ink-2">{recheckMsg}</p>}
               {missing.map((requirement) => {
                 const label = requirementLabel(requirement);
                 return (

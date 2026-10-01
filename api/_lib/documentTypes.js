@@ -189,6 +189,9 @@ export function isShopInternalDocument(fields) {
   return hasShopFact;
 }
 
+/** Mirrors extractFields.js's UNCONFIRMED_SUFFIX (not imported: extractFields.js imports this module). */
+const UNCONFIRMED_SUFFIX = '_unconfirmed';
+
 /** Display labels for field_keys, used wherever "missing" fields are shown. */
 export const FIELD_LABELS = {
   equipment_id: 'Equipment ID',
@@ -223,6 +226,11 @@ export const FIELD_LABELS = {
   reminder_text: 'Reminder',
   reminder_customer_name: 'Reminder — customer',
   reminder_trigger: 'Reminder trigger',
+  // R33: printed far-future dates parked for a person to confirm (extractFields.js UNCONFIRMED_SUFFIX). The label
+  // itself carries the caveat, so anything that renders field labels (dossiers, exports) never presents one as fact.
+  service_date_unconfirmed: 'Service date (unconfirmed: printed date is in the future)',
+  installation_date_unconfirmed: 'Installation date (unconfirmed: printed date is in the future)',
+  warranty_registered_date_unconfirmed: 'Warranty registered (unconfirmed: printed date is in the future)',
 };
 
 export function fieldLabel(fieldKey, pack = null) {
@@ -506,12 +514,20 @@ export function completenessFor(typeId, fields, pack = null) {
   const present = [];
   const missing = [];
   const satisfiedConfidences = [];
+  // R33: a requirement whose only reading is an UNCONFIRMED far-future date (service_date_unconfirmed — see
+  // extractFields.js's UNCONFIRMED_SUFFIX) is NOT missing: the date is printed and on file. It is listed in
+  // `unconfirmed` instead, and keeps `complete` false so the document is never auto-verified on a date nobody has
+  // confirmed; the Inbox shows a "check the year" chip, never "Missing information".
+  const unconfirmed = [];
 
   for (const requirement of required) {
-    const hit = requirement.split('|').map((k) => byKey.get(k)).find(Boolean);
+    const alts = requirement.split('|');
+    const hit = alts.map((k) => byKey.get(k)).find(Boolean);
     if (hit) {
       present.push(hit.field_key);
       satisfiedConfidences.push(hit.confidence);
+    } else if (alts.some((k) => byKey.has(`${k}${UNCONFIRMED_SUFFIX}`))) {
+      unconfirmed.push(requirement);
     } else {
       missing.push(requirement);
     }
@@ -523,5 +539,5 @@ export function completenessFor(typeId, fields, pack = null) {
     ? Math.min(...satisfiedConfidences)
     : (required.length ? 0 : 1);
 
-  return { type, required, present, missing, minConfidence, complete: missing.length === 0 };
+  return { type, required, present, missing, unconfirmed, minConfidence, complete: missing.length === 0 && unconfirmed.length === 0 };
 }

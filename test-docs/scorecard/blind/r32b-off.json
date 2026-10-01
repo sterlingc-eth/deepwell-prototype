@@ -1,0 +1,1188 @@
+{
+ "version": "r32b-blind-1",
+ "category": "blind-r32b-off",
+ "source": "scripts/gen-blind-r32b.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32b-off-001",
+   "text": "so uh, whats the capital of australia",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-002",
+   "text": "ok so who won the world series in 2016 when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-003",
+   "text": "hmm, how tall is mount everest please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-004",
+   "text": "so uh, who wrote pride and prejudice",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-005",
+   "text": "alright, what year did the titanic sink thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-006",
+   "text": "how many ounces in a pound for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-007",
+   "text": "hey, who is the president of france real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-008",
+   "text": "what's the speed of light please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-009",
+   "text": "sorry, one more - how far is the moon from earth",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-010",
+   "text": "hang on... what's the largest ocean thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-011",
+   "text": "ok so who painted the mona lisa for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-012",
+   "text": "ok so when did world war 2 end",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-013",
+   "text": "alright, what is the boiling point of water in fahrenheit when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-014",
+   "text": "so uh, who invented the telephone when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-015",
+   "text": "hey, what's the longest river in africa thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-016",
+   "text": "alright, how many continents are there please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-017",
+   "text": "ok um, what's the population of tokyo for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-018",
+   "text": "ok um, who discovered penicillin",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-019",
+   "text": "what is the square root of 144",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-020",
+   "text": "how many days in a leap year",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-021",
+   "text": "alright, what is the tallest mountain in north america for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-022",
+   "text": "hey, who invented the lightbulb real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-023",
+   "text": "sorry, one more - what is the capital of canada",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-024",
+   "text": "ok so who wrote romeo and juliet",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-025",
+   "text": "hey, what year did man land on the moon",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-026",
+   "text": "ok um, how many feet in a mile",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-027",
+   "text": "hang on... who painted the starry night",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-028",
+   "text": "hey, what is the freezing point of water in celsius",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_trivia",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-029",
+   "text": "which laptop should i buy for school please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-030",
+   "text": "real quick: whats a good gift for my dad real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-031",
+   "text": "hey, best pizza place near me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-032",
+   "text": "recommend a good movie for tonight",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-033",
+   "text": "ok so which car is more reliable, a camry or an accord",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-034",
+   "text": "hang on... what should i cook for dinner for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-035",
+   "text": "so uh, any good podcasts about history",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-036",
+   "text": "best way to learn guitar please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-037",
+   "text": "hey, where should i go on vacation this summer real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-038",
+   "text": "alright, what's a good book to read",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_shop",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-039",
+   "text": "hey, tell me a joke",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-040",
+   "text": "sorry, one more - write me a poem about the ocean",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-041",
+   "text": "hey, sing me a song for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-042",
+   "text": "quick one - what's your favorite color",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-043",
+   "text": "are you a robot",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-044",
+   "text": "real quick: who made you please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-045",
+   "text": "can you be my friend thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-046",
+   "text": "hey, do you ever get tired",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-047",
+   "text": "how are you feeling today real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-048",
+   "text": "quick one - tell me something interesting thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-049",
+   "text": "ok um, translate good morning into spanish",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-050",
+   "text": "what's 15 percent of 240",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-051",
+   "text": "ok so convert 5 miles to kilometers",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-052",
+   "text": "hey, spell necessary for me real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-053",
+   "text": "hang on... give me a riddle for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-054",
+   "text": "how do i reset my iphone",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-055",
+   "text": "my wifi keeps dropping what do i do",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-056",
+   "text": "quick one - how do i take a screenshot on a mac real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-057",
+   "text": "quick one - why is my laptop so slow",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-058",
+   "text": "hmm, how do i factory reset my android please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-059",
+   "text": "real quick: how do i clear my browser cache",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-060",
+   "text": "what should i take for a headache thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-061",
+   "text": "how many calories in a banana",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-062",
+   "text": "hey, is it ok to run every day",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-063",
+   "text": "hmm, how do i lose ten pounds when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-064",
+   "text": "so uh, why do i get hiccups",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-065",
+   "text": "ok um, will it rain tomorrow please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-066",
+   "text": "hey, whats the weather like this weekend",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-067",
+   "text": "alright, what's the temperature in new york right now",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_chat",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-068",
+   "text": "hang on... what about the one in chandler instead please",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-069",
+   "text": "hey, and what about the other one",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-070",
+   "text": "hey, how about the second one please",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-071",
+   "text": "sorry, one more - same thing for the one in mesa",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-072",
+   "text": "ok um, ok and the warranty on that one thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-073",
+   "text": "hey, what about last week instead",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-074",
+   "text": "hmm, and who installed it when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-075",
+   "text": "hmm, and what's the serial on that for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-076",
+   "text": "ok um, what about that one when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-077",
+   "text": "ok um, how about the previous one when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-078",
+   "text": "ok now the same for the newer unit real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-079",
+   "text": "real quick: and their phone number",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-080",
+   "text": "ok so what about the one before that please",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-081",
+   "text": "so uh, and for the other customer",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-082",
+   "text": "hey, ok what about the second unit for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-083",
+   "text": "hmm, now do the one in gilbert real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-084",
+   "text": "ok um, same for the other one please thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-085",
+   "text": "and when was it last serviced",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-086",
+   "text": "quick one - what about the one we did yesterday",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-087",
+   "text": "and what's the tonnage on it please",
+   "category": "blind-r32b-off",
+   "shape": "blind_dangling",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r32b-off-088",
+   "text": "how many Trane units do we have",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-089",
+   "text": "hmm, how many Carrier units do we have for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-090",
+   "text": "hey, how many Goodman units do we have",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-091",
+   "text": "ok so how many Lennox units do we have",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-092",
+   "text": "real quick: how many Rheem units do we have thanks",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-093",
+   "text": "alright, how many York units do we have real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-094",
+   "text": "real quick: how many Daikin units do we have",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-095",
+   "text": "how many Mitsubishi units do we have",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-096",
+   "text": "what's the phone number for Stephanie Osborn for me",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Stephanie Osborn%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-097",
+   "text": "so uh, what's the phone number for Melissa Pruitt real quick",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Melissa Pruitt%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-098",
+   "text": "hang on... what's the phone number for Cynthia Larkin",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Cynthia Larkin%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-099",
+   "text": "real quick: what's the phone number for Nancy Alvarez when you get a sec",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Nancy Alvarez%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-100",
+   "text": "so uh, what's the phone number for Donald Isaacson please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Donald Isaacson%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-101",
+   "text": "ok um, what's the phone number for Emily Whitfield please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Emily Whitfield%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-102",
+   "text": "what's the phone number for Richard Osborn",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Richard Osborn%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-off-103",
+   "text": "what's the phone number for Thomas Nakamura please",
+   "category": "blind-r32b-off",
+   "shape": "blind_off_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "%Thomas Nakamura%"
+    ]
+   },
+   "citationRequired": true
+  }
+ ]
+}

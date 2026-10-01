@@ -624,8 +624,9 @@ eq('buildReminderAnswer :: honest zero', buildReminderAnswer([], 'Karen Abernath
   // `installYear < currentYear - N`, and there is no reliable textual signal distinguishing it from
   // field-phrasing-4.json's day-precise oracle for the same phrasing. See analytics.js's own doc
   // comment on resolveAgeFilter for the full two-oracle-conflict writeup.
-  eq('teamA age :: older than 10 years (2026-09-23) -> installYear < 2016', JSON.stringify(A.resolveAgeFilter('customers with units older than 10 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'lt', value: 2016 }));
-  eq('teamA age :: newer than 5 years -> installYear >= 2021', JSON.stringify(A.resolveAgeFilter('units newer than 5 years', TODAY)), JSON.stringify({ field: 'installYear', op: 'gte', value: 2021 }));
+  // R32 (owner decision 2026-09-30): exact-date age everywhere (ADJUDICATION.md "R32"), superseding the calendar-year reading above.
+  eq('teamA age :: older than 10 years (2026-09-23) -> installDate <= 2016-09-23', JSON.stringify(A.resolveAgeFilter('customers with units older than 10 years', TODAY)), JSON.stringify({ field: 'installDate', op: 'lte', value: '2016-09-23' }));
+  eq('teamA age :: newer than 5 years -> installDate > 2021-09-23', JSON.stringify(A.resolveAgeFilter('units newer than 5 years', TODAY)), JSON.stringify({ field: 'installDate', op: 'gt', value: '2021-09-23' }));
   eq('teamA age :: no age words -> null', A.resolveAgeFilter('how many customers', TODAY), null);
 
   // 8. maintenance due (deterministic)

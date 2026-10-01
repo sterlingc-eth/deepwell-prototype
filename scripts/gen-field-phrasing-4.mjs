@@ -94,8 +94,10 @@ function setQ({ text, shape, sql, params = [], maxItems, citationRequired = true
   return q;
 }
 
-function decline({ text, shape, guardSql, guardParams = [], why }) {
-  return { id: nextId(), text, category: CATEGORY, shape, cmp: "honest-zero", oracle: { sql: guardSql, params: guardParams }, note: why };
+function decline({ text, shape, guardSql, guardParams = [], why, typoResolvesTo }) {
+  const q = { id: nextId(), text, category: CATEGORY, shape, cmp: "honest-zero", oracle: { sql: guardSql, params: guardParams }, note: why };
+  if (typoResolvesTo) q.typoResolvesTo = typoResolvesTo; // R32: the customer an unambiguous near-miss now resolves to (visible "Showing results for" note)
+  return q;
 }
 
 function rubricQ({ text, shape, rubric }) {
@@ -597,14 +599,15 @@ questions.push(valueQ({
  * the real counterpart verified to exist one row over).
  */
 const NEAR_MISS_NAMES = [
-  ["what's the phone number for Amanda Quinly", "Amanda Quinly"],
-  ["pull up the file for Kenith Fenwick", "Kenith Fenwick"],
-  ["what's the service address on file for Ashely Vance", "Ashely Vance"],
-  ["whats the warranty status for Micheal Redwine", "Micheal Redwine"],
-  ["do we have a serial number on file for Nancey Zamora", "Nancey Zamora"],
+  ["what's the phone number for Amanda Quinly", "Amanda Quinly", "Amanda Quinley"],
+  ["pull up the file for Kenith Fenwick", "Kenith Fenwick", "Kenneth Fenwick"],
+  ["what's the service address on file for Ashely Vance", "Ashely Vance", "Ashley Vance"],
+  ["whats the warranty status for Micheal Redwine", "Micheal Redwine", "Michael Redwine"],
+  ["do we have a serial number on file for Nancey Zamora", "Nancey Zamora", "Nancy Zamora"],
 ];
-for (const [text, name] of NEAR_MISS_NAMES) {
+for (const [text, name, real] of NEAR_MISS_NAMES) {
   questions.push(decline({
+    typoResolvesTo: real,
     text, shape: "adversarial_near_miss",
     guardSql: `SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1`,
     guardParams: [`%${name}%`],

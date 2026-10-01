@@ -233,7 +233,7 @@ export async function loadExportIntoNewTenant(lite, exportData, { tenantKey = "o
 const PASS_THROUGH_CMP = new Set(["number", "set", "value", "yesno", "honest-zero", "count-with-unknown"]);
 
 function emptyBucket() {
-  return { total: 0, answeredWithoutModel: 0, correct: 0, wrong: 0, needsModel: 0, needsGrader: 0, skipped: 0, oracleError: 0, cited: 0, citationChecked: 0, citationSupportRate: [], latenciesMs: [], keyFactGraded: 0 };
+  return { total: 0, answeredWithoutModel: 0, correct: 0, wrong: 0, needsModel: 0, clarified: 0, needsGrader: 0, skipped: 0, oracleError: 0, cited: 0, citationChecked: 0, citationSupportRate: [], latenciesMs: [], keyFactGraded: 0 };
 }
 
 function fold(bucket, r) {
@@ -241,6 +241,8 @@ function fold(bucket, r) {
   if (r.status === "oracle-error") { bucket.oracleError += 1; return; }
   if (r.status === "skipped") { bucket.skipped += 1; return; }
   if (r.status === "needs-model") { bucket.needsModel += 1; bucket.latenciesMs.push(r.latencyMs); return; }
+  // R32: a deterministic "clarify instead of model" reply (lookups/clarify.js) is neither a correct answer nor a model call: its own bucket.
+  if (r.status === "clarified") { bucket.clarified += 1; bucket.latenciesMs.push(r.latencyMs); return; }
   bucket.answeredWithoutModel += 1;
   bucket.latenciesMs.push(r.latencyMs);
   if (r.status === "needs-grader") { bucket.needsGrader += 1; return; }
@@ -262,6 +264,7 @@ function summarize(bucket) {
     wrong: bucket.wrong,
     accuracy: graded ? Math.round((bucket.correct / graded) * 1000) / 1000 : null,
     needsModel: bucket.needsModel,
+    clarified: bucket.clarified,
     needsGrader: bucket.needsGrader,
     skipped: bucket.skipped,
     oracleError: bucket.oracleError,
@@ -336,6 +339,10 @@ export async function runOfflineExam({ ctx, questions, today, modelCounter, cali
       perQuestion.push({ ...base, status: "wrong", expected: summarizeExpected({ ...q, expected: oracle.expected }), got: `error: ${asked.error ?? "no response"}`, latencyMs });
       continue;
     }
+    if (asked.data.clarify) {
+      perQuestion.push({ ...base, status: "clarified", clarifyReason: asked.data.clarifyReason, chips: (asked.data.didYouMean ?? []).map((c) => c.text), latencyMs });
+      continue;
+    }
     if (q.cmp === "rubric" && q.keyFacts) {
       const graded = gradeKeyFacts({ question: q, data: asked.data });
       let citationPrecision;
@@ -361,7 +368,7 @@ export async function runOfflineExam({ ctx, questions, today, modelCounter, cali
       continue;
     }
 
-    const graded = compareAnswer({ cmp: q.cmp, expected: oracle.expected, question: q.text, citationRequired: q.citationRequired, alts: oracle.alts, tolerance: q.tolerance, anyNumber: q.anyNumber }, asked.data);
+    const graded = compareAnswer({ cmp: q.cmp, expected: oracle.expected, question: q.text, citationRequired: q.citationRequired, alts: oracle.alts, tolerance: q.tolerance, anyNumber: q.anyNumber, typoResolvesTo: q.typoResolvesTo }, asked.data);
     let citationPrecision;
     if (graded.cited) {
       const cp = await checkCitationPrecision(withTenant, ctx, asked.data);

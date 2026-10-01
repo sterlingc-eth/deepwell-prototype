@@ -288,11 +288,18 @@ const TRIGGERS = [
   // regex here, which only needs to recognise the SHAPE.
   ['brand_match', new RegExp(`\\b(?:is|are)\\b[^?.!]*\\b(?:unit|system)\\b[^?.!]*\\b(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
   ['brand_match', new RegExp(`\\b(?:does|do)\\b[^?.!]*\\bhave\\b[^?.!]*\\b(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
+  // R32 (loop 2): "is that a trane unit out at <addr>" / "so is it a carrier at <addr>" — the demonstrative/pronoun framing of the same yes/no brand ask.
+  ['brand_match', new RegExp(`\\b(?:is|are)\\s+(?:that|it|this|the\\s+one)\\s+(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
+  // R32 (loop 2): any yes/no framing whose object is "a <brand>" ("is the equipment at <addr> a daikin", "would that be a trane unit at <addr>", "<addr> - is that a carrier").
+  // The exactly-one-brand rule in extractAskedBrand still guards "a trane or a carrier".
+  ['brand_match', new RegExp(`\\b(?:is|are|isn't|would|could|might|was)\\b[^?.!]*\\b(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
   ['installer', /\bwho (?:installed|did the install)\b|\bwho put\b[\s\S]*\bin\b|\binstaller\b/i],
   ['install_date', /\binstall(?:ed|ation)?\b[\s\S]*\b(date|when)\b|\b(date|when)\b[\s\S]*\binstall(?:ed|ation)?\b|\binstall date\b/i],
   ['last_service_tech', /\bwho\b[\s\S]*\b(last|out|worked on|came out|serviced)\b/i],
   ['last_service_tech', /\b(last|latest) (?:tech|technician)\b/i],
-  ['last_service_tech', /\b(?:which|what)\s+tech(?:nician)?\b/i],
+  ['last_service_tech', /\b(?:which|what)\s+tech(?:nician)?s?\b/i],
+  // R32 (loop 4): "list the technicians who visited X" -> the every-technician read (fastPathQuery.js's ALL_TECHS_RE)
+  ['last_service_tech', /\blist\s+(?:the\s+|all\s+)?tech(?:nician)?s\b|\btech(?:nician)?s\s+(?:who|that)\b/i],
   ['last_service_date', /\bwhen\b[\s\S]*\blast\b[\s\S]*\b(service|serviced|maintenance|visit|time)\b|\blast service(d)? date\b|\bwhen was it last serviced\b/i],
   ['customer_phone', /\bphone\b|\bcontact number\b/i],
   ['customer_email', /\bemail\b/i],
@@ -301,7 +308,7 @@ const TRIGGERS = [
   ['refrigerant', /\brefrigerant\b|\bfreon\b/i],
   ['tonnage', /\btonnage\b|\bhow many tons\b|\bwhat size (?:unit|system)\b|\bcapacity\b/i],
   ['seer', /\bseer2?\b|\befficiency\b/i],
-  ['filter_size', /\bfilter size\b|\bwhat size filter\b|\bfilter dimensions?\b/i],
+  ['filter_size', /\bfilter size\b|\b(?:what|which)\s+size\s+filter\b|\bfilter dimensions?\b|\bwhich\s+filter\s+(?:does|do|goes|fits|for)\b/i],
   ['permit_number', /\bpermit\b/i],
   // R24 (E3, field-phrasing-4 j091-j105: "what's the total on Michelle Tovar's invoice"): the
   // ORIGINAL trigger just below only ever matched "invoice/bill" appearing BEFORE "total/cost/
@@ -584,7 +591,7 @@ export function theNameNounCapture(question) {
 // THE_NAME_NOUN_RE (line above) alone — no confirmed failure from it this round, and rewriting a
 // working detector on spec-only risk contradicts the guard's own "never weaken/broaden without a
 // real case" discipline.
-const DOES_NAME_HAVE_RE = new RegExp(`\\bdoes\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2}?)\\s+(?:have|need|take)\\b`);
+const DOES_NAME_HAVE_RE = new RegExp(`\\bdoes\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Za-z'-]+){0,2}?)\\s+(?:have|need|take|use|run|want|prefer)\\b`);
 // R18 (H1, field-phrasing g036/g040/g044): "is Matthew Whitfield out of warranty yet" — same
 // no-leading-preposition shape as DOES_NAME_HAVE_RE above, just for the warranty_out/warranty_status
 // is/are phrasing instead of "does ... have". Lazy `{0,2}?` — see DOES_NAME_HAVE_RE's own doc
@@ -1216,6 +1223,7 @@ export function significantAddressTokens(address) {
   return words.filter((w, i) => !unitNumberIdx.has(i) && (/^\d+$/.test(w) || w.length >= 3) && !ADDRESS_STOPWORDS.has(w) && !STATE_NAME_WORDS.has(w));
 }
 
+const CITY_ABBREVIATIONS = new Set(['phx', 'phnx', 'chx', 'tuc', 'tus', 'abq', 'lv', 'vegas', 'sdl', 'glb', 'sf', 'nyc', 'atx', 'dfw', 'hou', 'okc']);
 const HOUSE_STREET_DIRECTIONALS = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw', 'north', 'south', 'east', 'west']);
 const HOUSE_STREET_HEAD_RE = new RegExp(
   `(\\d{1,6})\\s+((?:[A-Za-z0-9.']+\\s+){0,4}?[A-Za-z0-9.']+?)\\s+${STREET_SUFFIX_RE}\\b`,
@@ -1253,7 +1261,8 @@ export function houseStreetTokens(address) {
   // trailing city never sneaks in here either.
   const tokens = significantAddressTokens(text);
   const house = tokens.find((t) => /^\d+$/.test(t));
-  const rest = tokens.filter((t) => !/^\d+$/.test(t));
+  // R32b: a trailing metro abbreviation ("100 e main phx") is the CITY, never part of the street name.
+  const rest = tokens.filter((t) => !/^\d+$/.test(t) && !CITY_ABBREVIATIONS.has(t));
   return house && rest.length ? [house, ...rest.slice(0, 2)] : [];
 }
 
@@ -1444,7 +1453,8 @@ export const ADDRESS_ENTITY_FIELD_INTENTS = new Set(['warranty_status', 'warrant
 
 export const ADDRESS_FIELD_LABEL = {
   warranty_status: 'warranty status', warranty_expires: 'warranty', manufacturer: 'manufacturer',
-  tonnage: 'tonnage', refrigerant: 'refrigerant', install_date: 'install date', serial: 'serial number',
+  tonnage: 'tonnage', refrigerant: 'refrigerant', install_date: 'install date', serial: 'serial number', model: 'model number',
+  seer: 'SEER rating', filter_size: 'filter size', // R32b
 };
 
 /**

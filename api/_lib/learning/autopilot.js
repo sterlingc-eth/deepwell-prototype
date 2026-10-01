@@ -26,6 +26,7 @@
  * replayMisses/runScorecard's job, reused unchanged. The only direct model
  * calls here are vocabMining.js's own (≤5/tenant/night).
  */
+import { isAutopilotModelEnabled } from '../modelAvoidance/switches.js';
 import { getPool, withTenant } from '../recordsStore.js';
 import { VOCAB } from '../nlNormalize.js';
 import { rotationForDate } from './rotation.js';
@@ -308,6 +309,9 @@ async function maybeBuildWeeklyGapReport({ today, env }) {
  */
 export async function runAutopilotSweepStep({ deadlineAt, env = process.env, handler = askHandler, claim = true } = {}) {
   try {
+    // R32 (Team M): the nightly learning loop replays misses, runs a 12-question auto-exam through the ask handler and
+    // labels vocabulary with a model — up to $0.25/tenant/night. It is OPT-IN now (DONOVAN_AUTOPILOT_MODEL=1).
+    if (!isAutopilotModelEnabled(env)) return { skipped: 'model-opt-in' };
     if ((deadlineAt ?? Infinity) - Date.now() < MIN_TENANT_MS) return { skipped: 'no-time' };
     const today = todayUtc();
     const eligible = await listEligibleTenants();

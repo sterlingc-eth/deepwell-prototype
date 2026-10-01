@@ -84,8 +84,10 @@ function setQ({ text, shape, sql, params = [], maxItems, citationRequired = true
   if (Number.isFinite(maxItems)) q.maxItems = maxItems;
   return q;
 }
-function decline({ text, shape, guardSql, guardParams = [], why }) {
-  return { id: nextId(), text, category: CATEGORY, shape, cmp: "honest-zero", oracle: { sql: guardSql, params: guardParams }, note: why };
+function decline({ text, shape, guardSql, guardParams = [], why, typoResolvesTo }) {
+  const q = { id: nextId(), text, category: CATEGORY, shape, cmp: "honest-zero", oracle: { sql: guardSql, params: guardParams }, note: why };
+  if (typoResolvesTo) q.typoResolvesTo = typoResolvesTo; // R32: the customer an unambiguous near-miss now resolves to (visible "Showing results for" note)
+  return q;
 }
 function rubricQ({ text, shape, rubric }) {
   return { id: nextId(), text, category: CATEGORY, shape, cmp: "rubric", rubric, oracle: { sql: "SELECT NULL::text AS ref WHERE false" } };
@@ -377,7 +379,7 @@ for (const [text, a, b] of TECH_HEAD_TO_HEAD) {
 }
 questions.push(valueQ({
   text: "which technician has the fewest jobs logged, total", shape: "technician",
-  sql: `SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value ORDER BY count(*) ASC, value ASC LIMIT 1`,
+  sql: `SELECT v FROM (SELECT v, n, min(n) OVER () AS m FROM (SELECT t.value AS v, count(DISTINCT t.document_id) AS n FROM extractions t WHERE t.field_key='technician' AND t.value IS NOT NULL AND EXISTS (SELECT 1 FROM extractions s WHERE s.document_id=t.document_id AND s.field_key='service_date' AND s.value IS NOT NULL AND s.value<>'') GROUP BY t.value) y) z WHERE n = m`,
   params: [],
 }));
 questions.push(valueQ({
@@ -449,14 +451,15 @@ questions.push(yesNoQ({
  * SECTION J — adversarial traps: near-miss names, fake addresses, future dates, uninstalled brand (20)
  */
 const NEAR_MISS_NAMES = [
-  ["whats the phone number for Georg Hutchins", "Georg Hutchins"],
-  ["pull up the file for Rebeca Montoya", "Rebeca Montoya"],
-  ["whats the service address on file for Josephe Norwood", "Josephe Norwood"],
-  ["do we have a serial number on file for Stephany Nakamura", "Stephany Nakamura"],
-  ["whats the warranty status for Timothy Uloa", "Timothy Uloa"],
+  ["whats the phone number for Georg Hutchins", "Georg Hutchins", "George Hutchins"],
+  ["pull up the file for Rebeca Montoya", "Rebeca Montoya", "Rebecca Montoya"],
+  ["whats the service address on file for Josephe Norwood", "Josephe Norwood", "Joseph Norwood"],
+  ["do we have a serial number on file for Stephany Nakamura", "Stephany Nakamura", "Stephanie Nakamura"],
+  ["whats the warranty status for Timothy Uloa", "Timothy Uloa", "Timothy Ulloa"],
 ];
-for (const [text, name] of NEAR_MISS_NAMES) {
+for (const [text, name, real] of NEAR_MISS_NAMES) {
   questions.push(decline({
+    typoResolvesTo: real,
     text, shape: "adversarial_near_miss", guardSql: CUSTOMER_COUNT_SQL, guardParams: [`%${name}%`],
     why: `"${name}" matches zero customers in this tenant - a near-miss of a real, differently-spelled name; never guess the real one`,
   }));

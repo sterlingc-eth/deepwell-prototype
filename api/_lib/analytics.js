@@ -2917,13 +2917,13 @@ export function resolveAgeFilter(question, today) {
   }
   const m = AGE_THAN_RE.exec(q);
   if (!m) return null;
-  // R21 M2: year-based cutoff (installYear), not the day-precise installDate ageCutoffISO used for
-  // the between-shape above — see this function's own doc comment for why the single-threshold
-  // shape must match exam.json's own oracle convention, not field-phrasing-4.json's.
-  const cutoffYear = now.getUTCFullYear() - Number(m[2]);
+  // R32 (owner decision 2026-09-30, ADJUDICATION.md "R32"): exact-date age everywhere. "older/over N years" = installed on or
+  // before today - N years; "newer/under N years" = installed after it. A year-only / year-month install date is compared
+  // conservatively by matchesFilter (never guessed into a day). Supersedes the R21 calendar-year reading.
+  const cutoff = ageCutoffISO(now, Number(m[2]));
   return NEWER_DIRECTION_WORDS.has(m[1].toLowerCase())
-    ? { field: 'installYear', op: 'gte', value: cutoffYear }
-    : { field: 'installYear', op: 'lt', value: cutoffYear };
+    ? { field: 'installDate', op: 'gt', value: cutoff }
+    : { field: 'installDate', op: 'lte', value: cutoff };
 }
 
 /** "August 2026" from a validated plan's {from: '2026-08', to: '2026-08'} —
@@ -3031,7 +3031,9 @@ export function validatePlan(raw) {
       // (detPlan.js) is the only producer of an equipment-entity hasServiceType filter (never the
       // model; ANALYTICS_TOOL's schema has no such property for entity 'equipment'), matching the
       // oracle's own per-UNIT count for that shape rather than the per-customer one.
-      if ((p.entity !== 'customers' && p.entity !== 'equipment') || f.op !== 'eq') return null;
+      // R32: 'serviceVisits' too — a visit's OWN service_type (buildAnalyticsSQL's serviceVisits branch carries it; routes/analytics.js's
+      // ENTITY_SUPPORTED_FIELDS.serviceVisits already whitelists it). Without this a typed visit count could never validate.
+      if ((p.entity !== 'customers' && p.entity !== 'equipment' && p.entity !== 'serviceVisits') || f.op !== 'eq') return null;
       const canonical = SERVICE_TYPE_VALUES.find((v) => v.toLowerCase() === String(f.value).toLowerCase());
       if (!canonical) return null;
       filters.push({ field: f.field, op: f.op, value: canonical });
@@ -3315,10 +3317,16 @@ export function matchesFilter(row, filter) {
   const actual = row[field];
   if (DATE_STRING_FIELDS.has(field)) {
     if (actual === null || actual === undefined || actual === '') return false;
-    const a = String(actual);
+    let a = String(actual);
     const b = String(value);
     if (op === 'eq') return a === b;
     if (op === 'neq') return a !== b;
+    // R32: a year-only / year-month install date is never guessed into a day. "Older" (lt/lte) needs the LATEST day it could
+    // be to still qualify; "newer" (gt/gte) needs the EARLIEST. Full dates and warrantyExpires are compared as before.
+    if (field === 'installDate' && a.length < 10 && /^\d{4}(-\d{2})?$/.test(a)) {
+      const late = op === 'lt' || op === 'lte';
+      a = a.length === 4 ? `${a}-${late ? '12-31' : '01-01'}` : `${a}-${late ? '31' : '01'}`;
+    }
     if (op === 'gt') return a > b;
     if (op === 'gte') return a >= b;
     if (op === 'lt') return a < b;

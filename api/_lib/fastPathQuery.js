@@ -26,6 +26,9 @@ import { financialsTableExists } from './financials/store.js';
 import { documentsHaveAudience } from './audience/probe.js';
 import { audienceFilterSql } from './audience/sql.js';
 import { parseCompoundQuestion } from './lookups/compound.js';
+import { withTypoNote } from './lookups/typoResolve.js';
+import { PAGE_ATTRIBUTES, findPrintedValues, buildPageAttributeAnswer } from './lookups/pageAttribute.js';
+import { resolveNamedCustomers } from './contactLookup.js';
 // R24 (E3): brandMatches is the same case/synonym-aware brand comparison deterministicRouter.js's
 // own narrowByBrand already uses — reused, not reimplemented, for runBrandMatch below. No import
 // cycle: analytics.js imports scope.js (not this file), and scope.js's own fastPath.js import is
@@ -368,6 +371,37 @@ async function fetchLastServiceTech(db, resolution, teamScoped = false) {
   const rows = await fetchFieldRowsForResolution(db, resolution, 'technician', teamScoped);
   const preferred = rows.filter((r) => r.document_type === 'service-ticket' || r.document_type === 'work-order');
   return pickMostRecent(preferred.length ? preferred : rows);
+}
+
+const ALL_TECHS_RE = /\bwho(?:'s|s|\s+has|\s+have|\s+all)?\s+(?:been\s+(?:out|to)\b|serviced\b|worked\s+on\b|visited\b|gone\s+out\b)|\b(?:which|what)\s+tech(?:nician)?s\b|\blist\s+(?:the\s+|all\s+)?tech(?:nician)?s\b|\btech(?:nician)?s\s+(?:who|that)\b/i;
+const RECENCY_RE = /\b(?:last|latest|most\s+recent(?:ly)?|recent(?:ly)?|final|newest|first)\b/i;
+
+/** Every distinct technician on the resolved customer's/unit's service records, each cited to its own documents. */
+async function runAllServiceTechs(db, resolution, teamScoped = false) {
+  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician', teamScoped);
+  const use = rows.filter((r) => r.value != null && String(r.value).trim() !== '');
+  if (!use.length) return null;
+  const byTech = new Map();
+  for (const r of use) {
+    const k = String(r.value).trim();
+    if (!byTech.has(k)) byTech.set(k, []);
+    byTech.get(k).push(r);
+  }
+  const names = [...byTech.keys()].sort();
+  const label = subjectLabel(resolution);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const facts = names.map((nm) => ({
+    label: 'Technician', value: nm, basis: 'printed',
+    sources: byTech.get(nm).slice(0, 5).map((r) => ({ documentId: r.document_id, location: { field: r.field_key } })),
+  }));
+  const verified = use.filter((r) => r.stage === 'verified').length;
+  return {
+    kind: 'answer',
+    text: `${list} ${names.length === 1 ? 'has' : 'have'} been out to ${label.replace(/^The /, 'the ')}.`,
+    facts, sources: facts.flatMap((f) => f.sources),
+    confidence: 0.9, interpretation: label, verifiedCount: verified, unverifiedCount: use.length - verified, closest: [],
+    fastIntent: 'last_service_tech',
+  };
 }
 
 async function fetchLastServiceDate(db, resolution, today, teamScoped = false) {
@@ -1193,6 +1227,49 @@ async function runDocumentList(db, resolution, teamScoped = false) {
   return buildDocumentListAnswer({ resolution: customerResolution, documents, documentTypeLabel });
 }
 
+/**
+ * R32b (loop A): SEER rating / filter size = a search of the PAGE TEXT of the resolved customer's / unit's documents (lookups/pageAttribute.js).
+ * Same subject policy as the unit-field intents: a street address resolves through resolveAddressEntityFieldGroup (several customers there -> ask
+ * which, nothing there -> honest address decline, never a pick); a bare surname shared by several customers -> the named ambiguity decline; a
+ * subject that resolves to nothing -> null (the unknown-name gate / near-miss chips handle it).
+ */
+async function runPageAttribute(db, fp) {
+  const { intent, subject, raw } = fp;
+  if (!PAGE_ATTRIBUTES[intent]) return null;
+  let documentIds = [];
+  let label = null;
+  if (subject.address && !subject.customerNumber && !subject.identifier) {
+    const group = await resolveAddressEntityFieldGroup(db, subject.address);
+    if (group.kind === 'no-address' || group.kind === 'no-unit' || group.kind === 'multi-customer') {
+      return buildAddressFieldDecline({ intent, subject, resolution: { kind: group.kind, unit: group.unit, names: group.names } });
+    }
+    if (group.kind === 'customer') {
+      documentIds = await customerDocumentIds(db, group.customer);
+      label = group.customer.data?.customer_name ?? subject.address;
+    } else if (group.kind === 'equipment') {
+      documentIds = await equipmentDocumentIds(db, group.equipment.id);
+      label = String(subject.address).replace(/\s+/g, ' ').trim();
+    } else return null;
+  } else {
+    const resolution = await resolveFastPathSubject(db, subject);
+    if (resolution.kind === 'ambiguous' && !resolution.viaAddress && subject.name && !isNamedUnitPhrasing(raw)) {
+      return buildAmbiguousNameFieldDecline({ intent, name: subject.name, customers: resolution.customers ?? [] });
+    }
+    if (resolution.kind !== 'customer' && resolution.kind !== 'equipment') return null;
+    documentIds = await documentIdsForResolution(db, resolution);
+    label = subjectLabel(resolution).replace(/^The /, 'the ');
+  }
+  documentIds = await filterDocumentIdsByAudience(db, [...new Set(documentIds)], isTeamScopedQuestion(raw));
+  let pages = [];
+  if (documentIds.length) {
+    ({ rows: pages } = await db.raw(
+      `SELECT document_id, page_no, text FROM document_pages WHERE document_id = ANY($1::uuid[]) AND ${TENANT_SQL} ORDER BY document_id, page_no LIMIT 2000`,
+      [documentIds]
+    ));
+  }
+  return buildPageAttributeAnswer({ intent, label, found: findPrintedValues(intent, pages), docCount: documentIds.length });
+}
+
 /* ==================================================================== entry point */
 
 /**
@@ -1203,11 +1280,16 @@ async function runDocumentList(db, resolution, teamScoped = false) {
  * @returns   an /api/ask `data` object, or null — null means "answer this
  *            with retrieval + the model instead", never "answer unknown".
  */
-export async function runFastPath(db, fp, { today } = {}) {
+export function runFastPath(db, fp, opts = {}) {
+  return withTypoNote(() => runFastPathCore(db, fp, opts));
+}
+
+async function runFastPathCore(db, fp, { today } = {}) {
   const { intent, subject, raw } = fp;
   if (intent === 'out_of_domain') return buildOutOfDomainDecline(); // R19 (I1, C8)
   if (REVERSE_LOOKUP_INTENTS.has(intent)) return runReverseLookup(db, intent, subject.reverseValue); // R19 (I1, C1)
-  if (NO_FIELD_INTENTS.has(intent)) return null; // no extraction field exists — always defer (seer, filter_size)
+  // R32b (loop A): seer / filter_size have no extraction field, but their printed value (if any) is page text - a deterministic search.
+  if (NO_FIELD_INTENTS.has(intent)) return runPageAttribute(db, fp);
 
   // R24 (E3, field-phrasing-4 j106-j113): a purchase order is identified by its OWN number, never
   // by resolving a customer/equipment subject first — see fetchPoTotal's own doc comment. Handled
@@ -1233,7 +1315,20 @@ export async function runFastPath(db, fp, { today } = {}) {
   const compoundParsed = parseCompoundQuestion(raw);
   if (compoundParsed && (compoundParsed.kind === 'warrantyTech' || compoundParsed.kind === 'installerDate' || compoundParsed.kind === 'warrantyLastVisit')) return null;
 
-  const resolution = await resolveFastPathSubject(db, subject);
+  let resolution = await resolveFastPathSubject(db, subject);
+
+  // R32 (CEO decision 2026-09-30): a typo'd FULL customer name that nothing matched (fast path only ever ILIKEs the name)
+  // resolves when it is unambiguous - resolveNamedCustomers enforces the whole policy and records the visible note
+  // (lookups/typoResolve.js); every other outcome (Did-you-mean decline, no match) leaves the resolution untouched.
+  if (resolution.kind === 'none' && subject.name && !subject.address && !subject.identifier && String(subject.name).trim().split(/\s+/).length >= 2) {
+    try {
+      const { candidates, typoResolved } = await resolveNamedCustomers(db, raw, subject.name);
+      if (typoResolved && candidates.length === 1) {
+        const { rows: custRows } = await db.raw(`SELECT id, data, customer_number FROM entities WHERE id = $1 AND entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`, [candidates[0].id]);
+        if (custRows[0]) resolution = { kind: 'customer', customer: custRows[0] };
+      }
+    } catch (err) { console.error('fastPath typo resolve failed, deferring:', err?.message); }
+  }
 
   // OWNER DECISION (2026-09-26, R16): an address-sourced resolution asking about warranty/
   // manufacturer/tonnage/refrigerant/install-date is answered per runAddressEntityFieldPolicy's
@@ -1246,6 +1341,15 @@ export async function runFastPath(db, fp, { today } = {}) {
   // which the policy function's own resolver handles itself.
   if (resolution.viaAddress && ADDRESS_ENTITY_FIELD_INTENTS.has(intent)) {
     return runAddressEntityFieldPolicy(db, { intent, subject, raw, today });
+  }
+
+  // R32 (loop 2): "is that a Trane out at <addr>" at an address that is NOT on file / has no unit / is shared by several customers
+  // gets the same honest address decline the other unit-field asks give (never a guess, never a model call). A single resolvable
+  // customer+unit still goes to runBrandMatch below.
+  if ((intent === 'brand_match' || intent === 'model') && resolution.viaAddress && subject?.address) {
+    const group = await resolveAddressEntityFieldGroup(db, subject.address);
+    if (group.kind === 'no-address' || group.kind === 'no-unit') return buildAddressFieldDecline({ intent: intent === 'model' ? 'model' : 'manufacturer', subject, resolution: { kind: group.kind, unit: group.unit } });
+    if (group.kind === 'multi-customer') return buildAddressFieldDecline({ intent: intent === 'model' ? 'model' : 'manufacturer', subject, resolution: { kind: 'multi-customer', names: group.names } });
   }
 
   // R16 (F1): the same policy, for a business named AS the location instead of given an address —
@@ -1294,6 +1398,11 @@ export async function runFastPath(db, fp, { today } = {}) {
   // R24 (E3): a yes/no check across every unit's manufacturer, never a single bare fact — its own
   // answer shape (Yes/No), built and returned directly rather than through buildFieldAnswer below.
   if (intent === 'brand_match') return runBrandMatch(db, resolution, subject.askedBrand);
+
+  // R32 (loop 4): "who's been out to X's place" / "which techs have worked on X's account" ask for EVERY technician, not the latest one.
+  if (intent === 'last_service_tech' && ALL_TECHS_RE.test(raw) && !RECENCY_RE.test(raw)) {
+    return runAllServiceTechs(db, resolution, teamScoped);
+  }
 
   const fieldKey = FIELD_BY_INTENT[intent];
   if (!fieldKey) return null;

@@ -114,7 +114,8 @@ async function main(opts = {}) {
     let thrown = null;
     try { await askHandler(req, res); } catch (err) { thrown = err; }
     const data = res.body?.success ? res.body.data ?? null : null;
-    return { data, usedModel: modelCounter.n > 0, thrown, raw: res.body };
+    // R32: a recognised-entity clarify reply (lookups/clarify.js) stands in for a model call: grade it as "needed the model" (skipped), never as a wrong answer.
+    return { data, usedModel: modelCounter.n > 0 || data?.clarifyReason === "recognised-entity", thrown, raw: res.body };
   }
 
   /** Builds the NEXT ConversationTurn from the CURRENT turn's own real answer — mirrors

@@ -1,0 +1,2009 @@
+{
+ "version": "r32-blind-1",
+ "category": "blind-r32-unit2",
+ "source": "scripts/gen-blind-r32.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32-unit2-001",
+   "text": "what company manufactures the unit at 2949 W Baseline Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "2949 W Baseline Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2949 W Baseline Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-002",
+   "text": "alright, is coverage expiring at 2838 E Elliot Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "2838 E Elliot Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2838 E Elliot Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-003",
+   "text": "sorry, one more - when did they put the system in at 840 S Ellsworth Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "840 S Ellsworth Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "840 S Ellsworth Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-004",
+   "text": "serial no. for the unit at two nine one two east Broadway road",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "2912 E Broadway Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2912 E Broadway Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-005",
+   "text": "alright, unit model at 2616 N Recker Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "2616 N Recker Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2616 N Recker Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-006",
+   "text": "real quick: what company manufactures the unit at 766 N Val Vista Dr",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "766 N Val Vista Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "766 N Val Vista Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-007",
+   "text": "hang on... how big is the system at 470 E Chandler Blvd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_tons",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'tonnage' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'tonnage' IS NOT NULL AND e.data->>'tonnage' <> ''",
+    "params": [
+     "470 E Chandler Blvd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "470 E Chandler Blvd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-008",
+   "text": "hang on... end of coverage for 729 W Camelback Rd when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "729 W Camelback Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "729 W Camelback Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-009",
+   "text": "when was the equipment set at one eight zero two east Main street thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "1802 E Main St%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1802 E Main St%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-010",
+   "text": "hey, serial no. for the unit at 3097 E Ray Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "3097 E Ray Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3097 E Ray Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-011",
+   "text": "model no. for the unit at 618 N Power Rd real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "618 N Power Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "618 N Power Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-012",
+   "text": "hang on... who built the equipment at 3393 S Ellsworth Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "3393 S Ellsworth Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3393 S Ellsworth Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-013",
+   "text": "is coverage expiring at one three two one east Chandler boulevard thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "1321 E Chandler Blvd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1321 E Chandler Blvd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-014",
+   "text": "when was the equipment set at 2764 E University Dr for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "2764 E University Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2764 E University Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-015",
+   "text": "ok um, unit serial at 1395 E Ray Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "1395 E Ray Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1395 E Ray Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-016",
+   "text": "so uh, unit model at 137 W Southern Ave",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "137 W Southern Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "137 W Southern Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-017",
+   "text": "quick one - what company manufactures the unit at 2468 N Val Vista Dr please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "2468 N Val Vista Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2468 N Val Vista Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-018",
+   "text": "is coverage expiring at 174 N College Ave when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "174 N College Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "174 N College Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-019",
+   "text": "when did they put the system in at 544 E Ray Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "544 E Ray Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "544 E Ray Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-020",
+   "text": "serial no. for the unit at 2875 N Greenfield Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "2875 N Greenfield Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2875 N Greenfield Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-021",
+   "text": "which model is the system at 3356 E Pecos Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "3356 E Pecos Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3356 E Pecos Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-022",
+   "text": "brand name on the outdoor unit at one zero nine nine west Guadalupe road thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "1099 W Guadalupe Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1099 W Guadalupe Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-023",
+   "text": "warranty runs until when at 1136 E Elliot Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "1136 E Elliot Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1136 E Elliot Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-024",
+   "text": "sorry, one more - when was the equipment set at 988 W Southern Ave",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "988 W Southern Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "988 W Southern Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-025",
+   "text": "alright, serial no. for the unit at 3245 S Higley Rd when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "3245 S Higley Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3245 S Higley Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-026",
+   "text": "so uh, model no. for the unit at two five seven nine west Ocotillo road",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "2579 W Ocotillo Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2579 W Ocotillo Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-027",
+   "text": "brand name on the outdoor unit at 3689 E Elliot Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "3689 E Elliot Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3689 E Elliot Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-028",
+   "text": "quick one - what capacity is the unit at 1062 E University Dr real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_tons",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'tonnage' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'tonnage' IS NOT NULL AND e.data->>'tonnage' <> ''",
+    "params": [
+     "1062 E University Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1062 E University Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-029",
+   "text": "warranty runs until when at 100 E Main St please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "100 E Main St%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "100 E Main St%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-030",
+   "text": "sorry, one more - when was the equipment set at 914 N Recker Rd real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "914 N Recker Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "914 N Recker Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-031",
+   "text": "unit serial at nine five one east Main street thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "951 E Main St%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "951 E Main St%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-032",
+   "text": "hmm, which model is the system at 1173 N Greenfield Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "1173 N Greenfield Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1173 N Greenfield Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-033",
+   "text": "hang on... brand name on the outdoor unit at 1876 N College Ave thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "1876 N College Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1876 N College Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-034",
+   "text": "ok so end of coverage for 507 N Dobson Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "507 N Dobson Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "507 N Dobson Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-035",
+   "text": "what date was the unit installed at two two eight three west Thomas road for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "2283 W Thomas Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2283 W Thomas Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-036",
+   "text": "serial no. for the unit at 3578 N College Ave when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "3578 N College Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3578 N College Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-037",
+   "text": "hang on... model no. for the unit at 2098 W Baseline Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "2098 W Baseline Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2098 W Baseline Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-038",
+   "text": "real quick: what company manufactures the unit at 1543 S Higley Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "1543 S Higley Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1543 S Higley Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-039",
+   "text": "date the warranty ends at one four three two west Thomas road please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "1432 W Thomas Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1432 W Thomas Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-040",
+   "text": "when did they put the system in at 1728 W Ocotillo Rd for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "1728 W Ocotillo Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1728 W Ocotillo Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-041",
+   "text": "what is the serial tag at 3726 N Greenfield Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "3726 N Greenfield Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3726 N Greenfield Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-042",
+   "text": "alright, model no. for the unit at 322 N Greenfield Rd real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "322 N Greenfield Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "322 N Greenfield Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-043",
+   "text": "quick one - who is the mfg at 803 E Pecos Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "803 E Pecos Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "803 E Pecos Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-044",
+   "text": "so uh, when does the warranty finish at 2246 E Ray Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "2246 E Ray Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2246 E Ray Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-045",
+   "text": "when was the equipment set at 1987 E Elliot Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "1987 E Elliot Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1987 E Elliot Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-046",
+   "text": "serial no. for the unit at 285 E Elliot Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "285 E Elliot Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "285 E Elliot Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-047",
+   "text": "so uh, model no. for the unit at 2653 E Main St",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "2653 E Main St%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2653 E Main St%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-048",
+   "text": "hmm, what company manufactures the unit at two nine eight six south Alma School road when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "2986 S Alma School Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2986 S Alma School Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-049",
+   "text": "warranty runs until when at 433 S Alma School Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "433 S Alma School Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "433 S Alma School Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-050",
+   "text": "hang on... when was the equipment set at 2394 S Higley Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "2394 S Higley Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2394 S Higley Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-051",
+   "text": "hang on... unit serial at 1839 W Southern Ave",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "1839 W Southern Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1839 W Southern Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-052",
+   "text": "so uh, which model is the system at one four six nine north Power road thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "1469 N Power Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1469 N Power Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-053",
+   "text": "so uh, brand name on the outdoor unit at 3504 E Main St",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "3504 E Main St%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3504 E Main St%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-054",
+   "text": "hang on... how many tons of cooling at 2024 N Greenfield Rd for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_tons",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'tonnage' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'tonnage' IS NOT NULL AND e.data->>'tonnage' <> ''",
+    "params": [
+     "2024 N Greenfield Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2024 N Greenfield Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-055",
+   "text": "ok um, is coverage expiring at 3134 W Thomas Rd when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "3134 W Thomas Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3134 W Thomas Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-056",
+   "text": "hey, what date was the unit installed at 3837 S Alma School Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "3837 S Alma School Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3837 S Alma School Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-057",
+   "text": "hey, unit serial at one six five four east Pecos road",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "1654 E Pecos Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1654 E Pecos Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-058",
+   "text": "hey, unit model at 248 W Guadalupe Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "248 W Guadalupe Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "248 W Guadalupe Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-059",
+   "text": "real quick: brand name on the outdoor unit at 1617 N Val Vista Dr real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mfr",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'manufacturer' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'manufacturer' IS NOT NULL AND e.data->>'manufacturer' <> ''",
+    "params": [
+     "1617 N Val Vista Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1617 N Val Vista Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-060",
+   "text": "ok so warranty runs until when at 3800 W Baseline Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_cov",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data#>>'{warranty,expires}' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data#>>'{warranty,expires}' IS NOT NULL AND e.data#>>'{warranty,expires}' <> ''",
+    "params": [
+     "3800 W Baseline Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3800 W Baseline Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-061",
+   "text": "hey, when was the equipment set at one two eight four south Alma School road please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ins",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'installation_date' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'installation_date' IS NOT NULL AND e.data->>'installation_date' <> ''",
+    "params": [
+     "1284 S Alma School Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1284 S Alma School Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-062",
+   "text": "what is the serial tag at 1247 W Baseline Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_ser",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'serial_number' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'serial_number' IS NOT NULL AND e.data->>'serial_number' <> ''",
+    "params": [
+     "1247 W Baseline Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1247 W Baseline Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-063",
+   "text": "which model is the system at 2727 N College Ave",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_mod",
+   "cmp": "value",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT e.data->>'model' AS v FROM entities e\nWHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m)\n  AND (SELECT count(*) FROM m) = 1 AND e.data->>'model' IS NOT NULL AND e.data->>'model' <> ''",
+    "params": [
+     "2727 N College Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2727 N College Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-064",
+   "text": "is the equipment at 3763 E Broadway Rd a trayne",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3763 E Broadway Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3763 E Broadway Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-065",
+   "text": "hmm, 581 W Thomas Rd - is that a carriers system",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "581 W Thomas Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "581 W Thomas Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-066",
+   "text": "alright, would that be a good man unit at 3430 W Ocotillo Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3430 W Ocotillo Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3430 W Ocotillo Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-067",
+   "text": "is the equipment at 3060 N Dobson Rd a daikin thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3060 N Dobson Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3060 N Dobson Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-068",
+   "text": "sorry, one more - 2135 S Alma School Rd - is that a trayne system",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2135 S Alma School Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2135 S Alma School Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-069",
+   "text": "alright, would that be a carriers unit at 3652 W Guadalupe Rd for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3652 W Guadalupe Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3652 W Guadalupe Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-070",
+   "text": "is the equipment at 3171 N Power Rd a good man",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3171 N Power Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3171 N Power Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-071",
+   "text": "ok um, 2172 E Chandler Blvd - is that a daikin system real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2172 E Chandler Blvd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2172 E Chandler Blvd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-072",
+   "text": "would that be a trayne unit at 3874 E Chandler Blvd for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3874 E Chandler Blvd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3874 E Chandler Blvd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-073",
+   "text": "real quick: is the equipment at 2542 S Ellsworth Rd a carriers thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2542 S Ellsworth Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2542 S Ellsworth Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-074",
+   "text": "quick one - 2061 E Broadway Rd - is that a good man system please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2061 E Broadway Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2061 E Broadway Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-075",
+   "text": "ok so would that be a daikin unit at 3282 W Camelback Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3282 W Camelback Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3282 W Camelback Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-076",
+   "text": "so uh, is the equipment at 2431 W Camelback Rd a trayne when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2431 W Camelback Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2431 W Camelback Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-077",
+   "text": "1210 E Broadway Rd - is that a carriers system when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "1210 E Broadway Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1210 E Broadway Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-078",
+   "text": "ok um, would that be a good man unit at 1580 W Camelback Rd for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "1580 W Camelback Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1580 W Camelback Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-079",
+   "text": "is the equipment at 359 E Broadway Rd a daikin",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "359 E Broadway Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "359 E Broadway Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-080",
+   "text": "2801 W Guadalupe Rd - is that a trayne system",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2801 W Guadalupe Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2801 W Guadalupe Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-081",
+   "text": "so uh, would that be a carriers unit at 2690 W Southern Ave please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2690 W Southern Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2690 W Southern Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-082",
+   "text": "real quick: is the equipment at 1358 N Dobson Rd a good man thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "1358 N Dobson Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1358 N Dobson Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-083",
+   "text": "hey, 211 E University Dr - is that a daikin system",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "211 E University Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "211 E University Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-084",
+   "text": "so uh, would that be a trayne unit at 1950 W Guadalupe Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "1950 W Guadalupe Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1950 W Guadalupe Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-085",
+   "text": "alright, is the equipment at 2209 N Dobson Rd a carriers when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2209 N Dobson Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2209 N Dobson Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-086",
+   "text": "2357 E McKellips Rd - is that a good man system",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "2357 E McKellips Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "2357 E McKellips Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-087",
+   "text": "alright, would that be a daikin unit at 3208 E McKellips Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3208 E McKellips Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3208 E McKellips Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-088",
+   "text": "so uh, is the equipment at 3541 W Southern Ave a trayne thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Trane') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3541 W Southern Ave%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3541 W Southern Ave%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-089",
+   "text": "ok um, 1913 E University Dr - is that a carriers system when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Carrier') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "1913 E University Dr%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1913 E University Dr%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-090",
+   "text": "quick one - would that be a good man unit at 1506 E McKellips Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Goodman') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "1506 E McKellips Rd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "1506 E McKellips Rd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-091",
+   "text": "so uh, is the equipment at 3023 E Chandler Blvd a daikin",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_brand_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "WITH m AS (SELECT id FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1)\nSELECT (e.data->>'manufacturer' ILIKE 'Daikin') AS v FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.customer_id IN (SELECT id FROM m) AND (SELECT count(*) FROM m)=1",
+    "params": [
+     "3023 E Chandler Blvd%"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+     "params": [
+      "3023 E Chandler Blvd%"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32-unit2-092",
+   "text": "so uh, who built the equipment at 1486 N Power Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1486 N Power Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-093",
+   "text": "ok um, end of coverage for 1227 E Broadway Rd for me",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1227 E Broadway Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-094",
+   "text": "real quick: how big is the system at 1412 E Ray Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1412 E Ray Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-095",
+   "text": "is the equipment at 3336 N Val Vista Dr a trayne",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3336 N Val Vista Dr%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-096",
+   "text": "ok um, who built the equipment at 2855 E Elliot Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "2855 E Elliot Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-097",
+   "text": "ok um, end of coverage for 1967 W Guadalupe Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1967 W Guadalupe Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-098",
+   "text": "quick one - how big is the system at 1116 W Guadalupe Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1116 W Guadalupe Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-099",
+   "text": "is the equipment at 2115 W Baseline Rd a trayne when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "2115 W Baseline Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-100",
+   "text": "quick one - who built the equipment at 154 W Southern Ave real quick",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "154 W Southern Ave%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-101",
+   "text": "hmm, end of coverage for 3317 S Alma School Rd thanks",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3317 S Alma School Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-102",
+   "text": "how big is the system at 1523 E McKellips Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1523 E McKellips Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-103",
+   "text": "hmm, is the equipment at 3410 S Ellsworth Rd a trayne when you get a sec",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3410 S Ellsworth Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-104",
+   "text": "who built the equipment at 1035 E Pecos Rd please",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "1035 E Pecos Rd%"
+    ]
+   }
+  },
+  {
+   "id": "bl-r32-unit2-105",
+   "text": "quick one - end of coverage for 3447 W Ocotillo Rd",
+   "category": "blind-r32-unit2",
+   "shape": "blind2_unit_fake",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "3447 W Ocotillo Rd%"
+    ]
+   }
+  }
+ ]
+}

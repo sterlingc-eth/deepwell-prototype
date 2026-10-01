@@ -10,7 +10,7 @@ Donovan is the DeepWell assistant that answers questions from your own records. 
 
 ### What is Donovan?
 ~ what is donovan, who is donovan, what does donovan do, tell me about donovan, donovan ai, the assistant, your ai, how does donovan work, ask donovan, donovan explained, what is ask, ai assistant
-Donovan answers questions in plain language using your uploaded records: warranty status, last service, model and serial, who was out there. Every answer shows the source document, and if Donovan isn't sure it says so and shows the document instead of guessing.
+Donovan answers questions in plain language using your uploaded records: who a document is for, what an invoice totals, what a permit or agreement says, and, for equipment paperwork, warranty status, last service, model and serial. Every answer shows the source document, and if Donovan isn't sure it says so and shows the document instead of guessing.
 
 ### How do I ask Donovan a question?
 ~ how do i ask donovan, how to use donovan, use donovan, ask a question, ask box, where do i ask, where is donovan, asking questions, how to ask, how to search, search records, find a record, look something up
@@ -18,7 +18,7 @@ Open **Ask** in the app, on desktop or in the phone app, and type the question t
 
 ### What kinds of questions can Donovan answer?
 ~ what can i ask, what can donovan answer, what questions, questions to ask, what can i ask donovan, warranty questions, service history, what can donovan do
-Warranty status, last service date, model and serial numbers, who worked on a job, and which units are expiring soon, for example. Try something like "Is the furnace at 3247 Elm still under warranty?" It answers from your own records only.
+Things like "What did we pay Acme Supply in March?", "Show me the signed permit for 12 Main" or "When did we last service the unit at 3247 Elm?" For equipment paperwork it also covers warranty status, model and serial numbers, and which units are expiring soon. It answers from your own records only, and says so when something isn't on file.
 
 ### Can Donovan be wrong?
 ~ can donovan be wrong, is donovan accurate, accuracy, how accurate, wrong answer, incorrect answer, can i trust, trust the answers, hallucination, mistakes, reliable, ai mistakes, disclaimer, is it always right, how accurate are the answers, accuracy of answers, are the answers accurate, how accurate is donovan, are answers correct, how reliable, does donovan make mistakes, donovan mistakes, does donovan get things wrong, does donovan ever get it wrong, donovan errors
@@ -34,4 +34,4 @@ No. This chat only answers questions about DeepWell itself. For anything about y
 
 ### Does Donovan learn from my data or other customers' data?
 ~ does donovan learn, training, trained on my data, share data with other customers, other customers see my data, model training, ai training, used to train, is donovan trained on my data, donovan trained on my data, trained on my documents, donovan training
-Your records stay under your own account and are never pooled with another contractor's. Under our AI providers' API terms your content isn't used to train their models. Your corrections make the system sharper. See the security article for details.
+Your records stay under your own account and are never pooled with another company's. Under our AI providers' API terms your content isn't used to train their models. Your corrections make the system sharper. See the security article for details.

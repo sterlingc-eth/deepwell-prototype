@@ -27,7 +27,7 @@ It installs straight from the browser, so everyone always has the latest version
 
 ### Does the phone app cost extra?
 ~ mobile app cost, phone app price, app fee, extra for app, is the app free, app included, does the app cost extra, pay for app
-No. The phone app is included with every plan. Your techs sign in with their own DeepWell accounts, which the shop owner invites from Team.
+No. The phone app is included with every plan. Your team members sign in with their own DeepWell accounts, which the shop owner invites from Team.
 
 ### Does it work with bad signal?
 ~ bad signal, weak signal, offline, no signal, no service, poor connection, works offline, attic, crawlspace, slow connection, no internet, spotty coverage, rural, no cell service, cell service, crawl space, no reception, dead zone, basement, no bars, no wifi, no service in the crawl space can i still scan, can i still scan without signal

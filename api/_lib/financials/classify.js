@@ -83,6 +83,8 @@ export function isFinancialQuestion(question) {
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return false;
   if (FIN_MONEY_WORD_RE.test(q)) return true;
+  // R32: "did we invoice more in 2019 than 2023" / "did we bring in less this year than last" — a two-year invoiced-revenue comparison with no other money word.
+  if (/\bthan\b/.test(q) && /\b(?:more|less|higher|lower|fewer|bigger|greater|smaller)\b/.test(q) && /\b(?:invoic\w*|bring(?:ing)?\s+in|brought\s+in|billed)\b/.test(q) && (q.match(/\bthis\s+year\b|\blast\s+year\b|\b(?:19|20)\d{2}\b/g) ?? []).length >= 2) return true;
   if (FIN_JOB_COST_RE.test(q)) return true;
   if (FIN_STANDALONE_RE.test(q)) return true;
   if (FIN_QUOTE_WAITING_RE.test(q)) return true;

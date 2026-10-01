@@ -27,6 +27,7 @@ import { mergeDocumentVia } from "./routes/customers.js";
 // TEAM C (citations everywhere): every branch below states what it searched / read.
 import { attachCitations, customerRecord, documentRecord } from "./citations/records.js";
 import { documentRecordsFor } from "./citations/enrich.js";
+import { withTypoNote } from "./lookups/typoResolve.js";
 import { resolveAddressCandidates, nameTokens, resolveNamedCustomers, resolveContactCandidatesDetailed, corroboratesCandidate } from "./contactLookup.js";
 // Team A (2026-09-24): address/name scopes that include EVERY customer and unit at an address (apartments), the same
 // document union the customer profile uses, and legacy-tolerant document-type matching.
@@ -498,7 +499,11 @@ function formatDateLabel(rawDate) {
 const MAX_AGGREGATE_CANDIDATES = 8;
 const YES_NO_SHAPE_RE = /^\s*(?:do|does|did|is there|are there|have we|has anyone)\b/i;
 
-export async function runDocLookup(db, question, opts = {}) {
+export function runDocLookup(db, question, opts = {}) {
+  return withTypoNote(() => runDocLookupCore(db, question, opts));
+}
+
+async function runDocLookupCore(db, question, opts = {}) {
   const parsed = parseDocLookupQuestion(question, opts);
   if (!parsed) return null;
   // R23 (D1): parseDocLookupQuestion flags this shape (see isInternalMemoQuestion's own doc

@@ -34,7 +34,7 @@ export function DidYouMeanChips({ chips, onPick }: { chips: DidYouMeanChip[]; on
   if (!chips.length) return null;
   return (
     <div className="space-y-2">
-      <h3 className="dw-label">Did you mean</h3>
+      <h3 className="dw-label">{chips[0]?.heading ?? 'Did you mean'}</h3>
       <ChipRow items={chips.map((c) => c.text)} onPick={onPick} />
     </div>
   );

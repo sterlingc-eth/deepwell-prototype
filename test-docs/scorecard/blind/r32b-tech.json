@@ -1,0 +1,1659 @@
+{
+ "version": "r32b-blind-1",
+ "category": "blind-r32b-tech",
+ "source": "scripts/gen-blind-r32b.mjs (seeded, frozen before the loop that targets it)",
+ "questions": [
+  {
+   "id": "bl-r32b-tech-001",
+   "text": "ok um, is Danny Ochoa ahead of Kevin Pratt real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Danny Ochoa",
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-002",
+   "text": "so uh, has Wyatt Coburn done more jobs than Danny Ochoa thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-003",
+   "text": "ok um, does Danny Ochoa have more visits than Marisol Vega when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Danny Ochoa",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-004",
+   "text": "has Marisol Vega logged fewer calls than Danny Ochoa",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Marisol Vega",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-005",
+   "text": "sorry, one more - is Kevin Pratt behind Danny Ochoa on job count when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Kevin Pratt",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-006",
+   "text": "hmm, has Denise Ford been out on more jobs than Wyatt Coburn",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Denise Ford",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-007",
+   "text": "so uh, is Marisol Vega ahead of Kevin Pratt when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Marisol Vega",
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-008",
+   "text": "real quick: has Ray Sutton done more jobs than Marisol Vega",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Ray Sutton",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-009",
+   "text": "sorry, one more - does Marisol Vega have more visits than Denise Ford",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Marisol Vega",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-010",
+   "text": "alright, has Denise Ford logged fewer calls than Marisol Vega",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Denise Ford",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-011",
+   "text": "is Ray Sutton behind Kevin Pratt on job count for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Ray Sutton",
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-012",
+   "text": "ok so has Ray Sutton been out on more jobs than Wyatt Coburn",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Ray Sutton",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-013",
+   "text": "is Denise Ford ahead of Danny Ochoa",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Denise Ford",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-014",
+   "text": "ok so has Wyatt Coburn done more jobs than Denise Ford thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-015",
+   "text": "alright, does Wyatt Coburn have more visits than Marisol Vega real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-016",
+   "text": "hang on... has Kevin Pratt logged fewer calls than Ray Sutton for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Kevin Pratt",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-017",
+   "text": "quick one - is Kevin Pratt behind Wyatt Coburn on job count",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Kevin Pratt",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-018",
+   "text": "so uh, has Ray Sutton been out on more jobs than Danny Ochoa",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Ray Sutton",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-019",
+   "text": "ok so is Danny Ochoa ahead of Wyatt Coburn real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Danny Ochoa",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-020",
+   "text": "sorry, one more - has Marisol Vega done more jobs than Wyatt Coburn please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Marisol Vega",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-021",
+   "text": "real quick: does Marisol Vega have more visits than Ray Sutton when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Marisol Vega",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-022",
+   "text": "sorry, one more - has Kevin Pratt logged fewer calls than Denise Ford",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Kevin Pratt",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-023",
+   "text": "alright, is Denise Ford behind Kevin Pratt on job count when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Denise Ford",
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-024",
+   "text": "ok so has Danny Ochoa been out on more jobs than Denise Ford when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Danny Ochoa",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-025",
+   "text": "alright, is Kevin Pratt ahead of Marisol Vega please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Kevin Pratt",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-026",
+   "text": "ok um, has Danny Ochoa done more jobs than Ray Sutton",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Danny Ochoa",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-027",
+   "text": "quick one - does Wyatt Coburn have more visits than Ray Sutton when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-028",
+   "text": "ok um, has Wyatt Coburn logged fewer calls than Kevin Pratt",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_yesno",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) < (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-029",
+   "text": "quick one - is Denise Ford ahead of Ray Sutton",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Denise Ford",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-030",
+   "text": "quick one - has Ray Sutton done more jobs than Denise Ford for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_tied",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT ((SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2)) AS v",
+    "params": [
+     "Ray Sutton",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-031",
+   "text": "quick one - who has done more jobs, Marisol Vega or Danny Ochoa",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-032",
+   "text": "ok um, between Kevin Pratt and Danny Ochoa, who has more visits when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-033",
+   "text": "which is busier, Denise Ford or Marisol Vega real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-034",
+   "text": "so uh, does Denise Ford or Wyatt Coburn have more calls on file when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-035",
+   "text": "who has done more jobs, Ray Sutton or Kevin Pratt",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-036",
+   "text": "sorry, one more - between Wyatt Coburn and Kevin Pratt, who has more visits",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-037",
+   "text": "alright, which is busier, Danny Ochoa or Wyatt Coburn for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Danny Ochoa",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-038",
+   "text": "does Marisol Vega or Wyatt Coburn have more calls on file when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-039",
+   "text": "ok so who has done more jobs, Marisol Vega or Ray Sutton please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-040",
+   "text": "so uh, between Denise Ford and Kevin Pratt, who has more visits",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-041",
+   "text": "hmm, which is busier, Danny Ochoa or Denise Ford",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Danny Ochoa",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-042",
+   "text": "does Marisol Vega or Kevin Pratt have more calls on file",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-043",
+   "text": "who has done more jobs, Danny Ochoa or Ray Sutton for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Danny Ochoa",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-044",
+   "text": "between Wyatt Coburn and Ray Sutton, who has more visits when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-045",
+   "text": "sorry, one more - which is busier, Ray Sutton or Wyatt Coburn",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-046",
+   "text": "alright, does Ray Sutton or Danny Ochoa have more calls on file please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Danny Ochoa",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-047",
+   "text": "ok so who has done more jobs, Kevin Pratt or Marisol Vega please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-048",
+   "text": "between Danny Ochoa and Denise Ford, who has more visits",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Danny Ochoa",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-049",
+   "text": "real quick: which is busier, Denise Ford or Kevin Pratt",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-050",
+   "text": "alright, does Ray Sutton or Marisol Vega have more calls on file",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-051",
+   "text": "hang on... who has done more jobs, Wyatt Coburn or Marisol Vega",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-052",
+   "text": "hey, between Danny Ochoa and Wyatt Coburn, who has more visits please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Danny Ochoa",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-053",
+   "text": "hmm, which is busier, Kevin Pratt or Wyatt Coburn when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-054",
+   "text": "hang on... does Kevin Pratt or Ray Sutton have more calls on file",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-055",
+   "text": "ok so who has done more jobs, Denise Ford or Wyatt Coburn real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Wyatt Coburn",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-056",
+   "text": "between Denise Ford and Marisol Vega, who has more visits thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-057",
+   "text": "which is busier, Danny Ochoa or Kevin Pratt",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Kevin Pratt",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-058",
+   "text": "alright, does Danny Ochoa or Marisol Vega have more calls on file",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_cmp_which",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT CASE WHEN (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) > (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$2) THEN $1 ELSE $2 END AS v",
+    "params": [
+     "Marisol Vega",
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-059",
+   "text": "hmm, how many jobs has Danny Ochoa done",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-060",
+   "text": "hmm, how many visits has Danny Ochoa logged real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-061",
+   "text": "Danny Ochoa's job count real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-062",
+   "text": "alright, how many calls has Danny Ochoa been out on",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-063",
+   "text": "real quick: how many jobs on file for tech Danny Ochoa",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-064",
+   "text": "quick one - how many visits has Denise Ford logged",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-065",
+   "text": "Denise Ford's job count for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-066",
+   "text": "how many calls has Denise Ford been out on when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-067",
+   "text": "how many jobs on file for tech Denise Ford",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-068",
+   "text": "hmm, how many jobs has Denise Ford done please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-069",
+   "text": "hmm, Kevin Pratt's job count when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-070",
+   "text": "ok so how many calls has Kevin Pratt been out on",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-071",
+   "text": "quick one - how many jobs on file for tech Kevin Pratt",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-072",
+   "text": "how many jobs has Kevin Pratt done for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-073",
+   "text": "ok um, how many visits has Kevin Pratt logged",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-074",
+   "text": "how many calls has Marisol Vega been out on for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-075",
+   "text": "alright, how many jobs on file for tech Marisol Vega",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-076",
+   "text": "sorry, one more - how many jobs has Marisol Vega done",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-077",
+   "text": "real quick: how many visits has Marisol Vega logged real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-078",
+   "text": "Marisol Vega's job count",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-079",
+   "text": "how many jobs on file for tech Ray Sutton thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-080",
+   "text": "ok um, how many jobs has Ray Sutton done",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-081",
+   "text": "alright, how many visits has Ray Sutton logged real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-082",
+   "text": "so uh, Ray Sutton's job count",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-083",
+   "text": "real quick: how many calls has Ray Sutton been out on thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-084",
+   "text": "hey, how many jobs has Wyatt Coburn done",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-085",
+   "text": "hey, how many visits has Wyatt Coburn logged",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-086",
+   "text": "so uh, Wyatt Coburn's job count",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-087",
+   "text": "ok so how many calls has Wyatt Coburn been out on",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-088",
+   "text": "alright, how many jobs on file for tech Wyatt Coburn",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions WHERE field_key='technician' AND value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-089",
+   "text": "ok so how many repairs has Danny Ochoa done thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-090",
+   "text": "hey, how many repair calls has Danny Ochoa been on",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-091",
+   "text": "sorry, one more - repair count for Danny Ochoa for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Danny Ochoa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-092",
+   "text": "real quick: how many PM visits has Denise Ford done for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-093",
+   "text": "how many preventive maintenance calls has Denise Ford logged",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-094",
+   "text": "PM count for Denise Ford please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Denise Ford"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-095",
+   "text": "ok so how many repairs has Kevin Pratt done",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-096",
+   "text": "how many repair calls has Kevin Pratt been on when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-097",
+   "text": "hang on... repair count for Kevin Pratt please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Kevin Pratt"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-098",
+   "text": "real quick: how many PM visits has Marisol Vega done",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-099",
+   "text": "hmm, how many preventive maintenance calls has Marisol Vega logged for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-100",
+   "text": "real quick: PM count for Marisol Vega real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-101",
+   "text": "how many repairs has Ray Sutton done real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-102",
+   "text": "how many repair calls has Ray Sutton been on for me",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-103",
+   "text": "repair count for Ray Sutton please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Repair' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-104",
+   "text": "how many PM visits has Wyatt Coburn done when you get a sec",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-105",
+   "text": "sorry, one more - how many preventive maintenance calls has Wyatt Coburn logged real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-106",
+   "text": "ok so PM count for Wyatt Coburn thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_typed_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT (SELECT count(*) FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='Preventive Maintenance' WHERE t.field_key='technician' AND t.value=$1) AS n",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-107",
+   "text": "who has done the most jobs overall",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_most",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-108",
+   "text": "quick one - which technician has the most visits on file please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_most",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-109",
+   "text": "ok um, who's logged the most calls",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_most",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-110",
+   "text": "hey, which tech has the highest job count",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_most",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value ORDER BY count(*) DESC LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-111",
+   "text": "who has the fewest jobs on file",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_least",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) = (SELECT min(c) FROM (SELECT count(*) AS c FROM extractions WHERE field_key='technician' GROUP BY value) z)",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-112",
+   "text": "which technician has logged the fewest visits real quick",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_least",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) = (SELECT min(c) FROM (SELECT count(*) AS c FROM extractions WHERE field_key='technician' GROUP BY value) z)",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-113",
+   "text": "so uh, who's done the least number of calls please",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_least",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions WHERE field_key='technician' GROUP BY value HAVING count(*) = (SELECT min(c) FROM (SELECT count(*) AS c FROM extractions WHERE field_key='technician' GROUP BY value) z)",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r32b-tech-114",
+   "text": "hang on... how many technicians do we have on record thanks",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_control",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT value) AS n FROM extractions WHERE field_key='technician'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "bl-r32b-tech-115",
+   "text": "hang on... who's our busiest technician this year",
+   "category": "blind-r32b-tech",
+   "shape": "blind_tech_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT value AS v FROM extractions t WHERE field_key='technician' AND EXISTS (SELECT 1 FROM extractions y WHERE y.document_id=t.document_id AND y.field_key='service_date' AND y.value::date >= make_date(extract(year from $1::date)::int,1,1) AND y.value::date <= $1::date) GROUP BY value ORDER BY count(DISTINCT document_id) DESC LIMIT 1",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  }
+ ]
+}

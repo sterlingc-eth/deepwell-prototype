@@ -1,0 +1,116 @@
+/**
+ * R32b (loop A) — the UNKNOWN-NAME gate: a record question about a person/business whose name exists NOWHERE in the tenant (no customer or
+ * other entity, no page text, and no close spelling of any customer name) is an honest "not on file", answered without a model.
+ *
+ *   extractNamePhrase(question)                       pure: the name a record question is about, or null
+ *   buildUnknownNameDecline(db, question, ctx)        db: the decline answer, or null (name exists / not a name question / unsure)
+ *
+ * Why this is safe: it only declines when (a) the question has a record cue (phone, email, serial, warranty, last serviced, invoices, ...) and
+ * matches one of the closed name shapes below, (b) the captured name has at least one token that is not a real word / vocabulary word, (c) every
+ * such token is absent from entities AND the full text of every document page (full-text index), and (d) no customer-name word is within 2 edits
+ * of it (a typo of a real customer keeps the existing Did-you-mean / auto-resolve path). Anything else returns null and behaves as before.
+ * Kill switch: DONOVAN_UNKNOWN_NAME_DECLINE=0.
+ */
+import { attachCitations } from "../citations/records.js";
+import { stripConversationalFrame } from "../router/frame.js";
+import { isNonNameWord } from "./commonWords.js";
+import { damerauLevenshteinDistance } from "../integrity.js";
+
+export const unknownNameEnabled = () => process.env.DONOVAN_UNKNOWN_NAME_DECLINE !== "0";
+
+const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+const NAME = String.raw`([A-Za-z][A-Za-z'’-]{2,}(?:\s+[A-Za-z][A-Za-z'’-]{2,}){0,2})`;
+const FIELD = String.raw`(?:phone(?:\s+number)?|number|e-?mail(?:\s+address)?|address|file|account|invoices?|history|records?|paperwork|quotes?|estimates?|documents?|notes?|contact(?:\s+info)?|info(?:rmation)?)`;
+const UNITF = String.raw`(?:serial(?:\s+(?:number|#))?|s/n|model(?:\s+(?:number|#))?|brand|make|manufacturer|tonnage|size|warranty(?:\s+status)?|coverage|install(?:ation)?\s+date|age|refrigerant|seer(?:\s+rating)?|filter(?:\s+size)?)`;
+const POSS = String.raw`(?:['’]s?)?`;
+const TAIL = String.raw`(?:\s+(?:unit|units|system|systems|furnace|ac|a/c|equipment|account|file|place|house|site|job|jobs))?`;
+const SHAPES = [
+  new RegExp(String.raw`\b${FIELD}\s+(?:on\s+file\s+)?(?:for|on|about|of)\s+(?:the\s+)?${NAME}${POSS}${TAIL}\s*$`, "i"),
+  new RegExp(String.raw`^(?:pull\s+up|look\s+up|open|show\s+me|find|get\s+me|bring\s+up)\s+(?:the\s+)?(?:file\s+(?:on|for)\s+)?${NAME}${POSS}${TAIL}\s*$`, "i"),
+  new RegExp(String.raw`\bwhat\s+(?:do\s+we|have\s+we|do\s+you)\s+(?:have|got)\s+(?:on\s+file\s+)?(?:for|on)\s+${NAME}\s*$`, "i"),
+  new RegExp(String.raw`\b${UNITF}\s+(?:on|for|of|at)\s+(?:the\s+)?${NAME}${POSS}${TAIL}\s*$`, "i"),
+  new RegExp(String.raw`\bwhat\s+(?:brand|make|model|size|tonnage)\s+(?:is|are)\s+(?:the\s+)?${NAME}${POSS}\s+(?:unit|system|furnace|ac|a/c|equipment)\s*$`, "i"),
+  new RegExp(String.raw`\b(?:is|does)\s+(?:the\s+)?${NAME}${POSS}\s+(?:unit|system|furnace|ac|a/c|equipment)\s+(?:still\s+)?(?:under\s+warranty|covered|have\s+a\s+warranty)\s*$`, "i"),
+  new RegExp(String.raw`\bwhen\s+(?:was|did\s+we\s+last\s+(?:service|visit|see|go\s+(?:to|out\s+to)))\s+(?:the\s+)?${NAME}${POSS}(?:\s+last\s+(?:serviced|visited))?\s*$`, "i"),
+  new RegExp(String.raw`\b(?:last\s+(?:service|visit)|who\s+(?:was\s+)?(?:the\s+)?last\s+tech(?:nician)?)\s+(?:at|for|to\s+visit|to\s+service)\s+(?:the\s+)?${NAME}${POSS}\s*$`, "i"),
+  new RegExp(String.raw`\b(?:last\s+time\s+we\s+(?:serviced|visited|saw|went\s+(?:to|out\s+to))|where\s+does)\s+(?:the\s+)?${NAME}(?:\s+live)?\s*$`, "i"),
+  new RegExp(String.raw`\bwhat\s+(?:brand|make|model|size|tonnage|kind\s+of\s+(?:unit|system|furnace|ac))\s+(?:does|do)\s+(?:the\s+)?${NAME}\s+(?:have|use|own|run|got)\s*$`, "i"),
+  new RegExp(String.raw`^${NAME}['’]s\s+(?:unit|system|account|phone(?:\s+number)?|e-?mail|address|warranty|serial|model|furnace|file)\s*$`, "i"),
+];
+const TAIL_WORDS = new Set(["unit", "units", "system", "systems", "furnace", "ac", "equipment", "account", "file", "place", "house", "site", "job", "jobs"]);
+const FILLER_TAIL = /\s+(?:for\s+me|please|pls|thanks|thx|real\s+quick|when\s+you\s+get\s+a\s+sec|asap|right\s+now|again|today|now)\s*[?.!]*$/i;
+const CUE_WORDS = ["serial", "number", "model", "brand", "tonnage", "warranty", "address", "phone", "email", "invoices", "invoice", "serviced", "service", "visit", "technician", "account", "refrigerant", "install", "installation", "manufacturer", "coverage", "contact", "paperwork", "history", "records", "estimate", "estimates", "quote", "quotes", "system", "furnace", "equipment", "customer", "unit", "documents", "when", "last", "what", "whats", "pull", "show", "file", "does", "under", "still", "covered", "have"];
+const CUE_SET = new Set(CUE_WORDS);
+/** "seriel numbr on the smith unit" -> "serial number on the smith unit": one-edit repairs of record cue words only (never of the name). */
+function repairCueTypos(q) {
+  return q.replace(/#/g, " number ").replace(/\s+/g, " ").split(" ").map((w) => {
+    const lw = w.toLowerCase().replace(/[^a-z]/g, "");
+    if (lw.length < 5 || CUE_SET.has(lw)) return w;
+    const hit = CUE_WORDS.find((c) => c.length >= 5 && Math.abs(c.length - lw.length) <= 1 && damerauLevenshteinDistance(lw, c) === 1);
+    return hit ? w.replace(/[A-Za-z]+/, hit) : w;
+  }).join(" ");
+}
+const STOP = new Set(["the", "a", "an", "my", "our", "this", "that", "his", "her", "their", "customer", "client", "account"]);
+
+/** The name phrase the record question is about (shape-gated), or null. Pure. */
+export function extractNamePhrase(question) {
+  let q = String(question ?? "").trim();
+  if (!q || q.length > 160) return null;
+  q = repairCueTypos(String(stripConversationalFrame(q) ?? q).trim().replace(/[?!.]+$/, "").replace(FILLER_TAIL, "").replace(FILLER_TAIL, "").trim());
+  for (const re of SHAPES) {
+    const m = re.exec(q);
+    if (!m) continue;
+    const tokens = m[1].split(/\s+/).map((t) => t.replace(/['’]s?$/i, "")).filter((t) => t && !STOP.has(t.toLowerCase()) && !TAIL_WORDS.has(t.toLowerCase()));
+    if (!tokens.length || tokens.length > 3) continue;
+    return tokens.join(" ");
+  }
+  return null;
+}
+
+/** Tokens that make a phrase "an unknown name": not a real non-name word, 4+ letters. */
+// A hyphenated name ("Abernethy-Cole") stays ONE token (its halves are not names on their own: "abernethy" is one edit from the real "Abernathy").
+const candidateTokens = (phrase) => String(phrase).toLowerCase().split(/\s+/).map((t) => t.replace(/[^a-z-]/g, "").replace(/^-+|-+$/g, "")).filter((t) => t.length >= 4 && !isNonNameWord(t));
+
+async function tokenExists(db, token) {
+  const like = `%${token}%`;
+  const ent = await db.raw(`SELECT 1 FROM entities WHERE ${TENANT_SQL} AND data::text ILIKE $1 LIMIT 1`, [like]);
+  if (ent.rows.length) return true;
+  await db.raw("SAVEPOINT unknown_name_scan", []);
+  try {
+    const r = await db.raw(`SELECT 1 FROM document_pages WHERE ${TENANT_SQL} AND tsv @@ plainto_tsquery('english', $1) LIMIT 1`, [token]);
+    await db.raw("RELEASE SAVEPOINT unknown_name_scan", []);
+    if (r.rows.length) return true;
+    // the index stems and splits words; a stem miss can still be a literal substring hit (possessives, hyphenated names): confirm cheaply
+    return false;
+  } catch {
+    await db.raw("ROLLBACK TO SAVEPOINT unknown_name_scan", []).catch(() => {});
+    const r = await db.raw(`SELECT 1 FROM document_pages WHERE ${TENANT_SQL} AND text ILIKE $1 LIMIT 1`, [like]);
+    return r.rows.length > 0;
+  }
+}
+
+export function buildUnknownNameAnswer(phrase) {
+  return attachCitations(
+    {
+      kind: "no-answer",
+      text: `I don't have anyone named "${phrase}" on file, and that name doesn't appear in any of your documents either — nothing to look up. Check the spelling, or ask by address.`,
+      facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    },
+    { records: [], total: 0, kind: "searched", basis: `Searched every customer and entity record and the full text of every document page for "${phrase}"; nothing matches.` }
+  );
+}
+
+/** @returns the honest decline, or null when the name exists / is not an unknown-name question / anything is unsure. */
+export async function buildUnknownNameDecline(db, question) {
+  if (!unknownNameEnabled()) return null;
+  const phrase = extractNamePhrase(question);
+  if (!phrase) return null;
+  const tokens = candidateTokens(phrase);
+  if (!tokens.length) return null;
+  const { rows: custs } = await db.raw(`SELECT data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND ${TENANT_SQL}`, []);
+  const words = new Set();
+  for (const r of custs) for (const w of String(r.n ?? "").toLowerCase().split(/\s+/)) if (w.length >= 3) { const c = w.replace(/[^a-z-]/g, ""); words.add(c); for (const part of c.split("-")) if (part.length >= 3) words.add(part); }
+  for (const t of tokens) for (const w of words) if (damerauLevenshteinDistance(t, w) <= 2) return null; // a typo of a real name: the near-miss paths own it
+  for (const t of tokens) if (await tokenExists(db, t)) return null;
+  return buildUnknownNameAnswer(phrase);
+}

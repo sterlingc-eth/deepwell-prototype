@@ -5,7 +5,7 @@ import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } fro
 import { denyAuth } from "./_lib/auth.js";
 import { EXTRACT_TOOL, buildExtractPrompt, normalizeFields } from "./_lib/extractFields.js";
 import { extractDocumentFields, EXTRACT_MODEL, splitExtractPrompt } from "./_lib/extractDocument.js";
-import { extractFinancialsBestEffort } from "./_lib/financials/hook.js"; // FINANCIALS layer: money read for invoice-like documents
+import { extractFinancialsDeterministicFirst as extractFinancialsBestEffort } from "./_lib/modelAvoidance/financialsHook.js"; // FINANCIALS layer: money read for invoice-like documents (R32: deterministic text first, same contract as financials/hook.js)
 import { sniffMagicBytes } from "./_lib/readDocument.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit, assertModelBudget, sendModelBudgetExceeded } from "./_lib/rateLimit.js";

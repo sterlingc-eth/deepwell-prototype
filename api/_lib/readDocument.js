@@ -8,6 +8,9 @@ import { withCache } from "./promptCache.js";
 import { FIELD_SPECS } from "./extractFields.js";
 // Search by meaning: embed a document's pages once they are stored (api/_lib/search/*).
 import { embedDocumentPages } from "./search/store.js";
+// R32 (model avoidance): a born-digital PDF already contains its text — read it in-process instead of paying a vision model.
+import { readPdfTextLayer } from "./modelAvoidance/pdfText.js";
+import { isTextLayerReadEnabled } from "./modelAvoidance/switches.js";
 
 /**
  * The ingestion pipeline itself, with no HTTP in it.
@@ -463,6 +466,7 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
 
   let pages;
   let method;
+  let readSource = null;
 
   if (TEXT_TYPES.test(contentType)) {
     pages = chunkText(decodeText(bytes));
@@ -471,8 +475,19 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     if (bytes.length > MAX_PDF_BYTES) {
       throw new IngestError("File is too large to extract in one pass", 413);
     }
-    pages = await extractWithClaude(bytes, contentType, ctx, startedAt);
-    method = "model";
+    // R32: try the PDF's own text layer first (PDF_TEXT_LAYER=0 disables). readPdfTextLayer refuses (ok:false) anything
+    // that is not clearly real, complete, readable text — scans, OCR overlays, big images, garbled or unmappable fonts,
+    // rotated/invisible text — and those go to the model exactly as before.
+    const layer = contentType === "application/pdf" && isTextLayerReadEnabled() ? readPdfTextLayer(bytes) : null;
+    if (layer?.ok) {
+      pages = layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 }));
+      method = "text";
+      readSource = "pdf-text-layer";
+    } else {
+      pages = await extractWithClaude(bytes, contentType, ctx, startedAt);
+      method = "model";
+      if (layer && !layer.ok) readSource = `model:${String(layer.reason).slice(0, 40)}`;
+    }
   } else {
     const message =
       contentType === "image/heic" || contentType === "image/heif"
@@ -535,7 +550,7 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
       resource_type: "document",
       resource_id: documentId,
       clerk_user_id: userId,
-      changes: { pages: pages.length, method },
+      changes: { pages: pages.length, method, ...(readSource ? { source: readSource } : {}) },
     });
     return n;
   });
@@ -546,7 +561,7 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
   // the backfill (POST /api/review semanticBackfill) picks up anything missed.
   if (Date.now() - startedAt < 35_000) await embedDocumentPages(ctx, documentId);
 
-  return { documentId, pages: written, method };
+  return { documentId, pages: written, method, ...(readSource ? { source: readSource } : {}) };
 }
 
 /**

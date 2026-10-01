@@ -315,7 +315,16 @@ export function compareAnswer(q, data) {
     case "set": r = compareSet(q.expected, view); break;
     case "value": r = compareValue(q.expected, view); break;
     case "yesno": r = compareYesNo(q.expected, view); break;
-    case "honest-zero": r = compareHonestZero(view); break;
+    case "honest-zero": {
+      r = compareHonestZero(view);
+      // R32 (owner decision 2026-09-30, ADJUDICATION.md "R32"): a near-miss name that is UNAMBIGUOUSLY one real customer's
+      // typo is now resolved with a visible note. An honest-zero question that carries `typoResolvesTo` (the customer the
+      // typo maps to) also passes when the answer says "Showing results for <that customer>"; a plain decline still passes.
+      if (!r.passed && q.typoResolvesTo && new RegExp(`showing results for ${String(q.typoResolvesTo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(view.text)) {
+        r = { passed: true, score: 1, got: summarizeAnswer(view), why: "" };
+      }
+      break;
+    }
     default: throw new Error(`compareAnswer: unsupported comparison ${String(q.cmp)}`);
   }
   return withCitation(r, q, view);

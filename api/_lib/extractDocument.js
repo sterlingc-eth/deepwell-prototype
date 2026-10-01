@@ -27,6 +27,11 @@ import { integrityFixDocument } from "./routes/integrity.js";
 import { applyBodyNameLinks } from "./bodyNameLink.js";
 import { completeIntake } from "./intake/autofill.js";
 import { classifyDocumentAudience } from "./audience/store.js";
+// R32 (model avoidance): a plain labelled form is a lookup, not reasoning — see modelAvoidance/textExtract.js.
+import { extractFromText } from "./modelAvoidance/textExtract.js";
+import { isDeterministicExtractEnabled } from "./modelAvoidance/switches.js";
+// R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
+import { planLabelFill } from "./modelAvoidance/labelFill.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -93,14 +98,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     throw new IngestError("documentId must be a uuid", 400);
   }
 
-  // B1 (2026-09-19 adversarial audit): the daily model-spend cap used to be
-  // enforced at exactly one of four billed call sites (the Inngest read
-  // step) — this is a second one. Checked before the (cheap) document load
-  // below so an exhausted tenant never even pays for that query, let alone
-  // the Anthropic call. Covers BOTH callers of this function: the Inngest
-  // extract-fields worker (queue.js) and /api/extract's stored-document path
-  // — one check, both paths, rather than two call sites that could drift.
-  await assertModelBudget(ctx);
+  // B1 (2026-09-19 adversarial audit): the daily model-spend cap is enforced before every billed call. R32: the check
+  // now sits right before the ONE model call below (assertModelBudget(ctx)), not at the top, because a document the
+  // deterministic text extractor accepts makes no model call at all and must not be refused for a spent model budget.
+  // Covers BOTH callers of this function (the Inngest extract-fields worker and /api/extract's stored-document path).
 
   // Short transaction: the model call below must not hold a pool connection.
   const loaded = await withTenant(ctx, async (db) => {
@@ -131,6 +132,24 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   }
 
   const { pages: selected, truncated } = selectPages(pages);
+
+  // R32: deterministic extraction FIRST (EXTRACT_DETERMINISTIC=0 disables). extractFromText accepts a document only
+  // when its title names a template type, every line is explained, every validator passes and every field the type
+  // requires was found; anything else returns {accepted:false} and the model runs exactly as it always did. An explicit
+  // `documentType` override, a truncated document, or a non-HVAC industry pack never takes this path.
+  const det = !documentType && !truncated && isDeterministicExtractEnabled()
+    ? extractFromText(selected, { pack })
+    : null;
+  let extractMethod = "model";
+  let extractModelLabel = EXTRACT_MODEL;
+  let toolUse;
+  if (det?.accepted) {
+    extractMethod = "text";
+    extractModelLabel = "deterministic-text";
+    toolUse = { type: "tool_use", input: det.toolInput };
+    console.log(JSON.stringify({ route: "extract", method: "text", type: det.type, fields: det.toolInput.fields.length }));
+  } else {
+  await assertModelBudget(ctx);
   const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
 
   // See splitExtractPrompt()'s doc comment above for why this is split
@@ -192,14 +211,15 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     console.error("Failed to record extract usage:", err?.message);
   }
 
-  const toolUse = response.content.find((b) => b.type === "tool_use");
+  toolUse = response.content.find((b) => b.type === "tool_use");
+  }
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
   let { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage, pack });
 
   // A document that states nothing extractable is a real answer, not a failure.
   // The write still happens, so an empty result replaces stale rows from an
   // earlier run rather than leaving them there to look current.
-  const facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
+  let facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
 
   // Which technician installed a unit is exactly the kind of fact
   // findOrCreateEquipment's fill-once merge exists for (the first install
@@ -232,6 +252,28 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const existingIsDecided = classification.source !== 'explicit'
     && doc.document_type && !isLegacyOrUnknownType(doc.document_type);
   const resolvedType = existingIsDecided ? doc.document_type : classification.documentType;
+
+  // R33 (Sonoran Comfort Air, 2026-09-30): "Date of Service: 10/19/2028" printed on the page, "Missing information —
+  // Service date" in the Inbox. Whatever the extractor (model or text) left EMPTY for a field this type requires is
+  // looked up by its printed label on the same page text, $0, no model; every value goes through normalizeFields
+  // again, so a far-future date is kept as service_date_unconfirmed (flagged), never dropped and never fed to the
+  // warranty clock. Precision first: filled only when every labelled candidate agrees (labelFill.js). HVAC
+  // vocabulary only; never throws (a scan failure leaves the extraction exactly as it was).
+  let labelFilled = [];
+  let labelFillAmbiguous = [];
+  if (!pack || pack.id === 'hvac') {
+    try {
+      const plan = planLabelFill({ type: resolvedType, fields, pages: selected, method: 'label-fill', pageCount: highestPage });
+      labelFillAmbiguous = plan.ambiguous;
+      if (plan.add.length) {
+        labelFilled = plan.add;
+        fields = [...fields, ...plan.add];
+        facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
+      }
+    } catch (err) {
+      console.error("label-fill failed (extraction kept as is):", err?.message);
+    }
+  }
 
   // CUSTOMER REMINDERS (2026-09-22): reminder_text/reminder_customer_name/
   // reminder_trigger only mean anything on a memo-like document — see
@@ -457,7 +499,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         replaced: counts.replaced,
         dropped: dropped.length,
         truncated,
-        model: EXTRACT_MODEL,
+        model: extractModelLabel,
+        method: extractMethod,
         entity_id: entity?.id ?? null,
         entity_created: entity?.created ?? false,
         warranty_basis: warranty.expiresBasis,
@@ -488,6 +531,13 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         // because completenessFor doesn't know the difference. No DDL: reuses
         // audit_log.changes, already written on every extraction.
         future_dated_fields: fields.filter((f) => f.flags?.includes('future')).map((f) => f.field_key),
+        // R33: printed dates beyond the field's window, kept as <key>_unconfirmed for a person to confirm (never
+        // dropped any more); fields supplied by the label scan; and what the validator still refused, with its
+        // reason, so a later re-check (api/_lib/recheck.js) or a person can see exactly what was printed.
+        unconfirmed_dates: fields.filter((f) => f.flags?.includes('far_future')).map((f) => ({ field_key: f.unconfirmed_of, value: f.value })),
+        label_filled: labelFilled.map((f) => ({ field_key: f.field_key, value: f.value, page_no: f.page_no, method: 'label-fill' })),
+        ...(labelFillAmbiguous.length ? { label_fill_ambiguous: labelFillAmbiguous.slice(0, 10) } : {}),
+        dropped_fields: dropped.slice(0, 20).map((d) => ({ key: String(d.key ?? '').slice(0, 60), reason: String(d.reason ?? '').slice(0, 160) })),
         // Round 4: shop-internal documents (see isShopInternalDocument) carry
         // no customer at all, by design — recorded here (again, no DDL) so
         // that fact is on file wherever this action is audited, distinct from
@@ -558,7 +608,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     fields,
     dropped,
     truncated,
-    model: EXTRACT_MODEL,
+    model: extractModelLabel,
+    method: extractMethod,
     pagesRead: selected.length,
     pagesTotal: pages.length,
     warranty,

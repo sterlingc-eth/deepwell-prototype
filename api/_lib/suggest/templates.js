@@ -21,6 +21,7 @@
  * plain objects and no database at all.
  */
 import { routesWithoutModel } from "./classify.js";
+import { buildClarifyChips } from "../lookups/clarify.js";
 
 /**
  * One entry per question SHAPE this feature knows how to fill and validate. `role` is which empty-screen
@@ -139,6 +140,15 @@ export function buildDidYouMean(question, vocab, ctx = {}, deps = {}) {
     seen.add(key);
     chips.push({ text: clean, matched: routesWithoutModel(clean, ctx).matched });
   };
+
+  // R32: recognised-entity clarifications first (ambiguous bare surname -> one chip per candidate; a named customer/address -> the
+  // reformulations that route deterministically). Gated by DONOVAN_CLARIFY_CHIPS inside buildClarifyChips.
+  try {
+    for (const chip of buildClarifyChips(original, vocab, { ...ctx, routesWithoutModel, knownAddress: (vocab?.addresses ?? []).some((a) => original.toLowerCase().includes(String(a).toLowerCase().split(",")[0])) })) add(chip.text);
+  } catch {
+    /* best-effort */
+  }
+  if (chips.length) return chips.slice(0, 3).map(({ text }) => ({ text }));
 
   if (typeof correctTenantNameTypos === "function") {
     try {

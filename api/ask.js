@@ -52,7 +52,7 @@ import { metaCount, metaListCitations, metaDocumentTypes, withCitations, honestZ
 // at module scope (its one-Haiku-tool-use-call planner) — loaded lazily
 // below (loadAnalyticsRouteModule) instead of statically, so a request a
 // deterministic pre-router answers never pays for it.
-import { runContactLookup } from "./_lib/contactLookup.js";
+import { runContactLookup, resolveAddressCandidates } from "./_lib/contactLookup.js";
 import { runDocLookup, resolveHonestZeroContext, buildHonestZeroText, customerDocumentIds } from "./_lib/docLookup.js";
 // TEAM E (2026-09-24): full-corpus content-count questions ("how many jobs mention a capacitor", "which customers had
 // a coil issue on file") — a deterministic scan of document_pages.text (all of it, not a top-K search), never the
@@ -70,6 +70,7 @@ import { packForTenant } from "./_lib/industry/index.js";
 // file, cached per tenant by data-version) — widens normalization's fuzzy-typo correction beyond the
 // generic/pack vocabulary and grounds the analytics planner prompt in what THIS tenant's data contains.
 import { getTenantVocab, correctTenantNameTypos } from "./_lib/vocab/tenantVocab.js";
+import { decorateWithTypoNote, techNoteFromCorrection } from "./_lib/lookups/typoResolve.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -108,6 +109,12 @@ import { logRouteDecision } from "./_lib/agent/router.js";
 // Round 18 (H3): the unified pre-router classification (relations through analytics) — see this
 // module's own header and its call site below ("unified pre-router classification").
 import { classifyAll } from "./_lib/router/classifyAll.js";
+// R32: general early declines (off-domain / untracked component attribute / dangling follow-up with no conversation).
+import { buildAddressMissAnswer } from "./_lib/lookups/addressMiss.js";
+import { buildUnknownNameDecline } from "./_lib/lookups/unknownName.js";
+import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
+import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
+import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName } from "./_lib/router/earlyDecline.js";
 // Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
 // F1/F6) — see guard/check.js's own header for what each function checks and why, and the untracked-concept
 // registry (api/_lib/concepts/registry.js) for the honest-decline half.
@@ -127,6 +134,8 @@ import { takeScorecardCall } from "./_lib/scorecard/hook.js";
 // the tech?"), folded into a self-contained question BEFORE the existing pipeline below ever sees it.
 // A self-contained question, or a request with no conversationContext at all (every existing caller),
 // takes this exact same path it always has — nothing here changes behavior unless the field is sent.
+import { classifyNonQuestion, nonQuestionAnswer } from "./_lib/modelAvoidance/nonQuestion.js";
+import { isNonQuestionGateEnabled } from "./_lib/modelAvoidance/switches.js";
 import { validateConversationContext, isFollowupContinuation, composeFollowup } from "./_lib/conversation.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
@@ -754,9 +763,12 @@ export default async function handler(req, res) {
   // Round 29: set when the question looked like an app how-to that the strict help route did not answer; a no-answer
   // result then carries `helpHint` so the UI can point to the DeepWell Help chat instead of a bare "not in your records".
   let helpHint = false;
+  // R32: a technician-name typo silently corrected in the question text below is announced on the answer ("Showing results for ...").
+  let techTypoNote = null;
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
   const send = (status, body) => {
+    if (techTypoNote && body?.data && typeof body.data === "object" && body.data.kind === "answer") decorateWithTypoNote(body.data, techTypoNote);
     if (helpHint && body?.data && typeof body.data === "object" && body.data.kind === "no-answer" && !body.data.help) body.data.helpHint = true;
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
     // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
@@ -864,8 +876,25 @@ export default async function handler(req, res) {
       } catch { /* not a followup — the question is asked exactly as typed */ }
     }
 
+    // R32 (Team M): greetings / thanks / keyboard mash / unmistakably off-topic text is answered with a canned honest
+    // no-answer here, at $0, instead of falling through retrieval to the Sonnet agent. Conservative (see nonQuestion.js:
+    // any digit or records vocabulary vetoes it); scorecard calls are exempt; ASK_NONQUESTION_GATE=0 turns it off.
+    if (!scorecardCall && isNonQuestionGateEnabled()) {
+      const nq = classifyNonQuestion(question);
+      if (nq) {
+        console.log(JSON.stringify({ route: "ask", non_question: nq.kind }));
+        return send(200, { success: true, data: attachCitations(nonQuestionAnswer(nq), { records: [], total: 0, basis: "This isn't a question about your records, so nothing was searched." }) });
+      }
+    }
+
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
     const meta = classifyMetaQuestion(question);
+    if (!meta && earlyDeclineEnabled()) {
+      const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext });
+      let vetoed = false;
+      if (early?.kind === "off_domain") { try { vetoed = await withTenant(ctxArg, (db) => triggerMatchesCustomerName(db, early.trigger)); } catch { vetoed = false; } }
+      if (early && !vetoed) return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind) });
+    }
     // Never throws (see getActiveOverlay's own doc comment) — safe to await
     // directly with no try/catch here.
     // TEAM H (2026-09-24): the tenant's OWN learned vocabulary (per-tenant
@@ -914,6 +943,8 @@ export default async function handler(req, res) {
             tenant_name_correction_hashes: corrections.map((c) => ({ from: hashForLog(c.from), to: hashForLog(c.to) })),
           }));
           question = corrected;
+          const techFix = corrections.find((c) => c.category === "technician");
+          if (techFix) techTypoNote = techNoteFromCorrection(techFix, tenantVocab?.technicians?.phrases);
         }
       } catch (err) {
         console.error("Tenant name-typo correction failed, using original question:", err?.message);
@@ -1021,8 +1052,27 @@ export default async function handler(req, res) {
     // ever calling tryAgent(). Moved inside tryAgent's own body below (still resolved at
     // most once per request, via getAgentOn/getResearchV2Enabled's own module-level
     // memoization) so a request that never calls tryAgent() never loads either module.
+    // R32: deterministic "clarify instead of model" (lookups/clarify.js): an on-topic question whose entities we recognise but no rule
+    // answers gets 2-3 tap-able reformulations (the client fetches them through the existing didyoumean channel) instead of a model call.
+    const tryClarify = async () => {
+      if (conversationContext) return false;
+      try {
+        const miss = await withTenant(ctxArg, (db) => buildAddressMissAnswer(db, question));
+        if (miss) { send(200, { success: true, data: miss }); return true; }
+      } catch { /* best-effort: fall through to the normal path */ }
+      if (!clarifyEnabled() || !tenantVocab) return false; // a follow-up turn carries context the chips would drop
+      const { routesWithoutModel } = await import("./_lib/suggest/classify.js"); // lazy: pulls the analytics route (-> @anthropic-ai/sdk), see clarify.js
+      let knownAddress = false;
+      const addr = ADDRESS_RE.exec(question)?.[0];
+      if (addr) { try { knownAddress = (await withTenant(ctxArg, (db) => resolveAddressCandidates(db, addr))).length > 0; } catch { knownAddress = false; } }
+      const clarify = buildClarifyAnswer(question, tenantVocab, { overlay, pack, tenantVocab, routesWithoutModel, knownAddress });
+      if (!clarify) return false;
+      send(200, { success: true, data: clarify });
+      return true;
+    };
     const tryAgent = async ({ extraUsage = null, budgetMs, recordMiss = true } = {}) => {
       if (agentTried) return false;
+      if (await tryClarify()) return true;
       const agentOn = await getAgentOn();
       if (!agentOn) return false;
       agentTried = true;
@@ -1581,6 +1631,17 @@ export default async function handler(req, res) {
       // contentData is null only on an unexpected error above; retrieval (run inline just below) still gets a shot.
     }
 
+    // ---- 0.64 unknown-name gate (R32b, no model): a record question about a name that exists nowhere in this tenant is an honest "not on file".
+    if (!conversationContext && !moneyQuestion) {
+      try {
+        const unknown = await withTenant(ctxArg, async (db) => {
+          const cc = parseCustomerCount(question);
+          return (cc && (await runCustomerCount(db, cc))) || buildUnknownNameDecline(db, question);
+        });
+        if (unknown) return send(200, { success: true, data: unknown });
+      } catch { /* best-effort: fall through to the normal path */ }
+    }
+
     // ---- 0.65 money gate (no model, no DB, no cache) -----------------------
     // "What's the total dollar amount of our open invoices?" — the honest
     // "not built yet" answer, always, never a fabricated dollar figure. See
@@ -1903,6 +1964,7 @@ export default async function handler(req, res) {
     // so a tenant that is over budget never pays for it. Already IN FLIGHT
     // (fired concurrently with the gate check and retrieval above) — this
     // just consults the result at the same point in the flow it always was.
+    if (await tryClarify()) return;
     await budgetPromise;
 
     // Enumerations ("who all has ...", "list every ...") and repair-history questions ("has this unit had a

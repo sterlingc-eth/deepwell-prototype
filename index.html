@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="DeepWell reads your shop's work orders, invoices, warranty sheets and nameplate photos, so your whole team can ask a question and get the answer with the original page attached.">
+<meta name="description" content="DeepWell reads your invoices, contracts, forms and photos of documents, so your whole team can ask a question and get the answer with the original page attached. Built first for field service; works for any business with paperwork.">
 <meta property="og:title" content="DeepWell Technology — Knowledge Builds Business.">
-<meta property="og:description" content="One question answered right. For example, a $300 callback avoided. Your shop's paperwork, answerable in seconds.">
+<meta property="og:description" content="Your paperwork, answerable in seconds, with the original page attached. Built first for field-service shops; works for any business that stores documents.">
 <meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -13,15 +13,15 @@
 <meta property="og:url" content="https://deepwelltechnology.com/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="DeepWell Technology — Answers from your shop's paperwork">
-<meta name="twitter:description" content="DeepWell reads your shop's work orders, invoices, warranty sheets and nameplate photos, so your team can ask a question and get the answer with its source page.">
+<meta name="twitter:title" content="DeepWell Technology — Answers from your paperwork">
+<meta name="twitter:description" content="DeepWell reads your invoices, contracts, forms and photos of documents, so your team can ask a question and get the answer with its source page.">
 <meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
 <link rel="canonical" href="https://deepwelltechnology.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0B1613">
-<title>DeepWell Technology — Answers from your shop's paperwork</title>
+<title>DeepWell Technology — Answers from your paperwork</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -697,6 +697,9 @@ section{padding-block:clamp(12px,1.3vw,18px)}
 .what-more{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;margin-top:12px}
 .what-ask,.what-not{padding:10px 14px 12px;border:1px solid var(--line);background:var(--surface)}
 .what-not{border-left:4px solid var(--brass)}
+.what-built{margin-top:12px;padding:9px 14px 10px;border:1px solid var(--line);border-left:4px solid var(--brass);background:var(--surface);color:var(--muted);font-size:.9rem;line-height:1.45}
+.what-built b{color:var(--text);font-weight:600}
+@media (max-width:560px){.what-built{font-size:.86rem;padding:8px 12px 9px}}
 .what-ask h3,.what-not h3{font-size:1.05rem;margin-bottom:4px}
 .what-ask ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 18px}
 .what-ask li{position:relative;padding-left:14px;font-size:.86rem;line-height:1.35;color:var(--text)}
@@ -775,10 +778,11 @@ section{padding-block:clamp(12px,1.3vw,18px)}
            tap fires the same click handler as a mouse click. -->
       <div class="nav-dropdown">
         <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
-          Industries
+          Who it&rsquo;s for
           <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Industries">
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
+          <a role="menuitem" href="/#what">Any business with paperwork <span class="tag live">Live</span></a>
           <a role="menuitem" href="/industries/hvac.html">HVAC <span class="tag live">Live</span></a>
           <a role="menuitem" href="/industries/electrical.html">Electrical <span class="tag soon">Coming</span></a>
           <a role="menuitem" href="/industries/plumbing.html">Plumbing <span class="tag soon">Coming</span></a>
@@ -801,7 +805,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
   <div class="wrap">
     <div class="hero-copy dw-observe">
       <div class="hero-eyebrow-row">
-      <div class="eyebrow">For HVAC shop owners and office managers</div>
+      <div class="eyebrow">For any business that runs on paperwork</div>
       <svg class="hero-micro" viewBox="0 0 118 36" aria-hidden="true" focusable="false">
         <g class="hm-doc-g">
           <rect class="hm-doc-page" x="2" y="4" width="20" height="28" rx="2"/>
@@ -821,8 +825,8 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         </g>
       </svg>
       </div>
-      <h1 class="mm-headline">One question answered right. <em>For example, a $300 callback avoided.</em></h1>
-      <p class="lede">DeepWell turns your shop's paperwork — work orders, invoices, warranty sheets, nameplate photos — into answers your whole team can look up in seconds, each with the original page attached.</p>
+      <h1 class="mm-headline">Your paperwork already has the answer. <em>Now anyone can ask.</em></h1>
+      <p class="lede">DeepWell turns your paperwork — invoices, work orders, contracts, forms, receipts, photos of documents — into answers your whole team can look up in seconds, each with the original page attached.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
         <a class="btn btn-ghost" href="#what">See how it works</a>
@@ -878,18 +882,18 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         <div class="eyebrow">What DeepWell does</div>
         <h2>Your paperwork, turned into answers.</h2>
       </div>
-      <p class="lede">Your paperwork is split across a filing cabinet, an inbox and your techs' phones. DeepWell reads it all, so anyone on your team can just ask.</p>
+      <p class="lede">Your paperwork is split across a filing cabinet, an inbox and your team's phones. DeepWell reads it all, so anyone on your team can just ask.</p>
     </div>
     <ol class="what-steps">
       <li class="dw-observe dw-once">
         <span class="hiw-n">01</span>
         <h3>Send it your paperwork</h3>
-        <p>Upload files on the web or scan pages with the phone app: work orders, invoices, warranty sheets, nameplate photos. Handwriting and rough scans are fine.</p>
+        <p>Upload files on the web or scan pages with the phone app: invoices, work orders, contracts, permits, forms, photos of documents. Handwriting and rough scans are fine.</p>
       </li>
       <li class="dw-observe dw-once">
         <span class="hiw-n">02</span>
         <h3>It reads and organizes everything</h3>
-        <p>It reads every page, pulls out the customer, address, equipment model and serial, install and warranty dates and who did the work, and files it under the right customer and unit. The original page is kept.</p>
+        <p>It reads every page, pulls out the names, addresses, dates, amounts and document numbers, and files it under the right customer and address. For equipment paperwork it also picks up models, serials and warranty dates. The original page is kept.</p>
       </li>
       <li class="dw-observe dw-once">
         <span class="hiw-n">03</span>
@@ -897,20 +901,23 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         <p>Anyone on your team asks Donovan, DeepWell's assistant, in plain English and gets the answer with the original page attached. If it isn't in your records, it says so instead of guessing.</p>
       </li>
     </ol>
+    <div class="what-built dw-observe dw-once">
+      <b>Built first for field service.</b> DeepWell understands equipment paperwork best today: warranties, serial numbers, service tickets and the customer and unit they belong to. It works for any business with paperwork, from property managers and contractors to clinics, offices and nonprofits. For other kinds of documents it reads the names, addresses, dates and amounts, and answers with the page attached.
+    </div>
     <div class="what-more">
       <div class="what-ask">
         <h3>What you can ask</h3>
         <ul>
-          <li>Is the furnace at 3247 Elm still under warranty?</li>
-          <li>What did Marcus do at the Henderson job last fall?</li>
-          <li>What is serial 4N2119-08772, and where is it?</li>
-          <li>Which Carrier units we installed expire in the next 90 days?</li>
-          <li>When was the Smith system installed, and who did the work?</li>
+          <li>When did we last service the unit at 3247 Elm?</li>
+          <li>What did we pay Acme Supply in March?</li>
+          <li>Show me the signed permit for 12 Main.</li>
+          <li>When does the Okafor service agreement end?</li>
+          <li>What's still unpaid on the Henderson invoices?</li>
         </ul>
       </div>
       <div class="what-not">
         <h3>What it's not</h3>
-        <p>DeepWell is not a scheduling, dispatch or invoicing tool. Keep using the one you have; DeepWell works alongside it and is where the paperwork behind those jobs becomes answers.</p>
+        <p>DeepWell is not a scheduling, dispatch, accounting or invoicing tool. Keep using the one you have; DeepWell works alongside it and is where the paperwork behind it becomes answers.</p>
       </div>
     </div>
   </div>
@@ -1591,9 +1598,9 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       <div class="demo-side">
         <div class="eyebrow">Or try one of these</div>
         <button class="q" type="button" id="q0" data-i="0" aria-pressed="true">Is the furnace at 3247 Elm still under warranty?</button>
-        <button class="q" type="button" id="q1" data-i="1">What did Marcus do at the Henderson job last fall?</button>
+        <button class="q" type="button" id="q1" data-i="1">What did we pay Acme Supply in March?</button>
         <button class="q" type="button" id="q2" data-i="2">Serial 4N2119-08772 — what is it and where is it?</button>
-        <button class="q" type="button" id="q3" data-i="3">Which Carrier units we installed expire in the next 90 days?</button>
+        <button class="q" type="button" id="q3" data-i="3">Show me the signed permit for 12 Main.</button>
       </div>
       <div class="demo-main" id="demo-main" aria-live="polite">
         <!-- rendered by script -->
@@ -1603,23 +1610,23 @@ section{padding-block:clamp(12px,1.3vw,18px)}
     <div class="who" id="who">
       <div class="who-head">
         <h3>One system. Three views.</h3>
-        <p>The same records, seen from the desk, the truck, and the owner's office. Everybody gets the view that matches their day.</p>
+        <p>The same records, seen from the front desk, the job site, and the owner's office. Everybody gets the view that matches their day.</p>
       </div>
     <div class="people">
       <div class="person dw-observe dw-once">
-        <div class="role">Office manager · dispatch</div>
-        <blockquote>"The customer's on hold. I need the install date and who was out there last."</blockquote>
-        <p>Answer the call without putting it down: equipment, warranty status and the last three visits on one screen.</p>
+        <div class="role">Front desk · office manager</div>
+        <blockquote>"The customer's on hold. I need the paperwork and who handled it last."</blockquote>
+        <p>Answer the call without putting it down: the customer's documents, dates and amounts on one screen. For equipment, warranty status and the last three visits too.</p>
       </div>
       <div class="person dw-observe dw-once">
-        <div class="role">Field technician · on site</div>
-        <blockquote>"I'm in the attic on my phone. What's this unit's history?"</blockquote>
-        <p>Type the serial off the nameplate, or photograph it, and read the last tech's notes before you touch anything.</p>
+        <div class="role">In the field · on site</div>
+        <blockquote>"I'm on site with my phone. What's the history on this job?"</blockquote>
+        <p>Type an address or serial, or photograph the label, and read the last visit's notes before you start.</p>
       </div>
       <div class="person dw-observe dw-once">
         <div class="role">Owner · operations</div>
-        <blockquote>"How much warranty money did we leave on the table last year?"</blockquote>
-        <p>See expiring coverage across every unit, and where maintenance agreements are due. Which techs generate callbacks: <span class="pill-soon">Coming soon</span>.</p>
+        <blockquote>"What's expiring, and what did we miss?"</blockquote>
+        <p>See expiring coverage across every unit, and where agreements are due. Callback analytics for field-service teams: <span class="pill-soon">Coming soon</span>.</p>
       </div>
     </div>
     </div>
@@ -1671,12 +1678,12 @@ section{padding-block:clamp(12px,1.3vw,18px)}
             <li>Owner account doesn&rsquo;t count toward logins</li>
           </ul>
         </div>
-        <p class="math">One prevented callback covers 3&ndash;6 months.</p>
+        <p class="math">One avoided mix-up, like a repeat trip or a missed renewal, can cover months.</p>
         <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Start free trial</a>
       </div>
       <div class="plan featured dw-observe dw-once">
         <div class="plan-top"><div class="tier">Shop</div><span class="badge-pop">Most popular</span></div>
-        <div class="plan-price"><h3>$199<span class="per">/mo</span></h3><p class="for">Small shop</p></div>
+        <div class="plan-price"><h3>$199<span class="per">/mo</span></h3><p class="for">Small team</p></div>
 
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
@@ -1698,12 +1705,12 @@ section{padding-block:clamp(12px,1.3vw,18px)}
           <ul>
             <li>Email intake <span class="pill-soon">Coming soon</span></li>
           </ul></div>
-        <p class="math">Three techs preventing one callback a month each: $3,600&ndash;7,200 saved. You pay $199.</p>
+        <p class="math">Service shops: one avoided $300&ndash;600 repeat visit a month is $3,600&ndash;7,200 a year. You pay $199/mo.</p>
         <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Choose Shop</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Crew</div></div>
-        <div class="plan-price"><h3>$399<span class="per">/mo</span></h3><p class="for">Growing crew</p></div>
+        <div class="plan-price"><h3>$399<span class="per">/mo</span></h3><p class="for">Growing team</p></div>
 
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
@@ -1728,12 +1735,12 @@ section{padding-block:clamp(12px,1.3vw,18px)}
             <li>Google Drive sync <span class="pill-soon">Coming soon</span></li>
             <li>Branch scoping <span class="pill-soon">Coming soon</span></li>
           </ul></div>
-        <p class="math">Ten techs. One prevented callback a week pays for the year.</p>
+        <p class="math">Ten people. One avoided $300 mistake a week pays for the year.</p>
         <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Choose Crew</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Fleet</div></div>
-        <div class="plan-price"><h3>$899<span class="per">+/mo</span></h3><p class="for">Multi-crew teams</p></div>
+        <div class="plan-price"><h3>$899<span class="per">+/mo</span></h3><p class="for">Larger teams</p></div>
 
         <div class="grp"><h4>Team</h4>
           <ul class="spec">
@@ -1758,7 +1765,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
             <li>Backups every 6 hours + 12 monthly archives <span class="pill-soon">Coming soon</span></li>
             <li>Per-shop restore <span class="pill-soon">Coming soon</span></li>
           </ul></div>
-        <p class="math">Per-tech pricing is what&rsquo;s killing you. This isn&rsquo;t per tech.</p>
+        <p class="math">Priced by plan, not by the head. Talk to us for 11+ logins.</p>
         <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
@@ -1767,13 +1774,13 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       <div class="onboard">
         <div class="eyebrow">Included with every plan</div>
         <h3>White-glove setup by the DeepWell Technology team</h3>
-        <p>Our team takes stock of your records, loads your first big batch, checks the answers against the questions your office actually asks, and trains your crew in an afternoon.</p>
+        <p>Our team takes stock of your records, loads your first big batch, checks the answers against the questions your office actually asks, and trains your team in an afternoon.</p>
       </div>
       <div class="rescue">
         <div>
           <div class="eyebrow">Records Rescue</div>
           <h3>See it on your own records, free.</h3>
-          <p>Send one folder or box of old invoices, tickets or warranties. We digitize it free, so you can see the result first.</p>
+          <p>Send one folder or box of old invoices, contracts, forms or tickets. We digitize it free, so you can see the result first.</p>
         </div>
         <div class="rescue-cta">
           <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
@@ -1788,7 +1795,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
       <div>
-        <h2>Questions shop owners ask</h2>
+        <h2>Questions owners ask</h2>
       </div>
       <p class="lede">What owners ask before trusting software with their paperwork. More in our <a href="/security.html">security</a>, <a href="/privacy.html">privacy</a> and <a href="/terms.html">terms</a> pages.</p>
     </div>
@@ -1803,23 +1810,23 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       </details>
       <details>
         <summary>Does my data train AI? Who can see it?</summary>
-        <p>Your records are stored under your company's own account and are never mixed with another shop's. To read pages and answer questions, DeepWell sends them to its AI providers, and under those providers' API terms that content is not used to train their models. DeepWell staff can only look at your account if your admin grants time-limited support access.</p>
+        <p>Your records are stored under your company's own account and are never mixed with another company's. To read pages and answer questions, DeepWell sends them to its AI providers, and under those providers' API terms that content is not used to train their models. DeepWell staff can only look at your account if your admin grants time-limited support access.</p>
       </details>
       <details>
         <summary>What happens if I cancel?</summary>
         <p>You can cancel any time. A monthly plan ends at the end of the current billing period (no prorated refunds for partial months), and you can cancel the free trial before you are charged. Your admin can export or delete your shop's data from Team &rarr; Settings whenever they like.</p>
       </details>
       <details>
-        <summary>Does it replace my field-service software?</summary>
-        <p>No. DeepWell does not schedule jobs, dispatch trucks, take payments or send invoices, so keep the software you use now. There are no built-in integrations yet, but you can export CSV for dispatch and accounting.</p>
+        <summary>Does it replace my business software?</summary>
+        <p>No. DeepWell does not schedule jobs, dispatch, take payments, send invoices or keep your books, so keep the software you use now. There are no built-in integrations yet, but you can export CSV for dispatch and accounting.</p>
       </details>
       <details>
-        <summary>Does it work on my techs' phones?</summary>
-        <p>Yes. The phone app installs from the browser on iPhone, iPad and Android, with no app store and no extra charge. Techs can ask questions, scan paperwork and look up documents. A scan taken with no signal is saved on the phone and uploads when it is back online; asking a question needs a connection.</p>
+        <summary>Does it work on my team's phones?</summary>
+        <p>Yes. The phone app installs from the browser on iPhone, iPad and Android, with no app store and no extra charge. Your team can ask questions, scan paperwork and look up documents. A scan taken with no signal is saved on the phone and uploads when it is back online; asking a question needs a connection.</p>
       </details>
       <details>
-        <summary>I'm not an HVAC shop. Will it work for me?</summary>
-        <p>HVAC is the only trade DeepWell is built for and running today. Electrical, plumbing and property management pages are up and marked coming soon, with no dates. You can join the waitlist from those pages.</p>
+        <summary>Will it work for my business?</summary>
+        <p>If your business keeps documents or paperwork, yes. DeepWell reads invoices, contracts, permits, forms, correspondence and photos of documents, files them by customer and address, and answers questions with the original page attached. It was built first for field-service shops, so equipment paperwork (warranties, serials, service tickets) is where it understands the most today. Electrical, plumbing and property-management features are marked coming soon, with no dates; you can still upload your paperwork now. Not sure? Send a sample box free.</p>
       </details>
     </div>
   </div>
@@ -1829,10 +1836,10 @@ section{padding-block:clamp(12px,1.3vw,18px)}
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
       <div>
-        <div class="eyebrow">The cost of missing this</div>
+        <div class="eyebrow">The cost of missing this · a service-shop example</div>
         <h2>What a missed follow-up costs</h2>
       </div>
-      <p class="lede">Move the sliders to your own numbers. Every figure is an adjustable starting example, not a claim about your shop.</p>
+      <p class="lede">Move the sliders to your own numbers. This example is for service shops with warranties and repeat visits; every figure is an adjustable starting point, not a claim about your business.</p>
     </div>
 
     <div class="cost-calc dw-observe dw-once" id="cost-calc">
@@ -1897,7 +1904,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         </details>
 
         <details class="cost-line" open>
-          <summary><h3>Time spent hunting for paperwork</h3><span class="sub">Techs and office staff paging through boxes and drives instead of asking Donovan.</span><span class="cost-line-total">≈ <b id="cc-out-time">$9,100</b>/yr spent looking for documents</span></summary>
+          <summary><h3>Time spent hunting for paperwork</h3><span class="sub">Staff paging through boxes and drives instead of asking Donovan.</span><span class="cost-line-total">≈ <b id="cc-out-time">$9,100</b>/yr spent looking for documents</span></summary>
           <div class="cost-body">
           <div class="cost-field">
             <div class="fl"><label for="cc-hours">Hours / week hunting for records</label></div>
@@ -1931,7 +1938,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
 
     <div class="cost-foot">
     <div class="cost-card dw-observe dw-once">
-      <div class="where">A claim denied because nobody registered it</div>
+      <div class="where">An HVAC example: a claim denied because nobody registered it</div>
       <p>Many manufacturers cut the parts warranty in half if a unit isn't registered within 60–90 days of install (Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane: 10 yr registered, 5 yr not <span class="mono" style="font-size:.74rem;color:var(--faint)">(published registration windows)</span>). Then a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
     </div>
 
@@ -1954,11 +1961,11 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 6l14 6v10c0 8-6 13-14 16C14 35 8 30 8 22V12z"/><path d="M16 22l4 4 8-8"/></svg>
-        <div><h4>Your records stay yours.</h4><p>Your data is stored under your company's own account, never pooled with another contractor's and never used to build anything for anyone else. You can export or delete it at any time.</p></div>
+        <div><h4>Your records stay yours.</h4><p>Your data is stored under your company's own account, never pooled with another company's and never used to build anything for anyone else. You can export or delete it at any time.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15"/><path d="M22 12v10l7 4"/></svg>
-        <div><h4>Built for the job, not the demo.</h4><p>Readable in an attic on a cracked phone, and fast on a weak connection. Nothing that flashes or slows a tech down.</p></div>
+        <div><h4>Built for the job, not the demo.</h4><p>Readable on a cracked phone at a job site, and fast on a weak connection. Nothing that flashes or slows your team down.</p></div>
       </div>
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 32l10-10 6 6 12-14"/><path d="M28 14h8v8"/></svg>
@@ -1971,7 +1978,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       <div>
         <div class="eyebrow">Talk to us</div>
         <h3>Start with one box of records.</h3>
-        <p>Send a sample — a drawer, a folder, a month of job sheets — and we'll set up your account with it. On the first call you ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
+        <p>Send a sample — a drawer, a folder, a month of paperwork — and we'll set up your account with it. On the first call you ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
         <p class="cta-who">Talk to Sterling or Hilton: <a href="mailto:hello@deepwelltechnology.com?subject=Records%20audit">hello@deepwelltechnology.com</a></p>
       </div>
       <div class="cta-side">
@@ -2048,18 +2055,18 @@ const DEMO=[
   answer:"Yes — parts coverage on the Carrier 59TP6 at 3247 Elm St runs through 14 Mar 2029. Labor coverage ended 14 Mar 2024.",
   fields:[["Equipment","Carrier 59TP6A080V17","",""],["Serial","4N2119-08772","",""],["Installed","14 Mar 2019 · M. Reyes","",""],["Parts warranty","Active · 2y 6m left","ok","Active"],["Labor warranty","Ended Mar 2024","bad","Expired"],["Last service","02 Nov 2025 · igniter","",""]],
   sources:[["PDF","Warranty registration — Carrier, 03/19/2019","page 1"],["WO","Work order #19-0412, signed J. Alvarez","page 2, serial field"],["IMG","Nameplate photo, 11/02/2025, M. Reyes","truck upload"]]},
- {q:"What did Marcus do at the Henderson job last fall?",
-  answer:"Marcus Reyes made two visits to Henderson (8810 Ridgeview) in fall 2025: a no-heat call on 2 Nov where he replaced the hot-surface igniter, and a follow-up on 19 Nov for a blower wheel cleaning.",
-  fields:[["Customer","Henderson, R. & D.","",""],["Address","8810 Ridgeview Dr","",""],["Visit 1","02 Nov 2025 · igniter · $312","",""],["Visit 2","19 Nov 2025 · blower · $189","",""],["Callback?","None within 30 days","ok","Clean"],["Tech","Marcus Reyes · #T-07","",""]],
-  sources:[["WO","Work order #25-1187, 11/02/2025","notes, parts"],["WO","Work order #25-1233, 11/19/2025","notes"],["INV","Invoice 25-1187 · Henderson","line items"]]},
+ {q:"What did we pay Acme Supply in March?",
+  answer:"Acme Supply billed you $1,696.50 across two invoices dated in March. $1,284.50 is marked paid; $412.00 is still open.",
+  fields:[["Vendor","Acme Supply","",""],["Invoices","2 · March 2026","",""],["Billed","$1,696.50","",""],["Paid","$1,284.50","ok","Paid"],["Open balance","$412.00","warn","Open"],["Largest","INV-20418 · 4 Mar","",""]],
+  sources:[["INV","Invoice INV-20418 · Acme Supply","total, 4 Mar"],["INV","Invoice INV-20511 · Acme Supply","balance due, 21 Mar"],["PO","Purchase order PO-0392","vendor, amount"]]},
  {q:"Serial 4N2119-08772 — what is it and where is it?",
   answer:"That's a Carrier 59TP6 96% gas furnace, 80k BTU, installed 14 Mar 2019 at 3247 Elm St (customer: Okafor). It has been serviced four times; parts coverage is active.",
   fields:[["Model","59TP6A080V17--20","",""],["Location","3247 Elm St · basement","",""],["Customer","Okafor, T.","",""],["Age","7 yrs 6 mo","",""],["Parts warranty","Through Mar 2029","ok","Active"],["Service events","4 (last: Nov 2025)","",""]],
   sources:[["IMG","Nameplate photo, 03/14/2019","serial read from photo"],["PDF","Startup sheet, Carrier 59TP6","model/BTU"],["WO","4 work orders linked by serial","2019–2025"]]},
- {q:"Which Carrier units we installed expire in the next 90 days?",
-  answer:"Six Carrier units have parts coverage ending before 27 Dec 2026. Two are on active maintenance agreements; four are not — those are the ones worth a call this month.",
-  fields:[["Units expiring","6 of 214 Carrier","warn","90-day window"],["On agreement","2","ok","Covered"],["Not on agreement","4","warn","Call list"],["Earliest","9 Oct 2026 · 1120 Pine","",""],["Est. warranty value","$4,800 in parts","",""],["Export","CSV · dispatch list","",""]],
-  sources:[["PDF","6 warranty registrations, 2016–2017","expiry dates"],["XLS","Maintenance agreements 2026.xlsx","agreement status"],["WO","Install work orders (6)","addresses"]]}
+ {q:"Show me the signed permit for 12 Main.",
+  answer:"Found it: building permit BP-2025-0417 for 12 Main St, issued 8 Apr 2025 and signed off after the final inspection on 2 Jun 2025. The original pages are attached.",
+  fields:[["Document","Permit · BP-2025-0417","",""],["Address","12 Main St","",""],["Issued","08 Apr 2025","",""],["Final inspection","02 Jun 2025","ok","Passed"],["Customer","Delgado, M.","",""],["Original","2 pages, scanned","",""]],
+  sources:[["PDF","Permit BP-2025-0417","page 1, signature block"],["PDF","Inspection report, 06/02/2025","page 2, final sign-off"],["IMG","Photo of the posted permit","phone scan"]]}
 ];
 (function(){
   const main=document.getElementById('demo-main');
@@ -2118,7 +2125,7 @@ const DEMO=[
      first keystroke then REPLACES it. (Only 'input' used to cancel, so a click + type appended the visitor's
      text to the demo's half-typed question: "What did Marc" + "carrier expire 90".) */
   input.addEventListener('focus',()=>{if(activeIdx>=0){cancelRun();input.select();}});
-  const KEYS=[["elm","3247","furnace","warranty","under"],["marcus","henderson","ridgeview","fall","did"],["4n2119","08772","serial","what is it","where"],["carrier","expire","90","next","which"]];
+  const KEYS=[["elm","3247","furnace","warranty","under"],["acme","supply","march","pay","paid"],["4n2119","08772","serial","what is it","where"],["permit","12 main","signed","show me","main"]];
   function match(q){
     q=q.toLowerCase();let best=0,bi=-1;
     KEYS.forEach((ks,i)=>{const n=ks.filter(k=>q.includes(k)).length;if(n>best){best=n;bi=i}});

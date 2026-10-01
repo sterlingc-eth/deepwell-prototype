@@ -227,8 +227,11 @@ eq('array input rejected', normalizeNumber(['4280'], { money: true }), null);
     [{ key: 'installation_date', value: '03/07/2028', page_no: 1, confidence: 0.9 }],
     { pageCount: 1, today: '2026-09-21' }
   );
-  check('install date ~18mo out is still dropped (beyond the 3mo window)', !fields.length);
-  eq('drop recorded with a future-date reason', dropped[0]?.reason, 'date is in the future ("2028-03-07")');
+  // R33 (2026-09-30): beyond the window the printed date is no longer DROPPED (that is what made a printed date read
+  // as "missing") — it is parked under installation_date_unconfirmed, flagged far_future, and never reaches the
+  // canonical installation_date the warranty clock reads.
+  check('install date ~18mo out never becomes a canonical installation_date (beyond the 3mo window)', !fields.some((f) => f.field_key === 'installation_date'));
+  eq('...kept as printed under the unconfirmed key, flagged far_future, nothing dropped', [fields[0]?.field_key, fields[0]?.value, fields[0]?.flags, dropped.length], ['installation_date_unconfirmed', '2028-03-07', ['future', 'far_future'], 0]);
 }
 
 {
@@ -238,7 +241,7 @@ eq('array input rejected', normalizeNumber(['4280'], { money: true }), null);
     [{ key: 'service_date', value: '01/01/2030', page_no: 1, confidence: 0.9 }],
     { pageCount: 1, today: '2026-09-21' }
   );
-  check('service_date far beyond the 18mo window is still dropped', !fields.length);
+  check('service_date far beyond the 18mo window is never a canonical service_date (R33: kept as service_date_unconfirmed)', !fields.some((f) => f.field_key === 'service_date') && fields[0]?.field_key === 'service_date_unconfirmed' && fields[0]?.value === '2030-01-01');
 }
 
 {
@@ -249,7 +252,7 @@ eq('array input rejected', normalizeNumber(['4280'], { money: true }), null);
     [{ key: 'warranty_registered_date', value: '11/27/2026', page_no: 1, confidence: 0.9 }],
     { pageCount: 1, today: '2026-09-21' }
   );
-  check('warranty_registered_date has no extended future window', !fields.length);
+  check('warranty_registered_date has no extended future window (R33: printed value parked as unconfirmed, never canonical)', !fields.some((f) => f.field_key === 'warranty_registered_date') && fields[0]?.field_key === 'warranty_registered_date_unconfirmed');
 }
 
 {

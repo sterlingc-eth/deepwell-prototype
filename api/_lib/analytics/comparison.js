@@ -15,7 +15,7 @@
  * already-tested filter passes over the same fetched row set, reusing applyEntityFilters/brandMatches
  * — never a second, hand-written SQL comparison) and builds the yes/no answer + citations.
  */
-import { buildConditionOverrideFilter } from '../analytics.js';
+import { buildConditionOverrideFilter, SERVICE_TYPE_PHRASE_RE, serviceTypeValueOf } from '../analytics.js';
 
 // Both sides of a real comparison question always sit either side of the word "than" ("do we have
 // more X than Y", "is X bigger than Y", "has X had more ... than Y") — splitting there, then running
@@ -140,6 +140,30 @@ function detectInstallYearComparison(left, right, today) {
   };
 }
 
+/** R32: "do we have more repair visits than preventive maintenance visits" — two service TYPES (closed vocabulary,
+ *  SERVICE_TYPE_PHRASE_RE) counted over the same serviceVisits entity. Both sides must name a type and differ; the
+ *  "fewer/less" direction flips which side must be larger. */
+const FEWER_RE = /\b(?:fewer|less|smaller|lower)\b/i;
+const MORE_RE = /\b(?:more|greater|larger|higher|bigger|most)\b/i;
+function detectServiceTypeComparison(q, left, right) {
+  const lm = new RegExp(SERVICE_TYPE_PHRASE_RE.source, 'i').exec(left);
+  const rm = new RegExp(SERVICE_TYPE_PHRASE_RE.source, 'i').exec(right);
+  if (!lm || !rm) return null;
+  const lv = serviceTypeValueOf(lm[1]);
+  const rv = serviceTypeValueOf(rm[1]);
+  if (!lv || !rv || lv === rv) return null;
+  if (FEWER_RE.test(left) === MORE_RE.test(left)) return null;
+  const fewer = FEWER_RE.test(left);
+  const a = { field: 'hasServiceType', op: 'eq', value: lv };
+  const b = { field: 'hasServiceType', op: 'eq', value: rv };
+  return {
+    entity: 'serviceVisits',
+    leftFilter: fewer ? b : a, rightFilter: fewer ? a : b,
+    leftLabel: `${fewer ? rv : lv} visits`, rightLabel: `${fewer ? lv : rv} visits`,
+    fewerAsked: fewer, askedLeftLabel: `${lv} visits`, askedRightLabel: `${rv} visits`,
+  };
+}
+
 export function detectCountComparison(question, today) {
   const q = String(question ?? '').trim();
   if (!q || !YESNO_LEAD_RE.test(q)) return null;
@@ -154,6 +178,7 @@ export function detectCountComparison(question, today) {
   return (
     detectBrandCountComparison(left, right) ??
     detectCityCountComparison(left, right) ??
-    detectInstallYearComparison(left, right, today)
+    detectInstallYearComparison(left, right, today) ??
+    detectServiceTypeComparison(q, left, right)
   );
 }
