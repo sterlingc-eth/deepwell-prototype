@@ -2,7 +2,7 @@ import { ingestDocument, recordIngestFailure } from "../readDocument.js";
 import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeysWithSource } from "../opsStore.js";
 import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
 import { assertActiveBilling } from "../plan.js";
-import { captureMessage, captureException } from "../telemetry.js";
+import { captureMessage, captureException, recordInfo } from "../telemetry.js";
 import { runWarrantyNotificationSweep } from "../notify.js";
 import { runOutreachSweep } from "./outreach.js";
 import { runFollowupsSweep } from "./followups.js";
@@ -440,7 +440,9 @@ export default async function handler(req, res) {
 
   summary.billingGatedTenants = billingGatedTenantKeys.size;
 
-  await captureMessage(
+  // R34: the one-line sweep summary is routine INFORMATION, not an incident — a log line + breadcrumb only
+  // (it used to be a Sentry message every run, which became an unresolved "issue" forever: DEEPWELL-1).
+  await recordInfo(
     `cron-sweep: ${summary.tenantsChecked} tenant(s) checked, ${summary.stuckFound} stuck document(s) found, ` +
       `${summary.recovered} recovered, ${summary.stillFailing} still failing; ` +
       `${summary.budgetDeferredFound} budget-deferred document(s) found, ` +
@@ -467,6 +469,18 @@ export default async function handler(req, res) {
       `knowledge-reports: ${summary.knowledgeReportsProcessed} processed.`,
     { route: "/api/cron-sweep" }
   );
+
+  // Something ACTUALLY failed: documents the nightly retry could not recover (each one was also reported with its
+  // real error by recordIngestFailure). One short, stably-fingerprinted warning so it is a single Sentry issue
+  // whose event count shows how often it happens — not a sentence full of changing numbers.
+  const unrecovered = summary.stillFailing + summary.budgetDeferredStillFailing;
+  if (unrecovered > 0) {
+    await captureMessage(
+      `cron-sweep: ${unrecovered} stuck/deferred document(s) could not be recovered (${summary.stillFailing} stuck, ${summary.budgetDeferredStillFailing} budget-deferred)`,
+      { route: "/api/cron-sweep", stage: "unrecovered-documents" },
+      { level: "warning", fingerprint: ["cron-sweep-unrecovered-documents"] }
+    );
+  }
 
   return res.status(200).json(summary);
 }

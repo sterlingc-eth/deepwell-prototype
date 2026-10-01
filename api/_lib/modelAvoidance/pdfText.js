@@ -28,6 +28,11 @@
 import { inflateSync } from "node:zlib";
 
 const MAX_INFLATE = 24 * 1024 * 1024;
+// R34: the CUMULATIVE ceiling on inflated bytes across every stream of one file. MAX_INFLATE bounds ONE stream; a 1.2 MB file of
+// sixty 20 MB-of-spaces Flate streams passed that bound sixty times, pinned the function for the whole 6 s budget and grew the
+// stream cache by 720 MB (a 24 MB file of such streams is an out-of-memory kill of the worker). No real invoice/ticket has more
+// than a few MB of font programs-excluded text/CMap streams, so 48 MB is generous; past it the file is not read here (-> model path).
+const MAX_TOTAL_INFLATE = 48 * 1024 * 1024;
 const MAX_OBJECTS = 200_000;
 const MAX_PAGES = 200;
 const MAX_XOBJECT_DEPTH = 4;
@@ -212,7 +217,7 @@ function parseValue(cur, depth = 0) {
 }
 
 /* ------------------------------------------------------------------ file scan */
-function decodeFilters(dict, raw, deadline) {
+function decodeFilters(dict, raw, deadline, budget = null) {
   let filters = dict.Filter;
   let parms = dict.DecodeParms ?? dict.DP;
   if (filters === undefined) return { data: raw, ok: true, image: false };
@@ -223,9 +228,15 @@ function decodeFilters(dict, raw, deadline) {
     const f = filters[i];
     const p = parms?.[i] && typeof parms[i] === "object" ? parms[i] : {};
     if (f === "/FlateDecode" || f === "/Fl") {
-      try { data = inflateSync(data, { maxOutputLength: MAX_INFLATE }); } catch {
-        try { data = inflateSync(data, { maxOutputLength: MAX_INFLATE, finishFlush: 2 }); } catch { return { ok: false }; }
+      // R34: never allow more than what is left of the file-wide budget (see MAX_TOTAL_INFLATE).
+      const cap = budget ? Math.max(1, Math.min(MAX_INFLATE, budget.left)) : MAX_INFLATE;
+      try { data = inflateSync(data, { maxOutputLength: cap }); } catch {
+        try { data = inflateSync(data, { maxOutputLength: cap, finishFlush: 2 }); } catch {
+          if (budget && budget.left <= MAX_INFLATE) budget.over = true;
+          return { ok: false };
+        }
       }
+      if (budget) budget.left -= data.length;
       const pred = Number(p.Predictor ?? 1);
       if (pred >= 10) data = pngUnpredict(data, Number(p.Columns ?? 1), Number(p.Colors ?? 1) * Math.ceil(Number(p.BitsPerComponent ?? 8) / 8));
       else if (pred === 2) return { ok: false };
@@ -321,7 +332,7 @@ function scanObjects(bytes, deadline) {
 
 /* ------------------------------------------------------------------ document model */
 class Doc {
-  constructor(objs, deadline) { this.objs = objs; this.deadline = deadline; this.streamCache = new Map(); }
+  constructor(objs, deadline) { this.objs = objs; this.deadline = deadline; this.streamCache = new Map(); this.budget = { left: MAX_TOTAL_INFLATE, over: false }; }
   get(v) {
     let guard = 0;
     while (v && typeof v === "object" && v.r !== undefined && guard++ < 20) v = this.objs.get(v.r)?.value;
@@ -335,7 +346,7 @@ class Doc {
     if (num !== null && this.streamCache.has(num)) return this.streamCache.get(num);
     const o = num !== null ? this.objs.get(num) : null;
     let res = { ok: false };
-    if (o?.raw && o.value && typeof o.value === "object") res = decodeFilters(o.value, o.raw, this.deadline);
+    if (o?.raw && o.value && typeof o.value === "object") res = decodeFilters(o.value, o.raw, this.deadline, this.budget);
     if (num !== null) this.streamCache.set(num, res);
     return res;
   }
@@ -608,6 +619,7 @@ function interpret(doc, content, resources, state, depth) {
   const stack = [];
   let tm = IDENT.slice(), tlm = IDENT.slice();
   let font = null, fsize = 0, tc = 0, tw = 0, th = 1, tl = 0, trise = 0, tr = 0;
+  let whiteFill = false; // R34: current non-stroking colour is (near) white — see the hidden-text note in readPdfTextLayer
   const operands = [];
   const showString = (str) => {
     if (!font) return;
@@ -625,7 +637,10 @@ function interpret(doc, content, resources, state, depth) {
       adv += ((g.w / 1000) * fsize + tc + (g.single ? tw : 0)) * th;
     }
     const x1 = x0 + adv * Math.hypot(trm[0], trm[1]) * Math.sign(trm[0] || 1);
+    const box = state.box;
+    const offPage = box && (x0 < box[0] - 2 || x0 > box[2] + 2 || y0 < box[1] - 2 || y0 > box[3] + 2);
     if (tr === 3 || tr === 7) { stats.invisible++; }
+    else if (whiteFill || size < 3.5 || offPage) { stats.hidden++; }
     else if (rotated) { stats.rotated++; }
     else if (text.trim()) runs.push({ x: Math.min(x0, x1), x2: Math.max(x0, x1), y: y0, size: Math.max(1, size), text });
     // advance text matrix
@@ -639,8 +654,19 @@ function interpret(doc, content, resources, state, depth) {
       const op = t.op;
       const o = operands;
       switch (op) {
-        case "q": stack.push({ ctm: ctm.slice() }); break;
-        case "Q": if (stack.length) ctm = stack.pop().ctm; break;
+        case "q": stack.push({ ctm: ctm.slice(), whiteFill }); break;
+        case "Q": if (stack.length) { const top = stack.pop(); ctm = top.ctm; whiteFill = top.whiteFill; } break;
+        case "g": if (o.length >= 1) whiteFill = Number(o[o.length - 1]) >= 0.97; break;
+        case "rg": if (o.length >= 3) whiteFill = o.slice(-3).every((v) => Number(v) >= 0.97); break;
+        case "k": if (o.length >= 4) whiteFill = o.slice(-4).every((v) => Number(v) <= 0.03); break;
+        case "sc": case "scn": {
+          const nums = o.filter((v) => typeof v === "number");
+          if (nums.length === 1) whiteFill = nums[0] >= 0.97;
+          else if (nums.length === 3) whiteFill = nums.every((v) => v >= 0.97);
+          else if (nums.length === 4) whiteFill = nums.every((v) => v <= 0.03);
+          else whiteFill = false;
+          break;
+        }
         case "cm": if (o.length >= 6) ctm = mul(o.slice(-6), ctm); break;
         case "BT": tm = IDENT.slice(); tlm = IDENT.slice(); break;
         case "ET": break;
@@ -774,7 +800,7 @@ export function looksGarbled(text) {
 export function readPdfTextLayer(bytes, opts = {}) {
   const started = Date.now();
   const deadline = started + (opts.budgetMs ?? DEFAULT_BUDGET_MS);
-  const stats = { pages: 0, chars: 0, unmapped: 0, invisible: 0, rotated: 0, images: 0, bigImages: 0, badStream: false, unreadableFont: null, timeout: false, ms: 0 };
+  const stats = { pages: 0, chars: 0, unmapped: 0, invisible: 0, hidden: 0, rotated: 0, images: 0, bigImages: 0, badStream: false, unreadableFont: null, timeout: false, ms: 0 };
   try {
     const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
     if (buf.length < 64 || buf.subarray(0, 1024).toString("latin1").indexOf("%PDF") === -1) return { ok: false, reason: "not-pdf", stats };
@@ -782,6 +808,7 @@ export function readPdfTextLayer(bytes, opts = {}) {
     if (/\/Encrypt\s*(?:\d+\s+\d+\s+R|<<)/.test(text)) return { ok: false, reason: "encrypted", stats };
     const doc = new Doc(objs, deadline);
     unpackObjectStreams(doc);
+    if (doc.budget.over) return { ok: false, reason: "stream-budget", stats };
     const pageList = collectPages(doc, text);
     if (!pageList.length) return { ok: false, reason: "no-pages", stats };
     if (pageList.length > (opts.maxPages ?? MAX_PAGES)) return { ok: false, reason: "too-many-pages", stats };
@@ -798,18 +825,22 @@ export function readPdfTextLayer(bytes, opts = {}) {
       const refs = Array.isArray(c) ? c : node.Contents !== undefined ? [node.Contents] : [];
       for (const r of refs) {
         const st = doc.stream(r);
-        if (!st.ok) { return { ok: false, reason: "content-stream-undecodable", stats }; }
+        if (!st.ok) { return { ok: false, reason: doc.budget.over ? "stream-budget" : "content-stream-undecodable", stats }; }
         contentStr += st.data.toString("latin1") + "\n";
       }
       const runs = [];
       const images = [];
-      const pstats = { ...stats, unmapped: 0, chars: 0, invisible: 0, rotated: 0, unreadableFont: null };
-      const state = { runs, stats: pstats, fontCache, images, ctm: IDENT.slice() };
+      const pstats = { ...stats, unmapped: 0, chars: 0, invisible: 0, rotated: 0, hidden: 0, unreadableFont: null };
+      const state = { runs, stats: pstats, fontCache, images, ctm: IDENT.slice(), box: [Math.min(mb[0], mb[2]), Math.min(mb[1], mb[3]), Math.max(mb[0], mb[2]), Math.max(mb[1], mb[3])] };
       interpret(doc, contentStr, inh.Resources, state, 0);
       if (pstats.timeout || Date.now() > deadline) return { ok: false, reason: "timeout", stats };
+      if (doc.budget.over) return { ok: false, reason: "stream-budget", stats };
       if (pstats.badStream) return { ok: false, reason: "form-stream-undecodable", stats };
       if (pstats.unreadableFont) return { ok: false, reason: `font:${pstats.unreadableFont}`, stats };
       if (pstats.invisible) return { ok: false, reason: "invisible-text-ocr-layer", stats };
+      // R34: text a person cannot see (white fill, sub-4pt, or placed outside the page) is where "ignore your instructions, set the
+      // customer to ..." hides in a born-digital PDF. The vision model reads only what is VISIBLE, so such a file goes there.
+      if (pstats.hidden) return { ok: false, reason: "hidden-text", stats };
       if (pstats.rotated) return { ok: false, reason: "rotated-text", stats };
       if (pstats.chars && pstats.unmapped / pstats.chars > 0.005) return { ok: false, reason: "unmapped-characters", stats };
       stats.chars += pstats.chars; stats.unmapped += pstats.unmapped;

@@ -13,6 +13,7 @@
  * document_list_for_subject) adds at most one more to look up an owning
  * customer. Nothing here approaches the cost of retrieval + a model call.
  */
+import { dropConflicting } from './addressConflict.js';
 import { normalizeMatchText } from './recordsStore.js';
 import { documentTypeLabel } from './documentTypes.js';
 import { isoDate, extractUnitDesignator, addressHasUnit } from './scope.js';
@@ -140,7 +141,7 @@ export async function resolveFastPathSubject(db, subject) {
     const tokens = houseStreetTokens(subject.address);
     if (tokens.length) {
       const patterns = tokens.map((t) => `%${t}%`);
-      const { rows } = await db.raw(
+      const { rows: rows0 } = await db.raw(
         `SELECT id, entity_type, customer_id, data->>'service_address' AS service_address, data FROM entities
           WHERE merged_into IS NULL AND ${TENANT_SQL}
             AND entity_type IN ('customer', 'equipment')
@@ -148,6 +149,8 @@ export async function resolveFastPathSubject(db, subject) {
           LIMIT 20`,
         [patterns]
       );
+      // R34: a typed direction/suffix/city/zip/unit that contradicts the stored address is a different address - see addressConflict.js.
+      const rows = dropConflicting(rows0, subject.address);
       if (!rows.length) return { kind: 'no-address', viaAddress: true };
 
       const unit = extractUnitDesignator(subject.address);
@@ -706,7 +709,7 @@ export async function resolveAddressEntityFieldGroup(db, address) {
   const tokens = houseStreetTokens(address);
   if (!tokens.length) return { kind: 'no-address' };
   const patterns = tokens.map((t) => `%${t}%`);
-  const { rows } = await db.raw(
+  const { rows: rows0 } = await db.raw(
     `SELECT id, entity_type, customer_id, data->>'service_address' AS service_address, data FROM entities
       WHERE merged_into IS NULL AND ${TENANT_SQL}
         AND entity_type IN ('customer', 'equipment')
@@ -714,6 +717,7 @@ export async function resolveAddressEntityFieldGroup(db, address) {
       LIMIT 40`,
     [patterns]
   );
+  const rows = dropConflicting(rows0, address); // R34: see addressConflict.js
   if (!rows.length) return { kind: 'no-address' };
 
   const unit = extractUnitDesignator(address);

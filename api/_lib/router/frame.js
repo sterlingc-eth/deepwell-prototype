@@ -83,13 +83,20 @@ export function stripConversationalFrame(question) {
     if (next === q) break;
     q = next;
   }
+  // R34: a trailing "today" is filler after a lookup ("pull up Mercer's number today") but the DATE after a count/aggregate
+  // ("how many service tickets today") - stripping it there turned a one-day count into the all-time total.
+  const COUNT_LEAD = /^(?:how\s+(?:many|much)|number\s+of|total|count|which\s+(?:jobs?|visits?|invoices?|customers?|units?|tickets?|techs?|technicians?)|what\s+(?:jobs?|visits?|invoices?|tickets?)|list|show\s+me\s+(?:all\s+)?(?:the\s+)?(?:jobs?|visits?|invoices?|tickets?))\b/i;
+  const keepToday = COUNT_LEAD.test(q) && /\btoday\s*[?.!]*$/i.test(q);
+  if (keepToday) q = q.replace(/\btoday(\s*[?.!]*)$/i, "__TODAY__$1");
   for (let i = 0; i < 4; i++) {
     let next = q.replace(TRAILING, "").trim();
-    next = next.replace(ON_FILE_SUFFIX, "$1").trim();
+    // R34: "no warranty on file" is a condition (warranty status unknown), not a no-op "on file" tag - stripping it left "no warranty".
+    if (!/\b(?:no|without|missing|not)\s+(?:a\s+|any\s+)?warranty\s+on\s+file\b/i.test(next)) next = next.replace(ON_FILE_SUFFIX, "$1").trim();
     if (next === q) break;
     q = next;
   }
   for (const [re, to] of CANON) q = q.replace(re, to);
+  if (keepToday) q = q.replace("__TODAY__", "today");
   const w = q.match(WHERE_UNIT);
   if (w) q = `whats the service address for ${w[1]}`;
   // A stripped remainder too short to be a question (<2 words) is not a usable frame removal.

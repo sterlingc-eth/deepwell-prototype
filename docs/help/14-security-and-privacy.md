@@ -36,8 +36,8 @@ Cloudflare R2 (file storage), Neon (database), Clerk (sign-in), Anthropic (AI re
 ~ are files public, file access, signed links, private files, can someone guess a url, link sharing, shareable links, file security, secure links, document links
 Yes. Uploaded files are not public. Each time a document is opened, DeepWell issues a short-lived signed link for that one file, so a leaked link can't be reused for long and a file can't be found by guessing a URL.
 
-### Does DeepWell use cookies or tracking?
-~ cookies, tracking, cookie banner, analytics, advertising, ad tracking, do you track me, cookie policy, tracking cookies
+### Does DeepWell use cookies or advertising trackers?
+~ cookies, cookie banner, advertising, ad trackers, cookie policy, tracking cookies, do you use analytics, site analytics, do you spy on me, are you tracking me, third party trackers
 No tracking or advertising cookies, and no cookie banner. The only cookies are strictly necessary sign-in cookies from our authentication provider. Site analytics are cookieless.
 
 ### What if I find a security problem?

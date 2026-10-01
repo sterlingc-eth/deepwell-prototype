@@ -14,6 +14,7 @@
  *
  * No network, no Anthropic key, no real Stripe/Neon.  node scripts/verify-prod-hardening.mjs
  */
+process.env.DEEPWELL_TELEMETRY_OFF = '1'; // R34: its fixtures throw mocked 400/429/500/529 through handleError -> telemetry; never report
 delete process.env.STRIPE_SECRET_KEY;
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_hardening_fixture';
 process.env.NEON_CONNECTION_STRING = 'postgres://fixture_user:fixture_pw@db.fixture.invalid:5432/fixture?sslmode=require&channel_binding=require';
@@ -99,11 +100,11 @@ const PC = await import('../api/_lib/util/pgClient.js');
 const CL = await import('../api/_lib/claude.js');
 {
   const raw = '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."},"request_id":"req_011CXYZ"}';
-  const credit = Object.assign(new Error(raw), { name: 'BadRequestError', status: 400, error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } });
-  const overloaded = Object.assign(new Error('529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}'), { name: 'APIError', status: 529, error: { type: 'overloaded_error', message: 'Overloaded' } });
-  const server500 = Object.assign(new Error('500 {"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":"req_1"}'), { name: 'InternalServerError', status: 500, error: { type: 'api_error', message: 'Internal server error' } });
-  const bad400 = Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"messages: text content blocks must be non-empty"}}'), { name: 'BadRequestError', status: 400, error: { type: 'invalid_request_error', message: 'messages: text content blocks must be non-empty' } });
-  const rate = Object.assign(new Error('429 {"type":"error","error":{"type":"rate_limit_error","message":"rate limited"}}'), { name: 'RateLimitError', status: 429, error: { type: 'rate_limit_error', message: 'rate limited' } });
+  const credit = Object.assign(new Error(raw), { isMock: true, name: 'BadRequestError', status: 400, error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } });
+  const overloaded = Object.assign(new Error('529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}'), { isMock: true, name: 'APIError', status: 529, error: { type: 'overloaded_error', message: 'Overloaded' } });
+  const server500 = Object.assign(new Error('500 {"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":"req_1"}'), { isMock: true, name: 'InternalServerError', status: 500, error: { type: 'api_error', message: 'Internal server error' } });
+  const bad400 = Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"messages: text content blocks must be non-empty"}}'), { isMock: true, name: 'BadRequestError', status: 400, error: { type: 'invalid_request_error', message: 'messages: text content blocks must be non-empty' } });
+  const rate = Object.assign(new Error('429 {"type":"error","error":{"type":"rate_limit_error","message":"rate limited"}}'), { isMock: true, name: 'RateLimitError', status: 429, error: { type: 'rate_limit_error', message: 'rate limited' } });
   const conn = Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' });
   const ownPgError = Object.assign(new Error('duplicate key'), { code: '23505', status: 500 });
   const ownReviewError = Object.assign(new Error('bad input'), { name: 'ReviewError', status: 400 });
@@ -143,7 +144,9 @@ const CL = await import('../api/_lib/claude.js');
 /* ============================================================ #5 ask.js todayResolved regression guard */
 {
   const ask = read('api/ask.js');
-  const sendFn = ask.slice(ask.indexOf('const send = (status, body) => {'), ask.indexOf('const send = (status, body) => {') + 1400);
+  const sendStart = ask.indexOf('const send = (status, body) => {');
+  const sendEnd = ask.indexOf('\n  };', sendStart);
+  const sendFn = ask.slice(sendStart, sendEnd > sendStart ? sendEnd : sendStart + 1400); // whole send() body (R34 made it longer than 1,400 chars)
   check('#5 send() closure uses claimsToday (declared in handler scope), not the block-scoped todayResolved', /claimsToday \?\? new Date/.test(sendFn) && !/today: todayResolved/.test(sendFn));
   check('#5 claimsToday is declared before send()', ask.indexOf('let claimsToday = null;') > 0 && ask.indexOf('let claimsToday = null;') < ask.indexOf('const send = (status, body) => {'));
 }

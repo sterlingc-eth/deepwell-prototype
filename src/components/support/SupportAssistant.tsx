@@ -54,7 +54,23 @@ function loadChat(surface: SupportSurface): Persisted {
     if (raw) {
       const p = JSON.parse(raw) as Partial<Persisted>;
       if (Array.isArray(p.msgs)) {
-        const msgs = p.msgs.filter((m): m is ChatMsg => !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string' && typeof m.id === 'string');
+        // sessionStorage is editable by the person (and by any script that runs on the page): rebuild every message from validated fields only.
+        const msgs: ChatMsg[] = [];
+        for (const m of p.msgs.slice(-60) as unknown[]) {
+          const r = m as Partial<ChatMsg> | null;
+          if (!r || (r.role !== 'user' && r.role !== 'assistant') || typeof r.text !== 'string' || typeof r.id !== 'string') continue;
+          const sources = Array.isArray(r.sources) ? r.sources.filter((x): x is SupportSource => !!x && typeof x.title === 'string').slice(0, 3).map((x) => ({ id: String(x.id ?? x.title).slice(0, 80), title: x.title.slice(0, 120) })) : [];
+          const suggestions = Array.isArray(r.suggestions) ? r.suggestions.filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 4).map((x) => x.slice(0, 120)) : [];
+          msgs.push({
+            id: r.id.slice(0, 40),
+            role: r.role,
+            text: r.text.slice(0, 2000),
+            ...(sources.length ? { sources } : {}),
+            ...(typeof r.askQuestion === 'string' ? { askQuestion: r.askQuestion.slice(0, MAX_MESSAGE_CHARS) } : {}),
+            ...(r.handoffOffered === true ? { handoffOffered: true } : {}),
+            ...(suggestions.length ? { suggestions } : {}),
+          });
+        }
         return { msgs, handoffSent: p.handoffSent === true };
       }
     }
@@ -71,6 +87,13 @@ function saveChat(surface: SupportSurface, p: Persisted) {
   } catch {
     /* best effort */
   }
+}
+
+/** Trim to `n` UTF-16 units without leaving half of an emoji (a lone surrogate) at the end. */
+export function capText(t: string, n: number): string {
+  const c = t.slice(0, n);
+  const last = c.charCodeAt(c.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? c.slice(0, -1) : c;
 }
 
 const starterCache: Partial<Record<SupportSurface, SupportStarter>> = {};
@@ -220,7 +243,7 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
 
   const submit = useCallback(
     async (raw: string, retry = false) => {
-      const text = raw.trim().slice(0, MAX_MESSAGE_CHARS);
+      const text = capText(raw.trim(), MAX_MESSAGE_CHARS);
       if (!text || sending || cooldown > 0) return;
       const base = retry ? msgs : [...msgs, { id: newId(), role: 'user' as const, text }];
       if (!retry) {
@@ -442,7 +465,7 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
               <textarea
                 ref={taRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value.slice(0, MAX_MESSAGE_CHARS))}
+                onChange={(e) => setInput(capText(e.target.value, MAX_MESSAGE_CHARS))}
                 onKeyDown={onKeyDown}
                 rows={1}
                 maxLength={MAX_MESSAGE_CHARS}
@@ -538,7 +561,7 @@ function HandoffForm({
   const problem = kind === 'problem';
   const [email, setEmail] = useState(defaultEmail);
   const [name, setName] = useState(defaultName);
-  const [message, setMessage] = useState(defaultMessage.slice(0, MAX_MESSAGE_CHARS));
+  const [message, setMessage] = useState(capText(defaultMessage, MAX_MESSAGE_CHARS));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -581,7 +604,7 @@ function HandoffForm({
       </label>
       <label className="grid gap-1 text-caption text-ink-2">
         {problem ? 'What went wrong?' : 'What do you need help with?'}
-        <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_CHARS))} rows={3} maxLength={MAX_MESSAGE_CHARS} className={`${field} resize-none`} required />
+        <textarea value={message} onChange={(e) => setMessage(capText(e.target.value, MAX_MESSAGE_CHARS))} rows={3} maxLength={MAX_MESSAGE_CHARS} className={`${field} resize-none`} required />
       </label>
       {problem && <p className="m-0 text-caption text-ink-3">We attach the screen you are on, your device type and any recent error. Never your customers or documents.</p>}
       {err && (

@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { withTenant } from "./recordsStore.js";
-import { getObject, keyBelongsToTenant } from "./r2.js";
-import { getApiKey, MODEL_TIMEOUT_MS, providerFailureMessage } from "./claude.js";
+import { getObject, deleteObject, keyBelongsToTenant, normalizeContentType } from "./r2.js";
+export { normalizeContentType };
+import { getApiKey, MODEL_TIMEOUT_MS, providerFailureMessage, classifyProviderError, isAnthropicApiError } from "./claude.js";
 import { captureException } from "./telemetry.js";
 import { recordModelCall } from "./usage.js";
 import { withCache } from "./promptCache.js";
@@ -54,7 +55,9 @@ function stripControlChars(s) {
   // space-to-hyphen range, which deleted every space, comma, hyphen and
   // dollar sign from transcribed pages ("TOTALDUE9127.00") and made
   // word search impossible. Keep this written with explicit \x escapes.
-  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // R34: plus the Unicode directional override/embedding/isolate controls, which have no place in a transcription
+  // (U+202A-202E, U+2066-2069) - see extractFields.js stripControlChars. RLM/LRM and ZWJ/ZWNJ stay (RTL scripts need them).
+  return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\u202A-\u202E\u2066-\u2069]/g, '');
 }
 
 /**
@@ -451,7 +454,12 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     bytes = await getObject(doc.storage_key);
   } catch (err) {
     // R30 M5: an object over the read cap (PUT past its declared size) is the document's fault, not a blip.
-    if (err?.name === "R2Error" && err.status === 413) throw new IngestError("File is too large to read", 413);
+    if (err?.name === "R2Error" && err.status === 413) {
+      // R34: ...and it is storage the tenant is billed for and nothing will ever read. Upload-url only signs the length when
+      // the client declared one, so an object PUT past every limit is possible; do not keep it. Best effort, never blocks.
+      await deleteObject(doc.storage_key).catch(() => {});
+      throw new IngestError("File is too large to read", 413);
+    }
     throw err;
   }
   // Magic bytes beat a declared content type, which is only ever a browser's
@@ -462,14 +470,37 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
   // definite, that wins; a declared (or extension-guessed) type only fills in
   // when the bytes are inconclusive, e.g. plain text has no magic number.
   const sniffed = sniffMagicBytes(bytes);
-  const contentType = sniffed || doc.content_type || sniff(bytes, doc.original_filename);
+  // R34: a declared type is a browser's guess and is client-controlled: "Application/PDF", "application/pdf; charset=binary".
+  const contentType = sniffed || normalizeContentType(doc.content_type) || sniff(bytes, doc.original_filename);
+
+  // R34: the bytes said nothing definite, yet the type (declared, or guessed from the extension) names a format the model
+  // reads. An HTML page / SVG / program / empty or truncated file renamed ".pdf" or ".jpg" used to go to the vision model
+  // anyway: an API call that can only fail with a 400, retried three times by the queue, and recorded as "the AI service had a
+  // temporary problem" - the wrong message, the wrong retry, and a wasted call. Refuse it here with the real reason.
+  if (!sniffed && (contentType === "application/pdf" || VISION_IMAGE_TYPES.has(contentType))) {
+    const okPdf = contentType === "application/pdf" && bytes.subarray(0, 1024).toString("latin1").includes("%PDF");
+    if (!okPdf) {
+      const message = describeTypeMismatch(bytes, contentType);
+      await withTenant(ctx, (db) => db.markExtracted(documentId, { error: message }));
+      throw new IngestError(message, 415);
+    }
+  }
 
   let pages;
   let method;
   let readSource = null;
 
   if (TEXT_TYPES.test(contentType)) {
-    pages = chunkText(decodeText(bytes));
+    const decoded = decodeText(bytes);
+    // R34: a program, archive or other binary declared "text/plain" decoded to a page of mojibake and control characters that
+    // was stored as the document's text and then sent to the extraction model. Refuse it.
+    if (looksBinaryText(decoded)) {
+      const message = "This file is not readable text - it looks like a program, archive or other binary file. " +
+        "Export it as a PDF, a photo (JPEG/PNG) or a plain text/CSV file and upload again.";
+      await withTenant(ctx, (db) => db.markExtracted(documentId, { error: message }));
+      throw new IngestError(message, 415);
+    }
+    pages = chunkText(decoded);
     method = "text";
   } else if (contentType === "application/pdf" || VISION_IMAGE_TYPES.has(contentType)) {
     if (bytes.length > MAX_PDF_BYTES) {
@@ -484,7 +515,16 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
       method = "text";
       readSource = "pdf-text-layer";
     } else {
-      pages = await extractWithClaude(bytes, contentType, ctx, startedAt);
+      try {
+        pages = await extractWithClaude(bytes, contentType, ctx, startedAt);
+      } catch (err) {
+        const rejection = classifyModelInputRejection(err);
+        if (!rejection) throw err;
+        // A 413 is recorded by the caller (read-document.js / the queue's recordIfFinal); a 415 is recorded here, like the
+        // other terminal "cannot read this file" outcomes above.
+        if (rejection.status === 415) await withTenant(ctx, (db) => db.markExtracted(documentId, { error: rejection.message }));
+        throw new IngestError(rejection.message, rejection.status);
+      }
       method = "model";
       if (layer && !layer.ok) readSource = `model:${String(layer.reason).slice(0, 40)}`;
     }
@@ -492,7 +532,7 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     const message =
       contentType === "image/heic" || contentType === "image/heif"
         ? IPHONE_PHOTO_MESSAGE
-        : `Cannot read ${contentType} yet`;
+        : unsupportedTypeMessage(contentType);
     await withTenant(ctx, (db) =>
       db.markExtracted(documentId, { error: message })
     );
@@ -853,7 +893,17 @@ export function decodeText(bytes) {
     if (evenNuls / pairs > 0.3 && oddNuls / pairs < 0.1) return swap16(bytes).toString("utf16le");
   }
 
-  return bytes.toString("utf8");
+  // R34: a file that is not valid UTF-8 is, in practice, Windows-1252 (an old accounting/dispatch system's export: "Jos\xE9",
+  // "Mu\xF1oz", a degree sign). Decoded as UTF-8 each such byte became U+FFFD in the stored text and in the customer name
+  // extraction then matched on. Valid UTF-8 (including one that really contains U+FFFD) is untouched.
+  const utf8 = bytes.toString("utf8");
+  if (!utf8.includes("\uFFFD")) return utf8;
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return utf8;
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
 }
 
 /** Big-endian UTF-16 to little-endian, so Node can decode it. */
@@ -867,6 +917,75 @@ function swap16(buf) {
     out[i + 1] = t;
   }
   return out;
+}
+
+/** Pure (R34): why these bytes are not the PDF/photo they were declared to be, in words a person can act on. */
+export function describeTypeMismatch(bytes, claimed) {
+  const kind = claimed === "application/pdf" ? "PDF" : "photo (JPEG, PNG, GIF or WebP)";
+  const fix = `Re-export it as a real ${claimed === "application/pdf" ? "PDF" : "JPEG or PNG"} (or take the photo again) and upload it again.`;
+  if (!bytes || bytes.length === 0) return `This file is empty (0 bytes), so there is nothing to read. ${fix}`;
+  const head = bytes.subarray(0, 512).toString("latin1");
+  if (/^\s*(\xEF\xBB\xBF)?\s*<(!doctype|html|svg|\?xml|script|head|body)/i.test(head) || /<(html|svg|script)[\s>]/i.test(head)) {
+    return `This file is named like a ${kind} but it is really a web page or SVG drawing. ${fix}`;
+  }
+  if (head.startsWith("MZ") || head.startsWith("\x7fELF") || head.startsWith("PK\x03\x04") || head.startsWith("\x1f\x8b") || head.startsWith("Rar!")) {
+    return `This file is named like a ${kind} but it is really a program or compressed archive. ${fix}`;
+  }
+  if (bytes.length < 64) return `This file is too small (${bytes.length} bytes) to be a real ${kind} - it looks cut off or damaged. ${fix}`;
+  return `This file is not a valid ${kind}: its contents do not match its type, so it may be damaged or cut off. ${fix}`;
+}
+
+/** Pure (R34): the message for a file type the reader has no path for (replaces "Cannot read image/tiff yet"). */
+export function unsupportedTypeMessage(contentType) {
+  const t = String(contentType ?? "this type");
+  if (/^image\/(tiff?|bmp|x-ms-bmp|svg\+xml|avif|x-icon|vnd\.microsoft\.icon)$/.test(t)) {
+    return "TIFF, BMP, SVG and similar image files cannot be read yet. Save or export the page as a PDF, JPEG or PNG and upload again.";
+  }
+  return `This kind of file (${t.slice(0, 60)}) cannot be read yet. DeepWell reads PDFs, photos (JPEG, PNG, GIF, WebP) and plain text or CSV - convert it and upload again.`;
+}
+
+/**
+ * Pure (R34): is this decoded "text" really a binary file? A program or archive declared text/plain decodes to control
+ * characters and replacement characters, not words. Judged on the decoded string, so a correctly decoded UTF-16 or Latin-1
+ * file (no control characters) is never mistaken for binary. Needs a minimum sample so a one-line note is never refused.
+ */
+export function looksBinaryText(text) {
+  const sample = String(text ?? "").slice(0, 20000);
+  if (sample.length < 32) return false;
+  let bad = 0;
+  for (let i = 0; i < sample.length; i++) {
+    const c = sample.charCodeAt(i);
+    if ((c < 32 && c !== 9 && c !== 10 && c !== 13 && c !== 12) || c === 0xfffd || c === 127) bad++;
+  }
+  return bad / sample.length > 0.02;
+}
+
+/**
+ * Pure (R34): turn the model API refusing THE FILE (bad/encrypted/oversized PDF, oversized or corrupt image) into a clear,
+ * permanent, user-facing rejection instead of letting it fall through as "the AI service had a temporary problem" (which the
+ * queue also retried three times). Returns null for everything else - billing/credits/auth/overload, 429, 5xx, timeouts, and a
+ * 400 that is not about the file stay exactly as they were.
+ * @returns {{status: number, message: string}|null}
+ */
+export function classifyModelInputRejection(error) {
+  if (!error || !isAnthropicApiError(error)) return null;
+  if (classifyProviderError(error)) return null;
+  const status = Number(error.status ?? error.statusCode ?? 0);
+  if (![400, 413, 422].includes(status)) return null;
+  const msg = String(error.error?.error?.message ?? error.error?.message ?? error.message ?? "");
+  if (/password|encrypt/i.test(msg)) {
+    return { status: 415, message: "This PDF is password-protected, so it cannot be read. Remove the password (print it to a new PDF) and upload it again." };
+  }
+  if (status === 413 || /too large|exceeds? (the )?(maximum|max|limit)|maximum (allowed )?(size|file)|request_too_large|\b\d+\s*MB\b/i.test(msg)) {
+    return { status: 413, message: "This file is too large for the reader. Split it into smaller files, or save the photo at a lower resolution, and upload again." };
+  }
+  if (/page/i.test(msg) && /(maximum|exceed|more than|limit|too many)/i.test(msg)) {
+    return { status: 413, message: "This PDF has too many pages to read in one pass. Split it into smaller PDFs and upload them separately." };
+  }
+  if (/pdf|image|document|media|base64|file|could not process|unable to process/i.test(msg)) {
+    return { status: 415, message: "This file could not be opened - it may be damaged, cut off, or not a standard PDF or photo. Re-save or re-scan it and upload again." };
+  }
+  return null;
 }
 
 /** Split a plain-text file into page-sized rows so citations stay specific. */
@@ -898,6 +1017,9 @@ export function sniffMagicBytes(bytes) {
   if (head.subarray(0, 4).toString("latin1") === "GIF8") return "image/gif";
   if (bytes.length >= 12 && head.subarray(0, 4).toString("latin1") === "RIFF"
       && head.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  // R34: formats the reader cannot use, recognised by their bytes so a ".jpg" that is really a TIFF/BMP gets the right message.
+  if ((head[0] === 0x49 && head[1] === 0x49 && head[2] === 0x2a && head[3] === 0x00) || (head[0] === 0x4d && head[1] === 0x4d && head[2] === 0x00 && head[3] === 0x2a)) return "image/tiff";
+  if (bytes.length >= 14 && head[0] === 0x42 && head[1] === 0x4d && head[6] === 0 && head[7] === 0 && head[8] === 0 && head[9] === 0) return "image/bmp";
   // ISO-BMFF: a 4-byte box size, then "ftyp", then a 4-byte major brand.
   if (bytes.length >= 12 && head.subarray(4, 8).toString("latin1") === "ftyp") {
     const brand = head.subarray(8, 12).toString("latin1");

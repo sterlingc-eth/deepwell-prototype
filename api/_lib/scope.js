@@ -16,6 +16,7 @@
  *
  * No question text or row values are ever logged here.
  */
+import { dropConflicting } from './addressConflict.js';
 import { significantAddressTokens, formatDateHuman } from './fastPath.js';
 import { documentTypeLabel, DOCUMENT_TYPE_ALIASES } from './documentTypes.js';
 import { escapeRegex, escapeLikePattern as escapeLike } from './util/escape.js';
@@ -223,7 +224,7 @@ export async function resolveAddressScope(db, addressText, { unit = null, limit 
   if (!parsed) return empty;
   const patterns = [`${escapeLike(parsed.house)} %`, ...parsed.words.map((w) => `%${escapeLike(w)}%`)];
 
-  const { rows } = await db.raw(
+  const { rows: rows0 } = await db.raw(
     `SELECT id, entity_type, customer_id, customer_number, data->>'customer_name' AS customer_name,
             data->>'service_address' AS service_address, data
        FROM entities
@@ -232,6 +233,7 @@ export async function resolveAddressScope(db, addressText, { unit = null, limit 
       LIMIT ${Math.max(1, Math.min(200, limit))}`,
     [patterns]
   );
+  const rows = dropConflicting(rows0, addressText); // R34: see addressConflict.js
   let customers = rows.filter((r) => r.entity_type === 'customer');
   let equipment = rows.filter((r) => r.entity_type === 'equipment');
 

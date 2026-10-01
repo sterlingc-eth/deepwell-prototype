@@ -151,11 +151,18 @@ function parseReply(body: unknown): SupportReply | null {
   };
 }
 
+/** Trim to `n` UTF-16 units without leaving half of an emoji (a lone surrogate) at the end. */
+function capUnits(t: string, n: number): string {
+  const c = t.slice(0, n);
+  const last = c.charCodeAt(c.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? c.slice(0, -1) : c;
+}
+
 /** Ask the assistant a question. `history` is trimmed to the last MAX_HISTORY turns here so callers can't overshoot. */
 export function sendSupportMessage(req: { message: string; history?: SupportHistoryItem[]; surface: SupportSurface; page?: string }): Promise<SupportResult<SupportReply>> {
   const body = {
-    message: req.message.trim().slice(0, MAX_MESSAGE_CHARS),
-    history: (req.history ?? []).slice(-MAX_HISTORY).map((h) => ({ role: h.role, text: h.text })),
+    message: capUnits(req.message.trim(), MAX_MESSAGE_CHARS),
+    history: (req.history ?? []).slice(-MAX_HISTORY).map((h) => ({ role: h.role, text: capUnits(h.text, MAX_MESSAGE_CHARS) })),
     surface: req.surface,
     ...(req.page ? { page: req.page } : {}),
   };

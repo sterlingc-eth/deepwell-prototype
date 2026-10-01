@@ -165,7 +165,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // so buildExtractPrompt/buildExtractToolForPack return exactly EXTRACT_TOOL
   // and today's prompt text, unchanged — see extractFields.js's packFieldMeta.
   const extractTool = buildExtractToolForPack(pack);
-  const fullPrompt = buildExtractPrompt(selected, documentType || doc.document_type, pack);
+  // R34: `documentType` is a caller-supplied string (POST /api/extract) and doc.document_type was, until R34, whatever a member
+  // typed; either was interpolated into the prompt text verbatim. Only a plain type-id shape reaches the prompt.
+  const promptType = [documentType, doc.document_type].find((t) => typeof t === 'string' && /^[a-z][a-z0-9_-]{0,39}$/i.test(t.trim()))?.trim();
+  const fullPrompt = buildExtractPrompt(selected, promptType, pack);
   const { dynamic: dynamicPrompt, stable: stablePrompt } = splitExtractPrompt(fullPrompt);
 
   const startedAt = Date.now();

@@ -20,6 +20,7 @@
  *
  * parseMoneyIntent is pure (unit-tested with no DB). runMoneyIntent touches `db`.
  */
+import { resolveCalendarSpan } from '../timeSpans.js';
 import { formatMoney } from '../fastPath.js';
 import { resolveContactCandidates, resolveAddressCandidates } from '../contactLookup.js';
 import { extractionsHaveUnitIndex } from '../recordsStore.js';
@@ -89,6 +90,12 @@ export function parsePeriod(q, today) {
   // "yr to date" added (2026-09-26, hvac-bookkeeper-0011): a bookkeeper's own shorthand for
   // "year to date" - same meaning, just abbreviated the same way "yr" already stands for "year"
   // everywhere else in casual invoicing speech.
+  // R34: calendar spans (a specific day, Q1 2026, the 2010s, between/before/after <year>, today/yesterday) that no family below
+  // recognized and so silently answered with the shop-wide total - see timeSpans.js.
+  {
+    const span = resolveCalendarSpan(s, today);
+    if (span && !span.invalid) return { label: span.bare ?? span.label, from: span.from, to: span.to };
+  }
   if (/\b(year to date|yr to date|ytd|so far this year|this year so far)\b/.test(s)) return { label: `${Y} so far`, from: iso(Y, 1, 1), to: today };
   if (/\blast month\b/.test(s)) return Y && M === 1 ? month(Y - 1, 12) : month(Y, M - 1);
   if (/\bthis month\b|\bmonth to date\b|\bmtd\b/.test(s)) return { label: `${MONTH_NAMES[M - 1]} ${Y}`, from: iso(Y, M, 1), to: iso(Y, M, lastDay(Y, M)) };
@@ -191,7 +198,7 @@ export function extractSubjectPhrase(question) {
     /\b(?:for|to|from|of|with)\s+(?:the\s+)?(.+?)(?=['’]s\b|\s+(?:last|latest|most|this|in|so|since|during|total|and|vs|versus|so far|over|under|job)\b|$)/i,
     // R32b: "how many unpaid invoices does Rebecca Montoya have" / "how much has Rebecca Montoya been invoiced" - the name sits between an auxiliary
     // and the verb ("we"/"you"/"they" are stop words, so a shop-wide "have we sent out" never becomes a subject).
-    /\b(?:does|did|do|has|have|had)\s+(?:the\s+)?(.+?)\s+(?:have|had|got|been\s+(?:invoiced|billed|charged|sent|quoted)|paid|owe|owed|pay)\b/i,
+    /\b(?:does|did|do|has|have|had)\s+(?:the\s+)?(.+?)\s+(?:have|had|got|get|gets|receive|received|been\s+(?:invoiced|billed|charged|sent|quoted)|paid|owe|owed|pay)\b/i,
     // "how many invoices have we sent Maria Gallardo" - the name FOLLOWS the verb
     /\b(?:sent|send|billed|bill|charged|invoiced)\s+(?:to\s+)?(.+?)(?=\s+(?:for|in|on|last|this|since|during|so|and|vs|versus|so far|over|under)\b|$)/i,
   ];

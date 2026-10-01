@@ -308,6 +308,7 @@ if (!pgliteAvailable) {
     Object.getPrototypeOf(probe.messages).create = async function blockedCreate() {
       const err = new Error('r18h4 harness: model calls are disabled — this dialogue should be answerable by the deterministic layer alone');
       err.status = 400;
+      err.isMock = true;
       throw err;
     };
   } catch { /* SDK not installed in this environment — fine, nothing will try to call it either */ }

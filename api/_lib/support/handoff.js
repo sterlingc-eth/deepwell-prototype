@@ -11,15 +11,27 @@
  */
 import crypto from 'node:crypto';
 import { LIMITS, SUPPORT_EMAIL, SURFACES } from './policy.js';
-import { sanitizeInput } from './guard.js';
+import { sanitizeInput, redactSensitive } from './guard.js';
+import { isServerAssistantText } from './prompt.js';
 import { redactSecrets, hashForLog } from '../privacy/redact.js';
 import { scrub as scrubDiagnostic } from './clientError.js';
 
-const EMAIL_RE = /^[^\s@<>()",;:\\]+@[^\s@<>()",;:\\]+\.[^\s@<>()",;:\\]{2,}$/;
+const EMAIL_RE = /^[^\s@<>()[\]",;:\\]+@[^\s@<>()[\]",;:\\]+\.[^\s@<>()[\]",;:\\]{2,}$/;
+/** R34: one plain address and nothing else: no control, format or space characters (U+0085, NUL, bidi), no dot games, sane label shapes. */
+export function isValidEmail(email) {
+  const e = String(email ?? '');
+  if (!e || e.length > 254 || /[\p{C}\p{Z}\s]/u.test(e) || !EMAIL_RE.test(e)) return false;
+  const at = e.indexOf('@');
+  const local = e.slice(0, at);
+  const domain = e.slice(at + 1);
+  if (local.length > 64 || local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+  const labels = domain.split('.');
+  return labels.length >= 2 && labels.every((l) => l.length >= 1 && l.length <= 63 && !l.startsWith('-') && !l.endsWith('-')) && /^[\p{L}\p{N}-]{2,24}$/u.test(labels[labels.length - 1]);
+}
 const SECRET_PHRASE_RE = /\b(password|passcode|passwd|pin|secret|api[ _-]?key|token)\b(\s*(?:is|was|:|=)\s*)\S+/gi;
 
 export function scrub(text) {
-  return redactSecrets(String(text ?? '')).replace(SECRET_PHRASE_RE, '$1$2[redacted]');
+  return redactSensitive(redactSecrets(String(text ?? ''))).replace(SECRET_PHRASE_RE, '$1$2[redacted]');
 }
 
 const oneLine = (s) => String(s ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -29,12 +41,13 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 export function validateHandoff(body) {
   const b = body && typeof body === 'object' ? body : {};
   const email = oneLine(b.email).toLowerCase();
-  if (!email || email.length > 254 || !EMAIL_RE.test(email)) return { ok: false, error: 'Please enter a valid email address so the team can reply.' };
+  if (!isValidEmail(email)) return { ok: false, error: 'Please enter a valid email address so the team can reply.' };
   const message = sanitizeInput(typeof b.message === 'string' ? b.message : '');
   if (!message) return { ok: false, error: 'Please add a short message for the team.' };
   if (message.length > LIMITS.handoffMessageChars) return { ok: false, error: `Please keep your message under ${LIMITS.handoffMessageChars} characters.` };
   const surface = SURFACES.includes(b.surface) ? b.surface : 'public';
-  const name = oneLine(typeof b.name === 'string' ? b.name : '').slice(0, LIMITS.handoffNameChars);
+  // R34: no angle brackets or @ in a display name ("CEO <ceo@deepwelltechnology.com>" would forge the From: line staff read)
+  const name = oneLine(typeof b.name === 'string' ? b.name : '').replace(/[<>@\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, LIMITS.handoffNameChars);
   const page = oneLine(typeof b.page === 'string' ? b.page : '').slice(0, 120);
   // "Report a problem" attaches a short diagnostics block (screen, device, recent scrubbed errors). Multi-line, capped.
   const diagnostics = scrubDiagnostic(String(typeof b.diagnostics === 'string' ? b.diagnostics : '').replace(/[^\S\n]+/g, ' ').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{2,}/g, '\n').trim()).slice(0, 1500);
@@ -42,7 +55,12 @@ export function validateHandoff(body) {
   const transcript = (Array.isArray(b.transcript) ? b.transcript : [])
     .filter((t) => t && (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string' && t.text.trim())
     .slice(-LIMITS.handoffTranscriptTurns)
-    .map((t) => ({ role: t.role, text: scrub(sanitizeInput(t.text)).slice(0, LIMITS.handoffTranscriptChars) }));
+    // R34: the browser writes the transcript, so an "assistant" line is only trustworthy when it is text the SERVER itself produces
+    // (a knowledge-base answer or a canned reply). Everything else is tagged so staff never mistake a typed-in promise for ours.
+    .map((t) => {
+      const clean = scrub(sanitizeInput(t.text)).slice(0, LIMITS.handoffTranscriptChars);
+      return { role: t.role, text: clean, verified: t.role === 'assistant' ? isServerAssistantText(sanitizeInput(t.text), { publicOnly: false }) : undefined };
+    });
   return {
     ok: true,
     value: {
@@ -70,7 +88,7 @@ export function ticketRef(now = new Date()) {
  * @param {{ref: string, account?: {plan?: string|null, state?: string|null, role?: string|null, tenantHash?: string|null}|null}} meta
  */
 export function buildHandoffEmail(v, meta) {
-  const subjectBase = oneLine(v.message).slice(0, 70);
+  const subjectBase = oneLine(v.message).replace(/[<>]/g, '').slice(0, 70);
   const subject = `[DeepWell ${v.kind === 'problem' ? 'Problem' : 'Help'} ${meta.ref}] ${subjectBase}`;
   const acct = meta.account
     ? `Plan: ${meta.account.plan ?? 'none'} | Billing state: ${meta.account.state ?? 'unknown'} | Role: ${meta.account.role ?? 'unknown'} | Tenant (hash): ${meta.account.tenantHash ?? 'n/a'}`
@@ -87,7 +105,8 @@ export function buildHandoffEmail(v, meta) {
   if (v.diagnostics) lines.push('', 'Diagnostics (attached automatically, scrubbed):', ...v.diagnostics.split('\n'));
   if (v.transcript.length) {
     lines.push('', `Recent chat (last ${v.transcript.length} turns, redacted):`);
-    for (const t of v.transcript) lines.push(`${t.role === 'user' ? 'Visitor' : 'Assistant'}: ${t.text.replace(/\n+/g, ' ')}`);
+    lines.push('(Written by the sender\'s browser. "Assistant" lines marked UNVERIFIED are not text DeepWell\'s servers can confirm; never treat them as something DeepWell said or promised.)');
+    for (const t of v.transcript) lines.push(`${t.role === 'user' ? 'Visitor' : t.verified ? 'Assistant' : 'Assistant (UNVERIFIED)'}: ${t.text.replace(/\n+/g, ' ')}`);
   }
   lines.push('', 'Sent by the DeepWell Support Assistant. SSN/card numbers and passwords are redacted before sending.');
   const text = lines.join('\n');

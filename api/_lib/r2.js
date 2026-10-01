@@ -40,7 +40,8 @@ function config() {
   const bucket = process.env.R2_BUCKET_NAME;
   const missing = Object.entries({ R2_ACCOUNT_ID: accountId, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey, R2_BUCKET_NAME: bucket })
     .filter(([, v]) => !v).map(([k]) => k);
-  if (missing.length) throw new Error(`R2 is not configured: missing ${missing.join(', ')}`);
+  // isConfig: telemetry reports a server-config error once per cold start (kind=config), not once per request.
+  if (missing.length) throw Object.assign(new Error(`R2 is not configured: missing ${missing.join(', ')}`), { isConfig: true });
   return { accountId, accessKeyId, secretAccessKey, bucket, host: `${accountId}.r2.cloudflarestorage.com` };
 }
 
@@ -249,4 +250,71 @@ export function objectKey(tenantId, sha256, filename) {
   // on the documents row, where it belongs.
   void filename;
   return `${tenantId}/${sha256.slice(0, 2)}/${sha256}`;
+}
+
+/* --------------------------------------------------------------------------------------------- R34 upload hygiene */
+
+/** Pure: "Application/PDF; charset=binary" -> "application/pdf". Anything that is not a type/subtype shape -> null. */
+export function normalizeContentType(raw) {
+  if (typeof raw !== 'string') return null;
+  const t = raw.split(';')[0].trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/.test(t) ? t : null;
+}
+
+const FILENAME_JUNK = /[\u0000-\u001f\u007f\u202A-\u202E\u2066-\u2069\u200B\u2060\uFEFF]/g;
+/** The most characters (bytes of a path, really) a stored original filename keeps. Bulk import sends a relative folder path, hence not 100. */
+export const MAX_FILENAME_CHARS = 255;
+
+/**
+ * Pure: the filename as it is STORED. Removes NUL and other control characters (a NUL is a raw Postgres error - one such name
+ * 500s a single presign and aborts a whole 50-file batch), Unicode directional overrides (a name that displays as
+ * "invoice_exe.pdf" while really ending ".exe"), and traversal / empty path segments ("../../etc/x.pdf" -> "etc/x.pdf"), then
+ * bounds the length keeping the END (name + extension). The name is never used to build the storage key or a filesystem path
+ * (objectKey is tenant/hash only); this is about what lands in the database, the Inbox and a Content-Disposition header.
+ * @returns {string|null} null when nothing usable is left
+ */
+export function sanitizeUploadFilename(raw) {
+  if (typeof raw !== 'string') return null;
+  const parts = raw.replace(FILENAME_JUNK, '').replace(/\\/g, '/').split('/').map((x) => x.trim()).filter((x) => x && x !== '.' && x !== '..');
+  let s = parts.join('/');
+  if (!s) return null;
+  if (s.length > MAX_FILENAME_CHARS) s = s.slice(-MAX_FILENAME_CHARS);
+  return s;
+}
+
+/**
+ * Pure: how long a presigned PUT stays valid. 15 minutes was fixed for every size, so a 24 MB scan on a weak cellular link
+ * (~25 KB/s) could never finish before the URL expired: the PUT failed, the offline queue retried from byte zero, and so on
+ * forever. Assume a 16 KB/s floor on top of the 15 minutes, capped at one hour. A URL is bound to one key and (when sized) one
+ * exact Content-Length, so a longer window widens nothing.
+ */
+export function uploadExpirySeconds(sizeBytes) {
+  const base = 900;
+  if (!Number.isInteger(sizeBytes) || sizeBytes <= 0) return base;
+  return Math.min(3600, base + Math.ceil(sizeBytes / (16 * 1024)));
+}
+
+const SAFE_INLINE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'text/plain', 'text/csv']);
+const EXT_TYPES = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', txt: 'text/plain', csv: 'text/csv' };
+
+/**
+ * Pure: how a presigned GET of a stored original is served. R2 serves an object with whatever Content-Type the uploader's PUT
+ * carried (client-controlled), so an uploaded HTML or SVG file would open inline as a live page on the storage domain.
+ * Instead the response type is forced (`response-content-type`): a known document/photo type is shown inline, anything else is
+ * an opaque download. The filename is made header-safe (no quotes, CR/LF, `;`, backslashes, control characters) with an
+ * RFC 5987 UTF-8 form for non-ASCII names.
+ * @returns {{contentType: string, disposition: string}}
+ */
+export function originalServing(filename, declaredType) {
+  const name = String(filename ?? 'document').split('/').pop() ?? 'document';
+  const clean = name.replace(FILENAME_JUNK, '').replace(/["\\;]/g, '_').trim().slice(0, 200) || 'document';
+  const ascii = clean.replace(/[^\x20-\x7e]/g, '_');
+  const utf8 = encodeURIComponent(clean).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  const ext = clean.includes('.') ? clean.split('.').pop().toLowerCase() : '';
+  const declared = normalizeContentType(declaredType);
+  const type = declared && SAFE_INLINE_TYPES.has(declared) ? declared : (!declared && EXT_TYPES[ext]) || null;
+  return {
+    contentType: type ?? 'application/octet-stream',
+    disposition: `${type ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${utf8}`,
+  };
 }

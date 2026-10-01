@@ -114,6 +114,8 @@ import { buildAddressMissAnswer } from "./_lib/lookups/addressMiss.js";
 import { buildUnknownNameDecline } from "./_lib/lookups/unknownName.js";
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
+import { answerAddressConflict } from "./_lib/addressConflict.js";
+import { classifySafety, buildSafetyAnswer, unverifiedTypeNote, normalizeInputText, neutralizeMarkup } from "./_lib/router/safetyGate.js";
 import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName } from "./_lib/router/earlyDecline.js";
 // Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
 // F1/F6) — see guard/check.js's own header for what each function checks and why, and the untracked-concept
@@ -760,6 +762,8 @@ export default async function handler(req, res) {
   // R14 integration fix: `todayResolved` is declared inside the try block below, invisible to this closure —
   // every call threw a ReferenceError and the claim check was silently skipped on EVERY answer.
   let claimsToday = null;
+  // R34: the question as typed, so send() can refuse an answer about a DIFFERENT address than the one asked about (addressConflict.js).
+  let askedText = null;
   // Round 29: set when the question looked like an app how-to that the strict help route did not answer; a no-answer
   // result then carries `helpHint` so the UI can point to the DeepWell Help chat instead of a bare "not in your records".
   let helpHint = false;
@@ -768,6 +772,24 @@ export default async function handler(req, res) {
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
   const send = (status, body) => {
+    if (askedText && body?.data && typeof body.data === "object" && body.data.kind === "answer") {
+      try {
+        const typeNote = unverifiedTypeNote(askedText, body.data);
+        if (typeNote) body.data.text = `${body.data.text} ${typeNote}`;
+      } catch (err) { console.error("type-premise note failed, sending answer as computed:", err?.message); }
+      try {
+        const conflict = answerAddressConflict(askedText, body.data);
+        if (conflict?.soft) {
+          // A loosely typed city/zip never blocks the answer (the exam relies on that), but it is never silently ignored either.
+          body.data.text = `${body.data.text} (Note: you said ${conflict.asked}; the address on file is ${conflict.closest}.)`;
+        } else if (conflict) {
+          body = { ...body, data: attachCitations(
+            { kind: "no-answer", text: `Nothing on file for ${conflict.asked}. The closest address on file is ${conflict.closest}, which is a different ${conflict.kind === "city" ? "city" : conflict.kind === "zip" ? "zip code" : conflict.kind === "unit" ? "unit" : conflict.kind === "suffix" ? "street type" : "side of the street"}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [], addressMiss: true },
+            { records: [], total: 0, kind: "searched", basis: `Searched every customer service address for ${conflict.asked}; only a different ${conflict.kind} of the same street number is on file.` }
+          ) };
+        }
+      } catch (err) { console.error("address conflict check failed, sending answer as computed:", err?.message); }
+    }
     if (techTypoNote && body?.data && typeof body.data === "object" && body.data.kind === "answer") decorateWithTypoNote(body.data, techTypoNote);
     if (helpHint && body?.data && typeof body.data === "object" && body.data.kind === "no-answer" && !body.data.help) body.data.helpHint = true;
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
@@ -787,6 +809,7 @@ export default async function handler(req, res) {
         try { attachSentenceCitationsSync(body.data); } catch (err) { console.error("attachSentenceCitationsSync failed, sending answer without it:", err?.message); }
       }
     }
+    if (body?.data && typeof body.data === "object") { try { neutralizeMarkup(body.data); } catch { /* never block an answer on hygiene */ } }
     if (streaming) {
       try {
         const line = status < 400
@@ -844,6 +867,10 @@ export default async function handler(req, res) {
     if (question.length > MAX_QUESTION) {
       return res.status(400).json({ error: "Question is too long" });
     }
+    // R34: fold fullwidth/compatibility forms, drop invisible/bidi/control characters and lone surrogates before ANY router sees the text.
+    question = normalizeInputText(question);
+    if (!question) return res.status(400).json({ error: "Missing question" });
+    askedText = question;
 
     // ---- Round 29: how-to questions about the app itself ("how do I invite a tech", "where is billing") -------
     // Answered from the signed-in DeepWell Help KB at $0, labelled "From DeepWell Help: <article>". Two layers keep
@@ -884,6 +911,16 @@ export default async function handler(req, res) {
       if (nq) {
         console.log(JSON.stringify({ route: "ask", non_question: nq.kind }));
         return send(200, { success: true, data: attachCitations(nonQuestionAnswer(nq), { records: [], total: 0, basis: "This isn't a question about your records, so nothing was searched." }) });
+      }
+    }
+
+    // R34: injection / sensitive-identifier / forecast / impossible-date questions are declined here at $0, for every caller
+    // (scorecard included), before any router can answer them with a confident wrong number. See router/safetyGate.js.
+    {
+      const safety = classifySafety(question);
+      if (safety) {
+        console.log(JSON.stringify({ route: "ask", safety_gate: safety.kind }));
+        return send(200, { success: true, data: buildSafetyAnswer(safety) });
       }
     }
 

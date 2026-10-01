@@ -277,6 +277,8 @@ async function runSlotFillCore(db, parsed, opts = {}) {
   }
   const candidates = await resolveAddressCandidates(db, parsed.address);
   if (candidates.length === 0) {
+    // R34: the house + street exists but a typed direction/city/zip/unit contradicts it - say so (and name what IS on file) instead of deferring.
+    if (candidates.dropped?.length) return buildNoAddressAnswer(parsed.address, candidates.dropped.map((r) => ({ service_address: r.service_address, customer_name: r.customer_name })));
     if (await looseAddressExists(db, parsed.address)) return null;
     return buildNoAddressAnswer(parsed.address, await sameStreetNeighbors(db, parsed.address));
   }

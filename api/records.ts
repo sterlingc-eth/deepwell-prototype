@@ -23,6 +23,8 @@ import { limit } from './_lib/rateLimit.js';
 import { checkUploadGate } from './upload-url.js';
 import { clientLimits, planStateFor } from './_lib/plan.js';
 import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
+import { normalizeContentType, sanitizeUploadFilename } from './_lib/r2.js';
+import { DOCUMENT_TYPE_IDS } from './_lib/documentTypes.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
@@ -67,6 +69,38 @@ export function recordsActionAccess(action: string, auth: { orgId?: string | nul
   if (RECORDS_READ_ACTIONS.has(action) || RECORDS_MEMBER_WRITE_ACTIONS.has(action)) return 'ok';
   if (RECORDS_ADMIN_ACTIONS.has(action)) return !auth?.orgId || auth.orgRole === 'admin' ? 'ok' : 'forbidden';
   return 'unknown';
+}
+
+const MAX_CREATE_BYTES = 100 * 1024 * 1024;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * R34 (pure): the createDocument payload a member may send, validated the way /api/upload-url validates its own body. It used
+ * to be handed to the INSERT as typed, so a NUL byte in the filename, a non-uuid batch_id, a 10^20 file size or a 5,000-character
+ * content type each ended as a raw Postgres error (a 500, with the detail in the server log), and a 60 KB filename or a
+ * right-to-left override in it was stored as typed. Only the columns an upload sets are passed on.
+ */
+export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+  const filename = sanitizeUploadFilename(p?.original_filename);
+  if (!filename) return { ok: false, error: 'original_filename is required' };
+  if (typeof p?.sha256_hash !== 'string' || !/^[0-9a-f]{64}$/.test(p.sha256_hash)) return { ok: false, error: 'sha256_hash must be a 64-character hex digest' };
+  const size = p?.file_size_bytes;
+  if (size != null && (!Number.isInteger(size) || size <= 0 || size > MAX_CREATE_BYTES)) return { ok: false, error: 'file_size_bytes must be a whole number of bytes between 1 and 100 MB' };
+  if (p?.content_type != null && typeof p.content_type !== 'string') return { ok: false, error: 'content_type must be a string' };
+  if (p?.batch_id != null && (typeof p.batch_id !== 'string' || !UUID_SHAPE.test(p.batch_id))) return { ok: false, error: 'batch_id must be a uuid' };
+  const dt = typeof p?.document_type === 'string' ? p.document_type.trim().toLowerCase().replace(/[\s_]+/g, '-') : null;
+  return {
+    ok: true,
+    value: {
+      original_filename: filename,
+      sha256_hash: p.sha256_hash,
+      file_size_bytes: size ?? null,
+      content_type: normalizeContentType(p?.content_type),
+      batch_id: p?.batch_id ?? null,
+      // A type is kept only when it is a known id; anything else is left for classification to decide.
+      document_type: dt && DOCUMENT_TYPE_IDS.has(dt) ? dt : null,
+    },
+  };
 }
 
 const TENANT_PRED = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -189,6 +223,11 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     // tenant + hash; nothing else may supply one.
     delete payload.storage_key;
     delete payload.stage;
+    const cleaned = cleanCreateDocumentPayload(payload);
+    if (!cleaned.ok) return handleCors(res, req).status(400).json({ error: cleaned.error });
+    for (const k of Object.keys(payload)) delete payload[k];
+    Object.assign(payload, cleaned.value);
+    payload.clerk_user_id = auth.userId;
     payload.uploaded_by = auth.userId;
     // R30: this path used to skip the billing gate and the ingest rate limit that /api/upload-url applies, so a
     // member could create documents without either. Same gate, same bucket.

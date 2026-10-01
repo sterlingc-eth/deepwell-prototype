@@ -953,6 +953,19 @@ function detectWarrantyExpiryWindow(q, today) {
   return { entity: 'equipment', op: opFromShape(q), filters };
 }
 
+const TON_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, ten: 10 };
+const TONNAGE_MENTION_RE = /\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|ten)[\s-]*(?:tons?|tonners?|tonnage)\b/gi;
+/** Distinct tonnages named in the question as bare numbers ("3 ton", "two-ton", "5 tons"); [] when none. */
+function detectTonnageMentions(q) {
+  const out = new Set();
+  for (const m of String(q).matchAll(TONNAGE_MENTION_RE)) {
+    const raw = m[1].toLowerCase();
+    const n = TON_WORDS[raw] ?? Number(raw);
+    if (Number.isFinite(n) && n > 0) out.add(n);
+  }
+  return [...out];
+}
+
 /** "how many different years do we have customers on file for" — a DISTINCT-year count over
  *  service_date records (extractions.field_key='service_date'), forced to entity 'serviceVisits'
  *  the same way detectTechnicianGroupBy/detectDistinctDimensionCount force an entity a bare noun
@@ -1518,6 +1531,18 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
       const rf = buildRefrigerantFilter(q);
       if (!rf) return null;
       if (!filters.some((f) => f.field === 'refrigerant')) filters.push(rf);
+    }
+
+    // R34: "how many 3 ton units" / "how many two-ton Trane units" / "units that are 5 tons" - a nameplate TONNAGE is a real unit
+    // attribute (FILTER_FIELDS 'tonnage'; stored as "3 ton") that nothing built a filter for, so the count came back as every unit
+    // ("You have 132 pieces of equipment."). Applied to units, or to customers via their units; anywhere else a named tonnage cannot be
+    // honoured, so the plan is declined (falls through) rather than answered without it.
+    {
+      const tons = detectTonnageMentions(q);
+      if (tons.length) {
+        if (tons.length > 1 || !(equipmentLike || entity === 'customers')) return null;
+        if (!filters.some((f) => f.field === 'tonnage')) filters.push({ field: 'tonnage', op: 'eq', value: `${tons[0]} ton` });
+      }
     }
 
     // A bare noun phrase with NOTHING recognized at all (no filter, no

@@ -15,9 +15,11 @@ import {
   sanitizeInput, detectSensitive, detectInjection, detectSmalltalk, detectIdentity, detectHumanRequest,
   detectHandoffTrigger, detectRecordsStrong, detectRecordsWeak, detectCompetitorComparison, detectTradeHowTo,
   detectOffTopic, hasDeepwellLexicon, detectAccountIntent, validateModelReply, cleanLinksAndMarkup, defang, capWords,
+  detectConfidential, detectNegotiation, detectCommitment, detectIndustryFit,
 } from './guard.js';
-import { matchFaq, suggestionsFor, contactEntry, articleById, PUBLIC_ARTICLES, NEAR } from './faq.js';
+import { matchFaq, suggestionsFor, contactEntry, articleById, entryById, PUBLIC_ARTICLES, NEAR } from './faq.js';
 import { buildRequest, sanitizeHistory, RULES_SHINGLES } from './prompt.js';
+import { makePromptShingles } from './guard.js';
 import { estimateTokens } from '../promptCache.js';
 import { SYSTEM_TEXT } from './prompt.js';
 
@@ -165,12 +167,23 @@ export async function respond(input, deps = {}) {
   // 6. competitor comparisons are declined before the FAQ can mis-hit on them
   if (detectCompetitorComparison(message)) return done(withSuggestions(reply('guard', CANNED.competitor), ['How much does DeepWell cost?', 'What is included in every plan?']), 'guard', { reason: 'competitor' });
 
+  // 6b. R34: private details about the people at DeepWell, internal business figures, secrets and other tenants are never answered
+  // (and never reach the FAQ, which would answer an unrelated entry such as the founders' bio or the API add-on)
+  const conf = detectConfidential(message);
+  if (conf) {
+    const text = conf === 'personal' ? CANNED.personal : conf === 'secrets' ? CANNED.secrets : CANNED.internal;
+    const chips = conf === 'personal' ? ['Who are the founders?', 'How do I contact DeepWell?'] : conf === 'internal' ? ['Is my data isolated from other customers?', 'How do I contact DeepWell?'] : ['How do I contact DeepWell?'];
+    return done(withSuggestions(reply('guard', text, conf === 'secrets' ? handoff('asked-secrets') : {}), chips), 'guard', { reason: `confidential:${conf}` });
+  }
+
   // 7. account lookups (signed in only, read-only, $0)
   const acctIntent = detectAccountIntent(message);
   // Signed-out visitors can't get an account lookup, but the same words are often a general question
   // ("when will I be charged after the trial?"): let the FAQ try first and only then ask them to sign in.
-  const needSignIn = Boolean(acctIntent) && (!signedIn || !deps.tools);
-  if (acctIntent && !needSignIn) {
+  // R34: only a FIRST-PERSON account question needs a sign-in; "will you charge me when the trial ends?" is a pre-sales question for the FAQ / model
+  const canLookup = Boolean(acctIntent) && signedIn && Boolean(deps.tools);
+  const needSignIn = Boolean(acctIntent) && !canLookup && /\b(?:my|mine|i|im|i'm|ive|i've|we|our)\b/i.test(message.replace(/['\u2019]/g, "'"));
+  if (canLookup) {
     try {
       const needPlan = acctIntent !== 'uploads';
       const [plan, uploads] = await Promise.all([needPlan ? deps.tools.getPlanAndUsage(input.auth) : null, acctIntent === 'uploads' ? deps.tools.getRecentUploadStatus(input.auth) : null]);
@@ -204,6 +217,19 @@ export async function respond(input, deps = {}) {
   }
 
   if (needSignIn) return done(reply('faq', CANNED.signInForAccount, { sources: [] }), 'faq', { faqId: 'account-signin' });
+
+  // 9b. R34: things the FAQ could not settle but that still never need the model ($0 canned answers)
+  const fit = detectIndustryFit(message);
+  if (fit) {
+    const e = entryById(fit === 'other-trades' ? 'what-is-deepwell#3' : 'what-is-deepwell#4');
+    if (e) {
+      const a = articleById(e.article);
+      const regulated = fit === 'regulated';
+      return done(withSuggestions(reply('faq', regulated ? CANNED.industryFitRegulated : e.a, { sources: [{ id: a.id, title: a.title }], ...(regulated ? handoff('compliance') : {}) }), ['Is there a free demo or sample?', 'How much does DeepWell cost?'].filter((q) => ENTRIES.some((x) => x.q === q && (signedIn || x.audience !== 'app')))), 'faq', { faqId: `industry-fit:${fit}` });
+    }
+  }
+  if (detectNegotiation(message)) return done(withSuggestions(reply('guard', CANNED.negotiate, handoff('pricing')), ['How much does DeepWell cost?', 'Is there annual pricing or a discount?']), 'guard', { reason: 'negotiation' });
+  if (detectCommitment(message)) return done(withSuggestions(reply('guard', CANNED.commitments, handoff('legal')), ['What features are coming soon?', 'Is DeepWell SOC 2 certified or compliant?']), 'guard', { reason: 'commitment' });
 
   // 10. weaker "this is about my own data" signal
   if (detectRecordsWeak(message)) return done(reply('redirect', signedIn ? CANNED.recordsRedirectApp : CANNED.recordsRedirectPublic, { redirectTo: 'ask' }), 'redirect', { reason: 'records:weak' });
@@ -273,6 +299,17 @@ export async function respond(input, deps = {}) {
 const CAP_WORDS_PUBLIC = capWords(`${MODEL_KB_PUBLIC}\n${Object.values(CANNED).join('\n')}\n${ARTICLES.filter((a) => PUBLIC_ARTICLES.has(a.id)).map((a) => a.title).join('\n')}`);
 const CAP_WORDS_FULL = capWords(`${MODEL_KB}\n${Object.values(CANNED).join('\n')}\n${ARTICLES.map((a) => a.title).join('\n')}`);
 
+/**
+ * R34 defense in depth: a public reply may never repeat app-only answer text. The public model prefix does not contain it, so this only fires if
+ * something ever leaks it there. Shingles of app-only answers minus every shingle that also occurs in a public answer (generic phrasing is fine).
+ */
+const PUBLIC_SHINGLES = new Set(ENTRIES.filter((e) => e.audience !== 'app').flatMap((e) => [...makePromptShingles(e.a)]));
+const APP_ONLY_SHINGLES = new Set([...RULES_SHINGLES]);
+for (const e of ENTRIES.filter((x) => x.audience === 'app')) for (const sh of makePromptShingles(e.a)) if (!PUBLIC_SHINGLES.has(sh)) APP_ONLY_SHINGLES.add(sh);
+
+const KB_TEXT_PUBLIC = `${MODEL_KB_PUBLIC}\n${Object.values(CANNED).join('\n')}`;
+const KB_TEXT_FULL = `${MODEL_KB}\n${Object.values(CANNED).join('\n')}`;
+
 /** Public overview article to point a signed-out visitor to, per app-only article (audience enforcement, faq.js). */
 const APP_ONLY_OVERVIEW = Object.freeze({
   'signing-in-and-logins': 'plans-and-pricing',
@@ -304,7 +341,7 @@ function interpretModelOutput(input, { accountUsed, meta, pub = true }) {
   if (scope !== 'in_scope') { meta.reason = 'model-bad-scope'; return null; }
   const ids = (Array.isArray(input.article_ids) ? input.article_ids : []).map(String).filter((id) => { const a = articleById(id); return a && (!pub || PUBLIC_ARTICLES.has(a.id)); });
   if (ids.length === 0 && !accountUsed) { meta.reason = 'model-no-citation'; return null; }
-  const v = validateModelReply(input.answer, { allowedAmounts: PRICES.allowedAmounts, promptShingles: RULES_SHINGLES, knownCapWords: pub ? CAP_WORDS_PUBLIC : CAP_WORDS_FULL });
+  const v = validateModelReply(input.answer, { allowedAmounts: PRICES.allowedAmounts, promptShingles: pub ? APP_ONLY_SHINGLES : RULES_SHINGLES, knownCapWords: pub ? CAP_WORDS_PUBLIC : CAP_WORDS_FULL, kbText: pub ? KB_TEXT_PUBLIC : KB_TEXT_FULL, allowDates: accountUsed });
   if (!v.ok) { meta.reason = `validator:${v.reason}`; return null; }
   const sources = [...new Set(ids)].slice(0, 2).map((id) => ({ id, title: articleById(id).title }));
   if (accountUsed && sources.length === 0) sources.push(SOURCES_ACCOUNT);

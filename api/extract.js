@@ -116,10 +116,13 @@ export default async function handler(req, res) {
  * the serial read back. There is no document behind it, so nothing is stored —
  * the caller gets the fields and decides what to do with them.
  */
-async function extractFromImage(req, res, { auth, imageData, mediaType, documentType }) {
-  if (typeof imageData !== "string" || !imageData) {
+async function extractFromImage(req, res, { auth, imageData: rawImageData, mediaType, documentType }) {
+  if (typeof rawImageData !== "string" || !rawImageData) {
     return res.status(400).json({ error: "imageData must be a base64 string" });
   }
+  // R34: a data URL ("data:image/jpeg;base64,/9j/...") is what a canvas/FileReader hands over; the prefix made the bytes
+  // unrecognisable (no magic match) and the whole string was then sent to the model as "base64", a 400 -> generic 500.
+  const imageData = rawImageData.replace(/^data:[a-z0-9.+\/-]+;base64,/i, "");
 
   // B1: this path spends a Haiku call exactly like extractDocumentFields does,
   // but never goes through it (no document is stored for a photographed
@@ -143,7 +146,13 @@ async function extractFromImage(req, res, { auth, imageData, mediaType, document
     sniffed = null;
   }
   const declared = typeof mediaType === "string" ? mediaType : null;
-  const type = sniffed || declared || "image/jpeg";
+  // R34: every real JPEG/PNG/GIF/WebP is recognisable from its first bytes, so "the bytes say nothing" means this is not one
+  // (HTML, a program, empty, truncated, a TIFF/BMP). It used to be relabelled with the caller's claim (or "image/jpeg") and sent to
+  // the model anyway, where it could only fail.
+  if (!sniffed) {
+    return res.status(415).json({ error: "That does not look like a photo the reader can use. Send a JPEG, PNG, GIF or WebP image." });
+  }
+  const type = sniffed;
 
   if (!IMAGE_TYPES.has(type)) {
     const message =

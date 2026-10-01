@@ -36,6 +36,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // "R26 +1 wrong regression". Not an engine regression: a harness environment dependence. Set before any
 // PGlite instance is created; an explicit TZ from the caller is still honored via DONOVAN_EXAM_TZ.
 process.env.TZ = process.env.DONOVAN_EXAM_TZ || "America/Phoenix";
+// R34: an offline exam must never report to Sentry (its mocked "model calls are disabled" error was 3,189 production events).
+process.env.OFFLINE_EXAM = "1";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, "..");
 
@@ -111,6 +113,7 @@ export async function installPgHarness() {
  *  hit, not an earlier one. */
 export async function installModelBlock() {
   process.env.CLAUDE_API_KEY ||= "sk-ant-offline-exam-disabled";
+  process.env.DEEPWELL_TELEMETRY_OFF = "1"; // R34: mocked client => Sentry stays silent (api/_lib/util/envGuard.js)
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const probe = new Anthropic({ apiKey: "x" });
   const proto = Object.getPrototypeOf(probe.messages);
@@ -119,6 +122,7 @@ export async function installModelBlock() {
     counter.n += 1;
     const err = new Error("offline-exam: model calls are disabled for this run (Anthropic client mocked)");
     err.status = 400; // not one of isRetryableModelStatus's 429/529 — withBackoff throws immediately, no delay
+    err.isMock = true; // R34: telemetry's beforeSend drops mock-made errors even if a DSN is somehow active
     throw err;
   };
   return counter;

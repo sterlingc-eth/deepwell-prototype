@@ -14,8 +14,20 @@
   var st = { open: false, built: false, busy: false, msgs: [], turns: 0, handoffShown: false, lastUser: '' };
   var root, launcher, tip, scrim, panel, log, ta, sendBtn, count, chipsEl, lastFocus;
 
+  /* sessionStorage can be edited by the visitor (or poisoned by another script): trust only a validated shape, never the raw JSON */
+  function cap(t, n) { t = String(t).slice(0, n); var c = t.charCodeAt(t.length - 1); return c >= 0xd800 && c <= 0xdbff ? t.slice(0, -1) : t; }
+  function sane(v) {
+    if (!v || typeof v !== 'object') return null;
+    var n = Number(v.turns), out = { tip: v.tip ? 1 : 0, turns: isFinite(n) && n > 0 ? Math.min(Math.floor(n), TURNS) : 0, msgs: [] };
+    if (Array.isArray(v.msgs)) v.msgs.slice(-30).forEach(function (m) {
+      if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.text !== 'string') return;
+      var src = Array.isArray(m.sources) ? m.sources.filter(function (x) { return x && typeof x.title === 'string'; }).slice(0, 3).map(function (x) { return { title: cap(x.title, 100) }; }) : undefined;
+      out.msgs.push({ role: m.role, text: cap(m.text, 2000), sources: src && src.length ? src : undefined });
+    });
+    return out;
+  }
   function store(get, val) {
-    try { if (get) return JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.setItem(KEY, JSON.stringify(val)); } catch (e) { /* private mode */ }
+    try { if (get) return sane(JSON.parse(sessionStorage.getItem(KEY) || 'null')); sessionStorage.setItem(KEY, JSON.stringify(val)); } catch (e) { /* private mode */ }
     return null;
   }
   function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -222,11 +234,11 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && st.open) close(); });
 
   /* ---------- chat ---------- */
-  function history() { return st.msgs.slice(-10).map(function (m) { return { role: m.role === 'user' ? 'user' : 'assistant', text: String(m.text).slice(0, MAX) }; }); }
+  function history() { return st.msgs.slice(-10).map(function (m) { return { role: m.role === 'user' ? 'user' : 'assistant', text: cap(m.text, MAX) }; }); }
   function busy(on) { st.busy = on; sendBtn.disabled = on; ta.setAttribute('aria-busy', on ? 'true' : 'false'); }
   function fail(text) { typing(false); addMsg('assistant', text); busy(false); }
   function send(raw) {
-    var text = String(raw || '').trim().slice(0, MAX);
+    var text = cap(String(raw || '').trim(), MAX);
     if (!text || st.busy) return;
     clearChips(); removeForm();
     if (st.turns >= TURNS) { addMsg('assistant', "We've covered a lot. To keep going, I'll pass this to the team."); handoffForm(); return; }

@@ -36,12 +36,55 @@
  */
 
 import { redactText, hashForLog } from "./privacy/redact.js";
+import { telemetryDisabledReason, isMockError } from "./util/envGuard.js";
+
+/*
+ * ROUND 34 (observability hygiene): Sentry reports ONLY from a real Vercel deployment (VERCEL_ENV production or
+ * preview; SENTRY_FORCE=1 overrides for a deliberate live test). Tests, offline exams, mocked-model runs and any
+ * script under scripts/ never report, even with a SENTRY_DSN in their environment — see util/envGuard.js's
+ * telemetryDisabledReason(). It is evaluated on EVERY call (not cached at import) because harnesses flag themselves
+ * (markMockRun) after this module loaded. beforeSend re-checks it and also drops mock-made errors (belt and braces).
+ */
 
 let sentryPromise = null;
+const seenConfigErrors = new Set();
 
 function isConfigured() {
   const dsn = process.env.SENTRY_DSN;
   return Boolean(dsn) && !dsn.includes("<your-sentry-dsn>");
+}
+
+/** True when this process may send to Sentry right now. Pure function of env/argv + isConfigured(). */
+export function telemetryEnabled() {
+  return isConfigured() && telemetryDisabledReason() === null;
+}
+
+/** A missing-server-configuration error (R2 keys unset, ConfigError): reported to Sentry once per cold start. */
+function isConfigError(err) {
+  return Boolean(err) && (err.isConfig === true || err.name === "ConfigError");
+}
+
+/** The frame-level "culprit is a script" check used by beforeSend (belt and braces for events that slip through). */
+function eventFromScript(event) {
+  const frames = event?.exception?.values?.flatMap((v) => v?.stacktrace?.frames ?? []) ?? [];
+  const last = frames[frames.length - 1];
+  const file = String(last?.filename ?? last?.abs_path ?? "").replace(/\\/g, "/");
+  return /(^|\/)scripts\/verify-|(^|\/)scripts\/(offline-exam|live-test-day|model-ab)/.test(file);
+}
+
+/** beforeSend gate: null (drop) for anything a test could have produced; otherwise the scrubbed event. */
+export function gateSentryEvent(event, hint) {
+  try {
+    if (telemetryDisabledReason() !== null) return null;
+    const original = hint?.originalException;
+    if (isMockError(original)) return null;
+    const msg = event?.exception?.values?.[0]?.value ?? event?.message ?? "";
+    if (/\(mocked\b|Anthropic client mocked/i.test(String(msg))) return null;
+    if (process.env.SENTRY_FORCE !== "1" && eventFromScript(event)) return null;
+  } catch {
+    return null;
+  }
+  return scrubSentryEvent(event);
 }
 
 function loadSentry() {
@@ -50,7 +93,9 @@ function loadSentry() {
       .then((Sentry) => {
         Sentry.init({
           dsn: process.env.SENTRY_DSN,
-          environment: process.env.VERCEL_ENV || "development",
+          // Only "production" | "preview" can get here (telemetryDisabledReason), or "forced" for SENTRY_FORCE=1.
+          environment: process.env.VERCEL_ENV || "forced",
+          ...(process.env.VERCEL_GIT_COMMIT_SHA ? { release: process.env.VERCEL_GIT_COMMIT_SHA } : {}),
           // Tracing is a separate, billed feature this file has no opinion on;
           // error/message capture only.
           tracesSampleRate: 0,
@@ -58,7 +103,10 @@ function loadSentry() {
           // request body/headers, no "user" object auto-attached from a
           // request. See this file's own module doc.
           sendDefaultPii: false,
-          beforeSend: (event) => scrubSentryEvent(event),
+          // A dropped event (beforeSend -> null) otherwise makes the SDK POST a "client report" of what it
+          // discarded: a network send for an event we deliberately did not report. Off.
+          sendClientReports: false,
+          beforeSend: (event, hint) => gateSentryEvent(event, hint),
           beforeSendTransaction: (event) => scrubSentryEvent(event),
           beforeBreadcrumb: (breadcrumb) => scrubBreadcrumb(breadcrumb),
         });
@@ -76,7 +124,7 @@ function loadSentry() {
 }
 
 async function getSentry() {
-  if (!isConfigured()) return null;
+  if (!telemetryEnabled()) return null;
   try {
     return await loadSentry();
   } catch {
@@ -92,7 +140,7 @@ async function getSentry() {
  * straight through a denylist unnoticed. Nothing outside this list is ever
  * forwarded to Sentry or logged, no matter what a caller passes.
  */
-const ALLOWED_CONTEXT_KEYS = ["route", "tenant", "tenantId", "documentId", "stage", "userId", "requestId"];
+const ALLOWED_CONTEXT_KEYS = ["route", "tenant", "tenantId", "documentId", "stage", "userId", "requestId", "kind"];
 
 // Round 22 (S2, privacy): these identify a PERSON or an ORGANIZATION (a Clerk org id is that shop's
 // own identity, a Clerk user id is a specific human) rather than an opaque internal record pointer
@@ -204,12 +252,21 @@ function consoleFallback(level, message, meta, context) {
 }
 
 /** Report a caught error. Never throws, and never includes request bodies,
- * tokens, or connection strings — only what scrubContext allows through. */
+ * tokens, or connection strings — only what scrubContext allows through.
+ * A server-configuration error (R2 keys missing, ConfigError) goes to Sentry at most ONCE per cold start per
+ * message, tagged kind=config: it is the same fact on every request until someone fixes the env, not N incidents. */
 export async function captureException(err, context = {}) {
   try {
+    let ctx = context;
+    if (isConfigError(err)) {
+      const key = String(err?.message ?? "config").slice(0, 200);
+      if (seenConfigErrors.has(key)) return;
+      seenConfigErrors.add(key);
+      ctx = { ...context, kind: "config" };
+    }
     const Sentry = await getSentry();
     if (Sentry) {
-      Sentry.captureException(err, { extra: scrubContext(context), tags: scrubContext(context) });
+      Sentry.captureException(err, { extra: scrubContext(ctx), tags: scrubContext(ctx) });
       return;
     }
   } catch {
@@ -218,17 +275,47 @@ export async function captureException(err, context = {}) {
   consoleFallback("error", err?.message ?? String(err), { name: err?.name, code: err?.code }, context);
 }
 
-/** Report a notable event that is not an exception (e.g. a cron sweep
- * summary). Never throws. */
-export async function captureMessage(message, context = {}) {
+/** Report a notable event that is not an exception. Never throws.
+ * `opts.level` defaults to "info" (a Sentry info event is not an alert); pass "warning"/"error" ONLY when something
+ * actually failed. `opts.fingerprint` keeps a message with changing numbers in one Sentry issue. */
+export async function captureMessage(message, context = {}, opts = {}) {
+  const level = opts.level ?? "info";
   try {
     const Sentry = await getSentry();
     if (Sentry) {
-      Sentry.captureMessage(message, { level: "info", extra: scrubContext(context) });
+      Sentry.captureMessage(message, {
+        level,
+        extra: scrubContext(context),
+        ...(opts.fingerprint ? { fingerprint: opts.fingerprint } : {}),
+      });
       return;
     }
   } catch {
     // Fall through to the console path below.
   }
-  consoleFallback("info", message, {}, context);
+  consoleFallback(level, message, {}, context);
+}
+
+/** Record routine, non-failure information (a cron sweep summary): one structured console line (greppable in
+ * Vercel logs) plus a Sentry BREADCRUMB that rides along with the next real error — never a Sentry issue of its
+ * own. Never throws. */
+export async function recordInfo(message, context = {}) {
+  try {
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        message: message ? redactText(String(message)).slice(0, 2000) : undefined,
+        ...scrubContext(context),
+      })
+    );
+  } catch {
+    // never throw from logging
+  }
+  try {
+    const Sentry = await getSentry();
+    if (Sentry) Sentry.addBreadcrumb({ category: "info", level: "info", message: String(message).slice(0, 500) });
+  } catch {
+    // never throw from logging
+  }
 }

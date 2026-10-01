@@ -103,7 +103,7 @@ import {
 import { classifyFromText } from './modelAvoidance/textExtract.js';
 import { isDeterministicClassifyEnabled } from './modelAvoidance/switches.js';
 import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
-import { normalizeReminderTrigger, normalizeDate, UNCONFIRMED_SUFFIX } from './extractFields.js';
+import { normalizeReminderTrigger, normalizeDate, UNCONFIRMED_SUFFIX, validateCorrection } from './extractFields.js';
 import { recheckDocumentTx } from './recheck.js';
 import { deriveWarranty } from './warrantyRules.js';
 import { packForTenant } from './industry/index.js';
@@ -243,15 +243,25 @@ async function unverifyTx(client, documentId) {
  * build) has no extraction id to send, and every field this pipeline extracts
  * is a singleton per document in practice, so the pair is an unambiguous key.
  */
-export async function correctField(ctx, { documentId, fieldKey, value, by }, actorClerkId) {
+export async function correctField(ctx, { documentId, fieldKey: rawFieldKey, value: rawValue, by: rawBy }, actorClerkId) {
   assertUuid('documentId', documentId);
-  assertNonEmptyString('fieldKey', fieldKey);
-  assertNonEmptyString('value', value);
-  assertNonEmptyString('by', by);
+  assertNonEmptyString('fieldKey', rawFieldKey);
+  assertNonEmptyString('value', rawValue);
+  assertNonEmptyString('by', rawBy);
+  // R34: `by` is a display label; strip control characters (a NUL is a raw Postgres error) and bound it.
+  const by = String(rawBy).replace(/[\u0000-\u001f\u007f\u202A-\u202E\u2066-\u2069]/g, '').trim().slice(0, 120);
+  if (!by) throw new ReviewError('by is required');
 
   return withTenant(ctx, async (client, tenantId) => {
     const doc = (await client.query(`SELECT id, stage FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
     if (!doc) throw new ReviewError('Document not found', 404);
+
+    // R34: a correction OVERRIDES the extracted value wherever it is read, so it gets the same vocabulary + per-kind rules
+    // extraction applies (known field, real date, real number, bounded text, no control/NUL/override characters).
+    const checked = validateCorrection(rawFieldKey, rawValue, await packForTenant(client).catch(() => null));
+    if (!checked.ok) throw new ReviewError(checked.error, 400);
+    const fieldKey = checked.fieldKey;
+    const value = checked.value;
 
     const updated = await client.query(
       `UPDATE extractions
@@ -419,11 +429,17 @@ export async function setUnitInstallDate(ctx, { entityId, installDate, by }, act
   });
 }
 
-export async function classifyDocument(ctx, { documentId, documentType }, actorClerkId) {
+export async function classifyDocument(ctx, { documentId, documentType: rawDocumentType }, actorClerkId) {
   assertUuid('documentId', documentId);
-  assertNonEmptyString('documentType', documentType);
+  assertNonEmptyString('documentType', rawDocumentType);
 
   return withTenant(ctx, async (client, tenantId) => {
+    // R34: only a real type id (the base list, or the tenant's industry pack's own) - not "<script>", not 100 KB of text.
+    // A recognised alias/legacy spelling is stored in its canonical form.
+    const pack = await packForTenant(client).catch(() => null);
+    const wanted = String(rawDocumentType).trim().toLowerCase().replace(/[\s_]+/g, '-');
+    const documentType = normalizeDocumentType(wanted, {}, pack);
+    if (documentType === 'other' && wanted !== 'other') throw new ReviewError(`Unknown document type: ${wanted.slice(0, 40)}`, 400);
     // updated_at bump (M3-config/17-ask-cache-and-search-index.sql): a
     // reclassification changes document_type, which changes the label shown
     // on every answer that cites this document, but touches no other table

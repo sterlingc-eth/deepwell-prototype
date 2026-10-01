@@ -7,7 +7,7 @@
  *  - installErrorReporter() listens for window "error" and "unhandledrejection" and keeps the last 10 in a
  *    small in-memory ring (mirrored to sessionStorage so a reload after a crash still has them);
  *  - recordRenderError() is called by the screen error boundary;
- *  - crashes (uncaught error / render error) are sent ONCE each, at most 3 per page load, to POST /api/support
+ *  - crashes (uncaught error / render error) are sent (from the production hostnames only, R34) ONCE each, at most 3 per page load, to POST /api/support
  *    {action:'client-error'} with the person's normal session, where the server logs them (hashes only) — no
  *    Sentry SDK, no new domain, nothing for the CSP to allow;
  *  - buildDiagnostics() is what "Report a problem" attaches to the message a person sends to support.
@@ -31,6 +31,29 @@ const MAX_ENTRIES = 10;
 const MAX_AUTO_REPORTS = 3;
 const STORE_KEY = 'deepwell.clientErrors';
 const API_URL = '/api/support';
+
+/**
+ * R34: crashes are POSTed to the server (which forwards them to Sentry) ONLY from the real production site.
+ * localhost, 127.0.0.1, preview deployments, file:// and every test/QA harness page (which run on localhost and
+ * throw on purpose) record to the local ring for "Report a problem" but never leave the device.
+ * Mirrors APP_ORIGINS in api/_lib/util/origins.js (the production origins; not its localhost dev ports).
+ */
+export const PRODUCTION_HOSTS: readonly string[] = ['deepwelltechnology.com', 'www.deepwelltechnology.com', 'deepwellinc.vercel.app'];
+/** Pure: is `hostname` one of the production hostnames? */
+export function isProductionHost(hostname: string | undefined | null): boolean {
+  return PRODUCTION_HOSTS.includes(String(hostname ?? '').toLowerCase());
+}
+/** True when this page may send crash reports. `window.__DEEPWELL_FORCE_ERROR_REPORT__ = true` is the explicit
+ *  override for a deliberate live test (and for the QA harness that asserts the report payload). */
+export function reportingAllowed(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    if ((window as unknown as { __DEEPWELL_FORCE_ERROR_REPORT__?: boolean }).__DEEPWELL_FORCE_ERROR_REPORT__ === true) return true;
+    return isProductionHost(window.location?.hostname);
+  } catch {
+    return false;
+  }
+}
 
 /** Errors that are noise, not bugs: browser quirks, cancelled requests, being offline. */
 const NOISE_RE = /ResizeObserver loop|^Script error\.?$|AbortError|operation was aborted|Failed to fetch|NetworkError|Load failed|Network request failed|The user aborted a request|cancelled/i;
@@ -133,6 +156,7 @@ export function recordRenderError(err: unknown): void {
 }
 
 async function maybeReport(entry: ClientErrorEntry): Promise<void> {
+  if (!reportingAllowed()) return; // R34: dev / preview / harness pages never report
   const key = entry.message;
   if (sentThisLoad >= MAX_AUTO_REPORTS || sentKeys.has(key)) return;
   sentKeys.add(key);

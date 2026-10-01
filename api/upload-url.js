@@ -1,5 +1,5 @@
 import { withTenant } from "./_lib/recordsStore.js";
-import { presign, objectKey, keyBelongsToTenant } from "./_lib/r2.js";
+import { presign, objectKey, keyBelongsToTenant, normalizeContentType, sanitizeUploadFilename, uploadExpirySeconds, originalServing } from "./_lib/r2.js";
 import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { denyAuth } from "./_lib/auth.js";
@@ -160,14 +160,29 @@ export class UploadValidationError extends Error {
  * @throws {UploadValidationError}
  */
 function validateUploadBody(body) {
-  const { filename, sha256, contentType, sizeBytes } = body ?? {};
-  if (typeof filename !== "string" || !filename.trim()) {
+  const { filename: rawFilename, sha256, contentType: rawContentType, sizeBytes } = body ?? {};
+  if (typeof rawFilename !== "string" || !rawFilename.trim()) {
     throw new UploadValidationError("filename is required");
   }
+  // R34: a NUL (or any control character) in the name was a raw Postgres error - a 500 for one file and an aborted 50-file
+  // batch - and the length and directional-override characters were unbounded. Clean and bound it; refuse only if nothing is left.
+  const filename = sanitizeUploadFilename(rawFilename);
+  if (!filename) throw new UploadValidationError("filename is required");
   if (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/.test(sha256)) {
     throw new UploadValidationError("sha256 must be a 64-character hex digest");
   }
+  // R34: only a string type is a type. An object/array was stored as JSON text in documents.content_type.
+  if (rawContentType != null && typeof rawContentType !== "string") {
+    throw new UploadValidationError("contentType must be a string");
+  }
+  // R34: lower-cased with parameters removed, so "Application/PDF" and "application/pdf; charset=binary" are subject to the same
+  // size limits as "application/pdf" (they used to slip past the 24 MB / 20 MB checks below and were uploaded in full first).
+  const contentType = normalizeContentType(rawContentType);
   // R30 M5: an integer, because it is signed into the upload URL as the exact Content-Length R2 will accept.
+  if (sizeBytes != null && sizeBytes === 0) {
+    // R34: the old message ("sizeBytes must be a positive whole number of bytes") is what a person saw for an empty file.
+    throw new UploadValidationError("This file is empty (0 bytes), so there is nothing to upload. Choose the file again, or scan it again.");
+  }
   if (sizeBytes != null && (!Number.isInteger(sizeBytes) || sizeBytes <= 0)) {
     throw new UploadValidationError("sizeBytes must be a positive whole number of bytes");
   }
@@ -198,7 +213,7 @@ function validateUploadBody(body) {
       413
     );
   }
-  return { filename, sha256, contentType: contentType ?? null, sizeBytes: sizeBytes ?? null };
+  return { filename, sha256, contentType, sizeBytes: sizeBytes ?? null };
 }
 
 /**
@@ -246,7 +261,7 @@ async function createUploadUrlTx(db, validated, auth) {
     try {
       // R30 M5: when the client declared a size, sign it (Content-Length) so R2 rejects a PUT of any other size -
       // otherwise the "100 MB / 24 MB" limits above were only ever checked against what the client SAID.
-      uploadUrl = presign("PUT", key, 900, {}, new Date(), { contentLength: sizeBytes });
+      uploadUrl = presign("PUT", key, uploadExpirySeconds(sizeBytes), {}, new Date(), { contentLength: sizeBytes });
     } catch (err) {
       throw new StorageUnavailableError(err);
     }
@@ -375,10 +390,13 @@ export async function getOriginalUrl(auth, documentId) {
         throw new DocumentGetError("Document not found", 404);
       }
       const filename = doc.original_filename || "document";
+      // R34: serve it as a known document/photo type or as a download, never as whatever Content-Type the uploader's PUT carried.
+      const serving = originalServing(filename, doc.content_type);
       let url;
       try {
         url = presign("GET", doc.storage_key, 900, {
-          "response-content-disposition": `inline; filename="${filename.replace(/"/g, "")}"`,
+          "response-content-disposition": serving.disposition,
+          "response-content-type": serving.contentType,
         });
       } catch (err) {
         throw new StorageUnavailableError(err);

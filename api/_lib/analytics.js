@@ -49,6 +49,8 @@ const zipCounty = JSON.parse(readFileSync(join(__dirname, 'geo', 'zip-county.jso
 // liner; both already import from/are safe to import from this file (no cycle — see this file's
 // own STREET_SUFFIX_ALTERNATION import comment above for the cycle this codebase does have to
 // watch for, which doesn't apply here since this helper touches no other module).
+import { resolveCalendarSpan, findInvalidDate } from './timeSpans.js';
+export { findInvalidDate };
 export function escapeRegExp(s) {
   return String(s ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -904,7 +906,8 @@ const IDENTIFIER_TOKEN_RE = /\b[A-Za-z0-9][A-Za-z0-9-]{7,}\b/g;
 
 function looksLikeIdentifierToken(question) {
   const tokens = String(question ?? '').match(IDENTIFIER_TOKEN_RE) ?? [];
-  return tokens.some((tok) => /\d/.test(tok));
+  // a bare ISO date ("2026-09-21") has the identifier shape but is a date, never a serial
+  return tokens.some((tok) => /\d/.test(tok) && !/^\d{4}-\d{2}-\d{2}$/.test(tok));
 }
 
 /** "for serial M100017" / "serial number Y100023" — a serial VALUE named
@@ -1374,8 +1377,13 @@ export function moneyFallbackAnswer() {
  * this looking like a normal, successfully-computed empty result.
  */
 const FUTURE_YEAR_TOKEN_RE = /\b(19\d{2}|20\d{2}|21\d{2})\b/g;
+// R34: a FORWARD-LOOKING record field is legitimately dated in the future - "which warranties expire in 2027" is answerable from the
+// warranty end dates on file, not "a future date, nothing on file". Only a question about a past EVENT (filed/issued/logged/did) in a future
+// year is declined here.
+const FORWARD_RECORD_FIELD_RE = /\b(?:expir\w*|renew\w*|ends?|ending|due|schedul\w*|upcoming|coverage|covered|valid\s+(?:through|until)|good\s+(?:through|until))\b/i;
 export function mentionsFutureYear(question, today) {
   const q = String(question ?? '');
+  if (FORWARD_RECORD_FIELD_RE.test(q)) return false;
   const now = today ? new Date(today) : new Date();
   if (Number.isNaN(now.getTime())) return false;
   const currentYear = now.getUTCFullYear();
@@ -1586,6 +1594,13 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
     /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/,
     PAST_WARRANTY_RE,
   ];
+  // R34: phrasings that ARE the negation (not a status word preceded by one) and do not say whether the warranty lapsed or was never on
+  // file ("units with no warranty", "units that don't have a warranty") - never guessed.
+  const SELF_NEGATED = [
+    /\b(?:(?:with|have|has|had)\s+no|without(?:\s+(?:a|any))?)\s+warrant(?:y|ies)\s*[?.!]*$/,
+    /\b(?:don'?t|doesn'?t|do\s+not|does\s+not)\s+(?:still\s+)?have\s+(?:a\s+|any\s+)?warrant(?:y|ies)\b(?!\s+(?:registration|paperwork|info|information|date|on\s+file|anymore|any\s+more|any\s+longer|now))/,
+  ];
+  if (SELF_NEGATED.some((re) => re.test(q))) return true;
   return REGEXES.some((re) => {
     const m = re.exec(q);
     return m ? statusNegatedAt(q, m.index) : false;
@@ -1605,6 +1620,10 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
  */
 const STRICT_ACTIVE_STATUS_RE = /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/;
 
+const UNKNOWN_WARRANTY_RE =
+  /\b(?:no|without|missing|lack(?:s|ing)?)\s+(?:a\s+|any\s+|the\s+)?warrant(?:y|ies)\s+(?:on\s+file|info(?:rmation)?|dates?|end\s+dates?|expir\w*(?:\s+dates?)?|recorded|listed|data)\b|\bwarrant(?:y|ies)\s+(?:is\s+|are\s+)?(?:not\s+on\s+file|missing|not\s+listed|not\s+recorded)\b/;
+const NO_WARRANTY_ANYMORE_RE =
+  /\b(?:don'?t|doesn'?t|do\s+not|does\s+not)\s+(?:still\s+)?have\s+(?:a\s+|any\s+)?warrant(?:y|ies)\s+(?:anymore|any\s+more|any\s+longer|now)\b/;
 /** The warrantyStatus bucket a question names, or null. Pure. */
 export function warrantyStatusFromQuestion(question) {
   const q = String(question ?? '').toLowerCase();
@@ -1620,6 +1639,10 @@ export function warrantyStatusFromQuestion(question) {
   m = PAST_WARRANTY_RE.exec(q);
   if (m) return statusNegatedAt(q, m.index) ? null : 'expired';
   if (/\bunknown\b/.test(q)) return 'unknown';
+  // R34: "units with no warranty on file / no warranty end date / warranty info missing" is the 'unknown' bucket (no end date known), and
+  // "units that don't have a warranty anymore" is 'expired' - both used to match nothing here and answered with every unit.
+  if (UNKNOWN_WARRANTY_RE.test(q)) return 'unknown';
+  if (NO_WARRANTY_ANYMORE_RE.test(q)) return 'expired';
   m = STRICT_ACTIVE_STATUS_RE.exec(q);
   if (m) return statusNegatedAt(q, m.index) ? null : 'active';
   return null;
@@ -2694,6 +2717,10 @@ export function resolveExtendedTimeRange(question, today) {
  *  validatePlan, which only ever sees the stripped {from,to} a caller pulls
  *  out of this. */
 export function resolveAnyTimeRange(question, today) {
+  // R34: calendar spans (specific day, Q1 2026, the 2010s, between/before/after <year>, bare "in 2020", abbreviated month + year)
+  // that no family below recognized and so silently dropped the window - see timeSpans.js.
+  const span = resolveCalendarSpan(question, today);
+  if (span && !span.invalid) return span;
   // R21 M2 (Cluster 1/C1): "since last January" must resolve to the OPEN-ENDED "since the start of
   // last year" window (see resolveExtendedTimeRange's own "since last january" case, just below),
   // never resolveQuestionTimeRange's own plain month-name reading of "last January" (a single

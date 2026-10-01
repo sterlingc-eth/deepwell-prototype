@@ -9,6 +9,7 @@
  *   - no document page mentions "<house number> <first street word>".
  * Gate: DONOVAN_ADDRESS_MISS (default on; "0" disables). Never runs on a follow-up turn (context may carry the address).
  */
+import { dropConflicting } from '../addressConflict.js';
 import { resolveAddressCandidates } from "../contactLookup.js";
 import { attachCitations } from "../citations/records.js";
 import { ADDRESS_RE } from "./clarify.js";
@@ -39,11 +40,26 @@ export async function buildAddressMissAnswer(db, question) {
   if ((await resolveAddressCandidates(db, a.phrase)).length) return null;
   const esc = (s) => s.replace(/[\\%_]/g, "\\$&");
   const loose = await db.raw(
-    `SELECT 1 FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL
-        AND data->>'service_address' ILIKE $1 AND data->>'service_address' ILIKE $2 LIMIT 1`,
+    `SELECT data->>'customer_name' AS customer_name, data->>'service_address' AS service_address FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL
+        AND data->>'service_address' ILIKE $1 AND data->>'service_address' ILIKE $2 LIMIT 5`,
     [`${esc(a.number)} %`, `%${esc(a.street)}%`]
   );
-  if (loose.rows.length) return null;
+  if (loose.rows.length) {
+    // R34: the house + street exists but every such row contradicts a typed direction/city/zip/unit - a different address, so say so.
+    const kept = dropConflicting(loose.rows, a.phrase);
+    if (kept.length || !kept.dropped.length) return null;
+    const closest = kept.dropped.slice(0, 3).map((r) => `${r.service_address}${r.customer_name ? ` (${r.customer_name})` : ""}`).join("; ");
+    return attachCitations(
+      {
+        kind: "no-answer",
+        text: `I don't have anything on file for ${a.phrase}. The closest address on file is ${closest}.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+        addressMiss: true,
+      },
+      { records: [], total: 0, kind: "searched", basis: `Searched every customer service address for ${a.phrase}; only a different direction, city, zip or unit of the same street number matched.` }
+    );
+  }
   const pages = await db.raw(`SELECT 1 FROM document_pages WHERE text ILIKE $1 LIMIT 1`, [`%${esc(a.number)} %${esc(a.street)}%`]);
   if (pages.rows.length) return null;
   return attachCitations(

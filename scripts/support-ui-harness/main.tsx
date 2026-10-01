@@ -29,6 +29,12 @@ useAppStore.getState().setFieldMode(params.get('field') === '1');
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Hostile model/server replies (R34 break-it). The UI must render all of them as inert text.
+export const HOSTILE = [
+  '<img src=x onerror="window.__xss=1"> hi', '<script>window.__xss=2</script>', '<svg onload="window.__xss=3"></svg>', '[click](javascript:window.__xss=4)', 'javascript:window.__xss=5',
+  'https://deepwelltechnology.com"onmouseover="window.__xss=6', '<a href="javascript:window.__xss=7">x</a>', '![x](https://evil.example/a.png)', '**<img src=x onerror=window.__xss=8>**',
+  'data:text/html,<script>window.__xss=9</script>', '&lt;img src=x onerror=window.__xss=10&gt;', '`<img src=x onerror=window.__xss=11>`', 'A'.repeat(5000), '<iframe src="javascript:window.__xss=12"></iframe>',
+];
 const realFetch = window.fetch.bind(window);
 window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -48,6 +54,11 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (window.__rateLimit) {
     window.__rateLimit = false;
     return json(429, { error: 'Too many requests', retryAfterSec: 3 });
+  }
+  const hostile = /^hostile(\d+)$/.exec(m);
+  if (hostile) {
+    const bad = HOSTILE[Number(hostile[1])];
+    return json(200, { reply: bad, sources: [{ id: 'x', title: '<img src=x onerror=window.__xss=30>' }], mode: 'faq', suggestions: ['<img src=x onerror=window.__xss=31>', 'javascript:window.__xss=32'] });
   }
   if (/boom/i.test(m)) return json(500, { error: 'internal' });
   if (/records|installed|trane/i.test(m)) {

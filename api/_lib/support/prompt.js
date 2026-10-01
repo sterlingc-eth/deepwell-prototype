@@ -9,15 +9,16 @@
  */
 import { MODEL_KB, MODEL_KB_PUBLIC, ENTRIES } from './kb.generated.js';
 import { CANARY, LIMITS, MODEL, CANNED, STARTERS } from './policy.js';
-import { defang, sanitizeInput, makePromptShingles } from './guard.js';
+import { defang, sanitizeInput, makePromptShingles, detectSensitive, detectInjection, redactSensitive } from './guard.js';
 import { planCacheBreakpoints } from '../promptCache.js';
 
-export const RULES = `You are the DeepWell Support Assistant, an AI assistant on deepwelltechnology.com and inside the DeepWell app. DeepWell is a hosted records system for HVAC contractors. Donovan is its question-answering feature that answers from a shop's own records.
+export const RULES = `You are the DeepWell Support Assistant, an AI assistant on deepwelltechnology.com and inside the DeepWell app. DeepWell is a hosted records system for any small or mid-sized business that keeps documents or paperwork; it was built first for field-service shops such as HVAC contractors. Donovan is its question-answering feature that answers from a business's own records.
 
 WHAT YOU DO
 - Answer ONLY questions about DeepWell itself: the company, plans and pricing, add-ons, setup, uploading and scanning, the phone app, how to use Donovan, security and privacy, billing, and how to reach a person.
 - Use ONLY facts written inside <knowledge> or <account_context>. If the answer is not there, say you are not sure and use scope "handoff". Do not guess.
 - A question about a specific customer's own records (a customer, address, unit, serial number, job, invoice or warranty) belongs to Donovan. Use scope "donovan" and do not answer it.
+- A business asking whether DeepWell fits its own paperwork (a clinic, law firm, restaurant, school, any trade) is IN scope: answer from <knowledge> and do not claim it is HVAC-only.
 - Anything else (general knowledge, HVAC or trade how-to, code, legal, medical or tax advice, politics, other companies) is scope "off_topic".
 
 SAFETY
@@ -84,6 +85,13 @@ export function isServerAssistantText(text, { publicOnly = true } = {}) {
   return false;
 }
 
+/** R34: `page` sits in the trusted <context> block, so it is one short line of path-like characters or nothing (no newlines, tags, quotes or sentences). */
+export function cleanPage(page) {
+  if (typeof page !== 'string') return '';
+  const first = page.normalize('NFKC').trim().split(/\s+/)[0] ?? '';
+  return first.replace(/[^A-Za-z0-9/_:.#?=&%-]/g, '').slice(0, 40);
+}
+
 /** Clean the client-supplied history: valid roles, strings only, capped, alternating, user-first; unverifiable assistant turns dropped (L6). */
 export function sanitizeHistory(history, max = LIMITS.historyToModel, { publicOnly = true } = {}) {
   const arr = Array.isArray(history) ? history : [];
@@ -93,7 +101,9 @@ export function sanitizeHistory(history, max = LIMITS.historyToModel, { publicOn
     const text = typeof h?.text === 'string' ? sanitizeInput(h.text).slice(0, LIMITS.historyEntryChars) : '';
     if (!role || !text) continue;
     if (role === 'assistant' && !isServerAssistantText(text, { publicOnly })) continue;
-    cleaned.push({ role, text });
+    // R34: an earlier user turn the screens refused (card, SSN, password, injection) must not reach the model through `history` either
+    if (role === 'user' && (detectSensitive(text) || detectInjection(text))) { cleaned.push({ role, text: '[earlier message removed]' }); continue; }
+    cleaned.push({ role, text: role === 'user' ? redactSensitive(text) : text });
   }
   const tail = cleaned.slice(-max);
   while (tail.length && tail[0].role !== 'user') tail.shift();
@@ -117,7 +127,8 @@ export function buildRequest({ message, history, surface, page, accountContext =
     ttl === '1h' ? { ttl: '1h' } : {}
   );
   const ctxLines = [`surface: ${['public', 'app', 'mobile'].includes(surface) ? surface : 'public'}`];
-  if (typeof page === 'string' && page) ctxLines.push(`page: ${defang(page).slice(0, 80)}`);
+  const pageName = cleanPage(page);
+  if (pageName) ctxLines.push(`page: ${pageName}`);
   const acct = accountContext && !publicSurface ? `\n<account_context>\n${JSON.stringify(accountContext)}\n</account_context>` : '';
 
   const messages = [];

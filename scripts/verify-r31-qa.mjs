@@ -57,6 +57,7 @@ async function open({ auth = {}, backend = {}, vp = { width: 1280, height: 800 }
   });
   await page.addInitScript(({ a, f }) => {
     window.__QA_AUTH = a;
+    window.__DEEPWELL_FORCE_ERROR_REPORT__ = true; // R34: harness pages (localhost) never report unless they opt in; this suite asserts the report payload
     if (f) localStorage.setItem('deepwell.fieldMode', '1');
   }, { a: auth, f: field });
   await installBackend(page, backend);
@@ -307,7 +308,7 @@ try {
     check('L2-B: checkClientError allows the daily cap then drops (3 ok, then blocked)', outs.join() === 'true,true,true,false,false', outs.join());
     const unavailable = createLimiter({ tenant: { bumpWindow: async () => null } });
     check('L2-B: an unreadable counter never blocks reporting', (await unavailable.checkClientError({ auth: { userId: 'u1' } })).ok === true);
-    const h = validateHandoff({ email: 'a@b.co', message: 'The scan button does nothing', surface: 'app', kind: 'problem', page: 'ingest', diagnostics: 'Screen: ingest (app)\nDevice: Windows Chrome\nRecent errors: none recorded\ncall 555-123-4567 sk_live_abcdefghijklmnopqrstuv' });
+    const h = validateHandoff({ email: 'a@b.co', message: 'The scan button does nothing', surface: 'app', kind: 'problem', page: 'ingest', diagnostics: 'Screen: ingest (app)\nDevice: Windows Chrome\nRecent errors: none recorded\ncall 555-123-4567 sk_' + 'live_abcdefghijklmnopqrstuv' });
     check('L2-B: handoff accepts kind:problem + multi-line diagnostics, redacted', h.ok && h.value.kind === 'problem' && h.value.diagnostics.split('\n').length === 4 && !/555-123-4567|sk_live/.test(h.value.diagnostics), JSON.stringify(h.value?.diagnostics));
     check('L2-B: the real entry points install the reporter', /installErrorReporter\('app'/.test(read('src/main.tsx')) && /installErrorReporter\('mobile'/.test(read('src/mobile/main.tsx')) && /recordRenderError/.test(read('src/components/ScreenLoadBoundary.tsx')));
     const em = buildHandoffEmail(h.value, { ref: 'DW-1', account: null });

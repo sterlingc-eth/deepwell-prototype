@@ -27,6 +27,7 @@
  * scripts/verify-analytics.mjs's contact-lookup section. resolveContact/
  * runContactLookup are the only functions here that touch `db`.
  */
+import { dropConflicting } from './addressConflict.js';
 import { normalizeQuestion, correctTriggerWordTypos } from "./nlNormalize.js";
 // TEAM C (citations everywhere): each answer names the record(s) it was read from.
 import { attachCitations, customerRecord, unitRecord, documentRecord } from "./citations/records.js";
@@ -41,7 +42,7 @@ import { documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
 // against, defined once in documentTypes.js so importing it here never creates a circular
 // dependency with docLookup.js, which already imports FROM this file) lets that existing rejection
 // fire, exactly as it already does for the untypo'd "List invoices for Delgado".
-import { significantAddressTokens, formatDateHuman, hasAnchor, extractSubject } from "./fastPath.js";
+import { significantAddressTokens, houseStreetTokens, formatDateHuman, hasAnchor, extractSubject } from "./fastPath.js";
 import { alertTier, BRAND_RULES } from "./warrantyRules.js";
 import { listOpenReminders } from "./reminders.js";
 // Team A (2026-09-24): time-correct visit history (no future "last visit"), customer file summary, unit notes.
@@ -1862,7 +1863,11 @@ export async function resolveAddressCandidates(db, addressPhrase) {
   // record for an address that was never on file. The house-number token keeps its own
   // "at the start of the address" pattern (house numbers don't float mid-string); every other
   // token (remaining street words, city, zip) only needs to appear somewhere in the string.
-  const patterns = tokens.map((t, i) => (i === houseNumberIdx ? `${escapeLikeText(t)} %` : `%${escapeLikeText(t)}%`));
+  // R34: city/zip are no longer ILIKE-required here; a typed one that contradicts the stored address is dropped by dropConflicting below.
+  const core = houseStreetTokens(addressPhrase);
+  const useTokens = core.length >= 2 && /^\d+$/.test(core[0]) ? core : tokens;
+  const useHouseIdx = useTokens.findIndex((t) => /^\d+$/.test(t));
+  const patterns = useTokens.map((t, i) => (i === useHouseIdx ? `${escapeLikeText(t)} %` : `%${escapeLikeText(t)}%`));
   const { rows } = await db.raw(
     `SELECT ${CUSTOMER_ROW_COLUMNS}
        FROM entities
@@ -1871,7 +1876,8 @@ export async function resolveAddressCandidates(db, addressPhrase) {
       LIMIT 5`,
     [patterns]
   );
-  return rows;
+  // R34: a typed direction / suffix / city / zip / unit that contradicts the stored address is a DIFFERENT address, not noise.
+  return dropConflicting(rows, addressPhrase);
 }
 
 /**

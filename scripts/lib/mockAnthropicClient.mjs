@@ -162,6 +162,7 @@ export async function installMockAnthropicClient(opts = {}) {
   const rng = makeRng(seed);
 
   process.env.CLAUDE_API_KEY ||= "sk-ant-mock-live-test-day";
+  process.env.DEEPWELL_TELEMETRY_OFF = "1"; // R34: mocked client => Sentry stays silent (api/_lib/util/envGuard.js)
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const probe = new Anthropic({ apiKey: "x" });
   const proto = Object.getPrototypeOf(probe.messages);
@@ -179,6 +180,7 @@ export async function installMockAnthropicClient(opts = {}) {
       const err = new Error("Overloaded (mocked live-test-day scenario)");
       err.status = 529;
       err.type = "overloaded_error";
+      err.isMock = true;
       state.callLog.push({ call: callIndex, thrown: "overloaded" });
       throw err;
     }
@@ -186,12 +188,14 @@ export async function installMockAnthropicClient(opts = {}) {
       const err = new Error("Your credit balance is too low to access the Anthropic API (mocked live-test-day scenario)");
       err.status = 400;
       err.type = "invalid_request_error";
+      err.isMock = true;
       state.callLog.push({ call: callIndex, thrown: "credits" });
       throw err;
     }
     if (mode === "authError") {
       const err = new Error("invalid x-api-key (mocked live-test-day scenario)");
       err.status = 401;
+      err.isMock = true;
       state.callLog.push({ call: callIndex, thrown: "auth" });
       throw err;
     }

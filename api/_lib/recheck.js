@@ -38,6 +38,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** One document, inside an already-open tenant transaction (`db` = recordsStore's makeStore). */
 export async function recheckDocumentTx(db, documentId, { actorClerkId = null, source = "admin", today } = {}) {
+  // R34: the NOT EXISTS guard on the insert below is a snapshot read, so under READ COMMITTED two concurrent re-checks of the
+  // SAME document (the nightly sweep, an admin's "Re-check all", and a person's click can overlap) each saw "absent" and BOTH
+  // inserted - a duplicate extraction row. A per-document transaction-scoped advisory lock makes the second one wait, then see
+  // the first's rows and write nothing.
+  await db.raw("SELECT pg_advisory_xact_lock(hashtext($1))", [`recheck:${documentId}`]);
   const doc = await db.getDocument(documentId);
   if (!doc) return { documentId, status: "not-found", filled: [] };
   if (doc.stage === "verified") return { documentId, status: "already-verified", filled: [] };
