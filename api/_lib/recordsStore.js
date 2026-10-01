@@ -742,6 +742,49 @@ async function searchFunctionExists(db) {
   return searchFnState.ok;
 }
 
+/** R41: is M3-config/65's Donovan page finder (donovan_pages_by_text / donovan_pages_by_like) installed AND callable by this role?
+ *  Same contract as the 64 probe above: a yes is remembered, a no is re-checked each minute, so pasting the SQL takes effect
+ *  without a restart. Never throws. */
+let passageFnState = { ok: false, at: 0 };
+export function _resetPassageFnProbe() { passageFnState = { ok: false, at: 0 }; }
+async function passageFunctionsExist(db) {
+  if (passageFnState.ok) return true;
+  if (Date.now() - passageFnState.at < 60_000) return false;
+  try {
+    const r = await db.query(
+      `SELECT (has_function_privilege(to_regprocedure('donovan_pages_by_text(text,integer,uuid[])'), 'EXECUTE')
+           AND has_function_privilege(to_regprocedure('donovan_pages_by_like(text,integer,uuid[])'), 'EXECUTE')) AS ok`
+    );
+    passageFnState = { ok: r.rows[0]?.ok === true, at: Date.now() };
+  } catch {
+    passageFnState = { ok: false, at: Date.now() };
+  }
+  return passageFnState.ok;
+}
+
+/** R41: is M3-config/65's customer_activity summary installed, callable by this role, and complete (the table, both tables'
+ *  privileges, the refresh function and ALL TEN triggers that keep it current)? A half-pasted file is NOT used: without its
+ *  triggers the numbers would go stale. A yes is remembered; a no is re-checked each minute. Never throws. */
+let customerSummaryState = { ok: false, at: 0 };
+export function _resetCustomerSummaryProbe() { customerSummaryState = { ok: false, at: 0 }; }
+export const CUSTOMER_ACTIVITY_TRIGGER_COUNT = 10;
+async function customerSummaryReady(db) {
+  if (customerSummaryState.ok) return true;
+  if (Date.now() - customerSummaryState.at < 60_000) return false;
+  try {
+    const r = await db.query(
+      `SELECT (has_table_privilege(to_regclass('customer_activity'), 'SELECT, INSERT, UPDATE, DELETE')
+           AND has_table_privilege(to_regclass('customer_activity_dirty'), 'SELECT, INSERT, UPDATE, DELETE')
+           AND has_function_privilege(to_regprocedure('customer_activity_refresh()'), 'EXECUTE')
+           AND (SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'customer\\_activity\\_%' AND NOT tgisinternal) = ${CUSTOMER_ACTIVITY_TRIGGER_COUNT}) AS ok`
+    );
+    customerSummaryState = { ok: r.rows[0]?.ok === true, at: Date.now() };
+  } catch {
+    customerSummaryState = { ok: false, at: Date.now() };
+  }
+  return customerSummaryState.ok;
+}
+
 /** Newest documents the dense-search probe tests before falling back to the candidate set. */
 const SEARCH_WALK_WINDOW = 1000;
 
@@ -2328,6 +2371,10 @@ function makeStore(db, tenantId) {
       // SEMANTIC HYBRID (api/_lib/search/hybrid.js): null when off. Otherwise the question's embedding is
       // requested NOW so the Voyage round trip overlaps the keyword queries below instead of following them.
       const sem = startSemantic(question);
+      // R41: with M3-config/65 pasted, the page search runs through donovan_pages_by_text / donovan_pages_by_like (tenant-scoped,
+      // index-using functions; see that file's header) and only the few pages that win are read in full and highlighted. Without
+      // it, the inline queries below run exactly as before.
+      const viaFn = await passageFunctionsExist(db);
       const identifierPageIds = new Set(); // pages an identifier/serial token matched (kept on top by the hybrid step)
       const scopeSql = documentIds ? ' AND p.document_id = ANY($__ids__::uuid[])' : '';
       const withIds = (params) => documentIds ? [...params, documentIds] : params;
@@ -2362,7 +2409,28 @@ function makeStore(db, tenantId) {
          WHERE p.${TENANT} AND q.tsq IS NOT NULL AND p.tsv @@ q.tsq __SCOPE__
          ORDER BY rank DESC
          LIMIT $2`;
-      push((await scoped(ftsSql, [question, keywordCandidateLimit(limit, sem)])).rows, 'text');
+      const ftsViaFnSql = `
+        WITH q AS (
+          SELECT NULLIF(array_to_string(
+                   tsvector_to_array(to_tsvector('english', $1)), ' | '
+                 ), '')::tsquery AS tsq
+        )
+        SELECT p.id, p.document_id, p.page_no,
+               d.original_filename, d.document_type, d.stage,
+               ts_headline('english', p.text, q.tsq,
+                 'MaxFragments=2, MaxWords=55, MinWords=20, FragmentDelimiter=" … ", StartSel="", StopSel=""') AS excerpt,
+               h.rank AS rank
+          FROM donovan_pages_by_text($1, $2, $3::uuid[]) WITH ORDINALITY AS h(id, rank, ord)
+          JOIN document_pages p ON p.id = h.id AND p.${TENANT}
+          JOIN documents d ON d.id = p.document_id
+          CROSS JOIN q
+         ORDER BY h.ord`;
+      push(
+        (viaFn
+          ? await db.query(ftsViaFnSql, [question, keywordCandidateLimit(limit, sem), documentIds ?? null])
+          : await scoped(ftsSql, [question, keywordCandidateLimit(limit, sem)])).rows,
+        'text'
+      );
 
       // Belt and braces: if full-text search found nothing (an empty or
       // stale tsv column did exactly this in production once), fall back to
@@ -2375,7 +2443,19 @@ function makeStore(db, tenantId) {
             .filter((w) => !STOPWORDS.has(w))
         )].slice(0, 6);
         for (const w of words) {
-          const r = await scoped(
+          const r = viaFn
+            ? await db.query(
+              `SELECT p.id, p.document_id, p.page_no,
+                      d.original_filename, d.document_type, d.stage,
+                      substring(p.text from greatest(1, position(lower($2) in lower(p.text)) - 120) for 320) AS excerpt,
+                      0.5 AS rank
+                 FROM donovan_pages_by_like($1, 4, $3::uuid[]) WITH ORDINALITY AS h(id, ord)
+                 JOIN document_pages p ON p.id = h.id AND p.${TENANT}
+                 JOIN documents d ON d.id = p.document_id
+                ORDER BY h.ord`,
+              [`%${w}%`, w, documentIds ?? null]
+            )
+            : await scoped(
             `SELECT p.id, p.document_id, p.page_no,
                     d.original_filename, d.document_type, d.stage,
                     substring(p.text from greatest(1, position(lower($2) in lower(p.text)) - 120) for 320) AS excerpt,
@@ -2399,7 +2479,19 @@ function makeStore(db, tenantId) {
 
       for (const token of ids) {
         const like = `%${token}%`;
-        const r = await scoped(
+        const r = viaFn
+          ? await db.query(
+            `SELECT p.id, p.document_id, p.page_no,
+                    d.original_filename, d.document_type, d.stage,
+                    substring(p.text from greatest(1, position($2 in p.text) - 120) for 320) AS excerpt,
+                    1.0 AS rank
+               FROM donovan_pages_by_like($1, 5, $3::uuid[]) WITH ORDINALITY AS h(id, ord)
+               JOIN document_pages p ON p.id = h.id AND p.${TENANT}
+               JOIN documents d ON d.id = p.document_id
+              ORDER BY h.ord`,
+            [like, token, documentIds ?? null]
+          )
+          : await scoped(
           `SELECT p.id, p.document_id, p.page_no,
                   d.original_filename, d.document_type, d.stage,
                   substring(p.text from greatest(1, position($2 in p.text) - 120) for 320) AS excerpt,
@@ -3227,7 +3319,7 @@ function makeStore(db, tenantId) {
      * so a customer whose only recent event is a new/edited piece of
      * equipment doesn't read as stale.
      */
-    listCustomersSummary: ({ like = null, sort = 'recent', limit = 200, offset = 0, cap = 200 } = {}) => {
+    listCustomersSummary: async ({ like = null, sort = 'recent', limit = 200, offset = 0, cap = 200 } = {}) => {
       // R35: `cap` is the page ceiling (200 for every screen). The customers CSV export passes a bigger one: it asked for
       // 10,000 rows and silently got 200, so a 10k-customer shop's "export everything" was missing 98% of its customers.
       const ceiling = Math.min(Math.max(Math.trunc(Number(cap)) || 200, 1), 20000);
@@ -3237,6 +3329,56 @@ function makeStore(db, tenantId) {
       const orderBy = sort === 'name' ? "c.data->>'customer_name' ASC NULLS LAST, c.id"
         : sort === 'docs' ? 'doc_count DESC NULLS LAST, c.id'
         : 'last_activity DESC NULLS LAST, c.id';
+      // R41: with M3-config/65 pasted, the ORDER and the two numbers it sorts by (last_activity, doc_count) come from the
+      // customer_activity summary (kept current by triggers; customer_activity_refresh() recomputes whatever changed, in this
+      // same transaction, just before the list is read) and only the page's own rows are built up: a page costs the same at
+      // 6,000 customers as at 60,000. Same rows, same order, same numbers as the query below (scripts/verify-r41-scale-queries.mjs
+      // compares them on seeded data); that query is what runs when 65 has not been pasted.
+      if (await customerSummaryReady(db)) {
+        await db.query('SELECT customer_activity_refresh()');
+        const filter = `AND ($1::text IS NULL OR c.data->>'customer_name' ILIKE $1
+                                              OR c.data->>'service_address' ILIKE $1
+                                              OR c.customer_number ILIKE $1)`;
+        const caTenant = TENANT.replace('tenant_id', 'ca.tenant_id');
+        const cTenant = TENANT.replace('tenant_id', 'c.tenant_id');
+        const eTenant = TENANT.replace('tenant_id', 'e.tenant_id');
+        const page = sort === 'name'
+          ? `SELECT c.id, c.customer_number, c.data, ca.last_activity, ca.doc_count
+               FROM entities c
+               LEFT JOIN customer_activity ca ON ca.customer_id = c.id AND ${caTenant}
+              WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND ${cTenant} ${filter}
+              ORDER BY c.data->>'customer_name' ASC NULLS LAST, c.id
+              LIMIT $2 OFFSET $3`
+          : `SELECT c.id, c.customer_number, c.data, ca.last_activity, ca.doc_count
+               FROM customer_activity ca
+               JOIN entities c ON c.id = ca.customer_id
+              WHERE ${caTenant} AND c.entity_type = 'customer' AND c.merged_into IS NULL AND ${cTenant} ${filter}
+              ORDER BY ${sort === 'docs' ? 'ca.doc_count DESC, ca.customer_id' : 'ca.last_activity DESC NULLS LAST, ca.customer_id'}
+              LIMIT $2 OFFSET $3`;
+        const outerOrder = sort === 'name' ? "p.data->>'customer_name' ASC NULLS LAST, p.id"
+          : sort === 'docs' ? 'p.doc_count DESC, p.id'
+          : 'p.last_activity DESC NULLS LAST, p.id';
+        return many(
+          `WITH p AS (${page})
+           SELECT p.id, p.customer_number, p.data,
+                  COALESCE(p.doc_count, 0)::int AS doc_count,
+                  ec.n AS equipment_count,
+                  p.last_activity,
+                  COALESCE(wa.warranties, '[]'::jsonb) AS warranties
+             FROM p
+            CROSS JOIN LATERAL (
+              SELECT COUNT(*)::int AS n FROM entities e
+               WHERE e.entity_type = 'equipment' AND e.customer_id = p.id AND ${eTenant}
+            ) ec
+             LEFT JOIN LATERAL (
+              SELECT jsonb_agg(jsonb_build_object('id', e.id) || (e.data->'warranty') ORDER BY e.id) AS warranties
+                FROM entities e
+               WHERE e.entity_type = 'equipment' AND e.customer_id = p.id AND ${eTenant} AND e.data->'warranty' IS NOT NULL
+            ) wa ON TRUE
+            ORDER BY ${outerOrder}`,
+          [like, lim, off]
+        );
+      }
       return many(
         `WITH c AS (
            SELECT id, customer_number, data, updated_at
@@ -3246,9 +3388,11 @@ function makeStore(db, tenantId) {
                                     OR data->>'service_address' ILIKE $1
                                     OR customer_number ILIKE $1)
          ),
+         -- R41: only the units of the customers being listed (a name search lists a handful; this used to read every unit
+         -- in the shop and every document of all of them before keeping a few rows).
          equip AS (
            SELECT id, customer_id, data->'warranty' AS warranty, updated_at
-             FROM entities WHERE entity_type = 'equipment' AND customer_id IS NOT NULL AND ${TENANT}
+             FROM entities WHERE entity_type = 'equipment' AND customer_id IN (SELECT id FROM c) AND ${TENANT}
          ),
          doc_union AS (
            SELECT l.document_id, c.id AS customer_id

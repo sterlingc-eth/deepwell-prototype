@@ -6,8 +6,11 @@
 -- fake company that L1 created. It returns ONE table: what was measured, how many milliseconds it took, the target,
 -- and PASS or FAIL. Each measurement is run 3 times and the middle (median) time is shown.
 --
--- PASTE THIS ON THE SAME BRANCH AS L1, AFTER L1 FINISHED. It reads data and writes nothing (it only adds a few small
--- helper functions named loadtest_*, which L3 removes). Costs nothing: no AI, no storage. Takes under a minute.
+-- PASTE THIS ON THE SAME BRANCH AS L1, AFTER L1 FINISHED. It reads data and adds a few small helper functions named
+-- loadtest_*, which L3 removes. One exception: when migration 65 is pasted, the Customers list keeps a small summary table
+-- up to date (that is what makes it fast), and the very first use fills it in for the test company - this file does that
+-- once, exactly as the app does on a shop's first visit to the Customers tab, and shows how long it took (step 48). Those
+-- summary rows belong to the test company and L3 removes them with it. Costs nothing: no AI, no storage. Takes under a minute.
 --
 -- HOW TO READ THE TABLE
 --   * step 0 is the overall verdict. Steps 1-9 are the setup facts (how much data is there, are migrations 63 and 64
@@ -21,6 +24,8 @@
 --     timings are optimistic: row-level security is skipped.
 --   * If it had to switch to the app role it may run GRANT deepwell_rls TO <your role>. That only changes this branch.
 --   * "64 not pasted - search will be slow" means migration 64-records-search-indexes.sql is missing on this branch.
+--   * "65 not pasted - Customers and Donovan run the slower queries" means migration 65-scale-donovan-and-customers.sql is
+--     missing (or the app role cannot use it) on this branch: the Customers list and Donovan are then timed the old way.
 -- ============================================================================
 
 -- Fills the $1, $2 ... placeholders of a query with real values (this is what the database driver does for the app).
@@ -56,7 +61,8 @@ END
 $f$;
 
 -- The app's own queries (copied from api/_lib/recordsStore.js as the app sends them), each as one named step.
-CREATE OR REPLACE FUNCTION loadtest_q(p_name text, p_arg text, p_fn boolean) RETURNS bigint
+DROP FUNCTION IF EXISTS loadtest_q(text, text, boolean);
+CREATE OR REPLACE FUNCTION loadtest_q(p_name text, p_arg text, p_fn boolean, p_cust65 boolean, p_don65 boolean) RETURNS bigint
 LANGUAGE plpgsql AS $f$
 DECLARE
   v_today  text := current_date::text;
@@ -498,9 +504,11 @@ WITH c AS (
                                     OR data->>'service_address' ILIKE $1
                                     OR customer_number ILIKE $1)
          ),
+         -- R41: only the units of the customers being listed (a name search lists a handful; this used to read every unit
+         -- in the shop and every document of all of them before keeping a few rows).
          equip AS (
            SELECT id, customer_id, data->'warranty' AS warranty, updated_at
-             FROM entities WHERE entity_type = 'equipment' AND customer_id IS NOT NULL AND tenant_id = (current_setting('app.tenant_id', true))::uuid
+             FROM entities WHERE entity_type = 'equipment' AND customer_id IN (SELECT id FROM c) AND tenant_id = (current_setting('app.tenant_id', true))::uuid
          ),
          doc_union AS (
            SELECT l.document_id, c.id AS customer_id
@@ -552,6 +560,36 @@ WITH c AS (
            LEFT JOIN equip_agg ea ON ea.customer_id = c.id
           ORDER BY last_activity DESC NULLS LAST, c.id
           LIMIT $2 OFFSET $3
+  $s$;
+  -- R41 (migration 65 pasted): the Customers page reads the order and the two numbers it sorts by from the customer_activity
+  -- summary and builds up only the page's own rows. (recordsStore.js listCustomersSummary, sort = 'recent'.)
+  s_cust_sum constant text := $s$
+WITH p AS (
+           SELECT c.id, c.customer_number, c.data, ca.last_activity, ca.doc_count
+             FROM customer_activity ca
+             JOIN entities c ON c.id = ca.customer_id
+            WHERE ca.tenant_id = (current_setting('app.tenant_id', true))::uuid AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.tenant_id = (current_setting('app.tenant_id', true))::uuid
+              AND ($1::text IS NULL OR c.data->>'customer_name' ILIKE $1
+                                    OR c.data->>'service_address' ILIKE $1
+                                    OR c.customer_number ILIKE $1)
+            ORDER BY ca.last_activity DESC NULLS LAST, ca.customer_id
+            LIMIT $2 OFFSET $3)
+         SELECT p.id, p.customer_number, p.data,
+                COALESCE(p.doc_count, 0)::int AS doc_count,
+                ec.n AS equipment_count,
+                p.last_activity,
+                COALESCE(wa.warranties, '[]'::jsonb) AS warranties
+           FROM p
+          CROSS JOIN LATERAL (
+            SELECT COUNT(*)::int AS n FROM entities e
+             WHERE e.entity_type = 'equipment' AND e.customer_id = p.id AND e.tenant_id = (current_setting('app.tenant_id', true))::uuid
+          ) ec
+           LEFT JOIN LATERAL (
+            SELECT jsonb_agg(jsonb_build_object('id', e.id) || (e.data->'warranty') ORDER BY e.id) AS warranties
+              FROM entities e
+             WHERE e.entity_type = 'equipment' AND e.customer_id = p.id AND e.tenant_id = (current_setting('app.tenant_id', true))::uuid AND e.data->'warranty' IS NOT NULL
+          ) wa ON TRUE
+          ORDER BY p.last_activity DESC NULLS LAST, p.id
   $s$;
   s_cust_count constant text := $s$
 SELECT COUNT(*)::int AS n FROM entities
@@ -611,6 +649,35 @@ SELECT p.id, p.document_id, p.page_no,
             WHERE p.tenant_id = (current_setting('app.tenant_id', true))::uuid AND p.text ILIKE $1
             LIMIT 5
   $s$;
+  -- R41 (migration 65 pasted): the same two searches through donovan_pages_by_text / donovan_pages_by_like, which use the text
+  -- indexes; only the pages that win are read in full and highlighted. (recordsStore.js searchPassages.)
+  s_passages_fts_fn constant text := $s$
+WITH q AS (
+          SELECT NULLIF(array_to_string(
+                   tsvector_to_array(to_tsvector('english', $1)), ' | '
+                 ), '')::tsquery AS tsq
+        )
+        SELECT p.id, p.document_id, p.page_no,
+               d.original_filename, d.document_type, d.stage,
+               ts_headline('english', p.text, q.tsq,
+                 'MaxFragments=2, MaxWords=55, MinWords=20, FragmentDelimiter=" … ", StartSel="", StopSel=""') AS excerpt,
+               h.rank AS rank
+          FROM donovan_pages_by_text($1, $2::int, NULL::uuid[]) WITH ORDINALITY AS h(id, rank, ord)
+          JOIN document_pages p ON p.id = h.id AND p.tenant_id = (current_setting('app.tenant_id', true))::uuid
+          JOIN documents d ON d.id = p.document_id
+          CROSS JOIN q
+         ORDER BY h.ord
+  $s$;
+  s_passages_ident_fn constant text := $s$
+SELECT p.id, p.document_id, p.page_no,
+                    d.original_filename, d.document_type, d.stage,
+                    substring(p.text from greatest(1, position($2 in p.text) - 120) for 320) AS excerpt,
+                    1.0 AS rank
+               FROM donovan_pages_by_like($1, 5, NULL::uuid[]) WITH ORDINALITY AS h(id, ord)
+               JOIN document_pages p ON p.id = h.id AND p.tenant_id = (current_setting('app.tenant_id', true))::uuid
+               JOIN documents d ON d.id = p.document_id
+              ORDER BY h.ord
+  $s$;
 BEGIN
   CASE p_name
     -- Records list, newest first: the first page (50 rows) and the count the app shows next to it
@@ -649,15 +716,27 @@ BEGIN
     WHEN 'pages_month' THEN RETURN loadtest_exec(s_pages_month, ARRAY[(now() - interval '30 days')::text], true);
     WHEN 'pending' THEN RETURN loadtest_exec(s_pending, ARRAY[]::text[], true);
     -- Customers tab (p_arg = the offset into the list; 'recent' is the default order)
-    WHEN 'cust_page' THEN RETURN loadtest_exec(s_cust_page, ARRAY[NULL, '50', p_arg]);
-    WHEN 'cust_search' THEN RETURN loadtest_exec(s_cust_page, ARRAY[v_like, '50', '0']);
+    -- (with migration 65 the app first brings the summary up to date for whatever changed - a no-op when nothing did - then reads the page)
+    WHEN 'cust_page' THEN
+      IF p_cust65 THEN
+        PERFORM loadtest_exec('SELECT customer_activity_refresh()', ARRAY[]::text[], true);
+        RETURN loadtest_exec(s_cust_sum, ARRAY[NULL, '50', p_arg]);
+      END IF;
+      RETURN loadtest_exec(s_cust_page, ARRAY[NULL, '50', p_arg]);
+    WHEN 'cust_search' THEN
+      IF p_cust65 THEN
+        PERFORM loadtest_exec('SELECT customer_activity_refresh()', ARRAY[]::text[], true);
+        RETURN loadtest_exec(s_cust_sum, ARRAY[v_like, '50', '0']);
+      END IF;
+      RETURN loadtest_exec(s_cust_page, ARRAY[v_like, '50', '0']);
     WHEN 'cust_count' THEN RETURN loadtest_exec(s_cust_count, ARRAY[NULL], true);
     WHEN 'warranty' THEN RETURN loadtest_exec(s_warranty, ARRAY[v_today, v_plus60, v_today, v_plus90, '200']);
     -- Donovan ("Ask"): finding the pages that could answer a question. A serial number also triggers the exact-text pass.
     WHEN 'passages' THEN
-      v_n := loadtest_exec(s_passages_fts, ARRAY[p_arg, '12']);
+      v_n := loadtest_exec(CASE WHEN p_don65 THEN s_passages_fts_fn ELSE s_passages_fts END, ARRAY[p_arg, '12']);
       IF p_arg ~ '[A-Za-z0-9][A-Za-z0-9/-]{3,}' AND p_arg ~ '[0-9]' THEN
-        v_n := v_n + loadtest_exec(s_passages_ident, ARRAY['%' || substring(p_arg from '[A-Z][0-9]{2}[A-Z][0-9]{6}') || '%', substring(p_arg from '[A-Z][0-9]{2}[A-Z][0-9]{6}')]);
+        v_n := v_n + loadtest_exec(CASE WHEN p_don65 THEN s_passages_ident_fn ELSE s_passages_ident END,
+                                   ARRAY['%' || substring(p_arg from '[A-Z][0-9]{2}[A-Z][0-9]{6}') || '%', substring(p_arg from '[A-Z][0-9]{2}[A-Z][0-9]{6}')]);
       END IF;
       RETURN v_n;
     ELSE RAISE EXCEPTION 'unknown step %', p_name;
@@ -675,6 +754,7 @@ DECLARE
   v_serial text; v_custname text; v_deep_at bigint;
   v_ts1 text; v_id1 text; v_ts2 text; v_id2 text; v_ts3 text; v_id3 text;
   v_fn_installed boolean; v_fn boolean; v_idx64 int; v_idx63 int;
+  v_don65 boolean; v_cust65 boolean; v_trg65 int; v_fill_ms numeric; v_fill_n int; v_note65 text;
   v_ran text := 'owner'; v_role_note text := NULL;
   v_orig_user text := current_user;
   rec record;
@@ -744,6 +824,19 @@ BEGIN
   -- does the app role get to use records_search_candidates()? (the app checks this the same way)
   v_fn := v_fn_installed AND (NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'deepwell_rls')
                               OR has_function_privilege('deepwell_rls', 'records_search_candidates(text,text)', 'EXECUTE'));
+  -- migration 65 present AND usable by the app role? (the app checks the same things before using the faster queries)
+  v_don65 := to_regprocedure('donovan_pages_by_text(text,integer,uuid[])') IS NOT NULL
+         AND to_regprocedure('donovan_pages_by_like(text,integer,uuid[])') IS NOT NULL
+         AND (NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'deepwell_rls')
+              OR (has_function_privilege('deepwell_rls', 'donovan_pages_by_text(text,integer,uuid[])', 'EXECUTE')
+                  AND has_function_privilege('deepwell_rls', 'donovan_pages_by_like(text,integer,uuid[])', 'EXECUTE')));
+  SELECT count(*) INTO v_trg65 FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'customer\_activity\_%';
+  v_cust65 := to_regclass('public.customer_activity') IS NOT NULL AND to_regclass('public.customer_activity_dirty') IS NOT NULL
+          AND to_regprocedure('customer_activity_refresh()') IS NOT NULL AND v_trg65 = 10
+          AND (NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'deepwell_rls')
+               OR (has_function_privilege('deepwell_rls', 'customer_activity_refresh()', 'EXECUTE')
+                   AND has_table_privilege('deepwell_rls', 'customer_activity', 'SELECT,INSERT,UPDATE,DELETE')
+                   AND has_table_privilege('deepwell_rls', 'customer_activity_dirty', 'SELECT,INSERT,UPDATE,DELETE')));
 
   -- ---- setup facts ----
   step := 1; check_name := 'Seeded: documents'; ms := NULL; target_ms := NULL; result := 'INFO'; ran_as := NULL; result_size := v_docs; note := NULL; RETURN NEXT;
@@ -760,7 +853,32 @@ BEGIN
   step := 9; check_name := 'Migration 63 (pages-per-month index)'; result_size := v_idx63;
   IF v_idx63 = 1 THEN result := 'PASS'; note := 'index present'; ELSE result := 'FAIL'; note := '63 not pasted - the monthly page count will be slow'; END IF;
   RETURN NEXT;
-  note := v_role_note;
+  -- The one-time fill the app does on a shop's first visit to the Customers tab (a no-op, a few ms, on every later run).
+  v_fill_ms := NULL; v_fill_n := 0; v_note65 := NULL;
+  IF v_cust65 THEN
+    BEGIN
+      t0 := clock_timestamp();
+      v_fill_n := loadtest_exec('SELECT customer_activity_refresh()', ARRAY[]::text[], true);
+      v_fill_ms := round((extract(epoch FROM clock_timestamp() - t0) * 1000)::numeric, 1);
+    EXCEPTION WHEN OTHERS THEN
+      v_cust65 := false;
+      v_note65 := '65 not pasted - Customers and Donovan run the slower queries (the summary could not be filled: ' || left(SQLERRM, 120) || ')';
+    END;
+  END IF;
+  step := 49; check_name := 'Migration 65 (fast Customers list + fast Donovan page search)'; result_size := v_trg65;
+  IF v_cust65 AND v_don65 THEN
+    result := 'PASS'; note := 'summary tables, 10 triggers and both page-search functions present and usable by the app role';
+  ELSE
+    result := 'FAIL'; note := coalesce(v_note65, '65 not pasted - Customers and Donovan run the slower queries');
+  END IF;
+  ms := NULL; target_ms := NULL; RETURN NEXT;
+  IF v_cust65 THEN
+    step := 48; check_name := 'Customers summary (65): one-time fill, first visit to the Customers tab'; ms := v_fill_ms; target_ms := NULL;
+    result := 'INFO'; result_size := v_fill_n;
+    note := CASE WHEN v_fill_n = 0 THEN 'already up to date (this is the time of the no-change check)' ELSE v_fill_n || ' customers filled in this once; later visits only refresh what changed' END;
+    RETURN NEXT;
+  END IF;
+  ms := NULL; target_ms := NULL; note := v_role_note;
 
   -- ---- the timed checks: step, name, what to run, argument, target in ms ----
   FOR rec IN SELECT * FROM (VALUES
@@ -794,13 +912,16 @@ BEGIN
       times := ARRAY[]::numeric[];
       FOR i IN 1..3 LOOP
         t0 := clock_timestamp();
-        v_size := loadtest_q(rec.q, rec.arg, v_fn);
+        v_size := loadtest_q(rec.q, rec.arg, v_fn, v_cust65, v_don65);
         times := times || (extract(epoch FROM clock_timestamp() - t0) * 1000)::numeric;
       END LOOP;
       SELECT x INTO v_med FROM unnest(times) x ORDER BY x OFFSET 1 LIMIT 1;
       ms := round(v_med, 1); result_size := v_size;
       IF v_med <= rec.tgt THEN result := 'PASS'; v_pass := v_pass + 1; ELSE result := 'FAIL'; v_fail := v_fail + 1; END IF;
-      note := CASE WHEN rec.q = 'search' AND NOT v_fn THEN '64 not pasted - search will be slow' ELSE v_role_note END;
+      note := CASE WHEN rec.q = 'search' AND NOT v_fn THEN '64 not pasted - search will be slow'
+                   WHEN rec.q IN ('cust_page', 'cust_search') AND NOT v_cust65 THEN '65 not pasted - Customers and Donovan run the slower queries'
+                   WHEN rec.q = 'passages' AND NOT v_don65 THEN '65 not pasted - Customers and Donovan run the slower queries'
+                   ELSE v_role_note END;
     EXCEPTION WHEN OTHERS THEN
       result := 'ERROR'; ms := NULL; v_fail := v_fail + 1; note := left(SQLERRM, 200);
     END;

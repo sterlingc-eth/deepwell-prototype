@@ -26,6 +26,10 @@ const h = await bootHarness(dataDir ? { dataDir } : {});
 const { lite } = h;
 // The harness applies the migrations before it creates the app role, so 64's GRANT found nobody to grant to (see verify-r36-scale).
 await lite.exec(`GRANT EXECUTE ON FUNCTION records_search_candidates(text, text) TO deepwell_rls`);
+// Same for migration 65 (R41): its GRANTs also found nobody to grant to, so give the app role what 65's GRANTs give it in a real database.
+await lite.exec(`GRANT SELECT, INSERT, UPDATE, DELETE ON customer_activity, customer_activity_dirty TO deepwell_rls;
+  GRANT EXECUTE ON FUNCTION donovan_pages_by_text(text, int, uuid[]), donovan_pages_by_like(text, int, uuid[]),
+    customer_activity_refresh(), customer_activity_rebuild() TO deepwell_rls`);
 
 let failed = 0;
 const check = (name, ok, detail = '') => {
@@ -146,6 +150,7 @@ if (l2) {
   const byName = (re) => rows.find((r) => re.test(r.check_name));
   eq('L2 reports the seeded document count', Number(byName(/^Seeded: documents/).result_size), DOCS);
   eq('L2 sees migrations 63 and 64 as present', [byName(/^Migration 64/).result, byName(/^Migration 63/).result], ['PASS', 'PASS']);
+  eq('L2 sees migration 65 as present and fills the Customers summary once (step 48)', [byName(/^Migration 65/).result, byName(/^Customers summary \(65\)/)?.result, Number(byName(/^Customers summary \(65\)/)?.result_size)], ['PASS', 'INFO', sizes.customers]);
   check('targets: searches 300 ms, pages and counts 200 ms', timed.filter((r) => /^Records search|^Donovan/.test(r.check_name)).every((r) => r.target_ms === 300) && timed.filter((r) => /first page|Load more|^Inbox|^Billing|^Customers|^Upload|^Dashboard/.test(r.check_name)).every((r) => r.target_ms === 200));
   for (const [label, re] of [['the common word', /common word/], ['the phrase', /phrase/], ['the rare serial', /rare serial/], ['the customer name', /customer name/], ['the technician', /technician "/], ['the street name', /street name/]]) {
     const r = timed.find((x) => /^Records search/.test(x.check_name) && re.test(x.check_name));
@@ -164,7 +169,13 @@ if (l2) {
   await lite.exec(`GRANT EXECUTE ON FUNCTION records_search_candidates(text, text) TO deepwell_rls`);
   const m64 = noFn.rows.find((r) => /^Migration 64/.test(r.check_name));
   check('without the search function L2 still returns every check and flags "64 not pasted - search will be slow"', noFn.rows.filter((r) => r.target_ms != null).every((r) => r.ms !== null) && m64.result === 'FAIL' && /64 not pasted - search will be slow/.test(m64.note) && noFn.rows.some((r) => /^Records search/.test(r.check_name) && /64 not pasted/.test(r.note ?? '')), JSON.stringify(m64));
-  // L2 writes nothing but helper functions
+  // Without 65's grants for the app role L2 times the old queries for Customers and Donovan, says why, and still answers everything.
+  await lite.exec(`REVOKE EXECUTE ON FUNCTION customer_activity_refresh() FROM deepwell_rls`);
+  const no65 = await runFile(lite, 'L2');
+  await lite.exec(`GRANT EXECUTE ON FUNCTION customer_activity_refresh() TO deepwell_rls`);
+  const m65 = no65.rows.find((r) => /^Migration 65/.test(r.check_name));
+  check('without 65 usable by the app role L2 still returns every check and flags "65 not pasted"', no65.rows.filter((r) => r.target_ms != null).every((r) => r.ms !== null && r.result !== 'ERROR') && m65.result === 'FAIL' && /65 not pasted/.test(m65.note) && no65.rows.some((r) => /^Customers list: first page/.test(r.check_name) && /65 not pasted/.test(r.note ?? '')), JSON.stringify(m65));
+  // L2 writes nothing but helper functions (and, with 65, the test company's own summary rows)
   eq('L2 changed no rows', JSON.stringify(await countsFor(T)), JSON.stringify(c));
 }
 
