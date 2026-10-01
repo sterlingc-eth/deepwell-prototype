@@ -9,7 +9,7 @@ updated: 2026-09-29
 DeepWell Mobile installs from your browser. There is nothing to download from an app store and nothing to update.
 
 ### Is there a DeepWell phone app?
-~ phone app, mobile app, iphone app, android app, ios app, is there an app, do you have an app, app for technicians, tech app, mobile version, on my phone, mobile, use it on my phone, tablet app, ipad
+~ phone app, mobile app, iphone app, android app, ios app, is there an app, do you have an app, app for technicians, tech app, mobile version, on my phone, mobile, use it on my phone, tablet app, ipad, team member app
 Yes. DeepWell Mobile works on iPhone, iPad and Android. It has three tabs: **Ask** for Donovan, **Scan** for photographing paperwork and **Docs** for finding documents. The full desktop app has everything else: Inbox, Records, Dashboard, Team and Billing.
 
 ### How do I install the app on iPhone?
@@ -27,7 +27,7 @@ It installs straight from the browser, so everyone always has the latest version
 
 ### Does the phone app cost extra?
 ~ mobile app cost, phone app price, app fee, extra for app, is the app free, app included, does the app cost extra, pay for app
-No. The phone app is included with every plan. Your team members sign in with their own DeepWell accounts, which the shop owner invites from Team.
+No. The phone app is included with every plan. Your team members sign in with their own DeepWell accounts, which the company owner invites from Team.
 
 ### Does it work with bad signal?
 ~ bad signal, weak signal, offline, no signal, no service, poor connection, works offline, attic, crawlspace, slow connection, no internet, spotty coverage, rural, no cell service, cell service, crawl space, no reception, dead zone, basement, no bars, no wifi, no service in the crawl space can i still scan, can i still scan without signal

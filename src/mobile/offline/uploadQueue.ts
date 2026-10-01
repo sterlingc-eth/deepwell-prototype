@@ -311,7 +311,7 @@ export class OfflineUploadQueue {
       let soonest = Number.POSITIVE_INFINITY
       for (const item of items) {
         if (opts.signal?.aborted) break
-        if (!this.allowed(tenantKey)) break // signed-in shop changed mid-drain: leave the rest untouched
+        if (!this.allowed(tenantKey)) break // signed-in company changed mid-drain: leave the rest untouched
         if (this.authBlocked.has(tenantKey)) break
         if (item.status === 'error' && item.errorClass && item.errorClass !== 'transient') continue // permanent/too-large: only the tech deleting it changes anything
         const now = Date.now()

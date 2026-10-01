@@ -47,7 +47,7 @@ const TYPE_LABELS = {
   'purchase-order': 'Purchase order',
   'equipment-record': 'Equipment record',
   correspondence: 'Correspondence',
-  internal: 'Shop record',
+  internal: 'Company record',
 };
 
 export const MAX_DISPLAY_NAME_LENGTH = 70;

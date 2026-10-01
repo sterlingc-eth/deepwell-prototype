@@ -6,10 +6,10 @@ surface: both
 keywords: upgrade, downgrade, cancel, cancellation, invoice, receipt, refund, billing portal, manage billing, payment method, stripe
 updated: 2026-09-29
 ---
-Plan changes, cards and invoices are handled in Billing, through Stripe's billing portal. Only shop admins can open it.
+Plan changes, cards and invoices are handled in Billing, through Stripe's billing portal. Only company admins can open it.
 
 ### How do I upgrade or change my plan?
-~ upgrade, downgrade, change plan, switch plan, move to shop, move to crew, upgrade my plan, change my subscription, switch tiers, bigger plan, smaller plan, go from solo to shop, choose a plan, monthly or annual, how do i pick a plan, pick a plan, where do i change my plan, plan change, current plan
+~ upgrade, downgrade, change plan, switch plan, move to shop, move to crew, upgrade my plan, change my subscription, switch tiers, bigger plan, smaller plan, go from solo to shop, choose a plan, monthly or annual, how do i pick a plan, pick a plan, where do i change my plan, plan change, current plan, move to company, go from solo to company
 !covers:A-PLAN-CHANGE
 An admin opens **Billing → Choose a plan**, picks **Monthly** or **Annual · 1 month free**, then presses **Choose plan** on the tier they want. Your current tier shows **Current plan**. Payment happens on Stripe's secure checkout page. Members can open Billing but can't change the plan. Not sure which plan fits? Ask me or email support@deepwelltechnology.com.
 

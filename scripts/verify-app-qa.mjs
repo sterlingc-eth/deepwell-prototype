@@ -261,10 +261,10 @@ try {
   for (const field of [false, true]) {
     const page = await open({ auth: { orgId: null }, field, vp: { width: 390, height: 844 } });
     const rgbOf = (loc) => loc.evaluate((el) => getComputedStyle(el).color);
-    const plateBg = await page.locator('main, div').filter({ hasText: /DeepWell accounts belong to a shop/ }).last().evaluate((el) => getComputedStyle(el.closest('[style*="background"]') ?? el).backgroundColor);
+    const plateBg = await page.locator('main, div').filter({ hasText: /DeepWell accounts belong to a company/ }).last().evaluate((el) => getComputedStyle(el.closest('[style*="background"]') ?? el).backgroundColor);
     for (const [label, loc] of [
-      ['intro paragraph', page.getByText(/DeepWell accounts belong to a shop/)],
-      ['"Create your shop" option', page.getByText('Create your shop', { exact: true })],
+      ['intro paragraph', page.getByText(/DeepWell accounts belong to a company/)],
+      ['"Create your company" option', page.getByText('Create your company', { exact: true })],
       ['option helper text', page.getByText(/You're the first one here/)],
     ]) {
       const ratio = (luminance(plateBg) + 0.05) / (luminance(await rgbOf(loc)) + 0.05);

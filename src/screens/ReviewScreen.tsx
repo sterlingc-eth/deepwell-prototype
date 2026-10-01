@@ -633,8 +633,8 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
         {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
 
         <label className="inline-flex items-center gap-2 text-caption text-ink-2">
-          <input type="checkbox" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide shop records" />
-          Hide shop records
+          <input type="checkbox" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company records" />
+          Hide company records
         </label>
 
         {/* Filter chips: rendered by InboxScreen now, in the same row as its

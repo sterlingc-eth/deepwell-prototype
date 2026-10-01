@@ -168,8 +168,8 @@ try {
   {
     const page = await open({ backend: { docs: 12, customers: 6 } });
     await go(page, 'browse');
-    const emptyCard = page.getByText("Empty this shop's documents");
-    check('L1-B: the "Empty this shop\'s documents" card is on screen (admin, shop has documents)', (await emptyCard.count()) === 1);
+    const emptyCard = page.getByText("Empty this company's documents");
+    check('L1-B: the "Empty this company\'s documents" card is on screen (admin, shop has documents)', (await emptyCard.count()) === 1);
     const heading = await contrastOf(page, 'p.text-bad-ink');
     check('L1-B: its heading is readable in Office (dark): >= 4.5:1', heading >= 4.5, `ratio ${heading}`);
     const btn = await contrastOf(page, 'button.dw-btn-primary.\\!bg-bad');

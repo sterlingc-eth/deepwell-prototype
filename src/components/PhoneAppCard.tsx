@@ -32,7 +32,7 @@ export function PhoneAppCard() {
       <div className="flex-1 min-w-[220px] space-y-2">
         <h2 id="phone-app-title" className="text-body font-medium text-ink flex items-center gap-2">
           <Smartphone className="w-4 h-4" aria-hidden="true" />
-          Phone app for your techs
+          Phone app for your team
         </h2>
         <p className="text-caption text-ink-2">
           Ask, scan and find documents from the job site. Scan the code with a phone camera, or send your team the

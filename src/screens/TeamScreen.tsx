@@ -138,7 +138,7 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
               <Bell className="w-4 h-4" aria-hidden="true" /> Notifications
             </h3>
             <label className="flex items-center justify-between gap-3 py-1">
-              <span className="text-body text-ink-2">Send the shop&apos;s daily warranty digest (every admin)</span>
+              <span className="text-body text-ink-2">Send the company&apos;s daily warranty digest (every admin)</span>
               <button
                 type="button"
                 role="switch"
@@ -160,8 +160,8 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
               </button>
             </label>
             <p className="text-caption text-ink-3">
-              One email a day to the shop&apos;s admins, only when a warranty needs attention — expired, expiring soon,
-              or a registration window closing. This switch is for the whole shop.
+              One email a day to the company&apos;s admins, only when a warranty needs attention — expired, expiring soon,
+              or a registration window closing. This switch is for the whole company.
             </p>
             <label className="flex items-center justify-between gap-3 py-1 min-h-[44px]">
               <span className="text-body text-ink-2">Mute my daily digest</span>
@@ -196,7 +196,7 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
           <div className="space-y-2 pt-2 border-t border-line">
             <h3 className="text-body font-medium text-ink">Your data</h3>
             <p className="text-caption text-ink-3">
-              Download every document, extraction, customer/unit record and audit-log entry this shop has on file,
+              Download every document, extraction, customer/unit record and audit-log entry this company has on file,
               as one JSON file.
             </p>
             <button type="button" className="dw-btn-secondary shrink-0" disabled={exporting} onClick={() => void runExport()}>
@@ -211,15 +211,15 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
               independently requires the caller's own tenant id and admin role. */}
           <div className="space-y-2 pt-2 border-t border-line">
             <h3 className="text-body font-medium text-ink flex items-center gap-2">
-              <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete this shop
+              <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete this company
             </h3>
             <p className="text-caption text-ink-3">
               Cancels your subscription and permanently deletes every document, file, customer record and answer
-              history for this shop. This can't be undone — download the export above first.
+              history for this company. This can't be undone — download the export above first.
             </p>
             {!deleteOpen ? (
               <button type="button" className="dw-btn-secondary shrink-0" onClick={() => setDeleteOpen(true)} disabled={!tenantId}>
-                Delete shop data…
+                Delete company data…
               </button>
             ) : (
               <form
@@ -233,7 +233,7 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
                     await deleteShopData(tenantId);
                     window.location.assign('/?deleted=1');
                   } catch (err) {
-                    setDeleteError(err instanceof Error ? err.message : 'Could not delete the shop. Nothing was deleted — try again.');
+                    setDeleteError(err instanceof Error ? err.message : 'Could not delete the company. Nothing was deleted — try again.');
                     setDeleting(false);
                   }
                 }}
@@ -352,7 +352,7 @@ export function SupportAccessCard() {
       {open && (
         <div className="space-y-4 pt-1">
           <p className="text-caption text-ink-3">
-            By default, DeepWell staff cannot look at this shop&apos;s documents, answers, or learning data. Grant
+            By default, DeepWell staff cannot look at this company&apos;s documents, answers, or learning data. Grant
             time-boxed access below when you want help from support — it expires on its own, or you can revoke it
             any time. Every staff access is recorded in the Access log below, including any emergency access.
           </p>
@@ -538,7 +538,7 @@ export function TeamScreen() {
     return (
       <AppShell>
         <div className="max-w-md mx-auto dw-card p-6 space-y-4">
-          <p className="text-body text-ink-2">Create your shop to invite your team.</p>
+          <p className="text-body text-ink-2">Create your company to invite your team.</p>
           <CreateOrganization hideSlug afterCreateOrganizationUrl="/app/" appearance={clerkAppearance} />
         </div>
       </AppShell>
@@ -586,7 +586,7 @@ export function TeamScreen() {
                 in-form hint and the "Your plan includes…" sentence repeated. */}
             <InviteForm seats={seats} onInvited={() => { refreshSeats(); void organization?.reload(); }} />
             <p className="text-caption text-ink-3">
-              Invites are sent by email: anyone who accepts lands in this shop with the role you pick. To change a role,
+              Invites are sent by email: anyone who accepts lands in this company with the role you pick. To change a role,
               remove someone or cancel an invitation, use the <strong className="text-ink-2">Members</strong> and{' '}
               <strong className="text-ink-2">Invitations</strong> tabs of the panel at the bottom of this page.
             </p>
@@ -615,9 +615,9 @@ export function TeamScreen() {
           <>
             <PhoneAppCard />
             <div className="dw-card p-4">
-            <p className="text-body text-ink-2 mb-1">Members of {organization?.name ?? 'this shop'}:</p>
+            <p className="text-body text-ink-2 mb-1">Members of {organization?.name ?? 'this company'}:</p>
             <p className="text-caption text-ink-3 mb-3" data-testid="team-member-help">
-              Only a shop admin can invite people, change roles or remove someone. Ask an admin.
+              Only a company admin can invite people, change roles or remove someone. Ask an admin.
             </p>
             <ul className="divide-y divide-line">
               {(memberships?.data ?? []).map((m) => (

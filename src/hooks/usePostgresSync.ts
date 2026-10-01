@@ -516,7 +516,7 @@ async function syncServerCountsAndOlderNeedsReview(epoch: number, hydrate: boole
   try {
     summary = await recordsStore.reviewSummary();
   } catch {
-    return; // the totals stay as the graph counts them (exact for a small shop)
+    return; // the totals stay as the graph counts them (exact for a small company)
   }
   if (epoch !== hydrateEpoch) return;
   // A server (or a test double) that answers with anything but real counts must not put NaN on a screen.

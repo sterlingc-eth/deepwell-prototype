@@ -561,7 +561,7 @@ export default async function handler(req, res) {
       `followups: ${summary.followups?.tenantsEnabled ?? 0}/${summary.followups?.tenantsChecked ?? 0} tenant(s) enabled, ` +
       `${summary.followups?.messagesSent ?? 0} message(s) sent, ${summary.followups?.emailsSent ?? 0} emailed; ` +
       `integrity: ${summary.integrityMerged} merged, ${summary.integrityLinked} linked, ` +
-      `${summary.integrityHealed} survivor(s) healed, ${summary.integrityContactStripped} shop contact field(s) stripped, ` +
+      `${summary.integrityHealed} survivor(s) healed, ${summary.integrityContactStripped} company contact field(s) stripped, ` +
       `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +

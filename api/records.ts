@@ -217,7 +217,7 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     return res.status(400).json({ error: `Unknown action: ${action}` });
   }
   if (access === 'forbidden') {
-    return handleCors(res, req).status(403).json({ error: "This action requires the 'admin' role in your shop." });
+    return handleCors(res, req).status(403).json({ error: "This action requires the 'admin' role in your company." });
   }
 
   if (action === 'createDocument') {

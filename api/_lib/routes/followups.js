@@ -202,7 +202,7 @@ async function runFollowupsForTenant({ store, orgId, settings, apply }) {
 
     if (!apply) continue;
 
-    const name = group.member.displayName ?? "A technician";
+    const name = group.member.displayName ?? "A team member";
     await writeInAppNotification(store, {
       title: `${name}: ${message.subject}`,
       body: `${message.shownCount} of ${message.itemCount} document(s) listed — open the Inbox to fix them.`,

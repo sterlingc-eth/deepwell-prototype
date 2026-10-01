@@ -231,7 +231,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               changes (src/App.tsx, usePostgresSync's tenantKey), same as
               signing into a different account would. hidePersonal: DeepWell
               has no "personal" tenant concept in the UI — a user with no
-              shop sees OnboardingScreen instead of ever reaching this menu. */}
+              company sees OnboardingScreen instead of ever reaching this menu. */}
           <OrganizationSwitcher
             hidePersonal
             afterSelectOrganizationUrl="/app/"

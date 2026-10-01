@@ -72,7 +72,7 @@ function FullScreenMessage({ title, body, action }: { title: string; body: strin
         </a>
       )}
       {/* A tech stopped here by the plan gate (or a shop with no plan) had no way to sign out or switch to a
-          shop that IS subscribed — the app header with the account menu never renders. */}
+          company that IS subscribed — the app header with the account menu never renders. */}
       <AccountMenu />
     </div>
   )
@@ -216,8 +216,8 @@ export function MobileApp() {
   if (!orgId) {
     return (
       <FullScreenMessage
-        title="Join your shop first"
-        body="Your account isn't part of a shop yet. Create your shop or accept your invite on DeepWell, then come back here."
+        title="Join your company first"
+        body="Your account isn't part of a company yet. Create your company or accept your invite on DeepWell, then come back here."
         action={{ href: '/app/', label: 'Open DeepWell' }}
       />
     )
@@ -237,7 +237,7 @@ export function MobileApp() {
     return (
       <FullScreenMessage
         title="Choose a plan to continue"
-        body="Your shop doesn't have an active DeepWell plan. The shop owner can pick one on the desktop app."
+        body="Your company doesn't have an active DeepWell plan. The company owner can pick one on the desktop app."
         action={{ href: '/app/?screen=billing', label: 'See plans' }}
       />
     )

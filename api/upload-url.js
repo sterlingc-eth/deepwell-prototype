@@ -486,7 +486,7 @@ export default async function handler(req, res) {
     const expectedTenant = req.headers?.["x-dw-expected-tenant"];
     if (typeof expectedTenant === "string" && expectedTenant && !auth.viaKey && expectedTenant !== (auth.orgId ?? auth.userId)) {
       statusSent = 409;
-      return handleCors(res, req).status(409).json({ error: "This scan was captured in a different shop. Switch back to that shop to send it.", code: "tenant-mismatch" });
+      return handleCors(res, req).status(409).json({ error: "This scan was captured in a different company. Switch back to that company to send it.", code: "tenant-mismatch" });
     }
 
     // A 50-file batch presign is 50 units of ingest, not one request.

@@ -471,7 +471,7 @@ export async function runRanking(db, intent, { today } = {}) {
   // A handler that already cited real rows (customer/document records) is left as-is; the rest get a
   // human basis sentence with no per-row records (a group-by-column count, not one entity's own fact).
   if (Array.isArray(data.records)) return data;
-  return attachCitations(data, { records: [], total: 0, basis: `Grouped the shop's own records and read off the ${/fewest/i.test(intent.kind) ? 'minimum' : 'maximum'}.` });
+  return attachCitations(data, { records: [], total: 0, basis: `Grouped the company's own records and read off the ${/fewest/i.test(intent.kind) ? 'minimum' : 'maximum'}.` });
 }
 
 export async function classifyAndRunRanking(db, question) {

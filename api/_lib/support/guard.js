@@ -394,7 +394,7 @@ export function detectAccountIntent(text) {
 
 const COMPETITOR_ANY = new RegExp(`\\b(?:${RIVALS}|salesforce|hubspot)\\b`, 'i');
 const NEGATION = /\b(?:not|isn'?t|aren'?t|no|never|hasn'?t|haven'?t|can'?t|cannot|don'?t|doesn'?t|without|yet|unavailable|none|nor)\b/i;
-const COMING_SOON_FEATURES = /\b(?:email intake|folder sync|google drive sync|drive sync|branch scoping|off-?site backups?|backups every 6 hours|per-shop restore|status page|uptime sla|99\.5%|callback analytics|electrical|plumbing|property management)\b/i;
+const COMING_SOON_FEATURES = /\b(?:email intake|folder sync|google drive sync|drive sync|branch scoping|off-?site backups?|backups every 6 hours|per-shop restore|per-company restore|status page|uptime sla|99\.5%|callback analytics|electrical|plumbing|property management)\b/i;
 const PROMISE_RES = [
   /\bwill (?:soon )?be (?:available|added|released|launched|rolled out|live|ready|shipped)\b/i,
   /\b(?:we|deepwell) (?:will|are going to|plan to|intend to|are planning to|are working on|are building) (?:add|release|launch|build|ship|offer|support|include|introduce|roll out)\b/i,

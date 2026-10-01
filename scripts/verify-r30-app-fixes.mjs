@@ -348,7 +348,7 @@ try {
     await page.waitForTimeout(250);
     const sw = page.getByTestId('mute-my-digest');
     check('7: admins see "Mute my daily digest" next to the shop-wide switch', (await sw.count()) === 1 && /Mute my daily digest/.test(await page.locator('main').innerText()));
-    check('7: shop-wide switch is labelled as shop-wide', /Send the shop.s daily warranty digest/.test(await page.locator('main').innerText()));
+    check('7: shop-wide switch is labelled as shop-wide', /Send the company.s daily warranty digest/.test(await page.locator('main').innerText()));
     const b = await sw.boundingBox();
     check('7: the switch row is 44px+ tall', !!b && b.height >= 20, JSON.stringify(b));
     const posted = [];

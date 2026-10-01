@@ -277,7 +277,7 @@ async function handleSeats(req, res, auth) {
 
 /** POST ?action=invite body {email, role?} — admin-only; the server-side seat guard (seats.js guardedInvite). */
 async function handleInvite(req, res, auth) {
-  if (!hasShop(auth)) return res.status(400).json({ error: "Create your shop first to invite people." });
+  if (!hasShop(auth)) return res.status(400).json({ error: "Create your company first to invite people." });
   requireRole(auth, "admin");
   if (!(await rateLimit(req, res, auth, "billing"))) return; // 429 already written
   let body;

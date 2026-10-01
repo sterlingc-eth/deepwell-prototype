@@ -230,7 +230,8 @@
     "verify:r35-donovan": "node scripts/verify-r35-donovan.mjs",
     "verify:r35-limits": "tsx scripts/verify-r35-limits.mjs",
     "verify:r36-desktop-ux": "node scripts/verify-r36-desktop-ux.mjs",
-    "verify:r36-scale": "tsx scripts/verify-r36-scale.mjs"
+    "verify:r36-scale": "tsx scripts/verify-r36-scale.mjs",
+    "verify:r37-loadtest": "tsx scripts/verify-r37-loadtest.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",

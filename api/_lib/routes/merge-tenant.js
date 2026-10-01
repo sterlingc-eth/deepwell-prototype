@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   if (!hasShop(auth)) {
     // Solo tenant: there is nothing to merge into. Not an error — the client
     // calls this unconditionally once an org is active.
-    return res.status(200).json({ moved: {}, note: "No shop selected; nothing to merge." });
+    return res.status(200).json({ moved: {}, note: "No company selected; nothing to merge." });
   }
 
   const fromKey = `user_${auth.userId}`;

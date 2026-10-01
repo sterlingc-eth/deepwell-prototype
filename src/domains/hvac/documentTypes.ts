@@ -28,7 +28,7 @@ export const DOCUMENT_TYPES: DocumentTypeDef[] = [
   { id: 'purchase-order', label: 'Purchase order' },
   { id: 'equipment-record', label: 'Equipment record' },
   { id: 'correspondence', label: 'Correspondence' },
-  { id: 'internal', label: 'Shop record' },
+  { id: 'internal', label: 'Company record' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -68,9 +68,9 @@ export const FIELD_LABELS: Record<string, string> = {
   tonnage: 'Tonnage',
   refrigerant: 'Refrigerant',
   service_address: 'Service address',
-  shop_address: 'Shop address',
-  shop_phone: 'Shop phone',
-  shop_email: 'Shop email',
+  shop_address: 'Company address',
+  shop_phone: 'Company phone',
+  shop_email: 'Company email',
   customer_name: 'Customer',
   installation_date: 'Installation date',
   warranty_expires: 'Warranty expires',

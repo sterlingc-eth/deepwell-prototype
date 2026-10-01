@@ -26,12 +26,12 @@ When a plan or page-limit block stops a phone upload, the row shows the message 
 ### Do the phone tabs stay when I switch?
 ~ phone tabs, switch tabs, tabs on phone, ask tab scan tab docs tab, bottom tabs, lose my question, thread stays, does it remember, last tab, tab remembered, header buttons phone
 !covers:A-M-TABS
-Yes. The tab you were on is remembered and an Ask thread stays while you switch to Scan or Docs. The header shows the shop name, **Help**, the Field/Office view button and the round profile button (your initial), which opens the **Account** sheet.
+Yes. The tab you were on is remembered and an Ask thread stays while you switch to Scan or Docs. The header shows the company name, **Help**, the Field/Office view button and the round profile button (your initial), which opens the **Account** sheet.
 
-### Why does my phone say "Join your shop first" or "Choose a plan to continue"?
-~ join your shop first, choose a plan to continue, phone gate, phone says join your shop, phone says choose a plan, open deepwell, phone no shop, phone paywall, blocked on phone, cant use the phone app, phone wont open my shop
+### Why does my phone say "Join your company first" or "Choose a plan to continue"?
+~ join your shop first, choose a plan to continue, phone gate, phone says join your shop, phone says choose a plan, open deepwell, phone no shop, phone paywall, blocked on phone, cant use the phone app, phone wont open my shop, join your company first, phone says join your company, phone no company, phone wont open my company
 !covers:A-M-GATES
-"Join your shop first" means the account isn't in a shop yet: accept your invite email, or ask an admin to invite you. "Choose a plan to continue" means the shop has no active plan; the owner picks one in **Billing** on the desktop app (**See plans**).
+"Join your company first" means the account isn't in a company yet: accept your invite email, or ask an admin to invite you. "Choose a plan to continue" means the company has no active plan; the owner picks one in **Billing** on the desktop app (**See plans**).
 
 ### How do I find a document on my phone?
 ~ find a document on phone, search docs phone, docs tab, phone search, filters on phone, sort on phone, group by customer, customer sheet, document sheet, look up a customer on my phone, find a serial on my phone, phone filters, apply filters, open original on phone, call the customer from my phone
@@ -43,7 +43,7 @@ Open the **Docs** tab. Search "Customer, address, serial…", or tap **Filters**
 !covers:A-M-ASK
 Open the **Ask** tab, type in "Ask Donovan…" or tap a starter, and send. Answers show sources you can tap. It needs a connection; on a weak signal a slow answer says "That took too long — probably a weak signal. Try again." Questions typed into the Help chat can be passed to Ask.
 
-### Where do I sign out or switch shops on the phone?
-~ phone account, account sheet, profile button phone, avatar phone, round button top right, phone sign out, sign out of phone app, switch shop on phone, switch shops phone, change shop on my phone, phone shop switcher, sign out with unsent scans, sign out deletes my scans, stay signed in, sign out and delete, scans waiting sign out, which shop am i in on my phone, current shop phone
+### Where do I sign out or switch companies on the phone?
+~ phone account, account sheet, profile button phone, avatar phone, round button top right, phone sign out, sign out of phone app, switch shop on phone, switch shops phone, change shop on my phone, phone shop switcher, sign out with unsent scans, sign out deletes my scans, stay signed in, sign out and delete, scans waiting sign out, which shop am i in on my phone, current shop phone, switch company on phone, switch companies phone, change company on my phone, phone company switcher, which company am i in on my phone, current company phone
 !covers:A-M-ACCOUNT
-Tap the round profile button (your initial) at the top right of the phone app. The **Account** sheet shows your name and email, the **Current shop**, and **Sign out**. If you belong to more than one shop it also lists them under **Switch shop**; tapping one reloads the app on that shop. If scans are still waiting to upload, signing out warns you first: "N scans have not been sent yet. Signing out deletes them from this phone." Choose **Stay signed in** to keep them, or **Sign out and delete**. Scans waiting to upload stay with the shop they were taken in, so switching shops never sends them to the wrong one; they upload when that shop is active again.
+Tap the round profile button (your initial) at the top right of the phone app. The **Account** sheet shows your name and email, the **Current company**, and **Sign out**. If you belong to more than one company it also lists them under **Switch company**; tapping one reloads the app on that company. If scans are still waiting to upload, signing out warns you first: "N scans have not been sent yet. Signing out deletes them from this phone." Choose **Stay signed in** to keep them, or **Sign out and delete**. Scans waiting to upload stay with the company they were taken in, so switching companies never sends them to the wrong one; they upload when that company is active again.

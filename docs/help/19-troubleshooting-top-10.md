@@ -14,7 +14,7 @@ Check that you're signing in with the email your invite went to, and use the pas
 !handoff:sign-in-help
 
 ### My invite email didn't arrive
-~ my tech never got the invite email, tech never got the invite, never got the invite, invite never came, never received the invite, invite not arriving, invite email, did not get invite, invitation not received, didnt receive invite, tech didnt get invite, invite expired, resend invite, invite spam, invite link, invitation email
+~ my tech never got the invite email, tech never got the invite, never got the invite, invite never came, never received the invite, invite not arriving, invite email, did not get invite, invitation not received, didnt receive invite, tech didnt get invite, invite expired, resend invite, invite spam, invite link, invitation email, my team member never got the invite email, team member never got the invite, team member didnt get invite
 Ask the person to check spam or junk. Confirm the address is right in **Team**, and re-send the invite if needed. Invites count toward your plan's login limit, and if you're at the limit the invite is blocked with a message that says so.
 
 ### An upload failed
@@ -30,7 +30,7 @@ Open the cited source and check it. The document may still be processing, or a f
 ### I can't see the Dashboard or Team screen
 ~ cant see team, no team screen, cant see billing, no dashboard, missing screen, cant find team, permission denied, requires admin, admin role, not authorized, forbidden, access denied, why cant i
 !covers:A-TEAM-MEMBER
-Some screens and actions are for admins. Team is hidden from members, and if a member reaches it they see a read-only list of members. Billing, invites, exports and deletions need an admin. A member sees those buttons disabled with "Ask an admin" beside them (Export CSV, customer merge, Billing actions, API keys), and Empty documents and Delete document are hidden. Ask your shop's admin. On a phone the app only has Ask, Scan and Docs, so use the desktop app for the rest.
+Some screens and actions are for admins. Team is hidden from members, and if a member reaches it they see a read-only list of members. Billing, invites, exports and deletions need an admin. A member sees those buttons disabled with "Ask an admin" beside them (Export CSV, customer merge, Billing actions, API keys), and Empty documents and Delete document are hidden. Ask your company's admin. On a phone the app only has Ask, Scan and Docs, so use the desktop app for the rest.
 
 ### I get "API access is included on the Fleet plan"
 ~ api access error, api access is included on the fleet plan, cant create api key, api key error, create api key, api keys not working, 403 api, api forbidden

@@ -122,9 +122,9 @@ function DocumentsTab() {
       {/* Destructive and admin-only (api/_lib/routes/document-delete.js): a member never sees it at all. */}
       {canAdmin && totalCount > 0 && (
         <div className="dw-card p-4 space-y-2 border-bad/30">
-          <p className="font-medium text-bad-ink flex items-center gap-2"><Trash2 className="w-4 h-4" aria-hidden="true" /> Empty this shop's documents</p>
+          <p className="font-medium text-bad-ink flex items-center gap-2"><Trash2 className="w-4 h-4" aria-hidden="true" /> Empty this company's documents</p>
           <p className="text-body text-ink-2">
-            Permanently deletes all {totalCount} document{totalCount === 1 ? '' : 's'} in this shop, along with their extracted fields and links. This can't be undone.
+            Permanently deletes all {totalCount} document{totalCount === 1 ? '' : 's'} in this company, along with their extracted fields and links. This can't be undone.
             Type <span className="font-mono">DELETE</span> to confirm.
           </p>
           <div className="flex flex-wrap items-center gap-2">

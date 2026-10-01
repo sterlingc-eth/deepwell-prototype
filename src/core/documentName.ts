@@ -48,7 +48,7 @@ const TYPE_LABELS: Record<string, string> = {
   'equipment-record': 'Equipment record',
   'install-record': 'Install record',
   correspondence: 'Correspondence',
-  internal: 'Shop record',
+  internal: 'Company record',
 };
 
 const MAX_LEN = 70;

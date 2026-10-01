@@ -197,7 +197,7 @@ export function DonovanMissesCard() {
 
           {/* Platform-operator-only, independent of THIS tenant's own miss
               count — the digest is cross-tenant, so an operator whose own
-              shop has zero misses can still send today's platform digest. */}
+              company has zero misses can still send today's platform digest. */}
           {report?.isOperator && (
             <div className="flex items-center gap-2">
               <button

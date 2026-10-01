@@ -25,7 +25,7 @@ export function AccountMenu({ triggerClassName }: { triggerClassName?: string })
     <>
       <button
         type="button"
-        aria-label="Account and shops"
+        aria-label="Account and companies"
         aria-haspopup="dialog"
         data-testid="account-button"
         onClick={() => setOpen(true)}

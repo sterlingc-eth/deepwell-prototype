@@ -20,7 +20,7 @@ export function ApiAccessCard({ plan, onUpgrade }: { plan: BillingPlanId | null;
       </h2>
       {allowed && !canAdmin ? (
         <p className="text-ink-2">
-          API keys are managed by a shop admin. <AskAdminNote />
+          API keys are managed by a company admin. <AskAdminNote />
         </p>
       ) : allowed ? (
         <KeyManager />

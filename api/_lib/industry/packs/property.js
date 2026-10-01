@@ -34,7 +34,7 @@ const documentTypes = [
   { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or materials.', requires: ['vendor|customer_name', 'cost'], visitType: false, financial: true },
   { id: 'equipment-record', label: 'Appliance record', definition: 'Identifies a per-unit appliance with no service or billing context.', requires: ['serial_number|model'], visitType: false, financial: false },
   { id: 'correspondence', label: 'Correspondence', definition: 'Tenant/owner communication about a unit or property, not a paperwork form.', requires: ['customer_name'], visitType: false, financial: false },
-  { id: 'internal', label: 'Shop record', definition: 'Internal-only record naming no owner, tenant, or vendor.', requires: [], visitType: false, financial: false },
+  { id: 'internal', label: 'Company record', definition: 'Internal-only record naming no owner, tenant, or vendor.', requires: [], visitType: false, financial: false },
   { id: 'other', label: 'Other', definition: 'Does not clearly fit any type above.', requires: [], visitType: true, financial: false },
   // Property-management-specific, per the expansion brief's "▲" additions:
   { id: 'lease-agreement', label: 'Lease agreement', definition: 'A signed lease between the owner and a tenant for one unit, with a start/end date and rent.', requires: ['service_address', 'tenant_name', 'lease_end_date'], visitType: false, financial: true },

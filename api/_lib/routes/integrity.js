@@ -1282,7 +1282,7 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
       // follow-up 2026-09-20) — that document is left "doesn't state a
       // customer" for a human, not silently attributed to the shop.
       const customer = await withRecordsTenant(ctx, (db) => db.findOrCreateCustomer({ customer_name: r.customerName, service_address: r.serviceAddress }, shopContext));
-      if (!customer?.id) { result.skipped.push({ documentId: r.documentId, reason: 'no customer name or address to resolve (or a likely shop address)' }); continue; }
+      if (!customer?.id) { result.skipped.push({ documentId: r.documentId, reason: 'no customer name or address to resolve (or a likely company address)' }); continue; }
       const didLink = await withRecordsTenant(ctx, (db) => linkDocumentToCustomer(db, {
         documentId: r.documentId, customerId: customer.id, confidence: 0.75,
         linkedBy: linkedByForMatchBasis(customer.matchBasis),
@@ -1308,7 +1308,7 @@ async function applyIntegrityFix(ctx, { apply, dryRun, minMergeScore = CUSTOMER_
         continue;
       }
       const customer = await withRecordsTenant(ctx, (db) => db.findOrCreateCustomer({ customer_name: r.customerName, service_address: r.serviceAddress }, shopContext));
-      if (!customer?.id) { result.skipped.push({ documentId: null, reason: `equipment ${r.equipmentId}: no customer name or address to resolve (or a likely shop address)` }); continue; }
+      if (!customer?.id) { result.skipped.push({ documentId: null, reason: `equipment ${r.equipmentId}: no customer name or address to resolve (or a likely company address)` }); continue; }
       const n = await withRecordsTenant(ctx, (db) => db.setEquipmentCustomer(r.equipmentId, customer.id));
       if (n > 0) result.equipmentLinked.push({ equipmentId: r.equipmentId, customerId: customer.id });
     }

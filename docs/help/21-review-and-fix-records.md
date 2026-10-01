@@ -11,7 +11,7 @@ When DeepWell can't be sure of something it leaves a short job in **Inbox → Ne
 ### Where do I fix a document that needs info?
 ~ fix a document, needs info, needs your attention, needs a person, where are the flagged documents, flagged documents, where do i fix, where do i review, review queue, documents that need review, needs you, inbox needs you, where is the needs info queue, pending questions, missing information queue, clear the inbox, what do the chips mean, filter chips in inbox
 !covers:A-NEEDS-YOU
-Open **Inbox** and choose the **Needs you** tab (the badge is the count). Chips narrow the list: **Decisions** (quick questions), **Needs a person**, **Missing info**, **Needs linking**, **Conflicts**, **Duplicates**, **Ready to verify**, **Shop records**, **Money to check** (only when there are money issues) and **All**. Pick one, open a document and work through it. The Dashboard's Data health tiles open the matching chip.
+Open **Inbox** and choose the **Needs you** tab (the badge is the count). Chips narrow the list: **Decisions** (quick questions), **Needs a person**, **Missing info**, **Needs linking**, **Conflicts**, **Duplicates**, **Ready to verify**, **Company records**, **Money to check** (only when there are money issues) and **All**. Pick one, open a document and work through it. The Dashboard's Data health tiles open the matching chip.
 
 ### How do I answer DeepWell's questions in Decisions?
 ~ decisions, answer questions, answer a question, decision card, exception queue, pick an option, which customer, which address, confirm the serial, type it instead, snooze, dismiss, doesnt apply, ask again later, why are we asking, questions from deepwell, respond to deepwell, answer deepwell
@@ -49,9 +49,9 @@ Open the **Conflicts** chip. The panel says "Two documents disagree on <field>" 
 Open **Inbox → Needs you → Duplicates**, open the copy and press **Merge into original**. The original stays and the copy is dropped, so nothing is double counted. An upload with identical contents is caught automatically ("Already on file").
 
 ### How do I merge duplicate customers?
-~ merge customers, duplicate customers, duplicate customer, same customer twice, merge two customers, combine customers, two records for one customer, customer listed twice, merge into, not the same, keep separate, merge all, undo a merge, dedupe customers, clean up customers, customer twice, merge button not working, merge button greyed out, tech cant merge, only admins can merge, why is the merge button not working, merge button not working for my tech
+~ merge customers, duplicate customers, duplicate customer, same customer twice, merge two customers, combine customers, two records for one customer, customer listed twice, merge into, not the same, keep separate, merge all, undo a merge, dedupe customers, clean up customers, customer twice, merge button not working, merge button greyed out, tech cant merge, only admins can merge, why is the merge button not working, merge button not working for my tech, team member cant merge, merge button not working for my team member
 !covers:A-DUP-CUSTOMER
-Admins can merge; a member sees the merge buttons disabled with "Ask an admin" beside them, and the whole-shop scan is hidden. In **Records → Customers**, a banner lists likely pairs: **Merge into <name>** (tick which one to keep), **Not the same**, or **Merge all**. Admins also get a whole-shop **Duplicate customers** scan there, with Undo after a merge. The same suggestions appear in Inbox → Needs you. A different name at the same address is never merged automatically.
+Admins can merge; a member sees the merge buttons disabled with "Ask an admin" beside them, and the whole-company scan is hidden. In **Records → Customers**, a banner lists likely pairs: **Merge into <name>** (tick which one to keep), **Not the same**, or **Merge all**. Admins also get a whole-company **Duplicate customers** scan there, with Undo after a merge. The same suggestions appear in Inbox → Needs you. A different name at the same address is never merged automatically.
 
 ### What does Verify with AI do?
 ~ verify with ai, ai verify, ai verified, let ai check, verified by ai, ai check, auto verify, what is ai verified, automatic verification, use ai to verify
@@ -73,10 +73,10 @@ An admin opens the document (**Inbox → Needs you**, then the document) and pre
 !covers:A-MONEY-FIX
 Open the invoice. **Money on this document** lists Number, Date, Due, Subtotal, Tax, Total, Paid, Balance due and Status. Press **Correct <field>** beside a value, type the right one and save. The **Money to check** chip lists invoices where the numbers didn't add up.
 
-### What are shop records and Hide shop records?
-~ shop records, hide shop records, internal documents, our own paperwork, shop paperwork, internal type, internal documents in inbox, why are my own documents here, documents about my shop, team only documents, technician filter shop records
+### What are company records and Hide company records?
+~ shop records, hide shop records, internal documents, our own paperwork, shop paperwork, internal type, internal documents in inbox, why are my own documents here, documents about my shop, team only documents, technician filter shop records, company records, hide company records, company paperwork, documents about my company, technician filter company records
 !covers:A-HIDE-SHOP
-**Shop records** are documents about your own shop (typed Internal) rather than a customer's job. They have their own chip in Needs you, with an optional technician filter. Tick **Hide shop records** to keep them out of the other chips.
+**Company records** are documents about your own company (typed Internal) rather than a customer's job. They have their own chip in Needs you, with an optional technician filter. Tick **Hide company records** to keep them out of the other chips.
 
 ### What does Find reminders do?
 ~ find reminders, reminders, reminder, open reminders, next visit reminder, note for next visit, remind me next visit, reminder on customer, attach reminder, service reminder

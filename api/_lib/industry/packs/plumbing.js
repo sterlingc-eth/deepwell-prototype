@@ -21,7 +21,7 @@ const documentTypes = [
   { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or equipment.', requires: ['vendor|customer_name', 'cost'], visitType: false, financial: true },
   { id: 'equipment-record', label: 'Equipment record', definition: 'Identifies a fixture or appliance with no service or billing context.', requires: ['serial_number|model'], visitType: false, financial: false },
   { id: 'correspondence', label: 'Correspondence', definition: 'A letter or email about a customer or job, not a paperwork form.', requires: ['customer_name'], visitType: false, financial: false },
-  { id: 'internal', label: 'Shop record', definition: 'Shop-only record with no customer on it at all.', requires: [], visitType: false, financial: false },
+  { id: 'internal', label: 'Company record', definition: 'Shop-only record with no customer on it at all.', requires: [], visitType: false, financial: false },
   { id: 'other', label: 'Other', definition: 'Does not clearly fit any type above.', requires: [], visitType: true, financial: false },
   // Plumbing-specific, per the expansion brief's "▲" additions:
   { id: 'backflow-test-certificate', label: 'Backflow test certificate', definition: 'A certified annual/biennial backflow-preventer test result, filed with the water utility.', requires: ['service_address', 'service_date', 'backflow_test_result'], visitType: true, financial: false },
@@ -38,9 +38,9 @@ const fields = [
   { key: 'gallons', label: 'Tank size (gallons)', perUnit: true, description: 'Water heater tank capacity in gallons, as printed, e.g. "50 gallon".' },
   { key: 'pipe_material', label: 'Pipe material', perUnit: false, description: 'PEX, copper, galvanized, CPVC, cast iron — as printed for a repipe or repair job.' },
   { key: 'service_address', label: 'Service address', perUnit: false, description: 'Street address where the work was performed — not the contractor\'s own letterhead address.' },
-  { key: 'shop_address', label: 'Shop address', perUnit: false, description: 'The plumbing company\'s own business/letterhead address.' },
-  { key: 'shop_phone', label: 'Shop phone', perUnit: false, description: 'The plumbing company\'s own business/letterhead phone number.' },
-  { key: 'shop_email', label: 'Shop email', perUnit: false, description: 'The plumbing company\'s own business/letterhead email address.' },
+  { key: 'shop_address', label: 'Company address', perUnit: false, description: 'The plumbing company\'s own business/letterhead address.' },
+  { key: 'shop_phone', label: 'Company phone', perUnit: false, description: 'The plumbing company\'s own business/letterhead phone number.' },
+  { key: 'shop_email', label: 'Company email', perUnit: false, description: 'The plumbing company\'s own business/letterhead email address.' },
   { key: 'customer_name', label: 'Customer', perUnit: false, description: 'Customer or account name.' },
   { key: 'customer_phone', label: 'Customer phone', perUnit: false, description: 'Customer phone number, exactly as printed.' },
   { key: 'customer_email', label: 'Customer email', perUnit: false, description: 'Customer email address, exactly as printed.' },
@@ -120,7 +120,7 @@ const personas = [
   },
   {
     id: 'owner',
-    label: 'Shop owner',
+    label: 'Company owner',
     sampleQuestions: [
       'How much have we invoiced for water heater installs this year?',
       'How many backflow test certificates are on file?',

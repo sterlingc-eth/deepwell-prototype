@@ -49,7 +49,7 @@ export function classifyCapability({ outcome, category, detectedConditions } = {
  *  point for the weekly human-reviewed engineering session, not a final
  *  spec. Pure. */
 const FIX_SPEC_BY_CAPABILITY = {
-  'money-status-unknown': 'Donovan cannot yet say whether an amount is paid/overdue/unknown with confidence for these shops. Fix: extend the financials extraction/oracle to cover the document types these misses came from, and add an honest "status unknown" answer instead of a fallback.',
+  'money-status-unknown': 'Donovan cannot yet say whether an amount is paid/overdue/unknown with confidence for these companies. Fix: extend the financials extraction/oracle to cover the document types these misses came from, and add an honest "status unknown" answer instead of a fallback.',
   'content-count': 'A counting/aggregate question fell through to the generic fallback instead of an analytics plan. Fix: extend analytics.js\'s plan vocabulary (entity/op/filters) to cover the phrasing in these examples, and add a few-shot example once one grounded answer exists.',
   'multi-hop': 'The question needs facts joined across more than one document/entity and the current single-hop tools could not do it. Fix: add a bounded multi-step tool (or a pre-built join view) for this shape, scoped read-only like every other agent tool.',
   'contact-lookup': 'A customer/contact lookup matched zero or more than one record. Fix: improve name/address disambiguation (fuzzy match + a clarifying follow-up) for the shapes seen here.',

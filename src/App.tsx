@@ -437,7 +437,7 @@ function App() {
       {mergeNotice && (
         <div className="dw-card border-line px-5 py-3 m-4 mb-0 text-ink-2 flex items-start gap-2">
           <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-          <p>Moving any earlier uploads into {organization?.name ?? 'your shop'}…</p>
+          <p>Moving any earlier uploads into {organization?.name ?? 'your company'}…</p>
         </div>
       )}
       {!DEMO_MODE && sync.status === 'error' && (

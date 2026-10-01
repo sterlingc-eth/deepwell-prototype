@@ -151,7 +151,7 @@ export function BillingScreen() {
 
         {!canAdmin && (
           <p role="note" data-testid="billing-member-note" className="dw-card px-4 py-3 text-body text-ink-2">
-            Only a shop admin can start a plan, change it or manage billing. Ask an admin{gated ? ' to pick a plan so your shop can use DeepWell' : ''}.
+            Only a company admin can start a plan, change it or manage billing. Ask an admin{gated ? ' to pick a plan so your company can use DeepWell' : ''}.
           </p>
         )}
 

@@ -68,7 +68,7 @@ export function OnboardingScreen() {
           <Wordmark size="lg" />
         </h1>
         <p className="text-forest-100 mt-4 text-body-lg">
-          {mode === 'choose' ? "You're signed in — now join or start a shop." : 'Almost there.'}
+          {mode === 'choose' ? "You're signed in — now join or start a company." : 'Almost there.'}
         </p>
       </div>
 
@@ -79,9 +79,9 @@ export function OnboardingScreen() {
         {mode === 'choose' && (
           <>
             <p className="text-body text-ink-2">
-              DeepWell accounts belong to a shop, not to one technician, so every
+              DeepWell accounts belong to a company, not to one person, so every
               document and record your whole team touches ends up in the same
-              place. Create your shop, or join one you were invited to.
+              place. Create your company, or join one you were invited to.
             </p>
 
             <button
@@ -91,7 +91,7 @@ export function OnboardingScreen() {
             >
               <Building2 className="w-5 h-5 text-forest-700 shrink-0" aria-hidden="true" />
               <span>
-                <span className="block font-medium text-ink">Create your shop</span>
+                <span className="block font-medium text-ink">Create your company</span>
                 <span className="block text-caption text-ink-3">
                   You're the first one here — set it up for your team.
                 </span>
@@ -107,7 +107,7 @@ export function OnboardingScreen() {
               <span>
                 <span className="block font-medium text-ink">I was invited</span>
                 <span className="block text-caption text-ink-3">
-                  Accept an invite, or switch to a shop you already belong to.
+                  Accept an invite, or switch to a company you already belong to.
                 </span>
               </span>
             </button>
@@ -147,9 +147,9 @@ export function OnboardingScreen() {
               Back
             </button>
             <p className="text-body text-ink-2">
-              An invite from your shop's admin arrives by email with a link that
+              An invite from your company's admin arrives by email with a link that
               signs you straight in. If you already accepted one, or you belong
-              to a shop already, pick it below to make it active.
+              to a company already, pick it below to make it active.
             </p>
             <OrganizationList
               hidePersonal

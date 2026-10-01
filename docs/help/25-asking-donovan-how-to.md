@@ -16,7 +16,7 @@ Open **Ask**, type in the box ("Ask Donovan anything — an address, a serial, a
 ### Where do I get example questions or my recent ones?
 ~ example questions, try asking, sample questions, what can i ask, ideas for questions, recent questions, past questions, ask again, re-ask a question, history of questions, what should i ask, starter questions
 !covers:A-ASK-EXAMPLES
-Before your first question the Ask screen shows **Try asking** chips built from your own records (or "For example" samples) and a **Recent** list of past questions you can click to ask again. Field view uses tech-style examples.
+Before your first question the Ask screen shows **Try asking** chips built from your own records (or "For example" samples) and a **Recent** list of past questions you can click to ask again. Field view uses field-style examples.
 
 ### How do I see where an answer came from?
 ~ sources, citations, where did that come from, show the source, source document, open the source, proof, check the source, how do i verify an answer, cited documents, closest documents, numbered markers, records behind a count, show me the rows, show me the documents behind that
@@ -44,7 +44,7 @@ That means the records don't contain it, or it isn't checked yet. Look at the **
 Under an answer use **Was this right?**: thumbs up or thumbs down. A thumbs-down opens "What was wrong? (optional)"; it is logged and Donovan re-checks. Then open the cited source and correct the record if a field was misread.
 
 ### How do I share or copy an answer?
-~ share an answer, copy an answer, send an answer, share answer with my tech, copy the answer, copy a serial, copy button, share button on answer, text an answer, email an answer, export an answer
+~ share an answer, copy an answer, send an answer, share answer with my tech, copy the answer, copy a serial, copy button, share button on answer, text an answer, email an answer, export an answer, share answer with my team member
 !covers:A-ASK-SHARE
 Use **Share** on an answer to copy or share it, and the copy button next to a value to copy just that value.
 

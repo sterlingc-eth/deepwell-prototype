@@ -15,4 +15,4 @@ export function useCanAdmin(): boolean {
 
 /** Short text used next to (or on) a control a member can see but not use. */
 export const ASK_ADMIN = 'Ask an admin';
-export const ASK_ADMIN_TITLE = 'Only a shop admin can do this. Ask an admin.';
+export const ASK_ADMIN_TITLE = 'Only a company admin can do this. Ask an admin.';

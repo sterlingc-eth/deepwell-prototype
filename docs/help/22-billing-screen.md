@@ -6,17 +6,17 @@ surface: desktop
 keywords: billing, trial, plan, usage, status, paywall, records rescue, api keys, stripe, portal, checkout, subscription
 updated: 2026-09-29
 ---
-Billing is in the header (icon and "Billing"). Every member can open it and read the plan and usage; only admins can change anything. A member sees the Billing buttons disabled, with "Ask an admin" beside them and a note that only a shop admin can start a plan, change it or manage billing.
+Billing is in the header (icon and "Billing"). Every member can open it and read the plan and usage; only admins can change anything. A member sees the Billing buttons disabled, with "Ask an admin" beside them and a note that only a company admin can start a plan, change it or manage billing.
 
 ### How do I start my free trial?
 ~ start trial, start my free trial, start the 30 day trial, how do i start the trial, begin trial, activate trial, free trial button, try deepwell free, how do i try it, sign up for the trial, start free trial, start my 30 day trial, how do i start my 30 day trial, 30 day trial
 !covers:A-TRIAL
-An admin opens **Billing** and presses **Start 30-day free trial**. It is the Solo plan, a card is required, and nothing is charged until the 30 days end. It is offered only to a shop that has never subscribed. You can cancel any time before it ends from **Manage billing**.
+An admin opens **Billing** and presses **Start 30-day free trial**. It is the Solo plan, a card is required, and nothing is charged until the 30 days end. It is offered only to a company that has never subscribed. You can cancel any time before it ends from **Manage billing**.
 
 ### It says "Pick a plan to open your account". Why?
-~ pick a plan to open your account, choose a plan to continue, cant open anything, only billing and team, locked out, paywall, no plan yet, why is everything locked, why cant i use the app, app is locked, subscription ended, shop has no plan, need to pick a plan
+~ pick a plan to open your account, choose a plan to continue, cant open anything, only billing and team, locked out, paywall, no plan yet, why is everything locked, why cant i use the app, app is locked, subscription ended, shop has no plan, need to pick a plan, company has no plan
 !covers:A-PAYWALL
-A shop with no plan (never subscribed, or canceled) can only open **Billing** and **Team** until an admin picks a plan. On the phone it says "Choose a plan to continue" and the owner picks one on the desktop app. Nothing is deleted; your records are there when a plan is active again.
+A company with no plan (never subscribed, or canceled) can only open **Billing** and **Team** until an admin picks a plan. On the phone it says "Choose a plan to continue" and the owner picks one on the desktop app. Nothing is deleted; your records are there when a plan is active again.
 
 ### What is Manage billing?
 ~ manage billing, what is manage billing, billing portal, stripe portal, open the portal, where is manage billing, manage subscription, billing settings, subscription settings, stripe
@@ -46,7 +46,7 @@ An admin opens **Billing → Records Rescue**, enters the number of **Pages** (a
 ### How do I create an API key?
 ~ create api key, make an api key, api key, api keys, generate a key, new api key, api access, revoke api key, delete api key, where are api keys, dw_live, connect my own system, integration key, copy my key, lost my api key
 !covers:A-APIKEYS
-On the **Fleet** plan an admin opens **Billing → API access**, types a **Key name** and presses **Create key**. The key (starts dw_live_) is shown once, so copy it right away: "Copy your new key now — it will not be shown again". Keys can read, ingest and ask. **Revoke** on a row turns one off. A member on a Fleet shop sees "API keys are managed by a shop admin. Ask an admin." instead of the key form.
+On the **Fleet** plan an admin opens **Billing → API access**, types a **Key name** and presses **Create key**. The key (starts dw_live_) is shown once, so copy it right away: "Copy your new key now — it will not be shown again". Keys can read, ingest and ask. **Revoke** on a row turns one off. A member on a Fleet company sees "API keys are managed by a company admin. Ask an admin." instead of the key form.
 
 ### Where is API access? I don't see it.
 ~ i dont see api access, api access missing, no api section, see fleet, upgrade for api, why cant i use api keys, api not available on my plan, api locked

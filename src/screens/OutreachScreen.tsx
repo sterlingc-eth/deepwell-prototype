@@ -330,7 +330,7 @@ export function OutreachScreen() {
               </label>
 
               <label className="block">
-                <span className="text-caption text-ink-3">Shop name (shown in the email)</span>
+                <span className="text-caption text-ink-3">Company name (shown in the email)</span>
                 <input
                   type="text"
                   disabled={!admin}
@@ -342,7 +342,7 @@ export function OutreachScreen() {
               </label>
 
               <label className="block">
-                <span className="text-caption text-ink-3">Shop phone (optional — offered as a way to reply)</span>
+                <span className="text-caption text-ink-3">Company phone (optional — offered as a way to reply)</span>
                 <input
                   type="tel"
                   disabled={!admin}
@@ -406,7 +406,7 @@ export function OutreachScreen() {
                   {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : null} Save settings
                 </button>
               ) : (
-                <p className="text-caption text-ink-3">Only a shop admin can change these settings.</p>
+                <p className="text-caption text-ink-3">Only a company admin can change these settings.</p>
               )}
             </div>
           )}
@@ -480,7 +480,7 @@ export function OutreachScreen() {
             </p>
           )}
 
-          {!admin && approved.length > 0 && <p className="text-caption text-ink-3">Only a shop admin can send approved drafts.</p>}
+          {!admin && approved.length > 0 && <p className="text-caption text-ink-3">Only a company admin can send approved drafts.</p>}
 
           <ul className="space-y-2">
             {[...drafts, ...approved].map((msg) => (

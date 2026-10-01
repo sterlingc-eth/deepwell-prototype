@@ -6,24 +6,24 @@ surface: both
 keywords: login, logins, sign in, seats, invite, team, member, admin, role, owner, technician, add user, users
 updated: 2026-09-29
 ---
-People sign in with their own DeepWell account. A shop is one account, and the owner invites everyone else from the Team screen.
+People sign in with their own DeepWell account. A company is one account, and the owner invites everyone else from the Team screen.
 
 ### How many logins does my plan include?
-~ how many users, how many seats, how many people, how many technicians, how many techs, number of logins, user limit, seat limit, login limit, how many employees, users per plan, seats per plan, login cap, how many users can i add, users can i add, how many people can i add, how many people can use it
+~ how many users, how many seats, how many people, how many technicians, how many techs, number of logins, user limit, seat limit, login limit, how many employees, users per plan, seats per plan, login cap, how many users can i add, users can i add, how many people can i add, how many people can use it, how many team members
 Solo includes up to {{solo.logins}} logins, Shop up to {{shop.logins}}, Crew up to {{crew.logins}}, and Fleet {{fleet.logins}}. The owner account is not counted. So a Shop can have the owner plus five more people.
 
 ### Is the owner counted as a login?
 ~ owner counted, does the owner count, owner account, does the owner use a seat, main account, admin count
 No. The owner account does not count toward the login limit on any plan.
 
-### How do I invite a technician or teammate?
-~ invite, add a user, add a tech, add technician, add employee, add someone, add a member, send invite, invite team, invite my tech, give access, share access, new hire, office manager login, let my office manager, office manager have a login, add my office manager, own login, separate login, login for my office manager, login for my dispatcher, add my dispatcher, add my wife, add my partner, add a guy, add my guys, invite a tech, invite a user, invite a teammate, add a new user, add a user to my account, invite someone, invite people, get my tech on, get my crew on, where do i invite, where to invite, set up a login for, cant find where to add a user, where to add a user, cant find add user, invit, how to invit a tech
+### How do I invite a team member?
+~ invite, add a user, add a tech, add technician, add employee, add someone, add a member, send invite, invite team, invite my tech, give access, share access, new hire, office manager login, let my office manager, office manager have a login, add my office manager, own login, separate login, login for my office manager, login for my dispatcher, add my dispatcher, add my wife, add my partner, add a guy, add my guys, invite a tech, invite a user, invite a teammate, add a new user, add a user to my account, invite someone, invite people, get my tech on, get my crew on, where do i invite, where to invite, set up a login for, cant find where to add a user, where to add a user, cant find add user, invit, how to invit a tech, add a team member, invite my team member, invite a team member, get my team member on, how to invit a team member
 !covers:A-INVITE,A-INVITE-ROLE
-An admin opens **Team** (people icon in the top bar), then **Invite someone**: type the email, pick **Member** or **Admin**, and press **Send invite**. They accept from the email and land in your shop, on the computer or the phone app. Invites count toward your plan's login limit. Team is desktop only.
+An admin opens **Team** (people icon in the top bar), then **Invite someone**: type the email, pick **Member** or **Admin**, and press **Send invite**. They accept from the email and land in your company, on the computer or the phone app. Invites count toward your plan's login limit. Team is desktop only.
 
 ### What are the roles, admin and member?
 ~ roles, permissions, admin role, member role, what can members do, who can see billing, who can export, who can delete, who is an admin, access levels
-Two roles. **Admins** can manage billing and API keys, invite and remove people, export or delete the shop's data, delete documents, merge duplicate customers, send outreach and grant support access. **Members** can ask Donovan, upload and scan, browse, fix and verify records. A member sees those admin buttons greyed out with "Ask an admin" next to them (Export CSV, customer merge, Billing buttons, API keys), and the delete buttons are hidden for them, so ask an admin to do it.
+Two roles. **Admins** can manage billing and API keys, invite and remove people, export or delete the company's data, delete documents, merge duplicate customers, send outreach and grant support access. **Members** can ask Donovan, upload and scan, browse, fix and verify records. A member sees those admin buttons greyed out with "Ask an admin" next to them (Export CSV, customer merge, Billing buttons, API keys), and the delete buttons are hidden for them, so ask an admin to do it.
 
 ### Can I go over my login limit?
 !covers:A-SEATCAP
@@ -41,25 +41,25 @@ Desktop: go to deepwelltechnology.com/app (or choose **Log in** on the website).
 !covers:A-SIGNOUT
 Desktop: **Sign out** is at the far right of the top bar. Phone: tap the round profile button (your initial) at the top right to open the **Account** sheet, then tap **Sign out**. If scans are still waiting to upload, the phone warns you first that signing out deletes them from the phone; choose **Stay signed in** to keep them, or **Sign out and delete**.
 
-### How do I switch to a different shop?
-~ switch shop, switch org, switch organization, change shop, change organization, change company, two shops, work for two shops, more than one shop, different shop, other shop, switch company, switch accounts, another shop, second shop, switch between shops, org switcher
+### How do I switch to a different company?
+~ switch shop, switch org, switch organization, change shop, change organization, change company, two shops, work for two shops, more than one shop, different shop, other shop, switch company, switch accounts, another shop, second shop, switch between shops, org switcher, two companies, work for two companies, more than one company, different company, other company, another company, second company, switch between companies
 !covers:A-SWITCHORG
-If you belong to more than one shop, use the shop switcher in the desktop top bar (next to **Sign out**). The app reloads on that shop's records. On the phone, tap the round profile button at the top right to open the **Account** sheet; when you belong to more than one shop it lists them under **Switch shop**. Switching reloads the app on the other shop. Scans still waiting to upload stay with the shop they were taken in and only upload when that shop is active again.
+If you belong to more than one company, use the company switcher in the desktop top bar (next to **Sign out**). The app reloads on that company's records. On the phone, tap the round profile button at the top right to open the **Account** sheet; when you belong to more than one company it lists them under **Switch company**. Switching reloads the app on the other company. Scans still waiting to upload stay with the company they were taken in and only upload when that company is active again.
 
-### I just signed in and it asks me to create or join a shop. What do I do?
-~ create your shop, create a shop, create shop, i was invited, join a shop, join shop, accept invite, accept invitation, how do i accept an invite, join my team, join my boss, no shop, not part of a shop, join your shop first, start a shop, set up my shop, first time signing in, new account, get started, first login, just signed up
+### I just signed in and it asks me to create or join a company. What do I do?
+~ create your shop, create a shop, create shop, i was invited, join a shop, join shop, accept invite, accept invitation, how do i accept an invite, join my team, join my boss, no shop, not part of a shop, join your shop first, start a shop, set up my shop, first time signing in, new account, get started, first login, just signed up, create your company, create a company, create company, join a company, join company, no company, not part of a company, join your company first, start a company, set up my company
 !covers:A-CREATESHOP,A-JOINSHOP
-An account belongs to a shop. If you're the owner, choose **Create your shop** and name it, and you become its admin. If someone invited you, choose **I was invited** (or open the link in your invite email) and accept, using the same email address the invite went to. The phone app says "Join your shop first" until you have one.
+An account belongs to a company. If you're the owner, choose **Create your company** and name it, and you become its admin. If someone invited you, choose **I was invited** (or open the link in your invite email) and accept, using the same email address the invite went to. The phone app says "Join your company first" until you have one.
 
 ### How do I change someone's role?
-~ change role, change a role, change roles, make admin, make someone an admin, make my office manager an admin, promote to admin, demote, remove admin, make member, change permissions, change access level, give admin, take away admin, change user role, edit role, change my tech to admin, upgrade a user, downgrade a user
+~ change role, change a role, change roles, make admin, make someone an admin, make my office manager an admin, promote to admin, demote, remove admin, make member, change permissions, change access level, give admin, take away admin, change user role, edit role, change my tech to admin, upgrade a user, downgrade a user, change my team member to admin
 !covers:A-ROLE-CHANGE
 An admin opens **Team** and uses the **Members** tab of the panel under the invite form (it's our sign-in provider's panel). Change the person's role between **Member** and **Admin** on their row. Admins can manage billing, invites, exports, deletion and support access, so keep Admin for people who need it. Only admins can change roles.
 
-### How do I remove a user or a technician who left?
-~ remove user, remove a user, delete user, delete a user, remove technician, remove a tech, remove employee, remove member, remove someone, employee left, tech quit, fired, offboard, take someone off, take away access, revoke access, revoke user, kick off, delete a login, free up a login, remove a login, deactivate user, remove an admin, get rid of a user
+### How do I remove a user or team member who left?
+~ remove user, remove a user, delete user, delete a user, remove technician, remove a tech, remove employee, remove member, remove someone, employee left, tech quit, fired, offboard, take someone off, take away access, revoke access, revoke user, kick off, delete a login, free up a login, remove a login, deactivate user, remove an admin, get rid of a user, remove a team member, team member quit
 !covers:A-USER-REMOVE
-An admin opens **Team**, finds the person on the **Members** tab of the panel under the invite form (our sign-in provider's panel), and removes them from their row's menu. Their access ends and the login is freed up. The shop's records stay with the shop. Only admins can remove people.
+An admin opens **Team**, finds the person on the **Members** tab of the panel under the invite form (our sign-in provider's panel), and removes them from their row's menu. Their access ends and the login is freed up. The company's records stay with the company. Only admins can remove people.
 
 ### Can I cancel or resend an invite?
 ~ cancel invite, cancel invitation, revoke invite, revoke invitation, resend invite, resend invitation, resend, wrong email invite, invited the wrong email, pending invite, pending invitations, invite expired, delete invite, undo invite, invited wrong person, see pending invites, who have i invited
@@ -71,6 +71,6 @@ Pending invites show in the **Team** header as "N pending invites" and on the **
 !covers:A-SEATS
 On **Team**, the pill at the top right reads like "3 of 5 logins used (owner not counted)" and adds "N pending invites". **Billing** shows your plan's login limit. Members only see a member count.
 
-### Does DeepWell charge per technician?
-~ per tech, per technician, per user pricing, per seat pricing, per head, charged per person
-No. Plans are priced by team size tier, not per technician. Each plan has a set number of logins, a storage limit and a monthly scan allowance.
+### Does DeepWell charge per team member?
+~ per tech, per technician, per user pricing, per seat pricing, per head, charged per person, per team member
+No. Plans are priced by team size tier, not per team member. Each plan has a set number of logins, a storage limit and a monthly scan allowance.

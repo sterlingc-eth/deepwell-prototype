@@ -912,7 +912,7 @@ async function quoteVsInvoiceTotal(db, intent, ctx) {
     { label: 'Quoted', value: fmt(a.quoted), status: 'ok', sources: [] },
     { label: 'Invoiced', value: fmt(a.invoiced), status: 'ok', sources: [] },
   ], {
-    sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: 'quoted vs invoiced (shop-wide)',
+    sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: 'quoted vs invoiced (company-wide)',
     cite: { records: financeRecords(docs), total: a.n_quoted + a.n_invoiced, claimedCount: a.n_quoted + a.n_invoiced,
       basis: `Summed the printed totals of every quote/estimate (${fmt(a.quoted)}) and every invoice (${fmt(a.invoiced)}) on file.` },
   });

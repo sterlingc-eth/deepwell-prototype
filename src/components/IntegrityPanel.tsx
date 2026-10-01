@@ -14,8 +14,8 @@ const SUMMARY_ROWS: { key: keyof IntegrityScanResult['counts']; label: string }[
   { key: 'equipmentWithoutCustomer', label: 'Units without a customer' },
   { key: 'multiUnitDocsUnderLinked', label: 'Multi-unit docs under-linked' },
   { key: 'orphanEquipment', label: 'Orphaned units' },
-  { key: 'suspectedShopAddresses', label: 'Shop-address placeholder customers' },
-  { key: 'shopContactLeaks', label: 'Shop phone/email on a customer' },
+  { key: 'suspectedShopAddresses', label: 'Company-address placeholder customers' },
+  { key: 'shopContactLeaks', label: 'Company phone/email on a customer' },
   { key: 'mismatchedNameLinks', label: 'Wrong-name links' },
   { key: 'splitLinkDocuments', label: 'Split customer links' },
   { key: 'ambiguousNameOnlyLinks', label: 'Ambiguous name-only links' },
@@ -181,7 +181,7 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                   <p className="text-caption text-ink-3">
                     Merged {fixResult.merged.length} duplicate{fixResult.merged.length === 1 ? '' : 's'} · linked {fixResult.documentsLinked.length} document{fixResult.documentsLinked.length === 1 ? '' : 's'} to a customer ·
                     linked {fixResult.equipmentLinked.length} unit{fixResult.equipmentLinked.length === 1 ? '' : 's'} to a customer · created {fixResult.unitsCreated.length} missing unit{fixResult.unitsCreated.length === 1 ? '' : 's'} ·
-                    stripped {fixResult.shopContactStripped.length} shop contact field{fixResult.shopContactStripped.length === 1 ? '' : 's'}
+                    stripped {fixResult.shopContactStripped.length} company contact field{fixResult.shopContactStripped.length === 1 ? '' : 's'}
                     {(() => {
                       const recovered = fixResult.shopContactStripped.filter((l) => l.rederivedTo).length;
                       return recovered > 0 ? `, recovering the customer's real number/email for ${recovered} of them` : '';
@@ -214,7 +214,7 @@ export function IntegrityPanel({ onApplied }: { onApplied?: () => void }) {
                   <div className="space-y-2 pt-2 border-t border-line">
                     <p className="text-body text-ink-2">
                       {retireCount} customer record{retireCount === 1 ? ' is' : 's are'} just a placeholder for your
-                      own shop's address — retiring {retireCount === 1 ? 'it unlinks its documents' : 'them unlinks their documents'} so they can be relinked to the real customer instead.
+                      own company's address — retiring {retireCount === 1 ? 'it unlinks its documents' : 'them unlinks their documents'} so they can be relinked to the real customer instead.
                     </p>
                     <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1.5" disabled={retiring} onClick={() => void runRetire()}>
                       {retiring ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Sparkles className="w-4 h-4" aria-hidden="true" />} {retiring ? 'Retiring…' : `Retire ${retireCount} shop-address record${retireCount === 1 ? '' : 's'}`}

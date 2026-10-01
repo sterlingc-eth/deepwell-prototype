@@ -64,7 +64,7 @@ const personas = [
   },
   {
     id: 'owner',
-    label: 'Shop owner',
+    label: 'Company owner',
     sampleQuestions: [
       'How much have we invoiced this quarter?',
       'How many callbacks did we have on Goodman units?',

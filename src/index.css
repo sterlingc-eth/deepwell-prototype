@@ -177,7 +177,7 @@
   .dark .dw-pill-info { background: #0e3057; color: #c3d8ef; }
 
   /* R31 QA: status INK tokens (text-ok/warn/bad/info-ink) are dark shades built for the light pastel status
-     backgrounds. Used bare, on the dark page or a dark card (an error line under a form, "Empty this shop's
+     backgrounds. Used bare, on the dark page or a dark card (an error line under a form, "Empty this company's
      documents", a "saved" note), they measured 1.7:1 in Office view. On the dark surface they take the same
      light shades the .dw-pill-* variants above use. Left alone: an element that also carries its own
      bg-*-bg (a pastel chip/banner keeps its dark ink) and one that sets an explicit dark:text-* override. */

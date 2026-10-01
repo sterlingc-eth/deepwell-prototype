@@ -146,7 +146,7 @@ export async function notifyForInternalDocument(db, documentId, { techNames = []
       await insertNotification(db, {
         kind: 'internal-doc',
         title: `Internal document for ${m.displayName ?? 'you'}`,
-        body: 'A shop-only record was uploaded — not a customer document.',
+        body: 'A company-only record was uploaded — not a customer document.',
         link: RECORDS_INTERNAL_LINK,
       });
     }

@@ -83,7 +83,7 @@ const E = await import('../api/_lib/naming/engine.js');
     'inspection-report': [{ service_address: '17 Cactus Ln', service_date: '2025-08-01' }, 'Inspection report · 17 Cactus Ln · Aug 1, 2025'],
     'equipment-record': [{ manufacturer: 'Lennox', model: 'XC21', customer_name: 'Oak Phoenix Co' }, 'Equipment record · Lennox XC21 · Oak Phoenix Co'],
     correspondence: [{ reminder_customer_name: 'David Prentiss', service_date: '2025-09-01' }, 'Correspondence · David Prentiss · Sep 1, 2025'],
-    internal: [{ service_address: '2210 E Main St', service_date: '2025-02-14' }, 'Shop record · 2210 E Main St · Feb 14, 2025'],
+    internal: [{ service_address: '2210 E Main St', service_date: '2025-02-14' }, 'Company record · 2210 E Main St · Feb 14, 2025'],
   };
   for (const [typeId, [fields, want]] of Object.entries(REMAINING)) {
     eq(`${typeId}: template produces the expected name`, named(typeId, fields), want);

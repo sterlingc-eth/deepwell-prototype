@@ -33,7 +33,7 @@ export function AccountSheet({ onClose }: { onClose: () => void }) {
       setBusyOrg(null)
       // The old shop is still the signed-in one: let its queue run again.
       if (organization?.id) offlineQueue.setActiveTenant(organization.id)
-      setError(e instanceof Error && e.message ? e.message : 'Could not switch shops. Try again.')
+      setError(e instanceof Error && e.message ? e.message : 'Could not switch companies. Try again.')
     }
   }
 
@@ -73,16 +73,16 @@ export function AccountSheet({ onClose }: { onClose: () => void }) {
       </div>
 
       <section aria-labelledby="acct-shop-heading" className="space-y-2">
-        <h3 id="acct-shop-heading" className="m-0 text-caption font-semibold uppercase tracking-wide text-ink-3">Current shop</h3>
+        <h3 id="acct-shop-heading" className="m-0 text-caption font-semibold uppercase tracking-wide text-ink-3">Current company</h3>
         <p className="m-0 flex items-center gap-2 text-body-lg text-ink" data-testid="account-current-shop">
           <Store className="w-5 h-5 shrink-0 text-ink-3" aria-hidden="true" />
-          <span className="break-words min-w-0">{organization?.name ?? 'No shop'}</span>
+          <span className="break-words min-w-0">{organization?.name ?? 'No company'}</span>
         </p>
       </section>
 
       {isLoaded && memberships.length > 1 && (
         <section aria-labelledby="acct-switch-heading" className="space-y-2" data-testid="account-switcher">
-          <h3 id="acct-switch-heading" className="m-0 text-caption font-semibold uppercase tracking-wide text-ink-3">Switch shop</h3>
+          <h3 id="acct-switch-heading" className="m-0 text-caption font-semibold uppercase tracking-wide text-ink-3">Switch company</h3>
           <ul className="m-0 p-0 list-none grid gap-2">
             {memberships.map((m) => {
               const current = m.organization.id === organization?.id
@@ -97,13 +97,13 @@ export function AccountSheet({ onClose }: { onClose: () => void }) {
                     className="w-full min-h-touch px-4 rounded-xl border border-line bg-surface-2 text-ink text-left flex items-center justify-between gap-3 disabled:opacity-70"
                   >
                     <span className="break-words min-w-0">{m.organization.name}</span>
-                    {busy ? <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-label="Switching" /> : current ? <Check className="w-5 h-5 shrink-0 text-accent" aria-label="Current shop" /> : null}
+                    {busy ? <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-label="Switching" /> : current ? <Check className="w-5 h-5 shrink-0 text-accent" aria-label="Current company" /> : null}
                   </button>
                 </li>
               )
             })}
           </ul>
-          <p className="m-0 text-caption text-ink-3">Scans waiting to upload stay with the shop they were taken in.</p>
+          <p className="m-0 text-caption text-ink-3">Scans waiting to upload stay with the company they were taken in.</p>
         </section>
       )}
 

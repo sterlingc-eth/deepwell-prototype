@@ -19,7 +19,7 @@ const documentTypes = [
   { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or equipment.', requires: ['vendor|customer_name', 'cost'], visitType: false, financial: true },
   { id: 'equipment-record', label: 'Equipment record', definition: 'Identifies a panel, generator or charger with no service or billing context.', requires: ['serial_number|model'], visitType: false, financial: false },
   { id: 'correspondence', label: 'Correspondence', definition: 'A letter or email about a customer or job, not a paperwork form.', requires: ['customer_name'], visitType: false, financial: false },
-  { id: 'internal', label: 'Shop record', definition: 'Shop-only record with no customer on it at all.', requires: [], visitType: false, financial: false },
+  { id: 'internal', label: 'Company record', definition: 'Shop-only record with no customer on it at all.', requires: [], visitType: false, financial: false },
   { id: 'other', label: 'Other', definition: 'Does not clearly fit any type above.', requires: [], visitType: true, financial: false },
   // Electrical-specific, per the expansion brief's "▲" addition:
   { id: 'panel-schedule', label: 'Panel schedule', definition: 'Maps a panel\'s breakers to circuits/loads — the whole panel\'s circuit map, not one equipment record.', requires: ['service_address', 'amperage'], visitType: false, financial: false },
@@ -36,9 +36,9 @@ const fields = [
   { key: 'phase', label: 'Phase', perUnit: true, description: 'Single-phase or three-phase, as printed.' },
   { key: 'afci_gfci', label: 'AFCI/GFCI protection', perUnit: false, description: 'Whether AFCI/GFCI protection is documented on this job — yes/no or which circuits.' },
   { key: 'service_address', label: 'Service address', perUnit: false, description: 'Street address where the work was performed — not the contractor\'s own letterhead address.' },
-  { key: 'shop_address', label: 'Shop address', perUnit: false, description: 'The electrical contractor\'s own business/letterhead address.' },
-  { key: 'shop_phone', label: 'Shop phone', perUnit: false, description: 'The electrical contractor\'s own business/letterhead phone number.' },
-  { key: 'shop_email', label: 'Shop email', perUnit: false, description: 'The electrical contractor\'s own business/letterhead email address.' },
+  { key: 'shop_address', label: 'Company address', perUnit: false, description: 'The electrical contractor\'s own business/letterhead address.' },
+  { key: 'shop_phone', label: 'Company phone', perUnit: false, description: 'The electrical contractor\'s own business/letterhead phone number.' },
+  { key: 'shop_email', label: 'Company email', perUnit: false, description: 'The electrical contractor\'s own business/letterhead email address.' },
   { key: 'customer_name', label: 'Customer', perUnit: false, description: 'Customer or account name.' },
   { key: 'customer_phone', label: 'Customer phone', perUnit: false, description: 'Customer phone number, exactly as printed.' },
   { key: 'customer_email', label: 'Customer email', perUnit: false, description: 'Customer email address, exactly as printed.' },
@@ -115,7 +115,7 @@ const personas = [
   },
   {
     id: 'owner',
-    label: 'Shop owner',
+    label: 'Company owner',
     sampleQuestions: [
       'How much have we invoiced for panel upgrades this year?',
       'How many warranty registrations are missing a serial number?',

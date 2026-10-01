@@ -165,7 +165,7 @@ export function requireRole(auth, role) {
   if (!need) throw new Error(`requireRole: unknown role "${role}"`);
   const have = ROLE_RANK[auth?.orgRole] ?? 0;
   if (have < need) {
-    throw new AuthError(`This action requires the '${role}' role in your shop.`, 403);
+    throw new AuthError(`This action requires the '${role}' role in your company.`, 403);
   }
   return auth;
 }

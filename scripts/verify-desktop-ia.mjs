@@ -90,7 +90,7 @@ async function main() {
     // ---- Team: fits one 1440x900 viewport, keeps people/seats content ----
     await go(page, 'team');
     await page.waitForTimeout(400);
-    check('Team: Phone app install card still there', (await page.getByText('Phone app for your techs').count()) > 0);
+    check('Team: Phone app install card still there', (await page.getByText('Phone app for your team').count()) > 0);
     check('Team: Follow-ups card still there', (await page.getByText('Follow-ups').count()) > 0);
     check('Team: a collapsed Settings section exists (notifications + data export)', (await page.getByRole('button', { name: 'Settings', exact: true }).count()) > 0);
     check('Team: Donovan misses is NOT on this screen any more', (await page.getByText('Donovan misses').count()) === 0);
@@ -132,7 +132,7 @@ async function main() {
     await page.waitForTimeout(300);
     await page.getByRole('tab', { name: /^Customers$/ }).click();
     await page.waitForTimeout(300);
-    check('Customers tab: whole-shop "Possible duplicate customers" scan reachable', (await page.getByText('Possible duplicate customers').count()) > 0);
+    check('Customers tab: whole-company "Possible duplicate customers" scan reachable', (await page.getByText('Possible duplicate customers').count()) > 0);
     await page.screenshot({ path: path.join(SHOT_DIR, 'records-customers_office-dark_1440x900.png'), fullPage: true });
 
     // ---- Records: 5 tabs -> 4, no standalone Search tab ----
@@ -151,7 +151,7 @@ async function main() {
     const chipTexts = await page.getByRole('tablist', { name: 'Needs you filters' }).getByRole('tab').allTextContents();
     check('Inbox "Needs you": one row has "Decisions" + the original 9 filters (Money hidden when empty)', chipTexts.length >= 9, `got ${chipTexts.length}: ${JSON.stringify(chipTexts)}`);
     check('Inbox "Needs you": "Decisions" chip present (folds in the old Add-files-adjacent decision queue)', chipTexts.some((t) => t.includes('Decisions')));
-    for (const label of ['Needs a person', 'Missing info', 'Needs linking', 'Conflicts', 'Duplicates', 'Ready to verify', 'Shop records', 'All']) {
+    for (const label of ['Needs a person', 'Missing info', 'Needs linking', 'Conflicts', 'Duplicates', 'Ready to verify', 'Company records', 'All']) {
       check(`Inbox "Needs you": "${label}" filter still reachable`, chipTexts.some((t) => t.includes(label)));
     }
     await page.screenshot({ path: path.join(SHOT_DIR, 'inbox_office-dark_1440x900.png'), fullPage: true });

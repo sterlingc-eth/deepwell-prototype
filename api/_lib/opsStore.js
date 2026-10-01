@@ -368,7 +368,7 @@ export async function* exportEvents(ctx, opts = {}) {
       body: { mode: 'get', documentId: '<documentId from this list>' },
       note:
         'Original files are not embedded in this export. Each entry above has a stored original; request a fresh signed download link ' +
-        '(valid about 15 minutes) with the call shown, signed in as a shop admin, or use "Open original" on the document in the app. ' +
+        '(valid about 15 minutes) with the call shown, signed in as a company admin, or use "Open original" on the document in the app. ' +
         'No link or key is stored in this file.',
     },
   };

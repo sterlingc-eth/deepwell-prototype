@@ -115,8 +115,8 @@ export function FollowupsCard() {
         <div className="space-y-3 pt-1">
           <p className="text-caption text-ink-3">
             When a document is missing something Donovan needs — a serial number, an install date — send the
-            technician responsible a short message asking for it, with a link straight to their own work. At most
-            one message per technician per day.
+            team member responsible a short message asking for it, with a link straight to their own work. At most
+            one message per team member per day.
           </p>
 
           {error && <p role="alert" className="text-caption text-bad-ink">{error}</p>}

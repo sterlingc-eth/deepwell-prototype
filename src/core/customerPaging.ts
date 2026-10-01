@@ -61,7 +61,7 @@ export function customerCountLabel({ shown, loaded, total, activeCount, loadingM
   if (!incomplete) {
     return activeCount > 0 ? `${n(shown)} of ${n(loaded)} ${plural(loaded, 'customer', 'customers')}${filters}` : `${n(loaded)} ${plural(loaded, 'customer', 'customers')}`;
   }
-  const head = activeCount > 0 ? `${n(shown)} of the ${n(loaded)} loaded (${n(total)} in your shop)${filters}` : `Showing ${n(loaded)} of ${n(total)} customers`;
+  const head = activeCount > 0 ? `${n(shown)} of the ${n(loaded)} loaded (${n(total)} in your company)${filters}` : `Showing ${n(loaded)} of ${n(total)} customers`;
   if (loadingMore) return `${head} · loading the rest…`;
   if (moreError) return `${head} · ${moreError}`;
   return `${head} · search looks through all ${n(total)}`;

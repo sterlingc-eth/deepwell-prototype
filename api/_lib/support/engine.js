@@ -93,7 +93,7 @@ export function renderAccountReply(intent, plan, uploads) {
     return `You're on the ${pl}, ${STATE_WORDS[plan.state] ?? plan.state}. It includes ${logins}, ${plan.pagesAllowance ? fmt(plan.pagesAllowance) : 'your'} new pages a month, and unlimited Donovan.${plan.apiAccess ? ' API access is included.' : ''}`;
   }
   if (intent === 'billing') {
-    if (!plan.canSeeBilling) return 'Billing dates are visible to your shop admin. Ask them to open **Billing**, where the plan, status and renewal date are shown.';
+    if (!plan.canSeeBilling) return 'Billing dates are visible to your company admin. Ask them to open **Billing**, where the plan, status and renewal date are shown.';
     const pl = planLine(plan);
     if (!pl) return 'Your account has no active plan yet. Open **Billing** to choose one.';
     const bits = [`Your ${pl} is ${STATE_WORDS[plan.state] ?? plan.state}.`];

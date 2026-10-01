@@ -347,7 +347,7 @@ export function DonovanLearningCard() {
               </h3>
               <p className="text-caption text-ink-3 mb-2">
                 A fixed miss stays fixed only if something checks it again. &quot;Keep as test&quot; adds it to this
-                shop&apos;s permanent exam, re-checked against the records every time — so if this ever regresses,
+                company&apos;s permanent exam, re-checked against the records every time — so if this ever regresses,
                 it&apos;s caught here, not by a customer.
               </p>
               <ul className="divide-y divide-line">
@@ -407,7 +407,7 @@ export function DonovanLearningCard() {
                         </div>
                       </div>
                       <p className="text-caption text-ink-3">
-                        Seen {p.evidence?.count ?? 0}x across {p.evidence?.tenantCount ?? 0} shop(s)
+                        Seen {p.evidence?.count ?? 0}x across {p.evidence?.tenantCount ?? 0} company(ies)
                         {p.kind === 'recipe'
                           ? ` · same result seen ${Number(p.evidence?.seen ?? 1)}x${p.evidence?.thumbsUp ? ' · thumbs-up' : ''}`
                           : v && v.bankTotal != null ? ` · bank ${v.bankPass}/${v.bankTotal} · miss fixed ${v.missFixed?.fixed ?? 0}/${v.missFixed?.total ?? 0} · negatives ${v.negativesPass ? 'clean' : 'FAILED'}` : ''}
@@ -531,9 +531,9 @@ export function DonovanLearningCard() {
           <div className="border-t border-line pt-3">
             <h3 className="text-caption font-medium text-ink-3 uppercase tracking-wide mb-2">Learning autopilot</h3>
             <p className="text-caption text-ink-3 mb-2">
-              Every night this runs the same replay-and-exam loop above for EVERY paying shop, not just this
-              one — fairly rotated so every shop gets a turn, capped per-shop and platform-wide so it can never
-              run away with spend. Customers never see other shops&apos; data here.
+              Every night this runs the same replay-and-exam loop above for EVERY paying company, not just this
+              one — fairly rotated so every company gets a turn, capped per-company and platform-wide so it can never
+              run away with spend. Customers never see other companies&apos; data here.
             </p>
             {autopilotLoading && !autopilot && (
               <p className="text-body text-ink-3 flex items-center gap-2">
@@ -544,9 +544,9 @@ export function DonovanLearningCard() {
             {autopilot && (
               <>
                 <p className="text-caption text-ink-2 mb-2">
-                  {autopilot.tenantsEligible} eligible shop(s) · {autopilot.perTenant.length} ran in the last 24h ·
+                  {autopilot.tenantsEligible} eligible company(ies) · {autopilot.perTenant.length} ran in the last 24h ·
                   ${autopilot.platformSpentUsd.toFixed(2)} spent ·{' '}
-                  {autopilot.nextTenant ? `next up: ${autopilot.nextTenant.tenantName ?? autopilot.nextTenant.tenantKey}` : 'no shop queued'}
+                  {autopilot.nextTenant ? `next up: ${autopilot.nextTenant.tenantName ?? autopilot.nextTenant.tenantKey}` : 'no company queued'}
                 </p>
                 {autopilot.perTenant.length > 0 && (
                   <ul className="divide-y divide-line mb-2">
@@ -577,7 +577,7 @@ export function DonovanLearningCard() {
                       {gapReport.clusters.map((c) => (
                         <li key={c.capability} className="py-2">
                           <p className="text-body text-ink">
-                            <span className="dw-pill-warn">{c.capability}</span> {c.count}x across {c.tenantCount} shop(s)
+                            <span className="dw-pill-warn">{c.capability}</span> {c.count}x across {c.tenantCount} company(ies)
                             {c.industries.length > 0 ? ` (${c.industries.join(', ')})` : ''}
                           </p>
                           <p className="text-caption text-ink-3 mt-0.5">{c.fixSpec}</p>
