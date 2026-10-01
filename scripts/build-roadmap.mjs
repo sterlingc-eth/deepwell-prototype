@@ -58,12 +58,15 @@ const sectionHtml = `${START}
       </div>
       <p class="lede">What works today, what's being built now, and what comes after. No dates. We'd rather ship it than promise it.</p>
     </div>
-    <ol class="rm-stages">
+    <ol class="rm-stages" id="rm-stages" data-snap aria-label="Roadmap: live now, building next, later">
 ${stage('rm-live', 'Live now', 'Working today', road.live)}
 ${stage('rm-next', 'Building next', 'Coming soon', road.next)}
 ${stage('rm-later', 'Later', 'Planned', road.later)}
     </ol>
-    <p class="rm-ask">Need something that isn't here? <a href="mailto:${SUPPORT_MAIL}?subject=Feature%20request">Tell us what to build <span aria-hidden="true">→</span></a></p>
+    <div class="rm-foot">
+      <button type="button" class="rm-toggle" id="rm-toggle" aria-expanded="false" aria-controls="rm-stages">Show details</button>
+      <p class="rm-ask">Need something that isn't here? <a href="mailto:${SUPPORT_MAIL}?subject=Feature%20request">Tell us what to build <span aria-hidden="true">→</span></a></p>
+    </div>
   </div>
 </section>
 ${END}`;

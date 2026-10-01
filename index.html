@@ -549,6 +549,7 @@ footer a{color:var(--muted);text-decoration:none}
    the pre-existing .cost-card, which uses the same JS-only mechanism):
    without JS these would otherwise stay invisible forever. */
 .sec-head,.person,.founder,.plan,.principle,.cost-card,.cost-calc{opacity:1!important;transform:none!important}
+#roadmap .rm-items li span{display:block!important}.rm-toggle{display:none}
 </style></noscript>
 <style id="dw-tighten">
 /* ==== Density pass: fewer, tighter sections (r28) ==== */
@@ -733,10 +734,6 @@ section{padding-block:clamp(12px,1.3vw,18px)}
 #what .sec-head .eyebrow{margin-bottom:4px}
 #what h2{font-size:clamp(1.35rem,2.2vw,1.75rem)}
 #what .lede{font-size:.98rem;margin:0}
-.what-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.what-steps li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;padding:10px 14px 12px;background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--brass)}
-.what-steps h3{font-size:1.12rem}
-.what-steps p{color:var(--muted);font-size:.9rem;line-height:1.45;margin-top:3px;grid-column:2}
 .what-more{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;margin-top:12px}
 .what-ask,.what-not{padding:10px 14px 12px;border:1px solid var(--line);background:var(--surface)}
 .what-not{border-left:4px solid var(--brass)}
@@ -748,9 +745,9 @@ section{padding-block:clamp(12px,1.3vw,18px)}
 .what-ask li{position:relative;padding-left:14px;font-size:.86rem;line-height:1.35;color:var(--text)}
 .what-ask li::before{content:"";position:absolute;left:0;top:.5em;width:6px;height:6px;border-radius:50%;background:var(--brass)}
 .what-not p{color:var(--muted);font-size:.9rem;line-height:1.45;margin:0}
-@media (max-width:860px){.what-steps{grid-template-columns:1fr;gap:8px}.what-more{grid-template-columns:1fr;gap:8px}}
+@media (max-width:860px){.what-more{grid-template-columns:1fr;gap:8px}}
 @media (max-width:560px){.what-ask ul{grid-template-columns:1fr}}
-@media (max-width:560px){.what-steps li{padding:8px 12px 10px}.what-steps p,.what-not p{font-size:.86rem}.what-ask li{font-size:.84rem}}
+@media (max-width:560px){.what-not p{font-size:.86rem}.what-ask li{font-size:.84rem}}
 #faq .sec-head{align-items:center;margin-bottom:10px}
 #faq .sec-head .eyebrow{margin-bottom:4px}
 #faq h2{font-size:clamp(1.35rem,2.2vw,1.75rem)}
@@ -767,206 +764,6 @@ section{padding-block:clamp(12px,1.3vw,18px)}
 @media (max-width:860px){.faq-grid{grid-template-columns:1fr;gap:6px}.faq-grid summary{min-height:44px}}
 @media (prefers-reduced-motion:reduce){.faq-grid summary::after{transition:none}}
 </style>
-<link rel="stylesheet" href="/support/widget.css">
-</head>
-<body>
-
-
-<div class="ambient" aria-hidden="true">
-  <span></span><span></span>
-  <svg class="dw-topo" aria-hidden="true">
-    <defs>
-      <pattern id="dwDots" width="28" height="28" patternUnits="userSpaceOnUse">
-        <circle cx="2" cy="2" r="1" fill="currentColor"/>
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#dwDots)"/>
-  </svg>
-</div>
-
-<nav class="nav" aria-label="Primary">
-  <div class="wrap">
-    <a class="brand" href="#top" aria-label="DeepWell Technology home">
-      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-        <style>
-          .mark .dv-r{animation:dvDraw .5s cubic-bezier(.16,1,.3,1) forwards}
-          @keyframes dvDraw{to{stroke-dashoffset:0}}
-          .mark .dv-ripple{opacity:0}
-          .brand:hover .mark .dv-ripple{animation:dvRipple .7s cubic-bezier(.16,1,.3,1)}
-          @keyframes dvRipple{from{opacity:.8;r:22;stroke-width:4}to{opacity:0;r:50;stroke-width:.5}}
-          @media (prefers-reduced-motion:reduce){
-            .mark .dv-r{animation:none;stroke-dashoffset:0}
-            .mark .dv-ripple{display:none}
-          }
-        </style>
-        <g fill="none" stroke="var(--well)" stroke-width="4">
-          <circle class="dv-r" cx="50" cy="50" r="10" stroke-dasharray="62.83" stroke-dashoffset="62.83" style="animation-delay:0s"/>
-          <circle class="dv-r" cx="50" cy="50" r="19" stroke-dasharray="119.38" stroke-dashoffset="119.38" style="animation-delay:.09s"/>
-          <circle class="dv-r" cx="50" cy="50" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" style="animation-delay:.18s"/>
-          <circle class="dv-r" cx="50" cy="50" r="37" stroke-dasharray="232.48" stroke-dashoffset="232.48" style="animation-delay:.27s"/>
-          <circle class="dv-r" cx="50" cy="50" r="46" stroke-dasharray="289.03" stroke-dashoffset="289.03" style="animation-delay:.36s"/>
-        </g>
-        <circle class="dv-ripple" cx="50" cy="50" r="22" fill="none" stroke="var(--brass)" stroke-width="4"/>
-      </svg>
-      <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
-    </a>
-    <div class="navlinks" id="navLinks">
-      <a href="#how-it-works">How it works</a>
-      <a href="#demo">Try it</a>
-      <!-- Industries nav dropdown (Workstream C, 2026-09-21) — see the
-           labeled CSS block above and the standalone script near the end
-           of </body>. Keyboard: Enter/Space/↓ opens and focuses the first
-           item, ↑/↓ move between items, Esc closes and returns focus, Tab
-           closes on focus-out. Touch: the toggle is a real <button>, so a
-           tap fires the same click handler as a mouse click. -->
-      <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
-          Who it&rsquo;s for
-          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
-          <a role="menuitem" href="/#what">Any business with paperwork <span class="tag live">Live</span></a>
-          <a role="menuitem" href="/industries/hvac.html">HVAC <span class="tag live">Live</span></a>
-          <a role="menuitem" href="/industries/electrical.html">Electrical <span class="tag soon">Coming</span></a>
-          <a role="menuitem" href="/industries/plumbing.html">Plumbing <span class="tag soon">Coming</span></a>
-          <a role="menuitem" href="/industries/property-management.html">Property management <span class="tag soon">Coming</span></a>
-        </div>
-      </div>
-      <a href="#roadmap">Roadmap</a>
-      <a href="#plans">Pricing</a>
-      <a href="#team">Founders</a>
-    </div>
-    <div class="navcta">
-      <a class="btn btn-ghost" href="/app/">Log in</a>
-      <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
-      <button type="button" class="nav-menu-toggle" id="navMenuToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
-    </div>
-  </div>
-</nav>
-<main id="main">
-
-<header class="hero" id="top">
-  <div class="wrap">
-    <div class="hero-copy dw-observe">
-      <div class="hero-eyebrow-row">
-      <div class="eyebrow">For any business that runs on paperwork</div>
-      <svg class="hero-micro" viewBox="0 0 118 36" aria-hidden="true" focusable="false">
-        <g class="hm-doc-g">
-          <rect class="hm-doc-page" x="2" y="4" width="20" height="28" rx="2"/>
-          <rect class="hm-ink" x="6" y="10" width="12" height="1.6"/>
-          <rect class="hm-ink" x="6" y="15" width="12" height="1.6"/>
-          <rect class="hm-ink" x="6" y="20" width="8" height="1.6"/>
-        </g>
-        <path class="hm-arrow" d="M28 18h20" marker-end="url(#hmArrowHead)"/>
-        <defs>
-          <marker id="hmArrowHead" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M0 0l8 4-8 4z" fill="var(--brass)"/>
-          </marker>
-        </defs>
-        <g class="hm-ans-g">
-          <circle class="hm-ans" cx="100" cy="18" r="14"/>
-          <path class="hm-ans" d="M93 18l5 5 10-10"/>
-        </g>
-      </svg>
-      </div>
-      <h1 class="mm-headline">Your paperwork already has the answer. <em>Now anyone can ask.</em></h1>
-      <p class="lede">DeepWell turns your paperwork — invoices, work orders, contracts, forms, receipts, photos of documents — into answers your whole team can look up in seconds, each with the original page attached.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
-        <a class="btn btn-ghost" href="#what">See how it works</a>
-        <p class="hero-trial">30-day free trial on Solo. Card required, cancel anytime.</p>
-      </div>
-      <ol class="hero-steps" aria-label="How it works in 3 steps">
-        <li><b>1</b><span>Send it your paperwork</span></li>
-        <li><b>2</b><span>It reads and organizes everything</span></li>
-        <li><b>3</b><span>Ask, and get the answer with the source</span></li>
-      </ol>
-    </div>
-    <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
-    </div>
-  </div>
-</header>
-
-<section id="team">
-  <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">The Founders</div>
-        <h2>Two brothers, and a phone that gets answered.</h2>
-      </div>
-      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
-    </div>
-
-    <div class="founders">
-      <div class="founder dw-observe dw-once">
-        <img class="founder-img" src="/founders/sterling.jpg" srcset="/founders/sterling-480.webp 480w, /founders/sterling-720.webp 720w, /founders/sterling-1086.webp 1086w" sizes="(max-width:640px) 96px, 150px" alt="Sterling Chapman, co-founder of DeepWell" width="720" height="960" decoding="async" fetchpriority="auto">
-        <div>
-          <h3>Sterling Chapman</h3>
-          <div class="role">Co-founder</div>
-          <p>Prior Army service, and the engineer behind DeepWell — systems integration, APIs, databases and network support. He's the person you'll work with from your first sample box through go-live.</p>
-        </div>
-      </div>
-
-      <div class="founder dw-observe dw-once">
-        <img class="founder-img" src="/founders/hilton.jpg" srcset="/founders/hilton-480.webp 480w, /founders/hilton-720.webp 720w, /founders/hilton-1086.webp 1086w" sizes="(max-width:640px) 96px, 150px" alt="Hilton Chapman, co-founder of DeepWell" width="720" height="960" decoding="async" fetchpriority="auto">
-        <div>
-          <h3>Hilton Chapman</h3>
-          <div class="role">Co-founder</div>
-          <p>Retired Air Force veteran and the voice of DeepWell. Leads customer relationships and marketing, and sets the vision for where the platform goes next.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="what">
-  <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">What DeepWell does</div>
-        <h2>Your paperwork, turned into answers.</h2>
-      </div>
-      <p class="lede">Your paperwork is split across a filing cabinet, an inbox and your team's phones. DeepWell reads it all, so anyone on your team can just ask.</p>
-    </div>
-    <ol class="what-steps">
-      <li class="dw-observe dw-once">
-        <span class="hiw-n">01</span>
-        <h3>Send it your paperwork</h3>
-        <p>Upload files on the web or scan pages with the phone app: invoices, work orders, contracts, permits, forms, photos of documents. Handwriting and rough scans are fine.</p>
-      </li>
-      <li class="dw-observe dw-once">
-        <span class="hiw-n">02</span>
-        <h3>It reads and organizes everything</h3>
-        <p>It reads every page, pulls out the names, addresses, dates, amounts and document numbers, and files it under the right customer and address. For equipment paperwork it also picks up models, serials and warranty dates. The original page is kept.</p>
-      </li>
-      <li class="dw-observe dw-once">
-        <span class="hiw-n">03</span>
-        <h3>Ask, and get the answer with the source</h3>
-        <p>Anyone on your team asks Donovan, DeepWell's assistant, in plain English and gets the answer with the original page attached. If it isn't in your records, it says so instead of guessing.</p>
-      </li>
-    </ol>
-    <div class="what-built dw-observe dw-once">
-      <b>Built first for field service.</b> DeepWell understands equipment paperwork best today: warranties, serial numbers, service tickets and the customer and unit they belong to. It works for any business with paperwork, from property managers and contractors to clinics, offices and nonprofits. For other kinds of documents it reads the names, addresses, dates and amounts, and answers with the page attached.
-    </div>
-    <div class="what-more">
-      <div class="what-ask">
-        <h3>What you can ask</h3>
-        <ul>
-          <li>When did we last service the unit at 3247 Elm?</li>
-          <li>What did we pay Acme Supply in March?</li>
-          <li>Show me the signed permit for 12 Main.</li>
-          <li>When does the Okafor service agreement end?</li>
-          <li>What's still unpaid on the Henderson invoices?</li>
-        </ul>
-      </div>
-      <div class="what-not">
-        <h3>What it's not</h3>
-        <p>DeepWell is not a scheduling, dispatch, accounting or invoicing tool. Keep using the one you have; DeepWell works alongside it and is where the paperwork behind it becomes answers.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
 <style>
 /* ==================================================================== */
 /*  How it works — "chain reaction"                                      */
@@ -1125,6 +922,456 @@ section{padding-block:clamp(12px,1.3vw,18px)}
   .hiw-steps li::before{transition:none}.hiw.is-js .hiw-steps li h3,.hiw.is-js .hiw-steps li p{transition:none}
 }
 </style>
+<style id="dw-streamline">
+/* ==== r40 streamline: same content, much shorter page ==== */
+:root{--gut:clamp(16px,4vw,40px)}
+.wrap{max-width:1280px}
+.hiw{max-width:none}
+section,#team,#what,#faq{padding-block:clamp(12px,1vw,14px)}
+.hero .lede{max-width:none}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+h2{font-size:clamp(1.5rem,2.4vw,1.9rem)}
+.sec-head,#plans .sec-head{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:4px 28px;margin-bottom:10px}
+.sec-head .lede{font-size:.98rem;line-height:1.45}
+@media (max-width:860px){.sec-head,#plans .sec-head{grid-template-columns:1fr;gap:4px;margin-bottom:8px}}
+
+/* founders */
+#team .founder{grid-template-columns:116px minmax(0,1fr);gap:14px}
+@media (max-width:640px){#team .founder{grid-template-columns:84px minmax(0,1fr);gap:10px}#team .founder p{font-size:.84rem;line-height:1.4}#team .founder .role{margin-bottom:3px}}
+
+/* what */
+#what .what-more{margin-top:0;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:stretch}
+.what-left{display:flex;flex-direction:column;gap:10px;min-width:0}
+#what .what-built{margin-top:0}
+.what-left .what-not{flex:1}
+.what-ask ul{grid-template-columns:1fr}
+@media (min-width:1050px){
+  #what .what-more{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr)}
+  .what-left{display:contents}
+  .what-left .what-built{order:1}
+  .what-ask{order:2}
+  .what-left .what-not{order:3;flex:none}
+}
+.sec-head .lede{text-wrap:pretty}
+@media (max-width:860px){#what .what-more{grid-template-columns:minmax(0,1fr)}.demo{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:700px){.what-ask ul{grid-template-columns:1fr}}
+
+/* generic horizontal scroll-snap rows (phones) */
+@media (max-width:700px){
+  [data-snap]{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;gap:10px;
+    margin-inline:calc(-1*var(--gut));padding:2px var(--gut) 8px;scroll-padding-inline:var(--gut);scrollbar-width:none}
+  [data-snap]::-webkit-scrollbar{display:none}
+  [data-snap]>*{flex:0 0 min(84%,320px);scroll-snap-align:start;min-width:0}
+  .plan,.person,.founder,.principle{opacity:1!important;transform:none!important;transition:none}
+  #team .founders>.founder{flex-basis:min(90%,340px);align-items:start}
+  .closing-grid .principles{gap:10px}
+  .closing-grid .principles>.principle{flex-basis:min(78%,290px);display:grid;grid-template-columns:22px 1fr;gap:4px 10px;align-content:start;padding:12px;border:1px solid var(--line);background:var(--surface)}
+  .closing-grid .principle svg{display:block}
+  .principle h4,.principle p{display:block;margin:0}
+  .principle h4::after{content:none}
+  .principle p{grid-column:1 / -1;margin-top:2px}
+  .rm-stages{margin-top:2px}
+  .rm-stages>.rm-stage{flex-basis:min(80%,300px);padding-left:0;display:flex;flex-direction:column}
+  .rm-stage:not(:last-child)::before{top:calc(var(--rm-node)/2 - 1px);bottom:auto;left:calc(var(--rm-node) + 10px);right:-10px;width:auto;height:2px;background:var(--well)}
+  .rm-next::before{background:repeating-linear-gradient(90deg,var(--brass) 0 8px,transparent 8px 14px)!important}
+  .rm-top{flex-direction:column;align-items:flex-start;margin-left:0}
+  .rm-top h3{font-size:1.05rem}
+}
+[data-snap]:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
+
+/* how it works: shorter stage, richer captions */
+.hiw-stage{aspect-ratio:1200/310}
+@media (max-width:900px){.hiw-stage{aspect-ratio:16/9}}
+@media (max-width:640px){.hiw-stage{aspect-ratio:358/470}}
+.hiw-steps{margin-top:10px;gap:clamp(14px,2.4vw,32px)}
+.hiw-steps li{padding-top:10px}
+.hiw-steps p{font-size:.88rem;line-height:1.42}
+.hiw-feat{margin-top:6px}
+@media (max-width:700px){.hiw-steps{margin-top:6px}.hiw-steps li{padding-block:10px 4px;align-content:start}.hiw-steps>li{flex-basis:min(88%,340px)}}
+
+/* demo */
+.q-list{display:flex;flex-direction:column;gap:6px}
+.answer{max-width:62ch}
+.who{margin-top:10px}
+.who-head,.pb-head{margin-bottom:6px}
+.person{padding:9px 14px}
+.person p{font-size:.86rem;line-height:1.42}
+.person blockquote{font-size:1.05rem}
+@media (max-width:860px){
+  .demo-side{padding:10px 12px 6px;gap:4px}
+  .demo-side .eyebrow{margin-bottom:2px}
+  .demo-main{padding:10px 12px;gap:6px}
+  .answer{font-size:1.12rem;line-height:1.28}
+  .kv>div{padding:5px 9px}
+  .kv .v{font-size:.88rem}
+  .src{padding:4px 9px;font-size:.82rem}
+  .demo-wrap{gap:8px}
+}
+@media (max-width:700px){
+  .q-list{flex-direction:row;gap:8px;margin-bottom:0}
+  .q-list>.q{flex:0 0 min(78%,250px);padding:6px 10px;font-size:.8rem;line-height:1.35;border-color:var(--line)}
+  .people>.person{flex-basis:min(86%,330px)}
+}
+
+/* roadmap: titles by default, one toggle for the one-liners */
+#roadmap .rm-items li span{display:none}
+#roadmap.rm-open .rm-items li span{display:block}
+#roadmap{padding-block:clamp(14px,1.6vw,22px)}
+#roadmap .sec-head{margin-bottom:12px}
+.rm-top{margin-bottom:10px;gap:8px}
+.rm-items{gap:9px;padding:13px 16px}
+.rm-items li b{margin:0;line-height:1.35}
+.rm-items li::before{top:.5em}
+.rm-live .rm-items li::before{top:.4em}
+#roadmap.rm-open .rm-items{gap:12px}
+#roadmap.rm-open .rm-items li b{margin-bottom:1px}
+.rm-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 20px;margin-top:12px}
+.rm-foot .rm-ask{margin:0}
+.rm-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border:1px solid var(--line-strong);border-radius:4px;background:transparent;color:var(--text);font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;transition:background .2s ease}
+.rm-toggle:hover{background:var(--surface)}
+.rm-toggle::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s}
+.rm-toggle[aria-expanded="true"]::after{transform:translateY(2px) rotate(-135deg)}
+@media (min-width:701px) and (max-width:860px){.rm-stages{gap:16px}.rm-stage:not(:last-child)::before{bottom:-12px}.rm-top{margin-bottom:8px}}
+@media (max-width:860px){.rm-foot{margin-top:6px}}
+@media (max-width:600px){.rm-items{gap:8px;padding:11px 14px}.rm-foot{flex-direction:column;gap:0}}
+
+/* plans */
+.plans-every{margin-bottom:10px}
+.plan{padding:14px 16px;gap:6px}
+.plan-top{min-height:24px}
+.plan .spec{margin:0;padding-top:8px;border-top:1px solid var(--line)}
+.plan-more{border-top:1px solid var(--line)}
+.plan-more summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;font-weight:600;font-size:.88rem;color:var(--text)}
+.plan-more summary::-webkit-details-marker{display:none}
+.plan-more summary::after{content:"";flex:none;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-2px) rotate(45deg);transition:transform .2s}
+.plan-more[open] summary::after{transform:translateY(2px) rotate(-135deg)}
+.plan-more summary:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
+.plan-more-body{display:flex;flex-direction:column;gap:8px;padding-bottom:8px}
+.plan-more-body .spec{border-top:0;padding-top:0}
+.plan-more-body .grp{padding-top:8px}
+.plan .math{padding-top:8px;line-height:1.5}
+.plans-dots{display:none}
+@media (max-width:700px){
+  .plans-dots{display:flex;align-items:center;justify-content:center;gap:7px;margin:0 0 6px}
+  .plans-dots span{width:7px;height:7px;border-radius:50%;background:var(--line-strong);transition:background .2s,transform .2s}
+  .plans-dots span.on{background:var(--brass);transform:scale(1.3)}
+  .plans-dots em{margin-left:8px;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .plans-every{flex-direction:row;flex-wrap:wrap}
+  .plans-note{margin-top:4px;font-size:12.5px}
+}
+.plans-note{margin-top:8px;text-align:left}
+.plans-extra{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:0;margin-top:10px;border:1px solid var(--line);background:var(--surface)}
+.plans-extra .onboard,.plans-extra .rescue{border:0;background:transparent;padding:12px 18px}
+.plans-extra .onboard{border-left:4px solid var(--brass)}
+.plans-extra .rescue{border-left:1px solid var(--line);flex-direction:row;align-items:center;gap:14px 20px}
+.plans-extra .rescue>div{min-width:0}
+.plans-extra .rescue .btn{flex:none}
+.plans-extra h3{font-size:1.05rem;margin:1px 0 2px}
+.plans-extra p{font-size:.86rem;line-height:1.45}
+.rescue-price{margin-top:3px!important}
+.rescue-price a{color:var(--text);text-decoration:underline}
+@media (max-width:1000px){.plans-extra .rescue{flex-direction:column;align-items:flex-start}}
+@media (max-width:860px){.plans-extra{grid-template-columns:minmax(0,1fr)}.plans-extra .rescue{border-left:4px solid var(--line-strong);border-top:1px solid var(--line)}}
+
+/* cost: two-column block on desktop, closed accordions on phones */
+#cost{padding-block:clamp(14px,1.6vw,22px)}
+@media (min-width:901px){
+  .cost-calc{gap:10px 12px;align-items:start}
+  .cost-summary{padding:10px 16px}
+  .cost-line>summary{padding:10px 14px 4px}
+  .cost-body{padding:2px 14px 8px;gap:4px}
+}
+.cost-foot{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:8px 20px;align-items:start;margin-top:10px}
+.cost-note{font-size:.82rem;line-height:1.5}
+@media (max-width:900px){.cost-foot{grid-template-columns:minmax(0,1fr)}}
+.cost-card{padding:10px 16px;gap:4px}
+.cost-card p{font-size:.84rem;line-height:1.5}
+@media (max-width:900px){
+  .cost-calc{gap:6px}
+  .cost-lines{gap:6px}
+  .cost-line>summary{padding:8px 40px 8px 12px;gap:1px}
+  .cost-line>summary::after{top:50%;margin-top:-6px}
+  .cost-line[open]>summary::after{top:50%;margin-top:-2px}
+  .cost-line .sub{font-size:.78rem;line-height:1.35}
+  .cost-line .cost-line-total{padding-top:3px}
+  .cost-summary{padding:10px 14px;gap:6px}
+  .cost-note{font-size:.8rem;line-height:1.45}
+  .cost-foot{margin-top:6px}
+}
+
+/* closing: rules + contact side by side on desktop */
+#closing{padding-block:clamp(14px,1.6vw,22px)}
+.closing-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+#principles{margin-top:0;padding-top:0;border-top:0}
+.closing-grid .principles{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 22px}
+.principle{grid-template-columns:22px 1fr;gap:8px}
+.principle svg{width:22px;height:22px}
+.principle h4{font-size:1rem}
+.principle p{font-size:.84rem;line-height:1.42}
+.closing-grid .cta-card{margin-top:0;padding:14px 18px;gap:12px 28px}
+.closing-grid .cta-card h3{font-size:clamp(1.3rem,2vw,1.6rem)}
+.closing-grid .cta-card p{font-size:.92rem;line-height:1.5;margin-top:4px}
+.closing-grid .cta-card .eyebrow{margin-bottom:4px}
+.closing-grid .cta-side{flex-direction:row;align-items:center;gap:16px}
+.closing-grid .logo-card{padding:4px}
+.closing-grid .logo-card img{width:72px}
+@media (max-width:1000px){.closing-grid .principles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){
+  .closing-grid{gap:10px}
+  .closing-grid .cta-card{grid-template-columns:minmax(0,1fr)}
+  .closing-grid .logo-card{display:none}
+  .closing-grid .cta-card{padding:14px}
+  .closing-grid .cta-side{justify-content:flex-start}
+}
+@media (max-width:700px){
+  .pb-head p{font-size:.88rem}
+  .closing-grid .principles{gap:6px}
+  .principle{display:block}
+  .principle p{font-size:.84rem}
+}
+footer{padding-block:10px}
+@media (max-width:700px){footer .wrap{gap:6px}footer .wrap>div:last-child{gap:2px 14px}}
+
+
+/* ---- phones: last word (kept at the end so it wins) ---- */
+@media (max-width:700px){
+  [data-snap],.cost-foot,.plans-extra,.what-left{display:flex;flex-direction:row;align-items:stretch}
+  .eyebrow{font-size:.66rem;letter-spacing:.1em;gap:8px}
+  .hero-micro{display:none}
+  .hero .well{max-width:84px}
+  .hero-trial{font-size:.72rem}
+  .what-left>*{flex-basis:min(90%,340px)}
+  .what-left .what-not{flex:0 0 min(80%,300px)}
+  .what-ask{padding:10px 14px}
+  .plans-extra{border:0;background:transparent;padding-block:2px 6px}
+  .plans-extra>*{flex-basis:min(88%,340px);border:1px solid var(--line)!important;background:var(--surface)!important}
+  .plans-extra .onboard{border-left:4px solid var(--brass)!important}
+  .plans-extra .rescue{flex-direction:column;align-items:flex-start;border-top:1px solid var(--line)}
+  .plans-every{font-size:.82rem;padding:8px 12px;gap:2px 12px}
+  .cost-foot>*{flex-basis:min(90%,340px)}
+  .cost-foot>.cost-note{border:1px solid var(--line);background:var(--surface);padding:10px 14px;font-size:.84rem;margin:0}
+  .cost-foot>.cost-card{max-width:none}
+  .kv{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kv .k{font-size:.62rem;letter-spacing:.06em}
+  .kv .v{font-size:.8rem}
+  .kv>div{padding:5px 7px}
+  .sources{display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;margin-inline:calc(-1*var(--gut));padding:0 var(--gut) 4px;scroll-padding-inline:var(--gut);scrollbar-width:none}
+  .sources::-webkit-scrollbar{display:none}
+  .sources>.src{flex:0 0 min(84%,300px);scroll-snap-align:start}
+  .hiw-stage{aspect-ratio:358/410}
+  .lede,.sec-head .lede,#what .lede,#team .lede{font-size:.94rem;line-height:1.4}
+  .faq-grid{gap:4px}
+  .plans-note{font-size:12px;line-height:1.4}
+  .plans-every>span:not(.pe-label){white-space:nowrap}
+  .hero .cta-row{gap:8px 12px}
+  .hero .lede{font-size:.96rem;line-height:1.42}
+  .hero-copy{gap:8px}
+  .what-ask li{line-height:1.3}
+  .closing-grid .cta-card p{font-size:.88rem;line-height:1.42}
+  .closing-grid .cta-card{gap:6px}
+  .hiw-stage{aspect-ratio:358/395}
+  .demo-note{font-size:.74rem}
+  .cost-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t r" "c c";align-items:center;gap:4px 12px;padding:10px 14px}
+  .cost-summary>div{grid-area:t}
+  .cost-summary>.cost-compare{grid-area:c}
+  .cost-summary>.cost-reset{grid-area:r;align-self:center}
+  .cost-compare{padding-top:6px;border-top:1px solid var(--line)}
+}
+
+@media (min-width:861px){
+  .kv{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kv>div{flex-direction:row;flex-wrap:wrap;align-items:center;gap:1px 10px;padding:6px 12px}
+  .kv .k{flex:0 0 100%}
+  .closing-grid .cta-card p{max-width:90ch}
+}
+/* faq: three across on wide screens */
+@media (min-width:1100px){.faq-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
+<link rel="stylesheet" href="/support/widget.css">
+</head>
+<body>
+
+
+<div class="ambient" aria-hidden="true">
+  <span></span><span></span>
+  <svg class="dw-topo" aria-hidden="true">
+    <defs>
+      <pattern id="dwDots" width="28" height="28" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1" fill="currentColor"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#dwDots)"/>
+  </svg>
+</div>
+
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="DeepWell Technology home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <style>
+          .mark .dv-r{animation:dvDraw .5s cubic-bezier(.16,1,.3,1) forwards}
+          @keyframes dvDraw{to{stroke-dashoffset:0}}
+          .mark .dv-ripple{opacity:0}
+          .brand:hover .mark .dv-ripple{animation:dvRipple .7s cubic-bezier(.16,1,.3,1)}
+          @keyframes dvRipple{from{opacity:.8;r:22;stroke-width:4}to{opacity:0;r:50;stroke-width:.5}}
+          @media (prefers-reduced-motion:reduce){
+            .mark .dv-r{animation:none;stroke-dashoffset:0}
+            .mark .dv-ripple{display:none}
+          }
+        </style>
+        <g fill="none" stroke="var(--well)" stroke-width="4">
+          <circle class="dv-r" cx="50" cy="50" r="10" stroke-dasharray="62.83" stroke-dashoffset="62.83" style="animation-delay:0s"/>
+          <circle class="dv-r" cx="50" cy="50" r="19" stroke-dasharray="119.38" stroke-dashoffset="119.38" style="animation-delay:.09s"/>
+          <circle class="dv-r" cx="50" cy="50" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" style="animation-delay:.18s"/>
+          <circle class="dv-r" cx="50" cy="50" r="37" stroke-dasharray="232.48" stroke-dashoffset="232.48" style="animation-delay:.27s"/>
+          <circle class="dv-r" cx="50" cy="50" r="46" stroke-dasharray="289.03" stroke-dashoffset="289.03" style="animation-delay:.36s"/>
+        </g>
+        <circle class="dv-ripple" cx="50" cy="50" r="22" fill="none" stroke="var(--brass)" stroke-width="4"/>
+      </svg>
+      <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
+    </a>
+    <div class="navlinks" id="navLinks">
+      <a href="#how-it-works">How it works</a>
+      <a href="#demo">Try it</a>
+      <!-- Industries nav dropdown (Workstream C, 2026-09-21) — see the
+           labeled CSS block above and the standalone script near the end
+           of </body>. Keyboard: Enter/Space/↓ opens and focuses the first
+           item, ↑/↓ move between items, Esc closes and returns focus, Tab
+           closes on focus-out. Touch: the toggle is a real <button>, so a
+           tap fires the same click handler as a mouse click. -->
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
+          Who it&rsquo;s for
+          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
+          <a role="menuitem" href="/#what">Any business with paperwork <span class="tag live">Live</span></a>
+          <a role="menuitem" href="/industries/hvac.html">HVAC <span class="tag live">Live</span></a>
+          <a role="menuitem" href="/industries/electrical.html">Electrical <span class="tag soon">Coming</span></a>
+          <a role="menuitem" href="/industries/plumbing.html">Plumbing <span class="tag soon">Coming</span></a>
+          <a role="menuitem" href="/industries/property-management.html">Property management <span class="tag soon">Coming</span></a>
+        </div>
+      </div>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#plans">Pricing</a>
+      <a href="#team">Founders</a>
+    </div>
+    <div class="navcta">
+      <a class="btn btn-ghost" href="/app/">Log in</a>
+      <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+      <button type="button" class="nav-menu-toggle" id="navMenuToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    </div>
+  </div>
+</nav>
+<main id="main">
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-copy dw-observe">
+      <div class="hero-eyebrow-row">
+      <div class="eyebrow">For any business that runs on paperwork</div>
+      <svg class="hero-micro" viewBox="0 0 118 36" aria-hidden="true" focusable="false">
+        <g class="hm-doc-g">
+          <rect class="hm-doc-page" x="2" y="4" width="20" height="28" rx="2"/>
+          <rect class="hm-ink" x="6" y="10" width="12" height="1.6"/>
+          <rect class="hm-ink" x="6" y="15" width="12" height="1.6"/>
+          <rect class="hm-ink" x="6" y="20" width="8" height="1.6"/>
+        </g>
+        <path class="hm-arrow" d="M28 18h20" marker-end="url(#hmArrowHead)"/>
+        <defs>
+          <marker id="hmArrowHead" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0l8 4-8 4z" fill="var(--brass)"/>
+          </marker>
+        </defs>
+        <g class="hm-ans-g">
+          <circle class="hm-ans" cx="100" cy="18" r="14"/>
+          <path class="hm-ans" d="M93 18l5 5 10-10"/>
+        </g>
+      </svg>
+      </div>
+      <h1 class="mm-headline">Your paperwork already has the answer. <em>Now anyone can ask.</em></h1>
+      <p class="lede">DeepWell turns your paperwork — invoices, work orders, contracts, forms, receipts, photos of documents — into answers your whole team can look up in seconds, each with the original page attached.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+        <a class="btn btn-ghost" href="#what">See how it works</a>
+        <p class="hero-trial">30-day free trial on Solo. Card required, cancel anytime.</p>
+      </div>
+      <ol class="hero-steps" aria-label="How it works in 3 steps">
+        <li><b>1</b><span>Send it your paperwork</span></li>
+        <li><b>2</b><span>It reads and organizes everything</span></li>
+        <li><b>3</b><span>Ask, and get the answer with the source</span></li>
+      </ol>
+    </div>
+    <div class="well" aria-hidden="true"><canvas id="well"></canvas></div>
+    </div>
+  </div>
+</header>
+
+<section id="team">
+  <div class="wrap">
+    <div class="sec-head dw-observe dw-once">
+      <div>
+        <div class="eyebrow">The Founders</div>
+        <h2>Two brothers, and a phone that gets answered.</h2>
+      </div>
+      <p class="lede">You are not buying software and hoping. You get the two people who built it.</p>
+    </div>
+
+    <div class="founders" data-snap role="group" aria-label="The two founders">
+      <div class="founder dw-observe dw-once">
+        <img class="founder-img" src="/founders/sterling.jpg" srcset="/founders/sterling-480.webp 480w, /founders/sterling-720.webp 720w, /founders/sterling-1086.webp 1086w" sizes="(max-width:640px) 96px, 150px" alt="Sterling Chapman, co-founder of DeepWell" width="720" height="960" decoding="async" fetchpriority="auto">
+        <div>
+          <h3>Sterling Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Prior Army service, and the engineer behind DeepWell — systems integration, APIs, databases and network support. He's the person you'll work with from your first sample box through go-live.</p>
+        </div>
+      </div>
+
+      <div class="founder dw-observe dw-once">
+        <img class="founder-img" src="/founders/hilton.jpg" srcset="/founders/hilton-480.webp 480w, /founders/hilton-720.webp 720w, /founders/hilton-1086.webp 1086w" sizes="(max-width:640px) 96px, 150px" alt="Hilton Chapman, co-founder of DeepWell" width="720" height="960" decoding="async" fetchpriority="auto">
+        <div>
+          <h3>Hilton Chapman</h3>
+          <div class="role">Co-founder</div>
+          <p>Retired Air Force veteran and the voice of DeepWell. Leads customer relationships and marketing, and sets the vision for where the platform goes next.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="what">
+  <div class="wrap">
+    <div class="sec-head dw-observe dw-once">
+      <div>
+        <div class="eyebrow">What DeepWell does</div>
+        <h2>Your paperwork, turned into answers.</h2>
+      </div>
+      <p class="lede">Your paperwork is split across a filing cabinet, an inbox and your team's phones. DeepWell reads it all, so anyone on your team can just ask.</p>
+    </div>
+    <div class="what-more">
+      <div class="what-left" data-snap role="group" aria-label="Built first for field service, and what it is not">
+      <div class="what-built dw-observe dw-once">
+      <b>Built first for field service.</b> DeepWell understands equipment paperwork best today: warranties, serial numbers, service tickets and the customer and unit they belong to. It works for any business with paperwork, from property managers and contractors to clinics, offices and nonprofits. For other kinds of documents it reads the names, addresses, dates and amounts, and answers with the page attached.
+    </div>
+        <div class="what-not">
+          <h3>What it's not</h3>
+          <p>DeepWell is not a scheduling, dispatch, accounting or invoicing tool. Keep using the one you have; DeepWell works alongside it and is where the paperwork behind it becomes answers.</p>
+        </div>
+      </div>
+      <div class="what-ask">
+        <h3>What you can ask</h3>
+        <ul>
+          <li>When did we last service the unit at 3247 Elm?</li>
+          <li>What did we pay Acme Supply in March?</li>
+          <li>Show me the signed permit for 12 Main.</li>
+          <li>When does the Okafor service agreement end?</li>
+          <li>What's still unpaid on the Henderson invoices?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 
 <section id="how-it-works">
   <div class="wrap">
@@ -1189,23 +1436,23 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         </div>
       </div>
 
-      <ol class="hiw-steps">
+      <ol class="hiw-steps" data-snap aria-label="The three steps">
         <li>
           <span class="hiw-n">01</span>
           <h3>Send it your paperwork</h3>
-          <p>Scan with the phone or upload on the web.</p>
+          <p>Upload files on the web or scan pages with the phone app: invoices, work orders, contracts, permits, forms, photos of documents. Handwriting and rough scans are fine.</p>
           <div class="hiw-feat" role="list"><span role="listitem">Drag-and-drop upload</span><span role="listitem">Phone scans upload when the signal returns</span><span role="listitem">Email &amp; folder upload <span class="pill-soon">Coming soon</span></span></div>
         </li>
         <li>
           <span class="hiw-n">02</span>
           <h3>It reads and organizes everything</h3>
-          <p>Facts are pulled out and filed by customer and unit.</p>
+          <p>It reads every page, pulls out the names, addresses, dates, amounts and document numbers, and files it under the right customer and address. For equipment paperwork it also picks up models, serials and warranty dates. The original page is kept.</p>
           <div class="hiw-feat" role="list"><span role="listitem">Unsure reads are flagged for a quick check</span><span role="listitem">Your corrections are used in later answers</span></div>
         </li>
         <li>
           <span class="hiw-n">03</span>
           <h3>Ask, and get the answer with the source</h3>
-          <p>Ask in plain English. The answer links to the page.</p>
+          <p>Anyone on your team asks Donovan, DeepWell's assistant, in plain English and gets the answer with the original page attached. If it isn't in your records, it says so instead of guessing.</p>
           <div class="hiw-feat" role="list"><span role="listitem">Warranty alerts &amp; a daily email digest</span><span role="listitem">CSV export for dispatch &amp; accounting</span></div>
         </li>
       </ol>
@@ -1641,10 +1888,12 @@ section{padding-block:clamp(12px,1.3vw,18px)}
     <div class="demo">
       <div class="demo-side">
         <div class="eyebrow">Or try one of these</div>
+        <div class="q-list" data-snap role="group" aria-label="Suggested questions">
         <button class="q" type="button" id="q0" data-i="0" aria-pressed="true">Is the furnace at 3247 Elm still under warranty?</button>
         <button class="q" type="button" id="q1" data-i="1">What did we pay Acme Supply in March?</button>
         <button class="q" type="button" id="q2" data-i="2">Serial 4N2119-08772 — what is it and where is it?</button>
         <button class="q" type="button" id="q3" data-i="3">Show me the signed permit for 12 Main.</button>
+        </div>
       </div>
       <div class="demo-main" id="demo-main" aria-live="polite">
         <!-- rendered by script -->
@@ -1656,7 +1905,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         <h3>One system. Three views.</h3>
         <p>The same records, seen from the front desk, the job site, and the owner's office. Everybody gets the view that matches their day.</p>
       </div>
-    <div class="people">
+    <div class="people" data-snap role="group" aria-label="Three views of the same records">
       <div class="person dw-observe dw-once">
         <div class="role">Front desk · office manager</div>
         <blockquote>"The customer's on hold. I need the paperwork and who handled it last."</blockquote>
@@ -1687,7 +1936,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       </div>
       <p class="lede">What works today, what's being built now, and what comes after. No dates. We'd rather ship it than promise it.</p>
     </div>
-    <ol class="rm-stages">
+    <ol class="rm-stages" id="rm-stages" data-snap aria-label="Roadmap: live now, building next, later">
       <li class="rm-stage rm-live dw-observe dw-once">
         <div class="rm-top"><span class="rm-node" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><h3>Live now</h3><small>Working today</small></div></div>
         <ul class="rm-items">
@@ -1719,7 +1968,10 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         </ul>
       </li>
     </ol>
-    <p class="rm-ask">Need something that isn't here? <a href="mailto:support@deepwelltechnology.com?subject=Feature%20request">Tell us what to build <span aria-hidden="true">→</span></a></p>
+    <div class="rm-foot">
+      <button type="button" class="rm-toggle" id="rm-toggle" aria-expanded="false" aria-controls="rm-stages">Show details</button>
+      <p class="rm-ask">Need something that isn't here? <a href="mailto:support@deepwelltechnology.com?subject=Feature%20request">Tell us what to build <span aria-hidden="true">→</span></a></p>
+    </div>
   </div>
 </section>
 <!-- roadmap:end -->
@@ -1740,128 +1992,125 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       <span>Export your data anytime</span>
       <span>Public status page <span class="pill-soon">Coming soon</span></span>
     </div>
-    <div class="plans plans-4">
+    <div class="plans plans-4" id="plan-cards" data-snap role="group" aria-label="Plans: Solo, Team, Crew and Fleet">
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Solo</div><span class="trial-badge">30-day free trial</span></div>
         <div class="plan-price"><h3>$99<span class="per">/mo</span></h3><p class="for">Owner-operator</p></div>
-
-        <div class="grp"><h4>Team</h4>
-          <ul class="spec">
-            <li><span>Logins</span><b>up to 2</b></li>
-          </ul></div>
-        <div class="grp"><h4>Donovan &amp; documents</h4>
-          <ul class="spec">
-            <li><span>Donovan</span><b>Unlimited</b></li>
-            <li><span>Documents stored</span><b>25,000</b></li>
-            <li><span>New pages / month</span><b>750</b></li>
-            <li><span>API access</span><b>—</b></li>
-          </ul></div>
-        <div class="grp"><h4>Support &amp; protection</h4>
-          <ul class="spec">
-            <li><span>Support</span><b>Email</b></li>
-            <li><span>Response</span><b>Next business day</b></li>
-          </ul></div>
-        <div class="grp plus"><h4>Included</h4>
-          <ul>
-            <li>Unlimited Donovan, with sources</li>
-            <li>White-glove setup by our team</li>
-            <li>Export your data anytime</li>
-            <li>Owner account doesn&rsquo;t count toward logins</li>
-          </ul>
-        </div>
-        <p class="math">One avoided mix-up, like a repeat trip or a missed renewal, can cover months.</p>
+        <ul class="spec">
+          <li><span>Logins</span><b>up to 2</b></li>
+          <li><span>Documents stored</span><b>25,000</b></li>
+          <li><span>New pages / month</span><b>750</b></li>
+          <li><span>Support</span><b>Email</b></li>
+        </ul>
+        <details class="plan-more">
+          <summary>See all features<span class="sr-only"> for Solo</span></summary>
+          <div class="plan-more-body">
+            <ul class="spec">
+              <li><span>Donovan</span><b>Unlimited</b></li>
+              <li><span>API access</span><b>—</b></li>
+              <li><span>Response</span><b>Next business day</b></li>
+            </ul>
+          <div class="grp plus"><h4>Included</h4>
+            <ul>
+              <li>Unlimited Donovan, with sources</li>
+              <li>White-glove setup by our team</li>
+              <li>Export your data anytime</li>
+              <li>Owner account doesn&rsquo;t count toward logins</li>
+            </ul>
+          </div>
+            <p class="math">One avoided mix-up, like a repeat trip or a missed renewal, can cover months.</p>
+          </div>
+        </details>
         <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Start free trial</a>
       </div>
       <div class="plan featured dw-observe dw-once">
         <div class="plan-top"><div class="tier">Team</div><span class="badge-pop">Most popular</span></div>
         <div class="plan-price"><h3>$199<span class="per">/mo</span></h3><p class="for">Small team</p></div>
-
-        <div class="grp"><h4>Team</h4>
-          <ul class="spec">
-            <li><span>Logins</span><b>up to 5</b></li>
-          </ul></div>
-        <div class="grp"><h4>Donovan &amp; documents</h4>
-          <ul class="spec">
-            <li><span>Donovan</span><b>Unlimited</b></li>
-            <li><span>Documents stored</span><b>100,000</b></li>
-            <li><span>New pages / month</span><b>2,000</b></li>
-            <li><span>API access</span><b>—</b></li>
-          </ul></div>
-        <div class="grp"><h4>Support &amp; protection</h4>
-          <ul class="spec">
-            <li><span>Support</span><b>Email + chat</b></li>
-            <li><span>Response</span><b>Same business day</b></li>
-          </ul></div>
-        <div class="grp plus"><h4>Everything in Solo, plus</h4>
-          <ul>
-            <li>Email intake <span class="pill-soon">Coming soon</span></li>
-          </ul></div>
-        <p class="math">Service companies: one avoided $300&ndash;600 repeat visit a month is $3,600&ndash;7,200 a year. You pay $199/mo.</p>
+        <ul class="spec">
+          <li><span>Logins</span><b>up to 5</b></li>
+          <li><span>Documents stored</span><b>100,000</b></li>
+          <li><span>New pages / month</span><b>2,000</b></li>
+          <li><span>Support</span><b>Email + chat</b></li>
+        </ul>
+        <details class="plan-more">
+          <summary>See all features<span class="sr-only"> for Team</span></summary>
+          <div class="plan-more-body">
+            <ul class="spec">
+              <li><span>Donovan</span><b>Unlimited</b></li>
+              <li><span>API access</span><b>—</b></li>
+              <li><span>Response</span><b>Same business day</b></li>
+            </ul>
+          <div class="grp plus"><h4>Everything in Solo, plus</h4>
+            <ul>
+              <li>Email intake <span class="pill-soon">Coming soon</span></li>
+            </ul></div>
+            <p class="math">Service companies: one avoided $300&ndash;600 repeat visit a month is $3,600&ndash;7,200 a year. You pay $199/mo.</p>
+          </div>
+        </details>
         <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Choose Team</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Crew</div></div>
         <div class="plan-price"><h3>$399<span class="per">/mo</span></h3><p class="for">Growing team</p></div>
-
-        <div class="grp"><h4>Team</h4>
-          <ul class="spec">
-            <li><span>Logins</span><b>up to 10</b></li>
-          </ul></div>
-        <div class="grp"><h4>Donovan &amp; documents</h4>
-          <ul class="spec">
-            <li><span>Donovan</span><b>Unlimited</b></li>
-            <li><span>Documents stored</span><b>500,000</b></li>
-            <li><span>New pages / month</span><b>5,000</b></li>
-            <li><span>API access</span><b>—</b></li>
-          </ul></div>
-        <div class="grp"><h4>Support &amp; protection</h4>
-          <ul class="spec">
-            <li><span>Support</span><b>Email, chat, phone</b></li>
-            <li><span>Response</span><b>2 hrs, urgent issues</b></li>
-          </ul></div>
-        <div class="grp plus"><h4>Everything in Team, plus</h4>
-          <ul>
-            <li>Scheduled onboarding call</li>
-            <li>Daily off-site backups, 30-day restore <span class="pill-soon">Coming soon</span></li>
-            <li>Google Drive sync <span class="pill-soon">Coming soon</span></li>
-            <li>Branch scoping <span class="pill-soon">Coming soon</span></li>
-          </ul></div>
-        <p class="math">Ten people. One avoided $300 mistake a week pays for the year.</p>
+        <ul class="spec">
+          <li><span>Logins</span><b>up to 10</b></li>
+          <li><span>Documents stored</span><b>500,000</b></li>
+          <li><span>New pages / month</span><b>5,000</b></li>
+          <li><span>Support</span><b>Email, chat, phone</b></li>
+        </ul>
+        <details class="plan-more">
+          <summary>See all features<span class="sr-only"> for Crew</span></summary>
+          <div class="plan-more-body">
+            <ul class="spec">
+              <li><span>Donovan</span><b>Unlimited</b></li>
+              <li><span>API access</span><b>—</b></li>
+              <li><span>Response</span><b>2 hrs, urgent issues</b></li>
+            </ul>
+          <div class="grp plus"><h4>Everything in Team, plus</h4>
+            <ul>
+              <li>Scheduled onboarding call</li>
+              <li>Daily off-site backups, 30-day restore <span class="pill-soon">Coming soon</span></li>
+              <li>Google Drive sync <span class="pill-soon">Coming soon</span></li>
+              <li>Branch scoping <span class="pill-soon">Coming soon</span></li>
+            </ul></div>
+            <p class="math">Ten people. One avoided $300 mistake a week pays for the year.</p>
+          </div>
+        </details>
         <a class="btn btn-ghost" href="/app/?plan=crew&interval=month">Choose Crew</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Fleet</div></div>
         <div class="plan-price"><h3>$899<span class="per">+/mo</span></h3><p class="for">Larger teams</p></div>
-
-        <div class="grp"><h4>Team</h4>
-          <ul class="spec">
-            <li><span>Logins</span><b>11+</b></li>
-          </ul></div>
-        <div class="grp"><h4>Donovan &amp; documents</h4>
-          <ul class="spec">
-            <li><span>Donovan</span><b>Unlimited</b></li>
-            <li><span>Documents stored</span><b>Unlimited</b></li>
-            <li><span>New pages / month</span><b>10,000</b></li>
-            <li><span>API access</span><b>Yes</b></li>
-          </ul></div>
-        <div class="grp"><h4>Support &amp; protection</h4>
-          <ul class="spec">
-            <li><span>Support</span><b>Named contact</b></li>
-            <li><span>Response</span><b>1 hr, urgent, 24/7</b></li>
-          </ul></div>
-        <div class="grp plus"><h4>Everything in Crew, plus</h4>
-          <ul>
-            <li>Named contact (Sterling) from first sample to go-live</li>
-            <li>99.5% uptime SLA with service credits <span class="pill-soon">Coming soon</span></li>
-            <li>Backups every 6 hours + 12 monthly archives <span class="pill-soon">Coming soon</span></li>
-            <li>Per-company restore <span class="pill-soon">Coming soon</span></li>
-          </ul></div>
-        <p class="math">Priced by plan, not by the head. Talk to us for 11+ logins.</p>
+        <ul class="spec">
+          <li><span>Logins</span><b>11+</b></li>
+          <li><span>Documents stored</span><b>Unlimited</b></li>
+          <li><span>New pages / month</span><b>10,000</b></li>
+          <li><span>Support</span><b>Named contact</b></li>
+        </ul>
+        <details class="plan-more">
+          <summary>See all features<span class="sr-only"> for Fleet</span></summary>
+          <div class="plan-more-body">
+            <ul class="spec">
+              <li><span>Donovan</span><b>Unlimited</b></li>
+              <li><span>API access</span><b>Yes</b></li>
+              <li><span>Response</span><b>1 hr, urgent, 24/7</b></li>
+            </ul>
+          <div class="grp plus"><h4>Everything in Crew, plus</h4>
+            <ul>
+              <li>Named contact (Sterling) from first sample to go-live</li>
+              <li>99.5% uptime SLA with service credits <span class="pill-soon">Coming soon</span></li>
+              <li>Backups every 6 hours + 12 monthly archives <span class="pill-soon">Coming soon</span></li>
+              <li>Per-company restore <span class="pill-soon">Coming soon</span></li>
+            </ul></div>
+            <p class="math">Priced by plan, not by the head. Talk to us for 11+ logins.</p>
+          </div>
+        </details>
         <a class="btn btn-ghost" href="/app/?plan=fleet&interval=month">Contact sales</a>
       </div>
     </div>
+    <div class="plans-dots" aria-hidden="true"><span class="on"></span><span></span><span></span><span></span><em>Swipe to compare plans</em></div>
     <p class="plans-note"><b>Annual prepay:</b> one month free on every tier. The owner account doesn't count toward logins. Donovan is unlimited, with a fair-use safety limit ordinary use never reaches. <span class="pill-soon">Coming soon</span> marks features still being built.</p>
-    <div class="plans-extra">
+    <div class="plans-extra" data-snap role="group" aria-label="White-glove setup and Records Rescue">
       <div class="onboard">
         <div class="eyebrow">Included with every plan</div>
         <h3>White-glove setup by the DeepWell Technology team</h3>
@@ -1872,11 +2121,9 @@ section{padding-block:clamp(12px,1.3vw,18px)}
           <div class="eyebrow">Records Rescue</div>
           <h3>See it on your own records, free.</h3>
           <p>Send one folder or box of old invoices, contracts, forms or tickets. We digitize it free, so you can see the result first.</p>
+          <p class="rescue-price">Full service: <strong>$0.12/page</strong> · $500 min — or <a href="/app/?screen=billing">buy it under Billing</a></p>
         </div>
-        <div class="rescue-cta">
-          <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
-          <p>Full service: <strong>$0.12/page</strong> · $500 min — or <a href="/app/?screen=billing">buy it under Billing</a></p>
-        </div>
+        <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
       </div>
     </div>
   </div>
@@ -2027,25 +2274,27 @@ section{padding-block:clamp(12px,1.3vw,18px)}
       </div>
     </div>
 
-    <div class="cost-foot">
+    <div class="cost-foot" data-snap role="group" aria-label="An HVAC example, and a note on your numbers">
     <div class="cost-card dw-observe dw-once">
       <div class="where">An HVAC example: a claim denied because nobody registered it</div>
       <p>Many manufacturers cut the parts warranty in half if a unit isn't registered within 60–90 days of install (Heil/Tempstar/Comfortmaker and Armstrong Air/AirEase/Ducane: 10 yr registered, 5 yr not <span class="mono" style="font-size:.74rem;color:var(--faint)">(published registration windows)</span>). Then a year-6 compressor or heat-exchanger failure — often <b>$1,500–$4,000</b> in parts <span class="mono" style="font-size:.74rem;color:var(--faint)">(illustrative)</span> — lands on the bill instead of the manufacturer's.</p>
     </div>
-
     <p class="cost-note">Your numbers will differ. DeepWell watches every expiry — bell alert plus daily digest — then drafts the customer's extended-warranty email for an admin to approve and send, or run fully automatic. Both ship today.</p>
+
+
     </div>
   </div>
 </section>
 
 <section id="closing">
   <div class="wrap">
+   <div class="closing-grid">
     <div id="principles">
       <div class="pb-head">
         <h3>Rules we don't bend.</h3>
         <p>These are commitments in every DeepWell Technology agreement, not a values page. If a feature can't meet them, it doesn't ship.</p>
       </div>
-    <div class="principles">
+    <div class="principles" data-snap role="group" aria-label="Rules we don't bend">
       <div class="principle dw-observe dw-once">
         <svg viewBox="0 0 44 44" aria-hidden="true"><rect x="8" y="6" width="28" height="32" rx="2"/><path d="M14 16h16M14 22h16M14 28h9"/></svg>
         <div><h4>Every answer shows its source.</h4><p>If the system isn't sure, it says so and shows you the document instead of guessing.</p></div>
@@ -2077,6 +2326,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         <div class="logo-card"><img src="/deepwell-logo.jpg" alt="DeepWell Technology — Knowledge Builds Business." width="900" height="750" loading="lazy" decoding="async"></div>
       </div>
     </div>
+   </div>
   </div>
 </section>
 
@@ -2514,10 +2764,10 @@ const DEMO=[
 })();
 </script>
 <script>
-/* Cost calculator: the three cards sit side by side on wide screens; on phones/tablets only the first stays open. */
+/* Cost calculator: the three cards sit side by side on wide screens; on phones/tablets all start closed (each header shows its own total). */
 (function(){var b=document.getElementById('cost-calc');if(!b||!window.matchMedia)return;
 var mq=matchMedia('(max-width:900px)'),ds=[].slice.call(b.querySelectorAll('details.cost-line'));
-function sync(first){ds.forEach(function(d,i){if(!mq.matches)d.open=true;else if(first&&i)d.open=false;});}
+function sync(first){ds.forEach(function(d,i){if(!mq.matches)d.open=true;else if(first)d.open=false;});}
 ds.forEach(function(d){d.firstElementChild.addEventListener('click',function(e){if(!mq.matches)e.preventDefault();});});
 sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(false);});})();
 </script>
@@ -2623,6 +2873,31 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
   }
 
   render();
+})();
+</script>
+<script>
+/* r40 streamline helpers: roadmap details toggle, plan "See all features" sync, swipe-row dots + keyboard focus. */
+(function(){
+  var rm=document.getElementById('roadmap'),tg=document.getElementById('rm-toggle');
+  if(rm&&tg)tg.addEventListener('click',function(){
+    var o=rm.classList.toggle('rm-open');
+    tg.setAttribute('aria-expanded',o?'true':'false');tg.textContent=o?'Hide details':'Show details';
+  });
+  var ds=[].slice.call(document.querySelectorAll('.plan-more')),busy=false;
+  ds.forEach(function(d){d.addEventListener('toggle',function(){
+    if(busy)return;busy=true;ds.forEach(function(o){if(o!==d)o.open=d.open;});busy=false;
+  });});
+  var pc=document.getElementById('plan-cards'),dots=[].slice.call(document.querySelectorAll('.plans-dots span'));
+  if(pc&&dots.length)pc.addEventListener('scroll',function(){
+    var k=pc.children[1]?pc.children[1].offsetLeft-pc.children[0].offsetLeft:pc.clientWidth;
+    var i=Math.max(0,Math.min(dots.length-1,Math.round(pc.scrollLeft/k)));
+    dots.forEach(function(x,j){x.classList.toggle('on',j===i);});
+  },{passive:true});
+  var snaps=[].slice.call(document.querySelectorAll('[data-snap]'));
+  function focusable(){snaps.forEach(function(el){
+    if(el.scrollWidth>el.clientWidth+1)el.setAttribute('tabindex','0');else el.removeAttribute('tabindex');
+  });}
+  focusable();window.addEventListener('resize',focusable);window.addEventListener('load',focusable);
 })();
 </script>
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
